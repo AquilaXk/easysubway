@@ -160,6 +160,34 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.match(properties, /management\.endpoints\.web\.exposure\.include=health,info/);
 });
 
+test("mobile scaffold is a Flutter Android and iOS app", () => {
+  const pubspec = read("apps/mobile/pubspec.yaml");
+  const analysisOptions = read("apps/mobile/analysis_options.yaml");
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
+  const main = read("apps/mobile/lib/main.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+
+  assert.ok(existsSync(path.join(root, "apps/mobile/android")));
+  assert.ok(existsSync(path.join(root, "apps/mobile/ios")));
+  assert.ok(existsSync(path.join(root, "apps/mobile/pubspec.lock")));
+
+  assert.match(pubspec, /^name: easysubway_mobile$/m);
+  assert.match(pubspec, /sdk: \^3\./);
+  assert.match(pubspec, /flutter_lints:/);
+  assert.match(pubspec, /uses-material-design: true/);
+  assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
+  assert.match(androidManifest, /android:label="쉬운 지하철"/);
+  assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
+  assert.match(main, /class EasySubwayApp extends StatelessWidget/);
+  assert.match(main, /갈 수 있는 길을 먼저 안내합니다/);
+  assert.match(main, /고령자, 임산부, 장애인/);
+  assert.match(main, /이동 조건 선택/);
+  assert.match(widgetTest, /EasySubwayApp/);
+  assert.match(widgetTest, /접근성 이동 안내/);
+  assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
+});
+
 test("path classifier treats README as docs-only", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
