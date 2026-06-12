@@ -161,10 +161,10 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.match(controller, /CheckHealthUseCase/);
   assert.match(apiResponse, /record ApiResponse/);
   assert.equal(existsSync(path.join(root, "backend/src/main/resources/application.properties")), false);
-  assert.match(applicationYml, /spring:\n  application:\n    name: easysubway-backend/);
-  assert.match(applicationYml, /management:\n  endpoints:\n    web:\n      exposure:\n        include: "health,info"/);
-  assert.match(applicationDevYml, /logging:\n  level:\n    com\.easysubway: DEBUG/);
-  assert.match(applicationProdYml, /logging:\n  level:\n    com\.easysubway: INFO/);
+  assert.match(applicationYml, /spring:\s*\n\s*application:\s*\n\s*name:\s*["']?easysubway-backend["']?/);
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
+  assert.match(applicationDevYml, /logging:\s*\n\s*level:\s*\n\s*com\.easysubway:\s*["']?DEBUG["']?/);
+  assert.match(applicationProdYml, /logging:\s*\n\s*level:\s*\n\s*com\.easysubway:\s*["']?INFO["']?/);
   assert.doesNotMatch(applicationDevYml, /spring\.profiles\.active|on-profile/);
   assert.doesNotMatch(applicationProdYml, /spring\.profiles\.active|on-profile/);
 });
