@@ -302,9 +302,10 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(main, /역 찾기/);
-  assert.match(main, /가까운 역/);
+  assert.match(main, /역 검색/);
   assert.match(main, /이동 조건/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
+  assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /renders concise home screen actions/);
@@ -336,8 +337,8 @@ test("path classifier maps repository, backend, mobile, Android, and iOS changes
 
   const mobile = await classifyChangedFiles(["apps/mobile/lib/main.dart"]);
   assert.equal(mobile.mobile, "true");
-  assert.equal(mobile.android, "false");
-  assert.equal(mobile.ios, "false");
+  assert.equal(mobile.android, "true");
+  assert.equal(mobile.ios, "true");
 
   const android = await classifyChangedFiles(["apps/mobile/android/app/build.gradle.kts"]);
   assert.equal(android.mobile, "true");
