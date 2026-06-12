@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +61,12 @@ void main() {
               color: '#00A5DE',
               stationCode: '448',
             ),
+            StationSearchLine(
+              id: 'korail-gyeongui-jungang',
+              name: '경의중앙선',
+              color: '#75C5A1',
+              stationCode: 'K232',
+            ),
           ],
         ),
       ],
@@ -91,14 +99,20 @@ void main() {
       expect(repository.requestedQueries, ['상록수']);
       expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
       expect(find.text('4'), findsOneWidget);
-      expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
+        find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
+        findsOneWidget,
+      );
+      expect(find.text('경의중앙'), findsOneWidget);
+      expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
+      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
         findsOneWidget,
       );
       final resultSemantics = tester.getSemantics(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
       );
       expect(
         resultSemantics.getSemanticsData().flagsCollection.isButton,
@@ -114,9 +128,41 @@ void main() {
       final lineNumber = tester.widget<Text>(find.text('4'));
       expect(lineNumber.style?.fontSize, 24);
       expect(lineNumber.style?.color, const Color(0xFF102A2C));
+
+      final namedLine = tester.widget<Text>(find.text('경의중앙'));
+      expect(namedLine.style?.fontSize, 15);
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('disables search button while request is loading', (
+    tester,
+  ) async {
+    final repository = ControlledStationSearchRepository();
+
+    await tester.pumpWidget(EasySubwayApp(repository: repository));
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pump();
+
+    expect(repository.requestedQueries, ['상록수']);
+    final loadingButton = tester.widget<FilledButton>(
+      find.byKey(const Key('stationSearchSubmitButton')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    repository.complete(const []);
+    await tester.pumpAndSettle();
+
+    final completedButton = tester.widget<FilledButton>(
+      find.byKey(const Key('stationSearchSubmitButton')),
+    );
+    expect(completedButton.onPressed, isNotNull);
   });
 }
 
@@ -130,5 +176,20 @@ class FakeStationSearchRepository implements StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
     return nextResults;
+  }
+}
+
+class ControlledStationSearchRepository implements StationSearchRepository {
+  final requestedQueries = <String>[];
+  final _completer = Completer<List<StationSearchResult>>();
+
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) {
+    requestedQueries.add(query);
+    return _completer.future;
+  }
+
+  void complete(List<StationSearchResult> results) {
+    _completer.complete(results);
   }
 }

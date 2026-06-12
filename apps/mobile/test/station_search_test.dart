@@ -64,6 +64,55 @@ void main() {
     },
   );
 
+  test('station API repository rejects malformed station payloads', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    expect(
+      () => repository.searchStations('상록수'),
+      throwsA(
+        isA<StationSearchException>().having(
+          (error) => error.message,
+          'message',
+          '역 정보를 불러오지 못했습니다.',
+        ),
+      ),
+    );
+  });
+
   test(
     'station search controller keeps blank input idle without API calls',
     () async {

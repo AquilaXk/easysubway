@@ -287,6 +287,7 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
   assert.ok(existsSync(path.join(root, "apps/mobile/android")));
@@ -307,6 +308,8 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   assert.match(main, /이동 조건/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
+  assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
+  assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /renders concise home screen actions/);

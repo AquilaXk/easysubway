@@ -4,6 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+const _stationSearchTimeout = Duration(seconds: 8);
+const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
+
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
 }
@@ -22,34 +25,40 @@ class StationSearchApiRepository implements StationSearchRepository {
         .replace(queryParameters: {'query': query});
 
     try {
-      final request = await _httpClient.getUrl(uri);
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-      );
-      final body = await utf8.decodeStream(response);
+      final request = await _httpClient
+          .getUrl(uri)
+          .timeout(_stationSearchTimeout);
+      final response = await request.close().timeout(_stationSearchTimeout);
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_stationSearchTimeout);
 
       if (response.statusCode != HttpStatus.ok) {
-        throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+        throw const StationSearchException(_stationSearchErrorMessage);
       }
 
       final decoded = jsonDecode(body);
       if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-        throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+        throw const StationSearchException(_stationSearchErrorMessage);
       }
 
       final data = decoded['data'];
       if (data is! List) {
-        throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+        throw const StationSearchException(_stationSearchErrorMessage);
       }
 
       return data
-          .whereType<Map<String, Object?>>()
-          .map(StationSearchResult.fromJson)
-          .toList();
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid station payload');
+            }
+            return StationSearchResult.fromJson(item);
+          })
+          .toList(growable: false);
     } on StationSearchException {
       rethrow;
     } catch (_) {
-      throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+      throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
 }
@@ -75,20 +84,26 @@ class StationSearchResult {
   });
 
   factory StationSearchResult.fromJson(Map<String, Object?> json) {
-    final lines = json['lines'];
+    final rawLines = json['lines'];
+    if (rawLines is! List) {
+      throw const FormatException('Invalid station lines payload');
+    }
+
     return StationSearchResult(
-      id: json['id'] as String? ?? '',
-      nameKo: json['nameKo'] as String? ?? '',
-      nameEn: json['nameEn'] as String? ?? '',
-      region: json['region'] as String? ?? '',
-      dataQualityLevel: json['dataQualityLevel'] as String? ?? '',
-      lastVerifiedAt: json['lastVerifiedAt'] as String? ?? '',
-      lines: lines is List
-          ? lines
-                .whereType<Map<String, Object?>>()
-                .map(StationSearchLine.fromJson)
-                .toList()
-          : const [],
+      id: _requiredString(json, 'id'),
+      nameKo: _requiredString(json, 'nameKo'),
+      nameEn: _requiredString(json, 'nameEn'),
+      region: _requiredString(json, 'region'),
+      dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
+      lines: rawLines
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid station line payload');
+            }
+            return StationSearchLine.fromJson(item);
+          })
+          .toList(growable: false),
     );
   }
 
@@ -130,12 +145,20 @@ class StationSearchLine {
 
   factory StationSearchLine.fromJson(Map<String, Object?> json) {
     return StationSearchLine(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      color: json['color'] as String? ?? '',
-      stationCode: json['stationCode'] as String? ?? '',
+      id: _requiredString(json, 'id'),
+      name: _requiredString(json, 'name'),
+      color: _requiredString(json, 'color'),
+      stationCode: _requiredString(json, 'stationCode'),
     );
   }
+
+  static const _knownBadgeLabels = <String, String>{
+    '경의중앙': '경의중앙',
+    '수인분당': '수인분당',
+    '신분당': '신분당',
+    '인천1': '인천1',
+    '인천2': '인천2',
+  };
 
   final String id;
   final String name;
@@ -143,25 +166,22 @@ class StationSearchLine {
   final String stationCode;
 
   String get badgeText {
+    for (final entry in _knownBadgeLabels.entries) {
+      if (name.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
     final numberedLine = RegExp(r'(\d+)\s*호선').firstMatch(name);
     if (numberedLine != null) {
       return numberedLine.group(1) ?? name;
     }
 
-    if (name.contains('경의중앙')) {
-      return '경의\n중앙';
-    }
-    if (name.contains('수인분당')) {
-      return '수인\n분당';
-    }
-    if (name.contains('인천') && name.contains('1')) {
-      return '인천1';
-    }
-    if (name.contains('인천') && name.contains('2')) {
-      return '인천2';
-    }
-
-    final compactName = name.replaceAll('수도권 ', '').replaceAll('선', '');
+    final compactName = name
+        .replaceAll('수도권 ', '')
+        .replaceAll('광역 ', '')
+        .replaceAll('선', '')
+        .trim();
     if (compactName.length <= 4) {
       return compactName;
     }
@@ -178,6 +198,14 @@ class StationSearchLine {
     }
     return const Color(0xFF006D77);
   }
+}
+
+String _requiredString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value;
+  }
+  throw FormatException('Missing required station field: $key');
 }
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
@@ -319,11 +347,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              key: const Key('stationSearchSubmitButton'),
-              onPressed: () => _submit(_queryController.text),
-              icon: const Icon(Icons.search),
-              label: const Text('검색'),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final isLoading =
+                    _controller.state.status == StationSearchStatus.loading;
+                return FilledButton.icon(
+                  key: const Key('stationSearchSubmitButton'),
+                  onPressed: isLoading
+                      ? null
+                      : () => _submit(_queryController.text),
+                  icon: const Icon(Icons.search),
+                  label: const Text('검색'),
+                );
+              },
             ),
             const SizedBox(height: 20),
             AnimatedBuilder(
@@ -339,6 +376,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _submit(String query) {
+    if (_controller.state.status == StationSearchStatus.loading) {
+      return;
+    }
     _controller.search(query);
   }
 }
@@ -365,7 +405,13 @@ class _StationSearchBody extends StatelessWidget {
       StationSearchStatus.empty || StationSearchStatus.failure =>
         _StationSearchMessage(message: state.message, liveRegion: true),
       StationSearchStatus.success => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Semantics(
+            label: '검색 결과 ${state.results.length}개',
+            liveRegion: true,
+            child: const SizedBox.shrink(),
+          ),
           for (final result in state.results)
             _StationSearchResultTile(result: result),
         ],
@@ -496,7 +542,7 @@ class _StationSearchLineBadge extends StatelessWidget {
     final backgroundColor = line.badgeColor;
     final foregroundColor = _higherContrastTextColor(backgroundColor);
     final badgeText = line.badgeText;
-    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText) ? 24.0 : 13.0;
+    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText) ? 24.0 : 15.0;
 
     return Container(
       key: Key('stationLineBadge-${line.id}'),
