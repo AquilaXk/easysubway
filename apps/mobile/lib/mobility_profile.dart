@@ -183,6 +183,7 @@ class _MobilityProfileCard extends StatelessWidget {
         label: option.semanticsLabel(selected),
         selected: selected,
         button: true,
+        onTap: onTap,
         child: ExcludeSemantics(
           child: Material(
             color: backgroundColor,

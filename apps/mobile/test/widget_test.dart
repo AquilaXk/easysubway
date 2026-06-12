@@ -183,6 +183,15 @@ void main() {
       expect(find.text('엘리베이터와 넓은 길을 우선해요'), findsOneWidget);
       expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
 
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('휠체어 선택 가능, 계단 없는 길만 안내해요')),
+        isSemantics(
+          label: '휠체어 선택 가능, 계단 없는 길만 안내해요',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
