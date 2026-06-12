@@ -1,0 +1,47 @@
+name: "테스트"
+description: "테스트 추가, 회귀 검증, 품질 게이트 보강 작업을 정리합니다."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Test] 한국어 작업 요약` 형식으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+
+  - type: input
+    id: target
+    attributes:
+      label: 대상
+      description: 테스트가 필요한 기능, 화면, 모듈을 적어 주세요.
+      placeholder: 예) onboarding flow, station search, route scoring, report API
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 설명
+      description: 어떤 테스트를 작성하거나 수정해야 하는지 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: cases
+    attributes:
+      label: 테스트 케이스
+      description: 추가하거나 보강할 케이스를 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 성공 케이스
+        - [ ] 실패 / 예외 케이스
+        - [ ] 플랫폼별 차이
+        - [ ] 접근성 회귀 케이스
+    validations:
+      required: true
+
+  - type: textarea
+    id: verify
+    attributes:
+      label: 검증
+      description: 테스트 실행 명령이나 수동 확인 방법을 적어 주세요.
+    validations:
+      required: true

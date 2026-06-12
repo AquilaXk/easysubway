@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"
+tone_instructions: "간결하고 구체적으로 문제, 영향, 수정 제안만 작성한다. 과장된 표현과 농담은 피한다."
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  review_details: true
+  in_progress_fortune: false
+  path_instructions:
+    - path: "backend/**"
+      instructions: "인증, 보안, 트랜잭션, 입력 검증, 데이터 일관성, 전자정부프레임워크 경계 위반을 우선 확인한다."
+    - path: "apps/mobile/lib/**"
+      instructions: "모바일 UX 상태 전환, 접근성, 비활성 컨트롤 동작, Android/iOS 플랫폼별 분기 문제를 확인한다."
+    - path: ".github/workflows/**"
+      instructions: "시크릿 노출, 권한 범위, 조건 분기, 실패 시 중단 동작, 배포 게이트 누락을 확인한다."
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  art: false
+  auto_reply: true

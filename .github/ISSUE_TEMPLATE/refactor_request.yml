@@ -1,0 +1,49 @@
+name: "리팩터링"
+description: "구조 개선, 책임 분리, 중복 제거처럼 동작 유지가 중요한 개선 작업을 정리합니다."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Refactor] 한국어 작업 요약` 형식으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+
+  - type: input
+    id: target
+    attributes:
+      label: 대상
+      description: 리팩터링이 필요한 코드 영역, 화면, 모듈을 적어 주세요.
+      placeholder: 예) routing engine, report state, backend module boundaries
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 설명
+      description: 리팩터링이 필요한 이유나 현재 문제점을 작성해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 동작 유지 조건
+      description: 바뀌면 안 되는 사용자 동작이나 API 계약을 적어 주세요.
+      placeholder: |
+        - [ ] 기존 사용자 흐름은 동일하게 유지한다.
+        - [ ] API 요청/응답 계약을 바꾸지 않는다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: 작업 목록
+      description: 수행해야 할 작업을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 리팩터링 대상과 경계를 확정한다.
+        - [ ] 구조를 변경한다.
+        - [ ] 테스트와 수동 확인으로 동작 유지 여부를 확인한다.
+    validations:
+      required: true

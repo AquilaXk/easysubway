@@ -1,0 +1,70 @@
+name: "작업"
+description: "빌드, CI, 설정, 테스트, 배포처럼 유지보수와 정리가 필요한 작업을 정리합니다."
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Chore]`, `[Docs]`, `[Test]`, `[Build]`, `[CI]` 중 맞는 Type으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+        실제 개발자가 바로 판단할 수 있게 작업 배경, 사용자 또는 운영 영향, 실행할 검증을 구체적으로 적습니다.
+
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: 작업 유형
+      options:
+        - 문서
+        - 테스트
+        - 빌드 / CI
+        - 저장소 설정
+        - 모바일 개발 환경
+        - 백엔드 개발 환경
+        - 데이터 / 배치
+        - 배포
+        - 보안
+        - 정리
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: 영역
+      description: 관련 모듈, 화면, 운영 영역을 적어 주세요.
+      placeholder: 예) .github, apps/mobile, backend, ci, deploy
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 설명
+      description: 어떤 작업인지, 왜 지금 필요한지, 사용자 또는 운영 영향이 무엇인지 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: done_when
+    attributes:
+      label: 완료 조건
+      description: 완료로 볼 기준을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 목표로 한 정리가 끝났는가?
+        - [ ] Git 추적 범위가 정책과 일치하는가?
+        - [ ] 관련 검증과 문서 반영까지 마쳤는가?
+    validations:
+      required: true
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: 작업 목록
+      description: 실제 작업 항목과 실행할 검증을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 작업 대상을 충분히 파악한다.
+        - [ ] 변경을 적용하고 범위를 통제한다.
+        - [ ] 테스트와 검증을 수행한다.
+        - [ ] 필요한 문서까지 반영한다.
+    validations:
+      required: true

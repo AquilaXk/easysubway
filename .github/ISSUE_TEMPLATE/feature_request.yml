@@ -1,0 +1,84 @@
+name: "기능"
+description: "쉬운 지하철 사용자 가치나 기능을 추가합니다."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Feat] 한국어 작업 요약` 형식으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+        실제 개발자가 바로 판단할 수 있게 목표, 사용자 또는 운영 영향, 실행할 검증을 구체적으로 적습니다.
+
+  - type: input
+    id: goal
+    attributes:
+      label: 목표
+      description: 이 작업으로 만들고 싶은 결과를 한 문장으로 적어 주세요.
+      placeholder: 예) 사용자가 계단 없는 역 경로를 검색할 수 있다.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 대상 플랫폼
+      options:
+        - Android / iOS 공통
+        - Android
+        - iOS
+        - API 연동
+        - 데이터 / 배치
+        - 관리자
+        - 빌드 / CI / 배포
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: 영역
+      description: 관련 화면, 도메인, API 경로를 적어 주세요.
+      placeholder: 예) onboarding, station-search, routing, GET /api/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: 배경
+      description: 왜 필요한지, 사용자 또는 운영 영향이 무엇인지 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+      description: 완료로 볼 기준을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 핵심 사용자 흐름이 기대한 방식으로 동작하는가?
+        - [ ] Android/iOS 영향 범위를 확인했는가?
+        - [ ] API/화면 계약이 정리되었는가?
+        - [ ] 필요한 테스트와 검증을 수행했는가?
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: 제외 범위
+      description: 이번 작업에서 의도적으로 제외할 범위를 설명해 주세요.
+      placeholder: 예) 푸시 알림, 결제, 운영기관 관리자 기능은 이번 범위에서 제외
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: 작업 목록
+      description: 구현 순서와 실행할 검증을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 요구사항과 제외 범위를 정리한다.
+        - [ ] 화면/API 계약을 확정한다.
+        - [ ] 구현 후 필요한 검증을 수행한다.
+        - [ ] PR 본문에 검증 결과를 남긴다.
+    validations:
+      required: true

@@ -1,0 +1,98 @@
+name: "버그"
+description: "사용자 흐름, API, 데이터, 빌드에서 기대 동작과 실제 동작이 어긋난 문제를 정리합니다."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Fix] 한국어 작업 요약` 형식으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+        실제 개발자가 바로 판단할 수 있게 증상, 사용자 또는 운영 영향, 실행할 검증을 구체적으로 적습니다.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      description: 사용자와 배포 영향 기준으로 현재 심각도를 골라 주세요.
+      options:
+        - 1단계 - 앱 사용 불가 / 배포 차단
+        - 2단계 - 핵심 사용자 흐름 저하
+        - 3단계 - 우회 가능한 문제
+        - 4단계 - 경미한 문제
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 대상 플랫폼
+      options:
+        - Android / iOS 공통
+        - Android
+        - iOS
+        - API 연동
+        - 데이터 / 배치
+        - 빌드 / CI / 배포
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: 영역
+      description: 문제가 드러난 기능, 화면, API, 데이터, 배포 영역을 적어 주세요.
+      placeholder: 예) station-search, routing, report, admin, deploy
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 요약
+      description: 어떤 문제가 발생했는지 한두 문장으로 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 순서
+      description: 같은 현상을 다시 볼 수 있도록 재현 순서를 설명해 주세요.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: 기대 결과 / 실제 결과
+      description: 기대했던 동작과 실제 결과를 나란히 적어 주세요.
+      placeholder: |
+        - 기대 결과:
+        - 실제 결과:
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 영향
+      description: 사용자, 접근성, 데이터, 배포, 운영에 어떤 영향이 있는지 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: 작업 목록
+      description: 해결까지 필요한 작업을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 같은 조건에서 문제를 재현한다.
+        - [ ] 원인을 충분히 좁힌다.
+        - [ ] 수정 후 회귀 테스트를 수행한다.
+        - [ ] 운영 영향과 롤백 포인트를 확인한다.
+    validations:
+      required: true

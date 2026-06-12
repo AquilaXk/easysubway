@@ -1,0 +1,38 @@
+name: "스타일"
+description: "코드 포맷팅, UI 세부 조정, 네이밍처럼 의미 변화가 작은 정리를 요청합니다."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제목은 `[Style] 한국어 작업 요약` 형식으로 작성합니다.
+        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
+
+  - type: input
+    id: target
+    attributes:
+      label: 대상
+      description: 스타일 정리가 필요한 코드, 화면, 모듈을 적어 주세요.
+      placeholder: 예) station card spacing, route result naming, formatter
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: 설명
+      description: 포맷팅, UI 세부 조정, 네이밍 문제를 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: 작업 목록
+      description: 수행해야 할 작업을 체크리스트로 적어 주세요.
+      placeholder: |
+        - [ ] 대상 범위를 확인한다.
+        - [ ] 스타일 정리를 적용한다.
+        - [ ] 동작 변화가 없는지 확인한다.
+    validations:
+      required: true
