@@ -145,8 +145,10 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.match(build, /mavenBom 'org\.egovframe\.boot:egovframe-boot-starter-parent:5\.0\.0'/);
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-web'/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-security'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-actuator'/);
   assert.match(build, /testImplementation 'org\.springframework\.boot:spring-boot-starter-test'/);
+  assert.match(build, /testImplementation 'org\.springframework\.security:spring-security-test'/);
 
   assert.match(application, /@SpringBootApplication/);
   assert.match(domain, /record HealthStatus/);
@@ -211,19 +213,25 @@ test("backend transit master follows hexagonal API boundaries", () => {
 
 test("backend facility reports follow hexagonal API boundaries", () => {
   const report = read("backend/src/main/java/com/easysubway/report/domain/FacilityReport.java");
+  const reportReviewDecision = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportReviewDecision.java");
   const reportType = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportType.java");
   const reportStatus = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportStatus.java");
   const invalidReport = read("backend/src/main/java/com/easysubway/report/domain/InvalidFacilityReportException.java");
   const useCase = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java");
   const command = read("backend/src/main/java/com/easysubway/report/application/port/in/CreateFacilityReportCommand.java");
+  const reviewCommand = read("backend/src/main/java/com/easysubway/report/application/port/in/ReviewFacilityReportCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/report/application/port/out/LoadFacilityReportPort.java");
   const savePort = read("backend/src/main/java/com/easysubway/report/application/port/out/SaveFacilityReportPort.java");
   const service = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
   const repository = read("backend/src/main/java/com/easysubway/report/adapter/out/persistence/InMemoryFacilityReportRepository.java");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(report, /record FacilityReport/);
   assert.match(report, /reviewedAt/);
+  assert.match(reportReviewDecision, /ACCEPT/);
+  assert.match(reportReviewDecision, /REJECT/);
+  assert.match(reportReviewDecision, /MARK_DUPLICATE/);
   assert.match(reportType, /BROKEN/);
   assert.match(reportType, /LOCATION_WRONG/);
   assert.match(reportStatus, /SUBMITTED/);
@@ -232,16 +240,28 @@ test("backend facility reports follow hexagonal API boundaries", () => {
   assert.match(useCase, /interface FacilityReportUseCase/);
   assert.match(useCase, /createReport/);
   assert.match(useCase, /getReport/);
+  assert.match(useCase, /reviewReport/);
   assert.match(command, /record CreateFacilityReportCommand/);
+  assert.match(reviewCommand, /record ReviewFacilityReportCommand/);
   assert.match(loadPort, /interface LoadFacilityReportPort/);
   assert.match(savePort, /interface SaveFacilityReportPort/);
   assert.match(service, /implements FacilityReportUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
   assert.match(service, /FacilityReportStatus\.SUBMITTED/);
+  assert.match(service, /FacilityReportStatus\.ACCEPTED/);
+  assert.match(service, /FacilityReportStatus\.REJECTED/);
+  assert.match(service, /FacilityReportStatus\.DUPLICATE/);
   assert.match(repository, /implements LoadFacilityReportPort, SaveFacilityReportPort/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/reports\/\{reportId\}"\)/);
+  assert.match(controller, /@PostMapping\("\/admin\/reports\/\{reportId\}\/review"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
+  assert.match(security, /requestMatchers\("\/admin\/\*\*"\)\.hasRole\("ADMIN"\)/);
+  assert.match(security, /httpBasic/);
+  assert.match(security, /PasswordEncoder/);
+  assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
 });
 
 test("backend mobility profiles follow hexagonal API boundaries", () => {
