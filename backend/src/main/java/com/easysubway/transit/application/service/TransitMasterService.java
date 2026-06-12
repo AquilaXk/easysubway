@@ -67,11 +67,13 @@ public class TransitMasterService implements TransitMasterQueryUseCase {
 	private StationWithLines withLines(Station station) {
 		Map<String, SubwayLine> linesById = loadTransitMasterPort.loadLines()
 			.stream()
+			.filter(SubwayLine::active)
 			.collect(Collectors.toMap(SubwayLine::id, Function.identity()));
 
 		List<StationLineSummary> lines = loadTransitMasterPort.loadStationLines()
 			.stream()
 			.filter(stationLine -> stationLine.stationId().equals(station.id()))
+			.filter(stationLine -> linesById.containsKey(stationLine.lineId()))
 			.map(stationLine -> toSummary(stationLine, linesById))
 			.toList();
 
