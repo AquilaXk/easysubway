@@ -275,6 +275,29 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("노선 코드가 빈 값이면 노선명을 경로 단계 제목에 사용한다")
+	void searchRouteUsesLineNameWhenLineCodeIsBlank() {
+		var repository = new InMemoryRouteSearchRepository();
+		var blankLineCodeService = new RouteSearchService(
+			repository,
+			repository,
+			new BlankLineCodeTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = blankLineCodeService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.SENIOR
+		));
+
+		assertThat(result.steps())
+			.extracting("title")
+			.first()
+			.isEqualTo("출발역역에서 테스트 노선 승강장으로 이동");
+	}
+
+	@Test
 	@DisplayName("알 수 없는 경로 검색 식별자는 조회할 수 없다")
 	void getRouteSearchRequiresKnownRouteSearchId() {
 		assertThatThrownBy(() -> service.getRouteSearch("route-missing"))
@@ -353,6 +376,14 @@ class RouteSearchServiceTest {
 		@Override
 		public List<SubwayLine> loadLines() {
 			return List.of(new SubwayLine("line-a", "operator-a", "테스트 노선", "#0052A4", "수도권", null, true));
+		}
+	}
+
+	private static class BlankLineCodeTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<SubwayLine> loadLines() {
+			return List.of(new SubwayLine("line-a", "operator-a", "테스트 노선", "#0052A4", "수도권", "", true));
 		}
 	}
 

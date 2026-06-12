@@ -303,7 +303,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 
 	private String displayLineName(SubwayLine line) {
 		String lineCode = line.lineCode();
-		if (lineCode != null && lineCode.chars().allMatch(Character::isDigit)) {
+		if (lineCode != null && !lineCode.isBlank() && lineCode.chars().allMatch(Character::isDigit)) {
 			return lineCode + "호선";
 		}
 		return line.name();
