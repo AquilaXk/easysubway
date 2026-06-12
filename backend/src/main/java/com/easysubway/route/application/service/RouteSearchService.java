@@ -214,8 +214,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.anyMatch(this::hasUsableStatus);
 		boolean hasUsableStepFreeExit = highConfidenceExits.stream()
 			.anyMatch(exit -> isUsableStepFreeExit(exit, highConfidenceStepFreeFacilities));
-		boolean hasStairOnlyExit = highConfidenceExits.stream().anyMatch(StationExit::hasStairOnlyPath);
-		return hasStairOnlyExit && !hasUsableStepFreeFacility && !hasUsableStepFreeExit;
+		return !hasUsableStepFreeFacility && !hasUsableStepFreeExit;
 	}
 
 	private boolean isStepFreeFacility(AccessibilityFacility facility) {

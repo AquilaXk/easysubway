@@ -201,6 +201,29 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("휠체어 이동 유형은 고장난 엘리베이터 출구만 있는 역을 차단한다")
+	void wheelchairRouteBlocksBrokenElevatorOnlyExit() {
+		var repository = new InMemoryRouteSearchRepository();
+		var brokenElevatorOnlyService = new RouteSearchService(
+			repository,
+			repository,
+			new BrokenElevatorOnlyTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = brokenElevatorOnlyService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.BLOCKED);
+		assertThat(result.steps()).isEmpty();
+		assertThat(result.blockedReasons())
+			.containsExactly("계단 없는 역 접근 경로를 확인할 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("경로 검색은 존재하는 역과 공통 노선을 요구한다")
 	void searchRouteRequiresExistingStationsAndSharedLine() {
 		assertThatThrownBy(() -> service.searchRoute(new SearchRouteCommand(
@@ -392,6 +415,37 @@ class RouteSearchServiceTest {
 					"facility-a-elevator",
 					"station-a",
 					"exit-a-2",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.BROKEN
+				),
+				facility(
+					"facility-b-elevator",
+					"station-b",
+					"exit-b-1",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL
+				)
+			);
+		}
+	}
+
+	private static class BrokenElevatorOnlyTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of(
+				stepFreeExit("exit-a-1", "station-a"),
+				stepFreeExit("exit-b-1", "station-b")
+			);
+		}
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(
+				facility(
+					"facility-a-elevator",
+					"station-a",
+					"exit-a-1",
 					AccessibilityFacilityType.ELEVATOR,
 					AccessibilityFacilityStatus.BROKEN
 				),
