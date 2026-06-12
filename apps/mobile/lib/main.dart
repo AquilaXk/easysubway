@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
+import 'station_search.dart';
+
 void main() {
-  runApp(const EasySubwayApp());
+  runApp(EasySubwayApp());
 }
 
 class EasySubwayApp extends StatelessWidget {
-  const EasySubwayApp({super.key});
+  EasySubwayApp({StationSearchRepository? repository, super.key})
+    : repository =
+          repository ??
+          StationSearchApiRepository(baseUri: defaultStationApiBaseUri());
+
+  final StationSearchRepository repository;
 
   @override
   Widget build(BuildContext context) {
@@ -50,13 +57,15 @@ class EasySubwayApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: HomeScreen(repository: repository),
     );
   }
 }
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({required this.repository, super.key});
+
+  final StationSearchRepository repository;
 
   @override
   Widget build(BuildContext context) {
@@ -82,9 +91,15 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('stationSearchButton'),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => StationSearchScreen(repository: repository),
+                  ),
+                );
+              },
               icon: const Icon(Icons.search),
-              label: const Text('가까운 역'),
+              label: const Text('역 검색'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
