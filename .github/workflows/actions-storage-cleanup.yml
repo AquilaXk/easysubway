@@ -1,0 +1,41 @@
+name: Actions Storage Cleanup
+
+on:
+  pull_request:
+    types:
+      - closed
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup-pr-caches:
+    name: Delete closed PR caches
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete caches for closed pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          set -euo pipefail
+          gh cache delete --all --ref "$BRANCH" --succeed-on-no-caches
+
+  cleanup-weekly-caches:
+    name: Delete weekly repository caches
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all GitHub Actions caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh cache delete --all --succeed-on-no-caches
