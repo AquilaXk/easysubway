@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+// 경로 검색은 사용자별 저장 데이터 없이 역과 이동 조건만 계산하므로 로그인 전 탐색 화면에서도 호출한다.
 class RouteSearchController {
 
 	private final RouteSearchUseCase routeSearchUseCase;

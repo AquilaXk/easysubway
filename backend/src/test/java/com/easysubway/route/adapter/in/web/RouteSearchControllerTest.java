@@ -2,6 +2,7 @@ package com.easysubway.route.adapter.in.web;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,6 +50,24 @@ class RouteSearchControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.routeSearchId").value(routeSearchId))
+			.andExpect(jsonPath("$.data.status").value("FOUND"));
+	}
+
+	@Test
+	@DisplayName("공개 경로 검색은 잘못된 Basic 인증 헤더가 있어도 허용한다")
+	void publicRouteSearchIgnoresInvalidBasicAuthentication() throws Exception {
+		mockMvc.perform(post("/api/v1/routes/search")
+				.with(httpBasic("wrong-user", "wrong-password"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "mobilityType": "SENIOR"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.status").value("FOUND"));
 	}
 

@@ -50,6 +50,7 @@ public class SecurityConfig {
 	@Bean
 	@Order(3)
 	SecurityFilterChain publicSecurityFilterChain(HttpSecurity http) throws Exception {
+		// 역 검색과 경로 검색은 로그인 전 이동 계획에 필요한 공개 조회 기능이다.
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
 			.authorizeHttpRequests(authorize -> authorize

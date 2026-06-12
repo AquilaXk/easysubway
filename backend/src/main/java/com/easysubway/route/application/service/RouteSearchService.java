@@ -199,12 +199,19 @@ public class RouteSearchService implements RouteSearchUseCase {
 		if (exits.isEmpty()) {
 			return false;
 		}
-		// 휠체어 프로필은 계단만 확인되는 역 접근을 추천하지 않는다.
-		boolean hasStepFreeExit = exits.stream()
+		List<StationExit> highConfidenceExits = exits.stream()
+			.filter(exit -> exit.dataConfidence() == DataConfidenceLevel.HIGH)
+			.toList();
+		if (highConfidenceExits.isEmpty()) {
+			return false;
+		}
+		// 차단 판단은 신뢰도 높은 데이터만 사용하고, 낮은 신뢰도 데이터는 경고로만 노출한다.
+		boolean hasStepFreeExit = highConfidenceExits.stream()
 			.anyMatch(exit -> exit.hasElevatorConnection() && !exit.hasStairOnlyPath());
 		boolean hasNormalElevator = stationFacilities(stationId).stream()
+			.filter(facility -> facility.dataConfidence() == DataConfidenceLevel.HIGH)
 			.anyMatch(this::isNormalElevator);
-		boolean hasStairOnlyExit = exits.stream().anyMatch(StationExit::hasStairOnlyPath);
+		boolean hasStairOnlyExit = highConfidenceExits.stream().anyMatch(StationExit::hasStairOnlyPath);
 		return hasStairOnlyExit && !hasStepFreeExit && !hasNormalElevator;
 	}
 

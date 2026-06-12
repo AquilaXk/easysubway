@@ -110,6 +110,30 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("휠체어 이동 유형은 신뢰도 낮은 계단 정보만으로 경로를 차단하지 않는다")
+	void wheelchairRouteDoesNotBlockWithLowConfidenceStairOnlyData() {
+		var repository = new InMemoryRouteSearchRepository();
+		var lowConfidenceService = new RouteSearchService(
+			repository,
+			repository,
+			new LowConfidenceStairOnlyTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = lowConfidenceService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(result.blockedReasons()).isEmpty();
+		assertThat(result.warnings())
+			.extracting("code")
+			.contains(RouteWarningCode.LOW_DATA_CONFIDENCE);
+	}
+
+	@Test
 	@DisplayName("경로 검색은 존재하는 역과 공통 노선을 요구한다")
 	void searchRouteRequiresExistingStationsAndSharedLine() {
 		assertThatThrownBy(() -> service.searchRoute(new SearchRouteCommand(
@@ -196,6 +220,17 @@ class RouteSearchServiceTest {
 			return List.of(
 				new StationLine("station-a", "line-a", "101", 1, "상행 / 하행"),
 				new StationLine("station-b", "line-b", "202", 2, "상행 / 하행")
+			);
+		}
+	}
+
+	private static class LowConfidenceStairOnlyTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of(
+				new StationExit("exit-a-1", "station-a", "1", "1번 출구", BigDecimal.ONE, BigDecimal.ONE, false, true, DataConfidenceLevel.LOW),
+				new StationExit("exit-b-1", "station-b", "1", "1번 출구", BigDecimal.ONE, BigDecimal.ONE, false, true, DataConfidenceLevel.LOW)
 			);
 		}
 	}
