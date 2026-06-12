@@ -69,6 +69,18 @@ void main() {
 
       await tester.tap(find.byKey(const Key('stationSearchButton')));
       await tester.pumpAndSettle();
+
+      final searchInput = tester.widget<TextField>(
+        find.byKey(const Key('stationSearchInput')),
+      );
+      expect(searchInput.decoration?.hintText, '역 이름을 입력해 주세요');
+      expect(searchInput.decoration?.hintText, isNot('예: 상록수'));
+      expect(find.text('역 이름을 입력해 주세요.'), findsNothing);
+      expect(
+        searchInput.decoration?.floatingLabelBehavior,
+        FloatingLabelBehavior.always,
+      );
+
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -77,12 +89,23 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.requestedQueries, ['상록수']);
+      expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('기본 정보만 확인됨'), findsOneWidget);
       expect(
         find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
         findsOneWidget,
       );
+
+      final lineBadgeSize = tester.getSize(
+        find.byKey(const Key('stationLineBadge-seoul-4')),
+      );
+      expect(lineBadgeSize.width, 40);
+      expect(lineBadgeSize.height, 40);
+
+      final lineNumber = tester.widget<Text>(find.text('4'));
+      expect(lineNumber.style?.fontSize, 24);
     } finally {
       semanticsHandle.dispose();
     }

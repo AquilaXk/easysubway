@@ -141,6 +141,43 @@ class StationSearchLine {
   final String name;
   final String color;
   final String stationCode;
+
+  String get badgeText {
+    final numberedLine = RegExp(r'(\d+)\s*호선').firstMatch(name);
+    if (numberedLine != null) {
+      return numberedLine.group(1) ?? name;
+    }
+
+    if (name.contains('경의중앙')) {
+      return '경의\n중앙';
+    }
+    if (name.contains('수인분당')) {
+      return '수인\n분당';
+    }
+    if (name.contains('인천') && name.contains('1')) {
+      return '인천1';
+    }
+    if (name.contains('인천') && name.contains('2')) {
+      return '인천2';
+    }
+
+    final compactName = name.replaceAll('수도권 ', '').replaceAll('선', '');
+    if (compactName.length <= 4) {
+      return compactName;
+    }
+    return compactName.substring(0, 4);
+  }
+
+  Color get badgeColor {
+    final normalized = color.trim().replaceFirst('#', '');
+    if (normalized.length == 6) {
+      final parsed = int.tryParse(normalized, radix: 16);
+      if (parsed != null) {
+        return Color(0xFF000000 | parsed);
+      }
+    }
+    return const Color(0xFF006D77);
+  }
 }
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
@@ -261,7 +298,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 style: const TextStyle(fontSize: 20, height: 1.35),
                 decoration: const InputDecoration(
                   labelText: '역 이름',
-                  hintText: '예: 상록수',
+                  hintText: '역 이름을 입력해 주세요',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(8)),
                   ),
@@ -302,9 +340,7 @@ class _StationSearchBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (state.status) {
-      StationSearchStatus.idle => const _StationSearchMessage(
-        message: '역 이름을 입력해 주세요.',
-      ),
+      StationSearchStatus.idle => const SizedBox.shrink(),
       StationSearchStatus.loading => Semantics(
         label: '역 검색 중',
         liveRegion: true,
@@ -356,6 +392,8 @@ class _StationSearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return MergeSemantics(
       child: Semantics(
         label: result.semanticLabel,
@@ -371,59 +409,102 @@ class _StationSearchResultTile extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.train, color: Color(0xFF006D77), size: 32),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          result.nameKo,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: const Color(0xFF102A2C),
-                                fontWeight: FontWeight.w800,
-                                height: 1.25,
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          result.lineLabel,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: const Color(0xFF29484B),
-                                fontWeight: FontWeight.w700,
-                                height: 1.3,
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          result.region,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: const Color(0xFF405A5D),
-                                height: 1.3,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          result.dataQualityLabel,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: const Color(0xFF405A5D),
-                                height: 1.3,
-                              ),
-                        ),
-                      ],
+                  Text(
+                    result.nameKo,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _StationSearchLineBadges(lines: result.lines),
+                  const SizedBox(height: 8),
+                  Text(
+                    result.lineLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    result.region,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    result.dataQualityLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationSearchLineBadges extends StatelessWidget {
+  const _StationSearchLineBadges({required this.lines});
+
+  final List<StationSearchLine> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    if (lines.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [for (final line in lines) _StationSearchLineBadge(line: line)],
+    );
+  }
+}
+
+class _StationSearchLineBadge extends StatelessWidget {
+  const _StationSearchLineBadge({required this.line});
+
+  final StationSearchLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = line.badgeColor;
+    final foregroundColor = backgroundColor.computeLuminance() > 0.55
+        ? const Color(0xFF102A2C)
+        : Colors.white;
+    final badgeText = line.badgeText;
+    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText) ? 24.0 : 13.0;
+
+    return Container(
+      key: Key('stationLineBadge-${line.id}'),
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+      child: Text(
+        badgeText,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: foregroundColor,
+          fontSize: badgeFontSize,
+          fontWeight: FontWeight.w900,
+          height: 1.05,
         ),
       ),
     );
