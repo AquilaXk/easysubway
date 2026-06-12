@@ -59,6 +59,8 @@ while IFS= read -r file; do
   case "${file}" in
     apps/mobile/**)
       mobile=true
+      android=true
+      ios=true
       ;;
   esac
 
