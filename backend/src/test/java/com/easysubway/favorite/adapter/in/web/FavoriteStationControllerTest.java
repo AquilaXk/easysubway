@@ -22,7 +22,7 @@ class FavoriteStationControllerTest {
 
 	@Test
 	void favoriteStationsCanBeSavedListedAndRemoved() throws Exception {
-		mockMvc.perform(put("/api/v1/me/favorite-stations/station-sangnoksu")
+		mockMvc.perform(put("/api/v1/me/favorites/stations/station-sangnoksu")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -39,19 +39,19 @@ class FavoriteStationControllerTest {
 			.andExpect(jsonPath("$.data.lines[0].name").value("수도권 4호선"))
 			.andExpect(jsonPath("$.data.addedAt").isNotEmpty());
 
-		mockMvc.perform(get("/api/v1/me/favorite-stations")
+		mockMvc.perform(get("/api/v1/me/favorites/stations")
 				.param("userId", "anonymous-user-1"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data[0].stationId").value("station-sangnoksu"))
 			.andExpect(jsonPath("$.data[0].nameKo").value("상록수"));
 
-		mockMvc.perform(delete("/api/v1/me/favorite-stations/station-sangnoksu")
+		mockMvc.perform(delete("/api/v1/me/favorites/stations/station-sangnoksu")
 				.param("userId", "anonymous-user-1"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true));
 
-		mockMvc.perform(get("/api/v1/me/favorite-stations")
+		mockMvc.perform(get("/api/v1/me/favorites/stations")
 				.param("userId", "anonymous-user-1"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data").isEmpty());
@@ -59,7 +59,7 @@ class FavoriteStationControllerTest {
 
 	@Test
 	void favoriteStationsRejectUnknownStation() throws Exception {
-		mockMvc.perform(put("/api/v1/me/favorite-stations/missing-station")
+		mockMvc.perform(put("/api/v1/me/favorites/stations/missing-station")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -74,7 +74,7 @@ class FavoriteStationControllerTest {
 
 	@Test
 	void favoriteStationsRequireUserId() throws Exception {
-		mockMvc.perform(get("/api/v1/me/favorite-stations"))
+		mockMvc.perform(get("/api/v1/me/favorites/stations"))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.data").doesNotExist())

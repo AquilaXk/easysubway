@@ -312,9 +312,9 @@ test("backend favorite stations follow hexagonal API boundaries", () => {
   assert.match(service, /LoadTransitMasterPort/);
   assert.match(service, /StationNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteStationPort[\s\S]*SaveFavoriteStationPort[\s\S]*DeleteFavoriteStationPort/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorite-stations"\)/);
-  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorite-stations\/\{stationId\}"\)/);
-  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorite-stations\/\{stationId\}"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/stations"\)/);
+  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
+  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
 });
 
 test("mobile scaffold is a Flutter Android and iOS app", () => {

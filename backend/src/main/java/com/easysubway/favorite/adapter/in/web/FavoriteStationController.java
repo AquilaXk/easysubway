@@ -28,7 +28,7 @@ class FavoriteStationController {
 		this.favoriteStationUseCase = favoriteStationUseCase;
 	}
 
-	@GetMapping("/api/v1/me/favorite-stations")
+	@GetMapping("/api/v1/me/favorites/stations")
 	ApiResponse<List<FavoriteStationResponse>> listFavoriteStations(
 		@RequestParam(required = false) String userId
 	) {
@@ -39,7 +39,7 @@ class FavoriteStationController {
 		return ApiResponse.ok(response);
 	}
 
-	@PutMapping("/api/v1/me/favorite-stations/{stationId}")
+	@PutMapping("/api/v1/me/favorites/stations/{stationId}")
 	ApiResponse<FavoriteStationResponse> saveFavoriteStation(
 		@PathVariable String stationId,
 		@RequestBody SaveFavoriteStationRequest request
@@ -50,7 +50,7 @@ class FavoriteStationController {
 		return ApiResponse.ok(FavoriteStationResponse.from(favoriteStation));
 	}
 
-	@DeleteMapping("/api/v1/me/favorite-stations/{stationId}")
+	@DeleteMapping("/api/v1/me/favorites/stations/{stationId}")
 	ApiResponse<Void> removeFavoriteStation(
 		@PathVariable String stationId,
 		@RequestParam(required = false) String userId
