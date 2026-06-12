@@ -160,6 +160,35 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.match(properties, /management\.endpoints\.web\.exposure\.include=health,info/);
 });
 
+test("backend transit master follows hexagonal API boundaries", () => {
+  const operator = read("backend/src/main/java/com/easysubway/transit/domain/TransitOperator.java");
+  const line = read("backend/src/main/java/com/easysubway/transit/domain/SubwayLine.java");
+  const station = read("backend/src/main/java/com/easysubway/transit/domain/Station.java");
+  const quality = read("backend/src/main/java/com/easysubway/transit/domain/DataQualityLevel.java");
+  const source = read("backend/src/main/java/com/easysubway/transit/domain/DataSourceType.java");
+  const useCase = read("backend/src/main/java/com/easysubway/transit/application/port/in/TransitMasterQueryUseCase.java");
+  const outboundPort = read("backend/src/main/java/com/easysubway/transit/application/port/out/LoadTransitMasterPort.java");
+  const service = read("backend/src/main/java/com/easysubway/transit/application/service/TransitMasterService.java");
+  const repository = read("backend/src/main/java/com/easysubway/transit/adapter/out/persistence/InMemoryTransitMasterRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/transit/adapter/in/web/TransitMasterController.java");
+  const exceptionHandler = read("backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java");
+
+  assert.match(operator, /record TransitOperator/);
+  assert.match(line, /record SubwayLine/);
+  assert.match(station, /record Station/);
+  assert.match(quality, /LEVEL_1/);
+  assert.match(source, /OFFICIAL_FILE/);
+  assert.match(useCase, /interface TransitMasterQueryUseCase/);
+  assert.match(outboundPort, /interface LoadTransitMasterPort/);
+  assert.match(service, /implements TransitMasterQueryUseCase/);
+  assert.match(repository, /implements LoadTransitMasterPort/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/operators"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/lines"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/stations"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}"\)/);
+  assert.match(exceptionHandler, /@ExceptionHandler\(ResourceNotFoundException\.class\)/);
+});
+
 test("mobile scaffold is a Flutter Android and iOS app", () => {
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
