@@ -85,6 +85,45 @@ test("coderabbit is configured for Korean repository reviews", () => {
   assert.match(config, /auto_review:/);
 });
 
+test("env example provides non-secret local data infrastructure defaults", () => {
+  const envExample = read(".env.example");
+
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_DB=easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_USER=easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PASSWORD=easysubway_local$/m);
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
+  assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
+  assert.doesNotMatch(envExample, /prod|production|secret|token|key/i);
+});
+
+test("docker compose defines local PostGIS and Redis services", () => {
+  const compose = read("infra/docker-compose.yml");
+
+  assert.match(compose, /postgres:\n/);
+  assert.match(compose, /image: postgis\/postgis:16-3\.5/);
+  assert.match(compose, /POSTGRES_DB: \$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
+  assert.match(compose, /POSTGRES_USER: \$\{EASYSUBWAY_POSTGRES_USER:-easysubway\}/);
+  assert.match(compose, /POSTGRES_PASSWORD: \$\{EASYSUBWAY_POSTGRES_PASSWORD:-easysubway_local\}/);
+  assert.match(compose, /"\$\{EASYSUBWAY_POSTGRES_PORT:-5432\}:5432"/);
+  assert.match(compose, /pg_isready -U \$\$\{POSTGRES_USER\} -d \$\$\{POSTGRES_DB\}/);
+  assert.match(compose, /postgres-data:\/var\/lib\/postgresql\/data/);
+
+  assert.match(compose, /redis:\n/);
+  assert.match(compose, /image: redis:7\.4-alpine/);
+  assert.match(compose, /"\$\{EASYSUBWAY_REDIS_PORT:-6379\}:6379"/);
+  assert.match(compose, /redis-cli ping/);
+  assert.match(compose, /redis-data:\/data/);
+
+  assert.match(compose, /^volumes:\n  postgres-data:\n  redis-data:/m);
+});
+
+test("repository ci validates docker compose configuration", () => {
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(workflow, /Repository CI \/ Validate Docker Compose config/);
+  assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
+});
+
 test("path classifier treats README as docs-only", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
@@ -123,6 +162,10 @@ test("path classifier maps repository, backend, mobile, Android, and iOS changes
   const ci = await classifyChangedFiles([".github/workflows/ci.yml"]);
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
+
+  const infra = await classifyChangedFiles(["infra/docker-compose.yml"]);
+  assert.equal(infra.repository, "true");
+  assert.equal(infra.deploy, "true");
 });
 
 test("path classifier tests are stable when GITHUB_OUTPUT is inherited from CI", async () => {
