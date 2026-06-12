@@ -206,20 +206,39 @@ public class RouteSearchService implements RouteSearchUseCase {
 			return false;
 		}
 		// 차단 판단은 신뢰도 높은 실제 무단차 시설만 사용하고, 낮은 신뢰도 데이터는 경고로만 노출한다.
-		boolean hasUsableStepFreeFacility = stationFacilities(stationId).stream()
+		List<AccessibilityFacility> highConfidenceStepFreeFacilities = stationFacilities(stationId).stream()
 			.filter(facility -> facility.dataConfidence() == DataConfidenceLevel.HIGH)
-			.anyMatch(this::isUsableStepFreeFacility);
+			.filter(this::isStepFreeFacility)
+			.toList();
+		boolean hasUsableStepFreeFacility = highConfidenceStepFreeFacilities.stream()
+			.anyMatch(this::hasUsableStatus);
+		boolean hasUsableStepFreeExit = highConfidenceExits.stream()
+			.anyMatch(exit -> isUsableStepFreeExit(exit, highConfidenceStepFreeFacilities));
 		boolean hasStairOnlyExit = highConfidenceExits.stream().anyMatch(StationExit::hasStairOnlyPath);
-		return hasStairOnlyExit && !hasUsableStepFreeFacility;
+		return hasStairOnlyExit && !hasUsableStepFreeFacility && !hasUsableStepFreeExit;
 	}
 
-	private boolean isUsableStepFreeFacility(AccessibilityFacility facility) {
-		boolean usableStatus = facility.status() == AccessibilityFacilityStatus.NORMAL
-			|| facility.status() == AccessibilityFacilityStatus.ADMIN_VERIFIED;
-		return usableStatus && switch (facility.type()) {
+	private boolean isStepFreeFacility(AccessibilityFacility facility) {
+		return switch (facility.type()) {
 			case ELEVATOR, WHEELCHAIR_LIFT, RAMP -> true;
 			default -> false;
 		};
+	}
+
+	private boolean hasUsableStatus(AccessibilityFacility facility) {
+		return facility.status() == AccessibilityFacilityStatus.NORMAL
+			|| facility.status() == AccessibilityFacilityStatus.ADMIN_VERIFIED;
+	}
+
+	private boolean isUsableStepFreeExit(
+		StationExit exit,
+		List<AccessibilityFacility> highConfidenceStepFreeFacilities
+	) {
+		if (!exit.hasElevatorConnection() || exit.hasStairOnlyPath()) {
+			return false;
+		}
+		return highConfidenceStepFreeFacilities.stream()
+			.noneMatch(facility -> exit.id().equals(facility.exitId()) && !hasUsableStatus(facility));
 	}
 
 	private List<StationExit> stationExits(String stationId) {

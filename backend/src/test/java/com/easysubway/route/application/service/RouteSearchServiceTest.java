@@ -157,6 +157,27 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("휠체어 이동 유형은 출구 요약에 엘리베이터 연결이 있으면 별도 시설 행이 없어도 경로를 제공한다")
+	void wheelchairRouteAllowsElevatorConnectedExitWithoutFacilityRow() {
+		var repository = new InMemoryRouteSearchRepository();
+		var exitSummaryService = new RouteSearchService(
+			repository,
+			repository,
+			new ExitSummaryAccessibleTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = exitSummaryService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(result.blockedReasons()).isEmpty();
+	}
+
+	@Test
 	@DisplayName("휠체어 이동 유형은 고장난 엘리베이터만 있으면 계단 없는 경로로 보지 않는다")
 	void wheelchairRouteBlocksBrokenElevatorAsStepFreeAccess() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -341,6 +362,18 @@ class RouteSearchServiceTest {
 		}
 	}
 
+	private static class ExitSummaryAccessibleTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of(
+				stairOnlyExit("exit-a-1", "station-a"),
+				stepFreeExit("exit-a-2", "station-a"),
+				stepFreeExit("exit-b-1", "station-b")
+			);
+		}
+	}
+
 	private static class BrokenElevatorTransitMasterPort extends StairOnlyTransitMasterPort {
 
 		@Override
@@ -358,12 +391,14 @@ class RouteSearchServiceTest {
 				facility(
 					"facility-a-elevator",
 					"station-a",
+					"exit-a-2",
 					AccessibilityFacilityType.ELEVATOR,
 					AccessibilityFacilityStatus.BROKEN
 				),
 				facility(
 					"facility-b-elevator",
 					"station-b",
+					"exit-b-1",
 					AccessibilityFacilityType.ELEVATOR,
 					AccessibilityFacilityStatus.NORMAL
 				)
@@ -386,13 +421,14 @@ class RouteSearchServiceTest {
 	private static AccessibilityFacility facility(
 		String id,
 		String stationId,
+		String exitId,
 		AccessibilityFacilityType type,
 		AccessibilityFacilityStatus status
 	) {
 		return new AccessibilityFacility(
 			id,
 			stationId,
-			null,
+			exitId,
 			type,
 			"테스트 접근성 시설",
 			"지상",
@@ -404,6 +440,15 @@ class RouteSearchServiceTest {
 			DataConfidenceLevel.HIGH,
 			LocalDate.of(2026, 6, 13)
 		);
+	}
+
+	private static AccessibilityFacility facility(
+		String id,
+		String stationId,
+		AccessibilityFacilityType type,
+		AccessibilityFacilityStatus status
+	) {
+		return facility(id, stationId, null, type, status);
 	}
 
 	private static SubwayLine line(String id) {
