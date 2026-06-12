@@ -258,7 +258,9 @@ test("backend facility reports follow hexagonal API boundaries", () => {
   assert.match(controller, /Principal principal/);
   assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
-  assert.match(security, /requestMatchers\("\/admin\/\*\*"\)\.hasRole\("ADMIN"\)/);
+  assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
+  assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
+  assert.match(security, /anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /httpBasic/);
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
