@@ -6,65 +6,62 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test(
-    'station API repository requests backend stations and parses results',
-    () async {
-      late Uri requestedUri;
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(server.close);
+  test('역 API 저장소는 백엔드 역 목록을 요청하고 결과를 파싱한다', () async {
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
 
-      server.listen((request) {
-        requestedUri = request.uri;
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.json
-          ..write(
-            jsonEncode({
-              'success': true,
-              'data': [
-                {
-                  'id': 'station-sangnoksu',
-                  'nameKo': '상록수',
-                  'nameEn': 'Sangnoksu',
-                  'region': '수도권',
-                  'dataQualityLevel': 'LEVEL_1',
-                  'lastVerifiedAt': '2026-06-12',
-                  'lines': [
-                    {
-                      'id': 'seoul-4',
-                      'operatorId': 'seoul-metro',
-                      'name': '수도권 4호선',
-                      'color': '#00A5DE',
-                      'stationCode': '448',
-                      'sequence': 48,
-                      'platformInfo': '당고개 방면 / 오이도 방면',
-                    },
-                  ],
-                },
-              ],
-            }),
-          )
-          ..close();
-      });
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'operatorId': 'seoul-metro',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                    'sequence': 48,
+                    'platformInfo': '당고개 방면 / 오이도 방면',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
 
-      final repository = StationSearchApiRepository(
-        baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      );
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
 
-      final results = await repository.searchStations('상록수');
+    final results = await repository.searchStations('상록수');
 
-      expect(requestedUri.path, '/api/v1/stations');
-      expect(requestedUri.queryParameters['query'], '상록수');
-      expect(results, hasLength(1));
-      expect(results.single.id, 'station-sangnoksu');
-      expect(results.single.nameKo, '상록수');
-      expect(results.single.region, '수도권');
-      expect(results.single.dataQualityLabel, '기본 정보만 확인됨');
-      expect(results.single.lines.single.name, '수도권 4호선');
-    },
-  );
+    expect(requestedUri.path, '/api/v1/stations');
+    expect(requestedUri.queryParameters['query'], '상록수');
+    expect(results, hasLength(1));
+    expect(results.single.id, 'station-sangnoksu');
+    expect(results.single.nameKo, '상록수');
+    expect(results.single.region, '수도권');
+    expect(results.single.dataQualityLabel, '기본 정보만 확인됨');
+    expect(results.single.lines.single.name, '수도권 4호선');
+  });
 
-  test('station API repository rejects malformed station payloads', () async {
+  test('역 API 저장소는 형식이 잘못된 역 응답을 거부한다', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
@@ -113,21 +110,18 @@ void main() {
     );
   });
 
-  test(
-    'station search controller keeps blank input idle without API calls',
-    () async {
-      final repository = FakeStationSearchRepository();
-      final controller = StationSearchController(repository: repository);
+  test('역 검색 컨트롤러는 빈 입력을 API 호출 없이 대기 상태로 둔다', () async {
+    final repository = FakeStationSearchRepository();
+    final controller = StationSearchController(repository: repository);
 
-      await controller.search('   ');
+    await controller.search('   ');
 
-      expect(repository.requestedQueries, isEmpty);
-      expect(controller.state.status, StationSearchStatus.idle);
-      expect(controller.state.results, isEmpty);
-    },
-  );
+    expect(repository.requestedQueries, isEmpty);
+    expect(controller.state.status, StationSearchStatus.idle);
+    expect(controller.state.results, isEmpty);
+  });
 
-  test('station search controller ignores stale responses', () async {
+  test('역 검색 컨트롤러는 늦게 도착한 이전 응답을 무시한다', () async {
     final repository = ControlledStationSearchRepository();
     final controller = StationSearchController(repository: repository);
 
@@ -153,7 +147,7 @@ void main() {
     expect(controller.state.results.single.nameKo, '강남');
   });
 
-  test('station search controller exposes empty and failure states', () async {
+  test('역 검색 컨트롤러는 빈 결과와 실패 상태를 표시한다', () async {
     final repository = FakeStationSearchRepository();
     final controller = StationSearchController(repository: repository);
 

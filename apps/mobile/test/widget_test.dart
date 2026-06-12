@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('renders concise home screen actions', (tester) async {
+  testWidgets('홈 화면은 핵심 행동만 간결하게 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -41,9 +41,7 @@ void main() {
     }
   });
 
-  testWidgets('searches stations and shows accessible backend results', (
-    tester,
-  ) async {
+  testWidgets('역 검색은 접근성 표시가 포함된 백엔드 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
       nextResults: [
@@ -136,9 +134,7 @@ void main() {
     }
   });
 
-  testWidgets('disables search button while request is loading', (
-    tester,
-  ) async {
+  testWidgets('검색 요청 중에는 검색 버튼을 비활성화한다', (tester) async {
     final repository = ControlledStationSearchRepository();
 
     await tester.pumpWidget(EasySubwayApp(repository: repository));
