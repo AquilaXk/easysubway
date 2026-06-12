@@ -14,7 +14,7 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
-test("gitignore keeps local agent docs and non-README markdown out of git", () => {
+test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적되지 않는다", () => {
   const gitignore = read(".gitignore");
 
   assert.match(gitignore, /^\*\.md$/m);
@@ -25,7 +25,7 @@ test("gitignore keeps local agent docs and non-README markdown out of git", () =
   assert.match(gitignore, /^\.codex\/$/m);
 });
 
-test("ci enforces README-only markdown and local agent file policy", () => {
+test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추적 금지를 검사한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
   assert.match(workflow, /git ls-files '\*\.md' ':!:README\.md' ':!:\.github\/pull_request_template\.md'/);
@@ -34,7 +34,7 @@ test("ci enforces README-only markdown and local agent file policy", () => {
   assert.match(workflow, /Unexpected tracked local agent file/);
 });
 
-test("ci job and step names identify failure areas clearly", () => {
+test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
   assert.match(workflow, /name: Changes/);
@@ -50,7 +50,7 @@ test("ci job and step names identify failure areas clearly", () => {
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
-test("pull request template is tracked with review and CD gates", () => {
+test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
   const template = read(".github/pull_request_template.md");
 
   assert.match(template, /## 관련 이슈/);
@@ -62,7 +62,7 @@ test("pull request template is tracked with review and CD gates", () => {
   assert.match(template, /CD 상태를 확인했다/);
 });
 
-test("issue templates collect developer-style context without agent narration", () => {
+test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
   const templates = [
     read(".github/ISSUE_TEMPLATE/bug_report.yml"),
     read(".github/ISSUE_TEMPLATE/feature_request.yml"),
@@ -75,7 +75,7 @@ test("issue templates collect developer-style context without agent narration", 
   assert.doesNotMatch(templates, /AI 에이전트|자동 생성|제가 작업/);
 });
 
-test("coderabbit is configured for Korean repository reviews", () => {
+test("한국어 저장소 리뷰 기준으로 CodeRabbit이 설정된다", () => {
   const config = read(".coderabbit.yaml");
 
   assert.match(config, /language: "ko-KR"/);
@@ -85,7 +85,7 @@ test("coderabbit is configured for Korean repository reviews", () => {
   assert.match(config, /auto_review:/);
 });
 
-test("env example provides non-secret local data infrastructure defaults", () => {
+test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 제공한다", () => {
   const envExample = read(".env.example");
 
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_DB=easysubway$/m);
@@ -96,7 +96,7 @@ test("env example provides non-secret local data infrastructure defaults", () =>
   assert.doesNotMatch(envExample, /prod|production|secret|token|key/i);
 });
 
-test("docker compose defines local PostGIS and Redis services", () => {
+test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
   const compose = read("infra/docker-compose.yml");
 
   assert.match(compose, /postgres:\n/);
@@ -117,14 +117,14 @@ test("docker compose defines local PostGIS and Redis services", () => {
   assert.match(compose, /^volumes:\n  postgres-data:\n  redis-data:/m);
 });
 
-test("repository ci validates docker compose configuration", () => {
+test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
   assert.match(workflow, /Repository CI \/ Validate Docker Compose config/);
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
 });
 
-test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project", () => {
+test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 프로젝트다", () => {
   const build = read("backend/build.gradle");
   const wrapper = read("backend/gradle/wrapper/gradle-wrapper.properties");
   const application = read("backend/src/main/java/com/easysubway/EasySubwayBackendApplication.java");
@@ -169,7 +169,7 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.doesNotMatch(applicationProdYml, /spring\.profiles\.active|on-profile/);
 });
 
-test("backend transit master follows hexagonal API boundaries", () => {
+test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {
   const operator = read("backend/src/main/java/com/easysubway/transit/domain/TransitOperator.java");
   const line = read("backend/src/main/java/com/easysubway/transit/domain/SubwayLine.java");
   const station = read("backend/src/main/java/com/easysubway/transit/domain/Station.java");
@@ -218,7 +218,7 @@ test("backend transit master follows hexagonal API boundaries", () => {
   assert.match(exceptionHandler, /@ExceptionHandler\(ResourceNotFoundException\.class\)/);
 });
 
-test("backend facility reports follow hexagonal API boundaries", () => {
+test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const report = read("backend/src/main/java/com/easysubway/report/domain/FacilityReport.java");
   const reportReviewDecision = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportReviewDecision.java");
   const reportType = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportType.java");
@@ -273,7 +273,7 @@ test("backend facility reports follow hexagonal API boundaries", () => {
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
 });
 
-test("backend mobility profiles follow hexagonal API boundaries", () => {
+test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () => {
   const profile = read("backend/src/main/java/com/easysubway/profile/domain/MobilityProfile.java");
   const mobilityType = read("backend/src/main/java/com/easysubway/profile/domain/MobilityType.java");
   const invalidProfile = read("backend/src/main/java/com/easysubway/profile/domain/InvalidMobilityProfileException.java");
@@ -310,7 +310,7 @@ test("backend mobility profiles follow hexagonal API boundaries", () => {
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/mobility-profile"\)/);
 });
 
-test("backend favorite stations follow hexagonal API boundaries", () => {
+test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () => {
   const favorite = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteStation.java");
   const favoriteDetails = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteStationWithDetails.java");
   const invalidFavorite = read("backend/src/main/java/com/easysubway/favorite/domain/InvalidFavoriteStationException.java");
@@ -354,7 +354,52 @@ test("backend favorite stations follow hexagonal API boundaries", () => {
   assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
 });
 
-test("mobile scaffold is a Flutter Android and iOS app", () => {
+test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
+  const result = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchResult.java");
+  const status = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchStatus.java");
+  const warning = read("backend/src/main/java/com/easysubway/route/domain/RouteWarning.java");
+  const warningCode = read("backend/src/main/java/com/easysubway/route/domain/RouteWarningCode.java");
+  const step = read("backend/src/main/java/com/easysubway/route/domain/RouteStep.java");
+  const invalidSearch = read("backend/src/main/java/com/easysubway/route/domain/InvalidRouteSearchException.java");
+  const routeNotFound = read("backend/src/main/java/com/easysubway/route/domain/RouteNotFoundException.java");
+  const searchNotFound = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchNotFoundException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/route/application/port/in/RouteSearchUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/route/application/port/in/SearchRouteCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteSearchPort.java");
+  const savePort = read("backend/src/main/java/com/easysubway/route/application/port/out/SaveRouteSearchPort.java");
+  const service = read("backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java");
+  const repository = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/InMemoryRouteSearchRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+
+  assert.match(result, /record RouteSearchResult/);
+  assert.match(result, /mobilityType/);
+  assert.match(result, /blockedReasons/);
+  assert.match(status, /FOUND/);
+  assert.match(status, /BLOCKED/);
+  assert.match(warning, /record RouteWarning/);
+  assert.match(warningCode, /LOW_DATA_CONFIDENCE/);
+  assert.match(step, /record RouteStep/);
+  assert.match(invalidSearch, /extends InvalidRequestException/);
+  assert.match(routeNotFound, /extends ResourceNotFoundException/);
+  assert.match(searchNotFound, /extends ResourceNotFoundException/);
+  assert.match(useCase, /interface RouteSearchUseCase/);
+  assert.match(useCase, /searchRoute/);
+  assert.match(useCase, /getRouteSearch/);
+  assert.match(command, /record SearchRouteCommand/);
+  assert.match(loadPort, /interface LoadRouteSearchPort/);
+  assert.match(savePort, /interface SaveRouteSearchPort/);
+  assert.match(service, /implements RouteSearchUseCase/);
+  assert.match(service, /LoadTransitMasterPort/);
+  assert.match(service, /MobilityType\.WHEELCHAIR/);
+  assert.match(service, /RouteSearchStatus\.BLOCKED/);
+  assert.match(service, /hasStairOnlyAccess/);
+  assert.match(service, /routeScore/);
+  assert.match(repository, /implements LoadRouteSearchPort, SaveRouteSearchPort/);
+  assert.match(controller, /@PostMapping\("\/api\/v1\/routes\/search"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/routes\/\{routeSearchId\}"\)/);
+});
+
+test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다", () => {
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
@@ -385,12 +430,12 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
-  assert.match(widgetTest, /renders concise home screen actions/);
+  assert.match(widgetTest, /홈 화면은 핵심 행동만 간결하게 보여준다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
 });
 
-test("path classifier treats README as docs-only", async () => {
+test("경로 분류기는 README를 문서 전용 변경으로 처리한다", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
   assert.equal(outputs.docs_only, "true");
@@ -403,7 +448,7 @@ test("path classifier treats README as docs-only", async () => {
   assert.equal(outputs.deploy, "false");
 });
 
-test("path classifier maps repository, backend, mobile, Android, and iOS changes", async () => {
+test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경을 구분한다", async () => {
   const repository = await classifyChangedFiles([".github/ISSUE_TEMPLATE/task_request.yml"]);
   assert.equal(repository.repository, "true");
   assert.equal(repository.docs_only, "false");
@@ -434,7 +479,7 @@ test("path classifier maps repository, backend, mobile, Android, and iOS changes
   assert.equal(infra.deploy, "true");
 });
 
-test("path classifier tests are stable when GITHUB_OUTPUT is inherited from CI", async () => {
+test("경로 분류기 테스트는 CI의 GITHUB_OUTPUT을 물려받아도 안정적이다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-gh-output-"));
   const previousGithubOutput = process.env.GITHUB_OUTPUT;
   process.env.GITHUB_OUTPUT = path.join(dir, "github-output.txt");
