@@ -299,6 +299,7 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
+  assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(main, /역 찾기/);

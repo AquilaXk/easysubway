@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -77,6 +78,32 @@ void main() {
     },
   );
 
+  test('station search controller ignores stale responses', () async {
+    final repository = ControlledStationSearchRepository();
+    final controller = StationSearchController(repository: repository);
+
+    final firstSearch = controller.search('상록수');
+    final secondSearch = controller.search('강남');
+
+    expect(repository.requestedQueries, ['상록수', '강남']);
+
+    repository.complete('강남', [
+      _stationResult(id: 'station-gangnam', name: '강남'),
+    ]);
+    await secondSearch;
+
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.nameKo, '강남');
+
+    repository.complete('상록수', [
+      _stationResult(id: 'station-sangnoksu', name: '상록수'),
+    ]);
+    await firstSearch;
+
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.nameKo, '강남');
+  });
+
   test('station search controller exposes empty and failure states', () async {
     final repository = FakeStationSearchRepository();
     final controller = StationSearchController(repository: repository);
@@ -95,6 +122,25 @@ void main() {
   });
 }
 
+StationSearchResult _stationResult({required String id, required String name}) {
+  return StationSearchResult(
+    id: id,
+    nameKo: name,
+    nameEn: id,
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    lastVerifiedAt: '2026-06-12',
+    lines: const [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+    ],
+  );
+}
+
 class FakeStationSearchRepository implements StationSearchRepository {
   final requestedQueries = <String>[];
   Object? error;
@@ -108,5 +154,26 @@ class FakeStationSearchRepository implements StationSearchRepository {
       throw currentError;
     }
     return nextResults;
+  }
+}
+
+class ControlledStationSearchRepository implements StationSearchRepository {
+  final requestedQueries = <String>[];
+  final _pending = <String, Completer<List<StationSearchResult>>>{};
+
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) {
+    requestedQueries.add(query);
+    final completer = Completer<List<StationSearchResult>>();
+    _pending[query] = completer;
+    return completer.future;
+  }
+
+  void complete(String query, List<StationSearchResult> results) {
+    final completer = _pending.remove(query);
+    if (completer == null) {
+      throw StateError('Pending search not found: $query');
+    }
+    completer.complete(results);
   }
 }

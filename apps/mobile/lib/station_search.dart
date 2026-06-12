@@ -205,10 +205,12 @@ class StationSearchController extends ChangeNotifier {
   final StationSearchRepository repository;
 
   StationSearchState _state = const StationSearchState.idle();
+  int _searchRequestId = 0;
 
   StationSearchState get state => _state;
 
   Future<void> search(String query) async {
+    final requestId = ++_searchRequestId;
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
       _state = const StationSearchState.idle();
@@ -224,6 +226,9 @@ class StationSearchController extends ChangeNotifier {
 
     try {
       final results = await repository.searchStations(trimmedQuery);
+      if (requestId != _searchRequestId) {
+        return;
+      }
       if (results.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
@@ -237,12 +242,18 @@ class StationSearchController extends ChangeNotifier {
         );
       }
     } on StationSearchException catch (error) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
       _state = StationSearchState(
         status: StationSearchStatus.failure,
         results: const [],
         message: error.message,
       );
     } catch (_) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
       _state = const StationSearchState(
         status: StationSearchStatus.failure,
         results: [],
@@ -397,7 +408,6 @@ class _StationSearchResultTile extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         label: result.semanticLabel,
-        button: true,
         child: ExcludeSemantics(
           child: Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -484,9 +494,7 @@ class _StationSearchLineBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = line.badgeColor;
-    final foregroundColor = backgroundColor.computeLuminance() > 0.55
-        ? const Color(0xFF102A2C)
-        : Colors.white;
+    final foregroundColor = _higherContrastTextColor(backgroundColor);
     final badgeText = line.badgeText;
     final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText) ? 24.0 : 13.0;
 
@@ -509,6 +517,22 @@ class _StationSearchLineBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _higherContrastTextColor(Color backgroundColor) {
+  const darkText = Color(0xFF102A2C);
+  final darkContrast = _contrastRatio(backgroundColor, darkText);
+  final lightContrast = _contrastRatio(backgroundColor, Colors.white);
+  return darkContrast >= lightContrast ? darkText : Colors.white;
+}
+
+double _contrastRatio(Color first, Color second) {
+  final firstLuminance = first.computeLuminance() + 0.05;
+  final secondLuminance = second.computeLuminance() + 0.05;
+  if (firstLuminance > secondLuminance) {
+    return firstLuminance / secondLuminance;
+  }
+  return secondLuminance / firstLuminance;
 }
 
 Uri defaultStationApiBaseUri() {

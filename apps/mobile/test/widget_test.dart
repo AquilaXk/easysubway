@@ -97,6 +97,13 @@ void main() {
         find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
         findsOneWidget,
       );
+      final resultSemantics = tester.getSemantics(
+        find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
+      );
+      expect(
+        resultSemantics.getSemanticsData().flagsCollection.isButton,
+        isFalse,
+      );
 
       final lineBadgeSize = tester.getSize(
         find.byKey(const Key('stationLineBadge-seoul-4')),
@@ -106,6 +113,7 @@ void main() {
 
       final lineNumber = tester.widget<Text>(find.text('4'));
       expect(lineNumber.style?.fontSize, 24);
+      expect(lineNumber.style?.color, const Color(0xFF102A2C));
     } finally {
       semanticsHandle.dispose();
     }
