@@ -204,7 +204,44 @@ test("backend transit master follows hexagonal API boundaries", () => {
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/exits"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/facilities"\)/);
+  assert.match(exceptionHandler, /@ExceptionHandler\(HttpMessageNotReadableException\.class\)/);
+  assert.match(exceptionHandler, /@ExceptionHandler\(InvalidRequestException\.class\)/);
   assert.match(exceptionHandler, /@ExceptionHandler\(ResourceNotFoundException\.class\)/);
+});
+
+test("backend facility reports follow hexagonal API boundaries", () => {
+  const report = read("backend/src/main/java/com/easysubway/report/domain/FacilityReport.java");
+  const reportType = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportType.java");
+  const reportStatus = read("backend/src/main/java/com/easysubway/report/domain/FacilityReportStatus.java");
+  const invalidReport = read("backend/src/main/java/com/easysubway/report/domain/InvalidFacilityReportException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/report/application/port/in/CreateFacilityReportCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/report/application/port/out/LoadFacilityReportPort.java");
+  const savePort = read("backend/src/main/java/com/easysubway/report/application/port/out/SaveFacilityReportPort.java");
+  const service = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+  const repository = read("backend/src/main/java/com/easysubway/report/adapter/out/persistence/InMemoryFacilityReportRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+
+  assert.match(report, /record FacilityReport/);
+  assert.match(report, /reviewedAt/);
+  assert.match(reportType, /BROKEN/);
+  assert.match(reportType, /LOCATION_WRONG/);
+  assert.match(reportStatus, /SUBMITTED/);
+  assert.match(reportStatus, /RESOLVED/);
+  assert.match(invalidReport, /extends InvalidRequestException/);
+  assert.match(useCase, /interface FacilityReportUseCase/);
+  assert.match(useCase, /createReport/);
+  assert.match(useCase, /getReport/);
+  assert.match(command, /record CreateFacilityReportCommand/);
+  assert.match(loadPort, /interface LoadFacilityReportPort/);
+  assert.match(savePort, /interface SaveFacilityReportPort/);
+  assert.match(service, /implements FacilityReportUseCase/);
+  assert.match(service, /LoadTransitMasterPort/);
+  assert.match(service, /FacilityReportStatus\.SUBMITTED/);
+  assert.match(repository, /implements LoadFacilityReportPort, SaveFacilityReportPort/);
+  assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/reports\/\{reportId\}"\)/);
+  assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
 });
 
 test("mobile scaffold is a Flutter Android and iOS app", () => {
