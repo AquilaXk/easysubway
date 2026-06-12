@@ -5,7 +5,7 @@ import java.util.List;
 
 public interface FavoriteStationUseCase {
 
-	List<FavoriteStationWithDetails> listFavoriteStations(String userId);
+	List<FavoriteStationWithDetails> listFavoriteStations(ListFavoriteStationsCommand command);
 
 	FavoriteStationWithDetails saveFavoriteStation(SaveFavoriteStationCommand command);
 

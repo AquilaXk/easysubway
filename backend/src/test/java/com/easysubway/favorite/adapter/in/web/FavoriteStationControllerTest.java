@@ -1,5 +1,6 @@
 package com.easysubway.favorite.adapter.in.web;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -13,7 +14,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+	"easysubway.user.username=anonymous-user-1",
+	"easysubway.user.password=user-test-password"
+})
 @AutoConfigureMockMvc
 class FavoriteStationControllerTest {
 
@@ -23,10 +27,11 @@ class FavoriteStationControllerTest {
 	@Test
 	void favoriteStationsCanBeSavedListedAndRemoved() throws Exception {
 		mockMvc.perform(put("/api/v1/me/favorites/stations/station-sangnoksu")
+				.with(httpBasic("anonymous-user-1", "user-test-password"))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "userId": "anonymous-user-1"
+					  "userId": "spoofed-user"
 					}
 					"""))
 			.andExpect(status().isOk())
@@ -40,19 +45,19 @@ class FavoriteStationControllerTest {
 			.andExpect(jsonPath("$.data.addedAt").isNotEmpty());
 
 		mockMvc.perform(get("/api/v1/me/favorites/stations")
-				.param("userId", "anonymous-user-1"))
+				.with(httpBasic("anonymous-user-1", "user-test-password")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data[0].stationId").value("station-sangnoksu"))
 			.andExpect(jsonPath("$.data[0].nameKo").value("상록수"));
 
 		mockMvc.perform(delete("/api/v1/me/favorites/stations/station-sangnoksu")
-				.param("userId", "anonymous-user-1"))
+				.with(httpBasic("anonymous-user-1", "user-test-password")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true));
 
 		mockMvc.perform(get("/api/v1/me/favorites/stations")
-				.param("userId", "anonymous-user-1"))
+				.with(httpBasic("anonymous-user-1", "user-test-password")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data").isEmpty());
 	}
@@ -60,12 +65,7 @@ class FavoriteStationControllerTest {
 	@Test
 	void favoriteStationsRejectUnknownStation() throws Exception {
 		mockMvc.perform(put("/api/v1/me/favorites/stations/missing-station")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{
-					  "userId": "anonymous-user-2"
-					}
-					"""))
+				.with(httpBasic("anonymous-user-1", "user-test-password")))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.data").doesNotExist())
@@ -73,11 +73,8 @@ class FavoriteStationControllerTest {
 	}
 
 	@Test
-	void favoriteStationsRequireUserId() throws Exception {
+	void favoriteStationsRequireAuthentication() throws Exception {
 		mockMvc.perform(get("/api/v1/me/favorites/stations"))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.success").value(false))
-			.andExpect(jsonPath("$.data").doesNotExist())
-			.andExpect(jsonPath("$.message").value("사용자 식별자가 필요합니다."));
+			.andExpect(status().isUnauthorized());
 	}
 }

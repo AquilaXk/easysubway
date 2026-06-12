@@ -2,12 +2,14 @@ package com.easysubway.favorite.adapter.in.web;
 
 import com.easysubway.common.web.ApiResponse;
 import com.easysubway.favorite.application.port.in.FavoriteStationUseCase;
+import com.easysubway.favorite.application.port.in.ListFavoriteStationsCommand;
 import com.easysubway.favorite.application.port.in.RemoveFavoriteStationCommand;
 import com.easysubway.favorite.application.port.in.SaveFavoriteStationCommand;
 import com.easysubway.favorite.domain.FavoriteStationWithDetails;
 import com.easysubway.transit.domain.DataQualityLevel;
 import com.easysubway.transit.domain.Station;
 import com.easysubway.transit.domain.StationLineSummary;
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,8 +17,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -29,10 +29,9 @@ class FavoriteStationController {
 	}
 
 	@GetMapping("/api/v1/me/favorites/stations")
-	ApiResponse<List<FavoriteStationResponse>> listFavoriteStations(
-		@RequestParam(required = false) String userId
-	) {
-		List<FavoriteStationResponse> response = favoriteStationUseCase.listFavoriteStations(userId)
+	ApiResponse<List<FavoriteStationResponse>> listFavoriteStations(Principal principal) {
+		List<FavoriteStationResponse> response = favoriteStationUseCase
+			.listFavoriteStations(new ListFavoriteStationsCommand(principal.getName()))
 			.stream()
 			.map(FavoriteStationResponse::from)
 			.toList();
@@ -42,10 +41,10 @@ class FavoriteStationController {
 	@PutMapping("/api/v1/me/favorites/stations/{stationId}")
 	ApiResponse<FavoriteStationResponse> saveFavoriteStation(
 		@PathVariable String stationId,
-		@RequestBody SaveFavoriteStationRequest request
+		Principal principal
 	) {
 		FavoriteStationWithDetails favoriteStation = favoriteStationUseCase.saveFavoriteStation(
-			new SaveFavoriteStationCommand(request.userId(), stationId)
+			new SaveFavoriteStationCommand(principal.getName(), stationId)
 		);
 		return ApiResponse.ok(FavoriteStationResponse.from(favoriteStation));
 	}
@@ -53,13 +52,10 @@ class FavoriteStationController {
 	@DeleteMapping("/api/v1/me/favorites/stations/{stationId}")
 	ApiResponse<Void> removeFavoriteStation(
 		@PathVariable String stationId,
-		@RequestParam(required = false) String userId
+		Principal principal
 	) {
-		favoriteStationUseCase.removeFavoriteStation(new RemoveFavoriteStationCommand(userId, stationId));
+		favoriteStationUseCase.removeFavoriteStation(new RemoveFavoriteStationCommand(principal.getName(), stationId));
 		return ApiResponse.ok(null);
-	}
-
-	record SaveFavoriteStationRequest(String userId) {
 	}
 
 	record FavoriteStationResponse(

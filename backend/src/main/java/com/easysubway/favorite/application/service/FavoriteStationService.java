@@ -1,6 +1,7 @@
 package com.easysubway.favorite.application.service;
 
 import com.easysubway.favorite.application.port.in.FavoriteStationUseCase;
+import com.easysubway.favorite.application.port.in.ListFavoriteStationsCommand;
 import com.easysubway.favorite.application.port.in.RemoveFavoriteStationCommand;
 import com.easysubway.favorite.application.port.in.SaveFavoriteStationCommand;
 import com.easysubway.favorite.application.port.out.DeleteFavoriteStationPort;
@@ -66,9 +67,9 @@ public class FavoriteStationService implements FavoriteStationUseCase {
 	}
 
 	@Override
-	public List<FavoriteStationWithDetails> listFavoriteStations(String userId) {
-		requireUserId(userId);
-		return loadFavoriteStationPort.loadFavoriteStations(userId)
+	public List<FavoriteStationWithDetails> listFavoriteStations(ListFavoriteStationsCommand command) {
+		requireUserId(command.userId());
+		return loadFavoriteStationPort.loadFavoriteStations(command.userId())
 			.stream()
 			.sorted(Comparator.comparing(FavoriteStation::addedAt))
 			.map(this::withDetails)

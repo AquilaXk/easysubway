@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.favorite.adapter.out.persistence.InMemoryFavoriteStationRepository;
+import com.easysubway.favorite.application.port.in.ListFavoriteStationsCommand;
 import com.easysubway.favorite.application.port.in.RemoveFavoriteStationCommand;
 import com.easysubway.favorite.application.port.in.SaveFavoriteStationCommand;
+import com.easysubway.favorite.domain.FavoriteStation;
 import com.easysubway.favorite.domain.InvalidFavoriteStationException;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
 import com.easysubway.transit.domain.StationNotFoundException;
@@ -43,7 +45,8 @@ class FavoriteStationServiceTest {
 		assertThat(favorite.favoriteStation().addedAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 9, 0));
 		assertThat(favorite.station().station().nameKo()).isEqualTo("상록수");
 		assertThat(duplicated).isEqualTo(favorite);
-		assertThat(service.listFavoriteStations("anonymous-user-1")).containsExactly(favorite);
+		assertThat(service.listFavoriteStations(new ListFavoriteStationsCommand("anonymous-user-1")))
+			.containsExactly(favorite);
 	}
 
 	@Test
@@ -53,7 +56,7 @@ class FavoriteStationServiceTest {
 
 		service.removeFavoriteStation(new RemoveFavoriteStationCommand("anonymous-user-1", "station-sangnoksu"));
 
-		assertThat(service.listFavoriteStations("anonymous-user-1"))
+		assertThat(service.listFavoriteStations(new ListFavoriteStationsCommand("anonymous-user-1")))
 			.extracting(favorite -> favorite.favoriteStation().stationId())
 			.containsExactly("station-sadang");
 	}
@@ -70,7 +73,7 @@ class FavoriteStationServiceTest {
 
 	@Test
 	void favoriteStationCommandsRequireUserAndStation() {
-		assertThatThrownBy(() -> service.listFavoriteStations(""))
+		assertThatThrownBy(() -> service.listFavoriteStations(new ListFavoriteStationsCommand("")))
 			.isInstanceOf(InvalidFavoriteStationException.class)
 			.hasMessage("사용자 식별자가 필요합니다.");
 
@@ -80,5 +83,18 @@ class FavoriteStationServiceTest {
 		)))
 			.isInstanceOf(InvalidFavoriteStationException.class)
 			.hasMessage("역 식별자가 필요합니다.");
+	}
+
+	@Test
+	void favoriteStationDomainRejectsInvalidState() {
+		assertThatThrownBy(() -> new FavoriteStation("", "station-sangnoksu", LocalDateTime.now()))
+			.isInstanceOf(InvalidFavoriteStationException.class)
+			.hasMessage("사용자 식별자가 필요합니다.");
+		assertThatThrownBy(() -> new FavoriteStation("anonymous-user-1", "", LocalDateTime.now()))
+			.isInstanceOf(InvalidFavoriteStationException.class)
+			.hasMessage("역 식별자가 필요합니다.");
+		assertThatThrownBy(() -> new FavoriteStation("anonymous-user-1", "station-sangnoksu", null))
+			.isInstanceOf(InvalidFavoriteStationException.class)
+			.hasMessage("추가 시각이 필요합니다.");
 	}
 }

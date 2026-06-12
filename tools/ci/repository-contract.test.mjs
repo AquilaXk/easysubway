@@ -308,6 +308,7 @@ test("backend favorite stations follow hexagonal API boundaries", () => {
   const favoriteDetails = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteStationWithDetails.java");
   const invalidFavorite = read("backend/src/main/java/com/easysubway/favorite/domain/InvalidFavoriteStationException.java");
   const useCase = read("backend/src/main/java/com/easysubway/favorite/application/port/in/FavoriteStationUseCase.java");
+  const listCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/ListFavoriteStationsCommand.java");
   const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteStationCommand.java");
   const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteStationCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteStationPort.java");
@@ -316,15 +317,18 @@ test("backend favorite stations follow hexagonal API boundaries", () => {
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteStationService.java");
   const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteStationRepository.java");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteStationController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(favorite, /record FavoriteStation/);
   assert.match(favorite, /addedAt/);
+  assert.match(favorite, /InvalidFavoriteStationException/);
   assert.match(favoriteDetails, /StationWithLines/);
   assert.match(invalidFavorite, /extends InvalidRequestException/);
   assert.match(useCase, /interface FavoriteStationUseCase/);
   assert.match(useCase, /listFavoriteStations/);
   assert.match(useCase, /saveFavoriteStation/);
   assert.match(useCase, /removeFavoriteStation/);
+  assert.match(listCommand, /record ListFavoriteStationsCommand/);
   assert.match(saveCommand, /record SaveFavoriteStationCommand/);
   assert.match(removeCommand, /record RemoveFavoriteStationCommand/);
   assert.match(loadPort, /interface LoadFavoriteStationPort/);
@@ -337,6 +341,10 @@ test("backend favorite stations follow hexagonal API boundaries", () => {
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/stations"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
+  assert.match(security, /securityMatcher\("\/api\/v1\/me\/favorites\/\*\*"\)/);
+  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
 });
 
 test("mobile scaffold is a Flutter Android and iOS app", () => {
