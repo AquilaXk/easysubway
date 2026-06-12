@@ -13,6 +13,8 @@ import com.easysubway.route.domain.RouteWarningCode;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
 import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.domain.AccessibilityFacility;
+import com.easysubway.transit.domain.AccessibilityFacilityStatus;
+import com.easysubway.transit.domain.AccessibilityFacilityType;
 import com.easysubway.transit.domain.DataConfidenceLevel;
 import com.easysubway.transit.domain.DataQualityLevel;
 import com.easysubway.transit.domain.DataSourceType;
@@ -134,6 +136,50 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("휠체어 이동 유형은 정상 램프가 있으면 계단 출구가 있어도 경로를 제공한다")
+	void wheelchairRouteAllowsNormalRampAsStepFreeAccess() {
+		var repository = new InMemoryRouteSearchRepository();
+		var rampService = new RouteSearchService(
+			repository,
+			repository,
+			new RampAccessibleTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = rampService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(result.blockedReasons()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("휠체어 이동 유형은 고장난 엘리베이터만 있으면 계단 없는 경로로 보지 않는다")
+	void wheelchairRouteBlocksBrokenElevatorAsStepFreeAccess() {
+		var repository = new InMemoryRouteSearchRepository();
+		var brokenElevatorService = new RouteSearchService(
+			repository,
+			repository,
+			new BrokenElevatorTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = brokenElevatorService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.BLOCKED);
+		assertThat(result.steps()).isEmpty();
+		assertThat(result.blockedReasons())
+			.containsExactly("계단 없는 역 접근 경로를 확인할 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("경로 검색은 존재하는 역과 공통 노선을 요구한다")
 	void searchRouteRequiresExistingStationsAndSharedLine() {
 		assertThatThrownBy(() -> service.searchRoute(new SearchRouteCommand(
@@ -159,6 +205,29 @@ class RouteSearchServiceTest {
 		)))
 			.isInstanceOf(RouteNotFoundException.class)
 			.hasMessage("연결 가능한 경로를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("노선 코드가 없으면 노선명을 경로 단계 제목에 사용한다")
+	void searchRouteUsesLineNameWhenLineCodeIsMissing() {
+		var repository = new InMemoryRouteSearchRepository();
+		var missingLineCodeService = new RouteSearchService(
+			repository,
+			repository,
+			new MissingLineCodeTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = missingLineCodeService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.SENIOR
+		));
+
+		assertThat(result.steps())
+			.extracting("title")
+			.first()
+			.isEqualTo("출발역역에서 테스트 노선 승강장으로 이동");
 	}
 
 	@Test
@@ -235,6 +304,73 @@ class RouteSearchServiceTest {
 		}
 	}
 
+	private static class MissingLineCodeTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<SubwayLine> loadLines() {
+			return List.of(new SubwayLine("line-a", "operator-a", "테스트 노선", "#0052A4", "수도권", null, true));
+		}
+	}
+
+	private static class RampAccessibleTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of(
+				stairOnlyExit("exit-a-1", "station-a"),
+				stepFreeExit("exit-b-1", "station-b")
+			);
+		}
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(
+				facility(
+					"facility-a-ramp",
+					"station-a",
+					AccessibilityFacilityType.RAMP,
+					AccessibilityFacilityStatus.NORMAL
+				),
+				facility(
+					"facility-b-elevator",
+					"station-b",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL
+				)
+			);
+		}
+	}
+
+	private static class BrokenElevatorTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of(
+				stairOnlyExit("exit-a-1", "station-a"),
+				stepFreeExit("exit-a-2", "station-a"),
+				stepFreeExit("exit-b-1", "station-b")
+			);
+		}
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(
+				facility(
+					"facility-a-elevator",
+					"station-a",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.BROKEN
+				),
+				facility(
+					"facility-b-elevator",
+					"station-b",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL
+				)
+			);
+		}
+	}
+
 	private static TransitOperator operator() {
 		return new TransitOperator(
 			"operator-a",
@@ -244,6 +380,29 @@ class RouteSearchServiceTest {
 			"https://example.com/contact",
 			DataSourceType.OFFICIAL_FILE,
 			true
+		);
+	}
+
+	private static AccessibilityFacility facility(
+		String id,
+		String stationId,
+		AccessibilityFacilityType type,
+		AccessibilityFacilityStatus status
+	) {
+		return new AccessibilityFacility(
+			id,
+			stationId,
+			null,
+			type,
+			"테스트 접근성 시설",
+			"지상",
+			"대합실",
+			BigDecimal.ONE,
+			BigDecimal.ONE,
+			"테스트용 접근성 시설입니다.",
+			status,
+			DataConfidenceLevel.HIGH,
+			LocalDate.of(2026, 6, 13)
 		);
 	}
 
@@ -262,6 +421,34 @@ class RouteSearchServiceTest {
 			DataQualityLevel.LEVEL_1,
 			LocalDate.of(2026, 6, 13),
 			true
+		);
+	}
+
+	private static StationExit stairOnlyExit(String id, String stationId) {
+		return new StationExit(
+			id,
+			stationId,
+			"1",
+			"1번 출구",
+			BigDecimal.ONE,
+			BigDecimal.ONE,
+			false,
+			true,
+			DataConfidenceLevel.HIGH
+		);
+	}
+
+	private static StationExit stepFreeExit(String id, String stationId) {
+		return new StationExit(
+			id,
+			stationId,
+			"2",
+			"2번 출구",
+			BigDecimal.ONE,
+			BigDecimal.ONE,
+			true,
+			false,
+			DataConfidenceLevel.HIGH
 		);
 	}
 }

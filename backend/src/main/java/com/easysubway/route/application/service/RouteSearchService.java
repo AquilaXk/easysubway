@@ -205,20 +205,21 @@ public class RouteSearchService implements RouteSearchUseCase {
 		if (highConfidenceExits.isEmpty()) {
 			return false;
 		}
-		// 차단 판단은 신뢰도 높은 데이터만 사용하고, 낮은 신뢰도 데이터는 경고로만 노출한다.
-		boolean hasStepFreeExit = highConfidenceExits.stream()
-			.anyMatch(exit -> exit.hasElevatorConnection() && !exit.hasStairOnlyPath());
-		boolean hasNormalElevator = stationFacilities(stationId).stream()
+		// 차단 판단은 신뢰도 높은 실제 무단차 시설만 사용하고, 낮은 신뢰도 데이터는 경고로만 노출한다.
+		boolean hasUsableStepFreeFacility = stationFacilities(stationId).stream()
 			.filter(facility -> facility.dataConfidence() == DataConfidenceLevel.HIGH)
-			.anyMatch(this::isNormalElevator);
+			.anyMatch(this::isUsableStepFreeFacility);
 		boolean hasStairOnlyExit = highConfidenceExits.stream().anyMatch(StationExit::hasStairOnlyPath);
-		return hasStairOnlyExit && !hasStepFreeExit && !hasNormalElevator;
+		return hasStairOnlyExit && !hasUsableStepFreeFacility;
 	}
 
-	private boolean isNormalElevator(AccessibilityFacility facility) {
-		return facility.type() == AccessibilityFacilityType.ELEVATOR
-			&& (facility.status() == AccessibilityFacilityStatus.NORMAL
-				|| facility.status() == AccessibilityFacilityStatus.ADMIN_VERIFIED);
+	private boolean isUsableStepFreeFacility(AccessibilityFacility facility) {
+		boolean usableStatus = facility.status() == AccessibilityFacilityStatus.NORMAL
+			|| facility.status() == AccessibilityFacilityStatus.ADMIN_VERIFIED;
+		return usableStatus && switch (facility.type()) {
+			case ELEVATOR, WHEELCHAIR_LIFT, RAMP -> true;
+			default -> false;
+		};
 	}
 
 	private List<StationExit> stationExits(String stationId) {
@@ -283,8 +284,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	private String displayLineName(SubwayLine line) {
-		if (line.lineCode().chars().allMatch(Character::isDigit)) {
-			return line.lineCode() + "호선";
+		String lineCode = line.lineCode();
+		if (lineCode != null && lineCode.chars().allMatch(Character::isDigit)) {
+			return lineCode + "호선";
 		}
 		return line.name();
 	}
