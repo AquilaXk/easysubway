@@ -34,6 +34,22 @@ test("ci enforces README-only markdown and local agent file policy", () => {
   assert.match(workflow, /Unexpected tracked local agent file/);
 });
 
+test("ci job and step names identify failure areas clearly", () => {
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(workflow, /name: Changes/);
+  assert.match(workflow, /name: Repository CI/);
+  assert.match(workflow, /name: Backend CI/);
+  assert.match(workflow, /name: Mobile App CI/);
+  assert.match(workflow, /name: Android CI/);
+  assert.match(workflow, /name: iOS CI/);
+  assert.match(workflow, /Repository CI \/ Run contract tests/);
+  assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
+  assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
+  assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
+  assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
+});
+
 test("pull request template is tracked with review and CD gates", () => {
   const template = read(".github/pull_request_template.md");
 
