@@ -124,6 +124,42 @@ test("repository ci validates docker compose configuration", () => {
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
 });
 
+test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project", () => {
+  const build = read("backend/build.gradle");
+  const wrapper = read("backend/gradle/wrapper/gradle-wrapper.properties");
+  const application = read("backend/src/main/java/com/easysubway/EasySubwayBackendApplication.java");
+  const domain = read("backend/src/main/java/com/easysubway/health/domain/HealthStatus.java");
+  const port = read("backend/src/main/java/com/easysubway/health/application/port/in/CheckHealthUseCase.java");
+  const service = read("backend/src/main/java/com/easysubway/health/application/service/HealthCheckService.java");
+  const controller = read("backend/src/main/java/com/easysubway/health/adapter/in/web/HealthCheckController.java");
+  const apiResponse = read("backend/src/main/java/com/easysubway/common/web/ApiResponse.java");
+  const properties = read("backend/src/main/resources/application.properties");
+
+  assert.ok(existsSync(path.join(root, "backend/gradlew")));
+  assert.ok(existsSync(path.join(root, "backend/gradle/wrapper/gradle-wrapper.jar")));
+  assert.match(wrapper, /gradle-8\.14\.5-bin\.zip/);
+
+  assert.match(build, /id 'org\.springframework\.boot' version '3\.5\.6'/);
+  assert.match(build, /languageVersion = JavaLanguageVersion\.of\(21\)/);
+  assert.match(build, /https:\/\/maven\.egovframe\.go\.kr\/maven/);
+  assert.match(build, /mavenBom 'org\.egovframe\.boot:egovframe-boot-starter-parent:5\.0\.0'/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-web'/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-actuator'/);
+  assert.match(build, /testImplementation 'org\.springframework\.boot:spring-boot-starter-test'/);
+
+  assert.match(application, /@SpringBootApplication/);
+  assert.match(domain, /record HealthStatus/);
+  assert.match(port, /interface CheckHealthUseCase/);
+  assert.match(service, /implements CheckHealthUseCase/);
+  assert.match(service, /easysubway-backend/);
+  assert.match(controller, /@GetMapping\("\/api\/health"\)/);
+  assert.match(controller, /CheckHealthUseCase/);
+  assert.match(apiResponse, /record ApiResponse/);
+  assert.match(properties, /spring\.application\.name=easysubway-backend/);
+  assert.match(properties, /management\.endpoints\.web\.exposure\.include=health,info/);
+});
+
 test("path classifier treats README as docs-only", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
