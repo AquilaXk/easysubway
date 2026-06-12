@@ -209,11 +209,14 @@ test("mobile scaffold is a Flutter Android and iOS app", () => {
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(main, /갈 수 있는 길을 먼저 안내합니다/);
-  assert.match(main, /고령자, 임산부, 장애인/);
-  assert.match(main, /이동 조건 선택/);
+  assert.match(main, /역 찾기/);
+  assert.match(main, /가까운 역/);
+  assert.match(main, /이동 조건/);
+  assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
+  assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
-  assert.match(widgetTest, /접근성 이동 안내/);
+  assert.match(widgetTest, /renders concise home screen actions/);
+  assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
 });
 

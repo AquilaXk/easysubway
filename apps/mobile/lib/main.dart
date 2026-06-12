@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
             Semantics(
               header: true,
               child: Text(
-                '접근성 이동 안내',
+                '역 찾기',
                 style: textTheme.headlineSmall?.copyWith(
                   color: const Color(0xFF102A2C),
                   fontWeight: FontWeight.w800,
@@ -79,52 +79,35 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '빠른 길보다, 갈 수 있는 길을 먼저 안내합니다.',
-              style: textTheme.titleMedium?.copyWith(
-                color: const Color(0xFF284D50),
-                fontWeight: FontWeight.w700,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '고령자, 임산부, 장애인도 편하게 이동할 수 있도록 큰 글자와 명확한 선택지를 우선합니다.',
-              style: textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF345C60),
-                height: 1.55,
-              ),
-            ),
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('stationSearchButton'),
               onPressed: () {},
               icon: const Icon(Icons.search),
-              label: const Text('가까운 역 찾기'),
+              label: const Text('가까운 역'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('mobilityProfileButton'),
               onPressed: () {},
               icon: const Icon(Icons.accessibility_new),
-              label: const Text('이동 조건 선택'),
+              label: const Text('이동 조건'),
             ),
             const SizedBox(height: 24),
             const FeatureTile(
               icon: Icons.accessible_forward,
               title: '이동 프로필',
-              description: '휠체어, 유모차, 큰 짐처럼 이동 조건을 먼저 반영합니다.',
+              semanticLabel: '이동 프로필, 이동 조건 저장',
             ),
             const FeatureTile(
               icon: Icons.elevator,
               title: '시설 정보',
-              description: '엘리베이터, 경사로, 넓은 개찰구 상태를 확인합니다.',
+              semanticLabel: '시설 정보, 엘리베이터와 경사로',
             ),
             const FeatureTile(
               icon: Icons.report_outlined,
-              title: '신고와 검수',
-              description: '현장에서 발견한 불편 정보를 신고하고 검수할 수 있게 준비합니다.',
+              title: '신고',
+              semanticLabel: '신고, 불편 신고',
             ),
           ],
         ),
@@ -137,39 +120,39 @@ class FeatureTile extends StatelessWidget {
   const FeatureTile({
     required this.icon,
     required this.title,
-    required this.description,
+    required this.semanticLabel,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String description;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return MergeSemantics(
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        color: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: Color(0xFFD5E2E4)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: colorScheme.primary, size: 32),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+      child: Semantics(
+        label: semanticLabel,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(icon, color: colorScheme.primary, size: 32),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFF102A2C),
@@ -177,18 +160,10 @@ class FeatureTile extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF345C60),
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
