@@ -112,6 +112,42 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("유모차 이동 유형은 계단만 있는 역 접근 경로를 경고하고 점수를 높인다")
+	void strollerRouteWarnsStairOnlyStationAccess() {
+		var stairOnlyRepository = new InMemoryRouteSearchRepository();
+		var stairOnlyService = new RouteSearchService(
+			stairOnlyRepository,
+			stairOnlyRepository,
+			new StairOnlyTransitMasterPort(),
+			CLOCK
+		);
+		var accessibleRepository = new InMemoryRouteSearchRepository();
+		var accessibleService = new RouteSearchService(
+			accessibleRepository,
+			accessibleRepository,
+			new RampAccessibleTransitMasterPort(),
+			CLOCK
+		);
+
+		var stairOnlyResult = stairOnlyService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.STROLLER
+		));
+		var accessibleResult = accessibleService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.STROLLER
+		));
+
+		assertThat(stairOnlyResult.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(stairOnlyResult.warnings())
+			.extracting("code")
+			.contains(RouteWarningCode.STAIR_ONLY_ACCESS);
+		assertThat(stairOnlyResult.score()).isGreaterThan(accessibleResult.score());
+	}
+
+	@Test
 	@DisplayName("휠체어 이동 유형은 신뢰도 낮은 계단 정보만으로 경로를 차단하지 않는다")
 	void wheelchairRouteDoesNotBlockWithLowConfidenceStairOnlyData() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -175,6 +211,29 @@ class RouteSearchServiceTest {
 
 		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
 		assertThat(result.blockedReasons()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("출구 신뢰도가 높아도 무단차 시설 신뢰도가 낮으면 경고한다")
+	void routeWarnsWhenStepFreeFacilityConfidenceIsLow() {
+		var repository = new InMemoryRouteSearchRepository();
+		var lowConfidenceFacilityService = new RouteSearchService(
+			repository,
+			repository,
+			new LowConfidenceStepFreeFacilityTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = lowConfidenceFacilityService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.STROLLER
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(result.warnings())
+			.extracting("code")
+			.contains(RouteWarningCode.LOW_DATA_CONFIDENCE);
 	}
 
 	@Test
@@ -428,6 +487,31 @@ class RouteSearchServiceTest {
 		}
 	}
 
+	private static class LowConfidenceStepFreeFacilityTransitMasterPort extends ExitSummaryAccessibleTransitMasterPort {
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(
+				facility(
+					"facility-a-elevator",
+					"station-a",
+					"exit-a-2",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL,
+					DataConfidenceLevel.MEDIUM
+				),
+				facility(
+					"facility-b-elevator",
+					"station-b",
+					"exit-b-1",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL,
+					DataConfidenceLevel.MEDIUM
+				)
+			);
+		}
+	}
+
 	private static class BrokenElevatorTransitMasterPort extends StairOnlyTransitMasterPort {
 
 		@Override
@@ -510,6 +594,17 @@ class RouteSearchServiceTest {
 		AccessibilityFacilityType type,
 		AccessibilityFacilityStatus status
 	) {
+		return facility(id, stationId, exitId, type, status, DataConfidenceLevel.HIGH);
+	}
+
+	private static AccessibilityFacility facility(
+		String id,
+		String stationId,
+		String exitId,
+		AccessibilityFacilityType type,
+		AccessibilityFacilityStatus status,
+		DataConfidenceLevel dataConfidence
+	) {
 		return new AccessibilityFacility(
 			id,
 			stationId,
@@ -522,7 +617,7 @@ class RouteSearchServiceTest {
 			BigDecimal.ONE,
 			"테스트용 접근성 시설입니다.",
 			status,
-			DataConfidenceLevel.HIGH,
+			dataConfidence,
 			LocalDate.of(2026, 6, 13)
 		);
 	}

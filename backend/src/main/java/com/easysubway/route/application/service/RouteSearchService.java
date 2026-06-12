@@ -25,6 +25,7 @@ import com.easysubway.transit.domain.StationNotFoundException;
 import com.easysubway.transit.domain.SubwayLine;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -73,9 +74,10 @@ public class RouteSearchService implements RouteSearchUseCase {
 		}
 
 		DirectLine directLine = findDirectLine(origin.id(), destination.id());
-		List<RouteWarning> warnings = routeWarnings(origin.id(), destination.id());
+		boolean stairOnlyAccess = hasStairOnlyAccess(origin.id(), destination.id());
+		List<RouteWarning> warnings = routeWarnings(origin.id(), destination.id(), stairOnlyAccess);
 
-		if (command.mobilityType() == MobilityType.WHEELCHAIR && hasStairOnlyAccess(origin.id(), destination.id())) {
+		if (command.mobilityType() == MobilityType.WHEELCHAIR && stairOnlyAccess) {
 			return saveRouteSearchPort.saveRouteSearch(new RouteSearchResult(
 				newRouteSearchId(),
 				origin.id(),
@@ -170,15 +172,22 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.orElseThrow(RouteNotFoundException::new);
 	}
 
-	private List<RouteWarning> routeWarnings(String originStationId, String destinationStationId) {
+	private List<RouteWarning> routeWarnings(String originStationId, String destinationStationId, boolean stairOnlyAccess) {
 		// 출구 데이터가 없거나 신뢰도가 낮으면 사용자가 이동 전 확인할 수 있게 경고를 남긴다.
+		List<RouteWarning> warnings = new ArrayList<>();
 		if (hasLowAccessibilityData(originStationId) || hasLowAccessibilityData(destinationStationId)) {
-			return List.of(new RouteWarning(
+			warnings.add(new RouteWarning(
 				RouteWarningCode.LOW_DATA_CONFIDENCE,
 				"출발역 또는 도착역 접근성 정보가 부족합니다. 이동 전 역 상세 정보를 확인하세요."
 			));
 		}
-		return List.of();
+		if (stairOnlyAccess) {
+			warnings.add(new RouteWarning(
+				RouteWarningCode.STAIR_ONLY_ACCESS,
+				"출발역 또는 도착역에 계단 없는 접근 경로가 확인되지 않았습니다."
+			));
+		}
+		return List.copyOf(warnings);
 	}
 
 	private boolean hasLowAccessibilityData(String stationId) {
@@ -186,8 +195,12 @@ public class RouteSearchService implements RouteSearchUseCase {
 		if (exits.isEmpty()) {
 			return true;
 		}
-		return exits.stream()
+		boolean hasLowConfidenceExit = exits.stream()
 			.anyMatch(exit -> exit.dataConfidence() != DataConfidenceLevel.HIGH);
+		boolean hasLowConfidenceStepFreeFacility = stationFacilities(stationId).stream()
+			.filter(this::isStepFreeFacility)
+			.anyMatch(facility -> facility.dataConfidence() != DataConfidenceLevel.HIGH);
+		return hasLowConfidenceExit || hasLowConfidenceStepFreeFacility;
 	}
 
 	private boolean hasStairOnlyAccess(String originStationId, String destinationStationId) {
@@ -264,8 +277,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 			case TEMPORARY_INJURY -> 14;
 			case WHEELCHAIR -> 18;
 		};
-		int lowDataPenalty = warnings.isEmpty() ? 0 : 20;
-		return trainTime + walkingTime + profilePenalty + lowDataPenalty;
+		int lowDataPenalty = warnings.stream()
+			.anyMatch(warning -> warning.code() == RouteWarningCode.LOW_DATA_CONFIDENCE) ? 20 : 0;
+		int stairOnlyPenalty = warnings.stream()
+			.anyMatch(warning -> warning.code() == RouteWarningCode.STAIR_ONLY_ACCESS) ? 30 : 0;
+		return trainTime + walkingTime + profilePenalty + lowDataPenalty + stairOnlyPenalty;
 	}
 
 	private List<RouteStep> directLineSteps(Station origin, Station destination, DirectLine directLine) {
