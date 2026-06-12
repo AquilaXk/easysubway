@@ -109,6 +109,25 @@ test("path classifier maps repository, backend, mobile, Android, and iOS changes
   assert.equal(ci.ci, "true");
 });
 
+test("path classifier tests are stable when GITHUB_OUTPUT is inherited from CI", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-gh-output-"));
+  const previousGithubOutput = process.env.GITHUB_OUTPUT;
+  process.env.GITHUB_OUTPUT = path.join(dir, "github-output.txt");
+
+  try {
+    const outputs = await classifyChangedFiles(["README.md"]);
+
+    assert.equal(outputs.docs_only, "true");
+    assert.equal(outputs.repository, "false");
+  } finally {
+    if (previousGithubOutput === undefined) {
+      delete process.env.GITHUB_OUTPUT;
+    } else {
+      process.env.GITHUB_OUTPUT = previousGithubOutput;
+    }
+  }
+});
+
 async function classifyChangedFiles(files) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-ci-"));
   const changedFilesPath = path.join(dir, "changed-files.txt");
@@ -117,6 +136,13 @@ async function classifyChangedFiles(files) {
   const scriptPath = path.join(root, "tools/ci/detect-changed-paths.sh");
   assert.ok(existsSync(scriptPath), "Expected tools/ci/detect-changed-paths.sh to exist");
 
-  const { stdout } = await execFileAsync("bash", [scriptPath, changedFilesPath], { cwd: root });
+  const { stdout } = await execFileAsync("bash", [scriptPath, changedFilesPath], {
+    cwd: root,
+    env: {
+      ...process.env,
+      GITHUB_OUTPUT: "",
+      GITHUB_STEP_SUMMARY: "",
+    },
+  });
   return Object.fromEntries(stdout.trim().split("\n").map((line) => line.split("=")));
 }
