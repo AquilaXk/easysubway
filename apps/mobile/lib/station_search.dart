@@ -102,11 +102,11 @@ class StationSearchResult {
 
   String get dataQualityLabel {
     return switch (dataQualityLevel) {
-      'LEVEL_1' => '데이터 수준 1',
-      'LEVEL_2' => '데이터 수준 2',
-      'LEVEL_3' => '데이터 수준 3',
-      'LEVEL_4' => '데이터 수준 4',
-      _ => '데이터 수준 미확인',
+      'LEVEL_1' => '기본 정보만 확인됨',
+      'LEVEL_2' => '접근성 시설 확인됨',
+      'LEVEL_3' => '쉬운 경로 안내 가능',
+      'LEVEL_4' => '실시간 상태 반영됨',
+      _ => '확인 정보 부족',
     };
   }
 

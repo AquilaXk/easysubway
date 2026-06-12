@@ -58,7 +58,7 @@ void main() {
       expect(results.single.id, 'station-sangnoksu');
       expect(results.single.nameKo, '상록수');
       expect(results.single.region, '수도권');
-      expect(results.single.dataQualityLabel, '데이터 수준 1');
+      expect(results.single.dataQualityLabel, '기본 정보만 확인됨');
       expect(results.single.lines.single.name, '수도권 4호선');
     },
   );

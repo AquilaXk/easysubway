@@ -78,9 +78,9 @@ void main() {
 
       expect(repository.requestedQueries, ['상록수']);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('데이터 수준 1'), findsOneWidget);
+      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 데이터 수준 1'),
+        find.bySemanticsLabel('상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
         findsOneWidget,
       );
     } finally {
