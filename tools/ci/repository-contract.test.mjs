@@ -133,7 +133,9 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   const service = read("backend/src/main/java/com/easysubway/health/application/service/HealthCheckService.java");
   const controller = read("backend/src/main/java/com/easysubway/health/adapter/in/web/HealthCheckController.java");
   const apiResponse = read("backend/src/main/java/com/easysubway/common/web/ApiResponse.java");
-  const properties = read("backend/src/main/resources/application.properties");
+  const applicationYml = read("backend/src/main/resources/application.yml");
+  const applicationDevYml = read("backend/src/main/resources/application-dev.yml");
+  const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
 
   assert.ok(existsSync(path.join(root, "backend/gradlew")));
   assert.ok(existsSync(path.join(root, "backend/gradle/wrapper/gradle-wrapper.jar")));
@@ -158,8 +160,13 @@ test("backend scaffold is an eGovFrame 5.0 Spring Boot Java 21 hexagonal project
   assert.match(controller, /@GetMapping\("\/api\/health"\)/);
   assert.match(controller, /CheckHealthUseCase/);
   assert.match(apiResponse, /record ApiResponse/);
-  assert.match(properties, /spring\.application\.name=easysubway-backend/);
-  assert.match(properties, /management\.endpoints\.web\.exposure\.include=health,info/);
+  assert.equal(existsSync(path.join(root, "backend/src/main/resources/application.properties")), false);
+  assert.match(applicationYml, /spring:\s*\n\s*application:\s*\n\s*name:\s*["']?easysubway-backend["']?/);
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
+  assert.match(applicationDevYml, /logging:\s*\n\s*level:\s*\n\s*com\.easysubway:\s*["']?DEBUG["']?/);
+  assert.match(applicationProdYml, /logging:\s*\n\s*level:\s*\n\s*com\.easysubway:\s*["']?INFO["']?/);
+  assert.doesNotMatch(applicationDevYml, /spring\.profiles\.active|on-profile/);
+  assert.doesNotMatch(applicationProdYml, /spring\.profiles\.active|on-profile/);
 });
 
 test("backend transit master follows hexagonal API boundaries", () => {
