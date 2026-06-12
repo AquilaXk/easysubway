@@ -244,6 +244,43 @@ test("backend facility reports follow hexagonal API boundaries", () => {
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
 });
 
+test("backend mobility profiles follow hexagonal API boundaries", () => {
+  const profile = read("backend/src/main/java/com/easysubway/profile/domain/MobilityProfile.java");
+  const mobilityType = read("backend/src/main/java/com/easysubway/profile/domain/MobilityType.java");
+  const invalidProfile = read("backend/src/main/java/com/easysubway/profile/domain/InvalidMobilityProfileException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/profile/application/port/in/MobilityProfileUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/profile/application/port/in/SaveMobilityProfileCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/profile/application/port/out/LoadMobilityProfilePort.java");
+  const savePort = read("backend/src/main/java/com/easysubway/profile/application/port/out/SaveMobilityProfilePort.java");
+  const service = read("backend/src/main/java/com/easysubway/profile/application/service/MobilityProfileService.java");
+  const repository = read("backend/src/main/java/com/easysubway/profile/adapter/out/persistence/InMemoryMobilityProfileRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java");
+
+  assert.match(profile, /record MobilityProfile/);
+  assert.match(profile, /largeText/);
+  assert.match(profile, /highContrast/);
+  assert.match(profile, /simpleView/);
+  assert.match(mobilityType, /SENIOR/);
+  assert.match(mobilityType, /STROLLER/);
+  assert.match(mobilityType, /WHEELCHAIR/);
+  assert.match(mobilityType, /PREGNANT/);
+  assert.match(mobilityType, /TEMPORARY_INJURY/);
+  assert.match(mobilityType, /LUGGAGE/);
+  assert.match(invalidProfile, /extends InvalidRequestException/);
+  assert.match(useCase, /interface MobilityProfileUseCase/);
+  assert.match(useCase, /getProfile/);
+  assert.match(useCase, /saveProfile/);
+  assert.match(command, /record SaveMobilityProfileCommand/);
+  assert.match(loadPort, /interface LoadMobilityProfilePort/);
+  assert.match(savePort, /interface SaveMobilityProfilePort/);
+  assert.match(service, /implements MobilityProfileUseCase/);
+  assert.match(service, /defaultProfile/);
+  assert.match(service, /MobilityType\.WHEELCHAIR/);
+  assert.match(repository, /implements LoadMobilityProfilePort, SaveMobilityProfilePort/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/mobility-profile"\)/);
+  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/mobility-profile"\)/);
+});
+
 test("mobile scaffold is a Flutter Android and iOS app", () => {
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
