@@ -124,6 +124,30 @@ test("repository ci validates docker compose configuration", () => {
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
 });
 
+test("backend scaffold is a Spring Boot 3.5 Java 21 Gradle project", () => {
+  const build = read("backend/build.gradle");
+  const wrapper = read("backend/gradle/wrapper/gradle-wrapper.properties");
+  const application = read("backend/src/main/java/com/easysubway/EasySubwayBackendApplication.java");
+  const controller = read("backend/src/main/java/com/easysubway/api/health/HealthCheckController.java");
+  const properties = read("backend/src/main/resources/application.properties");
+
+  assert.ok(existsSync(path.join(root, "backend/gradlew")));
+  assert.ok(existsSync(path.join(root, "backend/gradle/wrapper/gradle-wrapper.jar")));
+  assert.match(wrapper, /gradle-8\.14\.5-bin\.zip/);
+
+  assert.match(build, /id 'org\.springframework\.boot' version '3\.5\.\d+'/);
+  assert.match(build, /languageVersion = JavaLanguageVersion\.of\(21\)/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-web'/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-actuator'/);
+  assert.match(build, /testImplementation 'org\.springframework\.boot:spring-boot-starter-test'/);
+
+  assert.match(application, /@SpringBootApplication/);
+  assert.match(controller, /@GetMapping\("\/api\/health"\)/);
+  assert.match(controller, /easysubway-backend/);
+  assert.match(properties, /spring\.application\.name=easysubway-backend/);
+  assert.match(properties, /management\.endpoints\.web\.exposure\.include=health,info/);
+});
+
 test("path classifier treats README as docs-only", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
