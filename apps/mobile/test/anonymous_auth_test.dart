@@ -47,12 +47,17 @@ void main() {
 
   test('익명 인증 세션은 한 번 발급한 Basic 헤더를 재사용한다', () async {
     final repository = FakeAnonymousAuthRepository();
-    final session = AnonymousAuthSession(repository: repository);
+    final credentialStore = MemoryAnonymousAuthCredentialStore();
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
 
     final firstHeader = await session.authorizationHeader();
     final secondHeader = await session.authorizationHeader();
 
     expect(repository.issueCount, 1);
+    expect(credentialStore.saveCount, 1);
     expect(firstHeader, secondHeader);
     expect(
       firstHeader,
@@ -60,9 +65,62 @@ void main() {
     );
   });
 
+  test('익명 인증 세션은 저장된 인증 정보를 먼저 사용한다', () async {
+    final repository = FakeAnonymousAuthRepository();
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stored-anonymous-user',
+        password: 'stored-password',
+      ),
+    );
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
+
+    final header = await session.authorizationHeader();
+
+    expect(repository.issueCount, 0);
+    expect(credentialStore.readCount, 1);
+    expect(credentialStore.saveCount, 0);
+    expect(
+      header,
+      'Basic ${base64Encode(utf8.encode('stored-anonymous-user:stored-password'))}',
+    );
+  });
+
+  test('익명 인증 세션은 발급한 인증 정보를 저장해 재시작 후 재사용한다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore();
+    final firstRepository = FakeAnonymousAuthRepository();
+    final firstSession = AnonymousAuthSession(
+      repository: firstRepository,
+      credentialStore: credentialStore,
+    );
+
+    final firstHeader = await firstSession.authorizationHeader();
+    final secondRepository = FakeAnonymousAuthRepository(
+      userId: 'new-anonymous-user',
+      password: 'new-password',
+    );
+    final secondSession = AnonymousAuthSession(
+      repository: secondRepository,
+      credentialStore: credentialStore,
+    );
+    final secondHeader = await secondSession.authorizationHeader();
+
+    expect(firstRepository.issueCount, 1);
+    expect(secondRepository.issueCount, 0);
+    expect(credentialStore.saveCount, 1);
+    expect(secondHeader, firstHeader);
+  });
+
   test('익명 인증 세션은 동시에 요청해도 발급 요청을 하나만 보낸다', () async {
     final repository = FakeAnonymousAuthRepository(issueDelay: Duration.zero);
-    final session = AnonymousAuthSession(repository: repository);
+    final credentialStore = MemoryAnonymousAuthCredentialStore();
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
 
     final headers = await Future.wait([
       session.authorizationHeader(),
@@ -71,6 +129,8 @@ void main() {
     ]);
 
     expect(repository.issueCount, 1);
+    expect(credentialStore.readCount, 1);
+    expect(credentialStore.saveCount, 1);
     expect(headers.toSet(), hasLength(1));
   });
 
@@ -112,19 +172,48 @@ void main() {
 class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   FakeAnonymousAuthRepository({
     this.issueDelay = const Duration(milliseconds: 10),
+    this.userId = 'anonymous-user-1',
+    this.password = 'user-test-password',
   });
 
   final Duration issueDelay;
+  final String userId;
+  final String password;
   int issueCount = 0;
 
   @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
     issueCount++;
     await Future<void>.delayed(issueDelay);
-    return const AnonymousAuthCredentials(
-      userId: 'anonymous-user-1',
-      password: 'user-test-password',
-    );
+    return AnonymousAuthCredentials(userId: userId, password: password);
+  }
+}
+
+class MemoryAnonymousAuthCredentialStore
+    implements AnonymousAuthCredentialStore {
+  MemoryAnonymousAuthCredentialStore([this.credentials]);
+
+  AnonymousAuthCredentials? credentials;
+  int readCount = 0;
+  int saveCount = 0;
+  int clearCount = 0;
+
+  @override
+  Future<AnonymousAuthCredentials?> readCredentials() async {
+    readCount++;
+    return credentials;
+  }
+
+  @override
+  Future<void> saveCredentials(AnonymousAuthCredentials credentials) async {
+    saveCount++;
+    this.credentials = credentials;
+  }
+
+  @override
+  Future<void> clearCredentials() async {
+    clearCount++;
+    credentials = null;
   }
 }
 

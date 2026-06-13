@@ -3,14 +3,68 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'station_search.dart';
 
 const _anonymousAuthTimeout = Duration(seconds: 8);
 const _anonymousAuthErrorMessage = '인증을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+const _anonymousAuthCredentialsKey = 'easysubway.anonymousAuth.credentials';
 
 abstract class AnonymousAuthRepository {
   Future<AnonymousAuthCredentials> issueAnonymousUser();
+}
+
+abstract class AnonymousAuthCredentialStore {
+  Future<AnonymousAuthCredentials?> readCredentials();
+
+  Future<void> saveCredentials(AnonymousAuthCredentials credentials);
+
+  Future<void> clearCredentials();
+}
+
+class SecureAnonymousAuthCredentialStore
+    implements AnonymousAuthCredentialStore {
+  const SecureAnonymousAuthCredentialStore({
+    this.storage = const FlutterSecureStorage(),
+  });
+
+  final FlutterSecureStorage storage;
+
+  @override
+  Future<AnonymousAuthCredentials?> readCredentials() async {
+    final value = await storage.read(key: _anonymousAuthCredentialsKey);
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map<String, Object?>) {
+        throw const FormatException('Invalid anonymous auth storage payload');
+      }
+      return AnonymousAuthCredentials.fromJson(decoded);
+    } catch (_) {
+      await clearCredentials();
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveCredentials(AnonymousAuthCredentials credentials) async {
+    await storage.write(
+      key: _anonymousAuthCredentialsKey,
+      value: jsonEncode({
+        'userId': credentials.userId,
+        'password': credentials.password,
+      }),
+    );
+  }
+
+  @override
+  Future<void> clearCredentials() async {
+    await storage.delete(key: _anonymousAuthCredentialsKey);
+  }
 }
 
 class AnonymousAuthApiRepository implements AnonymousAuthRepository {
@@ -68,9 +122,14 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
 }
 
 class AnonymousAuthSession implements FavoriteStationAuthProvider {
-  AnonymousAuthSession({required this.repository});
+  AnonymousAuthSession({
+    required this.repository,
+    AnonymousAuthCredentialStore? credentialStore,
+  }) : credentialStore =
+           credentialStore ?? const SecureAnonymousAuthCredentialStore();
 
   final AnonymousAuthRepository repository;
+  final AnonymousAuthCredentialStore credentialStore;
   AnonymousAuthCredentials? _credentials;
   Future<AnonymousAuthCredentials>? _issuingCredentials;
 
@@ -91,18 +150,29 @@ class AnonymousAuthSession implements FavoriteStationAuthProvider {
       return issuingCredentials;
     }
 
-    // 여러 API가 동시에 인증을 요구해도 익명 계정은 한 번만 발급한다.
-    final nextIssuingCredentials = repository.issueAnonymousUser();
+    // 저장소 조회와 신규 발급을 하나로 묶어 동시 호출에서도 익명 계정을 한 번만 준비한다.
+    final nextIssuingCredentials = _loadOrIssueCredentials();
     _issuingCredentials = nextIssuingCredentials;
     try {
-      final issuedCredentials = await nextIssuingCredentials;
-      _credentials = issuedCredentials;
-      return issuedCredentials;
+      return await nextIssuingCredentials;
     } finally {
       if (identical(_issuingCredentials, nextIssuingCredentials)) {
         _issuingCredentials = null;
       }
     }
+  }
+
+  Future<AnonymousAuthCredentials> _loadOrIssueCredentials() async {
+    final storedCredentials = await credentialStore.readCredentials();
+    if (storedCredentials != null) {
+      _credentials = storedCredentials;
+      return storedCredentials;
+    }
+
+    final issuedCredentials = await repository.issueAnonymousUser();
+    await credentialStore.saveCredentials(issuedCredentials);
+    _credentials = issuedCredentials;
+    return issuedCredentials;
   }
 }
 
