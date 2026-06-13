@@ -139,6 +139,13 @@ class AnonymousAuthSession implements FavoriteStationAuthProvider {
     return credentials.authorizationHeader;
   }
 
+  @override
+  Future<void> invalidateAuthorization() async {
+    _credentials = null;
+    _issuingCredentials = null;
+    await credentialStore.clearCredentials();
+  }
+
   Future<AnonymousAuthCredentials> _currentCredentials() async {
     final cachedCredentials = _credentials;
     if (cachedCredentials != null) {

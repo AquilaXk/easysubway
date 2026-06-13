@@ -167,6 +167,8 @@ abstract class FavoriteStationRepository {
 
 abstract class FavoriteStationAuthProvider {
   Future<String?> authorizationHeader();
+
+  Future<void> invalidateAuthorization();
 }
 
 class NoFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
@@ -174,6 +176,9 @@ class NoFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
 
   @override
   Future<String?> authorizationHeader() async => null;
+
+  @override
+  Future<void> invalidateAuthorization() async {}
 }
 
 class BasicFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
@@ -194,6 +199,9 @@ class BasicFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
     final token = base64Encode(utf8.encode('${username.trim()}:$password'));
     return 'Basic $token';
   }
+
+  @override
+  Future<void> invalidateAuthorization() async {}
 }
 
 class FavoriteStationApiRepository implements FavoriteStationRepository {
@@ -270,40 +278,53 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
     Uri uri, {
     required String errorMessage,
   }) async {
-    try {
-      final request = await _httpClient
-          .openUrl(method, uri)
-          .timeout(_favoriteStationTimeout);
-      final authorizationHeader = await authProvider
-          .authorizationHeader()
-          .timeout(_favoriteStationTimeout);
-      if (authorizationHeader != null) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          authorizationHeader,
-        );
-      }
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final request = await _httpClient
+            .openUrl(method, uri)
+            .timeout(_favoriteStationTimeout);
+        final authorizationHeader = await authProvider
+            .authorizationHeader()
+            .timeout(_favoriteStationTimeout);
+        if (authorizationHeader != null) {
+          request.headers.set(
+            HttpHeaders.authorizationHeader,
+            authorizationHeader,
+          );
+        }
 
-      final response = await request.close().timeout(_favoriteStationTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_favoriteStationTimeout);
+        final response = await request.close().timeout(_favoriteStationTimeout);
+        final body = await utf8
+            .decodeStream(response)
+            .timeout(_favoriteStationTimeout);
 
-      if (response.statusCode < HttpStatus.ok ||
-          response.statusCode >= HttpStatus.multipleChoices) {
+        if (response.statusCode == HttpStatus.unauthorized &&
+            authorizationHeader != null &&
+            attempt == 0) {
+          // 저장된 익명 인증이 서버에서 만료된 경우 지우고 새 인증으로 한 번만 재시도한다.
+          await authProvider.invalidateAuthorization().timeout(
+            _favoriteStationTimeout,
+          );
+          continue;
+        }
+
+        if (response.statusCode < HttpStatus.ok ||
+            response.statusCode >= HttpStatus.multipleChoices) {
+          throw FavoriteStationException(errorMessage);
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+          throw FavoriteStationException(errorMessage);
+        }
+        return decoded['data'];
+      } on FavoriteStationException {
+        rethrow;
+      } catch (_) {
         throw FavoriteStationException(errorMessage);
       }
-
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-        throw FavoriteStationException(errorMessage);
-      }
-      return decoded['data'];
-    } on FavoriteStationException {
-      rethrow;
-    } catch (_) {
-      throw FavoriteStationException(errorMessage);
     }
+    throw FavoriteStationException(errorMessage);
   }
 }
 

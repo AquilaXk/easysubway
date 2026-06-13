@@ -114,6 +114,40 @@ void main() {
     expect(secondHeader, firstHeader);
   });
 
+  test('익명 인증 세션은 인증 실패 후 저장된 인증 정보를 지우고 다시 발급한다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stale-anonymous-user',
+        password: 'stale-password',
+      ),
+    );
+    final repository = FakeAnonymousAuthRepository(
+      userId: 'fresh-anonymous-user',
+      password: 'fresh-password',
+    );
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
+
+    final staleHeader = await session.authorizationHeader();
+    await session.invalidateAuthorization();
+    final freshHeader = await session.authorizationHeader();
+
+    expect(
+      staleHeader,
+      'Basic ${base64Encode(utf8.encode('stale-anonymous-user:stale-password'))}',
+    );
+    expect(
+      freshHeader,
+      'Basic ${base64Encode(utf8.encode('fresh-anonymous-user:fresh-password'))}',
+    );
+    expect(repository.issueCount, 1);
+    expect(credentialStore.clearCount, 1);
+    expect(credentialStore.saveCount, 1);
+    expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
+  });
+
   test('익명 인증 세션은 동시에 요청해도 발급 요청을 하나만 보낸다', () async {
     final repository = FakeAnonymousAuthRepository(issueDelay: Duration.zero);
     final credentialStore = MemoryAnonymousAuthCredentialStore();

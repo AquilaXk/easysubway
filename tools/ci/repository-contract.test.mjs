@@ -596,11 +596,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuth, /FlutterSecureStorage/);
   assert.match(anonymousAuth, /readCredentials/);
   assert.match(anonymousAuth, /saveCredentials/);
+  assert.match(anonymousAuth, /clearCredentials/);
   assert.match(anonymousAuth, /POST|postUrl/);
   assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous/);
   assert.match(anonymousAuth, /class AnonymousAuthSession implements FavoriteStationAuthProvider/);
   assert.match(anonymousAuth, /_credentials/);
   assert.match(anonymousAuth, /_loadOrIssueCredentials/);
+  assert.match(anonymousAuth, /invalidateAuthorization/);
   assert.match(anonymousAuth, /_isAllowedAnonymousAuthBaseUri/);
   assert.match(anonymousAuth, /_isIpv4LoopbackLiteral/);
   assert.match(anonymousAuth, /allowAndroidEmulatorHttp = kDebugMode/);
@@ -608,9 +610,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuth, /10\.0\.2\.2/);
   assert.match(anonymousAuthTest, /저장된 인증 정보를 먼저 사용한다/);
   assert.match(anonymousAuthTest, /재시작 후 재사용한다/);
+  assert.match(anonymousAuthTest, /인증 실패 후 저장된 인증 정보를 지우고 다시 발급한다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
   assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);
+  assert.match(stationSearch, /HttpStatus\.unauthorized/);
+  assert.match(stationSearch, /invalidateAuthorization\(\)/);
+  assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /홈 화면은 핵심 행동만 간결하게 보여준다/);
