@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easysubway_mobile/main.dart';
+import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
         ),
       );
@@ -83,6 +85,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
         ),
       );
@@ -188,6 +191,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
         ),
       );
@@ -238,6 +242,14 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.ensureVisible(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(OutlinedButton, '상태 신고'), findsOneWidget);
+      expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 신고'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -253,6 +265,7 @@ void main() {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
       ),
     );
@@ -286,6 +299,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
         ),
       );
@@ -348,6 +362,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
         ),
       );
@@ -453,6 +468,7 @@ void main() {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
       ),
     );
@@ -487,6 +503,7 @@ void main() {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
       ),
     );
@@ -564,6 +581,7 @@ void main() {
       await tester.pumpWidget(
         EasySubwayApp(
           repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
         ),
       );
@@ -623,6 +641,101 @@ void main() {
         find.byKey(const Key('routeSearchSubmitButton')),
       );
       expect(completedButton.onPressed, isNotNull);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('시설 신고 화면은 신고 유형과 내용을 보내고 접수 결과를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final reportRepository = FakeFacilityReportRepository();
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: stationRepository,
+          reportRepository: reportRepository,
+          routeRepository: FakeRouteSearchRepository(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('시설 신고'), findsOneWidget);
+      expect(find.text('상록수역'), findsOneWidget);
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+      expect(find.text('무엇을 알려드릴까요?'), findsOneWidget);
+      expect(find.bySemanticsLabel('고장 선택됨'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('facilityReportType-CLOSED')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('facilityReportDescriptionInput')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('facilityReportDescriptionInput')),
+        '출입문이 막혀 있습니다.',
+      );
+      await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(reportRepository.requests, hasLength(1));
+      expect(reportRepository.requests.single.stationId, 'station-sangnoksu');
+      expect(
+        reportRepository.requests.single.facilityId,
+        'facility-sangnoksu-elevator-1',
+      );
+      expect(reportRepository.requests.single.reportType, 'CLOSED');
+      expect(reportRepository.requests.single.description, '출입문이 막혀 있습니다.');
+      expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
+      expect(find.bySemanticsLabel('신고가 접수되었습니다.'), findsOneWidget);
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
       semanticsHandle.dispose();
     }
@@ -714,6 +827,31 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
     return _sampleRouteSearchResult();
+  }
+}
+
+class FakeFacilityReportRepository implements FacilityReportRepository {
+  final requests = <FacilityReportRequest>[];
+  Object? error;
+
+  @override
+  Future<FacilityReportResult> createReport(
+    FacilityReportRequest request,
+  ) async {
+    requests.add(request);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return FacilityReportResult(
+      id: 'report-${requests.length}',
+      stationId: request.stationId,
+      facilityId: request.facilityId,
+      reportType: request.reportType,
+      description: request.description,
+      status: 'SUBMITTED',
+      createdAt: '2026-06-13T10:00:00',
+    );
   }
 }
 
