@@ -9,7 +9,7 @@ import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.provisioning.UserDetailsManager;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,7 +17,7 @@ public class SpringSecurityAnonymousUserRegistry implements RegisterAnonymousUse
 
 	static final int MAX_ANONYMOUS_USERS = 10_000;
 
-	private final InMemoryUserDetailsManager userDetailsManager;
+	private final UserDetailsManager userDetailsManager;
 	private final PasswordEncoder passwordEncoder;
 	private final int maxAnonymousUsers;
 	private final Deque<String> issuedAnonymousUserIds = new ArrayDeque<>();
@@ -25,14 +25,14 @@ public class SpringSecurityAnonymousUserRegistry implements RegisterAnonymousUse
 
 	@Autowired
 	public SpringSecurityAnonymousUserRegistry(
-		InMemoryUserDetailsManager userDetailsManager,
+		UserDetailsManager userDetailsManager,
 		PasswordEncoder passwordEncoder
 	) {
 		this(userDetailsManager, passwordEncoder, MAX_ANONYMOUS_USERS);
 	}
 
 	SpringSecurityAnonymousUserRegistry(
-		InMemoryUserDetailsManager userDetailsManager,
+		UserDetailsManager userDetailsManager,
 		PasswordEncoder passwordEncoder,
 		int maxAnonymousUsers
 	) {

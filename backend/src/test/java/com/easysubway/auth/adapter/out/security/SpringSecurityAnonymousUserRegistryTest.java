@@ -3,18 +3,18 @@ package com.easysubway.auth.adapter.out.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.easysubway.auth.domain.AnonymousUserCredentials;
+import com.easysubway.common.security.ConcurrentUserDetailsManager;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 
 @DisplayName("Spring Security 익명 사용자 저장소")
 class SpringSecurityAnonymousUserRegistryTest {
 
-	private final InMemoryUserDetailsManager userDetailsManager = new InMemoryUserDetailsManager();
+	private final ConcurrentUserDetailsManager userDetailsManager = new ConcurrentUserDetailsManager();
 	private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder =
 		PasswordEncoderFactories.createDelegatingPasswordEncoder();
 	private final SpringSecurityAnonymousUserRegistry registry = new SpringSecurityAnonymousUserRegistry(

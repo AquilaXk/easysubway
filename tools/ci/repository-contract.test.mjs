@@ -202,6 +202,7 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const rateLimiter = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthRateLimiter.java");
   const controller = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const userDetailsManager = read("backend/src/main/java/com/easysubway/common/security/ConcurrentUserDetailsManager.java");
 
   assert.match(credentials, /record AnonymousUserCredentials/);
   assert.match(credentials, /userId/);
@@ -221,10 +222,13 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(service, /implements AnonymousAuthUseCase/);
   assert.match(service, /RegisterAnonymousUserPort/);
   assert.match(registry, /implements RegisterAnonymousUserPort/);
-  assert.match(registry, /InMemoryUserDetailsManager/);
+  assert.match(registry, /UserDetailsManager/);
   assert.match(registry, /PasswordEncoder/);
   assert.match(registry, /MAX_ANONYMOUS_USERS/);
   assert.match(registry, /deleteUser/);
+  assert.match(userDetailsManager, /implements UserDetailsManager, UserDetailsPasswordService/);
+  assert.match(userDetailsManager, /ConcurrentHashMap/);
+  assert.doesNotMatch(security, /InMemoryUserDetailsManager/);
   assert.match(rateLimiter, /class AnonymousAuthRateLimiter/);
   assert.match(rateLimiter, /MAX_ISSUE_REQUESTS_PER_CLIENT/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);

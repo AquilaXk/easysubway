@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -64,14 +63,14 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	InMemoryUserDetailsManager userDetailsService(
+	ConcurrentUserDetailsManager userDetailsService(
 		@Value("${easysubway.admin.username:}") String adminUsername,
 		@Value("${easysubway.admin.password:}") String adminPassword,
 		@Value("${easysubway.user.username:}") String userUsername,
 		@Value("${easysubway.user.password:}") String userPassword,
 		PasswordEncoder passwordEncoder
 	) {
-		var users = new InMemoryUserDetailsManager();
+		var users = new ConcurrentUserDetailsManager();
 		if (!adminUsername.isBlank() && !adminPassword.isBlank()) {
 			users.createUser(User.withUsername(adminUsername)
 				.password(passwordEncoder.encode(adminPassword))
