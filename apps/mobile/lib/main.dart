@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'facility_report.dart';
 import 'mobility_profile.dart';
 import 'route_search.dart';
 import 'station_search.dart';
@@ -11,16 +12,21 @@ void main() {
 class EasySubwayApp extends StatelessWidget {
   EasySubwayApp({
     StationSearchRepository? repository,
+    FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
     super.key,
   }) : repository =
            repository ??
            StationSearchApiRepository(baseUri: defaultStationApiBaseUri()),
+       reportRepository =
+           reportRepository ??
+           FacilityReportApiRepository(baseUri: defaultStationApiBaseUri()),
        routeRepository =
            routeRepository ??
            RouteSearchApiRepository(baseUri: defaultStationApiBaseUri());
 
   final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
 
   @override
@@ -68,6 +74,7 @@ class EasySubwayApp extends StatelessWidget {
       ),
       home: HomeScreen(
         repository: repository,
+        reportRepository: reportRepository,
         routeRepository: routeRepository,
       ),
     );
@@ -77,11 +84,13 @@ class EasySubwayApp extends StatelessWidget {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.repository,
+    required this.reportRepository,
     required this.routeRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
 
   @override
@@ -111,7 +120,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => StationSearchScreen(repository: repository),
+                    builder: (_) => StationSearchScreen(
+                      repository: repository,
+                      reportRepository: reportRepository,
+                    ),
                   ),
                 );
               },

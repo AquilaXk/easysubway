@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'facility_report.dart';
+
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 
@@ -674,9 +676,14 @@ class StationDetailController extends ChangeNotifier {
 }
 
 class StationSearchScreen extends StatefulWidget {
-  const StationSearchScreen({required this.repository, super.key});
+  const StationSearchScreen({
+    required this.repository,
+    required this.reportRepository,
+    super.key,
+  });
 
   final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -771,6 +778,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       MaterialPageRoute<void>(
         builder: (_) => StationDetailScreen(
           repository: widget.repository,
+          reportRepository: widget.reportRepository,
           stationId: result.id,
         ),
       ),
@@ -923,11 +931,13 @@ class _StationSearchResultTile extends StatelessWidget {
 class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
     required this.repository,
+    required this.reportRepository,
     required this.stationId,
     super.key,
   });
 
   final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
   final String stationId;
 
   @override
@@ -958,7 +968,10 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
-            return _StationDetailBody(state: _controller.state);
+            return _StationDetailBody(
+              state: _controller.state,
+              reportRepository: widget.reportRepository,
+            );
           },
         ),
       ),
@@ -967,9 +980,13 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
 }
 
 class _StationDetailBody extends StatelessWidget {
-  const _StationDetailBody({required this.state});
+  const _StationDetailBody({
+    required this.state,
+    required this.reportRepository,
+  });
 
   final StationDetailState state;
+  final FacilityReportRepository reportRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -987,6 +1004,7 @@ class _StationDetailBody extends StatelessWidget {
         detail: state.detail!,
         exits: state.exits,
         facilities: state.facilities,
+        reportRepository: reportRepository,
       ),
     };
   }
@@ -997,11 +1015,13 @@ class _StationDetailContent extends StatelessWidget {
     required this.detail,
     required this.exits,
     required this.facilities,
+    required this.reportRepository,
   });
 
   final StationDetail detail;
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
+  final FacilityReportRepository reportRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -1023,8 +1043,29 @@ class _StationDetailContent extends StatelessWidget {
           const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
         else
           for (final facility in facilities)
-            _StationFacilityCard(facility: facility),
+            _StationFacilityCard(
+              facility: facility,
+              onReportTap: () => _openFacilityReport(context, facility),
+            ),
       ],
+    );
+  }
+
+  void _openFacilityReport(BuildContext context, StationFacilityInfo facility) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FacilityReportScreen(
+          repository: reportRepository,
+          target: FacilityReportTarget(
+            stationId: detail.id,
+            stationName: detail.nameKo,
+            facilityId: facility.id,
+            facilityName: facility.name,
+            facilityTypeLabel: facility.typeLabel,
+            facilityStatusLabel: facility.statusLabel,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1213,70 +1254,87 @@ class _StationExitCard extends StatelessWidget {
 }
 
 class _StationFacilityCard extends StatelessWidget {
-  const _StationFacilityCard({required this.facility});
+  const _StationFacilityCard({
+    required this.facility,
+    required this.onReportTap,
+  });
 
   final StationFacilityInfo facility;
+  final VoidCallback onReportTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: facility.semanticLabel,
-        child: ExcludeSemantics(
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: facility.semanticLabel,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFFD5E2E4)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                facility.name,
+                style: textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Text(
-                    facility.name,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w900,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _StationDetailTextPill(text: facility.typeLabel),
-                      _StationDetailTextPill(text: facility.statusLabel),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _StationDetailInfoRow(
-                    icon: Icons.place_outlined,
-                    text: facility.locationLabel,
-                  ),
-                  const SizedBox(height: 6),
-                  _StationDetailInfoRow(
-                    icon: Icons.event_available,
-                    text: facility.updatedLabel,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    facility.confidenceLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
+                  _StationDetailTextPill(text: facility.typeLabel),
+                  _StationDetailTextPill(text: facility.statusLabel),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+              _StationDetailInfoRow(
+                icon: Icons.place_outlined,
+                text: facility.locationLabel,
+              ),
+              const SizedBox(height: 6),
+              _StationDetailInfoRow(
+                icon: Icons.event_available,
+                text: facility.updatedLabel,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                facility.confidenceLabel,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF405A5D),
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Semantics(
+                container: true,
+                label: '${facility.name} 상태 신고',
+                button: true,
+                onTap: onReportTap,
+                child: ExcludeSemantics(
+                  child: OutlinedButton.icon(
+                    key: Key('facilityReportButton-${facility.id}'),
+                    onPressed: onReportTap,
+                    icon: const Icon(Icons.report_outlined),
+                    label: const Text('상태 신고'),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
