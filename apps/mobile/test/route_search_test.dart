@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,11 @@ void main() {
     addTearDown(server.close);
 
     server.listen((request) async {
+      expect(request.method, 'POST');
+      expect(
+        request.headers.value(HttpHeaders.contentTypeHeader),
+        contains(ContentType.json.mimeType),
+      );
       requestedUri = request.uri;
       requestedBody = await utf8.decoder.bind(request).join();
       request.response
@@ -109,8 +115,39 @@ void main() {
       ),
     );
 
+    expect(repository.requests, hasLength(1));
+    expect(repository.requests.single.originStationId, 'station-sangnoksu');
+    expect(repository.requests.single.destinationStationId, 'station-sadang');
+    expect(repository.requests.single.mobilityType, 'SENIOR');
     expect(controller.state.status, RouteSearchViewStatus.failure);
     expect(controller.state.message, '경로 정보를 불러오지 못했습니다.');
+  });
+
+  test('경로 검색 컨트롤러는 화면 종료 후 비동기 결과를 알리지 않는다', () async {
+    final repository = PendingRouteSearchRepository();
+    final controller = RouteSearchController(repository: repository);
+    var notificationCount = 0;
+    controller.addListener(() {
+      notificationCount += 1;
+    });
+
+    final searchFuture = controller.search(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'SENIOR',
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.status, RouteSearchViewStatus.loading);
+    expect(notificationCount, 1);
+
+    controller.dispose();
+    repository.complete(_sampleRouteSearchResult());
+    await searchFuture;
+
+    expect(notificationCount, 1);
   });
 }
 
@@ -126,6 +163,18 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
       throw currentError;
     }
     return _sampleRouteSearchResult();
+  }
+}
+
+class PendingRouteSearchRepository implements RouteSearchRepository {
+  final _completer = Completer<RouteSearchResult>();
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) =>
+      _completer.future;
+
+  void complete(RouteSearchResult result) {
+    _completer.complete(result);
   }
 }
 

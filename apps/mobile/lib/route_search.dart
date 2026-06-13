@@ -274,52 +274,74 @@ class RouteSearchController extends ChangeNotifier {
 
   RouteSearchState _state = const RouteSearchState.idle();
   int _searchRequestId = 0;
+  bool _disposed = false;
 
   RouteSearchState get state => _state;
 
   Future<void> search(RouteSearchRequest request) async {
+    if (_disposed) {
+      return;
+    }
+
     final requestId = ++_searchRequestId;
     final trimmedRequest = request.trimmed();
     if (trimmedRequest.originStationId.isEmpty ||
         trimmedRequest.destinationStationId.isEmpty) {
-      _state = const RouteSearchState(
-        status: RouteSearchViewStatus.failure,
-        message: '출발역과 도착역을 입력해 주세요.',
+      _emitState(
+        const RouteSearchState(
+          status: RouteSearchViewStatus.failure,
+          message: '출발역과 도착역을 입력해 주세요.',
+        ),
       );
-      notifyListeners();
       return;
     }
 
-    _state = const RouteSearchState(status: RouteSearchViewStatus.loading);
-    notifyListeners();
+    _emitState(const RouteSearchState(status: RouteSearchViewStatus.loading));
 
     try {
       final result = await repository.searchRoute(trimmedRequest);
-      if (requestId != _searchRequestId) {
+      if (_disposed || requestId != _searchRequestId) {
         return;
       }
-      _state = RouteSearchState(
-        status: RouteSearchViewStatus.success,
-        result: result,
+      _emitState(
+        RouteSearchState(status: RouteSearchViewStatus.success, result: result),
       );
     } on RouteSearchException catch (error) {
-      if (requestId != _searchRequestId) {
+      if (_disposed || requestId != _searchRequestId) {
         return;
       }
-      _state = RouteSearchState(
-        status: RouteSearchViewStatus.failure,
-        message: error.message,
+      _emitState(
+        RouteSearchState(
+          status: RouteSearchViewStatus.failure,
+          message: error.message,
+        ),
       );
     } catch (_) {
-      if (requestId != _searchRequestId) {
+      if (_disposed || requestId != _searchRequestId) {
         return;
       }
-      _state = const RouteSearchState(
-        status: RouteSearchViewStatus.failure,
-        message: _routeSearchErrorMessage,
+      _emitState(
+        const RouteSearchState(
+          status: RouteSearchViewStatus.failure,
+          message: _routeSearchErrorMessage,
+        ),
       );
     }
+  }
+
+  void _emitState(RouteSearchState nextState) {
+    if (_disposed) {
+      return;
+    }
+    _state = nextState;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // 화면을 떠난 뒤 도착한 네트워크 응답이 dispose된 리스너를 깨우지 않게 막는다.
+    _disposed = true;
+    super.dispose();
   }
 }
 
@@ -377,30 +399,35 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            InputDecorator(
               key: const Key('routeMobilityTypeInput'),
-              initialValue: _selectedMobilityType,
               decoration: const InputDecoration(
                 labelText: '이동 조건',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(8)),
                 ),
               ),
-              items: [
-                for (final option in mobilityProfileOptions)
-                  DropdownMenuItem<String>(
-                    value: option.mobilityType,
-                    child: Text(option.title),
-                  ),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-                setState(() {
-                  _selectedMobilityType = value;
-                });
-              },
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedMobilityType,
+                  isExpanded: true,
+                  items: [
+                    for (final option in mobilityProfileOptions)
+                      DropdownMenuItem<String>(
+                        value: option.mobilityType,
+                        child: Text(option.title),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _selectedMobilityType = value;
+                    });
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             AnimatedBuilder(

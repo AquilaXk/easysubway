@@ -295,45 +295,50 @@ void main() {
   });
 
   testWidgets('경로 검색 중에는 버튼을 비활성화하고 안내 불가 이유를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final routeRepository = ControlledRouteSearchRepository();
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        routeRepository: routeRepository,
-      ),
-    );
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          routeRepository: routeRepository,
+        ),
+      );
 
-    await tester.tap(find.byKey(const Key('routeSearchButton')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeSearchButton')));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      'station-sangnoksu',
-    );
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      'station-nowhere',
-    );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routeOriginStationInput')),
+        'station-sangnoksu',
+      );
+      await tester.enterText(
+        find.byKey(const Key('routeDestinationStationInput')),
+        'station-nowhere',
+      );
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pump();
 
-    expect(routeRepository.requests, hasLength(1));
-    expect(find.bySemanticsLabel('경로 검색 중'), findsOneWidget);
-    final loadingButton = tester.widget<FilledButton>(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    expect(loadingButton.onPressed, isNull);
+      expect(routeRepository.requests, hasLength(1));
+      expect(find.bySemanticsLabel('경로 검색 중'), findsOneWidget);
+      final loadingButton = tester.widget<FilledButton>(
+        find.byKey(const Key('routeSearchSubmitButton')),
+      );
+      expect(loadingButton.onPressed, isNull);
 
-    routeRepository.complete(_blockedRouteSearchResult());
-    await tester.pumpAndSettle();
+      routeRepository.complete(_blockedRouteSearchResult());
+      await tester.pumpAndSettle();
 
-    expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
-    expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
-    final completedButton = tester.widget<FilledButton>(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    expect(completedButton.onPressed, isNotNull);
+      expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
+      expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
+      final completedButton = tester.widget<FilledButton>(
+        find.byKey(const Key('routeSearchSubmitButton')),
+      );
+      expect(completedButton.onPressed, isNotNull);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 }
 
