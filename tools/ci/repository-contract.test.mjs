@@ -566,6 +566,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
@@ -585,7 +586,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /역 찾기/);
   assert.match(main, /역 검색/);
   assert.match(main, /이동 조건/);
+  assert.match(main, /AnonymousAuthSession/);
+  assert.match(main, /FavoriteStationApiRepository/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
+  assert.match(anonymousAuth, /class AnonymousAuthApiRepository implements AnonymousAuthRepository/);
+  assert.match(anonymousAuth, /POST|postUrl/);
+  assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous/);
+  assert.match(anonymousAuth, /class AnonymousAuthSession implements FavoriteStationAuthProvider/);
+  assert.match(anonymousAuth, /_credentials/);
+  assert.match(anonymousAuth, /_isAllowedAnonymousAuthBaseUri/);
+  assert.match(anonymousAuth, /10\.0\.2\.2/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
   assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);

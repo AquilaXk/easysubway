@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -60,11 +61,26 @@ void main() {
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
+        enableAnonymousAuth: false,
       ),
     );
 
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.widgetWithText(FilledButton, '즐겨찾기'), findsNothing);
+  });
+
+  testWidgets('기본 홈 화면은 익명 인증으로 즐겨찾기를 노출한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        anonymousAuthRepository: FakeAnonymousAuthRepository(),
+      ),
+    );
+
+    expect(find.byKey(const Key('favoriteStationsButton')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '즐겨찾기'), findsOneWidget);
   });
 
   testWidgets('홈 즐겨찾기는 저장한 역을 큰 목록으로 보여준다', (tester) async {
@@ -1175,6 +1191,19 @@ class ControlledFavoriteStationRepository implements FavoriteStationRepository {
 
   void complete(List<FavoriteStation> favorites) {
     _favoritesCompleter.complete(favorites);
+  }
+}
+
+class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
+  int issueCount = 0;
+
+  @override
+  Future<AnonymousAuthCredentials> issueAnonymousUser() async {
+    issueCount++;
+    return const AnonymousAuthCredentials(
+      userId: 'anonymous-user-1',
+      password: 'user-test-password',
+    );
   }
 }
 
