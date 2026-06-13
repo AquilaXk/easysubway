@@ -349,6 +349,14 @@ class RouteSearchController extends ChangeNotifier {
     }
   }
 
+  void reset() {
+    if (_disposed) {
+      return;
+    }
+    _searchRequestId += 1;
+    _emitState(const RouteSearchState.idle());
+  }
+
   void _emitState(RouteSearchState nextState) {
     if (_disposed) {
       return;
@@ -413,12 +421,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               optionKeyPrefix: 'routeOriginStationOption',
               selectedStation: _originStation,
               repository: widget.stationRepository,
-              onSelected: (station) {
-                setState(() {
-                  _originStation = station;
-                  _validationMessage = '';
-                });
-              },
+              onSelected: _updateOriginStation,
             ),
             const SizedBox(height: 16),
             _RouteStationPicker(
@@ -428,12 +431,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               optionKeyPrefix: 'routeDestinationStationOption',
               selectedStation: _destinationStation,
               repository: widget.stationRepository,
-              onSelected: (station) {
-                setState(() {
-                  _destinationStation = station;
-                  _validationMessage = '';
-                });
-              },
+              onSelected: _updateDestinationStation,
             ),
             const SizedBox(height: 12),
             InputDecorator(
@@ -504,6 +502,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       return;
     }
     if (_originStation == null || _destinationStation == null) {
+      _controller.reset();
       setState(() {
         _validationMessage = '출발역과 도착역을 검색 결과에서 선택해 주세요.';
       });
@@ -521,6 +520,22 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         mobilityType: _selectedMobilityType,
       ),
     );
+  }
+
+  void _updateOriginStation(StationSearchResult? station) {
+    setState(() {
+      _originStation = station;
+      _validationMessage = '';
+    });
+    _controller.reset();
+  }
+
+  void _updateDestinationStation(StationSearchResult? station) {
+    setState(() {
+      _destinationStation = station;
+      _validationMessage = '';
+    });
+    _controller.reset();
   }
 }
 
@@ -790,6 +805,7 @@ class _RouteStationOptionTile extends StatelessWidget {
       child: Semantics(
         label: '$labelText 선택, ${result.semanticLabel}',
         button: true,
+        onTap: () => onSelected(result),
         child: ExcludeSemantics(
           child: Card(
             margin: const EdgeInsets.only(bottom: 8),

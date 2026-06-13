@@ -274,6 +274,16 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
       await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(
+          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+        ),
+        isSemantics(
+          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 확인됨',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
       await tester.tap(
         find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
       );
@@ -364,6 +374,81 @@ void main() {
 
     expect(routeRepository.requests, isEmpty);
     expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsOneWidget);
+  });
+
+  testWidgets('경로 검색은 역 선택이 바뀌면 이전 결과를 숨긴다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        routeRepository: routeRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수에서 사당까지'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, 700));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록',
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+    submitButton.onPressed!();
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수에서 사당까지'), findsNothing);
   });
 
   testWidgets('경로 검색 중에는 버튼을 비활성화하고 안내 불가 이유를 보여준다', (tester) async {
