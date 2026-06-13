@@ -1,0 +1,728 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import 'mobility_profile.dart';
+
+const _routeSearchTimeout = Duration(seconds: 8);
+const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.';
+
+abstract class RouteSearchRepository {
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
+}
+
+class RouteSearchApiRepository implements RouteSearchRepository {
+  RouteSearchApiRepository({required this.baseUri, HttpClient? httpClient})
+    : _httpClient = httpClient ?? HttpClient();
+
+  final Uri baseUri;
+  final HttpClient _httpClient;
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest routeRequest) async {
+    final uri = baseUri.resolve('/api/v1/routes/search');
+
+    try {
+      final request = await _httpClient
+          .postUrl(uri)
+          .timeout(_routeSearchTimeout);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode(routeRequest.toJson()));
+
+      final response = await request.close().timeout(_routeSearchTimeout);
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_routeSearchTimeout);
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw const RouteSearchException(_routeSearchErrorMessage);
+      }
+
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const RouteSearchException(_routeSearchErrorMessage);
+      }
+
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const RouteSearchException(_routeSearchErrorMessage);
+      }
+
+      return RouteSearchResult.fromJson(data);
+    } on RouteSearchException {
+      rethrow;
+    } catch (_) {
+      throw const RouteSearchException(_routeSearchErrorMessage);
+    }
+  }
+}
+
+class RouteSearchException implements Exception {
+  const RouteSearchException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class RouteSearchRequest {
+  const RouteSearchRequest({
+    required this.originStationId,
+    required this.destinationStationId,
+    required this.mobilityType,
+  });
+
+  final String originStationId;
+  final String destinationStationId;
+  final String mobilityType;
+
+  RouteSearchRequest trimmed() {
+    return RouteSearchRequest(
+      originStationId: originStationId.trim(),
+      destinationStationId: destinationStationId.trim(),
+      mobilityType: mobilityType,
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    final trimmedRequest = trimmed();
+    return {
+      'originStationId': trimmedRequest.originStationId,
+      'destinationStationId': trimmedRequest.destinationStationId,
+      'mobilityType': trimmedRequest.mobilityType,
+    };
+  }
+}
+
+class RouteSearchResult {
+  const RouteSearchResult({
+    required this.routeSearchId,
+    required this.originStationId,
+    required this.originStationName,
+    required this.destinationStationId,
+    required this.destinationStationName,
+    required this.mobilityType,
+    required this.status,
+    required this.lineId,
+    required this.lineName,
+    required this.score,
+    required this.steps,
+    required this.warnings,
+    required this.blockedReasons,
+    required this.createdAt,
+  });
+
+  factory RouteSearchResult.fromJson(Map<String, Object?> json) {
+    final rawSteps = json['steps'];
+    final rawWarnings = json['warnings'];
+    final rawBlockedReasons = json['blockedReasons'];
+    if (rawSteps is! List ||
+        rawWarnings is! List ||
+        rawBlockedReasons is! List) {
+      throw const FormatException('Invalid route payload');
+    }
+
+    return RouteSearchResult(
+      routeSearchId: _requiredRouteString(json, 'routeSearchId'),
+      originStationId: _requiredRouteString(json, 'originStationId'),
+      originStationName: _requiredRouteString(json, 'originStationName'),
+      destinationStationId: _requiredRouteString(json, 'destinationStationId'),
+      destinationStationName: _requiredRouteString(
+        json,
+        'destinationStationName',
+      ),
+      mobilityType: _requiredRouteString(json, 'mobilityType'),
+      status: _requiredRouteString(json, 'status'),
+      lineId: _optionalRouteString(json, 'lineId'),
+      lineName: _optionalRouteString(json, 'lineName'),
+      score: _requiredRouteInt(json, 'score'),
+      steps: rawSteps
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid route step payload');
+            }
+            return RouteSearchStep.fromJson(item);
+          })
+          .toList(growable: false),
+      warnings: rawWarnings
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid route warning payload');
+            }
+            return RouteSearchWarning.fromJson(item);
+          })
+          .toList(growable: false),
+      blockedReasons: rawBlockedReasons
+          .map((item) {
+            if (item is! String || item.trim().isEmpty) {
+              throw const FormatException('Invalid blocked reason payload');
+            }
+            return item;
+          })
+          .toList(growable: false),
+      createdAt: _requiredRouteString(json, 'createdAt'),
+    );
+  }
+
+  final String routeSearchId;
+  final String originStationId;
+  final String originStationName;
+  final String destinationStationId;
+  final String destinationStationName;
+  final String mobilityType;
+  final String status;
+  final String lineId;
+  final String lineName;
+  final int score;
+  final List<RouteSearchStep> steps;
+  final List<RouteSearchWarning> warnings;
+  final List<String> blockedReasons;
+  final String createdAt;
+
+  String get summaryTitle => '$originStationName에서 $destinationStationName까지';
+
+  String get statusLabel {
+    return switch (status) {
+      'FOUND' => '경로를 찾았습니다',
+      'BLOCKED' => '안내할 수 있는 경로가 없습니다',
+      _ => '확인이 필요합니다',
+    };
+  }
+
+  String get scoreLabel => '이동 점수 $score점';
+
+  String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
+
+  bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
+
+  String get semanticLabel =>
+      '경로 검색 결과, $summaryTitle, $lineLabel, $scoreLabel';
+}
+
+class RouteSearchStep {
+  const RouteSearchStep({
+    required this.sequence,
+    required this.title,
+    required this.description,
+    required this.lineId,
+    required this.lineName,
+    required this.fromStationId,
+    required this.toStationId,
+  });
+
+  factory RouteSearchStep.fromJson(Map<String, Object?> json) {
+    return RouteSearchStep(
+      sequence: _requiredRouteInt(json, 'sequence'),
+      title: _requiredRouteString(json, 'title'),
+      description: _requiredRouteString(json, 'description'),
+      lineId: _optionalRouteString(json, 'lineId'),
+      lineName: _optionalRouteString(json, 'lineName'),
+      fromStationId: _optionalRouteString(json, 'fromStationId'),
+      toStationId: _optionalRouteString(json, 'toStationId'),
+    );
+  }
+
+  final int sequence;
+  final String title;
+  final String description;
+  final String lineId;
+  final String lineName;
+  final String fromStationId;
+  final String toStationId;
+}
+
+class RouteSearchWarning {
+  const RouteSearchWarning({required this.code, required this.message});
+
+  factory RouteSearchWarning.fromJson(Map<String, Object?> json) {
+    return RouteSearchWarning(
+      code: _requiredRouteString(json, 'code'),
+      message: _requiredRouteString(json, 'message'),
+    );
+  }
+
+  final String code;
+  final String message;
+}
+
+enum RouteSearchViewStatus { idle, loading, success, failure }
+
+class RouteSearchState {
+  const RouteSearchState({
+    required this.status,
+    this.result,
+    this.message = '',
+  });
+
+  const RouteSearchState.idle()
+    : status = RouteSearchViewStatus.idle,
+      result = null,
+      message = '';
+
+  final RouteSearchViewStatus status;
+  final RouteSearchResult? result;
+  final String message;
+}
+
+class RouteSearchController extends ChangeNotifier {
+  RouteSearchController({required this.repository});
+
+  final RouteSearchRepository repository;
+
+  RouteSearchState _state = const RouteSearchState.idle();
+  int _searchRequestId = 0;
+
+  RouteSearchState get state => _state;
+
+  Future<void> search(RouteSearchRequest request) async {
+    final requestId = ++_searchRequestId;
+    final trimmedRequest = request.trimmed();
+    if (trimmedRequest.originStationId.isEmpty ||
+        trimmedRequest.destinationStationId.isEmpty) {
+      _state = const RouteSearchState(
+        status: RouteSearchViewStatus.failure,
+        message: '출발역과 도착역을 입력해 주세요.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    _state = const RouteSearchState(status: RouteSearchViewStatus.loading);
+    notifyListeners();
+
+    try {
+      final result = await repository.searchRoute(trimmedRequest);
+      if (requestId != _searchRequestId) {
+        return;
+      }
+      _state = RouteSearchState(
+        status: RouteSearchViewStatus.success,
+        result: result,
+      );
+    } on RouteSearchException catch (error) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
+      _state = RouteSearchState(
+        status: RouteSearchViewStatus.failure,
+        message: error.message,
+      );
+    } catch (_) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
+      _state = const RouteSearchState(
+        status: RouteSearchViewStatus.failure,
+        message: _routeSearchErrorMessage,
+      );
+    }
+    notifyListeners();
+  }
+}
+
+class RouteSearchScreen extends StatefulWidget {
+  const RouteSearchScreen({required this.repository, super.key});
+
+  final RouteSearchRepository repository;
+
+  @override
+  State<RouteSearchScreen> createState() => _RouteSearchScreenState();
+}
+
+class _RouteSearchScreenState extends State<RouteSearchScreen> {
+  late final RouteSearchController _controller;
+  final TextEditingController _originController = TextEditingController();
+  final TextEditingController _destinationController = TextEditingController();
+  String _selectedMobilityType = mobilityProfileOptions.first.mobilityType;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = RouteSearchController(repository: widget.repository);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _originController.dispose();
+    _destinationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('경로 검색')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            _RouteTextField(
+              key: const Key('routeOriginStationInput'),
+              controller: _originController,
+              labelText: '출발역 ID',
+              hintText: '출발역 ID를 입력해 주세요',
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            _RouteTextField(
+              key: const Key('routeDestinationStationInput'),
+              controller: _destinationController,
+              labelText: '도착역 ID',
+              hintText: '도착역 ID를 입력해 주세요',
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: const Key('routeMobilityTypeInput'),
+              initialValue: _selectedMobilityType,
+              decoration: const InputDecoration(
+                labelText: '이동 조건',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                ),
+              ),
+              items: [
+                for (final option in mobilityProfileOptions)
+                  DropdownMenuItem<String>(
+                    value: option.mobilityType,
+                    child: Text(option.title),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedMobilityType = value;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final isLoading =
+                    _controller.state.status == RouteSearchViewStatus.loading;
+                return FilledButton.icon(
+                  key: const Key('routeSearchSubmitButton'),
+                  onPressed: isLoading ? null : _submit,
+                  icon: const Icon(Icons.route),
+                  label: const Text('경로 찾기'),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) =>
+                  _RouteSearchBody(state: _controller.state),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    if (_controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    _controller.search(
+      RouteSearchRequest(
+        originStationId: _originController.text,
+        destinationStationId: _destinationController.text,
+        mobilityType: _selectedMobilityType,
+      ),
+    );
+  }
+}
+
+class _RouteTextField extends StatelessWidget {
+  const _RouteTextField({
+    required this.controller,
+    required this.labelText,
+    required this.hintText,
+    required this.textInputAction,
+    this.onSubmitted,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String labelText;
+  final String hintText;
+  final TextInputAction textInputAction;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      minLines: 1,
+      textInputAction: textInputAction,
+      style: const TextStyle(fontSize: 20, height: 1.35),
+      decoration: InputDecoration(
+        labelText: labelText,
+        hintText: hintText,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+        ),
+      ),
+      onSubmitted: onSubmitted,
+    );
+  }
+}
+
+class _RouteSearchBody extends StatelessWidget {
+  const _RouteSearchBody({required this.state});
+
+  final RouteSearchState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state.status) {
+      RouteSearchViewStatus.idle => const SizedBox.shrink(),
+      RouteSearchViewStatus.loading => Semantics(
+        label: '경로 검색 중',
+        liveRegion: true,
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      RouteSearchViewStatus.failure => _RouteSearchMessage(
+        message: state.message,
+        liveRegion: true,
+      ),
+      RouteSearchViewStatus.success => _RouteSearchResultCard(
+        result: state.result!,
+      ),
+    };
+  }
+}
+
+class _RouteSearchMessage extends StatelessWidget {
+  const _RouteSearchMessage({required this.message, this.liveRegion = false});
+
+  final String message;
+  final bool liveRegion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: liveRegion,
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: const Color(0xFF405A5D),
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteSearchResultCard extends StatelessWidget {
+  const _RouteSearchResultCard({required this.result});
+
+  final RouteSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: result.semanticLabel,
+        liveRegion: true,
+        child: ExcludeSemantics(
+          child: Card(
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    result.statusLabel,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    result.summaryTitle,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    result.lineLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    result.scoreLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (result.blockedReasons.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    for (final reason in result.blockedReasons)
+                      _RouteNotice(text: reason, icon: Icons.block),
+                  ],
+                  if (result.warnings.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    for (final warning in result.warnings)
+                      _RouteNotice(
+                        text: warning.message,
+                        icon: Icons.warning_amber,
+                      ),
+                  ],
+                  if (result.steps.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    for (final step in result.steps) _RouteStepTile(step: step),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteNotice extends StatelessWidget {
+  const _RouteNotice({required this.text, required this.icon});
+
+  final String text;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF8A5A00), size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF3C2F00),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteStepTile extends StatelessWidget {
+  const _RouteStepTile({required this.step});
+
+  final RouteSearchStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: const Color(0xFF006D77),
+            child: Text(
+              '${step.sequence}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  step.title,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w900,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  step.description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF405A5D),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _requiredRouteString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value;
+  }
+  throw FormatException('Missing required route field: $key');
+}
+
+String _optionalRouteString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is String) {
+    return value.trim();
+  }
+  return '';
+}
+
+int _requiredRouteInt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is int) {
+    return value;
+  }
+  throw FormatException('Missing required route field: $key');
+}
