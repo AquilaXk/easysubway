@@ -61,6 +61,126 @@ void main() {
     expect(results.single.lines.single.name, '수도권 4호선');
   });
 
+  test('역 API 저장소는 역 상세와 출구와 시설 정보를 요청하고 파싱한다', () async {
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json;
+
+      switch (request.uri.path) {
+        case '/api/v1/stations/station-sangnoksu':
+          request.response.write(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'latitude': 37.302795,
+                'longitude': 126.866489,
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'operatorId': 'seoul-metro',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                    'sequence': 48,
+                    'platformInfo': '당고개 방면 / 오이도 방면',
+                  },
+                ],
+              },
+            }),
+          );
+          break;
+        case '/api/v1/stations/station-sangnoksu/exits':
+          request.response.write(
+            jsonEncode({
+              'success': true,
+              'data': [
+                {
+                  'id': 'exit-sangnoksu-1',
+                  'stationId': 'station-sangnoksu',
+                  'exitNumber': '1',
+                  'name': '1번 출구',
+                  'latitude': 37.302795,
+                  'longitude': 126.866489,
+                  'hasElevatorConnection': true,
+                  'hasStairOnlyPath': false,
+                  'dataConfidence': 'HIGH',
+                },
+              ],
+            }),
+          );
+          break;
+        case '/api/v1/stations/station-sangnoksu/facilities':
+          request.response.write(
+            jsonEncode({
+              'success': true,
+              'data': [
+                {
+                  'id': 'facility-sangnoksu-elevator-1',
+                  'stationId': 'station-sangnoksu',
+                  'exitId': 'exit-sangnoksu-1',
+                  'type': 'ELEVATOR',
+                  'name': '1번 출구 엘리베이터',
+                  'floorFrom': 'B1',
+                  'floorTo': '1F',
+                  'latitude': 37.302795,
+                  'longitude': 126.866489,
+                  'description': '1번 출구 앞',
+                  'status': 'NORMAL',
+                  'dataConfidence': 'HIGH',
+                  'lastUpdatedAt': '2026-06-12',
+                },
+              ],
+            }),
+          );
+          break;
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..write(jsonEncode({'success': false}));
+          break;
+      }
+
+      request.response.close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final detail = await repository.getStationDetail('station-sangnoksu');
+    final exits = await repository.listStationExits('station-sangnoksu');
+    final facilities = await repository.listStationFacilities(
+      'station-sangnoksu',
+    );
+
+    expect(requestedPaths, [
+      '/api/v1/stations/station-sangnoksu',
+      '/api/v1/stations/station-sangnoksu/exits',
+      '/api/v1/stations/station-sangnoksu/facilities',
+    ]);
+    expect(detail.nameKo, '상록수');
+    expect(detail.dataQualityLabel, '기본 정보만 확인됨');
+    expect(detail.lines.single.stationCode, '448');
+    expect(exits.single.name, '1번 출구');
+    expect(exits.single.elevatorConnectionLabel, '엘리베이터 연결');
+    expect(exits.single.stairPathLabel, '계단 없는 이동 가능');
+    expect(facilities.single.typeLabel, '엘리베이터');
+    expect(facilities.single.statusLabel, '정상');
+    expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
+  });
+
   test('역 API 저장소는 형식이 잘못된 역 응답을 거부한다', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
@@ -198,6 +318,21 @@ class FakeStationSearchRepository implements StationSearchRepository {
     }
     return nextResults;
   }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    throw UnimplementedError();
+  }
 }
 
 class ControlledStationSearchRepository implements StationSearchRepository {
@@ -210,6 +345,21 @@ class ControlledStationSearchRepository implements StationSearchRepository {
     final completer = Completer<List<StationSearchResult>>();
     _pending[query] = completer;
     return completer.future;
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    throw UnimplementedError();
   }
 
   void complete(String query, List<StationSearchResult> results) {

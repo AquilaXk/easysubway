@@ -9,6 +9,12 @@ const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.'
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
+
+  Future<StationDetail> getStationDetail(String stationId);
+
+  Future<List<StationExitInfo>> listStationExits(String stationId);
+
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId);
 }
 
 class StationSearchApiRepository implements StationSearchRepository {
@@ -24,6 +30,90 @@ class StationSearchApiRepository implements StationSearchRepository {
         .resolve('/api/v1/stations')
         .replace(queryParameters: {'query': query});
 
+    final data = await _getData(uri);
+    if (data is! List) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid station payload');
+            }
+            return StationSearchResult.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (_) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) async {
+    final uri = baseUri.resolve(
+      '/api/v1/stations/${Uri.encodeComponent(stationId)}',
+    );
+    final data = await _getData(uri);
+    if (data is! Map<String, Object?>) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+    try {
+      return StationDetail.fromJson(data);
+    } catch (_) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) async {
+    final uri = baseUri.resolve(
+      '/api/v1/stations/${Uri.encodeComponent(stationId)}/exits',
+    );
+    final data = await _getData(uri);
+    if (data is! List) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid station exit payload');
+            }
+            return StationExitInfo.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (_) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(
+    String stationId,
+  ) async {
+    final uri = baseUri.resolve(
+      '/api/v1/stations/${Uri.encodeComponent(stationId)}/facilities',
+    );
+    final data = await _getData(uri);
+    if (data is! List) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid station facility payload');
+            }
+            return StationFacilityInfo.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (_) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  Future<Object?> _getData(Uri uri) async {
     try {
       final request = await _httpClient
           .getUrl(uri)
@@ -43,18 +133,7 @@ class StationSearchApiRepository implements StationSearchRepository {
       }
 
       final data = decoded['data'];
-      if (data is! List) {
-        throw const StationSearchException(_stationSearchErrorMessage);
-      }
-
-      return data
-          .map((item) {
-            if (item is! Map<String, Object?>) {
-              throw const FormatException('Invalid station payload');
-            }
-            return StationSearchResult.fromJson(item);
-          })
-          .toList(growable: false);
+      return data;
     } on StationSearchException {
       rethrow;
     } catch (_) {
@@ -116,13 +195,7 @@ class StationSearchResult {
   final List<StationSearchLine> lines;
 
   String get dataQualityLabel {
-    return switch (dataQualityLevel) {
-      'LEVEL_1' => '기본 정보만 확인됨',
-      'LEVEL_2' => '접근성 시설 확인됨',
-      'LEVEL_3' => '쉬운 경로 안내 가능',
-      'LEVEL_4' => '실시간 상태 반영됨',
-      _ => '확인 정보 부족',
-    };
+    return _dataQualityLabel(dataQualityLevel);
   }
 
   String get lineLabel {
@@ -133,6 +206,197 @@ class StationSearchResult {
   }
 
   String get semanticLabel => '$nameKo, $lineLabel, $region, $dataQualityLabel';
+}
+
+class StationDetail {
+  const StationDetail({
+    required this.id,
+    required this.nameKo,
+    required this.nameEn,
+    required this.region,
+    required this.dataQualityLevel,
+    required this.lastVerifiedAt,
+    required this.lines,
+  });
+
+  factory StationDetail.fromJson(Map<String, Object?> json) {
+    final rawLines = json['lines'];
+    if (rawLines is! List) {
+      throw const FormatException('Invalid station detail lines payload');
+    }
+
+    return StationDetail(
+      id: _requiredString(json, 'id'),
+      nameKo: _requiredString(json, 'nameKo'),
+      nameEn: _requiredString(json, 'nameEn'),
+      region: _requiredString(json, 'region'),
+      dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
+      lines: rawLines
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException(
+                'Invalid station detail line payload',
+              );
+            }
+            return StationSearchLine.fromJson(item);
+          })
+          .toList(growable: false),
+    );
+  }
+
+  final String id;
+  final String nameKo;
+  final String nameEn;
+  final String region;
+  final String dataQualityLevel;
+  final String lastVerifiedAt;
+  final List<StationSearchLine> lines;
+
+  String get dataQualityLabel => _dataQualityLabel(dataQualityLevel);
+
+  String get lineLabel {
+    if (lines.isEmpty) {
+      return '노선 정보 없음';
+    }
+    return lines.map((line) => line.name).join(', ');
+  }
+
+  String get semanticLabel {
+    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
+  }
+}
+
+class StationExitInfo {
+  const StationExitInfo({
+    required this.id,
+    required this.stationId,
+    required this.exitNumber,
+    required this.name,
+    required this.hasElevatorConnection,
+    required this.hasStairOnlyPath,
+    required this.dataConfidence,
+  });
+
+  factory StationExitInfo.fromJson(Map<String, Object?> json) {
+    return StationExitInfo(
+      id: _requiredString(json, 'id'),
+      stationId: _requiredString(json, 'stationId'),
+      exitNumber: _requiredString(json, 'exitNumber'),
+      name: _requiredString(json, 'name'),
+      hasElevatorConnection: _requiredBool(json, 'hasElevatorConnection'),
+      hasStairOnlyPath: _requiredBool(json, 'hasStairOnlyPath'),
+      dataConfidence: _requiredString(json, 'dataConfidence'),
+    );
+  }
+
+  final String id;
+  final String stationId;
+  final String exitNumber;
+  final String name;
+  final bool hasElevatorConnection;
+  final bool hasStairOnlyPath;
+  final String dataConfidence;
+
+  String get elevatorConnectionLabel {
+    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결 확인 필요';
+  }
+
+  String get stairPathLabel {
+    return hasStairOnlyPath ? '계단만 있는 길 있음' : '계단 없는 이동 가능';
+  }
+
+  String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
+
+  String get semanticLabel {
+    return '$name, $elevatorConnectionLabel, $stairPathLabel, $confidenceLabel';
+  }
+}
+
+class StationFacilityInfo {
+  const StationFacilityInfo({
+    required this.id,
+    required this.stationId,
+    required this.exitId,
+    required this.type,
+    required this.name,
+    required this.floorFrom,
+    required this.floorTo,
+    required this.description,
+    required this.status,
+    required this.dataConfidence,
+    required this.lastUpdatedAt,
+  });
+
+  factory StationFacilityInfo.fromJson(Map<String, Object?> json) {
+    return StationFacilityInfo(
+      id: _requiredString(json, 'id'),
+      stationId: _requiredString(json, 'stationId'),
+      exitId: _stringOrEmpty(json, 'exitId'),
+      type: _requiredString(json, 'type'),
+      name: _requiredString(json, 'name'),
+      floorFrom: _stringOrEmpty(json, 'floorFrom'),
+      floorTo: _stringOrEmpty(json, 'floorTo'),
+      description: _stringOrEmpty(json, 'description'),
+      status: _requiredString(json, 'status'),
+      dataConfidence: _requiredString(json, 'dataConfidence'),
+      lastUpdatedAt: _requiredString(json, 'lastUpdatedAt'),
+    );
+  }
+
+  final String id;
+  final String stationId;
+  final String exitId;
+  final String type;
+  final String name;
+  final String floorFrom;
+  final String floorTo;
+  final String description;
+  final String status;
+  final String dataConfidence;
+  final String lastUpdatedAt;
+
+  String get typeLabel {
+    return switch (type) {
+      'ELEVATOR' => '엘리베이터',
+      'ESCALATOR' => '에스컬레이터',
+      'WHEELCHAIR_LIFT' => '휠체어 리프트',
+      'ACCESSIBLE_TOILET' => '장애인 화장실',
+      'NURSING_ROOM' => '수유실',
+      'STATION_OFFICE' => '역무실',
+      _ => '시설',
+    };
+  }
+
+  String get statusLabel {
+    return switch (status) {
+      'NORMAL' => '정상',
+      'BROKEN' => '고장',
+      'CONSTRUCTION' => '공사 중',
+      'CLOSED' => '폐쇄',
+      'NEEDS_REPORT' => '제보 필요',
+      'NEEDS_CHECK' => '확인 필요',
+      _ => '상태 확인 필요',
+    };
+  }
+
+  String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
+
+  String get locationLabel {
+    if (description.trim().isNotEmpty) {
+      return description;
+    }
+    if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
+      return '$floorFrom-$floorTo';
+    }
+    return '위치 확인 필요';
+  }
+
+  String get updatedLabel => '최근 확인 $lastUpdatedAt';
+
+  String get semanticLabel {
+    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel';
+  }
 }
 
 class StationSearchLine {
@@ -206,6 +470,41 @@ String _requiredString(Map<String, Object?> json, String key) {
     return value;
   }
   throw FormatException('Missing required station field: $key');
+}
+
+String _stringOrEmpty(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is String) {
+    return value;
+  }
+  return '';
+}
+
+bool _requiredBool(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is bool) {
+    return value;
+  }
+  throw FormatException('Missing required station boolean field: $key');
+}
+
+String _dataQualityLabel(String dataQualityLevel) {
+  return switch (dataQualityLevel) {
+    'LEVEL_1' => '기본 정보만 확인됨',
+    'LEVEL_2' => '접근성 시설 확인됨',
+    'LEVEL_3' => '쉬운 경로 안내 가능',
+    'LEVEL_4' => '실시간 상태 반영됨',
+    _ => '확인 정보 부족',
+  };
+}
+
+String _dataConfidenceLabel(String dataConfidence) {
+  return switch (dataConfidence) {
+    'HIGH' => '정보 신뢰도 높음',
+    'MEDIUM' => '정보 신뢰도 보통',
+    'LOW' => '정보 확인 필요',
+    _ => '정보 확인 필요',
+  };
 }
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
@@ -292,6 +591,79 @@ class StationSearchController extends ChangeNotifier {
   }
 }
 
+enum StationDetailStatus { loading, success, failure }
+
+class StationDetailState {
+  const StationDetailState({
+    required this.status,
+    this.detail,
+    this.exits = const [],
+    this.facilities = const [],
+    this.message = '',
+  });
+
+  const StationDetailState.loading()
+    : status = StationDetailStatus.loading,
+      detail = null,
+      exits = const [],
+      facilities = const [],
+      message = '';
+
+  final StationDetailStatus status;
+  final StationDetail? detail;
+  final List<StationExitInfo> exits;
+  final List<StationFacilityInfo> facilities;
+  final String message;
+}
+
+class StationDetailController extends ChangeNotifier {
+  StationDetailController({required this.repository});
+
+  final StationSearchRepository repository;
+
+  StationDetailState _state = const StationDetailState.loading();
+  bool _isDisposed = false;
+
+  StationDetailState get state => _state;
+
+  Future<void> load(String stationId) async {
+    _state = const StationDetailState.loading();
+    notifyListeners();
+
+    try {
+      // 상세 화면은 기본 정보, 출구, 시설을 함께 읽어 서로 맞지 않는 일부 결과만 보이지 않게 한다.
+      final detail = await repository.getStationDetail(stationId);
+      final exits = await repository.listStationExits(stationId);
+      final facilities = await repository.listStationFacilities(stationId);
+      if (_isDisposed) {
+        return;
+      }
+      _state = StationDetailState(
+        status: StationDetailStatus.success,
+        detail: detail,
+        exits: exits,
+        facilities: facilities,
+      );
+    } catch (_) {
+      if (_isDisposed) {
+        return;
+      }
+      _state = const StationDetailState(
+        status: StationDetailStatus.failure,
+        message: '역 상세 정보를 불러오지 못했습니다.',
+      );
+    }
+
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+}
+
 class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({required this.repository, super.key});
 
@@ -366,7 +738,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
-                return _StationSearchBody(state: _controller.state);
+                return _StationSearchBody(
+                  state: _controller.state,
+                  onResultTap: _openStationDetail,
+                );
               },
             ),
           ],
@@ -381,12 +756,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
     _controller.search(query);
   }
+
+  void _openStationDetail(StationSearchResult result) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: widget.repository,
+          stationId: result.id,
+        ),
+      ),
+    );
+  }
 }
 
 class _StationSearchBody extends StatelessWidget {
-  const _StationSearchBody({required this.state});
+  const _StationSearchBody({required this.state, required this.onResultTap});
 
   final StationSearchState state;
+  final ValueChanged<StationSearchResult> onResultTap;
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +800,10 @@ class _StationSearchBody extends StatelessWidget {
             child: const SizedBox.shrink(),
           ),
           for (final result in state.results)
-            _StationSearchResultTile(result: result),
+            _StationSearchResultTile(
+              result: result,
+              onTap: () => onResultTap(result),
+            ),
         ],
       ),
     };
@@ -443,9 +833,10 @@ class _StationSearchMessage extends StatelessWidget {
 }
 
 class _StationSearchResultTile extends StatelessWidget {
-  const _StationSearchResultTile({required this.result});
+  const _StationSearchResultTile({required this.result, required this.onTap});
 
   final StationSearchResult result;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -454,6 +845,311 @@ class _StationSearchResultTile extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         label: result.semanticLabel,
+        button: true,
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: InkWell(
+              key: Key('stationSearchResult-${result.id}'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.nameKo,
+                      style: textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    StationLineBadges(lines: result.lines),
+                    const SizedBox(height: 8),
+                    Text(
+                      result.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF29484B),
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      result.region,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF405A5D),
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      result.dataQualityLabel,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF405A5D),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StationDetailScreen extends StatefulWidget {
+  const StationDetailScreen({
+    required this.repository,
+    required this.stationId,
+    super.key,
+  });
+
+  final StationSearchRepository repository;
+  final String stationId;
+
+  @override
+  State<StationDetailScreen> createState() => _StationDetailScreenState();
+}
+
+class _StationDetailScreenState extends State<StationDetailScreen> {
+  late final StationDetailController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = StationDetailController(repository: widget.repository);
+    _controller.load(widget.stationId);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('역 상세')),
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return _StationDetailBody(state: _controller.state);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _StationDetailBody extends StatelessWidget {
+  const _StationDetailBody({required this.state});
+
+  final StationDetailState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state.status) {
+      StationDetailStatus.loading => Semantics(
+        label: '역 상세 정보 불러오는 중',
+        liveRegion: true,
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      StationDetailStatus.failure => Padding(
+        padding: const EdgeInsets.all(20),
+        child: _StationSearchMessage(message: state.message, liveRegion: true),
+      ),
+      StationDetailStatus.success => _StationDetailContent(
+        detail: state.detail!,
+        exits: state.exits,
+        facilities: state.facilities,
+      ),
+    };
+  }
+}
+
+class _StationDetailContent extends StatelessWidget {
+  const _StationDetailContent({
+    required this.detail,
+    required this.exits,
+    required this.facilities,
+  });
+
+  final StationDetail detail;
+  final List<StationExitInfo> exits;
+  final List<StationFacilityInfo> facilities;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      children: [
+        _StationDetailHeader(detail: detail),
+        const SizedBox(height: 24),
+        const _StationDetailSectionTitle(title: '출구'),
+        const SizedBox(height: 12),
+        if (exits.isEmpty)
+          const _StationDetailEmptyMessage(message: '출구 정보가 아직 없습니다.')
+        else
+          for (final exit in exits) _StationExitCard(exit: exit),
+        const SizedBox(height: 24),
+        const _StationDetailSectionTitle(title: '시설'),
+        const SizedBox(height: 12),
+        if (facilities.isEmpty)
+          const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
+        else
+          for (final facility in facilities)
+            _StationFacilityCard(facility: facility),
+      ],
+    );
+  }
+}
+
+class _StationDetailHeader extends StatelessWidget {
+  const _StationDetailHeader({required this.detail});
+
+  final StationDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      label: detail.semanticLabel,
+      header: true,
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${detail.nameKo}역',
+              style: textTheme.headlineSmall?.copyWith(
+                color: const Color(0xFF102A2C),
+                fontWeight: FontWeight.w900,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            StationLineBadges(lines: detail.lines),
+            const SizedBox(height: 10),
+            Text(
+              detail.lineLabel,
+              style: textTheme.titleMedium?.copyWith(
+                color: const Color(0xFF29484B),
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _StationDetailInfoRow(
+              icon: Icons.verified_outlined,
+              text: detail.dataQualityLabel,
+            ),
+            const SizedBox(height: 6),
+            _StationDetailInfoRow(
+              icon: Icons.event_available,
+              text: '마지막 확인 ${detail.lastVerifiedAt}',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StationDetailInfoRow extends StatelessWidget {
+  const _StationDetailInfoRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 22, color: const Color(0xFF006D77)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: const Color(0xFF29484B),
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StationDetailSectionTitle extends StatelessWidget {
+  const _StationDetailSectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          color: const Color(0xFF102A2C),
+          fontWeight: FontWeight.w900,
+          height: 1.25,
+        ),
+      ),
+    );
+  }
+}
+
+class _StationDetailEmptyMessage extends StatelessWidget {
+  const _StationDetailEmptyMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      message,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        color: const Color(0xFF405A5D),
+        fontWeight: FontWeight.w700,
+        height: 1.35,
+      ),
+    );
+  }
+}
+
+class _StationExitCard extends StatelessWidget {
+  const _StationExitCard({required this.exit});
+
+  final StationExitInfo exit;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: exit.semanticLabel,
         child: ExcludeSemantics(
           child: Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -469,43 +1165,171 @@ class _StationSearchResultTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    result.nameKo,
-                    style: textTheme.titleLarge?.copyWith(
+                    exit.name,
+                    style: textTheme.titleMedium?.copyWith(
                       color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  StationLineBadges(lines: result.lines),
+                  const SizedBox(height: 12),
+                  _StationDetailStatusPill(
+                    icon: Icons.elevator,
+                    text: exit.elevatorConnectionLabel,
+                    positive: exit.hasElevatorConnection,
+                  ),
+                  const SizedBox(height: 8),
+                  _StationDetailStatusPill(
+                    icon: Icons.stairs_outlined,
+                    text: exit.stairPathLabel,
+                    positive: !exit.hasStairOnlyPath,
+                  ),
                   const SizedBox(height: 8),
                   Text(
-                    result.lineLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
+                    exit.confidenceLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
                       fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    result.region,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    result.dataQualityLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
                       height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationFacilityCard extends StatelessWidget {
+  const _StationFacilityCard({required this.facility});
+
+  final StationFacilityInfo facility;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: facility.semanticLabel,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    facility.name,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _StationDetailTextPill(text: facility.typeLabel),
+                      _StationDetailTextPill(text: facility.statusLabel),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _StationDetailInfoRow(
+                    icon: Icons.place_outlined,
+                    text: facility.locationLabel,
+                  ),
+                  const SizedBox(height: 6),
+                  _StationDetailInfoRow(
+                    icon: Icons.event_available,
+                    text: facility.updatedLabel,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    facility.confidenceLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationDetailStatusPill extends StatelessWidget {
+  const _StationDetailStatusPill({
+    required this.icon,
+    required this.text,
+    required this.positive,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool positive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = positive ? const Color(0xFF006D77) : const Color(0xFF8A4B00);
+
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: const Color(0xFF102A2C),
+              fontWeight: FontWeight.w800,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StationDetailTextPill extends StatelessWidget {
+  const _StationDetailTextPill({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFB8D8D3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w800,
+            height: 1.2,
           ),
         ),
       ),
