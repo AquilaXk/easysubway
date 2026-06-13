@@ -283,6 +283,46 @@ void main() {
     expect(controller.state.status, StationSearchStatus.failure);
     expect(controller.state.message, '역 정보를 불러오지 못했습니다.');
   });
+
+  test('시설 정보는 백엔드 enum 값을 쉬운 라벨과 스크린리더 문구로 바꾼다', () {
+    const ramp = StationFacilityInfo(
+      id: 'facility-ramp-1',
+      stationId: 'station-sangnoksu',
+      exitId: 'exit-sangnoksu-1',
+      type: 'RAMP',
+      name: '1번 출구 경사로',
+      floorFrom: '1F',
+      floorTo: 'B1',
+      description: '',
+      status: 'UNDER_CONSTRUCTION',
+      dataConfidence: 'NEEDS_VERIFICATION',
+      lastUpdatedAt: '2026-06-13',
+    );
+    const customerCenter = StationFacilityInfo(
+      id: 'facility-center-1',
+      stationId: 'station-sangnoksu',
+      exitId: '',
+      type: 'CUSTOMER_CENTER',
+      name: '고객센터',
+      floorFrom: '대합실',
+      floorTo: '대합실',
+      description: '개찰구 옆',
+      status: 'ADMIN_VERIFIED',
+      dataConfidence: 'HIGH',
+      lastUpdatedAt: '2026-06-13',
+    );
+
+    expect(ramp.typeLabel, '경사로');
+    expect(ramp.statusLabel, '공사 중');
+    expect(ramp.confidenceLabel, '정보 확인 필요');
+    expect(
+      ramp.semanticLabel,
+      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 정보 확인 필요',
+    );
+    expect(customerCenter.typeLabel, '고객센터');
+    expect(customerCenter.statusLabel, '검수 완료');
+    expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
+  });
 }
 
 StationSearchResult _stationResult({required String id, required String name}) {
