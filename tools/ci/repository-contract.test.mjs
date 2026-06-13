@@ -14,6 +14,13 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+function jobBlock(workflow, startJob, nextJob) {
+  const pattern = new RegExp(`  ${startJob}:[\\s\\S]*?\\n  ${nextJob}:`);
+  const match = workflow.match(pattern);
+  assert.ok(match, `${startJob} job block not found`);
+  return match[0];
+}
+
 test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적되지 않는다", () => {
   const gitignore = read(".gitignore");
 
@@ -48,6 +55,21 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
+});
+
+test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(workflow, /Repository CI \/ Skip unchanged area/);
+  assert.match(workflow, /Backend CI \/ Skip unchanged area/);
+  assert.match(workflow, /Mobile App CI \/ Skip unchanged area/);
+  assert.match(workflow, /Android CI \/ Skip unchanged area/);
+  assert.match(workflow, /iOS CI \/ Skip unchanged area/);
+
+  assert.doesNotMatch(jobBlock(workflow, "repository-contracts", "backend"), /\n    if:/);
+  assert.doesNotMatch(jobBlock(workflow, "backend", "mobile-app"), /\n    if:/);
+  assert.doesNotMatch(jobBlock(workflow, "mobile-app", "android"), /\n    if:/);
+  assert.doesNotMatch(jobBlock(workflow, "android", "ios"), /\n    if:/);
 });
 
 test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {

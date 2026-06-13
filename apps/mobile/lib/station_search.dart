@@ -8,6 +8,10 @@ import 'facility_report.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
+const _favoriteStationTimeout = Duration(seconds: 8);
+const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
+const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
+const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했습니다.';
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -151,6 +155,230 @@ class StationSearchException implements Exception {
 
   @override
   String toString() => message;
+}
+
+abstract class FavoriteStationRepository {
+  Future<List<FavoriteStation>> listFavoriteStations();
+
+  Future<FavoriteStation> saveFavoriteStation(String stationId);
+
+  Future<void> removeFavoriteStation(String stationId);
+}
+
+abstract class FavoriteStationAuthProvider {
+  Future<String?> authorizationHeader();
+}
+
+class NoFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+  const NoFavoriteStationAuthProvider();
+
+  @override
+  Future<String?> authorizationHeader() async => null;
+}
+
+class BasicFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+  const BasicFavoriteStationAuthProvider({
+    required this.username,
+    required this.password,
+  });
+
+  final String username;
+  final String password;
+
+  @override
+  Future<String?> authorizationHeader() async {
+    // 실제 앱은 로그인 세션에서 인증값을 주입해야 하며, 빌드 타임 공용 인증값은 사용하지 않는다.
+    if (username.trim().isEmpty || password.isEmpty) {
+      return null;
+    }
+    final token = base64Encode(utf8.encode('${username.trim()}:$password'));
+    return 'Basic $token';
+  }
+}
+
+class FavoriteStationApiRepository implements FavoriteStationRepository {
+  FavoriteStationApiRepository({
+    required this.baseUri,
+    required this.authProvider,
+    HttpClient? httpClient,
+  }) : _httpClient = httpClient ?? HttpClient();
+
+  final Uri baseUri;
+  final FavoriteStationAuthProvider authProvider;
+  final HttpClient _httpClient;
+
+  @override
+  Future<List<FavoriteStation>> listFavoriteStations() async {
+    final data = await _requestData(
+      'GET',
+      baseUri.resolve('/api/v1/me/favorites/stations'),
+      errorMessage: _favoriteStationLoadErrorMessage,
+    );
+    if (data is! List) {
+      throw const FavoriteStationException(_favoriteStationLoadErrorMessage);
+    }
+
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid favorite station payload');
+            }
+            return FavoriteStation.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (_) {
+      throw const FavoriteStationException(_favoriteStationLoadErrorMessage);
+    }
+  }
+
+  @override
+  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+    final uri = baseUri.resolve(
+      '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}',
+    );
+    final data = await _requestData(
+      'PUT',
+      uri,
+      errorMessage: _favoriteStationChangeErrorMessage,
+    );
+    if (data is! Map<String, Object?>) {
+      throw const FavoriteStationException(_favoriteStationChangeErrorMessage);
+    }
+
+    try {
+      return FavoriteStation.fromJson(data);
+    } catch (_) {
+      throw const FavoriteStationException(_favoriteStationChangeErrorMessage);
+    }
+  }
+
+  @override
+  Future<void> removeFavoriteStation(String stationId) async {
+    final uri = baseUri.resolve(
+      '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}',
+    );
+    await _requestData(
+      'DELETE',
+      uri,
+      errorMessage: _favoriteStationChangeErrorMessage,
+    );
+  }
+
+  Future<Object?> _requestData(
+    String method,
+    Uri uri, {
+    required String errorMessage,
+  }) async {
+    try {
+      final request = await _httpClient
+          .openUrl(method, uri)
+          .timeout(_favoriteStationTimeout);
+      final authorizationHeader = await authProvider
+          .authorizationHeader()
+          .timeout(_favoriteStationTimeout);
+      if (authorizationHeader != null) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          authorizationHeader,
+        );
+      }
+
+      final response = await request.close().timeout(_favoriteStationTimeout);
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_favoriteStationTimeout);
+
+      if (response.statusCode < HttpStatus.ok ||
+          response.statusCode >= HttpStatus.multipleChoices) {
+        throw FavoriteStationException(errorMessage);
+      }
+
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw FavoriteStationException(errorMessage);
+      }
+      return decoded['data'];
+    } on FavoriteStationException {
+      rethrow;
+    } catch (_) {
+      throw FavoriteStationException(errorMessage);
+    }
+  }
+}
+
+class FavoriteStationException implements Exception {
+  const FavoriteStationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class FavoriteStation {
+  const FavoriteStation({
+    required this.userId,
+    required this.stationId,
+    required this.nameKo,
+    required this.nameEn,
+    required this.region,
+    required this.dataQualityLevel,
+    required this.lastVerifiedAt,
+    required this.lines,
+    required this.addedAt,
+  });
+
+  factory FavoriteStation.fromJson(Map<String, Object?> json) {
+    final rawLines = json['lines'];
+    if (rawLines is! List) {
+      throw const FormatException('Invalid favorite station lines payload');
+    }
+
+    return FavoriteStation(
+      userId: _requiredString(json, 'userId'),
+      stationId: _requiredString(json, 'stationId'),
+      nameKo: _requiredString(json, 'nameKo'),
+      nameEn: _requiredString(json, 'nameEn'),
+      region: _requiredString(json, 'region'),
+      dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
+      lines: rawLines
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException(
+                'Invalid favorite station line payload',
+              );
+            }
+            return StationSearchLine.fromJson(item);
+          })
+          .toList(growable: false),
+      addedAt: _requiredString(json, 'addedAt'),
+    );
+  }
+
+  final String userId;
+  final String stationId;
+  final String nameKo;
+  final String nameEn;
+  final String region;
+  final String dataQualityLevel;
+  final String lastVerifiedAt;
+  final List<StationSearchLine> lines;
+  final String addedAt;
+
+  String get dataQualityLabel => _dataQualityLabel(dataQualityLevel);
+
+  String get lineLabel {
+    if (lines.isEmpty) {
+      return '노선 정보 없음';
+    }
+    return lines.map((line) => line.name).join(', ');
+  }
+
+  String get semanticLabel {
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+  }
 }
 
 class StationSearchResult {
@@ -675,15 +903,252 @@ class StationDetailController extends ChangeNotifier {
   }
 }
 
+enum FavoriteStationListStatus { loading, success, empty, failure }
+
+class FavoriteStationListState {
+  const FavoriteStationListState({
+    required this.status,
+    this.favorites = const [],
+    this.message = '',
+  });
+
+  const FavoriteStationListState.loading()
+    : status = FavoriteStationListStatus.loading,
+      favorites = const [],
+      message = '';
+
+  final FavoriteStationListStatus status;
+  final List<FavoriteStation> favorites;
+  final String message;
+}
+
+class FavoriteStationListController extends ChangeNotifier {
+  FavoriteStationListController({required this.repository});
+
+  final FavoriteStationRepository repository;
+
+  FavoriteStationListState _state = const FavoriteStationListState.loading();
+  bool _isDisposed = false;
+
+  FavoriteStationListState get state => _state;
+
+  Future<void> load() async {
+    _emitState(const FavoriteStationListState.loading());
+
+    try {
+      final favorites = await repository.listFavoriteStations();
+      if (favorites.isEmpty) {
+        _emitState(
+          const FavoriteStationListState(
+            status: FavoriteStationListStatus.empty,
+            message: '저장한 역이 없습니다.',
+          ),
+        );
+      } else {
+        _emitState(
+          FavoriteStationListState(
+            status: FavoriteStationListStatus.success,
+            favorites: favorites,
+          ),
+        );
+      }
+    } on FavoriteStationException catch (error) {
+      _emitState(
+        FavoriteStationListState(
+          status: FavoriteStationListStatus.failure,
+          message: error.message,
+        ),
+      );
+    } catch (_) {
+      _emitState(
+        const FavoriteStationListState(
+          status: FavoriteStationListStatus.failure,
+          message: _favoriteStationLoadErrorMessage,
+        ),
+      );
+    }
+  }
+
+  void _emitState(FavoriteStationListState nextState) {
+    if (_isDisposed) {
+      return;
+    }
+    _state = nextState;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+}
+
+enum StationFavoriteToggleStatus { checking, ready, saving, removing, failure }
+
+class StationFavoriteToggleState {
+  const StationFavoriteToggleState({
+    required this.status,
+    required this.isFavorite,
+    this.message = '',
+  });
+
+  const StationFavoriteToggleState.ready({required this.isFavorite})
+    : status = StationFavoriteToggleStatus.ready,
+      message = '';
+
+  const StationFavoriteToggleState.checking({required this.isFavorite})
+    : status = StationFavoriteToggleStatus.checking,
+      message = '';
+
+  final StationFavoriteToggleStatus status;
+  final bool isFavorite;
+  final String message;
+
+  bool get isBusy {
+    return status == StationFavoriteToggleStatus.checking ||
+        status == StationFavoriteToggleStatus.saving ||
+        status == StationFavoriteToggleStatus.removing;
+  }
+
+  bool get isChanging {
+    return status == StationFavoriteToggleStatus.saving ||
+        status == StationFavoriteToggleStatus.removing;
+  }
+}
+
+class StationFavoriteToggleController extends ChangeNotifier {
+  StationFavoriteToggleController({
+    required this.repository,
+    required this.stationId,
+    bool initiallyFavorite = false,
+    bool initiallyChecking = false,
+  }) : _state = initiallyChecking
+           ? StationFavoriteToggleState.checking(isFavorite: initiallyFavorite)
+           : StationFavoriteToggleState.ready(isFavorite: initiallyFavorite);
+
+  final FavoriteStationRepository repository;
+  final String stationId;
+
+  StationFavoriteToggleState _state;
+  bool _isDisposed = false;
+
+  StationFavoriteToggleState get state => _state;
+
+  Future<void> load() async {
+    if (_state.isChanging) {
+      return;
+    }
+
+    _emitState(
+      StationFavoriteToggleState.checking(isFavorite: _state.isFavorite),
+    );
+
+    try {
+      final favorites = await repository.listFavoriteStations();
+      final isFavorite = favorites.any(
+        (favorite) => favorite.stationId == stationId,
+      );
+      _emitState(StationFavoriteToggleState.ready(isFavorite: isFavorite));
+    } on FavoriteStationException catch (error) {
+      _emitFailure(error.message);
+    } catch (_) {
+      _emitFailure(_favoriteStationStatusErrorMessage);
+    }
+  }
+
+  Future<void> save() async {
+    if (_state.isBusy) {
+      return;
+    }
+
+    _emitState(
+      StationFavoriteToggleState(
+        status: StationFavoriteToggleStatus.saving,
+        isFavorite: _state.isFavorite,
+      ),
+    );
+
+    try {
+      await repository.saveFavoriteStation(stationId);
+      _emitState(
+        const StationFavoriteToggleState(
+          status: StationFavoriteToggleStatus.ready,
+          isFavorite: true,
+          message: '즐겨찾기에 저장했습니다.',
+        ),
+      );
+    } on FavoriteStationException catch (error) {
+      _emitFailure(error.message);
+    } catch (_) {
+      _emitFailure(_favoriteStationChangeErrorMessage);
+    }
+  }
+
+  Future<void> remove() async {
+    if (_state.isBusy) {
+      return;
+    }
+
+    _emitState(
+      StationFavoriteToggleState(
+        status: StationFavoriteToggleStatus.removing,
+        isFavorite: _state.isFavorite,
+      ),
+    );
+
+    try {
+      await repository.removeFavoriteStation(stationId);
+      _emitState(
+        const StationFavoriteToggleState(
+          status: StationFavoriteToggleStatus.ready,
+          isFavorite: false,
+          message: '즐겨찾기에서 해제했습니다.',
+        ),
+      );
+    } on FavoriteStationException catch (error) {
+      _emitFailure(error.message);
+    } catch (_) {
+      _emitFailure(_favoriteStationChangeErrorMessage);
+    }
+  }
+
+  void _emitFailure(String message) {
+    _emitState(
+      StationFavoriteToggleState(
+        status: StationFavoriteToggleStatus.failure,
+        isFavorite: _state.isFavorite,
+        message: message,
+      ),
+    );
+  }
+
+  void _emitState(StationFavoriteToggleState nextState) {
+    if (_isDisposed) {
+      return;
+    }
+    _state = nextState;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+}
+
 class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({
     required this.repository,
     required this.reportRepository,
+    this.favoriteRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
+  final FavoriteStationRepository? favoriteRepository;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -779,6 +1244,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         builder: (_) => StationDetailScreen(
           repository: widget.repository,
           reportRepository: widget.reportRepository,
+          favoriteRepository: widget.favoriteRepository,
           stationId: result.id,
         ),
       ),
@@ -928,17 +1394,230 @@ class _StationSearchResultTile extends StatelessWidget {
   }
 }
 
+class FavoriteStationListScreen extends StatefulWidget {
+  const FavoriteStationListScreen({
+    required this.repository,
+    required this.stationRepository,
+    required this.reportRepository,
+    super.key,
+  });
+
+  final FavoriteStationRepository repository;
+  final StationSearchRepository stationRepository;
+  final FacilityReportRepository reportRepository;
+
+  @override
+  State<FavoriteStationListScreen> createState() =>
+      _FavoriteStationListScreenState();
+}
+
+class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
+  late final FavoriteStationListController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FavoriteStationListController(repository: widget.repository);
+    _controller.load();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기')),
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return _FavoriteStationListBody(
+              state: _controller.state,
+              onRetry: _controller.load,
+              onFavoriteTap: _openStationDetail,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openStationDetail(FavoriteStation favorite) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: widget.stationRepository,
+          reportRepository: widget.reportRepository,
+          favoriteRepository: widget.repository,
+          stationId: favorite.stationId,
+          // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
+          initiallyFavorite: true,
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    _controller.load();
+  }
+}
+
+class _FavoriteStationListBody extends StatelessWidget {
+  const _FavoriteStationListBody({
+    required this.state,
+    required this.onRetry,
+    required this.onFavoriteTap,
+  });
+
+  final FavoriteStationListState state;
+  final VoidCallback onRetry;
+  final ValueChanged<FavoriteStation> onFavoriteTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state.status) {
+      FavoriteStationListStatus.loading => Semantics(
+        label: '즐겨찾기 불러오는 중',
+        liveRegion: true,
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      FavoriteStationListStatus.empty => Padding(
+        padding: const EdgeInsets.all(20),
+        child: _StationSearchMessage(message: state.message, liveRegion: true),
+      ),
+      FavoriteStationListStatus.failure => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _StationSearchMessage(message: state.message, liveRegion: true),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              key: const Key('favoriteStationsRetryButton'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('다시 불러오기'),
+            ),
+          ],
+        ),
+      ),
+      FavoriteStationListStatus.success => ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        children: [
+          Semantics(
+            label: '즐겨찾기 역 ${state.favorites.length}개',
+            liveRegion: true,
+            child: const SizedBox.shrink(),
+          ),
+          for (final favorite in state.favorites)
+            _FavoriteStationTile(
+              favorite: favorite,
+              onTap: () => onFavoriteTap(favorite),
+            ),
+        ],
+      ),
+    };
+  }
+}
+
+class _FavoriteStationTile extends StatelessWidget {
+  const _FavoriteStationTile({required this.favorite, required this.onTap});
+
+  final FavoriteStation favorite;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: favorite.semanticLabel,
+        button: true,
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: InkWell(
+              key: Key('favoriteStationTile-${favorite.stationId}'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      favorite.nameKo,
+                      style: textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    StationLineBadges(lines: favorite.lines),
+                    const SizedBox(height: 8),
+                    Text(
+                      favorite.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF29484B),
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      favorite.region,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF405A5D),
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      favorite.dataQualityLabel,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF405A5D),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
     required this.repository,
     required this.reportRepository,
     required this.stationId,
+    this.favoriteRepository,
+    this.initiallyFavorite,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
+  final FavoriteStationRepository? favoriteRepository;
   final String stationId;
+  final bool? initiallyFavorite;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -946,17 +1625,32 @@ class StationDetailScreen extends StatefulWidget {
 
 class _StationDetailScreenState extends State<StationDetailScreen> {
   late final StationDetailController _controller;
+  StationFavoriteToggleController? _favoriteController;
 
   @override
   void initState() {
     super.initState();
     _controller = StationDetailController(repository: widget.repository);
+    final favoriteRepository = widget.favoriteRepository;
+    if (favoriteRepository != null) {
+      final initiallyFavorite = widget.initiallyFavorite;
+      _favoriteController = StationFavoriteToggleController(
+        repository: favoriteRepository,
+        stationId: widget.stationId,
+        initiallyFavorite: initiallyFavorite ?? false,
+        initiallyChecking: initiallyFavorite == null,
+      );
+      if (initiallyFavorite == null) {
+        _favoriteController!.load();
+      }
+    }
     _controller.load(widget.stationId);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _favoriteController?.dispose();
     super.dispose();
   }
 
@@ -971,6 +1665,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
             return _StationDetailBody(
               state: _controller.state,
               reportRepository: widget.reportRepository,
+              favoriteController: _favoriteController,
             );
           },
         ),
@@ -983,10 +1678,12 @@ class _StationDetailBody extends StatelessWidget {
   const _StationDetailBody({
     required this.state,
     required this.reportRepository,
+    required this.favoriteController,
   });
 
   final StationDetailState state;
   final FacilityReportRepository reportRepository;
+  final StationFavoriteToggleController? favoriteController;
 
   @override
   Widget build(BuildContext context) {
@@ -1005,6 +1702,7 @@ class _StationDetailBody extends StatelessWidget {
         exits: state.exits,
         facilities: state.facilities,
         reportRepository: reportRepository,
+        favoriteController: favoriteController,
       ),
     };
   }
@@ -1016,12 +1714,14 @@ class _StationDetailContent extends StatelessWidget {
     required this.exits,
     required this.facilities,
     required this.reportRepository,
+    required this.favoriteController,
   });
 
   final StationDetail detail;
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
   final FacilityReportRepository reportRepository;
+  final StationFavoriteToggleController? favoriteController;
 
   @override
   Widget build(BuildContext context) {
@@ -1029,6 +1729,13 @@ class _StationDetailContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _StationDetailHeader(detail: detail),
+        if (favoriteController != null) ...[
+          const SizedBox(height: 16),
+          _StationFavoriteControl(
+            detail: detail,
+            controller: favoriteController!,
+          ),
+        ],
         const SizedBox(height: 24),
         const _StationDetailSectionTitle(title: '출구'),
         const SizedBox(height: 12),
@@ -1119,6 +1826,84 @@ class _StationDetailHeader extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _StationFavoriteControl extends StatelessWidget {
+  const _StationFavoriteControl({
+    required this.detail,
+    required this.controller,
+  });
+
+  final StationDetail detail;
+  final StationFavoriteToggleController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final state = controller.state;
+        final isFavorite = state.isFavorite;
+        final label = _favoriteButtonLabel(state);
+        final actionLabel = state.status == StationFavoriteToggleStatus.checking
+            ? '즐겨찾기 확인 중'
+            : isFavorite
+            ? '즐겨찾기 해제'
+            : '즐겨찾기 저장';
+        final onPressed = state.isBusy
+            ? null
+            : isFavorite
+            ? controller.remove
+            : controller.save;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              container: true,
+              label: '${detail.nameKo}역 $actionLabel',
+              button: true,
+              onTap: onPressed,
+              child: ExcludeSemantics(
+                child: OutlinedButton.icon(
+                  key: const Key('stationFavoriteToggleButton'),
+                  onPressed: onPressed,
+                  icon: Icon(isFavorite ? Icons.star : Icons.star_border),
+                  label: Text(label),
+                ),
+              ),
+            ),
+            if (state.message.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Semantics(
+                label: state.message,
+                liveRegion: true,
+                child: Text(
+                  state.message,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  String _favoriteButtonLabel(StationFavoriteToggleState state) {
+    return switch (state.status) {
+      StationFavoriteToggleStatus.checking => '확인 중',
+      StationFavoriteToggleStatus.saving => '저장 중',
+      StationFavoriteToggleStatus.removing => '해제 중',
+      StationFavoriteToggleStatus.ready ||
+      StationFavoriteToggleStatus.failure =>
+        state.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 저장',
+    };
   }
 }
 
