@@ -160,6 +160,58 @@ void main() {
     );
     expect(completedButton.onPressed, isNotNull);
   });
+
+  testWidgets('이동 조건 화면은 큰 선택 카드로 사용자 상황을 고를 수 있다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(repository: FakeStationSearchRepository()),
+      );
+
+      await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('이동 조건'), findsOneWidget);
+      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('유모차'), findsOneWidget);
+      expect(find.text('휠체어'), findsOneWidget);
+      expect(find.text('임산부'), findsOneWidget);
+      expect(find.text('일시 부상'), findsOneWidget);
+      expect(find.text('큰 짐'), findsOneWidget);
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
+      expect(find.text('엘리베이터와 넓은 길을 우선해요'), findsOneWidget);
+      expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('휠체어 선택 가능, 계단 없는 길만 안내해요')),
+        isSemantics(
+          label: '휠체어 선택 가능, 계단 없는 길만 안내해요',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+
+      final wheelchairCard = find.byKey(
+        const Key('mobilityProfileCard-wheelchair'),
+      );
+      expect(wheelchairCard, findsOneWidget);
+      expect(tester.getSize(wheelchairCard).height, greaterThanOrEqualTo(76));
+
+      await tester.tap(wheelchairCard);
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('휠체어 선택됨, 계단 없는 길만 안내해요'), findsOneWidget);
+      expect(find.text('휠체어 조건을 선택했습니다'), findsOneWidget);
+      expect(find.bySemanticsLabel('선택 완료'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
 }
 
 class FakeStationSearchRepository implements StationSearchRepository {

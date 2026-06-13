@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'mobility_profile.dart';
 import 'station_search.dart';
 
 void main() {
@@ -104,7 +105,13 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('mobilityProfileButton'),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<MobilityProfileOption>(
+                    builder: (_) => const MobilityProfileScreen(),
+                  ),
+                );
+              },
               icon: const Icon(Icons.accessibility_new),
               label: const Text('이동 조건'),
             ),
