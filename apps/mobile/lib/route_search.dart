@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'mobility_profile.dart';
+import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.';
@@ -365,9 +366,14 @@ class RouteSearchController extends ChangeNotifier {
 }
 
 class RouteSearchScreen extends StatefulWidget {
-  const RouteSearchScreen({required this.repository, super.key});
+  const RouteSearchScreen({
+    required this.repository,
+    required this.stationRepository,
+    super.key,
+  });
 
   final RouteSearchRepository repository;
+  final StationSearchRepository stationRepository;
 
   @override
   State<RouteSearchScreen> createState() => _RouteSearchScreenState();
@@ -375,9 +381,10 @@ class RouteSearchScreen extends StatefulWidget {
 
 class _RouteSearchScreenState extends State<RouteSearchScreen> {
   late final RouteSearchController _controller;
-  final TextEditingController _originController = TextEditingController();
-  final TextEditingController _destinationController = TextEditingController();
+  StationSearchResult? _originStation;
+  StationSearchResult? _destinationStation;
   String _selectedMobilityType = mobilityProfileOptions.first.mobilityType;
+  String _validationMessage = '';
 
   @override
   void initState() {
@@ -388,8 +395,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   @override
   void dispose() {
     _controller.dispose();
-    _originController.dispose();
-    _destinationController.dispose();
     super.dispose();
   }
 
@@ -401,21 +406,34 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            _RouteTextField(
-              key: const Key('routeOriginStationInput'),
-              controller: _originController,
-              labelText: '출발역 ID',
-              hintText: '출발역 ID를 입력해 주세요',
-              textInputAction: TextInputAction.next,
+            _RouteStationPicker(
+              labelText: '출발역',
+              inputKey: const Key('routeOriginStationInput'),
+              searchButtonKey: const Key('routeOriginStationSearchButton'),
+              optionKeyPrefix: 'routeOriginStationOption',
+              selectedStation: _originStation,
+              repository: widget.stationRepository,
+              onSelected: (station) {
+                setState(() {
+                  _originStation = station;
+                  _validationMessage = '';
+                });
+              },
             ),
-            const SizedBox(height: 12),
-            _RouteTextField(
-              key: const Key('routeDestinationStationInput'),
-              controller: _destinationController,
-              labelText: '도착역 ID',
-              hintText: '도착역 ID를 입력해 주세요',
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
+            const SizedBox(height: 16),
+            _RouteStationPicker(
+              labelText: '도착역',
+              inputKey: const Key('routeDestinationStationInput'),
+              searchButtonKey: const Key('routeDestinationStationSearchButton'),
+              optionKeyPrefix: 'routeDestinationStationOption',
+              selectedStation: _destinationStation,
+              repository: widget.stationRepository,
+              onSelected: (station) {
+                setState(() {
+                  _destinationStation = station;
+                  _validationMessage = '';
+                });
+              },
             ),
             const SizedBox(height: 12),
             InputDecorator(
@@ -463,6 +481,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               },
             ),
             const SizedBox(height: 20),
+            if (_validationMessage.isNotEmpty) ...[
+              _RouteSearchMessage(
+                message: _validationMessage,
+                liveRegion: true,
+              ),
+              const SizedBox(height: 16),
+            ],
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) =>
@@ -478,48 +503,357 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     if (_controller.state.status == RouteSearchViewStatus.loading) {
       return;
     }
+    if (_originStation == null || _destinationStation == null) {
+      setState(() {
+        _validationMessage = '출발역과 도착역을 검색 결과에서 선택해 주세요.';
+      });
+      return;
+    }
+    setState(() {
+      _validationMessage = '';
+    });
+
+    // 화면에는 역 이름을 보여주지만 API에는 안정적인 station id만 전달한다.
     _controller.search(
       RouteSearchRequest(
-        originStationId: _originController.text,
-        destinationStationId: _destinationController.text,
+        originStationId: _originStation!.id,
+        destinationStationId: _destinationStation!.id,
         mobilityType: _selectedMobilityType,
       ),
     );
   }
 }
 
-class _RouteTextField extends StatelessWidget {
-  const _RouteTextField({
-    required this.controller,
+class _RouteStationPicker extends StatefulWidget {
+  const _RouteStationPicker({
     required this.labelText,
-    required this.hintText,
-    required this.textInputAction,
-    this.onSubmitted,
-    super.key,
+    required this.inputKey,
+    required this.searchButtonKey,
+    required this.optionKeyPrefix,
+    required this.selectedStation,
+    required this.repository,
+    required this.onSelected,
   });
 
-  final TextEditingController controller;
   final String labelText;
-  final String hintText;
-  final TextInputAction textInputAction;
-  final ValueChanged<String>? onSubmitted;
+  final Key inputKey;
+  final Key searchButtonKey;
+  final String optionKeyPrefix;
+  final StationSearchResult? selectedStation;
+  final StationSearchRepository repository;
+  final ValueChanged<StationSearchResult?> onSelected;
+
+  @override
+  State<_RouteStationPicker> createState() => _RouteStationPickerState();
+}
+
+class _RouteStationPickerState extends State<_RouteStationPicker> {
+  late final StationSearchController _controller;
+  final TextEditingController _textController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = StationSearchController(repository: widget.repository);
+    _textController.addListener(_clearSelectedStationIfNeeded);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      minLines: 1,
-      textInputAction: textInputAction,
-      style: const TextStyle(fontSize: 20, height: 1.35),
-      decoration: InputDecoration(
-        labelText: labelText,
-        hintText: hintText,
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        border: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: '${widget.labelText} 입력',
+          textField: true,
+          child: TextField(
+            key: widget.inputKey,
+            controller: _textController,
+            minLines: 1,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 20, height: 1.35),
+            decoration: InputDecoration(
+              labelText: widget.labelText,
+              hintText: '역 이름을 입력해 주세요',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+            ),
+            onSubmitted: (_) => _search(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final isLoading =
+                _controller.state.status == StationSearchStatus.loading;
+            return OutlinedButton.icon(
+              key: widget.searchButtonKey,
+              onPressed: isLoading ? null : _search,
+              icon: const Icon(Icons.search),
+              label: Text('${widget.labelText} 검색'),
+            );
+          },
+        ),
+        if (widget.selectedStation case final selectedStation?) ...[
+          const SizedBox(height: 8),
+          _RouteSelectedStationSummary(
+            labelText: widget.labelText,
+            station: selectedStation,
+          ),
+        ],
+        const SizedBox(height: 8),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return _RouteStationSearchBody(
+              labelText: widget.labelText,
+              optionKeyPrefix: widget.optionKeyPrefix,
+              state: _controller.state,
+              onSelected: _selectStation,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _search() {
+    if (_controller.state.status == StationSearchStatus.loading) {
+      return;
+    }
+    _controller.search(_textController.text);
+  }
+
+  void _selectStation(StationSearchResult station) {
+    widget.onSelected(station);
+    _textController.text = station.nameKo;
+    // 선택 후 후보 목록을 접어 다음 입력을 바로 찾을 수 있게 한다.
+    unawaited(_controller.search(''));
+  }
+
+  void _clearSelectedStationIfNeeded() {
+    final selectedStation = widget.selectedStation;
+    if (selectedStation == null) {
+      return;
+    }
+    if (_textController.text.trim() == selectedStation.nameKo) {
+      return;
+    }
+    widget.onSelected(null);
+  }
+}
+
+class _RouteSelectedStationSummary extends StatelessWidget {
+  const _RouteSelectedStationSummary({
+    required this.labelText,
+    required this.station,
+  });
+
+  final String labelText;
+  final StationSearchResult station;
+
+  @override
+  Widget build(BuildContext context) {
+    return MergeSemantics(
+      child: Semantics(
+        label: '$labelText 선택됨, ${station.semanticLabel}',
+        liveRegion: true,
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9F5F6),
+              border: Border.all(color: const Color(0xFFB9D4D8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.check_circle, color: Color(0xFF006D77)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$labelText ${station.nameKo}',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                color: const Color(0xFF102A2C),
+                                fontWeight: FontWeight.w900,
+                                height: 1.3,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        StationLineBadges(lines: station.lines),
+                        const SizedBox(height: 6),
+                        Text(
+                          station.lineLabel,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: const Color(0xFF29484B),
+                                fontWeight: FontWeight.w700,
+                                height: 1.3,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      onSubmitted: onSubmitted,
+    );
+  }
+}
+
+class _RouteStationSearchBody extends StatelessWidget {
+  const _RouteStationSearchBody({
+    required this.labelText,
+    required this.optionKeyPrefix,
+    required this.state,
+    required this.onSelected,
+  });
+
+  final String labelText;
+  final String optionKeyPrefix;
+  final StationSearchState state;
+  final ValueChanged<StationSearchResult> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state.status) {
+      StationSearchStatus.idle => const SizedBox.shrink(),
+      StationSearchStatus.loading => Semantics(
+        label: '$labelText 검색 중',
+        liveRegion: true,
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      StationSearchStatus.empty || StationSearchStatus.failure =>
+        _RouteSearchMessage(message: state.message, liveRegion: true),
+      StationSearchStatus.success => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            label: '$labelText 검색 결과 ${state.results.length}개',
+            liveRegion: true,
+            child: const SizedBox.shrink(),
+          ),
+          for (final result in state.results)
+            _RouteStationOptionTile(
+              key: Key('$optionKeyPrefix-${result.id}'),
+              labelText: labelText,
+              result: result,
+              onSelected: onSelected,
+            ),
+        ],
+      ),
+    };
+  }
+}
+
+class _RouteStationOptionTile extends StatelessWidget {
+  const _RouteStationOptionTile({
+    required this.labelText,
+    required this.result,
+    required this.onSelected,
+    super.key,
+  });
+
+  final String labelText;
+  final StationSearchResult result;
+  final ValueChanged<StationSearchResult> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: '$labelText 선택, ${result.semanticLabel}',
+        button: true,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: InkWell(
+              onTap: () => onSelected(result),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            result.nameKo,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: const Color(0xFF102A2C),
+                              fontWeight: FontWeight.w900,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StationLineBadges(lines: result.lines),
+                          const SizedBox(height: 8),
+                          Text(
+                            result.lineLabel,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: const Color(0xFF29484B),
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            result.dataQualityLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF405A5D),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFF006D77),
+                      size: 32,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

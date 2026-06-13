@@ -477,7 +477,7 @@ class _StationSearchResultTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _StationSearchLineBadges(lines: result.lines),
+                  StationLineBadges(lines: result.lines),
                   const SizedBox(height: 8),
                   Text(
                     result.lineLabel,
@@ -513,8 +513,8 @@ class _StationSearchResultTile extends StatelessWidget {
   }
 }
 
-class _StationSearchLineBadges extends StatelessWidget {
-  const _StationSearchLineBadges({required this.lines});
+class StationLineBadges extends StatelessWidget {
+  const StationLineBadges({required this.lines, super.key});
 
   final List<StationSearchLine> lines;
 
@@ -527,13 +527,13 @@ class _StationSearchLineBadges extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: [for (final line in lines) _StationSearchLineBadge(line: line)],
+      children: [for (final line in lines) StationLineBadge(line: line)],
     );
   }
 }
 
-class _StationSearchLineBadge extends StatelessWidget {
-  const _StationSearchLineBadge({required this.line});
+class StationLineBadge extends StatelessWidget {
+  const StationLineBadge({required this.line, super.key});
 
   final StationSearchLine line;
 
