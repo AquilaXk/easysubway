@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'station_search.dart';
 
 const _anonymousAuthTimeout = Duration(seconds: 8);
@@ -12,18 +14,25 @@ abstract class AnonymousAuthRepository {
 }
 
 class AnonymousAuthApiRepository implements AnonymousAuthRepository {
-  AnonymousAuthApiRepository({required this.baseUri, HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  AnonymousAuthApiRepository({
+    required this.baseUri,
+    HttpClient? httpClient,
+    this.allowAndroidEmulatorHttp = kDebugMode,
+  }) : _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
   final HttpClient _httpClient;
+  final bool allowAndroidEmulatorHttp;
 
   @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
     final uri = baseUri.resolve('/api/v1/auth/anonymous');
 
     try {
-      if (!_isAllowedAnonymousAuthBaseUri(uri)) {
+      if (!_isAllowedAnonymousAuthBaseUri(
+        uri,
+        allowAndroidEmulatorHttp: allowAndroidEmulatorHttp,
+      )) {
         throw const AnonymousAuthException(_anonymousAuthErrorMessage);
       }
 
@@ -136,12 +145,15 @@ String _requiredAuthString(Map<String, Object?> json, String key) {
   return value.trim();
 }
 
-bool _isAllowedAnonymousAuthBaseUri(Uri uri) {
+bool _isAllowedAnonymousAuthBaseUri(
+  Uri uri, {
+  required bool allowAndroidEmulatorHttp,
+}) {
   if (uri.scheme == 'https') {
     return true;
   }
 
-  // Basic 인증은 개발용 로컬 주소 외에는 평문 HTTP로 보내지 않는다.
+  // Basic 인증은 개발용 로컬 주소와 debug 에뮬레이터 별칭 외에는 평문 HTTP로 보내지 않는다.
   if (uri.scheme != 'http') {
     return false;
   }
@@ -149,7 +161,7 @@ bool _isAllowedAnonymousAuthBaseUri(Uri uri) {
   final host = uri.host.toLowerCase();
   return host == 'localhost' ||
       host == '::1' ||
-      host == '10.0.2.2' ||
+      (allowAndroidEmulatorHttp && host == '10.0.2.2') ||
       _isIpv4LoopbackLiteral(host);
 }
 

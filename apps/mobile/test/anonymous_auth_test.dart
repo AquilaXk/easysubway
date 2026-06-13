@@ -92,6 +92,21 @@ void main() {
       expect(httpClient.postUrlCalled, isFalse);
     }
   });
+
+  test('익명 인증 API 저장소는 릴리즈 가정에서 에뮬레이터 HTTP 별칭을 막는다', () async {
+    final httpClient = NetworkFailingHttpClient();
+    final repository = AnonymousAuthApiRepository(
+      baseUri: Uri.parse('http://10.0.2.2:8080'),
+      httpClient: httpClient,
+      allowAndroidEmulatorHttp: false,
+    );
+
+    expect(
+      repository.issueAnonymousUser,
+      throwsA(isA<AnonymousAuthException>()),
+    );
+    expect(httpClient.postUrlCalled, isFalse);
+  });
 }
 
 class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
