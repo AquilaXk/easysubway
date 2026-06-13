@@ -272,6 +272,71 @@ void main() {
     expect(authorizationHeader, isNull);
   });
 
+  test('즐겨찾기 역 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
+    final authorizationHeaders = <String?>[];
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestCount++;
+      authorizationHeaders.add(
+        request.headers.value(HttpHeaders.authorizationHeader),
+      );
+      request.response.headers.contentType = ContentType.json;
+
+      if (requestCount == 1) {
+        request.response
+          ..statusCode = HttpStatus.unauthorized
+          ..write(jsonEncode({'success': false}))
+          ..close();
+        return;
+      }
+
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'userId': 'anonymous-user-1',
+                'stationId': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                  },
+                ],
+                'addedAt': '2026-06-13T10:00:00',
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final authProvider = RetryFavoriteStationAuthProvider();
+    final repository = FavoriteStationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: authProvider,
+    );
+
+    final favorites = await repository.listFavoriteStations();
+
+    expect(favorites.single.stationId, 'station-sangnoksu');
+    expect(authorizationHeaders, ['Basic stale-token', 'Basic fresh-token']);
+    expect(authProvider.authorizationCount, 2);
+    expect(authProvider.invalidateCount, 1);
+  });
+
   test('즐겨찾기 역 API 저장소는 역 저장과 해제를 요청한다', () async {
     final requestedMethods = <String>[];
     final requestedPaths = <String>[];
@@ -769,5 +834,23 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
     favorites = favorites
         .where((favorite) => favorite.stationId != stationId)
         .toList(growable: false);
+  }
+}
+
+class RetryFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+  var authorizationCount = 0;
+  var invalidateCount = 0;
+  var _invalidated = false;
+
+  @override
+  Future<String?> authorizationHeader() async {
+    authorizationCount++;
+    return _invalidated ? 'Basic fresh-token' : 'Basic stale-token';
+  }
+
+  @override
+  Future<void> invalidateAuthorization() async {
+    invalidateCount++;
+    _invalidated = true;
   }
 }

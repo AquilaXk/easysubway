@@ -566,6 +566,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
+  const anonymousAuthTest = read("apps/mobile/test/anonymous_auth_test.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
@@ -576,19 +578,54 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /^name: easysubway_mobile$/m);
   assert.match(pubspec, /sdk: \^3\./);
   assert.match(pubspec, /flutter_lints:/);
+  assert.match(pubspec, /flutter_secure_storage:/);
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
+  assert.match(androidManifest, /android:allowBackup="false"/);
+  assert.match(androidManifest, /android:fullBackupContent="false"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(main, /역 찾기/);
   assert.match(main, /역 검색/);
   assert.match(main, /이동 조건/);
+  assert.match(main, /AnonymousAuthSession/);
+  assert.match(main, /FavoriteStationApiRepository/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
+  assert.match(anonymousAuth, /class AnonymousAuthApiRepository implements AnonymousAuthRepository/);
+  assert.match(anonymousAuth, /class SecureAnonymousAuthCredentialStore/);
+  assert.match(anonymousAuth, /FlutterSecureStorage/);
+  assert.match(anonymousAuth, /readCredentials/);
+  assert.match(anonymousAuth, /saveCredentials/);
+  assert.match(anonymousAuth, /clearCredentials/);
+  assert.match(anonymousAuth, /canReuseStoredCredentials/);
+  assert.match(anonymousAuth, /POST|postUrl/);
+  assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous/);
+  assert.match(anonymousAuth, /class AnonymousAuthSession implements FavoriteStationAuthProvider/);
+  assert.match(anonymousAuth, /_credentials/);
+  assert.match(anonymousAuth, /_loadOrIssueCredentials/);
+  assert.match(anonymousAuth, /invalidateAuthorization/);
+  assert.doesNotMatch(
+    anonymousAuth,
+    /Future<void>\s+invalidateAuthorization\(\)\s+async\s+\{[^}]*_issuingCredentials\s*=/,
+  );
+  assert.match(anonymousAuth, /_isAllowedAnonymousAuthBaseUri/);
+  assert.match(anonymousAuth, /_isIpv4LoopbackLiteral/);
+  assert.match(anonymousAuth, /allowAndroidEmulatorHttp = kDebugMode/);
+  assert.match(anonymousAuth, /allowAndroidEmulatorHttp && host == '10\.0\.2\.2'/);
+  assert.match(anonymousAuth, /10\.0\.2\.2/);
+  assert.match(anonymousAuthTest, /저장된 인증 정보를 먼저 사용한다/);
+  assert.match(anonymousAuthTest, /재시작 후 재사용한다/);
+  assert.match(anonymousAuthTest, /인증 실패 후 저장된 인증 정보를 지우고 다시 발급한다/);
+  assert.match(anonymousAuthTest, /동시 인증 무효화 후 하나의 새 인증 정보를 공유한다/);
+  assert.match(anonymousAuthTest, /원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
   assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);
+  assert.match(stationSearch, /HttpStatus\.unauthorized/);
+  assert.match(stationSearch, /invalidateAuthorization\(\)/);
+  assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /홈 화면은 핵심 행동만 간결하게 보여준다/);

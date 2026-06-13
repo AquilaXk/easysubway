@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'anonymous_auth.dart';
 import 'facility_report.dart';
 import 'mobility_profile.dart';
 import 'route_search.dart';
@@ -14,7 +15,9 @@ class EasySubwayApp extends StatelessWidget {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
-    this.favoriteRepository,
+    FavoriteStationRepository? favoriteRepository,
+    AnonymousAuthRepository? anonymousAuthRepository,
+    bool enableAnonymousAuth = true,
     super.key,
   }) : repository =
            repository ??
@@ -24,7 +27,14 @@ class EasySubwayApp extends StatelessWidget {
            FacilityReportApiRepository(baseUri: defaultStationApiBaseUri()),
        routeRepository =
            routeRepository ??
-           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri());
+           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri()),
+       favoriteRepository =
+           favoriteRepository ??
+           _defaultFavoriteStationRepository(
+             baseUri: defaultStationApiBaseUri(),
+             anonymousAuthRepository: anonymousAuthRepository,
+             enableAnonymousAuth: enableAnonymousAuth,
+           );
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -82,6 +92,24 @@ class EasySubwayApp extends StatelessWidget {
       ),
     );
   }
+}
+
+FavoriteStationRepository? _defaultFavoriteStationRepository({
+  required Uri baseUri,
+  required bool enableAnonymousAuth,
+  AnonymousAuthRepository? anonymousAuthRepository,
+}) {
+  if (!enableAnonymousAuth) {
+    return null;
+  }
+  return FavoriteStationApiRepository(
+    baseUri: baseUri,
+    authProvider: AnonymousAuthSession(
+      repository:
+          anonymousAuthRepository ??
+          AnonymousAuthApiRepository(baseUri: baseUri),
+    ),
+  );
 }
 
 class HomeScreen extends StatelessWidget {
