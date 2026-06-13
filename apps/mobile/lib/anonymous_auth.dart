@@ -152,7 +152,7 @@ class AnonymousAuthSession implements FavoriteStationAuthProvider {
   @override
   Future<void> invalidateAuthorization() async {
     _credentials = null;
-    _issuingCredentials = null;
+    // 401 복구 중 이미 새 인증을 발급 중이면 같은 Future를 공유해야 요청별 익명 계정이 갈라지지 않는다.
     await credentialStore.clearCredentials();
   }
 

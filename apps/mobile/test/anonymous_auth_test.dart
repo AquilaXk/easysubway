@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -148,6 +149,46 @@ void main() {
     expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
   });
 
+  test('익명 인증 세션은 동시 인증 무효화 후 하나의 새 인증 정보를 공유한다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stale-anonymous-user',
+        password: 'stale-password',
+      ),
+    );
+    final repository = ControlledAnonymousAuthRepository();
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
+
+    final staleHeader = await session.authorizationHeader();
+    final firstRefresh = _invalidateAndReadHeader(session);
+    await repository.issueStarted.future;
+    final secondRefresh = _invalidateAndReadHeader(session);
+
+    repository.completeIssue(
+      const AnonymousAuthCredentials(
+        userId: 'fresh-anonymous-user',
+        password: 'fresh-password',
+      ),
+    );
+    final refreshedHeaders = await Future.wait([firstRefresh, secondRefresh]);
+
+    expect(
+      staleHeader,
+      'Basic ${base64Encode(utf8.encode('stale-anonymous-user:stale-password'))}',
+    );
+    expect(repository.issueCount, 1);
+    expect(refreshedHeaders.toSet(), hasLength(1));
+    expect(
+      refreshedHeaders.toSet().single,
+      'Basic ${base64Encode(utf8.encode('fresh-anonymous-user:fresh-password'))}',
+    );
+    expect(credentialStore.saveCount, 1);
+    expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
+  });
+
   test('익명 인증 세션은 원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다', () async {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(
@@ -228,6 +269,11 @@ void main() {
   });
 }
 
+Future<String?> _invalidateAndReadHeader(AnonymousAuthSession session) async {
+  await session.invalidateAuthorization();
+  return session.authorizationHeader();
+}
+
 class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   FakeAnonymousAuthRepository({
     this.issueDelay = const Duration(milliseconds: 10),
@@ -248,6 +294,28 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
     issueCount++;
     await Future<void>.delayed(issueDelay);
     return AnonymousAuthCredentials(userId: userId, password: password);
+  }
+}
+
+class ControlledAnonymousAuthRepository implements AnonymousAuthRepository {
+  final issueStarted = Completer<void>();
+  final _issueCompleter = Completer<AnonymousAuthCredentials>();
+  var issueCount = 0;
+
+  @override
+  bool get canReuseStoredCredentials => true;
+
+  @override
+  Future<AnonymousAuthCredentials> issueAnonymousUser() {
+    issueCount++;
+    if (!issueStarted.isCompleted) {
+      issueStarted.complete();
+    }
+    return _issueCompleter.future;
+  }
+
+  void completeIssue(AnonymousAuthCredentials credentials) {
+    _issueCompleter.complete(credentials);
   }
 }
 
