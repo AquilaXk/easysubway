@@ -199,6 +199,7 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const registerPort = read("backend/src/main/java/com/easysubway/auth/application/port/out/RegisterAnonymousUserPort.java");
   const service = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthService.java");
   const registry = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/SpringSecurityAnonymousUserRegistry.java");
+  const rateLimiter = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthRateLimiter.java");
   const controller = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -224,7 +225,11 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(registry, /PasswordEncoder/);
   assert.match(registry, /MAX_ANONYMOUS_USERS/);
   assert.match(registry, /deleteUser/);
+  assert.match(rateLimiter, /class AnonymousAuthRateLimiter/);
+  assert.match(rateLimiter, /MAX_ISSUE_REQUESTS_PER_CLIENT/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);
+  assert.match(controller, /AnonymousAuthRateLimiter/);
+  assert.match(controller, /HttpStatus\.TOO_MANY_REQUESTS/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Principal principal/);
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
