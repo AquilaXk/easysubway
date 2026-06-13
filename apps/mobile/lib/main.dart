@@ -14,6 +14,7 @@ class EasySubwayApp extends StatelessWidget {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    FavoriteStationRepository? favoriteRepository,
     super.key,
   }) : repository =
            repository ??
@@ -23,11 +24,18 @@ class EasySubwayApp extends StatelessWidget {
            FacilityReportApiRepository(baseUri: defaultStationApiBaseUri()),
        routeRepository =
            routeRepository ??
-           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri());
+           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri()),
+       favoriteRepository =
+           favoriteRepository ??
+           FavoriteStationApiRepository(
+             baseUri: defaultStationApiBaseUri(),
+             credentials: const FavoriteStationCredentials.fromEnvironment(),
+           );
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository favoriteRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +84,7 @@ class EasySubwayApp extends StatelessWidget {
         repository: repository,
         reportRepository: reportRepository,
         routeRepository: routeRepository,
+        favoriteRepository: favoriteRepository,
       ),
     );
   }
@@ -86,12 +95,14 @@ class HomeScreen extends StatelessWidget {
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
+    required this.favoriteRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository favoriteRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +134,7 @@ class HomeScreen extends StatelessWidget {
                     builder: (_) => StationSearchScreen(
                       repository: repository,
                       reportRepository: reportRepository,
+                      favoriteRepository: favoriteRepository,
                     ),
                   ),
                 );
@@ -145,6 +157,23 @@ class HomeScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.route),
               label: const Text('경로 검색'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('favoriteStationsButton'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => FavoriteStationListScreen(
+                      repository: favoriteRepository,
+                      stationRepository: repository,
+                      reportRepository: reportRepository,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.star),
+              label: const Text('즐겨찾기'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
