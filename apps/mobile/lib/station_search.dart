@@ -361,8 +361,11 @@ class StationFacilityInfo {
       'ELEVATOR' => '엘리베이터',
       'ESCALATOR' => '에스컬레이터',
       'WHEELCHAIR_LIFT' => '휠체어 리프트',
+      'RAMP' => '경사로',
       'ACCESSIBLE_TOILET' => '장애인 화장실',
+      'TOILET' => '화장실',
       'NURSING_ROOM' => '수유실',
+      'CUSTOMER_CENTER' => '고객센터',
       'STATION_OFFICE' => '역무실',
       _ => '시설',
     };
@@ -372,8 +375,12 @@ class StationFacilityInfo {
     return switch (status) {
       'NORMAL' => '정상',
       'BROKEN' => '고장',
+      'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
+      'UNKNOWN' => '확인 필요',
+      'USER_REPORTED' => '제보됨',
+      'ADMIN_VERIFIED' => '검수 완료',
       'NEEDS_REPORT' => '제보 필요',
       'NEEDS_CHECK' => '확인 필요',
       _ => '상태 확인 필요',
@@ -395,7 +402,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel';
+    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $confidenceLabel';
   }
 }
 
