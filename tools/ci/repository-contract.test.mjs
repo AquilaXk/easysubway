@@ -571,6 +571,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const anonymousAuthTest = read("apps/mobile/test/anonymous_auth_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
+  const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
   const notificationSettingsTest = read("apps/mobile/test/notification_settings_test.dart");
@@ -601,6 +602,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /NotificationSettingsApiRepository/);
   assert.match(main, /OnboardingScreen/);
   assert.match(main, /initialOnboardingState/);
+  assert.match(main, /initialMobilityType: _onboardingState\.result\?\.profile\.mobilityType/);
+  assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
@@ -612,8 +615,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /큰 글씨/);
   assert.match(onboarding, /고대비/);
   assert.match(onboarding, /단순 보기/);
+  assert.match(onboarding, /onTap: \(\) => onChanged\(!value\)/);
+  assert.match(routeSearch, /final String initialMobilityType/);
+  assert.match(routeSearch, /_resolveInitialMobilityType/);
+  assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
   assert.match(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
+  assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(onboardingTest, /온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다/);
+  assert.match(onboardingTest, /hasTapAction: true/);
   assert.match(authHeaders, /abstract class AuthorizationHeaderProvider/);
   assert.match(authHeaders, /class BasicAuthorizationHeaderProvider implements AuthorizationHeaderProvider/);
   assert.match(authHeaders, /authorizationHeader/);

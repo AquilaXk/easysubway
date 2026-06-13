@@ -50,6 +50,10 @@ void main() {
       expect(find.text('큰 글씨'), findsOneWidget);
       expect(find.text('고대비'), findsOneWidget);
       expect(find.text('단순 보기'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('고대비 꺼짐')),
+        isSemantics(label: '고대비 꺼짐', hasTapAction: true),
+      );
 
       await tester.tap(
         find.byKey(const Key('onboardingPreference-highContrast')),

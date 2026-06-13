@@ -284,6 +284,7 @@ class _OnboardingPreferenceSwitch extends StatelessWidget {
       child: Semantics(
         label: '$title $state',
         toggled: value,
+        onTap: () => onChanged(!value),
         child: ExcludeSemantics(
           child: SwitchListTile(
             value: value,

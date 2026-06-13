@@ -153,6 +153,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       routeRepository: widget.routeRepository,
       favoriteRepository: widget.favoriteRepository,
       notificationRepository: widget.notificationRepository,
+      initialMobilityType: _onboardingState.result?.profile.mobilityType,
     );
   }
 }
@@ -251,20 +252,23 @@ NotificationSettingsRepository? _defaultNotificationSettingsRepository({
 }
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({
+  HomeScreen({
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
     required this.notificationRepository,
+    String? initialMobilityType,
     super.key,
-  });
+  }) : initialMobilityType =
+           initialMobilityType ?? mobilityProfileOptions.first.mobilityType;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final String initialMobilityType;
 
   @override
   Widget build(BuildContext context) {
@@ -315,6 +319,7 @@ class HomeScreen extends StatelessWidget {
                     builder: (_) => RouteSearchScreen(
                       repository: routeRepository,
                       stationRepository: repository,
+                      initialMobilityType: initialMobilityType,
                     ),
                   ),
                 );
