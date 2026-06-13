@@ -75,17 +75,22 @@ void main() {
   });
 
   test('익명 인증 API 저장소는 원격 HTTP 주소로 인증 정보를 보내지 않는다', () async {
-    final httpClient = NetworkFailingHttpClient();
-    final repository = AnonymousAuthApiRepository(
-      baseUri: Uri.parse('http://example.com'),
-      httpClient: httpClient,
-    );
+    for (final baseUri in [
+      Uri.parse('http://example.com'),
+      Uri.parse('http://127.example.com'),
+    ]) {
+      final httpClient = NetworkFailingHttpClient();
+      final repository = AnonymousAuthApiRepository(
+        baseUri: baseUri,
+        httpClient: httpClient,
+      );
 
-    expect(
-      repository.issueAnonymousUser,
-      throwsA(isA<AnonymousAuthException>()),
-    );
-    expect(httpClient.postUrlCalled, isFalse);
+      expect(
+        repository.issueAnonymousUser,
+        throwsA(isA<AnonymousAuthException>()),
+      );
+      expect(httpClient.postUrlCalled, isFalse);
+    }
   });
 }
 

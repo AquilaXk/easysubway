@@ -150,5 +150,12 @@ bool _isAllowedAnonymousAuthBaseUri(Uri uri) {
   return host == 'localhost' ||
       host == '::1' ||
       host == '10.0.2.2' ||
-      host.startsWith('127.');
+      _isIpv4LoopbackLiteral(host);
+}
+
+bool _isIpv4LoopbackLiteral(String host) {
+  final address = InternetAddress.tryParse(host);
+  return address != null &&
+      address.type == InternetAddressType.IPv4 &&
+      address.rawAddress.first == 127;
 }

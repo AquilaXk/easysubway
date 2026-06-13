@@ -595,6 +595,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuth, /class AnonymousAuthSession implements FavoriteStationAuthProvider/);
   assert.match(anonymousAuth, /_credentials/);
   assert.match(anonymousAuth, /_isAllowedAnonymousAuthBaseUri/);
+  assert.match(anonymousAuth, /_isIpv4LoopbackLiteral/);
   assert.match(anonymousAuth, /10\.0\.2\.2/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
