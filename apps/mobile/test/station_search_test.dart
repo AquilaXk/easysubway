@@ -284,6 +284,27 @@ void main() {
     expect(controller.state.message, '역 정보를 불러오지 못했습니다.');
   });
 
+  test('역 상세 컨트롤러는 상세와 출구와 시설 요청을 동시에 시작한다', () async {
+    final repository = ControlledStationDetailRepository();
+    final controller = StationDetailController(repository: repository);
+    addTearDown(controller.dispose);
+
+    final loadFuture = controller.load('station-sangnoksu');
+
+    expect(repository.requestedDetailStationIds, ['station-sangnoksu']);
+    expect(repository.requestedExitStationIds, ['station-sangnoksu']);
+    expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
+    expect(controller.state.status, StationDetailStatus.loading);
+
+    repository.completeAll();
+    await loadFuture;
+
+    expect(controller.state.status, StationDetailStatus.success);
+    expect(controller.state.detail?.nameKo, '상록수');
+    expect(controller.state.exits.single.name, '1번 출구');
+    expect(controller.state.facilities.single.name, '1번 출구 엘리베이터');
+  });
+
   test('시설 정보는 백엔드 enum 값을 쉬운 라벨과 스크린리더 문구로 바꾼다', () {
     const ramp = StationFacilityInfo(
       id: 'facility-ramp-1',
@@ -341,6 +362,53 @@ StationSearchResult _stationResult({required String id, required String name}) {
         stationCode: '222',
       ),
     ],
+  );
+}
+
+StationDetail _stationDetail({required String id, required String name}) {
+  return StationDetail(
+    id: id,
+    nameKo: name,
+    nameEn: id,
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    lastVerifiedAt: '2026-06-12',
+    lines: const [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '448',
+      ),
+    ],
+  );
+}
+
+StationExitInfo _stationExit() {
+  return const StationExitInfo(
+    id: 'exit-sangnoksu-1',
+    stationId: 'station-sangnoksu',
+    exitNumber: '1',
+    name: '1번 출구',
+    hasElevatorConnection: true,
+    hasStairOnlyPath: false,
+    dataConfidence: 'HIGH',
+  );
+}
+
+StationFacilityInfo _stationFacility() {
+  return const StationFacilityInfo(
+    id: 'facility-sangnoksu-elevator-1',
+    stationId: 'station-sangnoksu',
+    exitId: 'exit-sangnoksu-1',
+    type: 'ELEVATOR',
+    name: '1번 출구 엘리베이터',
+    floorFrom: '지상',
+    floorTo: '대합실',
+    description: '1번 출구와 대합실을 연결합니다.',
+    status: 'NORMAL',
+    dataConfidence: 'HIGH',
+    lastUpdatedAt: '2026-06-12',
   );
 }
 
@@ -408,5 +476,45 @@ class ControlledStationSearchRepository implements StationSearchRepository {
       throw StateError('Pending search not found: $query');
     }
     completer.complete(results);
+  }
+}
+
+class ControlledStationDetailRepository implements StationSearchRepository {
+  final requestedDetailStationIds = <String>[];
+  final requestedExitStationIds = <String>[];
+  final requestedFacilityStationIds = <String>[];
+  final _detailCompleter = Completer<StationDetail>();
+  final _exitsCompleter = Completer<List<StationExitInfo>>();
+  final _facilitiesCompleter = Completer<List<StationFacilityInfo>>();
+
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    requestedDetailStationIds.add(stationId);
+    return _detailCompleter.future;
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    requestedExitStationIds.add(stationId);
+    return _exitsCompleter.future;
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    requestedFacilityStationIds.add(stationId);
+    return _facilitiesCompleter.future;
+  }
+
+  void completeAll() {
+    _detailCompleter.complete(
+      _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+    _exitsCompleter.complete([_stationExit()]);
+    _facilitiesCompleter.complete([_stationFacility()]);
   }
 }

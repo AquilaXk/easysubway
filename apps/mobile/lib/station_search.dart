@@ -638,18 +638,20 @@ class StationDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 상세 화면은 기본 정보, 출구, 시설을 함께 읽어 서로 맞지 않는 일부 결과만 보이지 않게 한다.
-      final detail = await repository.getStationDetail(stationId);
-      final exits = await repository.listStationExits(stationId);
-      final facilities = await repository.listStationFacilities(stationId);
+      // 상세 화면은 기본 정보, 출구, 시설을 함께 읽되 느린 네트워크에서 대기 시간이 합산되지 않게 병렬로 요청한다.
+      final responses = await Future.wait<Object>([
+        repository.getStationDetail(stationId),
+        repository.listStationExits(stationId),
+        repository.listStationFacilities(stationId),
+      ]);
       if (_isDisposed) {
         return;
       }
       _state = StationDetailState(
         status: StationDetailStatus.success,
-        detail: detail,
-        exits: exits,
-        facilities: facilities,
+        detail: responses[0] as StationDetail,
+        exits: responses[1] as List<StationExitInfo>,
+        facilities: responses[2] as List<StationFacilityInfo>,
       );
     } catch (_) {
       if (_isDisposed) {
