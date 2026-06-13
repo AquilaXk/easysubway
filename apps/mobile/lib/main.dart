@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'anonymous_auth.dart';
+import 'auth_headers.dart';
 import 'facility_report.dart';
 import 'mobility_profile.dart';
+import 'notification_settings.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 
@@ -16,30 +18,35 @@ class EasySubwayApp extends StatelessWidget {
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
     FavoriteStationRepository? favoriteRepository,
+    NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
     bool enableAnonymousAuth = true,
-    super.key,
-  }) : repository =
-           repository ??
-           StationSearchApiRepository(baseUri: defaultStationApiBaseUri()),
-       reportRepository =
-           reportRepository ??
-           FacilityReportApiRepository(baseUri: defaultStationApiBaseUri()),
-       routeRepository =
-           routeRepository ??
-           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri()),
-       favoriteRepository =
-           favoriteRepository ??
-           _defaultFavoriteStationRepository(
-             baseUri: defaultStationApiBaseUri(),
-             anonymousAuthRepository: anonymousAuthRepository,
-             enableAnonymousAuth: enableAnonymousAuth,
-           );
+    Key? key,
+  }) : this._(
+         dependencies: _EasySubwayAppDependencies.resolve(
+           repository: repository,
+           reportRepository: reportRepository,
+           routeRepository: routeRepository,
+           favoriteRepository: favoriteRepository,
+           notificationRepository: notificationRepository,
+           anonymousAuthRepository: anonymousAuthRepository,
+           enableAnonymousAuth: enableAnonymousAuth,
+         ),
+         key: key,
+       );
+
+  EasySubwayApp._({required _EasySubwayAppDependencies dependencies, super.key})
+    : repository = dependencies.repository,
+      reportRepository = dependencies.reportRepository,
+      routeRepository = dependencies.routeRepository,
+      favoriteRepository = dependencies.favoriteRepository,
+      notificationRepository = dependencies.notificationRepository;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -89,12 +96,66 @@ class EasySubwayApp extends StatelessWidget {
         reportRepository: reportRepository,
         routeRepository: routeRepository,
         favoriteRepository: favoriteRepository,
+        notificationRepository: notificationRepository,
       ),
     );
   }
 }
 
-FavoriteStationRepository? _defaultFavoriteStationRepository({
+class _EasySubwayAppDependencies {
+  const _EasySubwayAppDependencies({
+    required this.repository,
+    required this.reportRepository,
+    required this.routeRepository,
+    required this.favoriteRepository,
+    required this.notificationRepository,
+  });
+
+  factory _EasySubwayAppDependencies.resolve({
+    StationSearchRepository? repository,
+    FacilityReportRepository? reportRepository,
+    RouteSearchRepository? routeRepository,
+    FavoriteStationRepository? favoriteRepository,
+    NotificationSettingsRepository? notificationRepository,
+    AnonymousAuthRepository? anonymousAuthRepository,
+    required bool enableAnonymousAuth,
+  }) {
+    final baseUri = defaultStationApiBaseUri();
+    final sharedAuthProvider = _defaultAuthorizationHeaderProvider(
+      baseUri: baseUri,
+      anonymousAuthRepository: anonymousAuthRepository,
+      enableAnonymousAuth: enableAnonymousAuth,
+    );
+
+    return _EasySubwayAppDependencies(
+      repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
+      reportRepository:
+          reportRepository ?? FacilityReportApiRepository(baseUri: baseUri),
+      routeRepository:
+          routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
+      favoriteRepository:
+          favoriteRepository ??
+          _defaultFavoriteStationRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
+      notificationRepository:
+          notificationRepository ??
+          _defaultNotificationSettingsRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
+    );
+  }
+
+  final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
+  final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
+}
+
+AuthorizationHeaderProvider? _defaultAuthorizationHeaderProvider({
   required Uri baseUri,
   required bool enableAnonymousAuth,
   AnonymousAuthRepository? anonymousAuthRepository,
@@ -102,13 +163,35 @@ FavoriteStationRepository? _defaultFavoriteStationRepository({
   if (!enableAnonymousAuth) {
     return null;
   }
+  return AnonymousAuthSession(
+    repository:
+        anonymousAuthRepository ?? AnonymousAuthApiRepository(baseUri: baseUri),
+  );
+}
+
+FavoriteStationRepository? _defaultFavoriteStationRepository({
+  required Uri baseUri,
+  required AuthorizationHeaderProvider? authProvider,
+}) {
+  if (authProvider == null) {
+    return null;
+  }
   return FavoriteStationApiRepository(
     baseUri: baseUri,
-    authProvider: AnonymousAuthSession(
-      repository:
-          anonymousAuthRepository ??
-          AnonymousAuthApiRepository(baseUri: baseUri),
-    ),
+    authProvider: authProvider,
+  );
+}
+
+NotificationSettingsRepository? _defaultNotificationSettingsRepository({
+  required Uri baseUri,
+  required AuthorizationHeaderProvider? authProvider,
+}) {
+  if (authProvider == null) {
+    return null;
+  }
+  return NotificationSettingsApiRepository(
+    baseUri: baseUri,
+    authProvider: authProvider,
   );
 }
 
@@ -118,6 +201,7 @@ class HomeScreen extends StatelessWidget {
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
+    required this.notificationRepository,
     super.key,
   });
 
@@ -125,11 +209,13 @@ class HomeScreen extends StatelessWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final favoriteRepository = this.favoriteRepository;
+    final notificationRepository = this.notificationRepository;
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
@@ -198,6 +284,23 @@ class HomeScreen extends StatelessWidget {
                 },
                 icon: const Icon(Icons.star),
                 label: const Text('즐겨찾기'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (notificationRepository != null) ...[
+              FilledButton.icon(
+                key: const Key('notificationSettingsButton'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => NotificationSettingsScreen(
+                        repository: notificationRepository,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: const Text('알림 설정'),
               ),
               const SizedBox(height: 12),
             ],

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
@@ -26,16 +27,11 @@ void main() {
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '경로 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '즐겨찾기'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
-      expect(find.text('이동 프로필'), findsOneWidget);
-      expect(find.text('시설 정보'), findsOneWidget);
-      expect(find.text('신고'), findsOneWidget);
       expect(find.textContaining('빠른 길보다'), findsNothing);
       expect(find.textContaining('고령자'), findsNothing);
       expect(find.textContaining('휠체어'), findsNothing);
-      expect(find.bySemanticsLabel('이동 프로필, 이동 조건 저장'), findsOneWidget);
-      expect(find.bySemanticsLabel('시설 정보, 엘리베이터와 경사로'), findsOneWidget);
-      expect(find.bySemanticsLabel('신고, 불편 신고'), findsOneWidget);
 
       final stationButtonSize = tester.getSize(
         find.byKey(const Key('stationSearchButton')),
@@ -46,10 +42,24 @@ void main() {
       final profileButtonSize = tester.getSize(
         find.byKey(const Key('mobilityProfileButton')),
       );
+      final notificationButtonSize = tester.getSize(
+        find.byKey(const Key('notificationSettingsButton')),
+      );
 
       expect(stationButtonSize.height, greaterThanOrEqualTo(60));
       expect(routeButtonSize.height, greaterThanOrEqualTo(60));
+      expect(notificationButtonSize.height, greaterThanOrEqualTo(60));
       expect(profileButtonSize.height, greaterThanOrEqualTo(60));
+
+      await tester.drag(find.byType(ListView), const Offset(0, -220));
+      await tester.pumpAndSettle();
+
+      expect(find.text('이동 프로필'), findsOneWidget);
+      expect(find.text('시설 정보'), findsOneWidget);
+      expect(find.text('신고'), findsOneWidget);
+      expect(find.bySemanticsLabel('이동 프로필, 이동 조건 저장'), findsOneWidget);
+      expect(find.bySemanticsLabel('시설 정보, 엘리베이터와 경사로'), findsOneWidget);
+      expect(find.bySemanticsLabel('신고, 불편 신고'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -67,6 +77,8 @@ void main() {
 
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.widgetWithText(FilledButton, '즐겨찾기'), findsNothing);
+    expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
+    expect(find.widgetWithText(FilledButton, '알림 설정'), findsNothing);
   });
 
   testWidgets('기본 홈 화면은 익명 인증으로 즐겨찾기를 노출한다', (tester) async {
@@ -81,6 +93,85 @@ void main() {
 
     expect(find.byKey(const Key('favoriteStationsButton')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '즐겨찾기'), findsOneWidget);
+    expect(find.byKey(const Key('notificationSettingsButton')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
+  });
+
+  test('기본 앱은 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
+    final app = EasySubwayApp(
+      repository: FakeStationSearchRepository(),
+      reportRepository: FakeFacilityReportRepository(),
+      routeRepository: FakeRouteSearchRepository(),
+      anonymousAuthRepository: FakeAnonymousAuthRepository(),
+    );
+
+    final favoriteRepository =
+        app.favoriteRepository as FavoriteStationApiRepository;
+    final notificationRepository =
+        app.notificationRepository as NotificationSettingsApiRepository;
+
+    expect(
+      identical(
+        favoriteRepository.authProvider,
+        notificationRepository.authProvider,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final notificationRepository = FakeNotificationSettingsRepository();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: notificationRepository,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('notificationSettingsButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림 설정'), findsOneWidget);
+      expect(find.text('역 시설 알림'), findsOneWidget);
+      expect(find.text('경로 시설 알림'), findsOneWidget);
+      expect(find.text('신고 처리 알림'), findsOneWidget);
+      expect(find.text('정보 갱신 알림'), findsOneWidget);
+      expect(find.bySemanticsLabel('역 시설 알림 켜짐'), findsOneWidget);
+      expect(find.bySemanticsLabel('경로 시설 알림 꺼짐'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('notificationSwitch-favoriteRouteFacilityAlerts')),
+      );
+      await tester.tap(
+        find.byKey(const Key('notificationSwitch-dataQualityAlerts')),
+      );
+      await tester.tap(find.byKey(const Key('notificationSettingsSaveButton')));
+      await tester.pumpAndSettle();
+
+      expect(notificationRepository.savedSettings, hasLength(1));
+      expect(
+        notificationRepository.savedSettings.single.favoriteRouteFacilityAlerts,
+        isTrue,
+      );
+      expect(
+        notificationRepository.savedSettings.single.dataQualityAlerts,
+        isTrue,
+      );
+      expect(find.text('알림 설정을 저장했습니다.'), findsOneWidget);
+      expect(find.bySemanticsLabel('알림 설정을 저장했습니다.'), findsOneWidget);
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('홈 즐겨찾기는 저장한 역을 큰 목록으로 보여준다', (tester) async {
@@ -1168,6 +1259,42 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
     favorites = favorites
         .where((favorite) => favorite.stationId != stationId)
         .toList(growable: false);
+  }
+}
+
+class FakeNotificationSettingsRepository
+    implements NotificationSettingsRepository {
+  NotificationSettings settings = const NotificationSettings(
+    userId: 'anonymous-user-1',
+    favoriteStationFacilityAlerts: true,
+    favoriteRouteFacilityAlerts: false,
+    reportStatusAlerts: true,
+    dataQualityAlerts: false,
+    updatedAt: '2026-06-14T09:00:00',
+  );
+  final savedSettings = <NotificationSettings>[];
+  Object? error;
+
+  @override
+  Future<NotificationSettings> getNotificationSettings() async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return settings;
+  }
+
+  @override
+  Future<NotificationSettings> saveNotificationSettings(
+    NotificationSettings settings,
+  ) async {
+    savedSettings.add(settings);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    this.settings = settings.copyWith(updatedAt: '2026-06-14T09:05:00');
+    return this.settings;
   }
 }
 
