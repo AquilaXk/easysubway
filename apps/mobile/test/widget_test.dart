@@ -97,6 +97,28 @@ void main() {
     expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
   });
 
+  test('기본 앱은 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
+    final app = EasySubwayApp(
+      repository: FakeStationSearchRepository(),
+      reportRepository: FakeFacilityReportRepository(),
+      routeRepository: FakeRouteSearchRepository(),
+      anonymousAuthRepository: FakeAnonymousAuthRepository(),
+    );
+
+    final favoriteRepository =
+        app.favoriteRepository as FavoriteStationApiRepository;
+    final notificationRepository =
+        app.notificationRepository as NotificationSettingsApiRepository;
+
+    expect(
+      identical(
+        favoriteRepository.authProvider,
+        notificationRepository.authProvider,
+      ),
+      isTrue,
+    );
+  });
+
   testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final notificationRepository = FakeNotificationSettingsRepository();
