@@ -181,6 +181,126 @@ void main() {
     expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
   });
 
+  test('즐겨찾기 역 API 저장소는 인증 헤더와 함께 목록을 요청하고 결과를 파싱한다', () async {
+    late String? authorizationHeader;
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      authorizationHeader = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'userId': 'anonymous-user-1',
+                'stationId': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                  },
+                ],
+                'addedAt': '2026-06-13T10:00:00',
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FavoriteStationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      credentials: const FavoriteStationCredentials(
+        username: 'anonymous-user-1',
+        password: 'user-test-password',
+      ),
+    );
+
+    final favorites = await repository.listFavoriteStations();
+
+    expect(requestedUri.path, '/api/v1/me/favorites/stations');
+    expect(
+      authorizationHeader,
+      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
+    );
+    expect(favorites, hasLength(1));
+    expect(favorites.single.stationId, 'station-sangnoksu');
+    expect(favorites.single.nameKo, '상록수');
+    expect(favorites.single.lineLabel, '수도권 4호선');
+    expect(favorites.single.dataQualityLabel, '기본 정보만 확인됨');
+  });
+
+  test('즐겨찾기 역 API 저장소는 역 저장과 해제를 요청한다', () async {
+    final requestedMethods = <String>[];
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedMethods.add(request.method);
+      requestedPaths.add(request.uri.path);
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json;
+
+      if (request.method == 'PUT') {
+        request.response.write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'userId': 'anonymous-user-1',
+              'stationId': 'station-sangnoksu',
+              'nameKo': '상록수',
+              'nameEn': 'Sangnoksu',
+              'region': '수도권',
+              'dataQualityLevel': 'LEVEL_1',
+              'lastVerifiedAt': '2026-06-12',
+              'lines': const [],
+              'addedAt': '2026-06-13T10:00:00',
+            },
+          }),
+        );
+      } else {
+        request.response.write(jsonEncode({'success': true, 'data': null}));
+      }
+
+      request.response.close();
+    });
+
+    final repository = FavoriteStationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      credentials: const FavoriteStationCredentials(
+        username: 'anonymous-user-1',
+        password: 'user-test-password',
+      ),
+    );
+
+    final favorite = await repository.saveFavoriteStation('station-sangnoksu');
+    await repository.removeFavoriteStation('station-sangnoksu');
+
+    expect(favorite.nameKo, '상록수');
+    expect(requestedMethods, ['PUT', 'DELETE']);
+    expect(requestedPaths, [
+      '/api/v1/me/favorites/stations/station-sangnoksu',
+      '/api/v1/me/favorites/stations/station-sangnoksu',
+    ]);
+  });
+
   test('역 API 저장소는 형식이 잘못된 역 응답을 거부한다', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
@@ -305,6 +425,51 @@ void main() {
     expect(controller.state.facilities.single.name, '1번 출구 엘리베이터');
   });
 
+  test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
+    final repository = FakeFavoriteStationRepository();
+    final controller = FavoriteStationListController(repository: repository);
+
+    repository.favorites = [
+      _favoriteStation(id: 'station-sangnoksu', name: '상록수'),
+    ];
+    await controller.load();
+
+    expect(controller.state.status, FavoriteStationListStatus.success);
+    expect(controller.state.favorites.single.nameKo, '상록수');
+
+    repository.favorites = const [];
+    await controller.load();
+
+    expect(controller.state.status, FavoriteStationListStatus.empty);
+    expect(controller.state.message, '저장한 역이 없습니다.');
+
+    repository.error = const FavoriteStationException('즐겨찾기를 불러오지 못했습니다.');
+    await controller.load();
+
+    expect(controller.state.status, FavoriteStationListStatus.failure);
+    expect(controller.state.message, '즐겨찾기를 불러오지 못했습니다.');
+  });
+
+  test('역 상세 즐겨찾기 컨트롤러는 저장과 해제를 순서대로 처리한다', () async {
+    final repository = FakeFavoriteStationRepository();
+    final controller = StationFavoriteToggleController(
+      repository: repository,
+      stationId: 'station-sangnoksu',
+    );
+
+    await controller.save();
+
+    expect(repository.savedStationIds, ['station-sangnoksu']);
+    expect(controller.state.isFavorite, isTrue);
+    expect(controller.state.message, '즐겨찾기에 저장했습니다.');
+
+    await controller.remove();
+
+    expect(repository.removedStationIds, ['station-sangnoksu']);
+    expect(controller.state.isFavorite, isFalse);
+    expect(controller.state.message, '즐겨찾기에서 해제했습니다.');
+  });
+
   test('시설 정보는 백엔드 enum 값을 쉬운 라벨과 스크린리더 문구로 바꾼다', () {
     const ramp = StationFacilityInfo(
       id: 'facility-ramp-1',
@@ -344,6 +509,27 @@ void main() {
     expect(customerCenter.statusLabel, '검수 완료');
     expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
   });
+}
+
+FavoriteStation _favoriteStation({required String id, required String name}) {
+  return FavoriteStation(
+    userId: 'anonymous-user-1',
+    stationId: id,
+    nameKo: name,
+    nameEn: id,
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    lastVerifiedAt: '2026-06-12',
+    lines: const [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '448',
+      ),
+    ],
+    addedAt: '2026-06-13T10:00:00',
+  );
 }
 
 StationSearchResult _stationResult({required String id, required String name}) {
@@ -516,5 +702,45 @@ class ControlledStationDetailRepository implements StationSearchRepository {
     );
     _exitsCompleter.complete([_stationExit()]);
     _facilitiesCompleter.complete([_stationFacility()]);
+  }
+}
+
+class FakeFavoriteStationRepository implements FavoriteStationRepository {
+  List<FavoriteStation> favorites = const [];
+  final savedStationIds = <String>[];
+  final removedStationIds = <String>[];
+  Object? error;
+
+  @override
+  Future<List<FavoriteStation>> listFavoriteStations() async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return favorites;
+  }
+
+  @override
+  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+    savedStationIds.add(stationId);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    final favorite = _favoriteStation(id: stationId, name: '상록수');
+    favorites = [favorite];
+    return favorite;
+  }
+
+  @override
+  Future<void> removeFavoriteStation(String stationId) async {
+    removedStationIds.add(stationId);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    favorites = favorites
+        .where((favorite) => favorite.stationId != stationId)
+        .toList(growable: false);
   }
 }
