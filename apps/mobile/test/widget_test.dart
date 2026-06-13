@@ -367,6 +367,76 @@ void main() {
     }
   });
 
+  testWidgets('검색 결과의 저장된 역은 상세에서 해제 버튼으로 시작한다', (tester) async {
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: favoriteRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+    expect(find.bySemanticsLabel('상록수역 즐겨찾기 해제'), findsOneWidget);
+  });
+
+  testWidgets('즐겨찾기 목록은 상세에서 해제하고 돌아오면 다시 불러온다', (tester) async {
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: favoriteRepository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('favoriteStationsButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationFavoriteToggleButton')));
+    await tester.pumpAndSettle();
+
+    expect(favoriteRepository.removedStationIds, ['station-sangnoksu']);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장한 역이 없습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+      findsNothing,
+    );
+  });
+
   testWidgets('검색 요청 중에는 검색 버튼을 비활성화한다', (tester) async {
     final repository = ControlledStationSearchRepository();
 

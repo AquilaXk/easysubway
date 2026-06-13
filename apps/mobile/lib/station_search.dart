@@ -164,21 +164,29 @@ abstract class FavoriteStationRepository {
   Future<void> removeFavoriteStation(String stationId);
 }
 
-class FavoriteStationCredentials {
-  const FavoriteStationCredentials({
+abstract class FavoriteStationAuthProvider {
+  Future<String?> authorizationHeader();
+}
+
+class NoFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+  const NoFavoriteStationAuthProvider();
+
+  @override
+  Future<String?> authorizationHeader() async => null;
+}
+
+class BasicFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+  const BasicFavoriteStationAuthProvider({
     required this.username,
     required this.password,
   });
 
-  const FavoriteStationCredentials.fromEnvironment()
-    : username = const String.fromEnvironment('EASYSUBWAY_FAVORITE_USERNAME'),
-      password = const String.fromEnvironment('EASYSUBWAY_FAVORITE_PASSWORD');
-
   final String username;
   final String password;
 
-  String? get authorizationHeader {
-    // 즐겨찾기는 사용자별 데이터라 Basic 인증값을 빌드 환경에서 주입받아 요청에만 붙인다.
+  @override
+  Future<String?> authorizationHeader() async {
+    // 실제 앱은 로그인 세션에서 인증값을 주입해야 하며, 빌드 타임 공용 인증값은 사용하지 않는다.
     if (username.trim().isEmpty || password.isEmpty) {
       return null;
     }
@@ -190,12 +198,12 @@ class FavoriteStationCredentials {
 class FavoriteStationApiRepository implements FavoriteStationRepository {
   FavoriteStationApiRepository({
     required this.baseUri,
-    required this.credentials,
+    required this.authProvider,
     HttpClient? httpClient,
   }) : _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
-  final FavoriteStationCredentials credentials;
+  final FavoriteStationAuthProvider authProvider;
   final HttpClient _httpClient;
 
   @override
@@ -265,7 +273,9 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
       final request = await _httpClient
           .openUrl(method, uri)
           .timeout(_favoriteStationTimeout);
-      final authorizationHeader = credentials.authorizationHeader;
+      final authorizationHeader = await authProvider
+          .authorizationHeader()
+          .timeout(_favoriteStationTimeout);
       if (authorizationHeader != null) {
         request.headers.set(
           HttpHeaders.authorizationHeader,
@@ -1192,7 +1202,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     _controller.search(query);
   }
 
-  void _openStationDetail(StationSearchResult result) {
+  Future<void> _openStationDetail(StationSearchResult result) async {
+    final initiallyFavorite = await _isFavoriteStation(result.id);
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => StationDetailScreen(
@@ -1200,9 +1214,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
           stationId: result.id,
+          initiallyFavorite: initiallyFavorite,
         ),
       ),
     );
+  }
+
+  Future<bool> _isFavoriteStation(String stationId) async {
+    try {
+      final favorites = await widget.favoriteRepository.listFavoriteStations();
+      return favorites.any((favorite) => favorite.stationId == stationId);
+    } catch (_) {
+      return false;
+    }
   }
 }
 
@@ -1400,8 +1424,8 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
     );
   }
 
-  void _openStationDetail(FavoriteStation favorite) {
-    Navigator.of(context).push(
+  Future<void> _openStationDetail(FavoriteStation favorite) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => StationDetailScreen(
           repository: widget.stationRepository,
@@ -1413,6 +1437,10 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
         ),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    _controller.load();
   }
 }
 

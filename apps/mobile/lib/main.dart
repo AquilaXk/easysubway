@@ -29,7 +29,7 @@ class EasySubwayApp extends StatelessWidget {
            favoriteRepository ??
            FavoriteStationApiRepository(
              baseUri: defaultStationApiBaseUri(),
-             credentials: const FavoriteStationCredentials.fromEnvironment(),
+             authProvider: const NoFavoriteStationAuthProvider(),
            );
 
   final StationSearchRepository repository;

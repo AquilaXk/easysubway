@@ -225,7 +225,7 @@ void main() {
 
     final repository = FavoriteStationApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      credentials: const FavoriteStationCredentials(
+      authProvider: const BasicFavoriteStationAuthProvider(
         username: 'anonymous-user-1',
         password: 'user-test-password',
       ),
@@ -243,6 +243,33 @@ void main() {
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
     expect(favorites.single.dataQualityLabel, '기본 정보만 확인됨');
+  });
+
+  test('즐겨찾기 역 API 저장소는 인증 제공자가 없으면 인증 헤더를 보내지 않는다', () async {
+    late String? authorizationHeader;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      authorizationHeader = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'success': true, 'data': []}))
+        ..close();
+    });
+
+    final repository = FavoriteStationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const NoFavoriteStationAuthProvider(),
+    );
+
+    final favorites = await repository.listFavoriteStations();
+
+    expect(favorites, isEmpty);
+    expect(authorizationHeader, isNull);
   });
 
   test('즐겨찾기 역 API 저장소는 역 저장과 해제를 요청한다', () async {
@@ -284,7 +311,7 @@ void main() {
 
     final repository = FavoriteStationApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      credentials: const FavoriteStationCredentials(
+      authProvider: const BasicFavoriteStationAuthProvider(
         username: 'anonymous-user-1',
         password: 'user-test-password',
       ),
