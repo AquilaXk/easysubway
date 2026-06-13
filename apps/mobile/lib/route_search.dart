@@ -374,30 +374,48 @@ class RouteSearchController extends ChangeNotifier {
 }
 
 class RouteSearchScreen extends StatefulWidget {
-  const RouteSearchScreen({
+  RouteSearchScreen({
     required this.repository,
     required this.stationRepository,
+    String? initialMobilityType,
     super.key,
-  });
+  }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
 
   final RouteSearchRepository repository;
   final StationSearchRepository stationRepository;
+  final String initialMobilityType;
 
   @override
   State<RouteSearchScreen> createState() => _RouteSearchScreenState();
+}
+
+String _resolveInitialMobilityType(String? mobilityType) {
+  if (mobilityType == null) {
+    return mobilityProfileOptions.first.mobilityType;
+  }
+
+  final isKnownMobilityType = mobilityProfileOptions.any(
+    (option) => option.mobilityType == mobilityType,
+  );
+
+  // 서버에 보내는 이동 조건은 화면 드롭다운에 있는 값으로만 제한한다.
+  return isKnownMobilityType
+      ? mobilityType
+      : mobilityProfileOptions.first.mobilityType;
 }
 
 class _RouteSearchScreenState extends State<RouteSearchScreen> {
   late final RouteSearchController _controller;
   StationSearchResult? _originStation;
   StationSearchResult? _destinationStation;
-  String _selectedMobilityType = mobilityProfileOptions.first.mobilityType;
+  late String _selectedMobilityType;
   String _validationMessage = '';
 
   @override
   void initState() {
     super.initState();
     _controller = RouteSearchController(repository: widget.repository);
+    _selectedMobilityType = widget.initialMobilityType;
   }
 
   @override

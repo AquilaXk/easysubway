@@ -3,13 +3,166 @@ import 'dart:async';
 import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
+import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
+  return OnboardingState.completed(
+    result: OnboardingResult(
+      profile: mobilityProfileOptions.firstWhere(
+        (option) => option.id == profileId,
+      ),
+      preferences: const OnboardingViewPreferences.defaults(),
+    ),
+  );
+}
+
+OnboardingState _completedOnboardingStateWithPreferences({
+  required OnboardingViewPreferences preferences,
+  String profileId = 'elderly',
+}) {
+  return OnboardingState.completed(
+    result: OnboardingResult(
+      profile: mobilityProfileOptions.firstWhere(
+        (option) => option.id == profileId,
+      ),
+      preferences: preferences,
+    ),
+  );
+}
+
 void main() {
+  testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+      ),
+    );
+
+    expect(find.text('쉬운 지하철'), findsOneWidget);
+    expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchButton')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('역 찾기'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+  });
+
+  testWidgets('온보딩을 마친 앱 세션은 홈을 바로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+  });
+
+  testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: routeRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(
+          profileId: 'wheelchair',
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+  });
+
+  testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingStateWithPreferences(
+          preferences: const OnboardingViewPreferences(
+            largeTextEnabled: true,
+            highContrastEnabled: true,
+            simpleViewEnabled: true,
+          ),
+        ),
+      ),
+    );
+
+    final homeContext = tester.element(find.byType(HomeScreen));
+
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(23.6, 0.01));
+    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.text('이동 프로필'), findsNothing);
+    expect(find.text('시설 정보'), findsNothing);
+    expect(find.text('신고'), findsNothing);
+  });
+
   testWidgets('홈 화면은 핵심 행동만 간결하게 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
@@ -20,6 +173,13 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: false,
+              simpleViewEnabled: false,
+            ),
+          ),
         ),
       );
 
@@ -72,6 +232,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         enableAnonymousAuth: false,
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -88,6 +249,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         anonymousAuthRepository: FakeAnonymousAuthRepository(),
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -103,6 +265,7 @@ void main() {
       reportRepository: FakeFacilityReportRepository(),
       routeRepository: FakeRouteSearchRepository(),
       anonymousAuthRepository: FakeAnonymousAuthRepository(),
+      initialOnboardingState: _completedOnboardingState(),
     );
 
     final favoriteRepository =
@@ -131,6 +294,7 @@ void main() {
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
           notificationRepository: notificationRepository,
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -187,6 +351,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: favoriteRepository,
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -255,6 +420,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -362,6 +528,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -445,6 +612,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: favoriteRepository,
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -502,6 +670,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -532,6 +701,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -572,6 +742,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -605,6 +776,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -640,6 +812,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -704,6 +877,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -811,6 +985,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
         favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -847,6 +1022,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
         favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
@@ -926,6 +1102,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
@@ -1019,6 +1196,7 @@ void main() {
           reportRepository: reportRepository,
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
