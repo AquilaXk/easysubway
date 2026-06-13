@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'mobility_profile.dart';
+import 'route_search.dart';
 import 'station_search.dart';
 
 void main() {
@@ -8,12 +9,19 @@ void main() {
 }
 
 class EasySubwayApp extends StatelessWidget {
-  EasySubwayApp({StationSearchRepository? repository, super.key})
-    : repository =
-          repository ??
-          StationSearchApiRepository(baseUri: defaultStationApiBaseUri());
+  EasySubwayApp({
+    StationSearchRepository? repository,
+    RouteSearchRepository? routeRepository,
+    super.key,
+  }) : repository =
+           repository ??
+           StationSearchApiRepository(baseUri: defaultStationApiBaseUri()),
+       routeRepository =
+           routeRepository ??
+           RouteSearchApiRepository(baseUri: defaultStationApiBaseUri());
 
   final StationSearchRepository repository;
+  final RouteSearchRepository routeRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -58,15 +66,23 @@ class EasySubwayApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: HomeScreen(repository: repository),
+      home: HomeScreen(
+        repository: repository,
+        routeRepository: routeRepository,
+      ),
     );
   }
 }
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({required this.repository, super.key});
+  const HomeScreen({
+    required this.repository,
+    required this.routeRepository,
+    super.key,
+  });
 
   final StationSearchRepository repository;
+  final RouteSearchRepository routeRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +117,20 @@ class HomeScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.search),
               label: const Text('역 검색'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('routeSearchButton'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        RouteSearchScreen(repository: routeRepository),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.route),
+              label: const Text('경로 검색'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
