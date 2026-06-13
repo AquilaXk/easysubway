@@ -11,7 +11,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,7 @@ class AnonymousAuthServiceTest {
 	@Test
 	@DisplayName("현재 사용자 조회는 인증된 사용자 식별자를 익명 사용자로 반환한다")
 	void currentUserReturnsAuthenticatedAnonymousUser() {
+		registry.issuedAnonymousUserIds.add("anonymous-user-1");
 		var service = new AnonymousAuthService(
 			registry,
 			clock,
@@ -73,6 +76,24 @@ class AnonymousAuthServiceTest {
 		assertThat(user.userId()).isEqualTo("anonymous-user-1");
 		assertThat(user.authType()).isEqualTo("BASIC");
 		assertThat(user.anonymous()).isTrue();
+	}
+
+	@Test
+	@DisplayName("현재 사용자 조회는 고정 Basic 계정을 익명 사용자가 아닌 계정으로 반환한다")
+	void currentUserReturnsNonAnonymousForConfiguredBasicUser() {
+		registry.registeredPasswordsByUserId.put("configured-user", "configured-password");
+		var service = new AnonymousAuthService(
+			registry,
+			clock,
+			() -> "anonymous-user-1",
+			() -> "test-password-1"
+		);
+
+		var user = service.currentUser("configured-user");
+
+		assertThat(user.userId()).isEqualTo("configured-user");
+		assertThat(user.authType()).isEqualTo("BASIC");
+		assertThat(user.anonymous()).isFalse();
 	}
 
 	@Test
@@ -93,6 +114,7 @@ class AnonymousAuthServiceTest {
 	private static final class FakeAnonymousUserRegistry implements RegisterAnonymousUserPort {
 
 		private final Map<String, String> registeredPasswordsByUserId = new HashMap<>();
+		private final Set<String> issuedAnonymousUserIds = new HashSet<>();
 
 		@Override
 		public boolean existsByUserId(String userId) {
@@ -100,8 +122,14 @@ class AnonymousAuthServiceTest {
 		}
 
 		@Override
+		public boolean isAnonymousUser(String userId) {
+			return issuedAnonymousUserIds.contains(userId);
+		}
+
+		@Override
 		public void registerAnonymousUser(AnonymousUserCredentials credentials) {
 			registeredPasswordsByUserId.put(credentials.userId(), credentials.password());
+			issuedAnonymousUserIds.add(credentials.userId());
 		}
 	}
 

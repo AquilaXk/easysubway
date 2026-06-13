@@ -69,7 +69,7 @@ public class AnonymousAuthService implements AnonymousAuthUseCase {
 
 	@Override
 	public AuthenticatedUser currentUser(String userId) {
-		return new AuthenticatedUser(userId, "BASIC", true);
+		return new AuthenticatedUser(userId, "BASIC", registerAnonymousUserPort.isAnonymousUser(userId));
 	}
 
 	private static String newAnonymousUserId() {

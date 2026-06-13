@@ -215,6 +215,7 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(useCase, /currentUser/);
   assert.match(registerPort, /interface RegisterAnonymousUserPort/);
   assert.match(registerPort, /existsByUserId/);
+  assert.match(registerPort, /isAnonymousUser/);
   assert.match(registerPort, /registerAnonymousUser/);
   assert.match(service, /implements AnonymousAuthUseCase/);
   assert.match(service, /RegisterAnonymousUserPort/);

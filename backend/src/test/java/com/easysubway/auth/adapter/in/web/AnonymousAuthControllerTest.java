@@ -15,7 +15,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+	"easysubway.user.username=configured-user",
+	"easysubway.user.password=configured-password"
+})
 @AutoConfigureMockMvc
 @DisplayName("익명 사용자 인증 API")
 class AnonymousAuthControllerTest {
@@ -49,6 +52,18 @@ class AnonymousAuthControllerTest {
 			.andExpect(jsonPath("$.data.userId").value(userId))
 			.andExpect(jsonPath("$.data.authType").value("BASIC"))
 			.andExpect(jsonPath("$.data.anonymous").value(true));
+	}
+
+	@Test
+	@DisplayName("현재 사용자 조회는 고정 Basic 계정을 익명 사용자가 아닌 계정으로 반환한다")
+	void currentUserReturnsNonAnonymousForConfiguredBasicUser() throws Exception {
+		mockMvc.perform(get("/api/v1/me")
+				.with(httpBasic("configured-user", "configured-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.data.userId").value("configured-user"))
+			.andExpect(jsonPath("$.data.authType").value("BASIC"))
+			.andExpect(jsonPath("$.data.anonymous").value(false));
 	}
 
 	@Test
