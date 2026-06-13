@@ -14,6 +14,7 @@ class EasySubwayApp extends StatelessWidget {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    this.favoriteRepository,
     super.key,
   }) : repository =
            repository ??
@@ -28,6 +29,7 @@ class EasySubwayApp extends StatelessWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository? favoriteRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +78,7 @@ class EasySubwayApp extends StatelessWidget {
         repository: repository,
         reportRepository: reportRepository,
         routeRepository: routeRepository,
+        favoriteRepository: favoriteRepository,
       ),
     );
   }
@@ -86,16 +89,19 @@ class HomeScreen extends StatelessWidget {
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
+    required this.favoriteRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository? favoriteRepository;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final favoriteRepository = this.favoriteRepository;
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
@@ -123,6 +129,7 @@ class HomeScreen extends StatelessWidget {
                     builder: (_) => StationSearchScreen(
                       repository: repository,
                       reportRepository: reportRepository,
+                      favoriteRepository: favoriteRepository,
                     ),
                   ),
                 );
@@ -147,6 +154,25 @@ class HomeScreen extends StatelessWidget {
               label: const Text('경로 검색'),
             ),
             const SizedBox(height: 12),
+            if (favoriteRepository != null) ...[
+              FilledButton.icon(
+                key: const Key('favoriteStationsButton'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => FavoriteStationListScreen(
+                        repository: favoriteRepository,
+                        stationRepository: repository,
+                        reportRepository: reportRepository,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.star),
+                label: const Text('즐겨찾기'),
+              ),
+              const SizedBox(height: 12),
+            ],
             OutlinedButton.icon(
               key: const Key('mobilityProfileButton'),
               onPressed: () {
