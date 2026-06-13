@@ -13,6 +13,8 @@ const _anonymousAuthCredentialsKey = 'easysubway.anonymousAuth.credentials';
 
 abstract class AnonymousAuthRepository {
   Future<AnonymousAuthCredentials> issueAnonymousUser();
+
+  bool get canReuseStoredCredentials => true;
 }
 
 abstract class AnonymousAuthCredentialStore {
@@ -77,6 +79,14 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
   final Uri baseUri;
   final HttpClient _httpClient;
   final bool allowAndroidEmulatorHttp;
+
+  @override
+  bool get canReuseStoredCredentials {
+    return _isAllowedAnonymousAuthBaseUri(
+      baseUri.resolve('/api/v1/auth/anonymous'),
+      allowAndroidEmulatorHttp: allowAndroidEmulatorHttp,
+    );
+  }
 
   @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
@@ -172,6 +182,10 @@ class AnonymousAuthSession implements FavoriteStationAuthProvider {
   Future<AnonymousAuthCredentials> _loadOrIssueCredentials() async {
     final storedCredentials = await credentialStore.readCredentials();
     if (storedCredentials != null) {
+      if (!repository.canReuseStoredCredentials) {
+        await credentialStore.clearCredentials();
+        throw const AnonymousAuthException(_anonymousAuthErrorMessage);
+      }
       _credentials = storedCredentials;
       return storedCredentials;
     }

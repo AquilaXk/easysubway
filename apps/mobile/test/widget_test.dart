@@ -1198,6 +1198,9 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   int issueCount = 0;
 
   @override
+  bool get canReuseStoredCredentials => true;
+
+  @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
     issueCount++;
     return const AnonymousAuthCredentials(

@@ -582,6 +582,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
+  assert.match(androidManifest, /android:allowBackup="false"/);
+  assert.match(androidManifest, /android:fullBackupContent="false"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
@@ -597,6 +599,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuth, /readCredentials/);
   assert.match(anonymousAuth, /saveCredentials/);
   assert.match(anonymousAuth, /clearCredentials/);
+  assert.match(anonymousAuth, /canReuseStoredCredentials/);
   assert.match(anonymousAuth, /POST|postUrl/);
   assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous/);
   assert.match(anonymousAuth, /class AnonymousAuthSession implements FavoriteStationAuthProvider/);
@@ -611,6 +614,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuthTest, /저장된 인증 정보를 먼저 사용한다/);
   assert.match(anonymousAuthTest, /재시작 후 재사용한다/);
   assert.match(anonymousAuthTest, /인증 실패 후 저장된 인증 정보를 지우고 다시 발급한다/);
+  assert.match(anonymousAuthTest, /원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
   assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);

@@ -148,6 +148,31 @@ void main() {
     expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
   });
 
+  test('익명 인증 세션은 원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stored-anonymous-user',
+        password: 'stored-password',
+      ),
+    );
+    final httpClient = NetworkFailingHttpClient();
+    final session = AnonymousAuthSession(
+      repository: AnonymousAuthApiRepository(
+        baseUri: Uri.parse('http://example.com'),
+        httpClient: httpClient,
+      ),
+      credentialStore: credentialStore,
+    );
+
+    await expectLater(
+      session.authorizationHeader(),
+      throwsA(isA<AnonymousAuthException>()),
+    );
+    expect(credentialStore.clearCount, 1);
+    expect(credentialStore.credentials, isNull);
+    expect(httpClient.postUrlCalled, isFalse);
+  });
+
   test('익명 인증 세션은 동시에 요청해도 발급 요청을 하나만 보낸다', () async {
     final repository = FakeAnonymousAuthRepository(issueDelay: Duration.zero);
     final credentialStore = MemoryAnonymousAuthCredentialStore();
@@ -179,8 +204,8 @@ void main() {
         httpClient: httpClient,
       );
 
-      expect(
-        repository.issueAnonymousUser,
+      await expectLater(
+        repository.issueAnonymousUser(),
         throwsA(isA<AnonymousAuthException>()),
       );
       expect(httpClient.postUrlCalled, isFalse);
@@ -195,8 +220,8 @@ void main() {
       allowAndroidEmulatorHttp: false,
     );
 
-    expect(
-      repository.issueAnonymousUser,
+    await expectLater(
+      repository.issueAnonymousUser(),
       throwsA(isA<AnonymousAuthException>()),
     );
     expect(httpClient.postUrlCalled, isFalse);
@@ -214,6 +239,9 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   final String userId;
   final String password;
   int issueCount = 0;
+
+  @override
+  bool get canReuseStoredCredentials => true;
 
   @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
