@@ -123,12 +123,15 @@ void main() {
         find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
         findsOneWidget,
       );
-      final resultSemantics = tester.getSemantics(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
-      );
       expect(
-        resultSemantics.getSemanticsData().flagsCollection.isButton,
-        isFalse,
+        tester.getSemantics(
+          find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
+        ),
+        isSemantics(
+          label: '상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨',
+          isButton: true,
+          hasTapAction: true,
+        ),
       );
 
       final lineBadgeSize = tester.getSize(
@@ -143,6 +146,102 @@ void main() {
 
       final namedLine = tester.widget<Text>(find.text('경의중앙'));
       expect(namedLine.style?.fontSize, 15);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 검색 결과를 누르면 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [
+        StationExitInfo(
+          id: 'exit-sangnoksu-1',
+          stationId: 'station-sangnoksu',
+          exitNumber: '1',
+          name: '1번 출구',
+          hasElevatorConnection: true,
+          hasStairOnlyPath: false,
+          dataConfidence: 'HIGH',
+        ),
+      ],
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          routeRepository: FakeRouteSearchRepository(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.requestedDetailStationIds, ['station-sangnoksu']);
+      expect(repository.requestedExitStationIds, ['station-sangnoksu']);
+      expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
+      expect(find.text('상록수역'), findsOneWidget);
+      expect(find.text('수도권 2호선'), findsOneWidget);
+      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
+      expect(find.text('출구'), findsOneWidget);
+      expect(find.text('1번 출구'), findsOneWidget);
+      expect(find.text('엘리베이터 연결'), findsOneWidget);
+      expect(find.text('계단 없는 이동 가능'), findsOneWidget);
+      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+      expect(find.text('엘리베이터'), findsOneWidget);
+      expect(find.text('정상'), findsOneWidget);
+      expect(find.text('1번 출구 앞'), findsOneWidget);
+      expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 확인됨, 마지막 확인 2026-06-13',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12',
+        ),
+        findsOneWidget,
+      );
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
       semanticsHandle.dispose();
     }
@@ -534,16 +633,47 @@ class FakeStationSearchRepository implements StationSearchRepository {
   FakeStationSearchRepository({
     this.nextResults = const [],
     this.queryResults = const {},
-  });
+    StationDetail? stationDetail,
+    this.stationExits = const [],
+    this.stationFacilities = const [],
+  }) : stationDetail =
+           stationDetail ??
+           _stationDetail(id: 'station-sangnoksu', name: '상록수');
 
   final List<StationSearchResult> nextResults;
   final Map<String, List<StationSearchResult>> queryResults;
+  final StationDetail stationDetail;
+  final List<StationExitInfo> stationExits;
+  final List<StationFacilityInfo> stationFacilities;
   final requestedQueries = <String>[];
+  final requestedDetailStationIds = <String>[];
+  final requestedExitStationIds = <String>[];
+  final requestedFacilityStationIds = <String>[];
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
     return queryResults[query] ?? nextResults;
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) async {
+    requestedDetailStationIds.add(stationId);
+    return stationDetail;
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) async {
+    requestedExitStationIds.add(stationId);
+    return stationExits;
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(
+    String stationId,
+  ) async {
+    requestedFacilityStationIds.add(stationId);
+    return stationFacilities;
   }
 }
 
@@ -555,6 +685,21 @@ class ControlledStationSearchRepository implements StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query) {
     requestedQueries.add(query);
     return _completer.future;
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    throw UnimplementedError();
   }
 
   void complete(List<StationSearchResult> results) {
@@ -589,6 +734,25 @@ class ControlledRouteSearchRepository implements RouteSearchRepository {
 
 StationSearchResult _stationResult({required String id, required String name}) {
   return StationSearchResult(
+    id: id,
+    nameKo: name,
+    nameEn: id,
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    lastVerifiedAt: '2026-06-13',
+    lines: const [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+    ],
+  );
+}
+
+StationDetail _stationDetail({required String id, required String name}) {
+  return StationDetail(
     id: id,
     nameKo: name,
     nameEn: id,
