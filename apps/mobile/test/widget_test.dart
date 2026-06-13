@@ -282,7 +282,11 @@ void main() {
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('경로 검색 결과, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점'),
+        find.bySemanticsLabel(
+          '경로 검색 결과, 경로를 찾았습니다, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, '
+          '주의 일부 시설 정보는 확인이 필요합니다., '
+          '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 엘리베이터를 이용해 승강장으로 이동합니다.',
+        ),
         findsOneWidget,
       );
 
@@ -332,6 +336,13 @@ void main() {
 
       expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          '경로 검색 결과, 안내할 수 있는 경로가 없습니다, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
+          '안내 불가 이유 휠체어로 이동 가능한 엘리베이터가 없습니다.',
+        ),
+        findsOneWidget,
+      );
       final completedButton = tester.widget<FilledButton>(
         find.byKey(const Key('routeSearchSubmitButton')),
       );

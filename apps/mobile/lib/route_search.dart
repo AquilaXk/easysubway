@@ -198,8 +198,27 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
 
-  String get semanticLabel =>
-      '경로 검색 결과, $summaryTitle, $lineLabel, $scoreLabel';
+  String get semanticLabel {
+    final parts = <String>[
+      '경로 검색 결과',
+      statusLabel,
+      summaryTitle,
+      lineLabel,
+      scoreLabel,
+    ];
+    if (blockedReasons.isNotEmpty) {
+      parts.add('안내 불가 이유 ${blockedReasons.join(', ')}');
+    }
+    if (warnings.isNotEmpty) {
+      parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
+    }
+    if (steps.isNotEmpty) {
+      parts.add(
+        '이동 안내 ${steps.map((step) => '${step.sequence}번 ${step.title}, ${step.description}').join(', ')}',
+      );
+    }
+    return parts.join(', ');
+  }
 }
 
 class RouteSearchStep {
