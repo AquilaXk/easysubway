@@ -74,6 +74,25 @@ class FavoriteRouteServiceTest {
 	}
 
 	@Test
+	@DisplayName("즐겨찾기 경로 목록은 임시 경로 검색 캐시가 정리돼도 저장한 요약을 보여준다")
+	void listFavoriteRoutesKeepsSavedRouteAfterRouteSearchEviction() {
+		routeSearchRepository.saveRouteSearch(routeSearch("route-search-saved", "상록수", "사당"));
+		service.saveFavoriteRoute(new SaveFavoriteRouteCommand("anonymous-user-1", "route-search-saved"));
+
+		for (int index = 0; index <= 1_000; index++) {
+			routeSearchRepository.saveRouteSearch(routeSearch("route-search-evict-" + index, "사당", "상록수"));
+		}
+
+		assertThat(service.listFavoriteRoutes(new ListFavoriteRoutesCommand("anonymous-user-1")))
+			.singleElement()
+			.satisfies(favorite -> {
+				assertThat(favorite.favoriteRoute().routeSearchId()).isEqualTo("route-search-saved");
+				assertThat(favorite.route().originStationName()).isEqualTo("상록수");
+				assertThat(favorite.route().destinationStationName()).isEqualTo("사당");
+			});
+	}
+
+	@Test
 	@DisplayName("삭제 요청은 같은 사용자와 같은 경로의 즐겨찾기만 제거한다")
 	void removeFavoriteRouteDeletesOnlyRequestedRoute() {
 		routeSearchRepository.saveRouteSearch(routeSearch("route-search-4", "상록수", "사당"));
@@ -117,13 +136,20 @@ class FavoriteRouteServiceTest {
 	@Test
 	@DisplayName("즐겨찾기 경로 도메인은 비어 있는 사용자와 경로 정보를 허용하지 않는다")
 	void favoriteRouteDomainRejectsInvalidState() {
-		assertThatThrownBy(() -> new FavoriteRoute("", "route-search-1", LocalDateTime.now()))
+		assertThatThrownBy(() -> new FavoriteRoute("", routeSearch("route-search-1", "상록수", "사당"), LocalDateTime.now()))
 			.isInstanceOf(InvalidFavoriteRouteException.class)
 			.hasMessage("사용자 식별자가 필요합니다.");
-		assertThatThrownBy(() -> new FavoriteRoute("anonymous-user-1", "", LocalDateTime.now()))
+		assertThatThrownBy(() -> new FavoriteRoute("anonymous-user-1", null, LocalDateTime.now()))
+			.isInstanceOf(InvalidFavoriteRouteException.class)
+			.hasMessage("경로 검색 결과가 필요합니다.");
+		assertThatThrownBy(() -> new FavoriteRoute("anonymous-user-1", routeSearch("", "상록수", "사당"), LocalDateTime.now()))
 			.isInstanceOf(InvalidFavoriteRouteException.class)
 			.hasMessage("경로 검색 식별자가 필요합니다.");
-		assertThatThrownBy(() -> new FavoriteRoute("anonymous-user-1", "route-search-1", null))
+		assertThatThrownBy(() -> new FavoriteRoute(
+			"anonymous-user-1",
+			routeSearch("route-search-1", "상록수", "사당"),
+			null
+		))
 			.isInstanceOf(InvalidFavoriteRouteException.class)
 			.hasMessage("추가 시각이 필요합니다.");
 	}

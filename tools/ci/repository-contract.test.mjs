@@ -393,6 +393,7 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(favorite, /record FavoriteRoute/);
+  assert.match(favorite, /RouteSearchResult/);
   assert.match(favorite, /routeSearchId/);
   assert.match(favorite, /addedAt/);
   assert.match(favorite, /InvalidFavoriteRouteException/);
