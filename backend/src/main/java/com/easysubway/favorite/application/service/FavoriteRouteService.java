@@ -73,15 +73,20 @@ public class FavoriteRouteService implements FavoriteRouteUseCase {
 	public FavoriteRouteWithDetails saveFavoriteRoute(SaveFavoriteRouteCommand command) {
 		requireUserId(command.userId());
 		requireRouteSearchId(command.routeSearchId());
+		FavoriteRoute existingFavoriteRoute = loadFavoriteRoutePort
+			.loadFavoriteRoute(command.userId(), command.routeSearchId())
+			.orElse(null);
+		if (existingFavoriteRoute != null) {
+			return withDetails(existingFavoriteRoute);
+		}
+
 		RouteSearchResult route = loadRouteSearch(command.routeSearchId());
 
-		FavoriteRoute favoriteRoute = loadFavoriteRoutePort
-			.loadFavoriteRoute(command.userId(), command.routeSearchId())
-			.orElseGet(() -> saveFavoriteRoutePort.saveFavoriteRoute(new FavoriteRoute(
-				command.userId(),
-				route,
-				LocalDateTime.now(clock)
-			)));
+		FavoriteRoute favoriteRoute = saveFavoriteRoutePort.saveFavoriteRoute(new FavoriteRoute(
+			command.userId(),
+			route,
+			LocalDateTime.now(clock)
+		));
 
 		return new FavoriteRouteWithDetails(favoriteRoute, route);
 	}

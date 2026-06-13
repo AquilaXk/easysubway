@@ -93,6 +93,28 @@ class FavoriteRouteServiceTest {
 	}
 
 	@Test
+	@DisplayName("중복 저장은 임시 경로 검색 캐시가 정리돼도 기존 즐겨찾기를 반환한다")
+	void duplicateSaveReturnsExistingFavoriteAfterRouteSearchEviction() {
+		routeSearchRepository.saveRouteSearch(routeSearch("route-search-duplicate", "상록수", "사당"));
+		var saved = service.saveFavoriteRoute(new SaveFavoriteRouteCommand(
+			"anonymous-user-1",
+			"route-search-duplicate"
+		));
+
+		for (int index = 0; index <= 1_000; index++) {
+			routeSearchRepository.saveRouteSearch(routeSearch("route-search-overflow-" + index, "사당", "상록수"));
+		}
+
+		var duplicated = service.saveFavoriteRoute(new SaveFavoriteRouteCommand(
+			"anonymous-user-1",
+			"route-search-duplicate"
+		));
+
+		assertThat(duplicated).isEqualTo(saved);
+		assertThat(duplicated.route().originStationName()).isEqualTo("상록수");
+	}
+
+	@Test
 	@DisplayName("삭제 요청은 같은 사용자와 같은 경로의 즐겨찾기만 제거한다")
 	void removeFavoriteRouteDeletesOnlyRequestedRoute() {
 		routeSearchRepository.saveRouteSearch(routeSearch("route-search-4", "상록수", "사당"));
