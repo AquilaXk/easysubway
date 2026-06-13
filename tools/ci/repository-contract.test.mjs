@@ -376,6 +376,51 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
 });
 
+test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 API 경계를 따른다", () => {
+  const favorite = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteRoute.java");
+  const favoriteDetails = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteRouteWithDetails.java");
+  const invalidFavorite = read("backend/src/main/java/com/easysubway/favorite/domain/InvalidFavoriteRouteException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/favorite/application/port/in/FavoriteRouteUseCase.java");
+  const listCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/ListFavoriteRoutesCommand.java");
+  const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteRouteCommand.java");
+  const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteRouteCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteRoutePort.java");
+  const savePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/SaveFavoriteRoutePort.java");
+  const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteRoutePort.java");
+  const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteRouteService.java");
+  const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteRouteRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(favorite, /record FavoriteRoute/);
+  assert.match(favorite, /routeSearchId/);
+  assert.match(favorite, /addedAt/);
+  assert.match(favorite, /InvalidFavoriteRouteException/);
+  assert.match(favoriteDetails, /RouteSearchResult/);
+  assert.match(invalidFavorite, /extends InvalidRequestException/);
+  assert.match(useCase, /interface FavoriteRouteUseCase/);
+  assert.match(useCase, /listFavoriteRoutes/);
+  assert.match(useCase, /saveFavoriteRoute/);
+  assert.match(useCase, /removeFavoriteRoute/);
+  assert.match(listCommand, /record ListFavoriteRoutesCommand/);
+  assert.match(saveCommand, /record SaveFavoriteRouteCommand/);
+  assert.match(removeCommand, /record RemoveFavoriteRouteCommand/);
+  assert.match(loadPort, /interface LoadFavoriteRoutePort/);
+  assert.match(savePort, /interface SaveFavoriteRoutePort/);
+  assert.match(deletePort, /interface DeleteFavoriteRoutePort/);
+  assert.match(service, /implements FavoriteRouteUseCase/);
+  assert.match(service, /LoadRouteSearchPort/);
+  assert.match(service, /RouteSearchNotFoundException/);
+  assert.match(repository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
+  assert.match(controller, /@PostMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
+  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/routes\/\{favoriteRouteId\}"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
+  assert.match(security, /securityMatcher\("\/api\/v1\/me\/favorites\/\*\*"/);
+  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+});
+
 test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계를 따른다", () => {
   const device = read("backend/src/main/java/com/easysubway/notification/domain/RegisteredDevice.java");
   const settings = read("backend/src/main/java/com/easysubway/notification/domain/NotificationSettings.java");
