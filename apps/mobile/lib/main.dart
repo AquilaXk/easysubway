@@ -5,6 +5,7 @@ import 'auth_headers.dart';
 import 'facility_report.dart';
 import 'mobility_profile.dart';
 import 'notification_settings.dart';
+import 'onboarding.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 
@@ -20,6 +21,7 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteStationRepository? favoriteRepository,
     NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
+    OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enableAnonymousAuth = true,
     Key? key,
   }) : this._(
@@ -32,21 +34,26 @@ class EasySubwayApp extends StatelessWidget {
            anonymousAuthRepository: anonymousAuthRepository,
            enableAnonymousAuth: enableAnonymousAuth,
          ),
+         initialOnboardingState: initialOnboardingState,
          key: key,
        );
 
-  EasySubwayApp._({required _EasySubwayAppDependencies dependencies, super.key})
-    : repository = dependencies.repository,
-      reportRepository = dependencies.reportRepository,
-      routeRepository = dependencies.routeRepository,
-      favoriteRepository = dependencies.favoriteRepository,
-      notificationRepository = dependencies.notificationRepository;
+  EasySubwayApp._({
+    required _EasySubwayAppDependencies dependencies,
+    required this.initialOnboardingState,
+    super.key,
+  }) : repository = dependencies.repository,
+       reportRepository = dependencies.reportRepository,
+       routeRepository = dependencies.routeRepository,
+       favoriteRepository = dependencies.favoriteRepository,
+       notificationRepository = dependencies.notificationRepository;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final OnboardingState initialOnboardingState;
 
   @override
   Widget build(BuildContext context) {
@@ -91,13 +98,61 @@ class EasySubwayApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: HomeScreen(
+      home: _EasySubwayHome(
         repository: repository,
         reportRepository: reportRepository,
         routeRepository: routeRepository,
         favoriteRepository: favoriteRepository,
         notificationRepository: notificationRepository,
+        initialOnboardingState: initialOnboardingState,
       ),
+    );
+  }
+}
+
+class _EasySubwayHome extends StatefulWidget {
+  const _EasySubwayHome({
+    required this.repository,
+    required this.reportRepository,
+    required this.routeRepository,
+    required this.favoriteRepository,
+    required this.notificationRepository,
+    required this.initialOnboardingState,
+  });
+
+  final StationSearchRepository repository;
+  final FacilityReportRepository reportRepository;
+  final RouteSearchRepository routeRepository;
+  final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
+  final OnboardingState initialOnboardingState;
+
+  @override
+  State<_EasySubwayHome> createState() => _EasySubwayHomeState();
+}
+
+class _EasySubwayHomeState extends State<_EasySubwayHome> {
+  // 영구 저장을 연결하기 전까지는 같은 앱 세션에서 온보딩 완료 상태를 유지한다.
+  late OnboardingState _onboardingState = widget.initialOnboardingState;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_onboardingState.isCompleted) {
+      return OnboardingScreen(
+        onCompleted: (result) {
+          setState(() {
+            _onboardingState = OnboardingState.completed(result: result);
+          });
+        },
+      );
+    }
+
+    return HomeScreen(
+      repository: widget.repository,
+      reportRepository: widget.reportRepository,
+      routeRepository: widget.routeRepository,
+      favoriteRepository: widget.favoriteRepository,
+      notificationRepository: widget.notificationRepository,
     );
   }
 }
