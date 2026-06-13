@@ -372,8 +372,53 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
   assert.match(controller, /Principal principal/);
   assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
-  assert.match(security, /securityMatcher\("\/api\/v1\/me\/favorites\/\*\*"\)/);
+  assert.match(security, /securityMatcher\("\/api\/v1\/me\/favorites\/\*\*"/);
   assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+});
+
+test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계를 따른다", () => {
+  const device = read("backend/src/main/java/com/easysubway/notification/domain/RegisteredDevice.java");
+  const settings = read("backend/src/main/java/com/easysubway/notification/domain/NotificationSettings.java");
+  const platform = read("backend/src/main/java/com/easysubway/notification/domain/DevicePlatform.java");
+  const invalidNotification = read("backend/src/main/java/com/easysubway/notification/domain/InvalidNotificationPreferenceException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/notification/application/port/in/NotificationPreferenceUseCase.java");
+  const registerCommand = read("backend/src/main/java/com/easysubway/notification/application/port/in/RegisterDeviceCommand.java");
+  const saveCommand = read("backend/src/main/java/com/easysubway/notification/application/port/in/SaveNotificationSettingsCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/LoadNotificationPreferencePort.java");
+  const saveDevicePort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SaveRegisteredDevicePort.java");
+  const saveSettingsPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SaveNotificationSettingsPort.java");
+  const service = read("backend/src/main/java/com/easysubway/notification/application/service/NotificationPreferenceService.java");
+  const repository = read("backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryNotificationPreferenceRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(device, /record RegisteredDevice/);
+  assert.match(device, /registeredAt/);
+  assert.match(settings, /record NotificationSettings/);
+  assert.match(settings, /favoriteStationFacilityAlerts/);
+  assert.match(settings, /favoriteRouteFacilityAlerts/);
+  assert.match(settings, /reportStatusAlerts/);
+  assert.match(settings, /dataQualityAlerts/);
+  assert.match(platform, /ANDROID/);
+  assert.match(platform, /IOS/);
+  assert.match(invalidNotification, /extends InvalidRequestException/);
+  assert.match(useCase, /interface NotificationPreferenceUseCase/);
+  assert.match(useCase, /registerDevice/);
+  assert.match(useCase, /getNotificationSettings/);
+  assert.match(useCase, /saveNotificationSettings/);
+  assert.match(registerCommand, /record RegisterDeviceCommand/);
+  assert.match(saveCommand, /record SaveNotificationSettingsCommand/);
+  assert.match(loadPort, /interface LoadNotificationPreferencePort/);
+  assert.match(saveDevicePort, /interface SaveRegisteredDevicePort/);
+  assert.match(saveSettingsPort, /interface SaveNotificationSettingsPort/);
+  assert.match(service, /implements NotificationPreferenceUseCase/);
+  assert.match(repository, /implements[\s\S]*LoadNotificationPreferencePort[\s\S]*SaveRegisteredDevicePort[\s\S]*SaveNotificationSettingsPort/);
+  assert.match(controller, /@PostMapping\("\/api\/v1\/devices"\)/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/notification-settings"\)/);
+  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/notification-settings"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
+  assert.match(security, /securityMatcher\("\/api\/v1\/me\/favorites\/\*\*", "\/api\/v1\/devices", "\/api\/v1\/me\/notification-settings"\)/);
 });
 
 test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
