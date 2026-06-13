@@ -147,15 +147,86 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       );
     }
 
-    return HomeScreen(
-      repository: widget.repository,
-      reportRepository: widget.reportRepository,
-      routeRepository: widget.routeRepository,
-      favoriteRepository: widget.favoriteRepository,
-      notificationRepository: widget.notificationRepository,
-      initialMobilityType: _onboardingState.result?.profile.mobilityType,
+    final onboardingResult = _onboardingState.result;
+    final preferences =
+        onboardingResult?.preferences ??
+        const OnboardingViewPreferences.defaults();
+
+    return _OnboardingPreferenceScope(
+      preferences: preferences,
+      child: HomeScreen(
+        repository: widget.repository,
+        reportRepository: widget.reportRepository,
+        routeRepository: widget.routeRepository,
+        favoriteRepository: widget.favoriteRepository,
+        notificationRepository: widget.notificationRepository,
+        initialMobilityType: onboardingResult?.profile.mobilityType,
+        simpleViewEnabled: preferences.simpleViewEnabled,
+      ),
     );
   }
+}
+
+class _OnboardingPreferenceScope extends StatelessWidget {
+  const _OnboardingPreferenceScope({
+    required this.preferences,
+    required this.child,
+  });
+
+  final OnboardingViewPreferences preferences;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final textScaler = preferences.largeTextEnabled
+        ? mediaQuery.textScaler.clamp(minScaleFactor: 1.18)
+        : mediaQuery.textScaler;
+
+    return MediaQuery(
+      data: mediaQuery.copyWith(
+        highContrast:
+            preferences.highContrastEnabled || mediaQuery.highContrast,
+        textScaler: textScaler,
+      ),
+      child: Theme(
+        data: _themeForPreferences(Theme.of(context), preferences),
+        child: child,
+      ),
+    );
+  }
+}
+
+ThemeData _themeForPreferences(
+  ThemeData baseTheme,
+  OnboardingViewPreferences preferences,
+) {
+  if (!preferences.highContrastEnabled) {
+    return baseTheme;
+  }
+
+  const textColor = Color(0xFF000000);
+  final colorScheme = baseTheme.colorScheme.copyWith(
+    primary: const Color(0xFF003D40),
+    onPrimary: Colors.white,
+    secondary: const Color(0xFF005E68),
+    onSecondary: Colors.white,
+    surface: Colors.white,
+    onSurface: textColor,
+    outline: textColor,
+  );
+
+  return baseTheme.copyWith(
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: Colors.white,
+    appBarTheme: baseTheme.appBarTheme.copyWith(
+      backgroundColor: Colors.white,
+      foregroundColor: textColor,
+      titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
+        color: textColor,
+      ),
+    ),
+  );
 }
 
 class _EasySubwayAppDependencies {
@@ -258,6 +329,7 @@ class HomeScreen extends StatelessWidget {
     required this.routeRepository,
     required this.favoriteRepository,
     required this.notificationRepository,
+    this.simpleViewEnabled = true,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -269,6 +341,7 @@ class HomeScreen extends StatelessWidget {
   final FavoriteStationRepository? favoriteRepository;
   final NotificationSettingsRepository? notificationRepository;
   final String initialMobilityType;
+  final bool simpleViewEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -376,22 +449,24 @@ class HomeScreen extends StatelessWidget {
               icon: const Icon(Icons.accessibility_new),
               label: const Text('이동 조건'),
             ),
-            const SizedBox(height: 24),
-            const FeatureTile(
-              icon: Icons.accessible_forward,
-              title: '이동 프로필',
-              semanticLabel: '이동 프로필, 이동 조건 저장',
-            ),
-            const FeatureTile(
-              icon: Icons.elevator,
-              title: '시설 정보',
-              semanticLabel: '시설 정보, 엘리베이터와 경사로',
-            ),
-            const FeatureTile(
-              icon: Icons.report_outlined,
-              title: '신고',
-              semanticLabel: '신고, 불편 신고',
-            ),
+            if (!simpleViewEnabled) ...[
+              const SizedBox(height: 24),
+              const FeatureTile(
+                icon: Icons.accessible_forward,
+                title: '이동 프로필',
+                semanticLabel: '이동 프로필, 이동 조건 저장',
+              ),
+              const FeatureTile(
+                icon: Icons.elevator,
+                title: '시설 정보',
+                semanticLabel: '시설 정보, 엘리베이터와 경사로',
+              ),
+              const FeatureTile(
+                icon: Icons.report_outlined,
+                title: '신고',
+                semanticLabel: '신고, 불편 신고',
+              ),
+            ],
           ],
         ),
       ),

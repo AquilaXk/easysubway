@@ -22,6 +22,20 @@ OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
   );
 }
 
+OnboardingState _completedOnboardingStateWithPreferences({
+  required OnboardingViewPreferences preferences,
+  String profileId = 'elderly',
+}) {
+  return OnboardingState.completed(
+    result: OnboardingResult(
+      profile: mobilityProfileOptions.firstWhere(
+        (option) => option.id == profileId,
+      ),
+      preferences: preferences,
+    ),
+  );
+}
+
 void main() {
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
     await tester.pumpWidget(
@@ -121,6 +135,34 @@ void main() {
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
 
+  testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingStateWithPreferences(
+          preferences: const OnboardingViewPreferences(
+            largeTextEnabled: true,
+            highContrastEnabled: true,
+            simpleViewEnabled: true,
+          ),
+        ),
+      ),
+    );
+
+    final homeContext = tester.element(find.byType(HomeScreen));
+
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(23.6, 0.01));
+    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.text('이동 프로필'), findsNothing);
+    expect(find.text('시설 정보'), findsNothing);
+    expect(find.text('신고'), findsNothing);
+  });
+
   testWidgets('홈 화면은 핵심 행동만 간결하게 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
@@ -131,7 +173,13 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: false,
+              simpleViewEnabled: false,
+            ),
+          ),
         ),
       );
 

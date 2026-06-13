@@ -602,8 +602,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /NotificationSettingsApiRepository/);
   assert.match(main, /OnboardingScreen/);
   assert.match(main, /initialOnboardingState/);
-  assert.match(main, /initialMobilityType: _onboardingState\.result\?\.profile\.mobilityType/);
+  assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
+  assert.match(main, /_OnboardingPreferenceScope/);
+  assert.match(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
+  assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
+  assert.match(main, /_themeForPreferences/);
+  assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
+  assert.match(main, /if \(!simpleViewEnabled\)/);
   assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
@@ -621,6 +627,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
   assert.match(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
+  assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
+  assert.match(widgetTest, /MediaQuery\.textScalerOf/);
   assert.match(onboardingTest, /온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다/);
   assert.match(onboardingTest, /hasTapAction: true/);
   assert.match(authHeaders, /abstract class AuthorizationHeaderProvider/);
