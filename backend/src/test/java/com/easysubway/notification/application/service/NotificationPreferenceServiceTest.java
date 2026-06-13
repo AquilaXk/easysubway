@@ -81,6 +81,26 @@ class NotificationPreferenceServiceTest {
 	}
 
 	@Test
+	@DisplayName("같은 기기 토큰은 새 사용자 등록 시 이전 사용자 목록에서 제거한다")
+	void registerDeviceMovesTokenOwnershipToLatestUser() {
+		var oldOwnerDevice = service.registerDevice(new RegisterDeviceCommand(
+			"anonymous-user-1",
+			DevicePlatform.IOS,
+			"shared-device-token"
+		));
+		var newOwnerDevice = service.registerDevice(new RegisterDeviceCommand(
+			"anonymous-user-2",
+			DevicePlatform.IOS,
+			"shared-device-token"
+		));
+
+		assertThat(oldOwnerDevice.userId()).isEqualTo("anonymous-user-1");
+		assertThat(newOwnerDevice.userId()).isEqualTo("anonymous-user-2");
+		assertThat(repository.loadDevices("anonymous-user-1")).isEmpty();
+		assertThat(repository.loadDevices("anonymous-user-2")).containsExactly(newOwnerDevice);
+	}
+
+	@Test
 	@DisplayName("알림 명령은 사용자, 플랫폼, 기기 토큰을 요구한다")
 	void notificationCommandsRequireUserPlatformAndToken() {
 		assertThatThrownBy(() -> service.getNotificationSettings(""))

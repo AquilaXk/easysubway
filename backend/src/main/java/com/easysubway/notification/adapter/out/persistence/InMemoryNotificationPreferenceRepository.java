@@ -40,9 +40,12 @@ public class InMemoryNotificationPreferenceRepository implements
 
 	@Override
 	public RegisteredDevice saveRegisteredDevice(RegisteredDevice device) {
+		var deviceKey = new DeviceKey(device.platform(), device.deviceToken());
+		// 한 물리 기기는 한 사용자에게만 알림이 가야 하므로 재등록 시 이전 소유자 버킷에서 제거한다.
+		devicesByUserId.values().forEach(devices -> devices.remove(deviceKey));
 		devicesByUserId
 			.computeIfAbsent(device.userId(), ignored -> new ConcurrentHashMap<>())
-			.put(new DeviceKey(device.platform(), device.deviceToken()), device);
+			.put(deviceKey, device);
 		return device;
 	}
 
