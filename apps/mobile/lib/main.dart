@@ -124,8 +124,10 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        RouteSearchScreen(repository: routeRepository),
+                    builder: (_) => RouteSearchScreen(
+                      repository: routeRepository,
+                      stationRepository: repository,
+                    ),
                   ),
                 );
               },
