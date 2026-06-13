@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'anonymous_auth.dart';
 import 'facility_report.dart';
 import 'mobility_profile.dart';
+import 'notification_settings.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 
@@ -16,6 +17,7 @@ class EasySubwayApp extends StatelessWidget {
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
     FavoriteStationRepository? favoriteRepository,
+    NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
     bool enableAnonymousAuth = true,
     super.key,
@@ -34,12 +36,20 @@ class EasySubwayApp extends StatelessWidget {
              baseUri: defaultStationApiBaseUri(),
              anonymousAuthRepository: anonymousAuthRepository,
              enableAnonymousAuth: enableAnonymousAuth,
+           ),
+       notificationRepository =
+           notificationRepository ??
+           _defaultNotificationSettingsRepository(
+             baseUri: defaultStationApiBaseUri(),
+             anonymousAuthRepository: anonymousAuthRepository,
+             enableAnonymousAuth: enableAnonymousAuth,
            );
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +99,7 @@ class EasySubwayApp extends StatelessWidget {
         reportRepository: reportRepository,
         routeRepository: routeRepository,
         favoriteRepository: favoriteRepository,
+        notificationRepository: notificationRepository,
       ),
     );
   }
@@ -112,12 +123,31 @@ FavoriteStationRepository? _defaultFavoriteStationRepository({
   );
 }
 
+NotificationSettingsRepository? _defaultNotificationSettingsRepository({
+  required Uri baseUri,
+  required bool enableAnonymousAuth,
+  AnonymousAuthRepository? anonymousAuthRepository,
+}) {
+  if (!enableAnonymousAuth) {
+    return null;
+  }
+  return NotificationSettingsApiRepository(
+    baseUri: baseUri,
+    authProvider: AnonymousAuthSession(
+      repository:
+          anonymousAuthRepository ??
+          AnonymousAuthApiRepository(baseUri: baseUri),
+    ),
+  );
+}
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
+    required this.notificationRepository,
     super.key,
   });
 
@@ -125,11 +155,13 @@ class HomeScreen extends StatelessWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final NotificationSettingsRepository? notificationRepository;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final favoriteRepository = this.favoriteRepository;
+    final notificationRepository = this.notificationRepository;
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
@@ -198,6 +230,23 @@ class HomeScreen extends StatelessWidget {
                 },
                 icon: const Icon(Icons.star),
                 label: const Text('즐겨찾기'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (notificationRepository != null) ...[
+              FilledButton.icon(
+                key: const Key('notificationSettingsButton'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => NotificationSettingsScreen(
+                        repository: notificationRepository,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: const Text('알림 설정'),
               ),
               const SizedBox(height: 12),
             ],

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'auth_headers.dart';
 import 'facility_report.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
@@ -165,43 +166,18 @@ abstract class FavoriteStationRepository {
   Future<void> removeFavoriteStation(String stationId);
 }
 
-abstract class FavoriteStationAuthProvider {
-  Future<String?> authorizationHeader();
+typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider;
 
-  Future<void> invalidateAuthorization();
-}
-
-class NoFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+class NoFavoriteStationAuthProvider extends NoAuthorizationHeaderProvider {
   const NoFavoriteStationAuthProvider();
-
-  @override
-  Future<String?> authorizationHeader() async => null;
-
-  @override
-  Future<void> invalidateAuthorization() async {}
 }
 
-class BasicFavoriteStationAuthProvider implements FavoriteStationAuthProvider {
+class BasicFavoriteStationAuthProvider
+    extends BasicAuthorizationHeaderProvider {
   const BasicFavoriteStationAuthProvider({
-    required this.username,
-    required this.password,
+    required super.username,
+    required super.password,
   });
-
-  final String username;
-  final String password;
-
-  @override
-  Future<String?> authorizationHeader() async {
-    // 실제 앱은 로그인 세션에서 인증값을 주입해야 하며, 빌드 타임 공용 인증값은 사용하지 않는다.
-    if (username.trim().isEmpty || password.isEmpty) {
-      return null;
-    }
-    final token = base64Encode(utf8.encode('${username.trim()}:$password'));
-    return 'Basic $token';
-  }
-
-  @override
-  Future<void> invalidateAuthorization() async {}
 }
 
 class FavoriteStationApiRepository implements FavoriteStationRepository {

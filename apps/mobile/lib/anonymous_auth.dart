@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'station_search.dart';
+import 'auth_headers.dart';
 
 const _anonymousAuthTimeout = Duration(seconds: 8);
 const _anonymousAuthErrorMessage = '인증을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
@@ -131,7 +131,7 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
   }
 }
 
-class AnonymousAuthSession implements FavoriteStationAuthProvider {
+class AnonymousAuthSession implements AuthorizationHeaderProvider {
   AnonymousAuthSession({
     required this.repository,
     AnonymousAuthCredentialStore? credentialStore,
