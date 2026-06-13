@@ -10,6 +10,7 @@ const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
+const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
 const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했습니다.';
 
 abstract class StationSearchRepository {
@@ -983,7 +984,7 @@ class FavoriteStationListController extends ChangeNotifier {
   }
 }
 
-enum StationFavoriteToggleStatus { ready, saving, removing, failure }
+enum StationFavoriteToggleStatus { checking, ready, saving, removing, failure }
 
 class StationFavoriteToggleState {
   const StationFavoriteToggleState({
@@ -996,11 +997,21 @@ class StationFavoriteToggleState {
     : status = StationFavoriteToggleStatus.ready,
       message = '';
 
+  const StationFavoriteToggleState.checking({required this.isFavorite})
+    : status = StationFavoriteToggleStatus.checking,
+      message = '';
+
   final StationFavoriteToggleStatus status;
   final bool isFavorite;
   final String message;
 
   bool get isBusy {
+    return status == StationFavoriteToggleStatus.checking ||
+        status == StationFavoriteToggleStatus.saving ||
+        status == StationFavoriteToggleStatus.removing;
+  }
+
+  bool get isChanging {
     return status == StationFavoriteToggleStatus.saving ||
         status == StationFavoriteToggleStatus.removing;
   }
@@ -1011,7 +1022,10 @@ class StationFavoriteToggleController extends ChangeNotifier {
     required this.repository,
     required this.stationId,
     bool initiallyFavorite = false,
-  }) : _state = StationFavoriteToggleState.ready(isFavorite: initiallyFavorite);
+    bool initiallyChecking = false,
+  }) : _state = initiallyChecking
+           ? StationFavoriteToggleState.checking(isFavorite: initiallyFavorite)
+           : StationFavoriteToggleState.ready(isFavorite: initiallyFavorite);
 
   final FavoriteStationRepository repository;
   final String stationId;
@@ -1020,6 +1034,28 @@ class StationFavoriteToggleController extends ChangeNotifier {
   bool _isDisposed = false;
 
   StationFavoriteToggleState get state => _state;
+
+  Future<void> load() async {
+    if (_state.isChanging) {
+      return;
+    }
+
+    _emitState(
+      StationFavoriteToggleState.checking(isFavorite: _state.isFavorite),
+    );
+
+    try {
+      final favorites = await repository.listFavoriteStations();
+      final isFavorite = favorites.any(
+        (favorite) => favorite.stationId == stationId,
+      );
+      _emitState(StationFavoriteToggleState.ready(isFavorite: isFavorite));
+    } on FavoriteStationException catch (error) {
+      _emitFailure(error.message);
+    } catch (_) {
+      _emitFailure(_favoriteStationStatusErrorMessage);
+    }
+  }
 
   Future<void> save() async {
     if (_state.isBusy) {
@@ -1106,13 +1142,13 @@ class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({
     required this.repository,
     required this.reportRepository,
-    required this.favoriteRepository,
+    this.favoriteRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
-  final FavoriteStationRepository favoriteRepository;
+  final FavoriteStationRepository? favoriteRepository;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -1202,11 +1238,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     _controller.search(query);
   }
 
-  Future<void> _openStationDetail(StationSearchResult result) async {
-    final initiallyFavorite = await _isFavoriteStation(result.id);
-    if (!mounted) {
-      return;
-    }
+  void _openStationDetail(StationSearchResult result) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => StationDetailScreen(
@@ -1214,19 +1246,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
           stationId: result.id,
-          initiallyFavorite: initiallyFavorite,
         ),
       ),
     );
-  }
-
-  Future<bool> _isFavoriteStation(String stationId) async {
-    try {
-      final favorites = await widget.favoriteRepository.listFavoriteStations();
-      return favorites.any((favorite) => favorite.stationId == stationId);
-    } catch (_) {
-      return false;
-    }
   }
 }
 
@@ -1585,17 +1607,17 @@ class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
     required this.repository,
     required this.reportRepository,
-    required this.favoriteRepository,
     required this.stationId,
-    this.initiallyFavorite = false,
+    this.favoriteRepository,
+    this.initiallyFavorite,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
-  final FavoriteStationRepository favoriteRepository;
+  final FavoriteStationRepository? favoriteRepository;
   final String stationId;
-  final bool initiallyFavorite;
+  final bool? initiallyFavorite;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -1603,24 +1625,32 @@ class StationDetailScreen extends StatefulWidget {
 
 class _StationDetailScreenState extends State<StationDetailScreen> {
   late final StationDetailController _controller;
-  late final StationFavoriteToggleController _favoriteController;
+  StationFavoriteToggleController? _favoriteController;
 
   @override
   void initState() {
     super.initState();
     _controller = StationDetailController(repository: widget.repository);
-    _favoriteController = StationFavoriteToggleController(
-      repository: widget.favoriteRepository,
-      stationId: widget.stationId,
-      initiallyFavorite: widget.initiallyFavorite,
-    );
+    final favoriteRepository = widget.favoriteRepository;
+    if (favoriteRepository != null) {
+      final initiallyFavorite = widget.initiallyFavorite;
+      _favoriteController = StationFavoriteToggleController(
+        repository: favoriteRepository,
+        stationId: widget.stationId,
+        initiallyFavorite: initiallyFavorite ?? false,
+        initiallyChecking: initiallyFavorite == null,
+      );
+      if (initiallyFavorite == null) {
+        _favoriteController!.load();
+      }
+    }
     _controller.load(widget.stationId);
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _favoriteController.dispose();
+    _favoriteController?.dispose();
     super.dispose();
   }
 
@@ -1653,7 +1683,7 @@ class _StationDetailBody extends StatelessWidget {
 
   final StationDetailState state;
   final FacilityReportRepository reportRepository;
-  final StationFavoriteToggleController favoriteController;
+  final StationFavoriteToggleController? favoriteController;
 
   @override
   Widget build(BuildContext context) {
@@ -1691,7 +1721,7 @@ class _StationDetailContent extends StatelessWidget {
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
   final FacilityReportRepository reportRepository;
-  final StationFavoriteToggleController favoriteController;
+  final StationFavoriteToggleController? favoriteController;
 
   @override
   Widget build(BuildContext context) {
@@ -1699,8 +1729,13 @@ class _StationDetailContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _StationDetailHeader(detail: detail),
-        const SizedBox(height: 16),
-        _StationFavoriteControl(detail: detail, controller: favoriteController),
+        if (favoriteController != null) ...[
+          const SizedBox(height: 16),
+          _StationFavoriteControl(
+            detail: detail,
+            controller: favoriteController!,
+          ),
+        ],
         const SizedBox(height: 24),
         const _StationDetailSectionTitle(title: '출구'),
         const SizedBox(height: 12),
@@ -1811,7 +1846,11 @@ class _StationFavoriteControl extends StatelessWidget {
         final state = controller.state;
         final isFavorite = state.isFavorite;
         final label = _favoriteButtonLabel(state);
-        final actionLabel = isFavorite ? '즐겨찾기 해제' : '즐겨찾기 저장';
+        final actionLabel = state.status == StationFavoriteToggleStatus.checking
+            ? '즐겨찾기 확인 중'
+            : isFavorite
+            ? '즐겨찾기 해제'
+            : '즐겨찾기 저장';
         final onPressed = state.isBusy
             ? null
             : isFavorite
@@ -1858,6 +1897,7 @@ class _StationFavoriteControl extends StatelessWidget {
 
   String _favoriteButtonLabel(StationFavoriteToggleState state) {
     return switch (state.status) {
+      StationFavoriteToggleStatus.checking => '확인 중',
       StationFavoriteToggleStatus.saving => '저장 중',
       StationFavoriteToggleStatus.removing => '해제 중',
       StationFavoriteToggleStatus.ready ||
