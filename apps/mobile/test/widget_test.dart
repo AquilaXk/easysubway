@@ -621,6 +621,98 @@ void main() {
     }
   });
 
+  testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          locationProvider: locationProvider,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+      await tester.pumpAndSettle();
+
+      expect(locationProvider.requestCount, 1);
+      expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
+      expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
+      expect(find.text('상록수'), findsOneWidget);
+      expect(find.text('230m 거리'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+        findsOneWidget,
+      );
+
+      final nearbyButtonSize = tester.getSize(
+        find.byKey(const Key('nearbyStationSearchButton')),
+      );
+      expect(nearbyButtonSize.height, greaterThanOrEqualTo(60));
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException('위치 권한을 확인해 주세요.'),
+    );
+    final repository = FakeStationSearchRepository();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          locationProvider: locationProvider,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+      await tester.pumpAndSettle();
+
+      expect(locationProvider.requestCount, 1);
+      expect(repository.requestedNearbyLocations, isEmpty);
+      expect(find.text('위치 권한을 확인해 주세요.'), findsOneWidget);
+      expect(find.bySemanticsLabel('위치 권한을 확인해 주세요.'), findsOneWidget);
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색 결과를 누르면 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
@@ -1472,6 +1564,7 @@ FavoriteFacility _favoriteFacility() {
 class FakeStationSearchRepository implements StationSearchRepository {
   FakeStationSearchRepository({
     this.nextResults = const [],
+    this.nearbyResults = const [],
     this.queryResults = const {},
     StationDetail? stationDetail,
     this.stationExits = const [],
@@ -1481,11 +1574,13 @@ class FakeStationSearchRepository implements StationSearchRepository {
            _stationDetail(id: 'station-sangnoksu', name: '상록수');
 
   final List<StationSearchResult> nextResults;
+  final List<StationSearchResult> nearbyResults;
   final Map<String, List<StationSearchResult>> queryResults;
   final StationDetail stationDetail;
   final List<StationExitInfo> stationExits;
   final List<StationFacilityInfo> stationFacilities;
   final requestedQueries = <String>[];
+  final requestedNearbyLocations = <CurrentLocation>[];
   final requestedDetailStationIds = <String>[];
   final requestedExitStationIds = <String>[];
   final requestedFacilityStationIds = <String>[];
@@ -1494,6 +1589,16 @@ class FakeStationSearchRepository implements StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
     return queryResults[query] ?? nextResults;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) async {
+    requestedNearbyLocations.add(location);
+    return nearbyResults;
   }
 
   @override
@@ -1525,6 +1630,15 @@ class ControlledStationSearchRepository implements StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query) {
     requestedQueries.add(query);
     return _completer.future;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) {
+    throw UnimplementedError();
   }
 
   @override
@@ -1782,7 +1896,11 @@ class ControlledRouteSearchRepository implements RouteSearchRepository {
   }
 }
 
-StationSearchResult _stationResult({required String id, required String name}) {
+StationSearchResult _stationResult({
+  required String id,
+  required String name,
+  int? distanceMeters,
+}) {
   return StationSearchResult(
     id: id,
     nameKo: name,
@@ -1791,6 +1909,7 @@ StationSearchResult _stationResult({required String id, required String name}) {
     dataQualityLevel: 'LEVEL_1',
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
+    distanceMeters: distanceMeters,
     lines: const [
       StationSearchLine(
         id: 'seoul-2',
@@ -1800,6 +1919,25 @@ StationSearchResult _stationResult({required String id, required String name}) {
       ),
     ],
   );
+}
+
+class FakeCurrentLocationProvider implements CurrentLocationProvider {
+  FakeCurrentLocationProvider({this.location, this.error});
+
+  final CurrentLocation? location;
+  final Object? error;
+  int requestCount = 0;
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    requestCount++;
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return location ??
+        const CurrentLocation(latitude: 37.3028, longitude: 126.8665);
+  }
 }
 
 StationDetail _stationDetail({required String id, required String name}) {
