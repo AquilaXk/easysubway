@@ -222,6 +222,7 @@ void main() {
                 'nameEn': 'Sangnoksu',
                 'region': '수도권',
                 'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
                 'lastVerifiedAt': '2026-06-12',
                 'lines': [
                   {
@@ -259,6 +260,7 @@ void main() {
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
     expect(favorites.single.dataQualityLabel, '기본 정보만 확인됨');
+    expect(favorites.single.dataSourceLabel, '출처 공식 파일');
   });
 
   test('즐겨찾기 역 API 저장소는 인증 제공자가 없으면 인증 헤더를 보내지 않는다', () async {
@@ -322,6 +324,7 @@ void main() {
                 'nameEn': 'Sangnoksu',
                 'region': '수도권',
                 'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
                 'lastVerifiedAt': '2026-06-12',
                 'lines': [
                   {
@@ -377,6 +380,7 @@ void main() {
               'nameEn': 'Sangnoksu',
               'region': '수도권',
               'dataQualityLevel': 'LEVEL_1',
+              'dataSourceType': 'OFFICIAL_FILE',
               'lastVerifiedAt': '2026-06-12',
               'lines': const [],
               'addedAt': '2026-06-13T10:00:00',

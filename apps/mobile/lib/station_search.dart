@@ -358,6 +358,7 @@ class FavoriteStation {
     required this.nameEn,
     required this.region,
     required this.dataQualityLevel,
+    this.dataSourceType = '',
     required this.lastVerifiedAt,
     required this.lines,
     required this.addedAt,
@@ -376,6 +377,7 @@ class FavoriteStation {
       nameEn: _requiredString(json, 'nameEn'),
       region: _requiredString(json, 'region'),
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
       lines: rawLines
           .map((item) {
@@ -397,11 +399,14 @@ class FavoriteStation {
   final String nameEn;
   final String region;
   final String dataQualityLevel;
+  final String dataSourceType;
   final String lastVerifiedAt;
   final List<StationSearchLine> lines;
   final String addedAt;
 
   String get dataQualityLabel => _dataQualityLabel(dataQualityLevel);
+
+  String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
   String get lineLabel {
     if (lines.isEmpty) {
@@ -411,7 +416,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel, $dataSourceLabel';
   }
 }
 
@@ -1707,6 +1712,14 @@ class _FavoriteStationTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       favorite.dataQualityLabel,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF405A5D),
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      favorite.dataSourceLabel,
                       style: textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF405A5D),
                         height: 1.3,
