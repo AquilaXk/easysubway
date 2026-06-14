@@ -1,6 +1,7 @@
 package com.easysubway.collection.adapter.out.batch;
 
 import com.easysubway.collection.application.service.DataCollectionRunRecorder;
+import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.util.UUID;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -36,9 +37,12 @@ class TransitMasterCollectionBatchConfig {
 				String runId = (String) chunkContext.getStepContext()
 					.getJobParameters()
 					.getOrDefault("runId", "collection-" + UUID.randomUUID());
-				String requestedBy = (String) chunkContext.getStepContext()
+				Object requestedByParameter = chunkContext.getStepContext()
 					.getJobParameters()
-					.getOrDefault("requestedBy", JOB_NAME);
+					.get("requestedBy");
+				if (!(requestedByParameter instanceof String requestedBy) || requestedBy.isBlank()) {
+					throw new InvalidDataCollectionException("요청자 식별자가 필요합니다.");
+				}
 				dataCollectionRunRecorder.recordTransitMasterRun(runId, requestedBy);
 				return RepeatStatus.FINISHED;
 			}, transactionManager)

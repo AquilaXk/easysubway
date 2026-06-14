@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.collection.adapter.out.persistence.InMemoryDataCollectionRunRepository;
 import com.easysubway.collection.application.port.in.RunDataCollectionCommand;
+import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
@@ -69,5 +70,39 @@ class DataCollectionRunRecorderTest {
 		assertThatThrownBy(() -> new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, ""))
 			.isInstanceOf(InvalidDataCollectionException.class)
 			.hasMessage("요청자 식별자가 필요합니다.");
+	}
+
+	@Test
+	@DisplayName("완료된 실행 기록은 완료 시간을 요구한다")
+	void completedRunRequiresCompletedAt() {
+		assertThatThrownBy(() -> new DataCollectionRun(
+			"collection-completed",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.COMPLETED,
+			"admin-user",
+			LocalDateTime.of(2026, 6, 14, 11, 0),
+			null,
+			13,
+			null
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("완료된 실행은 완료 시간이 필요합니다.");
+	}
+
+	@Test
+	@DisplayName("실패한 실행 기록은 실패 사유를 요구한다")
+	void failedRunRequiresFailureMessage() {
+		assertThatThrownBy(() -> new DataCollectionRun(
+			"collection-failed",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.FAILED,
+			"admin-user",
+			LocalDateTime.of(2026, 6, 14, 11, 0),
+			null,
+			0,
+			" "
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("실패한 실행은 실패 사유가 필요합니다.");
 	}
 }

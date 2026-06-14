@@ -55,7 +55,7 @@ public class DataCollectionService implements DataCollectionUseCase {
 		try {
 			jobLauncher.run(transitMasterCollectionJob, parameters);
 		} catch (JobExecutionException exception) {
-			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
+			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.", exception);
 		}
 		return loadDataCollectionRunPort.loadRun(runId)
 			.orElseThrow(() -> new InvalidDataCollectionException("데이터 수집 실행 기록을 찾을 수 없습니다."));

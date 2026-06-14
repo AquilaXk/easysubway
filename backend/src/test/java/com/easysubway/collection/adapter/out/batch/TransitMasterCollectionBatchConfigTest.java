@@ -46,4 +46,18 @@ class TransitMasterCollectionBatchConfigTest {
 		assertThat(run.status()).isEqualTo(DataCollectionStatus.COMPLETED);
 		assertThat(run.requestedBy()).isEqualTo("admin-batch");
 	}
+
+	@Test
+	@DisplayName("배치 Job은 요청자 파라미터가 없으면 실행 기록을 남기지 않는다")
+	void transitMasterCollectionJobRequiresRequesterParameter() throws Exception {
+		var parameters = new JobParametersBuilder()
+			.addString("runId", "collection-missing-requester")
+			.addLong("run.id", System.nanoTime())
+			.toJobParameters();
+
+		var execution = jobLauncher.run(job, parameters);
+
+		assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+		assertThat(repository.loadRun("collection-missing-requester")).isEmpty();
+	}
 }

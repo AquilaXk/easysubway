@@ -16,7 +16,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
-	"easysubway.admin.password=admin-test-password"
+	"easysubway.admin.password=admin-test-password",
+	"easysubway.user.username=basic-user",
+	"easysubway.user.password=user-test-password"
 })
 @AutoConfigureMockMvc
 @DisplayName("데이터 수집 배치 API")
@@ -67,5 +69,31 @@ class DataCollectionControllerTest {
 
 		mockMvc.perform(get("/admin/data-collections/runs"))
 			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(post("/admin/data-collections/runs")
+				.with(httpBasic("basic-user", "user-test-password"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "source": "TRANSIT_MASTER"
+					}
+					"""))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/admin/data-collections/runs")
+				.with(httpBasic("basic-user", "user-test-password")))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@DisplayName("데이터 수집 배치 실행 요청은 수집 대상을 요구한다")
+	void dataCollectionRunRequestRequiresSource() throws Exception {
+		mockMvc.perform(post("/admin/data-collections/runs")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.message").value("수집 대상을 선택해야 합니다."));
 	}
 }

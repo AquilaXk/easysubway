@@ -7,4 +7,8 @@ public class InvalidDataCollectionException extends InvalidRequestException {
 	public InvalidDataCollectionException(String message) {
 		super(message);
 	}
+
+	public InvalidDataCollectionException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }

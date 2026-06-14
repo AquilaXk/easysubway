@@ -6,6 +6,8 @@ import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.common.web.ApiResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +29,7 @@ class DataCollectionController {
 
 	@PostMapping("/admin/data-collections/runs")
 	ApiResponse<DataCollectionRunResponse> runCollection(
-		@RequestBody RunDataCollectionRequest request,
+		@Valid @RequestBody RunDataCollectionRequest request,
 		Principal principal
 	) {
 		DataCollectionRun run = dataCollectionUseCase.runCollection(
@@ -44,6 +46,7 @@ class DataCollectionController {
 	}
 
 	record RunDataCollectionRequest(
+		@NotNull(message = "수집 대상을 선택해야 합니다.")
 		DataCollectionSource source
 	) {
 	}
