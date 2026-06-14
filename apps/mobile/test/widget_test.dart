@@ -567,6 +567,7 @@ void main() {
           hasElevatorConnection: true,
           hasStairOnlyPath: false,
           dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
         ),
       ],
       stationFacilities: const [
@@ -581,6 +582,7 @@ void main() {
           description: '1번 출구 앞',
           status: 'NORMAL',
           dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-12',
         ),
       ],
@@ -616,24 +618,27 @@ void main() {
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('수도권 2호선'), findsOneWidget);
       expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.text('출처 공식 파일'), findsWidgets);
       expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
       expect(find.text('출구'), findsOneWidget);
       expect(find.text('1번 출구'), findsOneWidget);
       expect(find.text('엘리베이터 연결'), findsOneWidget);
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
-      expect(find.text('시설'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 확인됨, 마지막 확인 2026-06-13',
+          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 확인됨, 출처 공식 파일, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음'),
+        find.bySemanticsLabel(
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일',
+        ),
         findsOneWidget,
       );
       await tester.drag(find.byType(ListView), const Offset(0, -260));
       await tester.pumpAndSettle();
+      expect(find.text('시설'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('엘리베이터'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
@@ -641,7 +646,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일',
         ),
         findsOneWidget,
       );
@@ -1678,6 +1683,7 @@ StationSearchResult _stationResult({required String id, required String name}) {
     nameEn: id,
     region: '수도권',
     dataQualityLevel: 'LEVEL_1',
+    dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
     lines: const [
       StationSearchLine(
@@ -1697,6 +1703,7 @@ StationDetail _stationDetail({required String id, required String name}) {
     nameEn: id,
     region: '수도권',
     dataQualityLevel: 'LEVEL_1',
+    dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
     lines: const [
       StationSearchLine(
