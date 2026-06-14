@@ -567,6 +567,46 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"[\s\S]*"\/api\/v1\/devices"[\s\S]*"\/api\/v1\/me\/notification-settings"[\s\S]*\)/);
 });
 
+test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 따른다", () => {
+  const notification = read("backend/src/main/java/com/easysubway/notification/domain/PushNotification.java");
+  const result = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationDispatchResult.java");
+  const type = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationType.java");
+  const status = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationStatus.java");
+  const invalidPush = read("backend/src/main/java/com/easysubway/notification/domain/InvalidPushNotificationException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/notification/application/port/in/PushNotificationDispatchUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/notification/application/port/in/DispatchPushNotificationCommand.java");
+  const loadOutboxPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/LoadPushNotificationOutboxPort.java");
+  const saveOutboxPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SavePushNotificationOutboxPort.java");
+  const service = read("backend/src/main/java/com/easysubway/notification/application/service/PushNotificationDispatchService.java");
+  const repository = read("backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryPushNotificationOutboxRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(notification, /record PushNotification/);
+  assert.match(notification, /deviceToken/);
+  assert.match(notification, /PushNotificationStatus/);
+  assert.match(result, /record PushNotificationDispatchResult/);
+  assert.match(type, /FAVORITE_STATION_FACILITY/);
+  assert.match(type, /FAVORITE_ROUTE_FACILITY/);
+  assert.match(type, /REPORT_STATUS/);
+  assert.match(type, /DATA_QUALITY/);
+  assert.match(status, /PENDING/);
+  assert.match(invalidPush, /extends InvalidRequestException/);
+  assert.match(useCase, /interface PushNotificationDispatchUseCase/);
+  assert.match(useCase, /dispatch/);
+  assert.match(command, /record DispatchPushNotificationCommand/);
+  assert.match(loadOutboxPort, /interface LoadPushNotificationOutboxPort/);
+  assert.match(saveOutboxPort, /interface SavePushNotificationOutboxPort/);
+  assert.match(service, /implements PushNotificationDispatchUseCase/);
+  assert.match(service, /LoadNotificationPreferencePort/);
+  assert.match(service, /SavePushNotificationOutboxPort/);
+  assert.match(repository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort/);
+  assert.match(controller, /@PostMapping\("\/admin\/notifications\/push"\)/);
+  assert.match(controller, /PushNotificationDispatchUseCase/);
+  assert.doesNotMatch(controller, /deviceToken/);
+  assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
+});
+
 test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const result = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchResult.java");
   const status = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchStatus.java");
