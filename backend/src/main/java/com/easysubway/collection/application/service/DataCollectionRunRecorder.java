@@ -52,7 +52,12 @@ public class DataCollectionRunRecorder {
 			);
 			return saveDataCollectionRunPort.saveRun(run);
 		} catch (RuntimeException exception) {
-			saveFailedRun(runId, requestedBy, startedAt, exception);
+			try {
+				saveFailedRun(runId, requestedBy, startedAt, exception);
+			} catch (RuntimeException saveException) {
+				// 실패 기록 저장까지 실패하더라도 실제 수집 실패 원인을 호출자에게 보존한다.
+				exception.addSuppressed(saveException);
+			}
 			throw exception;
 		}
 	}

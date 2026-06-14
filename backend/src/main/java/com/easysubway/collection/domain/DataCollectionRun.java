@@ -32,6 +32,9 @@ public record DataCollectionRun(
 		if (collectedCount < 0) {
 			throw new InvalidDataCollectionException("수집 건수는 0 이상이어야 합니다.");
 		}
+		if (status == DataCollectionStatus.RUNNING && completedAt != null) {
+			throw new InvalidDataCollectionException("실행 중인 실행은 완료 시간을 포함할 수 없습니다.");
+		}
 		if (status == DataCollectionStatus.COMPLETED && completedAt == null) {
 			throw new InvalidDataCollectionException("완료된 실행은 완료 시간이 필요합니다.");
 		}
@@ -39,6 +42,9 @@ public record DataCollectionRun(
 		requestedBy = requestedBy.trim();
 		if (failureMessage != null) {
 			failureMessage = failureMessage.trim();
+		}
+		if (status == DataCollectionStatus.COMPLETED && failureMessage != null && !failureMessage.isBlank()) {
+			throw new InvalidDataCollectionException("완료된 실행은 실패 사유를 포함할 수 없습니다.");
 		}
 		if (status == DataCollectionStatus.FAILED && (failureMessage == null || failureMessage.isBlank())) {
 			throw new InvalidDataCollectionException("실패한 실행은 실패 사유가 필요합니다.");
