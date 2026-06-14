@@ -278,6 +278,18 @@ class FacilityReportControllerTest {
 			.andExpect(status().isForbidden());
 	}
 
+	@Test
+	@DisplayName("관리자 신고 목록은 잘못된 상태 필터를 공통 오류 형식으로 응답한다")
+	void adminReportListRejectsInvalidStatusWithCommonErrorResponse() throws Exception {
+		mockMvc.perform(get("/admin/reports")
+				.queryParam("status", "submitted")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.data").doesNotExist())
+			.andExpect(jsonPath("$.message").value("요청 값을 확인해야 합니다."));
+	}
+
 	private String createReport(String userId, String description) throws Exception {
 		String response = mockMvc.perform(post("/api/v1/reports")
 				.contentType(MediaType.APPLICATION_JSON)
