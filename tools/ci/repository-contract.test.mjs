@@ -72,6 +72,23 @@ test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로
   assert.doesNotMatch(jobBlock(workflow, "android", "ios"), /\n    if:/);
 });
 
+test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을 검증한다", () => {
+  const workflow = read(".github/workflows/cd.yml");
+
+  assert.match(workflow, /name: CD/);
+  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*-\s*main/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
+  assert.match(workflow, /name: CD Readiness/);
+  assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret/);
+  assert.match(workflow, /CD Readiness \/ Validate deployment dotenv contract/);
+  assert.match(workflow, /CD Readiness \/ Validate Docker Compose deployment config/);
+  assert.match(workflow, /docker compose --env-file "\$\{EASYSUBWAY_ENV_FILE\}" -f infra\/docker-compose\.yml config --quiet/);
+  assert.match(workflow, /EASYSUBWAY_ENV secret is not configured/);
+  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+});
+
 test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
   const template = read(".github/pull_request_template.md");
 
@@ -127,14 +144,17 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const workflow = read(".github/workflows/ci.yml");
+  const cdWorkflow = read(".github/workflows/cd.yml");
 
   assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증/);
   assert.match(script, /SECRET_NAME="\$\{EASYSUBWAY_ACTIONS_ENV_SECRET_NAME:-EASYSUBWAY_ENV\}"/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+  assert.doesNotMatch(cdWorkflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
