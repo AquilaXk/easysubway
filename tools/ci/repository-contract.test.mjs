@@ -572,6 +572,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const status = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchStatus.java");
   const warning = read("backend/src/main/java/com/easysubway/route/domain/RouteWarning.java");
   const warningCode = read("backend/src/main/java/com/easysubway/route/domain/RouteWarningCode.java");
+  const profileWeight = read("backend/src/main/java/com/easysubway/route/domain/RouteProfileWeight.java");
   const step = read("backend/src/main/java/com/easysubway/route/domain/RouteStep.java");
   const invalidSearch = read("backend/src/main/java/com/easysubway/route/domain/InvalidRouteSearchException.java");
   const routeNotFound = read("backend/src/main/java/com/easysubway/route/domain/RouteNotFoundException.java");
@@ -591,6 +592,10 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(status, /BLOCKED/);
   assert.match(warning, /record RouteWarning/);
   assert.match(warningCode, /LOW_DATA_CONFIDENCE/);
+  assert.match(profileWeight, /record RouteProfileWeight/);
+  assert.match(profileWeight, /MobilityType/);
+  assert.match(profileWeight, /blocksStairOnlyAccess/);
+  assert.match(profileWeight, /entryGuidance/);
   assert.match(step, /record RouteStep/);
   assert.match(invalidSearch, /extends InvalidRequestException/);
   assert.match(routeNotFound, /extends ResourceNotFoundException/);
@@ -603,7 +608,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(savePort, /interface SaveRouteSearchPort/);
   assert.match(service, /implements RouteSearchUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
-  assert.match(service, /MobilityType\.WHEELCHAIR/);
+  assert.match(service, /RouteProfileWeight\.from/);
   assert.match(service, /RouteSearchStatus\.BLOCKED/);
   assert.match(service, /hasStairOnlyAccess/);
   assert.match(service, /routeScore/);
