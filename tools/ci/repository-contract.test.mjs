@@ -302,8 +302,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const reviewCommand = read("backend/src/main/java/com/easysubway/report/application/port/in/ReviewFacilityReportCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/report/application/port/out/LoadFacilityReportPort.java");
   const savePort = read("backend/src/main/java/com/easysubway/report/application/port/out/SaveFacilityReportPort.java");
+  const saveFacilityStatusPort = read(
+    "backend/src/main/java/com/easysubway/transit/application/port/out/SaveAccessibilityFacilityStatusPort.java",
+  );
   const service = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
   const repository = read("backend/src/main/java/com/easysubway/report/adapter/out/persistence/InMemoryFacilityReportRepository.java");
+  const transitRepository = read(
+    "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/InMemoryTransitMasterRepository.java",
+  );
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -327,8 +333,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(loadPort, /interface LoadFacilityReportPort/);
   assert.match(loadPort, /loadReports/);
   assert.match(savePort, /interface SaveFacilityReportPort/);
+  assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
+  assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
   assert.match(service, /implements FacilityReportUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
+  assert.match(service, /SaveAccessibilityFacilityStatusPort/);
+  assert.match(service, /applyAcceptedReportToFacilityStatus/);
+  assert.match(service, /case BROKEN -> Optional\.of\(AccessibilityFacilityStatus\.BROKEN\)/);
+  assert.match(service, /case RECOVERED -> Optional\.of\(AccessibilityFacilityStatus\.NORMAL\)/);
   assert.match(service, /listReports\(FacilityReportStatus status\)/);
   assert.match(service, /Comparator\.comparing\(FacilityReport::createdAt\)\.reversed\(\)/);
   assert.match(service, /FacilityReportStatus\.SUBMITTED/);
@@ -337,6 +349,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(service, /FacilityReportStatus\.DUPLICATE/);
   assert.match(repository, /implements LoadFacilityReportPort, SaveFacilityReportPort/);
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
+  assert.match(transitRepository, /implements LoadTransitMasterPort, SaveAccessibilityFacilityStatusPort/);
+  assert.match(transitRepository, /saveFacilityStatus\(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/reports\/\{reportId\}"\)/);
   assert.match(controller, /@GetMapping\("\/admin\/reports"\)/);
