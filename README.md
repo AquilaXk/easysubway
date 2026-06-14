@@ -18,20 +18,19 @@
 - Infra: Docker, Docker Compose, GitHub Actions
 - Maps: Naver Map first, Kakao Map as a secondary candidate
 
-## Production Configuration
+## Runtime Environment
 
-운영 배포는 `prod` profile을 기준으로 아래 환경변수를 설정해야 합니다.
+`.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `EASYSUBWAY_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL |
-| `EASYSUBWAY_DATASOURCE_USERNAME` | Yes | PostgreSQL 계정 |
-| `EASYSUBWAY_DATASOURCE_PASSWORD` | Yes | PostgreSQL 비밀번호 |
-| `EASYSUBWAY_REDIS_HOST` | Yes | 익명 인증 발급 제한에 사용할 Redis host |
-| `EASYSUBWAY_REDIS_PORT` | No | Redis port. 기본값은 `6379`입니다. |
-| `EASYSUBWAY_TRUSTED_PROXY_CIDRS` | Yes | `X-Forwarded-For`를 신뢰할 프록시 IP 또는 CIDR 목록입니다. 예: `10.0.0.0/8,192.168.0.10` |
+GitHub Actions에는 개별 환경변수를 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다.
 
-`EASYSUBWAY_TRUSTED_PROXY_CIDRS`는 ALB, Nginx, API Gateway처럼 애플리케이션 앞단에 있는 신뢰 가능한 프록시만 포함해야 합니다. 운영에서는 누락 시 시작 단계에서 설정 오류가 드러나도록 기본값을 두지 않습니다. 개발 환경은 프록시 없이도 로컬 실행할 수 있도록 빈 기본값을 허용하며, 이 경우 전달 헤더를 익명 인증 발급 제한 키로 사용하지 않습니다.
+```bash
+scripts/github/sync-actions-env-secret.sh .env
+```
+
+워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
+
+`EASYSUBWAY_TRUSTED_PROXY_CIDRS`는 ALB, Nginx, API Gateway처럼 애플리케이션 앞단에 있는 신뢰 가능한 프록시 IP 또는 CIDR 목록입니다. 예: `10.0.0.0/8,192.168.0.10`. 운영에서는 누락 시 시작 단계에서 설정 오류가 드러나도록 기본값을 두지 않습니다. 개발 환경은 프록시 없이도 로컬 실행할 수 있도록 빈 기본값을 허용하며, 이 경우 전달 헤더를 익명 인증 발급 제한 키로 사용하지 않습니다.
 
 ## Workspace
 

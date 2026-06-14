@@ -114,8 +114,27 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_USER=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PASSWORD=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:5432\/easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_USERNAME=easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
+  assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
+  assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
   assert.doesNotMatch(envExample, /prod|production|secret|token|key/i);
+});
+
+test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
+  const readme = read("README.md");
+  const script = read("scripts/github/sync-actions-env-secret.sh");
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
+  assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
+  assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(script, /SECRET_NAME="\$\{EASYSUBWAY_ACTIONS_ENV_SECRET_NAME:-EASYSUBWAY_ENV\}"/);
+  assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
+  assert.match(script, /\.env\.example is a template/);
+  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
