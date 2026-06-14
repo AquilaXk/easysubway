@@ -28,6 +28,14 @@ function workflowFiles() {
   }).trim().split("\n").filter(Boolean);
 }
 
+function assertActionsEnvSecretPolicy(file, source) {
+  const disallowedSecretAccess = /secrets(?:\.EASYSUBWAY_(?!ENV\b)[A-Z0-9_]+|\[['"]EASYSUBWAY_(?!ENV['"]?\])[A-Z0-9_]+['"]\])/;
+  const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
+
+  assert.doesNotMatch(source, disallowedSecretAccess, `${file} must use only secrets.EASYSUBWAY_ENV`);
+  assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
+}
+
 function assertMobileCatchPolicy(file, source) {
   const catchPattern = /catch\s*\(([^)]*)\)/g;
   for (const match of source.matchAll(catchPattern)) {
@@ -182,9 +190,19 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
 
   for (const file of workflowFiles()) {
     const source = read(file);
-    assert.doesNotMatch(source, /secrets\.EASYSUBWAY_(?!ENV\b)[A-Z0-9_]+/, `${file} must use only secrets.EASYSUBWAY_ENV`);
-    assert.doesNotMatch(source, /vars\.EASYSUBWAY_[A-Z0-9_]+/, `${file} must not use GitHub Actions vars for app env`);
+    assertActionsEnvSecretPolicy(file, source);
   }
+});
+
+test("GitHub Actions 환경값 계약은 bracket notation 우회를 차단한다", () => {
+  assert.throws(
+    () => assertActionsEnvSecretPolicy("example.yml", "env:\n  DB: ${{ secrets['EASYSUBWAY_DATABASE_URL'] }}"),
+    /example\.yml must use only secrets\.EASYSUBWAY_ENV/,
+  );
+  assert.throws(
+    () => assertActionsEnvSecretPolicy("example.yml", "env:\n  DB: ${{ vars['EASYSUBWAY_DATABASE_URL'] }}"),
+    /example\.yml must not use GitHub Actions vars for app env/,
+  );
 });
 
 test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다", () => {
