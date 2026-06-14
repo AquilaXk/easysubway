@@ -450,6 +450,13 @@ class RouteSearchResult {
     return status == 'FOUND' ? '이동할 수 있는 경로' : '확인이 필요합니다';
   }
 
+  IconData get guidanceIcon {
+    if (isBlocked) {
+      return Icons.priority_high;
+    }
+    return status == 'FOUND' ? Icons.check_circle : Icons.warning_amber;
+  }
+
   String get attentionLabel {
     if (isBlocked) {
       return '안내 불가 이유';
@@ -1358,7 +1365,7 @@ class _RouteResultStatusHeader extends StatelessWidget {
       children: [
         _RouteGuidanceChip(
           key: const Key('routeGuidanceStatusChip'),
-          icon: result.isBlocked ? Icons.priority_high : Icons.check_circle,
+          icon: result.guidanceIcon,
           label: result.guidanceLabel,
           emphasized: true,
         ),

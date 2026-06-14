@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -156,6 +157,7 @@ void main() {
 
     expect(result.statusLabel, '확인이 필요합니다');
     expect(result.guidanceLabel, '확인이 필요합니다');
+    expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
   });
 
