@@ -123,4 +123,18 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('온보딩 완료 결과는 손상된 보기 설정 저장값을 거부한다', () {
+    expect(
+      () => OnboardingResult.decode(
+        '{"profileId":"elderly","preferences":{"largeTextEnabled":"yes","highContrastEnabled":false,"simpleViewEnabled":true}}',
+      ),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(
+      () => OnboardingResult.decode('{"profileId":"elderly","preferences":{}}'),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }

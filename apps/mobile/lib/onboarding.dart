@@ -70,10 +70,20 @@ class OnboardingViewPreferences {
       simpleViewEnabled = true;
 
   factory OnboardingViewPreferences.fromJson(Map<String, Object?> json) {
+    final largeTextEnabled = json['largeTextEnabled'];
+    final highContrastEnabled = json['highContrastEnabled'];
+    final simpleViewEnabled = json['simpleViewEnabled'];
+    // 손상된 저장값이 접근성 기본값을 조용히 끄지 않도록 타입을 엄격히 확인한다.
+    if (largeTextEnabled is! bool ||
+        highContrastEnabled is! bool ||
+        simpleViewEnabled is! bool) {
+      throw const FormatException('Invalid onboarding preferences payload');
+    }
+
     return OnboardingViewPreferences(
-      largeTextEnabled: json['largeTextEnabled'] == true,
-      highContrastEnabled: json['highContrastEnabled'] == true,
-      simpleViewEnabled: json['simpleViewEnabled'] == true,
+      largeTextEnabled: largeTextEnabled,
+      highContrastEnabled: highContrastEnabled,
+      simpleViewEnabled: simpleViewEnabled,
     );
   }
 
