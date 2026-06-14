@@ -1,6 +1,7 @@
 package com.easysubway.notification.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import com.easysubway.favorite.adapter.out.persistence.InMemoryFavoriteFacilityRepository;
 import com.easysubway.favorite.adapter.out.persistence.InMemoryFavoriteRouteRepository;
@@ -18,10 +19,23 @@ import com.easysubway.notification.domain.PushNotificationType;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
+import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
+import com.easysubway.transit.domain.AccessibilityFacility;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
+import com.easysubway.transit.domain.AccessibilityFacilityType;
+import com.easysubway.transit.domain.DataConfidenceLevel;
+import com.easysubway.transit.domain.DataQualityLevel;
+import com.easysubway.transit.domain.DataSourceType;
+import com.easysubway.transit.domain.Station;
+import com.easysubway.transit.domain.StationExit;
+import com.easysubway.transit.domain.StationLine;
+import com.easysubway.transit.domain.SubwayLine;
+import com.easysubway.transit.domain.TransitOperator;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -152,6 +166,22 @@ class FacilityStatusAlertServiceTest {
 		assertThat(outboxRepository.loadPushNotifications("disabled-user")).isEmpty();
 	}
 
+	@Test
+	@DisplayName("비활성 역에 속한 시설 상태 변경도 알림 경로에서 요청을 실패시키지 않는다")
+	void inactiveStationFacilityStatusChangeDoesNotFailAlertPath() {
+		var service = new FacilityStatusAlertService(
+			new TransitMasterPortWithInactiveStationFacility(),
+			favoriteFacilityRepository,
+			favoriteStationRepository,
+			favoriteRouteRepository,
+			dispatchService
+		);
+
+		assertThatNoException().isThrownBy(() -> service.alertFacilityStatusChanged(
+			new FacilityStatusChangedAlertCommand("facility-inactive-elevator", AccessibilityFacilityStatus.BROKEN)
+		));
+	}
+
 	private void registerDevice(String userId, DevicePlatform platform, String token) {
 		preferenceService.registerDevice(new RegisterDeviceCommand(userId, platform, token));
 	}
@@ -173,5 +203,70 @@ class FacilityStatusAlertServiceTest {
 			List.of(),
 			LocalDateTime.of(2026, 6, 14, 9, 2)
 		);
+	}
+
+	private static class TransitMasterPortWithInactiveStationFacility implements LoadTransitMasterPort {
+
+		@Override
+		public List<TransitOperator> loadOperators() {
+			return List.of(new TransitOperator(
+				"closed-operator",
+				"운영 종료 기관",
+				"수도권",
+				"https://example.com",
+				"https://example.com/help",
+				DataSourceType.OFFICIAL_FILE,
+				false
+			));
+		}
+
+		@Override
+		public List<SubwayLine> loadLines() {
+			return List.of(new SubwayLine("closed-line", "closed-operator", "운영 종료 노선", "#999999", "수도권", "C", false));
+		}
+
+		@Override
+		public List<Station> loadStations() {
+			return List.of(new Station(
+				"station-inactive",
+				"운영종료역",
+				"Inactive",
+				"수도권",
+				new BigDecimal("37.000000"),
+				new BigDecimal("127.000000"),
+				DataQualityLevel.LEVEL_1,
+				LocalDate.of(2026, 6, 12),
+				false
+			));
+		}
+
+		@Override
+		public List<StationLine> loadStationLines() {
+			return List.of(new StationLine("station-inactive", "closed-line", "000", 0, "운영 종료"));
+		}
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of();
+		}
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(new AccessibilityFacility(
+				"facility-inactive-elevator",
+				"station-inactive",
+				null,
+				AccessibilityFacilityType.ELEVATOR,
+				"엘리베이터",
+				"지상",
+				"대합실",
+				new BigDecimal("37.000000"),
+				new BigDecimal("127.000000"),
+				"운영 종료 역에 남아 있는 시설 데이터입니다.",
+				AccessibilityFacilityStatus.NORMAL,
+				DataConfidenceLevel.HIGH,
+				LocalDate.of(2026, 6, 12)
+			));
+		}
 	}
 }

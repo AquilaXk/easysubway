@@ -88,7 +88,6 @@ public class FacilityStatusAlertService implements FacilityStatusAlertUseCase {
 	private Station loadStation(String stationId) {
 		return loadTransitMasterPort.loadStations()
 			.stream()
-			.filter(Station::active)
 			.filter(station -> station.id().equals(stationId))
 			.findFirst()
 			.orElseThrow(StationNotFoundException::new);

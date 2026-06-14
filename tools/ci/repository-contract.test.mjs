@@ -707,6 +707,7 @@ test("백엔드 시설 상태 변경 알림은 즐겨찾기와 푸시 outbox 경
   assert.match(service, /new LinkedHashSet<String>\(\)/);
   assert.match(service, /PushNotificationType\.FAVORITE_STATION_FACILITY/);
   assert.match(service, /PushNotificationType\.FAVORITE_ROUTE_FACILITY/);
+  assert.doesNotMatch(service, /filter\(Station::active\)/);
   assert.match(reportService, /FacilityStatusAlertUseCase/);
   assert.match(reportService, /FacilityStatusChangedAlertCommand/);
   assert.match(reportService, /isFacilityStatusChanged/);
