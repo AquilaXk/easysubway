@@ -8,9 +8,10 @@ import 'notification_settings.dart';
 import 'onboarding.dart';
 import 'route_search.dart';
 import 'station_search.dart';
+import 'mobile_error_reporter.dart';
 
 void main() {
-  runApp(EasySubwayApp());
+  runApp(EasySubwayApp(onboardingStore: const SecureOnboardingResultStore()));
 }
 
 class EasySubwayApp extends StatelessWidget {
@@ -21,6 +22,7 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteStationRepository? favoriteRepository,
     NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
+    OnboardingResultStore? onboardingStore,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enableAnonymousAuth = true,
     Key? key,
@@ -35,12 +37,14 @@ class EasySubwayApp extends StatelessWidget {
            enableAnonymousAuth: enableAnonymousAuth,
          ),
          initialOnboardingState: initialOnboardingState,
+         onboardingStore: onboardingStore,
          key: key,
        );
 
   EasySubwayApp._({
     required _EasySubwayAppDependencies dependencies,
     required this.initialOnboardingState,
+    required this.onboardingStore,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -54,6 +58,7 @@ class EasySubwayApp extends StatelessWidget {
   final FavoriteStationRepository? favoriteRepository;
   final NotificationSettingsRepository? notificationRepository;
   final OnboardingState initialOnboardingState;
+  final OnboardingResultStore? onboardingStore;
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +110,7 @@ class EasySubwayApp extends StatelessWidget {
         favoriteRepository: favoriteRepository,
         notificationRepository: notificationRepository,
         initialOnboardingState: initialOnboardingState,
+        onboardingStore: onboardingStore,
       ),
     );
   }
@@ -118,6 +124,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.favoriteRepository,
     required this.notificationRepository,
     required this.initialOnboardingState,
+    required this.onboardingStore,
   });
 
   final StationSearchRepository repository;
@@ -126,20 +133,39 @@ class _EasySubwayHome extends StatefulWidget {
   final FavoriteStationRepository? favoriteRepository;
   final NotificationSettingsRepository? notificationRepository;
   final OnboardingState initialOnboardingState;
+  final OnboardingResultStore? onboardingStore;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
 }
 
 class _EasySubwayHomeState extends State<_EasySubwayHome> {
-  // 영구 저장을 연결하기 전까지는 같은 앱 세션에서 온보딩 완료 상태를 유지한다.
+  // 저장소가 없는 테스트/프리뷰에서도 같은 앱 세션에서는 온보딩 완료 상태를 유지한다.
   late OnboardingState _onboardingState = widget.initialOnboardingState;
+  late bool _loadingOnboardingState =
+      widget.onboardingStore != null &&
+      !widget.initialOnboardingState.isCompleted;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_loadingOnboardingState) {
+      _restoreOnboardingState();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingOnboardingState) {
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
+    }
+
     if (!_onboardingState.isCompleted) {
       return OnboardingScreen(
-        onCompleted: (result) {
+        onCompleted: (result) async {
+          await _saveOnboardingResult(result);
           setState(() {
             _onboardingState = OnboardingState.completed(result: result);
           });
@@ -164,6 +190,42 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         simpleViewEnabled: preferences.simpleViewEnabled,
       ),
     );
+  }
+
+  Future<void> _restoreOnboardingState() async {
+    OnboardingResult? storedResult;
+    try {
+      storedResult = await widget.onboardingStore?.readResult();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 설정을 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _onboardingState = storedResult == null
+          ? const OnboardingState.initial()
+          : OnboardingState.completed(result: storedResult);
+      _loadingOnboardingState = false;
+    });
+  }
+
+  Future<void> _saveOnboardingResult(OnboardingResult result) async {
+    try {
+      await widget.onboardingStore?.saveResult(result);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 설정을 저장하는 중 예외가 발생했습니다.',
+      );
+    }
   }
 }
 
