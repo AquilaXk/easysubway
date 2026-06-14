@@ -81,8 +81,7 @@ class EasySubwayMapAdapter implements MapAdapter {
           type: MapMarkerType.station,
           title: '${station.nameKo}역',
           coordinate: coordinate,
-          semanticLabel:
-              '${station.nameKo}역 위치, ${station.lineLabel}, ${station.dataQualityLabel}',
+          semanticLabel: '${station.semanticLabel}, 지도 위치',
         ),
       for (final exit in exits)
         if (_coordinateFrom(exit.latitude, exit.longitude)
@@ -93,8 +92,7 @@ class EasySubwayMapAdapter implements MapAdapter {
             title: exit.name,
             coordinate: coordinate,
             // 지도 SDK marker 접근성 문구는 화면 문구보다 더 직접적으로 이동 판단 정보를 담는다.
-            semanticLabel:
-                '${exit.name}, ${exit.elevatorConnectionLabel}, ${exit.stairPathLabel}',
+            semanticLabel: '${exit.semanticLabel}, 지도 위치',
           ),
       for (final facility in facilities)
         if (_coordinateFrom(facility.latitude, facility.longitude)
@@ -104,8 +102,7 @@ class EasySubwayMapAdapter implements MapAdapter {
             type: MapMarkerType.facility,
             title: facility.name,
             coordinate: coordinate,
-            semanticLabel:
-                '${facility.name}, ${facility.typeLabel}, ${facility.statusLabel}, ${facility.locationLabel}',
+            semanticLabel: '${facility.semanticLabel}, 지도 위치',
           ),
     ];
   }
