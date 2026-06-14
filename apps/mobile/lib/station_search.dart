@@ -441,6 +441,8 @@ class StationDetail {
     required this.nameKo,
     required this.nameEn,
     required this.region,
+    this.latitude,
+    this.longitude,
     required this.dataQualityLevel,
     required this.lastVerifiedAt,
     required this.lines,
@@ -457,6 +459,8 @@ class StationDetail {
       nameKo: _requiredString(json, 'nameKo'),
       nameEn: _requiredString(json, 'nameEn'),
       region: _requiredString(json, 'region'),
+      latitude: _optionalDouble(json, 'latitude'),
+      longitude: _optionalDouble(json, 'longitude'),
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
       lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
       lines: rawLines
@@ -476,6 +480,8 @@ class StationDetail {
   final String nameKo;
   final String nameEn;
   final String region;
+  final double? latitude;
+  final double? longitude;
   final String dataQualityLevel;
   final String lastVerifiedAt;
   final List<StationSearchLine> lines;
@@ -500,6 +506,8 @@ class StationExitInfo {
     required this.stationId,
     required this.exitNumber,
     required this.name,
+    this.latitude,
+    this.longitude,
     required this.hasElevatorConnection,
     required this.hasStairOnlyPath,
     required this.dataConfidence,
@@ -511,6 +519,8 @@ class StationExitInfo {
       stationId: _requiredString(json, 'stationId'),
       exitNumber: _requiredString(json, 'exitNumber'),
       name: _requiredString(json, 'name'),
+      latitude: _optionalDouble(json, 'latitude'),
+      longitude: _optionalDouble(json, 'longitude'),
       hasElevatorConnection: _requiredBool(json, 'hasElevatorConnection'),
       hasStairOnlyPath: _requiredBool(json, 'hasStairOnlyPath'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
@@ -521,6 +531,8 @@ class StationExitInfo {
   final String stationId;
   final String exitNumber;
   final String name;
+  final double? latitude;
+  final double? longitude;
   final bool hasElevatorConnection;
   final bool hasStairOnlyPath;
   final String dataConfidence;
@@ -549,6 +561,8 @@ class StationFacilityInfo {
     required this.name,
     required this.floorFrom,
     required this.floorTo,
+    this.latitude,
+    this.longitude,
     required this.description,
     required this.status,
     required this.dataConfidence,
@@ -564,6 +578,8 @@ class StationFacilityInfo {
       name: _requiredString(json, 'name'),
       floorFrom: _stringOrEmpty(json, 'floorFrom'),
       floorTo: _stringOrEmpty(json, 'floorTo'),
+      latitude: _optionalDouble(json, 'latitude'),
+      longitude: _optionalDouble(json, 'longitude'),
       description: _stringOrEmpty(json, 'description'),
       status: _requiredString(json, 'status'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
@@ -578,6 +594,8 @@ class StationFacilityInfo {
   final String name;
   final String floorFrom;
   final String floorTo;
+  final double? latitude;
+  final double? longitude;
   final String description;
   final String status;
   final String dataConfidence;
@@ -720,6 +738,20 @@ bool _requiredBool(Map<String, Object?> json, String key) {
     return value;
   }
   throw FormatException('Missing required station boolean field: $key');
+}
+
+double? _optionalDouble(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String && value.trim().isNotEmpty) {
+    return double.tryParse(value);
+  }
+  return null;
 }
 
 String _dataQualityLabel(String dataQualityLevel) {
