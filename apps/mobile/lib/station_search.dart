@@ -832,6 +832,18 @@ class StationFacilityInfo {
     };
   }
 
+  bool get needsAttention => statusPriority < 40;
+
+  int get statusPriority {
+    return switch (status) {
+      'BROKEN' || 'CLOSED' => 10,
+      'UNDER_CONSTRUCTION' || 'CONSTRUCTION' => 20,
+      'USER_REPORTED' || 'UNKNOWN' || 'NEEDS_REPORT' || 'NEEDS_CHECK' => 30,
+      'NORMAL' || 'ADMIN_VERIFIED' => 40,
+      _ => 30,
+    };
+  }
+
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
@@ -1199,6 +1211,39 @@ class StationDetailState {
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
   final String message;
+
+  List<StationFacilityInfo> get prioritizedFacilities {
+    final sorted = List<StationFacilityInfo>.of(facilities);
+    sorted.sort((left, right) {
+      // 이동에 영향을 주는 시설 상태를 먼저 보여 사용자가 우회 여부를 빨리 판단하게 한다.
+      final priority = left.statusPriority.compareTo(right.statusPriority);
+      if (priority != 0) {
+        return priority;
+      }
+      return left.name.compareTo(right.name);
+    });
+    return List.unmodifiable(sorted);
+  }
+
+  int get attentionFacilityCount {
+    return facilities.where((facility) => facility.needsAttention).length;
+  }
+
+  String get facilityAttentionSummary {
+    final count = attentionFacilityCount;
+    if (count == 0) {
+      return '확인 필요 없음';
+    }
+    return '확인 필요 $count개';
+  }
+
+  String get facilityAttentionSemanticLabel {
+    final count = attentionFacilityCount;
+    if (count == 0) {
+      return '확인이 필요한 시설 없음';
+    }
+    return '확인이 필요한 시설 $count개';
+  }
 }
 
 class StationDetailController extends ChangeNotifier {
@@ -2111,7 +2156,9 @@ class _StationDetailBody extends StatelessWidget {
       StationDetailStatus.success => _StationDetailContent(
         detail: state.detail!,
         exits: state.exits,
-        facilities: state.facilities,
+        facilities: state.prioritizedFacilities,
+        facilityAttentionSummary: state.facilityAttentionSummary,
+        facilityAttentionSemanticLabel: state.facilityAttentionSemanticLabel,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
       ),
@@ -2124,6 +2171,8 @@ class _StationDetailContent extends StatelessWidget {
     required this.detail,
     required this.exits,
     required this.facilities,
+    required this.facilityAttentionSummary,
+    required this.facilityAttentionSemanticLabel,
     required this.reportRepository,
     required this.favoriteController,
   });
@@ -2131,6 +2180,8 @@ class _StationDetailContent extends StatelessWidget {
   final StationDetail detail;
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
+  final String facilityAttentionSummary;
+  final String facilityAttentionSemanticLabel;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
 
@@ -2159,12 +2210,18 @@ class _StationDetailContent extends StatelessWidget {
         const SizedBox(height: 12),
         if (facilities.isEmpty)
           const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
-        else
+        else ...[
+          _StationFacilityStatusSummary(
+            text: facilityAttentionSummary,
+            semanticLabel: facilityAttentionSemanticLabel,
+          ),
+          const SizedBox(height: 12),
           for (final facility in facilities)
             _StationFacilityCard(
               facility: facility,
               onReportTap: () => _openFacilityReport(context, facility),
             ),
+        ],
       ],
     );
   }
@@ -2183,6 +2240,26 @@ class _StationDetailContent extends StatelessWidget {
             facilityStatusLabel: facility.statusLabel,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StationFacilityStatusSummary extends StatelessWidget {
+  const _StationFacilityStatusSummary({
+    required this.text,
+    required this.semanticLabel,
+  });
+
+  final String text;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: _StationDetailInfoRow(icon: Icons.priority_high, text: text),
       ),
     );
   }
