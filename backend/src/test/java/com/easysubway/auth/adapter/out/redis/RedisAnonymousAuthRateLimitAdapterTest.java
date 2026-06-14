@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -51,5 +52,17 @@ class RedisAnonymousAuthRateLimitAdapterTest {
 		assertThatThrownBy(() -> adapter.consume("client-1", Duration.ofMinutes(10)))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessage("익명 인증 발급 제한을 확인할 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("TTL이 1ms보다 작으면 Redis 호출 전에 거부한다")
+	void consumeRejectsSubMillisecondWindowBeforeRedisCall() {
+		var redisTemplate = org.mockito.Mockito.mock(StringRedisTemplate.class);
+		var adapter = new RedisAnonymousAuthRateLimitAdapter(redisTemplate);
+
+		assertThatThrownBy(() -> adapter.consume("client-1", Duration.ZERO))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("익명 인증 발급 제한 시간은 1ms 이상이어야 합니다.");
+		verifyNoInteractions(redisTemplate);
 	}
 }

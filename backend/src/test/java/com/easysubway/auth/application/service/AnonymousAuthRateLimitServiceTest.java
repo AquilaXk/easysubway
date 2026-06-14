@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.auth.application.port.out.ConsumeAnonymousAuthRateLimitPort;
 import com.easysubway.auth.domain.AnonymousAuthRateLimitExceededException;
+import jakarta.validation.Validation;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +49,20 @@ class AnonymousAuthRateLimitServiceTest {
 		service.check("  ");
 
 		assertThat(port.clientKeys).containsExactly("unknown");
+	}
+
+	@Test
+	@DisplayName("제한 시간 설정은 최소 1ms 이상이어야 한다")
+	void propertiesRejectsWindowShorterThanOneMillisecond() {
+		var properties = rateLimitProperties(1);
+		properties.setWindow(Duration.ZERO);
+
+		try (var validatorFactory = Validation.buildDefaultValidatorFactory()) {
+			var violations = validatorFactory.getValidator().validate(properties);
+
+			assertThat(violations)
+				.anySatisfy(violation -> assertThat(violation.getPropertyPath().toString()).isEqualTo("window"));
+		}
 	}
 
 	private AnonymousAuthRateLimitProperties rateLimitProperties(int maxRequests) {

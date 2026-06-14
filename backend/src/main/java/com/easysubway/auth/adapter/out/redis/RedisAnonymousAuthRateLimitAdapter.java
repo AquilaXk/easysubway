@@ -27,14 +27,22 @@ public class RedisAnonymousAuthRateLimitAdapter implements ConsumeAnonymousAuthR
 
 	@Override
 	public long consume(String clientKey, Duration window) {
+		long ttlMillis = ttlMillisFrom(window);
 		Long count = redisTemplate.execute(
 			CONSUME_SCRIPT,
 			List.of(KEY_PREFIX + clientKey),
-			String.valueOf(window.toMillis())
+			String.valueOf(ttlMillis)
 		);
 		if (count == null) {
 			throw new IllegalStateException("익명 인증 발급 제한을 확인할 수 없습니다.");
 		}
 		return count;
+	}
+
+	private long ttlMillisFrom(Duration window) {
+		if (window == null || window.toMillis() < 1) {
+			throw new IllegalArgumentException("익명 인증 발급 제한 시간은 1ms 이상이어야 합니다.");
+		}
+		return window.toMillis();
 	}
 }
