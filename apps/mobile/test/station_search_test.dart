@@ -65,6 +65,57 @@ void main() {
     expect(results.single.lines.single.name, '수도권 4호선');
   });
 
+  test('역 API 저장소는 초성 검색어를 그대로 요청한다', () async {
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'operatorId': 'seoul-metro',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                    'sequence': 48,
+                    'platformInfo': '당고개 방면 / 오이도 방면',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final results = await repository.searchStations('ㅅㄹㅅ');
+
+    expect(requestedUri.path, '/api/v1/stations');
+    expect(requestedUri.queryParameters['query'], 'ㅅㄹㅅ');
+    expect(results.single.nameKo, '상록수');
+  });
+
   test('역 API 저장소는 현재 위치 기준 가까운 역을 요청하고 거리를 파싱한다', () async {
     late Uri requestedUri;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
