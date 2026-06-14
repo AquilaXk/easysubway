@@ -198,14 +198,28 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const credentials = read("backend/src/main/java/com/easysubway/auth/domain/AnonymousUserCredentials.java");
   const authenticatedUser = read("backend/src/main/java/com/easysubway/auth/domain/AuthenticatedUser.java");
   const invalidAuth = read("backend/src/main/java/com/easysubway/auth/domain/InvalidAnonymousAuthException.java");
+  const rateLimitExceeded = read("backend/src/main/java/com/easysubway/auth/domain/AnonymousAuthRateLimitExceededException.java");
   const useCase = read("backend/src/main/java/com/easysubway/auth/application/port/in/AnonymousAuthUseCase.java");
+  const rateLimitUseCase = read("backend/src/main/java/com/easysubway/auth/application/port/in/AnonymousAuthRateLimitUseCase.java");
   const registerPort = read("backend/src/main/java/com/easysubway/auth/application/port/out/RegisterAnonymousUserPort.java");
+  const consumeRateLimitPort = read(
+    "backend/src/main/java/com/easysubway/auth/application/port/out/ConsumeAnonymousAuthRateLimitPort.java",
+  );
   const service = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthService.java");
+  const rateLimitProperties = read(
+    "backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitProperties.java",
+  );
+  const rateLimitService = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitService.java");
   const registry = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/SpringSecurityAnonymousUserRegistry.java");
-  const rateLimiter = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthRateLimiter.java");
+  const redisRateLimitAdapter = read(
+    "backend/src/main/java/com/easysubway/auth/adapter/out/redis/RedisAnonymousAuthRateLimitAdapter.java",
+  );
   const controller = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const userDetailsManager = read("backend/src/main/java/com/easysubway/common/security/ConcurrentUserDetailsManager.java");
+  const build = read("backend/build.gradle");
+  const applicationDev = read("backend/src/main/resources/application-dev.yml");
+  const applicationProd = read("backend/src/main/resources/application-prod.yml");
 
   assert.match(credentials, /record AnonymousUserCredentials/);
   assert.match(credentials, /userId/);
@@ -215,15 +229,26 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(authenticatedUser, /authType/);
   assert.match(authenticatedUser, /anonymous/);
   assert.match(invalidAuth, /extends InvalidRequestException/);
+  assert.match(rateLimitExceeded, /extends RuntimeException/);
   assert.match(useCase, /interface AnonymousAuthUseCase/);
   assert.match(useCase, /issueAnonymousUser/);
   assert.match(useCase, /currentUser/);
+  assert.match(rateLimitUseCase, /interface AnonymousAuthRateLimitUseCase/);
+  assert.match(rateLimitUseCase, /check\(String clientKey\)/);
   assert.match(registerPort, /interface RegisterAnonymousUserPort/);
   assert.match(registerPort, /existsByUserId/);
   assert.match(registerPort, /isAnonymousUser/);
   assert.match(registerPort, /registerAnonymousUser/);
+  assert.match(consumeRateLimitPort, /interface ConsumeAnonymousAuthRateLimitPort/);
+  assert.match(consumeRateLimitPort, /consume\(String clientKey, Duration window\)/);
   assert.match(service, /implements AnonymousAuthUseCase/);
   assert.match(service, /RegisterAnonymousUserPort/);
+  assert.match(rateLimitProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.rate-limit\.anonymous"\)/);
+  assert.match(rateLimitProperties, /maxRequests = 20/);
+  assert.match(rateLimitProperties, /Duration\.ofMinutes\(10\)/);
+  assert.match(rateLimitService, /implements AnonymousAuthRateLimitUseCase/);
+  assert.match(rateLimitService, /ConsumeAnonymousAuthRateLimitPort/);
+  assert.match(rateLimitService, /AnonymousAuthRateLimitExceededException/);
   assert.match(registry, /implements RegisterAnonymousUserPort/);
   assert.match(registry, /UserDetailsManager/);
   assert.match(registry, /PasswordEncoder/);
@@ -232,14 +257,24 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(userDetailsManager, /implements UserDetailsManager, UserDetailsPasswordService/);
   assert.match(userDetailsManager, /ConcurrentHashMap/);
   assert.doesNotMatch(security, /InMemoryUserDetailsManager/);
-  assert.match(rateLimiter, /class AnonymousAuthRateLimiter/);
-  assert.match(rateLimiter, /MAX_ISSUE_REQUESTS_PER_CLIENT/);
+  assert.match(build, /spring-boot-starter-data-redis/);
+  assert.match(redisRateLimitAdapter, /implements ConsumeAnonymousAuthRateLimitPort/);
+  assert.match(redisRateLimitAdapter, /StringRedisTemplate/);
+  assert.match(redisRateLimitAdapter, /RedisScript\.of/);
+  assert.match(redisRateLimitAdapter, /redis\.call\('INCR'/);
+  assert.match(redisRateLimitAdapter, /redis\.call\('PEXPIRE'/);
+  assert.match(redisRateLimitAdapter, /easysubway:auth:anonymous:rate-limit:/);
+  assert.doesNotMatch(redisRateLimitAdapter, /synchronized/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);
-  assert.match(controller, /AnonymousAuthRateLimiter/);
+  assert.match(controller, /AnonymousAuthRateLimitUseCase/);
   assert.match(controller, /HttpStatus\.TOO_MANY_REQUESTS/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Principal principal/);
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
+  assert.match(applicationDev, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST:localhost\}/);
+  assert.match(applicationDev, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
+  assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
+  assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
 });
 
 test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {
