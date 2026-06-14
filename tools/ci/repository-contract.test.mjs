@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -159,6 +159,18 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   assert.match(script, /\.env\.example is a template/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
   assert.doesNotMatch(cdWorkflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+});
+
+test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다", () => {
+  const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+
+  assert.ok(mobileFiles.length > 0, "mobile Dart files not found");
+  for (const file of mobileFiles) {
+    assert.doesNotMatch(read(file), /catch\s*\(_\)/, `${file} has catch (_)`);
+  }
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {

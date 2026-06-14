@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -57,6 +59,7 @@ void main() {
   });
 
   test('시설 신고 API 저장소는 잘못된 접수 응답도 쉬운 실패 문구로 바꾼다', () async {
+    final reportedErrors = _captureReportedErrors();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
@@ -77,24 +80,70 @@ void main() {
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
     );
 
-    await expectLater(
-      repository.createReport(
-        const FacilityReportRequest(
-          userId: 'anonymous-mobile-user',
-          stationId: 'station-sangnoksu',
-          facilityId: 'facility-sangnoksu-elevator-1',
-          reportType: 'BROKEN',
-          description: '문이 열리지 않습니다.',
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await expectLater(
+        repository.createReport(
+          const FacilityReportRequest(
+            userId: 'anonymous-mobile-user',
+            stationId: 'station-sangnoksu',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            reportType: 'BROKEN',
+            description: '문이 열리지 않습니다.',
+          ),
         ),
-      ),
-      throwsA(
-        isA<FacilityReportException>().having(
-          (error) => error.message,
-          'message',
-          '신고를 보내지 못했습니다.',
+        throwsA(
+          isA<FacilityReportException>().having(
+            (error) => error.message,
+            'message',
+            '신고를 보내지 못했습니다.',
+          ),
         ),
-      ),
+      );
+    });
+    expect(reportedErrors, hasLength(1));
+  });
+
+  test('시설 신고 API 저장소는 파싱 실패 원인과 스택을 오류 경계에 보고한다', () async {
+    final reportedErrors = _captureReportedErrors();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write('{broken-json')
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
     );
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await expectLater(
+        repository.createReport(
+          const FacilityReportRequest(
+            userId: 'anonymous-mobile-user',
+            stationId: 'station-sangnoksu',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            reportType: 'BROKEN',
+            description: '문이 열리지 않습니다.',
+          ),
+        ),
+        throwsA(
+          isA<FacilityReportException>().having(
+            (error) => error.message,
+            'message',
+            '신고를 보내지 못했습니다.',
+          ),
+        ),
+      );
+    });
+
+    expect(reportedErrors, hasLength(1));
+    expect(reportedErrors.single.exception, isA<FormatException>());
+    expect(reportedErrors.single.stack, isNotNull);
   });
 
   test('시설 신고 API 저장소는 접수번호로 처리 상태를 조회한다', () async {
@@ -245,6 +294,10 @@ void main() {
   });
 }
 
+List<FlutterErrorDetails> _captureReportedErrors() {
+  return <FlutterErrorDetails>[];
+}
+
 FacilityReportTarget _reportTarget() {
   return const FacilityReportTarget(
     stationId: 'station-sangnoksu',
@@ -351,8 +404,6 @@ class FailingRefreshFacilityReportRepository
   @override
   Future<FacilityReportResult> getReport(String reportId) {
     loadedReportIds.add(reportId);
-    return Future.error(
-      const FacilityReportException('처리 상태를 확인하지 못했습니다.'),
-    );
+    return Future.error(const FacilityReportException('처리 상태를 확인하지 못했습니다.'));
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
 import 'facility_report.dart';
+import 'mobile_error_reporter.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
@@ -51,7 +52,12 @@ class StationSearchApiRepository implements StationSearchRepository {
             return StationSearchResult.fromJson(item);
           })
           .toList(growable: false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 검색 목록 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
@@ -67,7 +73,8 @@ class StationSearchApiRepository implements StationSearchRepository {
     }
     try {
       return StationDetail.fromJson(data);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '역 상세 응답 처리 중 예외가 발생했습니다.');
       throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
@@ -90,7 +97,12 @@ class StationSearchApiRepository implements StationSearchRepository {
             return StationExitInfo.fromJson(item);
           })
           .toList(growable: false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 출구 목록 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
@@ -115,7 +127,12 @@ class StationSearchApiRepository implements StationSearchRepository {
             return StationFacilityInfo.fromJson(item);
           })
           .toList(growable: false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 시설 목록 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
@@ -143,7 +160,12 @@ class StationSearchApiRepository implements StationSearchRepository {
       return data;
     } on StationSearchException {
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 정보 API 요청 처리 중 예외가 발생했습니다.',
+      );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
   }
@@ -211,7 +233,12 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
             return FavoriteStation.fromJson(item);
           })
           .toList(growable: false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 역 목록 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const FavoriteStationException(_favoriteStationLoadErrorMessage);
     }
   }
@@ -232,7 +259,12 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
 
     try {
       return FavoriteStation.fromJson(data);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 역 저장 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const FavoriteStationException(_favoriteStationChangeErrorMessage);
     }
   }
@@ -296,7 +328,12 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
         return decoded['data'];
       } on FavoriteStationException {
         rethrow;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '즐겨찾기 역 API 요청 처리 중 예외가 발생했습니다.',
+        );
         throw FavoriteStationException(errorMessage);
       }
     }
@@ -843,7 +880,8 @@ class StationSearchController extends ChangeNotifier {
         results: const [],
         message: error.message,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '역 검색 화면 처리 중 예외가 발생했습니다.');
       if (requestId != _searchRequestId) {
         return;
       }
@@ -912,7 +950,8 @@ class StationDetailController extends ChangeNotifier {
         exits: responses[1] as List<StationExitInfo>,
         facilities: responses[2] as List<StationFacilityInfo>,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '역 상세 화면 로드 중 예외가 발생했습니다.');
       if (_isDisposed) {
         return;
       }
@@ -988,7 +1027,12 @@ class FavoriteStationListController extends ChangeNotifier {
           message: error.message,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 역 목록 화면 로드 중 예외가 발생했습니다.',
+      );
       _emitState(
         const FavoriteStationListState(
           status: FavoriteStationListStatus.failure,
@@ -1081,7 +1125,12 @@ class StationFavoriteToggleController extends ChangeNotifier {
       _emitState(StationFavoriteToggleState.ready(isFavorite: isFavorite));
     } on FavoriteStationException catch (error) {
       _emitFailure(error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 즐겨찾기 상태 확인 중 예외가 발생했습니다.',
+      );
       _emitFailure(_favoriteStationStatusErrorMessage);
     }
   }
@@ -1109,7 +1158,8 @@ class StationFavoriteToggleController extends ChangeNotifier {
       );
     } on FavoriteStationException catch (error) {
       _emitFailure(error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '역 즐겨찾기 저장 중 예외가 발생했습니다.');
       _emitFailure(_favoriteStationChangeErrorMessage);
     }
   }
@@ -1137,7 +1187,8 @@ class StationFavoriteToggleController extends ChangeNotifier {
       );
     } on FavoriteStationException catch (error) {
       _emitFailure(error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '역 즐겨찾기 해제 중 예외가 발생했습니다.');
       _emitFailure(_favoriteStationChangeErrorMessage);
     }
   }

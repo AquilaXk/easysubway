@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/station_search.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -400,6 +402,7 @@ void main() {
   });
 
   test('역 API 저장소는 형식이 잘못된 역 응답을 거부한다', () async {
+    final reportedErrors = _captureReportedErrors();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
@@ -436,16 +439,21 @@ void main() {
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
     );
 
-    expect(
-      () => repository.searchStations('상록수'),
-      throwsA(
-        isA<StationSearchException>().having(
-          (error) => error.message,
-          'message',
-          '역 정보를 불러오지 못했습니다.',
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await expectLater(
+        repository.searchStations('상록수'),
+        throwsA(
+          isA<StationSearchException>().having(
+            (error) => error.message,
+            'message',
+            '역 정보를 불러오지 못했습니다.',
+          ),
         ),
-      ),
-    );
+      );
+    });
+    expect(reportedErrors, hasLength(1));
+    expect(reportedErrors.single.exception, isA<FormatException>());
+    expect(reportedErrors.single.stack, isNotNull);
   });
 
   test('역 검색 컨트롤러는 빈 입력을 API 호출 없이 대기 상태로 둔다', () async {
@@ -607,6 +615,10 @@ void main() {
     expect(customerCenter.statusLabel, '검수 완료');
     expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
   });
+}
+
+List<FlutterErrorDetails> _captureReportedErrors() {
+  return <FlutterErrorDetails>[];
 }
 
 FavoriteStation _favoriteStation({required String id, required String name}) {

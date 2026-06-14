@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auth_headers.dart';
+import 'mobile_error_reporter.dart';
 
 const _anonymousAuthTimeout = Duration(seconds: 8);
 const _anonymousAuthErrorMessage = '인증을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
@@ -46,7 +47,12 @@ class SecureAnonymousAuthCredentialStore
         throw const FormatException('Invalid anonymous auth storage payload');
       }
       return AnonymousAuthCredentials.fromJson(decoded);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '저장된 익명 인증 정보를 읽는 중 예외가 발생했습니다.',
+      );
       await clearCredentials();
       return null;
     }
@@ -125,7 +131,12 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
       return AnonymousAuthCredentials.fromJson(data);
     } on AnonymousAuthException {
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '익명 인증 API 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const AnonymousAuthException(_anonymousAuthErrorMessage);
     }
   }
