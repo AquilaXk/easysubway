@@ -114,8 +114,27 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_USER=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PASSWORD=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:5432\/easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_USERNAME=easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
+  assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
+  assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
   assert.doesNotMatch(envExample, /prod|production|secret|token|key/i);
+});
+
+test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
+  const readme = read("README.md");
+  const script = read("scripts/github/sync-actions-env-secret.sh");
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
+  assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
+  assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(script, /SECRET_NAME="\$\{EASYSUBWAY_ACTIONS_ENV_SECRET_NAME:-EASYSUBWAY_ENV\}"/);
+  assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
+  assert.match(script, /\.env\.example is a template/);
+  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
@@ -214,6 +233,10 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const redisRateLimitAdapter = read(
     "backend/src/main/java/com/easysubway/auth/adapter/out/redis/RedisAnonymousAuthRateLimitAdapter.java",
   );
+  const clientIpProperties = read(
+    "backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthClientIpProperties.java",
+  );
+  const clientIpResolver = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthClientIpResolver.java");
   const controller = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const userDetailsManager = read("backend/src/main/java/com/easysubway/common/security/ConcurrentUserDetailsManager.java");
@@ -265,16 +288,27 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(redisRateLimitAdapter, /redis\.call\('PEXPIRE'/);
   assert.match(redisRateLimitAdapter, /easysubway:auth:anonymous:rate-limit:/);
   assert.doesNotMatch(redisRateLimitAdapter, /synchronized/);
+  assert.match(clientIpProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.client-ip"\)/);
+  assert.match(clientIpProperties, /trustedProxies/);
+  assert.match(clientIpResolver, /X-Forwarded-For/);
+  assert.match(clientIpResolver, /firstUntrustedForwardedClientIp/);
+  assert.match(clientIpResolver, /isTrustedProxy/);
+  assert.match(clientIpResolver, /matchesCidr/);
+  assert.match(clientIpResolver, /parseIpAddress/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);
   assert.match(controller, /AnonymousAuthRateLimitUseCase/);
+  assert.match(controller, /AnonymousAuthClientIpResolver/);
+  assert.doesNotMatch(controller, /request\.getRemoteAddr\(\)/);
   assert.match(controller, /HttpStatus\.TOO_MANY_REQUESTS/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Principal principal/);
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
   assert.match(applicationDev, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST:localhost\}/);
   assert.match(applicationDev, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
+  assert.match(applicationDev, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS:\}/);
   assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
   assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
+  assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
 });
 
 test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {
