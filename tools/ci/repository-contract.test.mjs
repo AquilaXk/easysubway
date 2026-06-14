@@ -272,6 +272,7 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(clientIpProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.client-ip"\)/);
   assert.match(clientIpProperties, /trustedProxies/);
   assert.match(clientIpResolver, /X-Forwarded-For/);
+  assert.match(clientIpResolver, /firstUntrustedForwardedClientIp/);
   assert.match(clientIpResolver, /isTrustedProxy/);
   assert.match(clientIpResolver, /matchesCidr/);
   assert.match(clientIpResolver, /parseIpAddress/);
@@ -288,7 +289,7 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(applicationDev, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS:\}/);
   assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
   assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
-  assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS:\}/);
+  assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
 });
 
 test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {

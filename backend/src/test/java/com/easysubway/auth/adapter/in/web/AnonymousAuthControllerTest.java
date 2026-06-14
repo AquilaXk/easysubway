@@ -111,6 +111,17 @@ class AnonymousAuthControllerTest {
 	}
 
 	@Test
+	@DisplayName("신뢰 프록시 요청은 주입된 전달 헤더보다 마지막 비신뢰 IP를 우선한다")
+	void issueAnonymousUserUsesLastUntrustedForwardedClientIpFromTrustedProxy() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/anonymous")
+				.with(remoteAddr("10.12.0.8"))
+				.header("X-Forwarded-For", "198.51.100.200, 203.0.113.77, 10.12.0.8"))
+			.andExpect(status().isOk());
+
+		assertThat(rateLimitUseCase.clientKeys).containsExactly("203.0.113.77");
+	}
+
+	@Test
 	@DisplayName("신뢰하지 않는 원격 주소의 전달 헤더는 발급 제한 키로 사용하지 않는다")
 	void issueAnonymousUserIgnoresForwardedClientIpFromUntrustedRemoteAddress() throws Exception {
 		mockMvc.perform(post("/api/v1/auth/anonymous")

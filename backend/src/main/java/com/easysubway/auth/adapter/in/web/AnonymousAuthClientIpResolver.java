@@ -22,22 +22,28 @@ class AnonymousAuthClientIpResolver {
 			return remoteAddress;
 		}
 		// 전달 헤더는 신뢰 프록시에서 들어온 요청일 때만 rate limit 키 후보로 사용한다.
-		String forwardedClientIp = firstForwardedClientIp(request.getHeader(X_FORWARDED_FOR));
+		String forwardedClientIp = firstUntrustedForwardedClientIp(request.getHeader(X_FORWARDED_FOR));
 		if (forwardedClientIp == null) {
 			return remoteAddress;
 		}
 		return forwardedClientIp;
 	}
 
-	private String firstForwardedClientIp(String forwardedFor) {
+	private String firstUntrustedForwardedClientIp(String forwardedFor) {
 		if (forwardedFor == null || forwardedFor.isBlank()) {
 			return null;
 		}
-		String firstCandidate = forwardedFor.split(",", 2)[0].trim();
-		if (firstCandidate.isBlank() || !isIpAddress(firstCandidate)) {
-			return null;
+		String[] hops = forwardedFor.split(",");
+		for (int index = hops.length - 1; index >= 0; index--) {
+			String candidate = hops[index].trim();
+			if (candidate.isBlank() || !isIpAddress(candidate)) {
+				return null;
+			}
+			if (!isTrustedProxy(candidate)) {
+				return candidate;
+			}
 		}
-		return firstCandidate;
+		return null;
 	}
 
 	private boolean isTrustedProxy(String remoteAddress) {
@@ -126,7 +132,9 @@ class AnonymousAuthClientIpResolver {
 			}
 			return (byte) parsed;
 		} catch (NumberFormatException exception) {
-			throw new UnknownHostException(originalValue);
+			UnknownHostException unknownHostException = new UnknownHostException(originalValue);
+			unknownHostException.initCause(exception);
+			throw unknownHostException;
 		}
 	}
 }
