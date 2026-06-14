@@ -188,12 +188,18 @@ void main() {
       find.byKey(const Key('routeDestinationStationSearchButton')),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('routeDestinationStationOption-station-sadang')),
     );
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.ensureVisible(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
@@ -1283,9 +1289,20 @@ void main() {
         'station-sadang',
       );
       expect(routeRepository.requests.single.mobilityType, 'SENIOR');
+      expect(find.text('이동할 수 있는 경로'), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeGuidanceMobilityChip')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('routeGuidanceAttentionChip')),
+        findsOneWidget,
+      );
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('이동 점수 92점'), findsOneWidget);
+      expect(find.text('이동 순서'), findsOneWidget);
+      expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(
@@ -1298,7 +1315,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '경로 검색 결과, 경로를 찾았습니다, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, '
+          '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
           '주의 일부 시설 정보는 확인이 필요합니다., '
           '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 엘리베이터를 이용해 승강장으로 이동합니다.',
         ),
@@ -1376,6 +1393,73 @@ void main() {
 
     expect(favoriteRouteRepository.savedRouteSearchIds, ['route-1']);
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
+  });
+
+  testWidgets('경로 안내 칩은 좁은 화면과 큰 글자에서도 넘치지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        status: 'REVIEW_REQUIRED',
+        mobilityType: 'UNKNOWN_MOBILITY_TYPE',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: stationRepository,
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('확인이 필요합니다'), findsWidgets);
+    expect(find.text('이동 조건 확인 필요'), findsOneWidget);
   });
 
   testWidgets('경로 검색은 입력만 하고 선택하지 않은 역을 쉬운 문구로 안내한다', (tester) async {
@@ -1550,11 +1634,16 @@ void main() {
       routeRepository.complete(_blockedRouteSearchResult());
       await tester.pumpAndSettle();
 
+      expect(find.text('다른 경로가 필요합니다'), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeGuidanceMobilityChip')),
+        findsOneWidget,
+      );
       expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '경로 검색 결과, 안내할 수 있는 경로가 없습니다, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
+          '경로 검색 결과, 다른 경로가 필요합니다, 휠체어, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
           '안내 불가 이유 휠체어로 이동 가능한 엘리베이터가 없습니다.',
         ),
         findsOneWidget,
@@ -1853,12 +1942,16 @@ class ControlledStationSearchRepository implements StationSearchRepository {
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
+  FakeRouteSearchRepository({RouteSearchResult? result})
+    : result = result ?? _sampleRouteSearchResult();
+
+  final RouteSearchResult result;
   final requests = <RouteSearchRequest>[];
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
-    return _sampleRouteSearchResult();
+    return result;
   }
 }
 
@@ -2201,19 +2294,22 @@ StationDetail _stationDetail({required String id, required String name}) {
   );
 }
 
-RouteSearchResult _sampleRouteSearchResult() {
-  return const RouteSearchResult(
+RouteSearchResult _sampleRouteSearchResult({
+  String status = 'FOUND',
+  String mobilityType = 'SENIOR',
+}) {
+  return RouteSearchResult(
     routeSearchId: 'route-1',
     originStationId: 'station-sangnoksu',
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
     destinationStationName: '사당',
-    mobilityType: 'SENIOR',
-    status: 'FOUND',
+    mobilityType: mobilityType,
+    status: status,
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
     score: 92,
-    steps: [
+    steps: const [
       RouteSearchStep(
         sequence: 1,
         title: '상록수역에서 4호선 승강장으로 이동',
@@ -2224,7 +2320,7 @@ RouteSearchResult _sampleRouteSearchResult() {
         toStationId: 'station-sadang',
       ),
     ],
-    warnings: [
+    warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
         message: '일부 시설 정보는 확인이 필요합니다.',

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -151,6 +152,15 @@ void main() {
     expect(notificationCount, 1);
   });
 
+  test('경로 검색 결과는 확인 필요 상태를 이동 가능으로 안내하지 않는다', () {
+    final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
+
+    expect(result.statusLabel, '확인이 필요합니다');
+    expect(result.guidanceLabel, '확인이 필요합니다');
+    expect(result.guidanceIcon, Icons.warning_amber);
+    expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
+  });
+
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
     final requestedMethods = <String>[];
     final requestedPaths = <String>[];
@@ -242,19 +252,19 @@ class PendingRouteSearchRepository implements RouteSearchRepository {
   }
 }
 
-RouteSearchResult _sampleRouteSearchResult() {
-  return const RouteSearchResult(
+RouteSearchResult _sampleRouteSearchResult({String status = 'FOUND'}) {
+  return RouteSearchResult(
     routeSearchId: 'route-1',
     originStationId: 'station-sangnoksu',
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
     destinationStationName: '사당',
     mobilityType: 'SENIOR',
-    status: 'FOUND',
+    status: status,
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
     score: 92,
-    steps: [
+    steps: const [
       RouteSearchStep(
         sequence: 1,
         title: '상록수역에서 4호선 승강장으로 이동',
@@ -265,7 +275,7 @@ RouteSearchResult _sampleRouteSearchResult() {
         toStationId: 'station-sadang',
       ),
     ],
-    warnings: [
+    warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
         message: '일부 시설 정보는 확인이 필요합니다.',
