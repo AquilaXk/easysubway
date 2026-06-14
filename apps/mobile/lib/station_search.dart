@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
 import 'facility_report.dart';
@@ -18,11 +19,89 @@ const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했습�
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
 
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  });
+
   Future<StationDetail> getStationDetail(String stationId);
 
   Future<List<StationExitInfo>> listStationExits(String stationId);
 
   Future<List<StationFacilityInfo>> listStationFacilities(String stationId);
+}
+
+class CurrentLocation {
+  const CurrentLocation({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
+abstract class CurrentLocationProvider {
+  Future<CurrentLocation> currentLocation();
+}
+
+class CurrentLocationException implements Exception {
+  const CurrentLocationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
+  MethodChannelCurrentLocationProvider({MethodChannel? channel})
+    : _channel =
+          channel ??
+          const MethodChannel('com.easysubway.easysubway_mobile/location');
+
+  final MethodChannel _channel;
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    try {
+      // 위치 권한과 센서 접근은 Android/iOS 네이티브 채널에 맡기고 화면은 같은 실패 문구를 사용한다.
+      final response = await _channel.invokeMapMethod<String, Object?>(
+        'currentLocation',
+      );
+      final latitude = _coordinateFrom(response, 'latitude');
+      final longitude = _coordinateFrom(response, 'longitude');
+      if (latitude == null || longitude == null) {
+        throw const CurrentLocationException('현재 위치를 확인하지 못했습니다.');
+      }
+      return CurrentLocation(latitude: latitude, longitude: longitude);
+    } on CurrentLocationException {
+      rethrow;
+    } on PlatformException catch (error) {
+      throw CurrentLocationException(_locationErrorMessage(error.code));
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '현재 위치 조회 중 예외가 발생했습니다.');
+      throw const CurrentLocationException('현재 위치를 확인하지 못했습니다.');
+    }
+  }
+
+  double? _coordinateFrom(Map<String, Object?>? response, String key) {
+    final value = response?[key];
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value);
+    }
+    return null;
+  }
+
+  String _locationErrorMessage(String code) {
+    return switch (code) {
+      'permissionDenied' => '위치 권한을 확인해 주세요.',
+      'locationDisabled' => '기기 위치를 켜 주세요.',
+      'locationUnavailable' => '현재 위치를 확인하지 못했습니다.',
+      _ => '현재 위치를 확인하지 못했습니다.',
+    };
+  }
 }
 
 class StationSearchApiRepository implements StationSearchRepository {
@@ -57,6 +136,47 @@ class StationSearchApiRepository implements StationSearchRepository {
         error,
         stackTrace,
         context: '역 검색 목록 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) async {
+    final uri = baseUri
+        .resolve('/api/v1/stations/nearby')
+        .replace(
+          queryParameters: {
+            'lat': location.latitude.toString(),
+            'lng': location.longitude.toString(),
+            'radiusMeters': radiusMeters.toString(),
+            'limit': limit.toString(),
+          },
+        );
+
+    final data = await _getData(uri);
+    if (data is! List) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid nearby station payload');
+            }
+            return StationSearchResult.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '주변 역 목록 응답 처리 중 예외가 발생했습니다.',
       );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -429,6 +549,7 @@ class StationSearchResult {
     required this.dataQualityLevel,
     this.dataSourceType = '',
     required this.lastVerifiedAt,
+    this.distanceMeters,
     required this.lines,
   });
 
@@ -446,6 +567,7 @@ class StationSearchResult {
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
+      distanceMeters: _optionalInt(json, 'distanceMeters'),
       lines: rawLines
           .map((item) {
             if (item is! Map<String, Object?>) {
@@ -464,6 +586,7 @@ class StationSearchResult {
   final String dataQualityLevel;
   final String dataSourceType;
   final String lastVerifiedAt;
+  final int? distanceMeters;
   final List<StationSearchLine> lines;
 
   String get dataQualityLabel {
@@ -479,7 +602,24 @@ class StationSearchResult {
     return lines.map((line) => line.name).join(', ');
   }
 
-  String get semanticLabel => '$nameKo, $lineLabel, $region, $dataQualityLabel';
+  String get distanceLabel {
+    final distance = distanceMeters;
+    if (distance == null) {
+      return '';
+    }
+    if (distance < 1000) {
+      return '${distance}m 거리';
+    }
+    return '${(distance / 1000).toStringAsFixed(1)}km 거리';
+  }
+
+  String get semanticLabel {
+    final distance = distanceLabel;
+    if (distance.isEmpty) {
+      return '$nameKo, $lineLabel, $region, $dataQualityLabel';
+    }
+    return '$nameKo, $distance, $lineLabel, $region, $dataQualityLabel';
+  }
 }
 
 class StationDetail {
@@ -816,6 +956,30 @@ double? _optionalDouble(Map<String, Object?> json, String key) {
   return null;
 }
 
+int? _optionalInt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) {
+    return null;
+  }
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    if (value % 1 == 0) {
+      return value.toInt();
+    }
+    throw FormatException('Invalid integer station field: $key');
+  }
+  if (value is String && value.trim().isNotEmpty) {
+    final parsed = int.tryParse(value);
+    if (parsed == null) {
+      throw FormatException('Invalid integer station field: $key');
+    }
+    return parsed;
+  }
+  return null;
+}
+
 String _dataQualityLabel(String dataQualityLevel) {
   return switch (dataQualityLevel) {
     'LEVEL_1' => '기본 정보만 확인됨',
@@ -873,6 +1037,7 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState _state = const StationSearchState.idle();
   int _searchRequestId = 0;
+  bool _isDisposed = false;
 
   StationSearchState get state => _state;
 
@@ -881,7 +1046,7 @@ class StationSearchController extends ChangeNotifier {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
       _state = const StationSearchState.idle();
-      notifyListeners();
+      _notifyIfActive(requestId);
       return;
     }
 
@@ -889,11 +1054,11 @@ class StationSearchController extends ChangeNotifier {
       status: StationSearchStatus.loading,
       results: [],
     );
-    notifyListeners();
+    _notifyIfActive(requestId);
 
     try {
       final results = await repository.searchStations(trimmedQuery);
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       if (results.isEmpty) {
@@ -909,7 +1074,7 @@ class StationSearchController extends ChangeNotifier {
         );
       }
     } on StationSearchException catch (error) {
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = StationSearchState(
@@ -919,7 +1084,7 @@ class StationSearchController extends ChangeNotifier {
       );
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '역 검색 화면 처리 중 예외가 발생했습니다.');
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = const StationSearchState(
@@ -928,7 +1093,86 @@ class StationSearchController extends ChangeNotifier {
         message: '역 정보를 불러오지 못했습니다.',
       );
     }
-    notifyListeners();
+    _notifyIfActive(requestId);
+  }
+
+  Future<void> searchNearby(CurrentLocationProvider locationProvider) async {
+    final requestId = ++_searchRequestId;
+    _state = const StationSearchState(
+      status: StationSearchStatus.loading,
+      results: [],
+    );
+    _notifyIfActive(requestId);
+
+    try {
+      final location = await locationProvider.currentLocation();
+      final results = await repository.searchNearbyStations(location);
+      if (!_isActiveRequest(requestId)) {
+        return;
+      }
+      if (results.isEmpty) {
+        _state = const StationSearchState(
+          status: StationSearchStatus.empty,
+          results: [],
+          message: '주변 역을 찾지 못했습니다.',
+        );
+      } else {
+        _state = StationSearchState(
+          status: StationSearchStatus.success,
+          results: results,
+        );
+      }
+    } on CurrentLocationException catch (error) {
+      if (!_isActiveRequest(requestId)) {
+        return;
+      }
+      _state = StationSearchState(
+        status: StationSearchStatus.failure,
+        results: const [],
+        message: error.message,
+      );
+    } on StationSearchException catch (error) {
+      if (!_isActiveRequest(requestId)) {
+        return;
+      }
+      _state = StationSearchState(
+        status: StationSearchStatus.failure,
+        results: const [],
+        message: error.message,
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '주변 역 검색 화면 처리 중 예외가 발생했습니다.',
+      );
+      if (!_isActiveRequest(requestId)) {
+        return;
+      }
+      _state = const StationSearchState(
+        status: StationSearchStatus.failure,
+        results: [],
+        message: '역 정보를 불러오지 못했습니다.',
+      );
+    }
+    _notifyIfActive(requestId);
+  }
+
+  bool _isActiveRequest(int requestId) {
+    return !_isDisposed && requestId == _searchRequestId;
+  }
+
+  void _notifyIfActive(int requestId) {
+    if (_isActiveRequest(requestId)) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _searchRequestId++;
+    super.dispose();
   }
 }
 
@@ -1267,12 +1511,14 @@ class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({
     required this.repository,
     required this.reportRepository,
+    required this.locationProvider,
     this.favoriteRepository,
     super.key,
   });
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
+  final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
 
   @override
@@ -1340,6 +1586,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 );
               },
             ),
+            const SizedBox(height: 12),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final isLoading =
+                    _controller.state.status == StationSearchStatus.loading;
+                return OutlinedButton.icon(
+                  key: const Key('nearbyStationSearchButton'),
+                  onPressed: isLoading ? null : _searchNearby,
+                  icon: const Icon(Icons.my_location),
+                  label: const Text('내 주변 역 찾기'),
+                );
+              },
+            ),
             const SizedBox(height: 20),
             AnimatedBuilder(
               animation: _controller,
@@ -1361,6 +1621,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       return;
     }
     _controller.search(query);
+  }
+
+  void _searchNearby() {
+    if (_controller.state.status == StationSearchStatus.loading) {
+      return;
+    }
+    _controller.searchNearby(widget.locationProvider);
   }
 
   void _openStationDetail(StationSearchResult result) {
@@ -1483,6 +1750,17 @@ class _StationSearchResultTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     StationLineBadges(lines: result.lines),
+                    if (result.distanceLabel.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        result.distanceLabel,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: const Color(0xFF006D77),
+                          fontWeight: FontWeight.w800,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       result.lineLabel,
