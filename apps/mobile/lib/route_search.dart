@@ -14,6 +14,15 @@ const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 
+String _mobilityLabelFor(String mobilityType) {
+  for (final option in mobilityProfileOptions) {
+    if (option.mobilityType == mobilityType) {
+      return option.title;
+    }
+  }
+  return '이동 조건 확인 필요';
+}
+
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
 }
@@ -286,14 +295,7 @@ class FavoriteRoute {
 
   String get scoreLabel => '이동 점수 $score점';
 
-  String get mobilityLabel {
-    for (final option in mobilityProfileOptions) {
-      if (option.mobilityType == mobilityType) {
-        return option.title;
-      }
-    }
-    return '이동 조건 확인 필요';
-  }
+  String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get semanticLabel {
     return '즐겨찾기 경로, $summaryTitle, $lineLabel, $mobilityLabel, $scoreLabel';
@@ -439,14 +441,42 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
 
+  String get mobilityLabel => _mobilityLabelFor(mobilityType);
+
+  String get guidanceLabel {
+    if (isBlocked) {
+      return '다른 경로가 필요합니다';
+    }
+    return status == 'FOUND' ? '이동할 수 있는 경로' : '확인이 필요합니다';
+  }
+
+  IconData get guidanceIcon {
+    if (isBlocked) {
+      return Icons.priority_high;
+    }
+    return status == 'FOUND' ? Icons.check_circle : Icons.warning_amber;
+  }
+
+  String get attentionLabel {
+    if (isBlocked) {
+      return '안내 불가 이유';
+    }
+    return warnings.isEmpty ? '주의 없음' : '주의 확인';
+  }
+
   String get semanticLabel {
+    // 결과 첫 문장은 사용자가 이동 가능 여부를 바로 판단할 수 있게 구성한다.
     final parts = <String>[
       '경로 검색 결과',
-      statusLabel,
+      guidanceLabel,
+      mobilityLabel,
       summaryTitle,
       lineLabel,
       scoreLabel,
     ];
+    if (!isBlocked && warnings.isNotEmpty) {
+      parts.add(attentionLabel);
+    }
     if (blockedReasons.isNotEmpty) {
       parts.add('안내 불가 이유 ${blockedReasons.join(', ')}');
     }
@@ -1253,6 +1283,8 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _RouteResultStatusHeader(result: result),
+                  const SizedBox(height: 14),
                   Text(
                     result.statusLabel,
                     style: textTheme.titleMedium?.copyWith(
@@ -1289,21 +1321,26 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                     ),
                   ),
                   if (result.blockedReasons.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     for (final reason in result.blockedReasons)
-                      _RouteNotice(text: reason, icon: Icons.block),
+                      _RouteNotice(
+                        title: '안내 불가 이유',
+                        text: reason,
+                        icon: Icons.block,
+                      ),
                   ],
                   if (result.warnings.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     for (final warning in result.warnings)
                       _RouteNotice(
+                        title: '주의 확인',
                         text: warning.message,
                         icon: Icons.warning_amber,
                       ),
                   ],
                   if (result.steps.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    for (final step in result.steps) _RouteStepTile(step: step),
+                    const SizedBox(height: 18),
+                    _RouteStepSection(steps: result.steps),
                   ],
                 ],
               ),
@@ -1315,9 +1352,99 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
   }
 }
 
-class _RouteNotice extends StatelessWidget {
-  const _RouteNotice({required this.text, required this.icon});
+class _RouteResultStatusHeader extends StatelessWidget {
+  const _RouteResultStatusHeader({required this.result});
 
+  final RouteSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _RouteGuidanceChip(
+          key: const Key('routeGuidanceStatusChip'),
+          icon: result.guidanceIcon,
+          label: result.guidanceLabel,
+          emphasized: true,
+        ),
+        _RouteGuidanceChip(
+          key: const Key('routeGuidanceMobilityChip'),
+          icon: Icons.accessibility_new,
+          label: result.mobilityLabel,
+        ),
+        if (!result.isBlocked && result.warnings.isNotEmpty)
+          _RouteGuidanceChip(
+            key: const Key('routeGuidanceAttentionChip'),
+            icon: Icons.warning_amber,
+            label: result.attentionLabel,
+          ),
+      ],
+    );
+  }
+}
+
+class _RouteGuidanceChip extends StatelessWidget {
+  const _RouteGuidanceChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = emphasized
+        ? const Color(0xFFE6F2F0)
+        : const Color(0xFFF3F7F7);
+    final foregroundColor = emphasized
+        ? const Color(0xFF004A50)
+        : const Color(0xFF29484B);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border.all(color: const Color(0xFFB9D4D8)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22, color: foregroundColor),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                softWrap: true,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: foregroundColor,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteNotice extends StatelessWidget {
+  const _RouteNotice({
+    required this.title,
+    required this.text,
+    required this.icon,
+  });
+
+  final String title;
   final String text;
   final IconData icon;
 
@@ -1325,23 +1452,72 @@ class _RouteNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xFF8A5A00), size: 24),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF3C2F00),
-                fontWeight: FontWeight.w700,
-                height: 1.35,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7E0),
+          border: Border.all(color: const Color(0xFFE6C875)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: const Color(0xFF7A4F00), size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF3C2F00),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      text,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF3C2F00),
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _RouteStepSection extends StatelessWidget {
+  const _RouteStepSection({required this.steps});
+
+  final List<RouteSearchStep> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '이동 순서',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final step in steps) _RouteStepTile(step: step),
+      ],
     );
   }
 }
@@ -1359,13 +1535,14 @@ class _RouteStepTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 16,
+            key: Key('routeStepNumber-${step.sequence}'),
+            radius: 22,
             backgroundColor: const Color(0xFF006D77),
             child: Text(
               '${step.sequence}',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: 22,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1386,8 +1563,9 @@ class _RouteStepTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   step.description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: const Color(0xFF405A5D),
+                    fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
                 ),
