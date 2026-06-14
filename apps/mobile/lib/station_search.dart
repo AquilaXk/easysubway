@@ -422,6 +422,7 @@ class StationSearchResult {
     required this.nameEn,
     required this.region,
     required this.dataQualityLevel,
+    this.dataSourceType = '',
     required this.lastVerifiedAt,
     required this.lines,
   });
@@ -438,6 +439,7 @@ class StationSearchResult {
       nameEn: _requiredString(json, 'nameEn'),
       region: _requiredString(json, 'region'),
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
       lines: rawLines
           .map((item) {
@@ -455,12 +457,15 @@ class StationSearchResult {
   final String nameEn;
   final String region;
   final String dataQualityLevel;
+  final String dataSourceType;
   final String lastVerifiedAt;
   final List<StationSearchLine> lines;
 
   String get dataQualityLabel {
     return _dataQualityLabel(dataQualityLevel);
   }
+
+  String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
   String get lineLabel {
     if (lines.isEmpty) {
@@ -481,6 +486,7 @@ class StationDetail {
     this.latitude,
     this.longitude,
     required this.dataQualityLevel,
+    this.dataSourceType = '',
     required this.lastVerifiedAt,
     required this.lines,
   });
@@ -499,6 +505,7 @@ class StationDetail {
       latitude: _optionalDouble(json, 'latitude'),
       longitude: _optionalDouble(json, 'longitude'),
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
+      dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastVerifiedAt: _requiredString(json, 'lastVerifiedAt'),
       lines: rawLines
           .map((item) {
@@ -520,10 +527,13 @@ class StationDetail {
   final double? latitude;
   final double? longitude;
   final String dataQualityLevel;
+  final String dataSourceType;
   final String lastVerifiedAt;
   final List<StationSearchLine> lines;
 
   String get dataQualityLabel => _dataQualityLabel(dataQualityLevel);
+
+  String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
   String get lineLabel {
     if (lines.isEmpty) {
@@ -533,7 +543,7 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, $dataSourceLabel, 마지막 확인 $lastVerifiedAt';
   }
 }
 
@@ -548,6 +558,7 @@ class StationExitInfo {
     required this.hasElevatorConnection,
     required this.hasStairOnlyPath,
     required this.dataConfidence,
+    this.dataSourceType = '',
   });
 
   factory StationExitInfo.fromJson(Map<String, Object?> json) {
@@ -561,6 +572,7 @@ class StationExitInfo {
       hasElevatorConnection: _requiredBool(json, 'hasElevatorConnection'),
       hasStairOnlyPath: _requiredBool(json, 'hasStairOnlyPath'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
+      dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
     );
   }
 
@@ -573,6 +585,7 @@ class StationExitInfo {
   final bool hasElevatorConnection;
   final bool hasStairOnlyPath;
   final String dataConfidence;
+  final String dataSourceType;
 
   String get elevatorConnectionLabel {
     return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결 확인 필요';
@@ -584,8 +597,10 @@ class StationExitInfo {
 
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
+  String get dataSourceLabel => _dataSourceLabel(dataSourceType);
+
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel, $confidenceLabel';
+    return '$name, $elevatorConnectionLabel, $stairPathLabel, $confidenceLabel, $dataSourceLabel';
   }
 }
 
@@ -603,6 +618,7 @@ class StationFacilityInfo {
     required this.description,
     required this.status,
     required this.dataConfidence,
+    this.dataSourceType = '',
     required this.lastUpdatedAt,
   });
 
@@ -620,6 +636,7 @@ class StationFacilityInfo {
       description: _stringOrEmpty(json, 'description'),
       status: _requiredString(json, 'status'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
+      dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastUpdatedAt: _requiredString(json, 'lastUpdatedAt'),
     );
   }
@@ -636,6 +653,7 @@ class StationFacilityInfo {
   final String description;
   final String status;
   final String dataConfidence;
+  final String dataSourceType;
   final String lastUpdatedAt;
 
   String get typeLabel {
@@ -671,6 +689,8 @@ class StationFacilityInfo {
 
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
+  String get dataSourceLabel => _dataSourceLabel(dataSourceType);
+
   String get locationLabel {
     if (description.trim().isNotEmpty) {
       return description;
@@ -684,7 +704,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $confidenceLabel';
+    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel';
   }
 }
 
@@ -807,6 +827,18 @@ String _dataConfidenceLabel(String dataConfidence) {
     'MEDIUM' => '정보 신뢰도 보통',
     'LOW' => '정보 확인 필요',
     _ => '정보 확인 필요',
+  };
+}
+
+String _dataSourceLabel(String dataSourceType) {
+  return switch (dataSourceType) {
+    'OFFICIAL_API' => '출처 공공 API',
+    'OFFICIAL_FILE' => '출처 공식 파일',
+    'OPERATOR_PAGE' => '출처 운영기관 페이지',
+    'USER_REPORT' => '출처 사용자 제보',
+    'ADMIN_VERIFIED' => '출처 관리자 검수',
+    'PARTNER_FEED' => '출처 제휴 데이터',
+    _ => '출처 확인 필요',
   };
 }
 
@@ -1907,6 +1939,11 @@ class _StationDetailHeader extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _StationDetailInfoRow(
+              icon: Icons.source_outlined,
+              text: detail.dataSourceLabel,
+            ),
+            const SizedBox(height: 6),
+            _StationDetailInfoRow(
               icon: Icons.event_available,
               text: '마지막 확인 ${detail.lastVerifiedAt}',
             ),
@@ -2116,6 +2153,15 @@ class _StationExitCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    exit.dataSourceLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2186,6 +2232,15 @@ class _StationFacilityCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 facility.confidenceLabel,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF405A5D),
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                facility.dataSourceLabel,
                 style: textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF405A5D),
                   fontWeight: FontWeight.w700,
