@@ -14,6 +14,15 @@ const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 
+String _mobilityLabelFor(String mobilityType) {
+  for (final option in mobilityProfileOptions) {
+    if (option.mobilityType == mobilityType) {
+      return option.title;
+    }
+  }
+  return '이동 조건 확인 필요';
+}
+
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
 }
@@ -286,14 +295,7 @@ class FavoriteRoute {
 
   String get scoreLabel => '이동 점수 $score점';
 
-  String get mobilityLabel {
-    for (final option in mobilityProfileOptions) {
-      if (option.mobilityType == mobilityType) {
-        return option.title;
-      }
-    }
-    return '이동 조건 확인 필요';
-  }
+  String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get semanticLabel {
     return '즐겨찾기 경로, $summaryTitle, $lineLabel, $mobilityLabel, $scoreLabel';
@@ -439,14 +441,7 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
 
-  String get mobilityLabel {
-    for (final option in mobilityProfileOptions) {
-      if (option.mobilityType == mobilityType) {
-        return option.title;
-      }
-    }
-    return '이동 조건 확인 필요';
-  }
+  String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get guidanceLabel => isBlocked ? '다른 경로가 필요합니다' : '이동할 수 있는 경로';
 
