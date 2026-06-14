@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
+const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 
 abstract class FacilityReportRepository {
@@ -40,7 +41,11 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         throw const FacilityReportException(_facilityReportErrorMessage);
       }
 
-      return _readReportResult(response);
+      // 응답 파싱 실패도 repository 예외 문구로 통일되도록 try 블록 안에서 완료한다.
+      return await _readReportResult(
+        response,
+        errorMessage: _facilityReportErrorMessage,
+      );
     } on FacilityReportException {
       rethrow;
     } catch (_) {
@@ -52,7 +57,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
   Future<FacilityReportResult> getReport(String reportId) async {
     final trimmedReportId = reportId.trim();
     if (trimmedReportId.isEmpty) {
-      throw const FacilityReportException(_facilityReportErrorMessage);
+      throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
 
     final uri = baseUri.resolve(
@@ -66,31 +71,36 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       final response = await request.close().timeout(_facilityReportTimeout);
 
       if (response.statusCode != HttpStatus.ok) {
-        throw const FacilityReportException(_facilityReportErrorMessage);
+        throw const FacilityReportException(_facilityReportStatusErrorMessage);
       }
 
-      return _readReportResult(response);
+      // 상태 확인 응답도 파싱 오류까지 사용자가 이해할 수 있는 문구로 바꾼다.
+      return await _readReportResult(
+        response,
+        errorMessage: _facilityReportStatusErrorMessage,
+      );
     } on FacilityReportException {
       rethrow;
     } catch (_) {
-      throw const FacilityReportException(_facilityReportErrorMessage);
+      throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
   }
 
   Future<FacilityReportResult> _readReportResult(
-    HttpClientResponse response,
-  ) async {
+    HttpClientResponse response, {
+    required String errorMessage,
+  }) async {
     final body = await utf8
         .decodeStream(response)
         .timeout(_facilityReportTimeout);
     final decoded = jsonDecode(body);
     if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-      throw const FacilityReportException(_facilityReportErrorMessage);
+      throw FacilityReportException(errorMessage);
     }
 
     final data = decoded['data'];
     if (data is! Map<String, Object?>) {
-      throw const FacilityReportException(_facilityReportErrorMessage);
+      throw FacilityReportException(errorMessage);
     }
 
     return FacilityReportResult.fromJson(data);
