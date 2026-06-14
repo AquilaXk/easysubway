@@ -340,6 +340,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/reports\/\{reportId\}"\)/);
   assert.match(controller, /@GetMapping\("\/admin\/reports"\)/);
+  assert.match(controller, /@GetMapping\("\/admin\/reports\/\{reportId\}"\)/);
   assert.match(controller, /@RequestParam\(required = false\) FacilityReportStatus status/);
   assert.match(controller, /@PostMapping\("\/admin\/reports\/\{reportId\}\/review"\)/);
   assert.match(controller, /Principal principal/);
