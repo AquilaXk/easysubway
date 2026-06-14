@@ -21,6 +21,13 @@ function jobBlock(workflow, startJob, nextJob) {
   return match[0];
 }
 
+function workflowFiles() {
+  return execFileSync("git", ["ls-files", ".github/workflows/*.yml", ".github/workflows/*.yaml"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+}
+
 function assertMobileCatchPolicy(file, source) {
   const catchPattern = /catch\s*\(([^)]*)\)/g;
   for (const match of source.matchAll(catchPattern)) {
@@ -162,18 +169,22 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
-  const workflow = read(".github/workflows/ci.yml");
-  const cdWorkflow = read(".github/workflows/cd.yml");
 
   assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
+  assert.match(readme, /GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
   assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증/);
-  assert.match(script, /SECRET_NAME="\$\{EASYSUBWAY_ACTIONS_ENV_SECRET_NAME:-EASYSUBWAY_ENV\}"/);
+  assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
+  assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
-  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
-  assert.doesNotMatch(cdWorkflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+
+  for (const file of workflowFiles()) {
+    const source = read(file);
+    assert.doesNotMatch(source, /secrets\.EASYSUBWAY_(?!ENV\b)[A-Z0-9_]+/, `${file} must use only secrets.EASYSUBWAY_ENV`);
+    assert.doesNotMatch(source, /vars\.EASYSUBWAY_[A-Z0-9_]+/, `${file} must not use GitHub Actions vars for app env`);
+  }
 });
 
 test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다", () => {

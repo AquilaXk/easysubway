@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${1:-.env}"
-REPO="${GITHUB_REPOSITORY:-AquilaXk/easysubway}"
-SECRET_NAME="${EASYSUBWAY_ACTIONS_ENV_SECRET_NAME:-EASYSUBWAY_ENV}"
+readonly ENV_FILE="${1:-.env}"
+readonly REPO="${GITHUB_REPOSITORY:-AquilaXk/easysubway}"
+readonly SECRET_NAME="EASYSUBWAY_ENV"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
 	printf 'Local env file not found: %s\n' "${ENV_FILE}" >&2

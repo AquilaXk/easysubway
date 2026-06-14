@@ -22,7 +22,7 @@
 
 `.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-GitHub Actions에는 개별 환경변수를 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다.
+GitHub Actions에는 개별 환경변수를 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다.
 
 ```bash
 scripts/github/sync-actions-env-secret.sh .env
