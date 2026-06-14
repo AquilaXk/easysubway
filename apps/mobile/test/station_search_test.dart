@@ -126,6 +126,64 @@ void main() {
     expect(results.single.distanceLabel, '230m 거리');
   });
 
+  test('역 API 저장소는 정수가 아닌 거리 응답을 계약 위반으로 처리한다', () async {
+    final reportedErrors = _captureReportedErrors();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'lastVerifiedAt': '2026-06-12',
+                'distanceMeters': 230.4,
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await expectLater(
+        repository.searchNearbyStations(
+          const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+        ),
+        throwsA(
+          isA<StationSearchException>().having(
+            (error) => error.message,
+            'message',
+            '역 정보를 불러오지 못했습니다.',
+          ),
+        ),
+      );
+    });
+
+    expect(reportedErrors.single.exception, isA<FormatException>());
+  });
+
   test('역 API 저장소는 역 상세와 출구와 시설 정보를 요청하고 파싱한다', () async {
     final requestedPaths = <String>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -621,6 +679,25 @@ void main() {
     expect(controller.state.message, '위치 권한을 확인해 주세요.');
   });
 
+  test('역 검색 컨트롤러는 주변 검색 중 화면이 닫히면 늦은 응답을 알리지 않는다', () async {
+    final repository = ControlledNearbyStationSearchRepository();
+    final controller = StationSearchController(repository: repository);
+
+    final searchFuture = controller.searchNearby(
+      FakeCurrentLocationProvider(
+        location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.requestedNearbyLocations, hasLength(1));
+    expect(controller.state.status, StationSearchStatus.loading);
+
+    controller.dispose();
+    repository.complete([_stationResult(id: 'station-sangnoksu', name: '상록수')]);
+    await searchFuture;
+  });
+
   test('역 상세 컨트롤러는 상세와 출구와 시설 요청을 동시에 시작한다', () async {
     final repository = ControlledStationDetailRepository();
     final controller = StationDetailController(repository: repository);
@@ -928,6 +1005,46 @@ class ControlledStationSearchRepository implements StationSearchRepository {
       throw StateError('Pending search not found: $query');
     }
     completer.complete(results);
+  }
+}
+
+class ControlledNearbyStationSearchRepository
+    implements StationSearchRepository {
+  final requestedNearbyLocations = <CurrentLocation>[];
+  final _nearbyCompleter = Completer<List<StationSearchResult>>();
+
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) {
+    requestedNearbyLocations.add(location);
+    return _nearbyCompleter.future;
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    throw UnimplementedError();
+  }
+
+  void complete(List<StationSearchResult> results) {
+    _nearbyCompleter.complete(results);
   }
 }
 

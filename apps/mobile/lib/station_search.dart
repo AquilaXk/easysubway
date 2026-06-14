@@ -965,10 +965,17 @@ int? _optionalInt(Map<String, Object?> json, String key) {
     return value;
   }
   if (value is num) {
-    return value.round();
+    if (value % 1 == 0) {
+      return value.toInt();
+    }
+    throw FormatException('Invalid integer station field: $key');
   }
   if (value is String && value.trim().isNotEmpty) {
-    return int.tryParse(value);
+    final parsed = int.tryParse(value);
+    if (parsed == null) {
+      throw FormatException('Invalid integer station field: $key');
+    }
+    return parsed;
   }
   return null;
 }
@@ -1030,6 +1037,7 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState _state = const StationSearchState.idle();
   int _searchRequestId = 0;
+  bool _isDisposed = false;
 
   StationSearchState get state => _state;
 
@@ -1038,7 +1046,7 @@ class StationSearchController extends ChangeNotifier {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
       _state = const StationSearchState.idle();
-      notifyListeners();
+      _notifyIfActive(requestId);
       return;
     }
 
@@ -1046,11 +1054,11 @@ class StationSearchController extends ChangeNotifier {
       status: StationSearchStatus.loading,
       results: [],
     );
-    notifyListeners();
+    _notifyIfActive(requestId);
 
     try {
       final results = await repository.searchStations(trimmedQuery);
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       if (results.isEmpty) {
@@ -1066,7 +1074,7 @@ class StationSearchController extends ChangeNotifier {
         );
       }
     } on StationSearchException catch (error) {
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = StationSearchState(
@@ -1076,7 +1084,7 @@ class StationSearchController extends ChangeNotifier {
       );
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '역 검색 화면 처리 중 예외가 발생했습니다.');
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = const StationSearchState(
@@ -1085,7 +1093,7 @@ class StationSearchController extends ChangeNotifier {
         message: '역 정보를 불러오지 못했습니다.',
       );
     }
-    notifyListeners();
+    _notifyIfActive(requestId);
   }
 
   Future<void> searchNearby(CurrentLocationProvider locationProvider) async {
@@ -1094,12 +1102,12 @@ class StationSearchController extends ChangeNotifier {
       status: StationSearchStatus.loading,
       results: [],
     );
-    notifyListeners();
+    _notifyIfActive(requestId);
 
     try {
       final location = await locationProvider.currentLocation();
       final results = await repository.searchNearbyStations(location);
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       if (results.isEmpty) {
@@ -1115,7 +1123,7 @@ class StationSearchController extends ChangeNotifier {
         );
       }
     } on CurrentLocationException catch (error) {
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = StationSearchState(
@@ -1124,7 +1132,7 @@ class StationSearchController extends ChangeNotifier {
         message: error.message,
       );
     } on StationSearchException catch (error) {
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = StationSearchState(
@@ -1138,7 +1146,7 @@ class StationSearchController extends ChangeNotifier {
         stackTrace,
         context: '주변 역 검색 화면 처리 중 예외가 발생했습니다.',
       );
-      if (requestId != _searchRequestId) {
+      if (!_isActiveRequest(requestId)) {
         return;
       }
       _state = const StationSearchState(
@@ -1147,7 +1155,24 @@ class StationSearchController extends ChangeNotifier {
         message: '역 정보를 불러오지 못했습니다.',
       );
     }
-    notifyListeners();
+    _notifyIfActive(requestId);
+  }
+
+  bool _isActiveRequest(int requestId) {
+    return !_isDisposed && requestId == _searchRequestId;
+  }
+
+  void _notifyIfActive(int requestId) {
+    if (_isActiveRequest(requestId)) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _searchRequestId++;
+    super.dispose();
   }
 }
 
