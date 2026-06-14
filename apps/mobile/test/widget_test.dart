@@ -858,6 +858,20 @@ void main() {
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-12',
         ),
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-2',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-2',
+          type: 'ELEVATOR',
+          name: '2번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '2번 출구 앞',
+          status: 'BROKEN',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-14',
+        ),
       ],
     );
 
@@ -912,8 +926,20 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -260));
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
-      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+      expect(find.text('확인 필요 1개'), findsOneWidget);
+      expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsOneWidget);
+      expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('엘리베이터'), findsOneWidget);
+      expect(find.text('고장'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
       expect(find.text('1번 출구 앞'), findsOneWidget);
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
@@ -923,18 +949,73 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.ensureVisible(
+      expect(
         find.byKey(
           const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
         ),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-      expect(find.widgetWithText(OutlinedButton, '상태 신고'), findsOneWidget);
       expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 신고'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 상세는 시설 목록이 없으면 확인 필요 요약을 숨긴다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [
+        StationExitInfo(
+          id: 'exit-sangnoksu-1',
+          stationId: 'station-sangnoksu',
+          exitNumber: '1',
+          name: '1번 출구',
+          hasElevatorConnection: true,
+          hasStairOnlyPath: false,
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+        ),
+      ],
+      stationFacilities: const [],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.pumpAndSettle();
+
+      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('시설 정보가 아직 없습니다.'), findsOneWidget);
+      expect(find.text('확인 필요 없음'), findsNothing);
+      expect(find.bySemanticsLabel('확인이 필요한 시설 없음'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
