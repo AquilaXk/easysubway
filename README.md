@@ -18,6 +18,21 @@
 - Infra: Docker, Docker Compose, GitHub Actions
 - Maps: Naver Map first, Kakao Map as a secondary candidate
 
+## Production Configuration
+
+운영 배포는 `prod` profile을 기준으로 아래 환경변수를 설정해야 합니다.
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `EASYSUBWAY_DATASOURCE_URL` | Yes | PostgreSQL JDBC URL |
+| `EASYSUBWAY_DATASOURCE_USERNAME` | Yes | PostgreSQL 계정 |
+| `EASYSUBWAY_DATASOURCE_PASSWORD` | Yes | PostgreSQL 비밀번호 |
+| `EASYSUBWAY_REDIS_HOST` | Yes | 익명 인증 발급 제한에 사용할 Redis host |
+| `EASYSUBWAY_REDIS_PORT` | No | Redis port. 기본값은 `6379`입니다. |
+| `EASYSUBWAY_TRUSTED_PROXY_CIDRS` | Yes | `X-Forwarded-For`를 신뢰할 프록시 IP 또는 CIDR 목록입니다. 예: `10.0.0.0/8,192.168.0.10` |
+
+`EASYSUBWAY_TRUSTED_PROXY_CIDRS`는 ALB, Nginx, API Gateway처럼 애플리케이션 앞단에 있는 신뢰 가능한 프록시만 포함해야 합니다. 운영에서는 누락 시 시작 단계에서 설정 오류가 드러나도록 기본값을 두지 않습니다. 개발 환경은 프록시 없이도 로컬 실행할 수 있도록 빈 기본값을 허용하며, 이 경우 전달 헤더를 익명 인증 발급 제한 키로 사용하지 않습니다.
+
 ## Workspace
 
 - `apps/mobile/`: Flutter Android/iOS app
