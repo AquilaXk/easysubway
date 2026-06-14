@@ -3,6 +3,10 @@ logging:
     com.easysubway: INFO
 
 spring:
+  batch:
+    jdbc:
+      # 신규 운영 DB에서도 Batch 메타데이터 테이블이 준비되어 관리자 배치 실행이 실패하지 않게 한다.
+      initialize-schema: always
   datasource:
     url: ${EASYSUBWAY_DATASOURCE_URL}
     username: ${EASYSUBWAY_DATASOURCE_USERNAME}
