@@ -28,11 +28,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FacilityReportService implements FacilityReportUseCase {
+
+	private static final Logger log = LoggerFactory.getLogger(FacilityReportService.class);
 
 	private final LoadTransitMasterPort loadTransitMasterPort;
 	private final SaveAccessibilityFacilityStatusPort saveAccessibilityFacilityStatusPort;
@@ -205,13 +209,28 @@ public class FacilityReportService implements FacilityReportUseCase {
 		FacilityReport saved = saveFacilityReportPort.saveReport(reviewed);
 		// 같은 결과로 재검수한 경우 사용자가 중복 처리 알림을 받지 않도록 상태 변경만 알린다.
 		if (report.status() != saved.status()) {
-			reportStatusAlertUseCase.alertReportStatusChanged(
-				new ReportStatusChangedAlertCommand(saved.userId(), saved.id(), saved.status())
-			);
+			alertReportStatusChanged(saved);
 		}
 		// 승인된 상태 신고만 실제 시설 운영 상태에 반영한다.
 		applyAcceptedReportToFacilityStatus(report, command.decision());
 		return saved;
+	}
+
+	private void alertReportStatusChanged(FacilityReport saved) {
+		try {
+			reportStatusAlertUseCase.alertReportStatusChanged(
+				new ReportStatusChangedAlertCommand(saved.userId(), saved.id(), saved.status())
+			);
+		} catch (RuntimeException exception) {
+			// 알림은 저장 이후 부수 효과이므로 실패해도 검수 결과 응답과 시설 상태 반영을 막지 않는다.
+			log.warn(
+				"신고 처리 결과 알림 발송에 실패했습니다. reportId={}, userId={}, status={}",
+				saved.id(),
+				saved.userId(),
+				saved.status(),
+				exception
+			);
+		}
 	}
 
 	private void requireReportType(CreateFacilityReportCommand command) {

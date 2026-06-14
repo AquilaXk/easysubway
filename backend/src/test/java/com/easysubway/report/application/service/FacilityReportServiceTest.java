@@ -1,6 +1,7 @@
 package com.easysubway.report.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.report.adapter.out.persistence.InMemoryFacilityReportRepository;
@@ -246,6 +247,33 @@ class FacilityReportServiceTest {
 		assertThat(reportStatusAlertUseCase.commands)
 			.extracting(ReportStatusChangedAlertCommand::status)
 			.containsExactly(FacilityReportStatus.REJECTED);
+	}
+
+	@Test
+	@DisplayName("신고 처리 결과 알림 실패는 검수 저장 결과를 실패시키지 않는다")
+	void reportStatusAlertFailureDoesNotFailReviewResult() {
+		var repository = new InMemoryFacilityReportRepository();
+		var service = new FacilityReportService(
+			new InMemoryTransitMasterRepository(),
+			new InMemoryTransitMasterRepository(),
+			repository,
+			repository,
+			command -> {
+			},
+			command -> {
+				throw new IllegalStateException("푸시 알림 발송 실패");
+			},
+			Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+		var report = service.createReport(reportCommand(
+			"anonymous-user-alert-failure",
+			FacilityReportType.INFORMATION_WRONG,
+			"알림 실패와 별개로 저장되어야 하는 신고입니다."
+		));
+
+		assertThatNoException()
+			.isThrownBy(() -> service.reviewReport(reviewCommand(report.id(), FacilityReportReviewDecision.REJECT)));
+		assertThat(service.getReport(report.id()).status()).isEqualTo(FacilityReportStatus.REJECTED);
 	}
 
 	@Test

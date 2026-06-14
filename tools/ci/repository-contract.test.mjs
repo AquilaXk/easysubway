@@ -739,9 +739,13 @@ test("백엔드 신고 처리 결과 알림은 신고 서비스와 푸시 outbox
   assert.match(service, /case ACCEPTED/);
   assert.match(service, /case REJECTED/);
   assert.match(service, /case DUPLICATE/);
+  assert.match(service, /case UNDER_REVIEW/);
+  assert.match(service, /case RESOLVED/);
+  assert.match(service, /case SUBMITTED/);
   assert.match(reportService, /ReportStatusAlertUseCase/);
   assert.match(reportService, /ReportStatusChangedAlertCommand/);
   assert.match(reportService, /report\.status\(\) != saved\.status\(\)/);
+  assert.match(reportService, /catch \(RuntimeException exception\)/);
   assert.match(reportService, /alertReportStatusChanged/);
 });
 
