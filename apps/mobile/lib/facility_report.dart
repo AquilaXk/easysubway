@@ -6,10 +6,13 @@ import 'package:flutter/material.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
+const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
+
+  Future<FacilityReportResult> getReport(String reportId);
 }
 
 class FacilityReportApiRepository implements FacilityReportRepository {
@@ -33,31 +36,74 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       request.write(jsonEncode(reportRequest.toJson()));
 
       final response = await request.close().timeout(_facilityReportTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_facilityReportTimeout);
-
       if (response.statusCode != HttpStatus.created &&
           response.statusCode != HttpStatus.ok) {
         throw const FacilityReportException(_facilityReportErrorMessage);
       }
 
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-        throw const FacilityReportException(_facilityReportErrorMessage);
-      }
-
-      final data = decoded['data'];
-      if (data is! Map<String, Object?>) {
-        throw const FacilityReportException(_facilityReportErrorMessage);
-      }
-
-      return FacilityReportResult.fromJson(data);
+      // 응답 파싱 실패도 repository 예외 문구로 통일되도록 try 블록 안에서 완료한다.
+      return await _readReportResult(
+        response,
+        errorMessage: _facilityReportErrorMessage,
+      );
     } on FacilityReportException {
       rethrow;
     } catch (_) {
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) async {
+    final trimmedReportId = reportId.trim();
+    if (trimmedReportId.isEmpty) {
+      throw const FacilityReportException(_facilityReportStatusErrorMessage);
+    }
+
+    final uri = baseUri.resolve(
+      '/api/v1/reports/${Uri.encodeComponent(trimmedReportId)}',
+    );
+
+    try {
+      final request = await _httpClient
+          .getUrl(uri)
+          .timeout(_facilityReportTimeout);
+      final response = await request.close().timeout(_facilityReportTimeout);
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw const FacilityReportException(_facilityReportStatusErrorMessage);
+      }
+
+      // 상태 확인 응답도 파싱 오류까지 사용자가 이해할 수 있는 문구로 바꾼다.
+      return await _readReportResult(
+        response,
+        errorMessage: _facilityReportStatusErrorMessage,
+      );
+    } on FacilityReportException {
+      rethrow;
+    } catch (_) {
+      throw const FacilityReportException(_facilityReportStatusErrorMessage);
+    }
+  }
+
+  Future<FacilityReportResult> _readReportResult(
+    HttpClientResponse response, {
+    required String errorMessage,
+  }) async {
+    final body = await utf8
+        .decodeStream(response)
+        .timeout(_facilityReportTimeout);
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+      throw FacilityReportException(errorMessage);
+    }
+
+    final data = decoded['data'];
+    if (data is! Map<String, Object?>) {
+      throw FacilityReportException(errorMessage);
+    }
+
+    return FacilityReportResult.fromJson(data);
   }
 }
 
@@ -292,6 +338,52 @@ class FacilityReportController extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshCurrentReport() async {
+    final currentResult = _state.result;
+    if (_disposed ||
+        _state.status == FacilityReportViewStatus.loading ||
+        currentResult == null) {
+      return;
+    }
+
+    _emitState(
+      FacilityReportState(
+        status: FacilityReportViewStatus.loading,
+        message: '처리 상태 확인 중',
+        result: currentResult,
+      ),
+    );
+
+    try {
+      final result = await repository.getReport(currentResult.id);
+      _emitState(
+        FacilityReportState(
+          status: FacilityReportViewStatus.success,
+          message: '처리 상태를 확인했습니다.',
+          result: result,
+        ),
+      );
+    } on FacilityReportException catch (error) {
+      // 상태 확인이 실패해도 사용자가 접수번호를 잃지 않도록 직전 결과는 유지한다.
+      _emitState(
+        FacilityReportState(
+          status: FacilityReportViewStatus.failure,
+          message: error.message,
+          result: currentResult,
+        ),
+      );
+    } catch (_) {
+      // 알 수 없는 오류도 같은 화면에서 다시 확인할 수 있게 접수 결과를 보존한다.
+      _emitState(
+        FacilityReportState(
+          status: FacilityReportViewStatus.failure,
+          message: '처리 상태를 확인하지 못했습니다.',
+          result: currentResult,
+        ),
+      );
+    }
+  }
+
   void _emitState(FacilityReportState nextState) {
     if (_disposed) {
       return;
@@ -345,7 +437,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   Widget build(BuildContext context) {
     final state = _controller.state;
     final isLoading = state.status == FacilityReportViewStatus.loading;
-    final isSuccess = state.status == FacilityReportViewStatus.success;
+    final reportResult = state.result;
+    final hasSubmittedReport = reportResult != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 신고')),
@@ -370,7 +463,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                         child: _FacilityReportTypeCard(
                           option: option,
                           selected: option == _selectedType,
-                          onTap: isLoading || isSuccess
+                          onTap: isLoading || hasSubmittedReport
                               ? null
                               : () => setState(() => _selectedType = option),
                         ),
@@ -383,7 +476,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             TextField(
               key: const Key('facilityReportDescriptionInput'),
               controller: _descriptionController,
-              enabled: !isLoading && !isSuccess,
+              enabled: !isLoading && !hasSubmittedReport,
               minLines: 3,
               maxLines: 5,
               textInputAction: TextInputAction.newline,
@@ -400,9 +493,17 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             const SizedBox(height: 16),
             if (state.message.isNotEmpty) _FacilityReportMessage(state: state),
             const SizedBox(height: 16),
+            if (reportResult != null) ...[
+              _FacilityReportStatusPanel(
+                result: reportResult,
+                isLoading: isLoading,
+                onRefresh: _controller.refreshCurrentReport,
+              ),
+              const SizedBox(height: 16),
+            ],
             FilledButton.icon(
               key: const Key('facilityReportSubmitButton'),
-              onPressed: isLoading || isSuccess ? null : _submit,
+              onPressed: isLoading || hasSubmittedReport ? null : _submit,
               icon: isLoading
                   ? const SizedBox(
                       width: 22,
@@ -410,7 +511,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     )
                   : const Icon(Icons.send),
-              label: Text(isSuccess ? '접수 완료' : '신고 보내기'),
+              label: Text(hasSubmittedReport ? '접수 완료' : '신고 보내기'),
             ),
           ],
         ),
@@ -429,6 +530,95 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       target: widget.target,
       selectedType: _selectedType,
       description: _descriptionController.text,
+    );
+  }
+}
+
+class _FacilityReportStatusPanel extends StatelessWidget {
+  const _FacilityReportStatusPanel({
+    required this.result,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  final FacilityReportResult result;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF93C7C2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(
+              // 접수번호와 상태를 한 문장으로 묶어 스크린리더가 상태 변화를 읽게 한다.
+              label: '신고 접수번호 ${result.id}, 현재 상태 ${result.statusLabel}',
+              liveRegion: true,
+              child: ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FacilityReportStatusRow(label: '접수번호', value: result.id),
+                    const SizedBox(height: 10),
+                    _FacilityReportStatusRow(
+                      label: '처리 상태',
+                      value: result.statusLabel,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: const Key('facilityReportRefreshButton'),
+              onPressed: isLoading ? null : onRefresh,
+              icon: const Icon(Icons.refresh),
+              label: Text(isLoading ? '확인 중' : '처리 상태 확인'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FacilityReportStatusRow extends StatelessWidget {
+  const _FacilityReportStatusRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF29484B),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: textTheme.titleMedium?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+          ),
+        ),
+      ],
     );
   }
 }
