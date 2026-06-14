@@ -272,7 +272,33 @@ class RouteSearchServiceTest {
 		assertThat(stairOnlyResult.warnings())
 			.extracting("code")
 			.contains(RouteWarningCode.STAIR_ONLY_ACCESS);
+		assertThat(stairOnlyResult.steps().get(0).includesStairs()).isTrue();
+		assertThat(stairOnlyResult.steps().get(1).includesStairs()).isFalse();
+		assertThat(stairOnlyResult.steps().get(2).includesStairs()).isTrue();
 		assertThat(stairOnlyResult.score()).isGreaterThan(accessibleResult.score());
+	}
+
+	@Test
+	@DisplayName("계단 전용 환승역은 환승 단계에 계단 포함으로 표시한다")
+	void routeStepMarksStairOnlyTransferAccess() {
+		var repository = new InMemoryRouteSearchRepository();
+		var transferService = new RouteSearchService(
+			repository,
+			repository,
+			new StairOnlyTransferTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = transferService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.STROLLER
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.FOUND);
+		assertThat(result.steps())
+			.extracting("includesStairs")
+			.containsExactly(false, false, true, false, false);
 	}
 
 	@Test

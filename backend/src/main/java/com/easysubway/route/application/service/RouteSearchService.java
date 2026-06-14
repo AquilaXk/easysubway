@@ -431,6 +431,8 @@ public class RouteSearchService implements RouteSearchUseCase {
 		RouteProfileWeight profileWeight
 	) {
 		String displayLine = displayLineName(directLine.line());
+		boolean originIncludesStairs = hasStairOnlyAccess(origin.id());
+		boolean destinationIncludesStairs = hasStairOnlyAccess(destination.id());
 		return List.of(
 			new RouteStep(
 				1,
@@ -442,7 +444,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				origin.id(),
 				ENTRY_ESTIMATED_MINUTES,
 				ENTRY_DISTANCE_METERS,
-				false,
+				originIncludesStairs,
 				true
 			),
 			new RouteStep(
@@ -468,7 +470,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				destination.id(),
 				EXIT_ESTIMATED_MINUTES,
 				EXIT_DISTANCE_METERS,
-				false,
+				destinationIncludesStairs,
 				true
 			)
 		);
@@ -482,6 +484,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 	) {
 		String firstDisplayLine = displayLineName(route.firstLine());
 		String secondDisplayLine = displayLineName(route.secondLine());
+		boolean originIncludesStairs = hasStairOnlyAccess(origin.id());
+		boolean transferIncludesStairs = hasStairOnlyAccess(route.transferStation().id());
+		boolean destinationIncludesStairs = hasStairOnlyAccess(destination.id());
 		return List.of(
 			new RouteStep(
 				1,
@@ -493,7 +498,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				origin.id(),
 				ENTRY_ESTIMATED_MINUTES,
 				ENTRY_DISTANCE_METERS,
-				false,
+				originIncludesStairs,
 				true
 			),
 			new RouteStep(
@@ -519,7 +524,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.transferStation().id(),
 				TRANSFER_ESTIMATED_MINUTES,
 				TRANSFER_DISTANCE_METERS,
-				false,
+				transferIncludesStairs,
 				true
 			),
 			new RouteStep(
@@ -545,7 +550,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				destination.id(),
 				EXIT_ESTIMATED_MINUTES,
 				EXIT_DISTANCE_METERS,
-				false,
+				destinationIncludesStairs,
 				true
 			)
 		);
