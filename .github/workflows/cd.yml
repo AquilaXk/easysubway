@@ -34,7 +34,7 @@ jobs:
 
           env_file="${RUNNER_TEMP}/easysubway.env"
           if [[ -n "${EASYSUBWAY_ENV_SECRET}" ]]; then
-            printf '%s\n' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+            printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
             echo "source=secret" >> "${GITHUB_OUTPUT}"
           else
             cp .env.example "${env_file}"

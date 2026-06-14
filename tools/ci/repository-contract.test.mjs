@@ -83,6 +83,8 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
   assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret/);
   assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
+  assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
   assert.match(workflow, /CD Readiness \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Readiness \/ Validate Docker Compose deployment config/);
   assert.match(workflow, /docker compose --env-file "\$\{EASYSUBWAY_ENV_FILE\}" -f infra\/docker-compose\.yml config --quiet/);
