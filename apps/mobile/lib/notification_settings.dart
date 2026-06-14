@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
+import 'mobile_error_reporter.dart';
 
 const _notificationSettingsTimeout = Duration(seconds: 8);
 const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했습니다.';
@@ -45,7 +46,12 @@ class NotificationSettingsApiRepository
 
     try {
       return NotificationSettings.fromJson(data);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림 설정 조회 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const NotificationSettingsException(
         _notificationSettingsLoadErrorMessage,
       );
@@ -70,7 +76,12 @@ class NotificationSettingsApiRepository
 
     try {
       return NotificationSettings.fromJson(data);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림 설정 저장 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const NotificationSettingsException(
         _notificationSettingsSaveErrorMessage,
       );
@@ -131,7 +142,12 @@ class NotificationSettingsApiRepository
         return decoded['data'];
       } on NotificationSettingsException {
         rethrow;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '알림 설정 API 요청 처리 중 예외가 발생했습니다.',
+        );
         throw NotificationSettingsException(errorMessage);
       }
     }
@@ -257,7 +273,12 @@ class NotificationSettingsController extends ChangeNotifier {
       );
     } on NotificationSettingsException catch (error) {
       _emitFailure(error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림 설정 화면 조회 처리 중 예외가 발생했습니다.',
+      );
       _emitFailure(_notificationSettingsLoadErrorMessage);
     }
   }
@@ -312,7 +333,12 @@ class NotificationSettingsController extends ChangeNotifier {
           message: error.message,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림 설정 화면 저장 처리 중 예외가 발생했습니다.',
+      );
       _emitState(
         NotificationSettingsState(
           status: NotificationSettingsStatus.ready,

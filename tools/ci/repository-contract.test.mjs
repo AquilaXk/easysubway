@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,6 +19,20 @@ function jobBlock(workflow, startJob, nextJob) {
   const match = workflow.match(pattern);
   assert.ok(match, `${startJob} job block not found`);
   return match[0];
+}
+
+function assertMobileCatchPolicy(file, source) {
+  const catchPattern = /catch\s*\(([^)]*)\)/g;
+  for (const match of source.matchAll(catchPattern)) {
+    const lineStart = source.lastIndexOf("\n", match.index) + 1;
+    const linePrefix = source.slice(lineStart, match.index);
+    if (/\bon\s+\w+/.test(linePrefix)) {
+      continue;
+    }
+
+    const names = match[1].split(",").map((name) => name.trim());
+    assert.deepEqual(names, ["error", "stackTrace"], `${file} has catch without named error and stackTrace`);
+  }
 }
 
 test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적되지 않는다", () => {
@@ -53,6 +67,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
+  assert.match(workflow, /Mobile App CI \/ Run mobile catch contract/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
@@ -159,6 +174,30 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   assert.match(script, /\.env\.example is a template/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
   assert.doesNotMatch(cdWorkflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+});
+
+test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다", () => {
+  const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+
+  assert.ok(mobileFiles.length > 0, "mobile Dart files not found");
+  for (const file of mobileFiles) {
+    assertMobileCatchPolicy(file, read(file));
+  }
+});
+
+test("모바일 변경 CI는 원본 예외 catch 계약을 실행한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const mobileJob = jobBlock(workflow, "mobile-app", "android");
+
+  assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
+  assert.match(mobileJob, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(
+    mobileJob,
+    /node --test --test-name-pattern "모바일 generic catch" tools\/ci\/repository-contract\.test\.mjs/,
+  );
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
