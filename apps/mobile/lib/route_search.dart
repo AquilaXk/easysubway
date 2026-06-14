@@ -443,7 +443,12 @@ class RouteSearchResult {
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
-  String get guidanceLabel => isBlocked ? '다른 경로가 필요합니다' : '이동할 수 있는 경로';
+  String get guidanceLabel {
+    if (isBlocked) {
+      return '다른 경로가 필요합니다';
+    }
+    return status == 'FOUND' ? '이동할 수 있는 경로' : '확인이 필요합니다';
+  }
 
   String get attentionLabel {
     if (isBlocked) {
