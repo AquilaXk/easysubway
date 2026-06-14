@@ -81,9 +81,15 @@ class MainActivity : FlutterActivity() {
 
     private fun emitCurrentLocation(result: MethodChannel.Result) {
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        val providers = locationManager.getProviders(true)
-        if (providers.isEmpty()) {
+        val enabledProviders = locationManager.getProviders(true)
+        if (enabledProviders.isEmpty()) {
             result.error("locationDisabled", "location provider disabled", null)
+            return
+        }
+
+        val providers = usableProviders(enabledProviders)
+        if (providers.isEmpty()) {
+            result.error("locationUnavailable", "location provider unavailable", null)
             return
         }
 
@@ -96,6 +102,23 @@ class MainActivity : FlutterActivity() {
         }
 
         requestSingleLocation(locationManager, providers.first(), result)
+    }
+
+    private fun usableProviders(enabledProviders: List<String>): List<String> {
+        val preferredProviders = if (hasFineLocationPermission()) {
+            listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER,
+            )
+        } else {
+            listOf(
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER,
+            )
+        }
+
+        return preferredProviders.filter { provider -> enabledProviders.contains(provider) }
     }
 
     private fun requestSingleLocation(
@@ -148,8 +171,21 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             return true
         }
-        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return hasFineLocationPermission() || hasCoarseLocationPermission()
+    }
+
+    private fun hasFineLocationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true
+        }
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasCoarseLocationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true
+        }
+        return checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun LocationManager.safeLastKnownLocation(provider: String): Location? {
