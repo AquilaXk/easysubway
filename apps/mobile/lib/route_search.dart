@@ -485,7 +485,7 @@ class RouteSearchResult {
     }
     if (steps.isNotEmpty) {
       parts.add(
-        '이동 안내 ${steps.map((step) => '${step.sequence}번 ${step.title}, ${step.description}').join(', ')}',
+        '이동 안내 ${steps.map((step) => '${step.sequence}번 ${step.title}, ${step.burdenLabel}, ${step.description}').join(', ')}',
       );
     }
     return parts.join(', ');
@@ -501,6 +501,10 @@ class RouteSearchStep {
     required this.lineName,
     required this.fromStationId,
     required this.toStationId,
+    required this.estimatedMinutes,
+    required this.distanceMeters,
+    required this.includesStairs,
+    required this.requiresAccessibilityCheck,
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -512,6 +516,13 @@ class RouteSearchStep {
       lineName: _optionalRouteString(json, 'lineName'),
       fromStationId: _optionalRouteString(json, 'fromStationId'),
       toStationId: _optionalRouteString(json, 'toStationId'),
+      estimatedMinutes: _requiredRouteInt(json, 'estimatedMinutes'),
+      distanceMeters: _requiredRouteInt(json, 'distanceMeters'),
+      includesStairs: _requiredRouteBool(json, 'includesStairs'),
+      requiresAccessibilityCheck: _requiredRouteBool(
+        json,
+        'requiresAccessibilityCheck',
+      ),
     );
   }
 
@@ -522,6 +533,32 @@ class RouteSearchStep {
   final String lineName;
   final String fromStationId;
   final String toStationId;
+  final int estimatedMinutes;
+  final int distanceMeters;
+  final bool includesStairs;
+  final bool requiresAccessibilityCheck;
+
+  String get burdenLabel {
+    final labels = <String>[
+      '약 $estimatedMinutes분',
+      _routeDistanceLabel(distanceMeters),
+      if (includesStairs) '계단 포함',
+      if (requiresAccessibilityCheck) '접근성 확인',
+    ];
+    return labels.join(' · ');
+  }
+}
+
+String _routeDistanceLabel(int distanceMeters) {
+  if (distanceMeters < 1000) {
+    return '${distanceMeters}m';
+  }
+
+  final kilometers = distanceMeters / 1000;
+  if (distanceMeters % 1000 == 0) {
+    return '${kilometers.toStringAsFixed(0)}km';
+  }
+  return '${kilometers.toStringAsFixed(1)}km';
 }
 
 class RouteSearchWarning {
@@ -1562,6 +1599,15 @@ class _RouteStepTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
+                  step.burdenLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF29484B),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
                   step.description,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: const Color(0xFF405A5D),
@@ -2077,6 +2123,14 @@ String _optionalRouteString(Map<String, Object?> json, String key) {
 int _requiredRouteInt(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is int) {
+    return value;
+  }
+  throw FormatException('Missing required route field: $key');
+}
+
+bool _requiredRouteBool(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is bool) {
     return value;
   }
   throw FormatException('Missing required route field: $key');

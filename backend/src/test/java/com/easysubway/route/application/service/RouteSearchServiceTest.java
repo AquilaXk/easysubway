@@ -70,6 +70,12 @@ class RouteSearchServiceTest {
 				"수도권 4호선으로 사당역까지 이동",
 				"사당역에서 출구 접근성 정보를 확인"
 			);
+		assertThat(result.steps().get(0).estimatedMinutes()).isEqualTo(4);
+		assertThat(result.steps().get(0).distanceMeters()).isEqualTo(180);
+		assertThat(result.steps().get(0).includesStairs()).isFalse();
+		assertThat(result.steps().get(0).requiresAccessibilityCheck()).isTrue();
+		assertThat(result.steps().get(1).estimatedMinutes()).isGreaterThan(0);
+		assertThat(result.steps().get(1).requiresAccessibilityCheck()).isFalse();
 		assertThat(result.warnings())
 			.extracting("code")
 			.contains(RouteWarningCode.LOW_DATA_CONFIDENCE);
@@ -142,6 +148,9 @@ class RouteSearchServiceTest {
 			);
 		assertThat(result.steps().get(2).description())
 			.isEqualTo("환승역의 엘리베이터와 계단 없는 연결 동선을 먼저 확인합니다.");
+		assertThat(result.steps().get(2).estimatedMinutes()).isEqualTo(6);
+		assertThat(result.steps().get(2).distanceMeters()).isEqualTo(260);
+		assertThat(result.steps().get(2).requiresAccessibilityCheck()).isTrue();
 	}
 
 	@Test

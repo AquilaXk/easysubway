@@ -39,6 +39,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class RouteSearchService implements RouteSearchUseCase {
 
+	private static final int ENTRY_ESTIMATED_MINUTES = 4;
+	private static final int ENTRY_DISTANCE_METERS = 180;
+	private static final int EXIT_ESTIMATED_MINUTES = 3;
+	private static final int EXIT_DISTANCE_METERS = 120;
+	private static final int TRANSFER_ESTIMATED_MINUTES = 6;
+	private static final int TRANSFER_DISTANCE_METERS = 260;
+	private static final int MINUTES_PER_STATION = 2;
+	private static final int METERS_PER_STATION = 900;
+
 	private final LoadRouteSearchPort loadRouteSearchPort;
 	private final SaveRouteSearchPort saveRouteSearchPort;
 	private final LoadTransitMasterPort loadTransitMasterPort;
@@ -430,7 +439,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				directLine.line().id(),
 				directLine.line().name(),
 				origin.id(),
-				origin.id()
+				origin.id(),
+				ENTRY_ESTIMATED_MINUTES,
+				ENTRY_DISTANCE_METERS,
+				false,
+				true
 			),
 			new RouteStep(
 				2,
@@ -439,7 +452,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				directLine.line().id(),
 				directLine.line().name(),
 				origin.id(),
-				destination.id()
+				destination.id(),
+				trainEstimatedMinutes(directLine.stopCount()),
+				trainDistanceMeters(directLine.stopCount()),
+				false,
+				false
 			),
 			new RouteStep(
 				3,
@@ -448,7 +465,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				directLine.line().id(),
 				directLine.line().name(),
 				destination.id(),
-				destination.id()
+				destination.id(),
+				EXIT_ESTIMATED_MINUTES,
+				EXIT_DISTANCE_METERS,
+				false,
+				true
 			)
 		);
 	}
@@ -469,7 +490,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.firstLine().id(),
 				route.firstLine().name(),
 				origin.id(),
-				origin.id()
+				origin.id(),
+				ENTRY_ESTIMATED_MINUTES,
+				ENTRY_DISTANCE_METERS,
+				false,
+				true
 			),
 			new RouteStep(
 				2,
@@ -478,7 +503,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.firstLine().id(),
 				route.firstLine().name(),
 				origin.id(),
-				route.transferStation().id()
+				route.transferStation().id(),
+				trainEstimatedMinutes(route.firstSegmentStopCount()),
+				trainDistanceMeters(route.firstSegmentStopCount()),
+				false,
+				false
 			),
 			new RouteStep(
 				3,
@@ -487,7 +516,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.secondLine().id(),
 				route.secondLine().name(),
 				route.transferStation().id(),
-				route.transferStation().id()
+				route.transferStation().id(),
+				TRANSFER_ESTIMATED_MINUTES,
+				TRANSFER_DISTANCE_METERS,
+				false,
+				true
 			),
 			new RouteStep(
 				4,
@@ -496,7 +529,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.secondLine().id(),
 				route.secondLine().name(),
 				route.transferStation().id(),
-				destination.id()
+				destination.id(),
+				trainEstimatedMinutes(route.secondSegmentStopCount()),
+				trainDistanceMeters(route.secondSegmentStopCount()),
+				false,
+				false
 			),
 			new RouteStep(
 				5,
@@ -505,9 +542,21 @@ public class RouteSearchService implements RouteSearchUseCase {
 				route.secondLine().id(),
 				route.secondLine().name(),
 				destination.id(),
-				destination.id()
+				destination.id(),
+				EXIT_ESTIMATED_MINUTES,
+				EXIT_DISTANCE_METERS,
+				false,
+				true
 			)
 		);
+	}
+
+	private int trainEstimatedMinutes(int stopCount) {
+		return Math.max(1, stopCount) * MINUTES_PER_STATION;
+	}
+
+	private int trainDistanceMeters(int stopCount) {
+		return Math.max(1, stopCount) * METERS_PER_STATION;
 	}
 
 	private String displayLineName(SubwayLine line) {

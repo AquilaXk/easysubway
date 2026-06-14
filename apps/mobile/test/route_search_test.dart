@@ -48,6 +48,10 @@ void main() {
                   'lineName': '수도권 4호선',
                   'fromStationId': 'station-sangnoksu',
                   'toStationId': 'station-sadang',
+                  'estimatedMinutes': 4,
+                  'distanceMeters': 180,
+                  'includesStairs': false,
+                  'requiresAccessibilityCheck': true,
                 },
               ],
               'warnings': [
@@ -88,6 +92,11 @@ void main() {
     expect(result.statusLabel, '경로를 찾았습니다');
     expect(result.scoreLabel, '이동 점수 92점');
     expect(result.steps.single.title, '상록수역에서 4호선 승강장으로 이동');
+    expect(result.steps.single.estimatedMinutes, 4);
+    expect(result.steps.single.distanceMeters, 180);
+    expect(result.steps.single.includesStairs, isFalse);
+    expect(result.steps.single.requiresAccessibilityCheck, isTrue);
+    expect(result.steps.single.burdenLabel, '약 4분 · 180m · 접근성 확인');
     expect(result.warnings.single.message, '일부 시설 정보는 확인이 필요합니다.');
   });
 
@@ -159,6 +168,24 @@ void main() {
     expect(result.guidanceLabel, '확인이 필요합니다');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
+  });
+
+  test('경로 단계 이동 부담은 긴 거리를 킬로미터로 표시한다', () {
+    const step = RouteSearchStep(
+      sequence: 2,
+      title: '수도권 4호선으로 사당역까지 이동',
+      description: '15개 역을 이동합니다. 환승은 없습니다.',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      fromStationId: 'station-sangnoksu',
+      toStationId: 'station-sadang',
+      estimatedMinutes: 30,
+      distanceMeters: 13500,
+      includesStairs: false,
+      requiresAccessibilityCheck: false,
+    );
+
+    expect(step.burdenLabel, '약 30분 · 13.5km');
   });
 
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
@@ -273,6 +300,10 @@ RouteSearchResult _sampleRouteSearchResult({String status = 'FOUND'}) {
         lineName: '수도권 4호선',
         fromStationId: 'station-sangnoksu',
         toStationId: 'station-sadang',
+        estimatedMinutes: 4,
+        distanceMeters: 180,
+        includesStairs: false,
+        requiresAccessibilityCheck: true,
       ),
     ],
     warnings: const [
