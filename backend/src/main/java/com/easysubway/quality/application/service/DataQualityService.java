@@ -44,7 +44,8 @@ public class DataQualityService implements DataQualityUseCase {
 	private Map<DataQualityLevel, Long> countStationQuality(List<Station> stations) {
 		var counts = emptyQualityCounts();
 		for (Station station : stations) {
-			counts.computeIfPresent(station.dataQualityLevel(), (level, count) -> count + 1);
+			DataQualityLevel level = requireQualityLevel(station);
+			counts.put(level, counts.get(level) + 1);
 		}
 		return counts;
 	}
@@ -52,7 +53,8 @@ public class DataQualityService implements DataQualityUseCase {
 	private Map<DataConfidenceLevel, Long> countExitConfidence(List<StationExit> exits) {
 		var counts = emptyConfidenceCounts();
 		for (StationExit exit : exits) {
-			counts.computeIfPresent(exit.dataConfidence(), (level, count) -> count + 1);
+			DataConfidenceLevel level = requireConfidenceLevel(exit);
+			counts.put(level, counts.get(level) + 1);
 		}
 		return counts;
 	}
@@ -60,9 +62,32 @@ public class DataQualityService implements DataQualityUseCase {
 	private Map<DataConfidenceLevel, Long> countFacilityConfidence(List<AccessibilityFacility> facilities) {
 		var counts = emptyConfidenceCounts();
 		for (AccessibilityFacility facility : facilities) {
-			counts.computeIfPresent(facility.dataConfidence(), (level, count) -> count + 1);
+			DataConfidenceLevel level = requireConfidenceLevel(facility);
+			counts.put(level, counts.get(level) + 1);
 		}
 		return counts;
+	}
+
+	// 마스터 데이터 오류는 요약 집계에서 조용히 누락하지 않고 운영자가 바로 알 수 있게 실패시킨다.
+	private DataQualityLevel requireQualityLevel(Station station) {
+		if (station.dataQualityLevel() == null) {
+			throw new IllegalStateException("역 " + station.id() + "의 dataQualityLevel이 비어 있습니다.");
+		}
+		return station.dataQualityLevel();
+	}
+
+	private DataConfidenceLevel requireConfidenceLevel(StationExit exit) {
+		if (exit.dataConfidence() == null) {
+			throw new IllegalStateException("출구 " + exit.id() + "의 dataConfidence가 비어 있습니다.");
+		}
+		return exit.dataConfidence();
+	}
+
+	private DataConfidenceLevel requireConfidenceLevel(AccessibilityFacility facility) {
+		if (facility.dataConfidence() == null) {
+			throw new IllegalStateException("시설 " + facility.id() + "의 dataConfidence가 비어 있습니다.");
+		}
+		return facility.dataConfidence();
 	}
 
 	private long countNeedsVerificationFacilities(List<AccessibilityFacility> facilities) {
