@@ -64,7 +64,6 @@ public class FacilityStatusAlertService implements FacilityStatusAlertUseCase {
 			.formatted(station.nameKo(), facility.name(), statusLabel(command.status()));
 		loadFavoriteRouteAlertTargetPort.loadUserIdsByRouteStationId(facility.stationId())
 			.stream()
-			.distinct()
 			.forEach(userId -> dispatch(
 				userId,
 				PushNotificationType.FAVORITE_ROUTE_FACILITY,
@@ -78,18 +77,12 @@ public class FacilityStatusAlertService implements FacilityStatusAlertUseCase {
 	}
 
 	private AccessibilityFacility loadFacility(String facilityId) {
-		return loadTransitMasterPort.loadAccessibilityFacilities()
-			.stream()
-			.filter(facility -> facility.id().equals(facilityId))
-			.findFirst()
+		return loadTransitMasterPort.loadAccessibilityFacility(facilityId)
 			.orElseThrow(AccessibilityFacilityNotFoundException::new);
 	}
 
 	private Station loadStation(String stationId) {
-		return loadTransitMasterPort.loadStations()
-			.stream()
-			.filter(station -> station.id().equals(stationId))
-			.findFirst()
+		return loadTransitMasterPort.loadStation(stationId)
 			.orElseThrow(StationNotFoundException::new);
 	}
 

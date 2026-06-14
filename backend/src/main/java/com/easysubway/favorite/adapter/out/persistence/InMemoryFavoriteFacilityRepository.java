@@ -8,6 +8,7 @@ import com.easysubway.favorite.domain.FavoriteFacility;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
@@ -33,6 +34,7 @@ public class InMemoryFavoriteFacilityRepository implements
 
 	@Override
 	public List<String> loadUserIdsByFavoriteFacilityId(String facilityId) {
+		Objects.requireNonNull(facilityId, "시설 식별자가 필요합니다.");
 		return favoritesByUserId.entrySet()
 			.stream()
 			.filter(entry -> entry.getValue().containsKey(facilityId))

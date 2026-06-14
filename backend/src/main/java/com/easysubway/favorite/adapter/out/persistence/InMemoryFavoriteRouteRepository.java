@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -35,6 +36,7 @@ public class InMemoryFavoriteRouteRepository implements
 
 	@Override
 	public synchronized List<String> loadUserIdsByRouteStationId(String stationId) {
+		Objects.requireNonNull(stationId, "역 식별자가 필요합니다.");
 		return favoritesByUserId.entrySet()
 			.stream()
 			.filter(entry -> hasRouteTouchingStation(entry.getValue(), stationId))

@@ -222,6 +222,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 				return;
 			}
 			// 신고 승인과 관리자 직접 수정은 같은 알림 정책을 사용해야 사용자 경험이 일관된다.
+			// 현재는 outbox 생성까지 같은 요청에서 처리하며, 외부 push 발송 어댑터는 별도 재시도/트랜잭션 경계를 둔다.
 			facilityStatusAlertUseCase.alertFacilityStatusChanged(
 				new FacilityStatusChangedAlertCommand(report.facilityId(), status)
 			);
