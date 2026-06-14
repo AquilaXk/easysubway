@@ -53,11 +53,10 @@ class CurrentLocationException implements Exception {
 }
 
 class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
-  MethodChannelCurrentLocationProvider({
-    MethodChannel channel = const MethodChannel(
-      'com.easysubway.easysubway_mobile/location',
-    ),
-  }) : _channel = channel;
+  MethodChannelCurrentLocationProvider({MethodChannel? channel})
+    : _channel =
+          channel ??
+          const MethodChannel('com.easysubway.easysubway_mobile/location');
 
   final MethodChannel _channel;
 
