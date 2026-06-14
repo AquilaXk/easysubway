@@ -839,7 +839,8 @@ class StationFacilityInfo {
       'BROKEN' || 'CLOSED' => 10,
       'UNDER_CONSTRUCTION' || 'CONSTRUCTION' => 20,
       'USER_REPORTED' || 'UNKNOWN' || 'NEEDS_REPORT' || 'NEEDS_CHECK' => 30,
-      _ => 40,
+      'NORMAL' || 'ADMIN_VERIFIED' => 40,
+      _ => 30,
     };
   }
 
@@ -2207,19 +2208,20 @@ class _StationDetailContent extends StatelessWidget {
         const SizedBox(height: 24),
         const _StationDetailSectionTitle(title: '시설'),
         const SizedBox(height: 12),
-        _StationFacilityStatusSummary(
-          text: facilityAttentionSummary,
-          semanticLabel: facilityAttentionSemanticLabel,
-        ),
-        const SizedBox(height: 12),
         if (facilities.isEmpty)
           const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
-        else
+        else ...[
+          _StationFacilityStatusSummary(
+            text: facilityAttentionSummary,
+            semanticLabel: facilityAttentionSemanticLabel,
+          ),
+          const SizedBox(height: 12),
           for (final facility in facilities)
             _StationFacilityCard(
               facility: facility,
               onReportTap: () => _openFacilityReport(context, facility),
             ),
+        ],
       ],
     );
   }

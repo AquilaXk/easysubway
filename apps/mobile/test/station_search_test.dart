@@ -746,6 +746,11 @@ void main() {
           status: 'UNDER_CONSTRUCTION',
         ),
         _stationFacility(
+          id: 'facility-sangnoksu-call-bell-1',
+          name: '비상벨',
+          status: 'NEW_BACKEND_STATUS',
+        ),
+        _stationFacility(
           id: 'facility-sangnoksu-elevator-2',
           name: '2번 출구 엘리베이터',
           status: 'BROKEN',
@@ -756,10 +761,11 @@ void main() {
     expect(state.prioritizedFacilities.map((facility) => facility.name), [
       '2번 출구 엘리베이터',
       '1번 출구 경사로',
+      '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '확인 필요 2개');
-    expect(state.facilityAttentionSemanticLabel, '확인이 필요한 시설 2개');
+    expect(state.facilityAttentionSummary, '확인 필요 3개');
+    expect(state.facilityAttentionSemanticLabel, '확인이 필요한 시설 3개');
   });
 
   test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
