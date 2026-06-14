@@ -171,12 +171,18 @@ void main() {
       '/api/v1/stations/station-sangnoksu/facilities',
     ]);
     expect(detail.nameKo, '상록수');
+    expect(detail.latitude, 37.302795);
+    expect(detail.longitude, 126.866489);
     expect(detail.dataQualityLabel, '기본 정보만 확인됨');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
+    expect(exits.single.latitude, 37.302795);
+    expect(exits.single.longitude, 126.866489);
     expect(exits.single.elevatorConnectionLabel, '엘리베이터 연결');
     expect(exits.single.stairPathLabel, '계단 없는 이동 가능');
     expect(facilities.single.typeLabel, '엘리베이터');
+    expect(facilities.single.latitude, 37.302795);
+    expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
     expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
   });
