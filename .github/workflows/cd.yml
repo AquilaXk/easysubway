@@ -18,9 +18,6 @@ jobs:
     name: CD Readiness
     runs-on: ubuntu-latest
 
-    env:
-      EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
-
     steps:
       - name: CD Readiness / Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -30,6 +27,8 @@ jobs:
       - name: CD Readiness / Restore GitHub Actions dotenv secret
         id: dotenv
         shell: bash
+        env:
+          EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
         run: |
           set -euo pipefail
 

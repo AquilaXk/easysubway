@@ -82,10 +82,12 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /name: CD Readiness/);
   assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
   assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret/);
+  assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /CD Readiness \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Readiness \/ Validate Docker Compose deployment config/);
   assert.match(workflow, /docker compose --env-file "\$\{EASYSUBWAY_ENV_FILE\}" -f infra\/docker-compose\.yml config --quiet/);
   assert.match(workflow, /EASYSUBWAY_ENV secret is not configured/);
+  assert.doesNotMatch(workflow, /runs-on: ubuntu-latest\s*\n\s*env:\s*\n\s*EASYSUBWAY_ENV_SECRET/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
 
