@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'anonymous_auth.dart';
 import 'auth_headers.dart';
 import 'facility_report.dart';
+import 'favorite_facility.dart';
 import 'mobility_profile.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
@@ -20,6 +21,7 @@ class EasySubwayApp extends StatelessWidget {
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
     FavoriteStationRepository? favoriteRepository,
+    FavoriteFacilityRepository? favoriteFacilityRepository,
     NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
     OnboardingResultStore? onboardingStore,
@@ -32,6 +34,7 @@ class EasySubwayApp extends StatelessWidget {
            reportRepository: reportRepository,
            routeRepository: routeRepository,
            favoriteRepository: favoriteRepository,
+           favoriteFacilityRepository: favoriteFacilityRepository,
            notificationRepository: notificationRepository,
            anonymousAuthRepository: anonymousAuthRepository,
            enableAnonymousAuth: enableAnonymousAuth,
@@ -50,12 +53,14 @@ class EasySubwayApp extends StatelessWidget {
        reportRepository = dependencies.reportRepository,
        routeRepository = dependencies.routeRepository,
        favoriteRepository = dependencies.favoriteRepository,
+       favoriteFacilityRepository = dependencies.favoriteFacilityRepository,
        notificationRepository = dependencies.notificationRepository;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
   final NotificationSettingsRepository? notificationRepository;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
@@ -108,6 +113,7 @@ class EasySubwayApp extends StatelessWidget {
         reportRepository: reportRepository,
         routeRepository: routeRepository,
         favoriteRepository: favoriteRepository,
+        favoriteFacilityRepository: favoriteFacilityRepository,
         notificationRepository: notificationRepository,
         initialOnboardingState: initialOnboardingState,
         onboardingStore: onboardingStore,
@@ -122,6 +128,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
+    required this.favoriteFacilityRepository,
     required this.notificationRepository,
     required this.initialOnboardingState,
     required this.onboardingStore,
@@ -131,6 +138,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
   final NotificationSettingsRepository? notificationRepository;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
@@ -185,6 +193,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         reportRepository: widget.reportRepository,
         routeRepository: widget.routeRepository,
         favoriteRepository: widget.favoriteRepository,
+        favoriteFacilityRepository: widget.favoriteFacilityRepository,
         notificationRepository: widget.notificationRepository,
         initialMobilityType: onboardingResult?.profile.mobilityType,
         simpleViewEnabled: preferences.simpleViewEnabled,
@@ -297,6 +306,7 @@ class _EasySubwayAppDependencies {
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
+    required this.favoriteFacilityRepository,
     required this.notificationRepository,
   });
 
@@ -305,6 +315,7 @@ class _EasySubwayAppDependencies {
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
     FavoriteStationRepository? favoriteRepository,
+    FavoriteFacilityRepository? favoriteFacilityRepository,
     NotificationSettingsRepository? notificationRepository,
     AnonymousAuthRepository? anonymousAuthRepository,
     required bool enableAnonymousAuth,
@@ -328,6 +339,12 @@ class _EasySubwayAppDependencies {
             baseUri: baseUri,
             authProvider: sharedAuthProvider,
           ),
+      favoriteFacilityRepository:
+          favoriteFacilityRepository ??
+          _defaultFavoriteFacilityRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
       notificationRepository:
           notificationRepository ??
           _defaultNotificationSettingsRepository(
@@ -341,6 +358,7 @@ class _EasySubwayAppDependencies {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
   final NotificationSettingsRepository? notificationRepository;
 }
 
@@ -371,6 +389,19 @@ FavoriteStationRepository? _defaultFavoriteStationRepository({
   );
 }
 
+FavoriteFacilityRepository? _defaultFavoriteFacilityRepository({
+  required Uri baseUri,
+  required AuthorizationHeaderProvider? authProvider,
+}) {
+  if (authProvider == null) {
+    return null;
+  }
+  return FavoriteFacilityApiRepository(
+    baseUri: baseUri,
+    authProvider: authProvider,
+  );
+}
+
 NotificationSettingsRepository? _defaultNotificationSettingsRepository({
   required Uri baseUri,
   required AuthorizationHeaderProvider? authProvider,
@@ -390,6 +421,7 @@ class HomeScreen extends StatelessWidget {
     required this.reportRepository,
     required this.routeRepository,
     required this.favoriteRepository,
+    required this.favoriteFacilityRepository,
     required this.notificationRepository,
     this.simpleViewEnabled = true,
     String? initialMobilityType,
@@ -401,6 +433,7 @@ class HomeScreen extends StatelessWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
   final NotificationSettingsRepository? notificationRepository;
   final String initialMobilityType;
   final bool simpleViewEnabled;
@@ -409,6 +442,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final favoriteRepository = this.favoriteRepository;
+    final favoriteFacilityRepository = this.favoriteFacilityRepository;
     final notificationRepository = this.notificationRepository;
 
     return Scaffold(
@@ -478,7 +512,24 @@ class HomeScreen extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.star),
-                label: const Text('즐겨찾기'),
+                label: const Text('즐겨찾기 역'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (favoriteFacilityRepository != null) ...[
+              FilledButton.icon(
+                key: const Key('favoriteFacilitiesButton'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => FavoriteFacilityListScreen(
+                        repository: favoriteFacilityRepository,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.elevator_outlined),
+                label: const Text('즐겨찾기 시설'),
               ),
               const SizedBox(height: 12),
             ],
