@@ -438,6 +438,9 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteStationCommand.java");
   const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteStationCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteStationPort.java");
+  const alertTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteStationAlertTargetPort.java",
+  );
   const savePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/SaveFavoriteStationPort.java");
   const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteStationPort.java");
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteStationService.java");
@@ -458,12 +461,15 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(saveCommand, /record SaveFavoriteStationCommand/);
   assert.match(removeCommand, /record RemoveFavoriteStationCommand/);
   assert.match(loadPort, /interface LoadFavoriteStationPort/);
+  assert.match(alertTargetPort, /interface LoadFavoriteStationAlertTargetPort/);
+  assert.match(alertTargetPort, /loadUserIdsByFavoriteStationId/);
   assert.match(savePort, /interface SaveFavoriteStationPort/);
   assert.match(deletePort, /interface DeleteFavoriteStationPort/);
   assert.match(service, /implements FavoriteStationUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
   assert.match(service, /StationNotFoundException/);
-  assert.match(repository, /implements[\s\S]*LoadFavoriteStationPort[\s\S]*SaveFavoriteStationPort[\s\S]*DeleteFavoriteStationPort/);
+  assert.match(repository, /implements[\s\S]*LoadFavoriteStationPort[\s\S]*LoadFavoriteStationAlertTargetPort[\s\S]*SaveFavoriteStationPort[\s\S]*DeleteFavoriteStationPort/);
+  assert.match(repository, /loadUserIdsByFavoriteStationId/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/stations"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
@@ -483,6 +489,9 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteFacilityCommand.java");
   const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteFacilityCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteFacilityPort.java");
+  const alertTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteFacilityAlertTargetPort.java",
+  );
   const savePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/SaveFavoriteFacilityPort.java");
   const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteFacilityPort.java");
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteFacilityService.java");
@@ -507,13 +516,16 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   assert.match(saveCommand, /record SaveFavoriteFacilityCommand/);
   assert.match(removeCommand, /record RemoveFavoriteFacilityCommand/);
   assert.match(loadPort, /interface LoadFavoriteFacilityPort/);
+  assert.match(alertTargetPort, /interface LoadFavoriteFacilityAlertTargetPort/);
+  assert.match(alertTargetPort, /loadUserIdsByFavoriteFacilityId/);
   assert.match(savePort, /interface SaveFavoriteFacilityPort/);
   assert.match(deletePort, /interface DeleteFavoriteFacilityPort/);
   assert.match(service, /implements FavoriteFacilityUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
   assert.match(service, /loadAccessibilityFacilities/);
   assert.match(service, /FavoriteFacilityNotFoundException/);
-  assert.match(repository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort/);
+  assert.match(repository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*LoadFavoriteFacilityAlertTargetPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort/);
+  assert.match(repository, /loadUserIdsByFavoriteFacilityId/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/facilities"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
@@ -534,6 +546,9 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteRouteCommand.java");
   const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteRouteCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteRoutePort.java");
+  const alertTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteRouteAlertTargetPort.java",
+  );
   const savePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/SaveFavoriteRoutePort.java");
   const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteRoutePort.java");
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteRouteService.java");
@@ -556,12 +571,15 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   assert.match(saveCommand, /record SaveFavoriteRouteCommand/);
   assert.match(removeCommand, /record RemoveFavoriteRouteCommand/);
   assert.match(loadPort, /interface LoadFavoriteRoutePort/);
+  assert.match(alertTargetPort, /interface LoadFavoriteRouteAlertTargetPort/);
+  assert.match(alertTargetPort, /loadUserIdsByRouteStationId/);
   assert.match(savePort, /interface SaveFavoriteRoutePort/);
   assert.match(deletePort, /interface DeleteFavoriteRoutePort/);
   assert.match(service, /implements FavoriteRouteUseCase/);
   assert.match(service, /LoadRouteSearchPort/);
   assert.match(service, /RouteSearchNotFoundException/);
-  assert.match(repository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort/);
+  assert.match(repository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*LoadFavoriteRouteAlertTargetPort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort/);
+  assert.match(repository, /loadUserIdsByRouteStationId/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/routes\/\{favoriteRouteId\}"\)/);
@@ -654,6 +672,47 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(controller, /PushNotificationDispatchUseCase/);
   assert.doesNotMatch(controller, /deviceToken/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
+});
+
+test("백엔드 시설 상태 변경 알림은 즐겨찾기와 푸시 outbox 경계를 따른다", () => {
+  const useCase = read("backend/src/main/java/com/easysubway/notification/application/port/in/FacilityStatusAlertUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/notification/application/port/in/FacilityStatusChangedAlertCommand.java");
+  const service = read("backend/src/main/java/com/easysubway/notification/application/service/FacilityStatusAlertService.java");
+  const facilityTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteFacilityAlertTargetPort.java",
+  );
+  const stationTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteStationAlertTargetPort.java",
+  );
+  const routeTargetPort = read(
+    "backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteRouteAlertTargetPort.java",
+  );
+  const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+  const transitService = read("backend/src/main/java/com/easysubway/transit/application/service/TransitMasterService.java");
+
+  assert.match(useCase, /interface FacilityStatusAlertUseCase/);
+  assert.match(useCase, /alertFacilityStatusChanged/);
+  assert.match(command, /record FacilityStatusChangedAlertCommand/);
+  assert.match(command, /String facilityId/);
+  assert.match(command, /AccessibilityFacilityStatus status/);
+  assert.match(facilityTargetPort, /interface LoadFavoriteFacilityAlertTargetPort/);
+  assert.match(stationTargetPort, /interface LoadFavoriteStationAlertTargetPort/);
+  assert.match(routeTargetPort, /interface LoadFavoriteRouteAlertTargetPort/);
+  assert.match(service, /implements FacilityStatusAlertUseCase/);
+  assert.match(service, /LoadTransitMasterPort/);
+  assert.match(service, /LoadFavoriteFacilityAlertTargetPort/);
+  assert.match(service, /LoadFavoriteStationAlertTargetPort/);
+  assert.match(service, /LoadFavoriteRouteAlertTargetPort/);
+  assert.match(service, /PushNotificationDispatchUseCase/);
+  assert.match(service, /new LinkedHashSet<String>\(\)/);
+  assert.match(service, /PushNotificationType\.FAVORITE_STATION_FACILITY/);
+  assert.match(service, /PushNotificationType\.FAVORITE_ROUTE_FACILITY/);
+  assert.match(reportService, /FacilityStatusAlertUseCase/);
+  assert.match(reportService, /FacilityStatusChangedAlertCommand/);
+  assert.match(reportService, /alertFacilityStatusChanged/);
+  assert.match(transitService, /FacilityStatusAlertUseCase/);
+  assert.match(transitService, /FacilityStatusChangedAlertCommand/);
+  assert.match(transitService, /alertFacilityStatusChanged/);
 });
 
 test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계를 따른다", () => {
