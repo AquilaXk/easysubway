@@ -2,6 +2,8 @@ package com.easysubway.collection.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.easysubway.collection.adapter.out.persistence.InMemoryDataCollectionRunRepository;
 import com.easysubway.collection.application.port.in.RunDataCollectionCommand;
@@ -10,6 +12,7 @@ import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
+import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -58,6 +61,25 @@ class DataCollectionRunRecorderTest {
 		assertThat(recentRuns)
 			.extracting("requestedBy")
 			.containsExactly("admin-b");
+	}
+
+	@Test
+	@DisplayName("도시철도 마스터 데이터 로딩 실패도 실행 기록에 실패 상태로 남긴다")
+	void recordTransitMasterRunStoresFailedRunWhenLoadingFails() {
+		LoadTransitMasterPort failingTransitMasterPort = mock(LoadTransitMasterPort.class);
+		when(failingTransitMasterPort.loadOperators()).thenThrow(new IllegalStateException("loader down"));
+		var failingRepository = new InMemoryDataCollectionRunRepository();
+		var failingRecorder = new DataCollectionRunRecorder(failingTransitMasterPort, failingRepository, CLOCK);
+
+		assertThatThrownBy(() -> failingRecorder.recordTransitMasterRun("collection-failed-run", "admin-user"))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("loader down");
+
+		var run = failingRepository.loadRun("collection-failed-run").orElseThrow();
+		assertThat(run.status()).isEqualTo(DataCollectionStatus.FAILED);
+		assertThat(run.requestedBy()).isEqualTo("admin-user");
+		assertThat(run.completedAt()).isEqualTo(LocalDateTime.of(2026, 6, 14, 11, 0));
+		assertThat(run.failureMessage()).isEqualTo("loader down");
 	}
 
 	@Test

@@ -37,19 +37,50 @@ public class DataCollectionRunRecorder {
 
 	public DataCollectionRun recordTransitMasterRun(String runId, String requestedBy) {
 		LocalDateTime startedAt = LocalDateTime.now(clock);
-		int collectedCount = countTransitMasterRecords();
-		LocalDateTime completedAt = LocalDateTime.now(clock);
-		var run = new DataCollectionRun(
+		try {
+			int collectedCount = countTransitMasterRecords();
+			LocalDateTime completedAt = LocalDateTime.now(clock);
+			var run = new DataCollectionRun(
+				runId,
+				DataCollectionSource.TRANSIT_MASTER,
+				DataCollectionStatus.COMPLETED,
+				requestedBy,
+				startedAt,
+				completedAt,
+				collectedCount,
+				null
+			);
+			return saveDataCollectionRunPort.saveRun(run);
+		} catch (RuntimeException exception) {
+			saveFailedRun(runId, requestedBy, startedAt, exception);
+			throw exception;
+		}
+	}
+
+	private void saveFailedRun(
+		String runId,
+		String requestedBy,
+		LocalDateTime startedAt,
+		RuntimeException exception
+	) {
+		// Batch가 FAILED로 끝나도 관리자 실행 이력에서 원인을 확인할 수 있게 실패 기록을 먼저 남긴다.
+		saveDataCollectionRunPort.saveRun(new DataCollectionRun(
 			runId,
 			DataCollectionSource.TRANSIT_MASTER,
-			DataCollectionStatus.COMPLETED,
+			DataCollectionStatus.FAILED,
 			requestedBy,
 			startedAt,
-			completedAt,
-			collectedCount,
-			null
-		);
-		return saveDataCollectionRunPort.saveRun(run);
+			LocalDateTime.now(clock),
+			0,
+			failureMessageOf(exception)
+		));
+	}
+
+	private String failureMessageOf(RuntimeException exception) {
+		if (exception.getMessage() == null || exception.getMessage().isBlank()) {
+			return exception.getClass().getSimpleName();
+		}
+		return exception.getMessage();
 	}
 
 	private int countTransitMasterRecords() {
