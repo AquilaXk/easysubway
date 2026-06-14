@@ -4,12 +4,15 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
 import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.';
+const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
+const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
@@ -63,6 +66,237 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       );
       throw const RouteSearchException(_routeSearchErrorMessage);
     }
+  }
+}
+
+abstract class FavoriteRouteRepository {
+  Future<List<FavoriteRoute>> listFavoriteRoutes();
+
+  Future<FavoriteRoute> saveFavoriteRoute(String routeSearchId);
+
+  Future<void> removeFavoriteRoute(String favoriteRouteId);
+}
+
+class FavoriteRouteApiRepository implements FavoriteRouteRepository {
+  FavoriteRouteApiRepository({
+    required this.baseUri,
+    required this.authProvider,
+    HttpClient? httpClient,
+  }) : _httpClient = httpClient ?? HttpClient();
+
+  final Uri baseUri;
+  final AuthorizationHeaderProvider authProvider;
+  final HttpClient _httpClient;
+
+  @override
+  Future<List<FavoriteRoute>> listFavoriteRoutes() async {
+    final data = await _requestData(
+      'GET',
+      baseUri.resolve('/api/v1/me/favorites/routes'),
+      errorMessage: _favoriteRouteLoadErrorMessage,
+    );
+    if (data is! List) {
+      throw const FavoriteRouteException(_favoriteRouteLoadErrorMessage);
+    }
+
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid favorite route payload');
+            }
+            return FavoriteRoute.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 경로 목록 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const FavoriteRouteException(_favoriteRouteLoadErrorMessage);
+    }
+  }
+
+  @override
+  Future<FavoriteRoute> saveFavoriteRoute(String routeSearchId) async {
+    final data = await _requestData(
+      'POST',
+      baseUri.resolve('/api/v1/me/favorites/routes'),
+      body: {'routeSearchId': routeSearchId},
+      errorMessage: _favoriteRouteErrorMessage,
+    );
+    if (data is! Map<String, Object?>) {
+      throw const FavoriteRouteException(_favoriteRouteErrorMessage);
+    }
+
+    try {
+      return FavoriteRoute.fromJson(data);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 경로 저장 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const FavoriteRouteException(_favoriteRouteErrorMessage);
+    }
+  }
+
+  @override
+  Future<void> removeFavoriteRoute(String favoriteRouteId) async {
+    await _requestData(
+      'DELETE',
+      baseUri.resolve('/api/v1/me/favorites/routes/$favoriteRouteId'),
+      errorMessage: _favoriteRouteErrorMessage,
+    );
+  }
+
+  Future<Object?> _requestData(
+    String method,
+    Uri uri, {
+    Map<String, Object?>? body,
+    required String errorMessage,
+  }) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final request = await _httpClient
+            .openUrl(method, uri)
+            .timeout(_routeSearchTimeout);
+        final authorizationHeader = await authProvider
+            .authorizationHeader()
+            .timeout(_routeSearchTimeout);
+        if (authorizationHeader != null) {
+          request.headers.set(
+            HttpHeaders.authorizationHeader,
+            authorizationHeader,
+          );
+        }
+        if (body != null) {
+          request.headers.contentType = ContentType.json;
+          request.write(jsonEncode(body));
+        }
+
+        final response = await request.close().timeout(_routeSearchTimeout);
+        final responseBody = await utf8
+            .decodeStream(response)
+            .timeout(_routeSearchTimeout);
+
+        if (response.statusCode == HttpStatus.unauthorized &&
+            authorizationHeader != null &&
+            attempt == 0) {
+          // 만료된 익명 인증은 비우고 새 인증으로 한 번만 다시 시도한다.
+          await authProvider.invalidateAuthorization().timeout(
+            _routeSearchTimeout,
+          );
+          continue;
+        }
+
+        if (response.statusCode < HttpStatus.ok ||
+            response.statusCode >= HttpStatus.multipleChoices) {
+          throw FavoriteRouteException(errorMessage);
+        }
+
+        final decoded = jsonDecode(responseBody);
+        if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+          throw FavoriteRouteException(errorMessage);
+        }
+        return decoded['data'];
+      } on FavoriteRouteException {
+        rethrow;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '즐겨찾기 경로 API 요청 처리 중 예외가 발생했습니다.',
+        );
+        throw FavoriteRouteException(errorMessage);
+      }
+    }
+    throw FavoriteRouteException(errorMessage);
+  }
+}
+
+class FavoriteRouteException implements Exception {
+  const FavoriteRouteException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class FavoriteRoute {
+  const FavoriteRoute({
+    required this.userId,
+    required this.favoriteRouteId,
+    required this.routeSearchId,
+    required this.originStationId,
+    required this.originStationName,
+    required this.destinationStationId,
+    required this.destinationStationName,
+    required this.mobilityType,
+    required this.status,
+    required this.lineId,
+    required this.lineName,
+    required this.score,
+    required this.routeCreatedAt,
+    required this.addedAt,
+  });
+
+  factory FavoriteRoute.fromJson(Map<String, Object?> json) {
+    return FavoriteRoute(
+      userId: _requiredRouteString(json, 'userId'),
+      favoriteRouteId: _requiredRouteString(json, 'favoriteRouteId'),
+      routeSearchId: _requiredRouteString(json, 'routeSearchId'),
+      originStationId: _requiredRouteString(json, 'originStationId'),
+      originStationName: _requiredRouteString(json, 'originStationName'),
+      destinationStationId: _requiredRouteString(json, 'destinationStationId'),
+      destinationStationName: _requiredRouteString(
+        json,
+        'destinationStationName',
+      ),
+      mobilityType: _requiredRouteString(json, 'mobilityType'),
+      status: _requiredRouteString(json, 'status'),
+      lineId: _optionalRouteString(json, 'lineId'),
+      lineName: _optionalRouteString(json, 'lineName'),
+      score: _requiredRouteInt(json, 'score'),
+      routeCreatedAt: _requiredRouteString(json, 'routeCreatedAt'),
+      addedAt: _requiredRouteString(json, 'addedAt'),
+    );
+  }
+
+  final String userId;
+  final String favoriteRouteId;
+  final String routeSearchId;
+  final String originStationId;
+  final String originStationName;
+  final String destinationStationId;
+  final String destinationStationName;
+  final String mobilityType;
+  final String status;
+  final String lineId;
+  final String lineName;
+  final int score;
+  final String routeCreatedAt;
+  final String addedAt;
+
+  String get summaryTitle => '$originStationName에서 $destinationStationName까지';
+
+  String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
+
+  String get scoreLabel => '이동 점수 $score점';
+
+  String get mobilityLabel {
+    for (final option in mobilityProfileOptions) {
+      if (option.mobilityType == mobilityType) {
+        return option.title;
+      }
+    }
+    return '이동 조건 확인 필요';
+  }
+
+  String get semanticLabel {
+    return '즐겨찾기 경로, $summaryTitle, $lineLabel, $mobilityLabel, $scoreLabel';
   }
 }
 
@@ -388,12 +622,14 @@ class RouteSearchScreen extends StatefulWidget {
   RouteSearchScreen({
     required this.repository,
     required this.stationRepository,
+    this.favoriteRouteRepository,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
 
   final RouteSearchRepository repository;
   final StationSearchRepository stationRepository;
+  final FavoriteRouteRepository? favoriteRouteRepository;
   final String initialMobilityType;
 
   @override
@@ -517,8 +753,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
             ],
             AnimatedBuilder(
               animation: _controller,
-              builder: (context, _) =>
-                  _RouteSearchBody(state: _controller.state),
+              builder: (context, _) => _RouteSearchBody(
+                state: _controller.state,
+                favoriteRouteRepository: widget.favoriteRouteRepository,
+              ),
             ),
           ],
         ),
@@ -904,9 +1142,13 @@ class _RouteStationOptionTile extends StatelessWidget {
 }
 
 class _RouteSearchBody extends StatelessWidget {
-  const _RouteSearchBody({required this.state});
+  const _RouteSearchBody({
+    required this.state,
+    required this.favoriteRouteRepository,
+  });
 
   final RouteSearchState state;
+  final FavoriteRouteRepository? favoriteRouteRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -928,6 +1170,7 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
+        favoriteRouteRepository: favoriteRouteRepository,
       ),
     };
   }
@@ -956,7 +1199,36 @@ class _RouteSearchMessage extends StatelessWidget {
 }
 
 class _RouteSearchResultCard extends StatelessWidget {
-  const _RouteSearchResultCard({required this.result});
+  const _RouteSearchResultCard({
+    required this.result,
+    required this.favoriteRouteRepository,
+  });
+
+  final RouteSearchResult result;
+  final FavoriteRouteRepository? favoriteRouteRepository;
+
+  @override
+  Widget build(BuildContext context) {
+    final canSaveRoute = favoriteRouteRepository != null && !result.isBlocked;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RouteSearchResultSummaryCard(result: result),
+        if (canSaveRoute) ...[
+          const SizedBox(height: 12),
+          _RouteFavoriteSaveButton(
+            result: result,
+            repository: favoriteRouteRepository!,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _RouteSearchResultSummaryCard extends StatelessWidget {
+  const _RouteSearchResultSummaryCard({required this.result});
 
   final RouteSearchResult result;
 
@@ -1123,6 +1395,486 @@ class _RouteStepTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RouteFavoriteSaveButton extends StatefulWidget {
+  const _RouteFavoriteSaveButton({
+    required this.result,
+    required this.repository,
+  });
+
+  final RouteSearchResult result;
+  final FavoriteRouteRepository repository;
+
+  @override
+  State<_RouteFavoriteSaveButton> createState() =>
+      _RouteFavoriteSaveButtonState();
+}
+
+class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
+  bool _saving = false;
+  String _message = '';
+
+  @override
+  void didUpdateWidget(_RouteFavoriteSaveButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.result.routeSearchId != widget.result.routeSearchId) {
+      _saving = false;
+      _message = '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          key: const Key('routeFavoriteSaveButton'),
+          onPressed: _saving ? null : _save,
+          icon: const Icon(Icons.bookmark_add_outlined),
+          label: Text(_saving ? '저장 중' : '자주 쓰는 경로 저장'),
+        ),
+        if (_message.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _message,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF29484B),
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _message = '';
+    });
+
+    try {
+      await widget.repository.saveFavoriteRoute(widget.result.routeSearchId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _message = '자주 쓰는 경로에 저장했습니다.';
+      });
+    } on FavoriteRouteException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _message = error.message;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 즐겨찾기 저장 화면 처리 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _message = _favoriteRouteErrorMessage;
+      });
+    }
+  }
+}
+
+enum FavoriteRouteListStatus { loading, success, empty, failure }
+
+class FavoriteRouteListState {
+  const FavoriteRouteListState({
+    required this.status,
+    required this.favorites,
+    this.message = '',
+    this.removingIds = const {},
+  });
+
+  const FavoriteRouteListState.loading()
+    : status = FavoriteRouteListStatus.loading,
+      favorites = const [],
+      message = '',
+      removingIds = const {};
+
+  final FavoriteRouteListStatus status;
+  final List<FavoriteRoute> favorites;
+  final String message;
+  final Set<String> removingIds;
+
+  FavoriteRouteListState copyWith({
+    FavoriteRouteListStatus? status,
+    List<FavoriteRoute>? favorites,
+    String? message,
+    Set<String>? removingIds,
+  }) {
+    return FavoriteRouteListState(
+      status: status ?? this.status,
+      favorites: favorites ?? this.favorites,
+      message: message ?? this.message,
+      removingIds: removingIds ?? this.removingIds,
+    );
+  }
+}
+
+class FavoriteRouteListController extends ChangeNotifier {
+  FavoriteRouteListController({required this.repository});
+
+  final FavoriteRouteRepository repository;
+  FavoriteRouteListState _state = const FavoriteRouteListState.loading();
+  bool _disposed = false;
+
+  FavoriteRouteListState get state => _state;
+
+  Future<void> load() async {
+    _emitState(const FavoriteRouteListState.loading());
+    try {
+      final favorites = await repository.listFavoriteRoutes();
+      if (_disposed) {
+        return;
+      }
+      _emitState(
+        favorites.isEmpty
+            ? const FavoriteRouteListState(
+                status: FavoriteRouteListStatus.empty,
+                favorites: [],
+                message: '저장한 경로가 없습니다.',
+              )
+            : FavoriteRouteListState(
+                status: FavoriteRouteListStatus.success,
+                favorites: favorites,
+              ),
+      );
+    } on FavoriteRouteException catch (error) {
+      _emitFailure(error.message);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 경로 목록 화면 처리 중 예외가 발생했습니다.',
+      );
+      _emitFailure(_favoriteRouteLoadErrorMessage);
+    }
+  }
+
+  Future<void> remove(FavoriteRoute favorite) async {
+    final favoriteRouteId = favorite.favoriteRouteId;
+    if (_state.removingIds.contains(favoriteRouteId)) {
+      return;
+    }
+
+    _emitState(
+      _state.copyWith(removingIds: {..._state.removingIds, favoriteRouteId}),
+    );
+
+    try {
+      await repository.removeFavoriteRoute(favoriteRouteId);
+      if (_disposed) {
+        return;
+      }
+      final nextFavorites = _state.favorites
+          .where((item) => item.favoriteRouteId != favoriteRouteId)
+          .toList(growable: false);
+      final nextRemovingIds = {..._state.removingIds}..remove(favoriteRouteId);
+      _emitState(
+        nextFavorites.isEmpty
+            ? FavoriteRouteListState(
+                status: FavoriteRouteListStatus.empty,
+                favorites: const [],
+                message: '저장한 경로가 없습니다.',
+                removingIds: nextRemovingIds,
+              )
+            : FavoriteRouteListState(
+                status: FavoriteRouteListStatus.success,
+                favorites: nextFavorites,
+                removingIds: nextRemovingIds,
+              ),
+      );
+    } on FavoriteRouteException catch (error) {
+      _emitFailure(error.message, removingIdToClear: favoriteRouteId);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 경로 삭제 처리 중 예외가 발생했습니다.',
+      );
+      _emitFailure(
+        _favoriteRouteErrorMessage,
+        removingIdToClear: favoriteRouteId,
+      );
+    }
+  }
+
+  void _emitFailure(String message, {String? removingIdToClear}) {
+    final nextRemovingIds = {..._state.removingIds};
+    if (removingIdToClear != null) {
+      nextRemovingIds.remove(removingIdToClear);
+    }
+    _emitState(
+      FavoriteRouteListState(
+        status: FavoriteRouteListStatus.failure,
+        favorites: _state.favorites,
+        message: message,
+        removingIds: nextRemovingIds,
+      ),
+    );
+  }
+
+  void _emitState(FavoriteRouteListState nextState) {
+    if (_disposed) {
+      return;
+    }
+    _state = nextState;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+class FavoriteRouteListScreen extends StatefulWidget {
+  const FavoriteRouteListScreen({required this.repository, super.key});
+
+  final FavoriteRouteRepository repository;
+
+  @override
+  State<FavoriteRouteListScreen> createState() =>
+      _FavoriteRouteListScreenState();
+}
+
+class _FavoriteRouteListScreenState extends State<FavoriteRouteListScreen> {
+  late final FavoriteRouteListController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FavoriteRouteListController(repository: widget.repository);
+    unawaited(_controller.load());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기 경로')),
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => _FavoriteRouteListBody(
+            state: _controller.state,
+            onRetry: _controller.load,
+            onRemove: _controller.remove,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteRouteListBody extends StatelessWidget {
+  const _FavoriteRouteListBody({
+    required this.state,
+    required this.onRetry,
+    required this.onRemove,
+  });
+
+  final FavoriteRouteListState state;
+  final VoidCallback onRetry;
+  final ValueChanged<FavoriteRoute> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      children: [
+        switch (state.status) {
+          FavoriteRouteListStatus.loading => Semantics(
+            label: '즐겨찾기 경로 불러오는 중',
+            liveRegion: true,
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+          FavoriteRouteListStatus.empty => _RouteSearchMessage(
+            message: state.message,
+            liveRegion: true,
+          ),
+          FavoriteRouteListStatus.failure => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _RouteSearchMessage(message: state.message, liveRegion: true),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('favoriteRoutesRetryButton'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 불러오기'),
+              ),
+            ],
+          ),
+          FavoriteRouteListStatus.success => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                label: '즐겨찾기 경로 ${state.favorites.length}개',
+                liveRegion: true,
+                child: const SizedBox.shrink(),
+              ),
+              for (final favorite in state.favorites)
+                _FavoriteRouteTile(
+                  favorite: favorite,
+                  isRemoving: state.removingIds.contains(
+                    favorite.favoriteRouteId,
+                  ),
+                  onRemove: onRemove,
+                ),
+            ],
+          ),
+        },
+      ],
+    );
+  }
+}
+
+class _FavoriteRouteTile extends StatelessWidget {
+  const _FavoriteRouteTile({
+    required this.favorite,
+    required this.isRemoving,
+    required this.onRemove,
+  });
+
+  final FavoriteRoute favorite;
+  final bool isRemoving;
+  final ValueChanged<FavoriteRoute> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final removeSemanticLabel =
+        '${favorite.summaryTitle} ${isRemoving ? '삭제 중' : '삭제'}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _FavoriteRouteSummaryCard(favorite: favorite),
+        const SizedBox(height: 12),
+        Semantics(
+          container: true,
+          label: removeSemanticLabel,
+          button: true,
+          enabled: !isRemoving,
+          onTap: isRemoving ? null : () => onRemove(favorite),
+          child: ExcludeSemantics(
+            child: OutlinedButton.icon(
+              key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
+              onPressed: isRemoving ? null : () => onRemove(favorite),
+              icon: isRemoving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              label: Text(isRemoving ? '삭제 중' : '삭제'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+}
+
+class _FavoriteRouteSummaryCard extends StatelessWidget {
+  const _FavoriteRouteSummaryCard({required this.favorite});
+
+  final FavoriteRoute favorite;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return MergeSemantics(
+      child: Semantics(
+        label: favorite.semanticLabel,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    favorite.summaryTitle,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    favorite.lineLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    favorite.mobilityLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    favorite.scoreLabel,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

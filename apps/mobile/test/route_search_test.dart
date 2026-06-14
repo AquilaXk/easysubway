@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -149,6 +150,69 @@ void main() {
 
     expect(notificationCount, 1);
   });
+
+  test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
+    final requestedMethods = <String>[];
+    final requestedPaths = <String>[];
+    final requestedBodies = <String>[];
+    final requestedAuthorizations = <String?>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestedMethods.add(request.method);
+      requestedPaths.add(request.uri.path);
+      requestedAuthorizations.add(
+        request.headers.value(HttpHeaders.authorizationHeader),
+      );
+      requestedBodies.add(await utf8.decoder.bind(request).join());
+
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json;
+
+      if (request.method == 'GET') {
+        request.response.write(
+          jsonEncode({
+            'success': true,
+            'data': [_favoriteRouteJson()],
+          }),
+        );
+      } else if (request.method == 'POST') {
+        request.response.write(
+          jsonEncode({'success': true, 'data': _favoriteRouteJson()}),
+        );
+      } else {
+        request.response.write(jsonEncode({'success': true, 'data': null}));
+      }
+      await request.response.close();
+    });
+
+    final repository = FavoriteRouteApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const BasicAuthorizationHeaderProvider(
+        username: 'anonymous-user-1',
+        password: 'password',
+      ),
+    );
+
+    final favorites = await repository.listFavoriteRoutes();
+    final saved = await repository.saveFavoriteRoute('route-1');
+    await repository.removeFavoriteRoute('route-1');
+
+    expect(requestedMethods, ['GET', 'POST', 'DELETE']);
+    expect(requestedPaths, [
+      '/api/v1/me/favorites/routes',
+      '/api/v1/me/favorites/routes',
+      '/api/v1/me/favorites/routes/route-1',
+    ]);
+    expect(jsonDecode(requestedBodies[1]), {'routeSearchId': 'route-1'});
+    expect(requestedAuthorizations, everyElement(startsWith('Basic ')));
+    expect(favorites.single.summaryTitle, '상록수에서 사당까지');
+    expect(saved.favoriteRouteId, 'route-1');
+    expect(saved.mobilityLabel, '고령자');
+    expect(saved.scoreLabel, '이동 점수 92점');
+  });
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
@@ -210,4 +274,23 @@ RouteSearchResult _sampleRouteSearchResult() {
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
   );
+}
+
+Map<String, Object?> _favoriteRouteJson() {
+  return {
+    'userId': 'anonymous-user-1',
+    'favoriteRouteId': 'route-1',
+    'routeSearchId': 'route-1',
+    'originStationId': 'station-sangnoksu',
+    'originStationName': '상록수',
+    'destinationStationId': 'station-sadang',
+    'destinationStationName': '사당',
+    'mobilityType': 'SENIOR',
+    'status': 'FOUND',
+    'lineId': 'seoul-4',
+    'lineName': '수도권 4호선',
+    'score': 92,
+    'routeCreatedAt': '2026-06-13T04:20:00',
+    'addedAt': '2026-06-14T10:00:00',
+  };
 }
