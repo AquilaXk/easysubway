@@ -432,9 +432,12 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel(
+          '즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨, 출처 공식 파일',
+        ),
         findsOneWidget,
       );
+      expect(find.text('출처 공식 파일'), findsOneWidget);
 
       final tileSize = tester.getSize(
         find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
@@ -1366,6 +1369,7 @@ FavoriteStation _favoriteStation({required String id, required String name}) {
     nameEn: id,
     region: '수도권',
     dataQualityLevel: 'LEVEL_1',
+    dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
     lines: const [
       StationSearchLine(
