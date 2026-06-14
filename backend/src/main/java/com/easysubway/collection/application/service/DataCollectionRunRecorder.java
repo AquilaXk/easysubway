@@ -37,14 +37,16 @@ public class DataCollectionRunRecorder {
 
 	public DataCollectionRun recordTransitMasterRun(String runId, String requestedBy) {
 		LocalDateTime startedAt = LocalDateTime.now(clock);
+		int collectedCount = countTransitMasterRecords();
+		LocalDateTime completedAt = LocalDateTime.now(clock);
 		var run = new DataCollectionRun(
 			runId,
 			DataCollectionSource.TRANSIT_MASTER,
 			DataCollectionStatus.COMPLETED,
 			requestedBy,
 			startedAt,
-			LocalDateTime.now(clock),
-			countTransitMasterRecords(),
+			completedAt,
+			collectedCount,
 			null
 		);
 		return saveDataCollectionRunPort.saveRun(run);
