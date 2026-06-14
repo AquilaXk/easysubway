@@ -1419,12 +1419,15 @@ class _RouteGuidanceChip extends StatelessWidget {
           children: [
             Icon(icon, size: 22, color: foregroundColor),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: foregroundColor,
-                fontWeight: FontWeight.w900,
-                height: 1.2,
+            Flexible(
+              child: Text(
+                label,
+                softWrap: true,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: foregroundColor,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
               ),
             ),
           ],
