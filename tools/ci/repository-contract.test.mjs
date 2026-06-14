@@ -21,6 +21,20 @@ function jobBlock(workflow, startJob, nextJob) {
   return match[0];
 }
 
+function assertMobileCatchPolicy(file, source) {
+  const catchPattern = /catch\s*\(([^)]*)\)/g;
+  for (const match of source.matchAll(catchPattern)) {
+    const lineStart = source.lastIndexOf("\n", match.index) + 1;
+    const linePrefix = source.slice(lineStart, match.index);
+    if (/\bon\s+\w+/.test(linePrefix)) {
+      continue;
+    }
+
+    const names = match[1].split(",").map((name) => name.trim());
+    assert.deepEqual(names, ["error", "stackTrace"], `${file} has catch without named error and stackTrace`);
+  }
+}
+
 test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적되지 않는다", () => {
   const gitignore = read(".gitignore");
 
@@ -53,6 +67,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
+  assert.match(workflow, /Mobile App CI \/ Run mobile catch contract/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
@@ -169,8 +184,20 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
 
   assert.ok(mobileFiles.length > 0, "mobile Dart files not found");
   for (const file of mobileFiles) {
-    assert.doesNotMatch(read(file), /catch\s*\(_\)/, `${file} has catch (_)`);
+    assertMobileCatchPolicy(file, read(file));
   }
+});
+
+test("모바일 변경 CI는 원본 예외 catch 계약을 실행한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const mobileJob = jobBlock(workflow, "mobile-app", "android");
+
+  assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
+  assert.match(mobileJob, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(
+    mobileJob,
+    /node --test --test-name-pattern "모바일 generic catch" tools\/ci\/repository-contract\.test\.mjs/,
+  );
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {

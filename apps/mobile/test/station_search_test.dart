@@ -531,6 +531,21 @@ void main() {
     expect(controller.state.facilities.single.name, '1번 출구 엘리베이터');
   });
 
+  test('역 상세 컨트롤러는 처리된 역 정보 실패를 오류 경계에 다시 보고하지 않는다', () async {
+    final reportedErrors = _captureReportedErrors();
+    final repository = FailingStationDetailRepository();
+    final controller = StationDetailController(repository: repository);
+    addTearDown(controller.dispose);
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await controller.load('station-sangnoksu');
+    });
+
+    expect(reportedErrors, isEmpty);
+    expect(controller.state.status, StationDetailStatus.failure);
+    expect(controller.state.message, '역 상세 정보를 불러오지 못했습니다.');
+  });
+
   test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
     final repository = FakeFavoriteStationRepository();
     final controller = FavoriteStationListController(repository: repository);
@@ -812,6 +827,30 @@ class ControlledStationDetailRepository implements StationSearchRepository {
     );
     _exitsCompleter.complete([_stationExit()]);
     _facilitiesCompleter.complete([_stationFacility()]);
+  }
+}
+
+class FailingStationDetailRepository implements StationSearchRepository {
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) async {
+    return const [];
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) async {
+    throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) async {
+    return const [];
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(
+    String stationId,
+  ) async {
+    return const [];
   }
 }
 
