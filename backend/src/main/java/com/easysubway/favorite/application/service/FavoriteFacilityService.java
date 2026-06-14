@@ -76,7 +76,8 @@ public class FavoriteFacilityService implements FavoriteFacilityUseCase {
 		requireUserId(command.userId());
 		requireFacilityId(command.facilityId());
 		// 고장 또는 확인 필요 시설도 추적 대상이므로 상태값은 저장 가능 여부에 쓰지 않는다.
-		loadFacility(command.facilityId());
+		AccessibilityFacility facility = loadFacility(command.facilityId());
+		Station station = loadActiveStation(facility.stationId());
 
 		FavoriteFacility favoriteFacility = loadFavoriteFacilityPort
 			.loadFavoriteFacility(command.userId(), command.facilityId())
@@ -86,7 +87,7 @@ public class FavoriteFacilityService implements FavoriteFacilityUseCase {
 				LocalDateTime.now(clock)
 			)));
 
-		return withDetails(favoriteFacility);
+		return new FavoriteFacilityWithDetails(favoriteFacility, facility, station);
 	}
 
 	@Override
