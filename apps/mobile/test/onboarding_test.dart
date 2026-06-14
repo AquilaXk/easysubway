@@ -93,4 +93,48 @@ void main() {
     expect(result.preferences.highContrastEnabled, isTrue);
     expect(result.preferences.simpleViewEnabled, isFalse);
   });
+
+  test('온보딩 완료 결과는 로컬 저장용 문자열로 변환하고 다시 읽는다', () {
+    final result = OnboardingResult(
+      profile: mobilityProfileOptions.firstWhere(
+        (option) => option.id == 'wheelchair',
+      ),
+      preferences: const OnboardingViewPreferences(
+        largeTextEnabled: true,
+        highContrastEnabled: true,
+        simpleViewEnabled: false,
+      ),
+    );
+
+    final decoded = OnboardingResult.decode(result.encode());
+
+    expect(decoded.profile.id, 'wheelchair');
+    expect(decoded.profile.mobilityType, 'WHEELCHAIR');
+    expect(decoded.preferences.largeTextEnabled, isTrue);
+    expect(decoded.preferences.highContrastEnabled, isTrue);
+    expect(decoded.preferences.simpleViewEnabled, isFalse);
+  });
+
+  test('온보딩 완료 결과는 알 수 없는 이동 조건 저장값을 거부한다', () {
+    expect(
+      () => OnboardingResult.decode(
+        '{"profileId":"unknown","preferences":{"largeTextEnabled":true,"highContrastEnabled":false,"simpleViewEnabled":true}}',
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('온보딩 완료 결과는 손상된 보기 설정 저장값을 거부한다', () {
+    expect(
+      () => OnboardingResult.decode(
+        '{"profileId":"elderly","preferences":{"largeTextEnabled":"yes","highContrastEnabled":false,"simpleViewEnabled":true}}',
+      ),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(
+      () => OnboardingResult.decode('{"profileId":"elderly","preferences":{}}'),
+      throwsA(isA<FormatException>()),
+    );
+  });
 }
