@@ -1555,7 +1555,7 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('즐겨찾기')),
+      appBar: AppBar(title: const Text('즐겨찾기 역')),
       body: SafeArea(
         child: AnimatedBuilder(
           animation: _controller,
