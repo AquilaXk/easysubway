@@ -3,6 +3,11 @@ logging:
     com.easysubway: INFO
 
 spring:
+  datasource:
+    url: ${EASYSUBWAY_DATASOURCE_URL}
+    username: ${EASYSUBWAY_DATASOURCE_USERNAME}
+    password: ${EASYSUBWAY_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   sql:
     init:
       # 운영 배포 초기화 단계에서 Batch 메타데이터 테이블을 멱등하게 준비한다.
