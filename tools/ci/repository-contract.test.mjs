@@ -721,6 +721,30 @@ test("백엔드 시설 상태 변경 알림은 즐겨찾기와 푸시 outbox 경
   assert.match(transitService, /alertFacilityStatusChanged/);
 });
 
+test("백엔드 신고 처리 결과 알림은 신고 서비스와 푸시 outbox 경계를 따른다", () => {
+  const useCase = read("backend/src/main/java/com/easysubway/notification/application/port/in/ReportStatusAlertUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/notification/application/port/in/ReportStatusChangedAlertCommand.java");
+  const service = read("backend/src/main/java/com/easysubway/notification/application/service/ReportStatusAlertService.java");
+  const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+
+  assert.match(useCase, /interface ReportStatusAlertUseCase/);
+  assert.match(useCase, /alertReportStatusChanged/);
+  assert.match(command, /record ReportStatusChangedAlertCommand/);
+  assert.match(command, /String userId/);
+  assert.match(command, /String reportId/);
+  assert.match(command, /FacilityReportStatus status/);
+  assert.match(service, /implements ReportStatusAlertUseCase/);
+  assert.match(service, /PushNotificationDispatchUseCase/);
+  assert.match(service, /PushNotificationType\.REPORT_STATUS/);
+  assert.match(service, /case ACCEPTED/);
+  assert.match(service, /case REJECTED/);
+  assert.match(service, /case DUPLICATE/);
+  assert.match(reportService, /ReportStatusAlertUseCase/);
+  assert.match(reportService, /ReportStatusChangedAlertCommand/);
+  assert.match(reportService, /report\.status\(\) != saved\.status\(\)/);
+  assert.match(reportService, /alertReportStatusChanged/);
+});
+
 test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계를 따른다", () => {
   const buildGradle = read("backend/build.gradle");
   const application = read("backend/src/main/resources/application.yml");

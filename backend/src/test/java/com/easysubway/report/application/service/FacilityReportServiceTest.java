@@ -14,6 +14,8 @@ import com.easysubway.report.domain.FacilityReportType;
 import com.easysubway.report.domain.InvalidFacilityReportException;
 import com.easysubway.notification.application.port.in.FacilityStatusAlertUseCase;
 import com.easysubway.notification.application.port.in.FacilityStatusChangedAlertCommand;
+import com.easysubway.notification.application.port.in.ReportStatusAlertUseCase;
+import com.easysubway.notification.application.port.in.ReportStatusChangedAlertCommand;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
 import com.easysubway.transit.domain.StationNotFoundException;
@@ -181,6 +183,69 @@ class FacilityReportServiceTest {
 		assertThat(reviewed.reviewedAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 9, 0));
 		assertThat(reviewed.reviewedBy()).isEqualTo("admin-1");
 		assertThat(service.getReport(report.id())).isEqualTo(reviewed);
+	}
+
+	@Test
+	@DisplayName("신고 검수 결과는 신고 작성자에게 처리 알림을 요청한다")
+	void reviewedReportRequestsReportStatusAlertForReporter() {
+		var reportStatusAlertUseCase = new RecordingReportStatusAlertUseCase();
+		var repository = new InMemoryFacilityReportRepository();
+		var service = new FacilityReportService(
+			new InMemoryTransitMasterRepository(),
+			new InMemoryTransitMasterRepository(),
+			repository,
+			repository,
+			command -> {
+			},
+			reportStatusAlertUseCase,
+			Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+		var report = service.createReport(reportCommand(
+			"anonymous-user-report-alert",
+			FacilityReportType.INFORMATION_WRONG,
+			"신고 처리 결과 알림을 받을 신고입니다."
+		));
+
+		service.reviewReport(reviewCommand(report.id(), FacilityReportReviewDecision.REJECT));
+
+		assertThat(reportStatusAlertUseCase.commands)
+			.extracting(ReportStatusChangedAlertCommand::userId)
+			.containsExactly("anonymous-user-report-alert");
+		assertThat(reportStatusAlertUseCase.commands)
+			.extracting(ReportStatusChangedAlertCommand::reportId)
+			.containsExactly(report.id());
+		assertThat(reportStatusAlertUseCase.commands)
+			.extracting(ReportStatusChangedAlertCommand::status)
+			.containsExactly(FacilityReportStatus.REJECTED);
+	}
+
+	@Test
+	@DisplayName("이미 같은 상태인 신고 재검수는 처리 알림을 다시 요청하지 않는다")
+	void repeatedSameReportReviewDoesNotRequestReportStatusAlertAgain() {
+		var reportStatusAlertUseCase = new RecordingReportStatusAlertUseCase();
+		var repository = new InMemoryFacilityReportRepository();
+		var service = new FacilityReportService(
+			new InMemoryTransitMasterRepository(),
+			new InMemoryTransitMasterRepository(),
+			repository,
+			repository,
+			command -> {
+			},
+			reportStatusAlertUseCase,
+			Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+		var report = service.createReport(reportCommand(
+			"anonymous-user-repeat-alert",
+			FacilityReportType.INFORMATION_WRONG,
+			"같은 결과로 다시 검수할 신고입니다."
+		));
+
+		service.reviewReport(reviewCommand(report.id(), FacilityReportReviewDecision.REJECT));
+		service.reviewReport(reviewCommand(report.id(), FacilityReportReviewDecision.REJECT));
+
+		assertThat(reportStatusAlertUseCase.commands)
+			.extracting(ReportStatusChangedAlertCommand::status)
+			.containsExactly(FacilityReportStatus.REJECTED);
 	}
 
 	@Test
@@ -509,6 +574,16 @@ class FacilityReportServiceTest {
 
 		@Override
 		public void alertFacilityStatusChanged(FacilityStatusChangedAlertCommand command) {
+			commands.add(command);
+		}
+	}
+
+	private static class RecordingReportStatusAlertUseCase implements ReportStatusAlertUseCase {
+
+		private final java.util.List<ReportStatusChangedAlertCommand> commands = new java.util.ArrayList<>();
+
+		@Override
+		public void alertReportStatusChanged(ReportStatusChangedAlertCommand command) {
 			commands.add(command);
 		}
 	}

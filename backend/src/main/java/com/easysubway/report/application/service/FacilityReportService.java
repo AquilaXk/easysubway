@@ -14,6 +14,8 @@ import com.easysubway.report.domain.FacilityReportType;
 import com.easysubway.report.domain.InvalidFacilityReportException;
 import com.easysubway.notification.application.port.in.FacilityStatusAlertUseCase;
 import com.easysubway.notification.application.port.in.FacilityStatusChangedAlertCommand;
+import com.easysubway.notification.application.port.in.ReportStatusAlertUseCase;
+import com.easysubway.notification.application.port.in.ReportStatusChangedAlertCommand;
 import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.application.port.out.SaveAccessibilityFacilityStatusPort;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
@@ -37,9 +39,29 @@ public class FacilityReportService implements FacilityReportUseCase {
 	private final LoadFacilityReportPort loadFacilityReportPort;
 	private final SaveFacilityReportPort saveFacilityReportPort;
 	private final FacilityStatusAlertUseCase facilityStatusAlertUseCase;
+	private final ReportStatusAlertUseCase reportStatusAlertUseCase;
 	private final Clock clock;
 
 	@Autowired
+	public FacilityReportService(
+		LoadTransitMasterPort loadTransitMasterPort,
+		SaveAccessibilityFacilityStatusPort saveAccessibilityFacilityStatusPort,
+		LoadFacilityReportPort loadFacilityReportPort,
+		SaveFacilityReportPort saveFacilityReportPort,
+		FacilityStatusAlertUseCase facilityStatusAlertUseCase,
+		ReportStatusAlertUseCase reportStatusAlertUseCase
+	) {
+		this(
+			loadTransitMasterPort,
+			saveAccessibilityFacilityStatusPort,
+			loadFacilityReportPort,
+			saveFacilityReportPort,
+			facilityStatusAlertUseCase,
+			reportStatusAlertUseCase,
+			Clock.systemDefaultZone()
+		);
+	}
+
 	public FacilityReportService(
 		LoadTransitMasterPort loadTransitMasterPort,
 		SaveAccessibilityFacilityStatusPort saveAccessibilityFacilityStatusPort,
@@ -53,6 +75,8 @@ public class FacilityReportService implements FacilityReportUseCase {
 			loadFacilityReportPort,
 			saveFacilityReportPort,
 			facilityStatusAlertUseCase,
+			command -> {
+			},
 			Clock.systemDefaultZone()
 		);
 	}
@@ -71,6 +95,8 @@ public class FacilityReportService implements FacilityReportUseCase {
 			saveFacilityReportPort,
 			command -> {
 			},
+			command -> {
+			},
 			clock
 		);
 	}
@@ -83,11 +109,33 @@ public class FacilityReportService implements FacilityReportUseCase {
 		FacilityStatusAlertUseCase facilityStatusAlertUseCase,
 		Clock clock
 	) {
+		this(
+			loadTransitMasterPort,
+			saveAccessibilityFacilityStatusPort,
+			loadFacilityReportPort,
+			saveFacilityReportPort,
+			facilityStatusAlertUseCase,
+			command -> {
+			},
+			clock
+		);
+	}
+
+	public FacilityReportService(
+		LoadTransitMasterPort loadTransitMasterPort,
+		SaveAccessibilityFacilityStatusPort saveAccessibilityFacilityStatusPort,
+		LoadFacilityReportPort loadFacilityReportPort,
+		SaveFacilityReportPort saveFacilityReportPort,
+		FacilityStatusAlertUseCase facilityStatusAlertUseCase,
+		ReportStatusAlertUseCase reportStatusAlertUseCase,
+		Clock clock
+	) {
 		this.loadTransitMasterPort = loadTransitMasterPort;
 		this.saveAccessibilityFacilityStatusPort = saveAccessibilityFacilityStatusPort;
 		this.loadFacilityReportPort = loadFacilityReportPort;
 		this.saveFacilityReportPort = saveFacilityReportPort;
 		this.facilityStatusAlertUseCase = facilityStatusAlertUseCase;
+		this.reportStatusAlertUseCase = reportStatusAlertUseCase;
 		this.clock = clock;
 	}
 
@@ -155,6 +203,12 @@ public class FacilityReportService implements FacilityReportUseCase {
 		);
 
 		FacilityReport saved = saveFacilityReportPort.saveReport(reviewed);
+		// 같은 결과로 재검수한 경우 사용자가 중복 처리 알림을 받지 않도록 상태 변경만 알린다.
+		if (report.status() != saved.status()) {
+			reportStatusAlertUseCase.alertReportStatusChanged(
+				new ReportStatusChangedAlertCommand(saved.userId(), saved.id(), saved.status())
+			);
+		}
 		// 승인된 상태 신고만 실제 시설 운영 상태에 반영한다.
 		applyAcceptedReportToFacilityStatus(report, command.decision());
 		return saved;
