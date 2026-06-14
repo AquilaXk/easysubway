@@ -1,6 +1,61 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mobility_profile.dart';
+import 'mobile_error_reporter.dart';
+
+const _onboardingResultStorageKey = 'easysubway.onboarding.result';
+
+abstract class OnboardingResultStore {
+  Future<OnboardingResult?> readResult();
+
+  Future<void> saveResult(OnboardingResult result);
+
+  Future<void> clearResult();
+}
+
+class SecureOnboardingResultStore implements OnboardingResultStore {
+  const SecureOnboardingResultStore({
+    this.storage = const FlutterSecureStorage(),
+  });
+
+  final FlutterSecureStorage storage;
+
+  @override
+  Future<OnboardingResult?> readResult() async {
+    final value = await storage.read(key: _onboardingResultStorageKey);
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return OnboardingResult.decode(value);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '저장된 온보딩 설정을 읽는 중 예외가 발생했습니다.',
+      );
+      await clearResult();
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveResult(OnboardingResult result) async {
+    await storage.write(
+      key: _onboardingResultStorageKey,
+      value: result.encode(),
+    );
+  }
+
+  @override
+  Future<void> clearResult() async {
+    await storage.delete(key: _onboardingResultStorageKey);
+  }
+}
 
 class OnboardingViewPreferences {
   const OnboardingViewPreferences({
@@ -13,6 +68,24 @@ class OnboardingViewPreferences {
     : largeTextEnabled = true,
       highContrastEnabled = false,
       simpleViewEnabled = true;
+
+  factory OnboardingViewPreferences.fromJson(Map<String, Object?> json) {
+    final largeTextEnabled = json['largeTextEnabled'];
+    final highContrastEnabled = json['highContrastEnabled'];
+    final simpleViewEnabled = json['simpleViewEnabled'];
+    // 손상된 저장값이 접근성 기본값을 조용히 끄지 않도록 타입을 엄격히 확인한다.
+    if (largeTextEnabled is! bool ||
+        highContrastEnabled is! bool ||
+        simpleViewEnabled is! bool) {
+      throw const FormatException('Invalid onboarding preferences payload');
+    }
+
+    return OnboardingViewPreferences(
+      largeTextEnabled: largeTextEnabled,
+      highContrastEnabled: highContrastEnabled,
+      simpleViewEnabled: simpleViewEnabled,
+    );
+  }
 
   final bool largeTextEnabled;
   final bool highContrastEnabled;
@@ -29,13 +102,55 @@ class OnboardingViewPreferences {
       simpleViewEnabled: simpleViewEnabled ?? this.simpleViewEnabled,
     );
   }
+
+  Map<String, Object?> toJson() {
+    return {
+      'largeTextEnabled': largeTextEnabled,
+      'highContrastEnabled': highContrastEnabled,
+      'simpleViewEnabled': simpleViewEnabled,
+    };
+  }
 }
 
 class OnboardingResult {
   const OnboardingResult({required this.profile, required this.preferences});
 
+  factory OnboardingResult.fromJson(Map<String, Object?> json) {
+    final profileId = json['profileId'];
+    final preferences = json['preferences'];
+    if (profileId is! String || preferences is! Map<String, Object?>) {
+      throw const FormatException('Invalid onboarding storage payload');
+    }
+
+    final profile = mobilityProfileOptions.firstWhere(
+      (option) => option.id == profileId,
+      orElse: () => throw const FormatException('Invalid onboarding profile'),
+    );
+
+    return OnboardingResult(
+      profile: profile,
+      preferences: OnboardingViewPreferences.fromJson(preferences),
+    );
+  }
+
+  factory OnboardingResult.decode(String value) {
+    final decoded = jsonDecode(value);
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('Invalid onboarding storage payload');
+    }
+    return OnboardingResult.fromJson(decoded);
+  }
+
   final MobilityProfileOption profile;
   final OnboardingViewPreferences preferences;
+
+  Map<String, Object?> toJson() {
+    return {'profileId': profile.id, 'preferences': preferences.toJson()};
+  }
+
+  String encode() {
+    return jsonEncode(toJson());
+  }
 }
 
 class OnboardingState {

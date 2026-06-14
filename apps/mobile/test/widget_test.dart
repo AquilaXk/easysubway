@@ -4,6 +4,7 @@ import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -38,6 +39,8 @@ OnboardingState _completedOnboardingStateWithPreferences({
 
 void main() {
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
+    final onboardingStore = MemoryOnboardingResultStore();
+
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -45,8 +48,10 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
+        onboardingStore: onboardingStore,
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('쉬운 지하철'), findsOneWidget);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
@@ -60,6 +65,66 @@ void main() {
     expect(find.text('역 찾기'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+    expect(onboardingStore.savedResult?.profile.id, 'elderly');
+    expect(onboardingStore.saveCount, 1);
+  });
+
+  testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.firstWhere(
+          (option) => option.id == 'wheelchair',
+        ),
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: true,
+          simpleViewEnabled: true,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final homeContext = tester.element(find.byType(HomeScreen));
+
+    expect(onboardingStore.readCount, 1);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(23.6, 0.01));
+    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
+  });
+
+  testWidgets('앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다', (tester) async {
+    final reportedErrors = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          onboardingStore: MemoryOnboardingResultStore(throwOnRead: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+    });
+
+    expect(reportedErrors, hasLength(1));
+    expect(reportedErrors.single.exception, isA<FormatException>());
+    expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchButton')), findsNothing);
   });
 
   testWidgets('온보딩을 마친 앱 세션은 홈을 바로 보여준다', (tester) async {
@@ -1556,6 +1621,38 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
       userId: 'anonymous-user-1',
       password: 'user-test-password',
     );
+  }
+}
+
+class MemoryOnboardingResultStore implements OnboardingResultStore {
+  MemoryOnboardingResultStore({
+    OnboardingResult? initialResult,
+    this.throwOnRead = false,
+  }) : savedResult = initialResult;
+
+  OnboardingResult? savedResult;
+  final bool throwOnRead;
+  int readCount = 0;
+  int saveCount = 0;
+
+  @override
+  Future<OnboardingResult?> readResult() async {
+    readCount++;
+    if (throwOnRead) {
+      throw const FormatException('broken onboarding result');
+    }
+    return savedResult;
+  }
+
+  @override
+  Future<void> saveResult(OnboardingResult result) async {
+    saveCount++;
+    savedResult = result;
+  }
+
+  @override
+  Future<void> clearResult() async {
+    savedResult = null;
   }
 }
 
