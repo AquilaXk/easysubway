@@ -858,6 +858,20 @@ void main() {
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-12',
         ),
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-2',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-2',
+          type: 'ELEVATOR',
+          name: '2번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '2번 출구 앞',
+          status: 'BROKEN',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-14',
+        ),
       ],
     );
 
@@ -912,8 +926,20 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -260));
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
-      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+      expect(find.text('확인 필요 1개'), findsOneWidget);
+      expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsOneWidget);
+      expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('엘리베이터'), findsOneWidget);
+      expect(find.text('고장'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
       expect(find.text('1번 출구 앞'), findsOneWidget);
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
@@ -923,13 +949,12 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.ensureVisible(
+      expect(
         find.byKey(
           const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
         ),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-      expect(find.widgetWithText(OutlinedButton, '상태 신고'), findsOneWidget);
       expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 신고'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));

@@ -734,6 +734,34 @@ void main() {
     expect(controller.state.message, '역 상세 정보를 불러오지 못했습니다.');
   });
 
+  test('역 상세 상태는 확인이 필요한 시설을 먼저 보여 주고 짧은 요약을 만든다', () {
+    final state = StationDetailState(
+      status: StationDetailStatus.success,
+      detail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      facilities: [
+        _stationFacility(),
+        _stationFacility(
+          id: 'facility-sangnoksu-ramp-1',
+          name: '1번 출구 경사로',
+          status: 'UNDER_CONSTRUCTION',
+        ),
+        _stationFacility(
+          id: 'facility-sangnoksu-elevator-2',
+          name: '2번 출구 엘리베이터',
+          status: 'BROKEN',
+        ),
+      ],
+    );
+
+    expect(state.prioritizedFacilities.map((facility) => facility.name), [
+      '2번 출구 엘리베이터',
+      '1번 출구 경사로',
+      '1번 출구 엘리베이터',
+    ]);
+    expect(state.facilityAttentionSummary, '확인 필요 2개');
+    expect(state.facilityAttentionSemanticLabel, '확인이 필요한 시설 2개');
+  });
+
   test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
     final repository = FakeFavoriteStationRepository();
     final controller = FavoriteStationListController(repository: repository);
@@ -900,17 +928,21 @@ StationExitInfo _stationExit() {
   );
 }
 
-StationFacilityInfo _stationFacility() {
-  return const StationFacilityInfo(
-    id: 'facility-sangnoksu-elevator-1',
+StationFacilityInfo _stationFacility({
+  String id = 'facility-sangnoksu-elevator-1',
+  String name = '1번 출구 엘리베이터',
+  String status = 'NORMAL',
+}) {
+  return StationFacilityInfo(
+    id: id,
     stationId: 'station-sangnoksu',
     exitId: 'exit-sangnoksu-1',
     type: 'ELEVATOR',
-    name: '1번 출구 엘리베이터',
+    name: name,
     floorFrom: '지상',
     floorTo: '대합실',
     description: '1번 출구와 대합실을 연결합니다.',
-    status: 'NORMAL',
+    status: status,
     dataConfidence: 'HIGH',
     lastUpdatedAt: '2026-06-12',
   );
