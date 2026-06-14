@@ -566,7 +566,7 @@ void main() {
         find.bySemanticsLabel('즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 고령자, 이동 점수 92점'),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('삭제'), findsOneWidget);
+      expect(find.bySemanticsLabel('상록수에서 사당까지 삭제'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
       await tester.pumpAndSettle();
@@ -580,6 +580,48 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('홈 즐겨찾기 경로 삭제 중에는 같은 항목을 다시 누를 수 없다', (tester) async {
+    final removeCompleter = Completer<void>();
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute()],
+      removeCompleter: removeCompleter,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('favoriteRoutesButton')));
+    await tester.pumpAndSettle();
+
+    final removeButton = find.byKey(const Key('favoriteRouteRemove-route-1'));
+    await tester.tap(removeButton);
+    await tester.pump();
+
+    expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
+    expect(find.text('삭제 중'), findsOneWidget);
+    expect(find.bySemanticsLabel('상록수에서 사당까지 삭제 중'), findsOneWidget);
+
+    await tester.tap(removeButton);
+    await tester.pump();
+
+    expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
+
+    removeCompleter.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장한 경로가 없습니다.'), findsOneWidget);
   });
 
   testWidgets('역 검색은 접근성 표시가 포함된 백엔드 결과를 보여준다', (tester) async {
@@ -1960,9 +2002,13 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
 }
 
 class FakeFavoriteRouteRepository implements FavoriteRouteRepository {
-  FakeFavoriteRouteRepository({this.favorites = const []});
+  FakeFavoriteRouteRepository({
+    this.favorites = const [],
+    this.removeCompleter,
+  });
 
   List<FavoriteRoute> favorites;
+  final Completer<void>? removeCompleter;
   final savedRouteSearchIds = <String>[];
   final removedFavoriteRouteIds = <String>[];
   Object? error;
@@ -1994,6 +2040,10 @@ class FakeFavoriteRouteRepository implements FavoriteRouteRepository {
     final currentError = error;
     if (currentError != null) {
       throw currentError;
+    }
+    final currentRemoveCompleter = removeCompleter;
+    if (currentRemoveCompleter != null) {
+      await currentRemoveCompleter.future;
     }
     favorites = favorites
         .where((favorite) => favorite.favoriteRouteId != favoriteRouteId)

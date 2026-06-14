@@ -1503,16 +1503,33 @@ class FavoriteRouteListState {
     required this.status,
     required this.favorites,
     this.message = '',
+    this.removingIds = const {},
   });
 
   const FavoriteRouteListState.loading()
     : status = FavoriteRouteListStatus.loading,
       favorites = const [],
-      message = '';
+      message = '',
+      removingIds = const {};
 
   final FavoriteRouteListStatus status;
   final List<FavoriteRoute> favorites;
   final String message;
+  final Set<String> removingIds;
+
+  FavoriteRouteListState copyWith({
+    FavoriteRouteListStatus? status,
+    List<FavoriteRoute>? favorites,
+    String? message,
+    Set<String>? removingIds,
+  }) {
+    return FavoriteRouteListState(
+      status: status ?? this.status,
+      favorites: favorites ?? this.favorites,
+      message: message ?? this.message,
+      removingIds: removingIds ?? this.removingIds,
+    );
+  }
 }
 
 class FavoriteRouteListController extends ChangeNotifier {
@@ -1556,44 +1573,64 @@ class FavoriteRouteListController extends ChangeNotifier {
   }
 
   Future<void> remove(FavoriteRoute favorite) async {
+    final favoriteRouteId = favorite.favoriteRouteId;
+    if (_state.removingIds.contains(favoriteRouteId)) {
+      return;
+    }
+
+    _emitState(
+      _state.copyWith(removingIds: {..._state.removingIds, favoriteRouteId}),
+    );
+
     try {
-      await repository.removeFavoriteRoute(favorite.favoriteRouteId);
+      await repository.removeFavoriteRoute(favoriteRouteId);
       if (_disposed) {
         return;
       }
       final nextFavorites = _state.favorites
-          .where((item) => item.favoriteRouteId != favorite.favoriteRouteId)
+          .where((item) => item.favoriteRouteId != favoriteRouteId)
           .toList(growable: false);
+      final nextRemovingIds = {..._state.removingIds}..remove(favoriteRouteId);
       _emitState(
         nextFavorites.isEmpty
-            ? const FavoriteRouteListState(
+            ? FavoriteRouteListState(
                 status: FavoriteRouteListStatus.empty,
-                favorites: [],
+                favorites: const [],
                 message: '저장한 경로가 없습니다.',
+                removingIds: nextRemovingIds,
               )
             : FavoriteRouteListState(
                 status: FavoriteRouteListStatus.success,
                 favorites: nextFavorites,
+                removingIds: nextRemovingIds,
               ),
       );
     } on FavoriteRouteException catch (error) {
-      _emitFailure(error.message);
+      _emitFailure(error.message, removingIdToClear: favoriteRouteId);
     } catch (error, stackTrace) {
       reportMobileError(
         error,
         stackTrace,
         context: '즐겨찾기 경로 삭제 처리 중 예외가 발생했습니다.',
       );
-      _emitFailure(_favoriteRouteErrorMessage);
+      _emitFailure(
+        _favoriteRouteErrorMessage,
+        removingIdToClear: favoriteRouteId,
+      );
     }
   }
 
-  void _emitFailure(String message) {
+  void _emitFailure(String message, {String? removingIdToClear}) {
+    final nextRemovingIds = {..._state.removingIds};
+    if (removingIdToClear != null) {
+      nextRemovingIds.remove(removingIdToClear);
+    }
     _emitState(
       FavoriteRouteListState(
         status: FavoriteRouteListStatus.failure,
         favorites: _state.favorites,
         message: message,
+        removingIds: nextRemovingIds,
       ),
     );
   }
@@ -1710,7 +1747,13 @@ class _FavoriteRouteListBody extends StatelessWidget {
                 child: const SizedBox.shrink(),
               ),
               for (final favorite in state.favorites)
-                _FavoriteRouteTile(favorite: favorite, onRemove: onRemove),
+                _FavoriteRouteTile(
+                  favorite: favorite,
+                  isRemoving: state.removingIds.contains(
+                    favorite.favoriteRouteId,
+                  ),
+                  onRemove: onRemove,
+                ),
             ],
           ),
         },
@@ -1720,23 +1763,45 @@ class _FavoriteRouteListBody extends StatelessWidget {
 }
 
 class _FavoriteRouteTile extends StatelessWidget {
-  const _FavoriteRouteTile({required this.favorite, required this.onRemove});
+  const _FavoriteRouteTile({
+    required this.favorite,
+    required this.isRemoving,
+    required this.onRemove,
+  });
 
   final FavoriteRoute favorite;
+  final bool isRemoving;
   final ValueChanged<FavoriteRoute> onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final removeSemanticLabel =
+        '${favorite.summaryTitle} ${isRemoving ? '삭제 중' : '삭제'}';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _FavoriteRouteSummaryCard(favorite: favorite),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
-          onPressed: () => onRemove(favorite),
-          icon: const Icon(Icons.delete_outline),
-          label: const Text('삭제'),
+        Semantics(
+          container: true,
+          label: removeSemanticLabel,
+          button: true,
+          enabled: !isRemoving,
+          onTap: isRemoving ? null : () => onRemove(favorite),
+          child: ExcludeSemantics(
+            child: OutlinedButton.icon(
+              key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
+              onPressed: isRemoving ? null : () => onRemove(favorite),
+              icon: isRemoving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              label: Text(isRemoving ? '삭제 중' : '삭제'),
+            ),
+          ),
         ),
         const SizedBox(height: 12),
       ],
