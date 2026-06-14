@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'mobile_error_reporter.dart';
+
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
@@ -48,7 +50,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       );
     } on FacilityReportException {
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 접수 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
   }
@@ -81,7 +88,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       );
     } on FacilityReportException {
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 처리 상태 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
   }
@@ -328,7 +340,12 @@ class FacilityReportController extends ChangeNotifier {
           message: error.message,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 화면 제출 처리 중 예외가 발생했습니다.',
+      );
       _emitState(
         const FacilityReportState(
           status: FacilityReportViewStatus.failure,
@@ -372,7 +389,12 @@ class FacilityReportController extends ChangeNotifier {
           result: currentResult,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 처리 상태 새로고침 중 예외가 발생했습니다.',
+      );
       // 알 수 없는 오류도 같은 화면에서 다시 확인할 수 있게 접수 결과를 보존한다.
       _emitState(
         FacilityReportState(

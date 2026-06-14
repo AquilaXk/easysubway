@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
 import 'station_search.dart';
 
@@ -54,7 +55,12 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       return RouteSearchResult.fromJson(data);
     } on RouteSearchException {
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 검색 API 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const RouteSearchException(_routeSearchErrorMessage);
     }
   }
@@ -336,7 +342,12 @@ class RouteSearchController extends ChangeNotifier {
           message: error.message,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 검색 화면 처리 중 예외가 발생했습니다.',
+      );
       if (_disposed || requestId != _searchRequestId) {
         return;
       }
