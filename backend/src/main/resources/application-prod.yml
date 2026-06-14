@@ -1,3 +1,10 @@
 logging:
   level:
     com.easysubway: INFO
+
+spring:
+  datasource:
+    url: ${EASYSUBWAY_DATASOURCE_URL}
+    username: ${EASYSUBWAY_DATASOURCE_USERNAME}
+    password: ${EASYSUBWAY_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver

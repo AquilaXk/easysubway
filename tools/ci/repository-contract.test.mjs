@@ -607,6 +607,58 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
 
+test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계를 따른다", () => {
+  const buildGradle = read("backend/build.gradle");
+  const application = read("backend/src/main/resources/application.yml");
+  const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
+  const source = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionSource.java");
+  const status = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStatus.java");
+  const invalidCollection = read("backend/src/main/java/com/easysubway/collection/domain/InvalidDataCollectionException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/collection/application/port/in/DataCollectionUseCase.java");
+  const command = read("backend/src/main/java/com/easysubway/collection/application/port/in/RunDataCollectionCommand.java");
+  const loadRunPort = read("backend/src/main/java/com/easysubway/collection/application/port/out/LoadDataCollectionRunPort.java");
+  const saveRunPort = read("backend/src/main/java/com/easysubway/collection/application/port/out/SaveDataCollectionRunPort.java");
+  const service = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionService.java");
+  const recorder = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionRunRecorder.java");
+  const repository = read("backend/src/main/java/com/easysubway/collection/adapter/out/persistence/InMemoryDataCollectionRunRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/collection/adapter/in/web/DataCollectionController.java");
+  const batchConfig = read("backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(buildGradle, /spring-boot-starter-batch/);
+  assert.match(buildGradle, /spring-batch-test/);
+  assert.match(application, /batch:[\s\S]*job:[\s\S]*enabled: false/);
+  assert.match(run, /record DataCollectionRun/);
+  assert.match(run, /requestedBy/);
+  assert.match(run, /collectedCount/);
+  assert.match(source, /TRANSIT_MASTER/);
+  assert.match(status, /RUNNING/);
+  assert.match(status, /COMPLETED/);
+  assert.match(status, /FAILED/);
+  assert.match(invalidCollection, /extends InvalidRequestException/);
+  assert.match(useCase, /interface DataCollectionUseCase/);
+  assert.match(useCase, /runCollection/);
+  assert.match(useCase, /listRecentRuns/);
+  assert.match(command, /record RunDataCollectionCommand/);
+  assert.match(loadRunPort, /interface LoadDataCollectionRunPort/);
+  assert.match(saveRunPort, /interface SaveDataCollectionRunPort/);
+  assert.match(service, /implements DataCollectionUseCase/);
+  assert.match(service, /JobLauncher/);
+  assert.match(service, /transitMasterCollectionJob/);
+  assert.match(service, /loadRun\(runId\)/);
+  assert.match(recorder, /LoadTransitMasterPort/);
+  assert.match(recorder, /recordTransitMasterRun/);
+  assert.match(repository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
+  assert.match(repository, /loadRun\(String runId\)/);
+  assert.match(controller, /@PostMapping\("\/admin\/data-collections\/runs"\)/);
+  assert.match(controller, /@GetMapping\("\/admin\/data-collections\/runs"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.match(batchConfig, /new JobBuilder\(JOB_NAME, jobRepository\)/);
+  assert.match(batchConfig, /new StepBuilder\(STEP_NAME, jobRepository\)/);
+  assert.match(batchConfig, /DataCollectionRunRecorder/);
+  assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
+});
+
 test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const result = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchResult.java");
   const status = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchStatus.java");
