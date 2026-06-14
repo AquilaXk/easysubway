@@ -1254,6 +1254,30 @@ void main() {
       expect(reportRepository.requests.single.description, '출입문이 막혀 있습니다.');
       expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
       expect(find.bySemanticsLabel('신고가 접수되었습니다.'), findsOneWidget);
+      expect(find.text('접수번호'), findsOneWidget);
+      expect(find.text('report-1'), findsOneWidget);
+      expect(find.text('처리 상태'), findsOneWidget);
+      expect(find.text('접수됨'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 접수됨'),
+        findsOneWidget,
+      );
+
+      reportRepository.nextReportStatus = 'ACCEPTED';
+      await tester.ensureVisible(
+        find.byKey(const Key('facilityReportRefreshButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('facilityReportRefreshButton')));
+      await tester.pumpAndSettle();
+
+      expect(reportRepository.loadedReportIds, ['report-1']);
+      expect(find.text('처리 상태를 확인했습니다.'), findsOneWidget);
+      expect(find.text('반영됨'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 반영됨'),
+        findsOneWidget,
+      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -1375,6 +1399,8 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
 
 class FakeFacilityReportRepository implements FacilityReportRepository {
   final requests = <FacilityReportRequest>[];
+  final loadedReportIds = <String>[];
+  String nextReportStatus = 'SUBMITTED';
   Object? error;
 
   @override
@@ -1393,6 +1419,24 @@ class FakeFacilityReportRepository implements FacilityReportRepository {
       reportType: request.reportType,
       description: request.description,
       status: 'SUBMITTED',
+      createdAt: '2026-06-13T10:00:00',
+    );
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) async {
+    loadedReportIds.add(reportId);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return FacilityReportResult(
+      id: reportId,
+      stationId: 'station-sangnoksu',
+      facilityId: 'facility-sangnoksu-elevator-1',
+      reportType: 'CLOSED',
+      description: '출입문이 막혀 있습니다.',
+      status: nextReportStatus,
       createdAt: '2026-06-13T10:00:00',
     );
   }

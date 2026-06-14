@@ -573,6 +573,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const facilityReport = read("apps/mobile/lib/facility_report.dart");
+  const facilityReportTest = read("apps/mobile/test/facility_report_test.dart");
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
   const notificationSettingsTest = read("apps/mobile/test/notification_settings_test.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
@@ -669,6 +671,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /HttpStatus\.unauthorized/);
   assert.match(stationSearch, /invalidateAuthorization\(\)/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
+  assert.match(facilityReport, /Future<FacilityReportResult> getReport\(String reportId\)/);
+  assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
+  assert.match(facilityReport, /refreshCurrentReport/);
+  assert.match(facilityReport, /처리 상태 확인 중/);
+  assert.match(facilityReport, /접수번호/);
+  assert.match(facilityReport, /facilityReportRefreshButton/);
+  assert.match(facilityReportTest, /접수번호로 처리 상태를 조회한다/);
+  assert.match(facilityReportTest, /접수 후 처리 상태를 다시 확인한다/);
+  assert.match(widgetTest, /신고 접수번호 report-1, 현재 상태 반영됨/);
   assert.match(notificationSettings, /class NotificationSettingsApiRepository/);
   assert.match(notificationSettings, /\/api\/v1\/me\/notification-settings/);
   assert.match(notificationSettings, /AuthorizationHeaderProvider/);

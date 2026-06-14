@@ -56,6 +56,117 @@ void main() {
     expect(result.statusLabel, '접수됨');
   });
 
+  test('시설 신고 API 저장소는 잘못된 접수 응답도 쉬운 실패 문구로 바꾼다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {'id': 'report-1'},
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await expectLater(
+      repository.createReport(
+        const FacilityReportRequest(
+          userId: 'anonymous-mobile-user',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'BROKEN',
+          description: '문이 열리지 않습니다.',
+        ),
+      ),
+      throwsA(
+        isA<FacilityReportException>().having(
+          (error) => error.message,
+          'message',
+          '신고를 보내지 못했습니다.',
+        ),
+      ),
+    );
+  });
+
+  test('시설 신고 API 저장소는 접수번호로 처리 상태를 조회한다', () async {
+    late String requestMethod;
+    late String requestPath;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestMethod = request.method;
+      requestPath = request.uri.path;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'id': 'report-1',
+              'stationId': 'station-sangnoksu',
+              'facilityId': 'facility-sangnoksu-elevator-1',
+              'reportType': 'BROKEN',
+              'description': '문이 열리지 않습니다.',
+              'status': 'ACCEPTED',
+              'createdAt': '2026-06-13T10:00:00',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final result = await repository.getReport('report-1');
+
+    expect(requestMethod, 'GET');
+    expect(requestPath, '/api/v1/reports/report-1');
+    expect(result.id, 'report-1');
+    expect(result.status, 'ACCEPTED');
+    expect(result.statusLabel, '반영됨');
+  });
+
+  test('시설 신고 API 저장소는 상태 조회 실패를 전용 안내 문구로 바꾼다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.internalServerError
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'success': false}))
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await expectLater(
+      repository.getReport('report-1'),
+      throwsA(
+        isA<FacilityReportException>().having(
+          (error) => error.message,
+          'message',
+          '처리 상태를 확인하지 못했습니다.',
+        ),
+      ),
+    );
+  });
+
   test('시설 신고 컨트롤러는 전송 중 중복 제출을 막고 성공 상태를 알린다', () async {
     final repository = PendingFacilityReportRepository();
     final controller = FacilityReportController(repository: repository);
@@ -84,6 +195,54 @@ void main() {
     expect(controller.state.status, FacilityReportViewStatus.success);
     expect(controller.state.message, '신고가 접수되었습니다.');
   });
+
+  test('시설 신고 컨트롤러는 접수 후 처리 상태를 다시 확인한다', () async {
+    final repository = RefreshableFacilityReportRepository();
+    final controller = FacilityReportController(repository: repository);
+    addTearDown(controller.dispose);
+
+    await controller.submit(
+      target: _reportTarget(),
+      selectedType: FacilityReportTypeOption.broken,
+      description: '문이 열리지 않습니다.',
+    );
+
+    expect(controller.state.result?.statusLabel, '접수됨');
+
+    final refresh = controller.refreshCurrentReport();
+
+    expect(repository.loadedReportIds, ['report-1']);
+    expect(controller.state.status, FacilityReportViewStatus.loading);
+    expect(controller.state.message, '처리 상태 확인 중');
+    expect(controller.state.result?.statusLabel, '접수됨');
+
+    repository.completeRefresh();
+    await refresh;
+
+    expect(controller.state.status, FacilityReportViewStatus.success);
+    expect(controller.state.message, '처리 상태를 확인했습니다.');
+    expect(controller.state.result?.statusLabel, '반영됨');
+  });
+
+  test('시설 신고 컨트롤러는 상태 확인 실패에도 접수 결과를 유지한다', () async {
+    final repository = FailingRefreshFacilityReportRepository();
+    final controller = FacilityReportController(repository: repository);
+    addTearDown(controller.dispose);
+
+    await controller.submit(
+      target: _reportTarget(),
+      selectedType: FacilityReportTypeOption.broken,
+      description: '문이 열리지 않습니다.',
+    );
+
+    await controller.refreshCurrentReport();
+
+    expect(repository.loadedReportIds, ['report-1']);
+    expect(controller.state.status, FacilityReportViewStatus.failure);
+    expect(controller.state.message, '처리 상태를 확인하지 못했습니다.');
+    expect(controller.state.result?.id, 'report-1');
+    expect(controller.state.result?.statusLabel, '접수됨');
+  });
 }
 
 FacilityReportTarget _reportTarget() {
@@ -107,6 +266,11 @@ class PendingFacilityReportRepository implements FacilityReportRepository {
     return _completer.future;
   }
 
+  @override
+  Future<FacilityReportResult> getReport(String reportId) {
+    throw UnimplementedError();
+  }
+
   void complete() {
     _completer.complete(
       const FacilityReportResult(
@@ -118,6 +282,77 @@ class PendingFacilityReportRepository implements FacilityReportRepository {
         status: 'SUBMITTED',
         createdAt: '2026-06-13T10:00:00',
       ),
+    );
+  }
+}
+
+class RefreshableFacilityReportRepository implements FacilityReportRepository {
+  final requests = <FacilityReportRequest>[];
+  final loadedReportIds = <String>[];
+  Completer<FacilityReportResult>? _refreshCompleter;
+
+  @override
+  Future<FacilityReportResult> createReport(FacilityReportRequest request) {
+    requests.add(request);
+    return Future.value(
+      const FacilityReportResult(
+        id: 'report-1',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+        status: 'SUBMITTED',
+        createdAt: '2026-06-13T10:00:00',
+      ),
+    );
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) {
+    loadedReportIds.add(reportId);
+    _refreshCompleter = Completer<FacilityReportResult>();
+    return _refreshCompleter!.future;
+  }
+
+  void completeRefresh() {
+    _refreshCompleter!.complete(
+      const FacilityReportResult(
+        id: 'report-1',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+        status: 'ACCEPTED',
+        createdAt: '2026-06-13T10:00:00',
+      ),
+    );
+  }
+}
+
+class FailingRefreshFacilityReportRepository
+    implements FacilityReportRepository {
+  final loadedReportIds = <String>[];
+
+  @override
+  Future<FacilityReportResult> createReport(FacilityReportRequest request) {
+    return Future.value(
+      const FacilityReportResult(
+        id: 'report-1',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+        status: 'SUBMITTED',
+        createdAt: '2026-06-13T10:00:00',
+      ),
+    );
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) {
+    loadedReportIds.add(reportId);
+    return Future.error(
+      const FacilityReportException('처리 상태를 확인하지 못했습니다.'),
     );
   }
 }
