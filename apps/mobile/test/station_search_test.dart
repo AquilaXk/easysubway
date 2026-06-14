@@ -28,6 +28,7 @@ void main() {
                 'nameEn': 'Sangnoksu',
                 'region': '수도권',
                 'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
                 'lastVerifiedAt': '2026-06-12',
                 'lines': [
                   {
@@ -60,6 +61,7 @@ void main() {
     expect(results.single.nameKo, '상록수');
     expect(results.single.region, '수도권');
     expect(results.single.dataQualityLabel, '기본 정보만 확인됨');
+    expect(results.single.dataSourceLabel, '출처 공식 파일');
     expect(results.single.lines.single.name, '수도권 4호선');
   });
 
@@ -87,6 +89,7 @@ void main() {
                 'latitude': 37.302795,
                 'longitude': 126.866489,
                 'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
                 'lastVerifiedAt': '2026-06-12',
                 'lines': [
                   {
@@ -118,6 +121,7 @@ void main() {
                   'hasElevatorConnection': true,
                   'hasStairOnlyPath': false,
                   'dataConfidence': 'HIGH',
+                  'dataSourceType': 'OFFICIAL_FILE',
                 },
               ],
             }),
@@ -141,6 +145,7 @@ void main() {
                   'description': '1번 출구 앞',
                   'status': 'NORMAL',
                   'dataConfidence': 'HIGH',
+                  'dataSourceType': 'OFFICIAL_FILE',
                   'lastUpdatedAt': '2026-06-12',
                 },
               ],
@@ -176,17 +181,20 @@ void main() {
     expect(detail.latitude, 37.302795);
     expect(detail.longitude, 126.866489);
     expect(detail.dataQualityLabel, '기본 정보만 확인됨');
+    expect(detail.dataSourceLabel, '출처 공식 파일');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
     expect(exits.single.latitude, 37.302795);
     expect(exits.single.longitude, 126.866489);
     expect(exits.single.elevatorConnectionLabel, '엘리베이터 연결');
     expect(exits.single.stairPathLabel, '계단 없는 이동 가능');
+    expect(exits.single.dataSourceLabel, '출처 공식 파일');
     expect(facilities.single.typeLabel, '엘리베이터');
     expect(facilities.single.latitude, 37.302795);
     expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
     expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
+    expect(facilities.single.dataSourceLabel, '출처 공식 파일');
   });
 
   test('즐겨찾기 역 API 저장소는 인증 헤더와 함께 목록을 요청하고 결과를 파싱한다', () async {
@@ -624,7 +632,7 @@ void main() {
     expect(ramp.confidenceLabel, '정보 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 정보 확인 필요',
+      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 정보 확인 필요, 출처 확인 필요',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
