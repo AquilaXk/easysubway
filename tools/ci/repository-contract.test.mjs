@@ -424,6 +424,58 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
 });
 
+test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 경계를 따른다", () => {
+  const favorite = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteFacility.java");
+  const favoriteDetails = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteFacilityWithDetails.java");
+  const invalidFavorite = read("backend/src/main/java/com/easysubway/favorite/domain/InvalidFavoriteFacilityException.java");
+  const notFound = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteFacilityNotFoundException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/favorite/application/port/in/FavoriteFacilityUseCase.java");
+  const listCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/ListFavoriteFacilitiesCommand.java");
+  const saveCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/SaveFavoriteFacilityCommand.java");
+  const removeCommand = read("backend/src/main/java/com/easysubway/favorite/application/port/in/RemoveFavoriteFacilityCommand.java");
+  const loadPort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/LoadFavoriteFacilityPort.java");
+  const savePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/SaveFavoriteFacilityPort.java");
+  const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteFacilityPort.java");
+  const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteFacilityService.java");
+  const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteFacilityRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(favorite, /record FavoriteFacility/);
+  assert.match(favorite, /facilityId/);
+  assert.match(favorite, /addedAt/);
+  assert.match(favorite, /InvalidFavoriteFacilityException/);
+  assert.match(favoriteDetails, /AccessibilityFacility/);
+  assert.match(favoriteDetails, /Station/);
+  assert.match(invalidFavorite, /extends InvalidRequestException/);
+  assert.match(notFound, /extends ResourceNotFoundException/);
+  assert.match(notFound, /시설 정보를 찾을 수 없습니다\./);
+  assert.match(useCase, /interface FavoriteFacilityUseCase/);
+  assert.match(useCase, /listFavoriteFacilities/);
+  assert.match(useCase, /saveFavoriteFacility/);
+  assert.match(useCase, /removeFavoriteFacility/);
+  assert.match(listCommand, /record ListFavoriteFacilitiesCommand/);
+  assert.match(saveCommand, /record SaveFavoriteFacilityCommand/);
+  assert.match(removeCommand, /record RemoveFavoriteFacilityCommand/);
+  assert.match(loadPort, /interface LoadFavoriteFacilityPort/);
+  assert.match(savePort, /interface SaveFavoriteFacilityPort/);
+  assert.match(deletePort, /interface DeleteFavoriteFacilityPort/);
+  assert.match(service, /implements FavoriteFacilityUseCase/);
+  assert.match(service, /LoadTransitMasterPort/);
+  assert.match(service, /loadAccessibilityFacilities/);
+  assert.match(service, /FavoriteFacilityNotFoundException/);
+  assert.match(repository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort/);
+  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/facilities"\)/);
+  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
+  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.match(controller, /AccessibilityFacilityStatus/);
+  assert.match(controller, /DataConfidenceLevel/);
+  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
+  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"/);
+  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+});
+
 test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 API 경계를 따른다", () => {
   const favorite = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteRoute.java");
   const favoriteDetails = read("backend/src/main/java/com/easysubway/favorite/domain/FavoriteRouteWithDetails.java");
