@@ -65,6 +65,67 @@ void main() {
     expect(results.single.lines.single.name, '수도권 4호선');
   });
 
+  test('역 API 저장소는 현재 위치 기준 가까운 역을 요청하고 거리를 파싱한다', () async {
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
+                'lastVerifiedAt': '2026-06-12',
+                'distanceMeters': 230,
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'operatorId': 'seoul-metro',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                    'sequence': 48,
+                    'platformInfo': '당고개 방면 / 오이도 방면',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final results = await repository.searchNearbyStations(
+      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      radiusMeters: 1500,
+      limit: 5,
+    );
+
+    expect(requestedUri.path, '/api/v1/stations/nearby');
+    expect(requestedUri.queryParameters['lat'], '37.3028');
+    expect(requestedUri.queryParameters['lng'], '126.8665');
+    expect(requestedUri.queryParameters['radiusMeters'], '1500');
+    expect(requestedUri.queryParameters['limit'], '5');
+    expect(results.single.nameKo, '상록수');
+    expect(results.single.distanceMeters, 230);
+    expect(results.single.distanceLabel, '230m 거리');
+  });
+
   test('역 API 저장소는 역 상세와 출구와 시설 정보를 요청하고 파싱한다', () async {
     final requestedPaths = <String>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -522,6 +583,44 @@ void main() {
     expect(controller.state.message, '역 정보를 불러오지 못했습니다.');
   });
 
+  test('역 검색 컨트롤러는 현재 위치 주변 역을 거리와 함께 표시한다', () async {
+    final repository = FakeStationSearchRepository()
+      ..nextNearbyResults = [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ];
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+    final controller = StationSearchController(repository: repository);
+
+    await controller.searchNearby(locationProvider);
+
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
+    expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.distanceLabel, '230m 거리');
+  });
+
+  test('역 검색 컨트롤러는 위치 조회 실패를 쉬운 문구로 표시한다', () async {
+    final repository = FakeStationSearchRepository();
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException('위치 권한을 확인해 주세요.'),
+    );
+    final controller = StationSearchController(repository: repository);
+
+    await controller.searchNearby(locationProvider);
+
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, isEmpty);
+    expect(controller.state.status, StationSearchStatus.failure);
+    expect(controller.state.message, '위치 권한을 확인해 주세요.');
+  });
+
   test('역 상세 컨트롤러는 상세와 출구와 시설 요청을 동시에 시작한다', () async {
     final repository = ControlledStationDetailRepository();
     final controller = StationDetailController(repository: repository);
@@ -669,7 +768,11 @@ FavoriteStation _favoriteStation({required String id, required String name}) {
   );
 }
 
-StationSearchResult _stationResult({required String id, required String name}) {
+StationSearchResult _stationResult({
+  required String id,
+  required String name,
+  int? distanceMeters,
+}) {
   return StationSearchResult(
     id: id,
     nameKo: name,
@@ -677,6 +780,7 @@ StationSearchResult _stationResult({required String id, required String name}) {
     region: '수도권',
     dataQualityLevel: 'LEVEL_1',
     lastVerifiedAt: '2026-06-12',
+    distanceMeters: distanceMeters,
     lines: const [
       StationSearchLine(
         id: 'seoul-2',
@@ -737,8 +841,10 @@ StationFacilityInfo _stationFacility() {
 
 class FakeStationSearchRepository implements StationSearchRepository {
   final requestedQueries = <String>[];
+  final requestedNearbyLocations = <CurrentLocation>[];
   Object? error;
   List<StationSearchResult> nextResults = const [];
+  List<StationSearchResult> nextNearbyResults = const [];
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -748,6 +854,20 @@ class FakeStationSearchRepository implements StationSearchRepository {
       throw currentError;
     }
     return nextResults;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) async {
+    requestedNearbyLocations.add(location);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return nextNearbyResults;
   }
 
   @override
@@ -776,6 +896,15 @@ class ControlledStationSearchRepository implements StationSearchRepository {
     final completer = Completer<List<StationSearchResult>>();
     _pending[query] = completer;
     return completer.future;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) {
+    throw UnimplementedError();
   }
 
   @override
@@ -816,6 +945,15 @@ class ControlledStationDetailRepository implements StationSearchRepository {
   }
 
   @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<StationDetail> getStationDetail(String stationId) {
     requestedDetailStationIds.add(stationId);
     return _detailCompleter.future;
@@ -849,6 +987,15 @@ class FailingStationDetailRepository implements StationSearchRepository {
   }
 
   @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) async {
+    return const [];
+  }
+
+  @override
   Future<StationDetail> getStationDetail(String stationId) async {
     throw const StationSearchException('역 정보를 불러오지 못했습니다.');
   }
@@ -863,6 +1010,25 @@ class FailingStationDetailRepository implements StationSearchRepository {
     String stationId,
   ) async {
     return const [];
+  }
+}
+
+class FakeCurrentLocationProvider implements CurrentLocationProvider {
+  FakeCurrentLocationProvider({this.location, this.error});
+
+  final CurrentLocation? location;
+  final Object? error;
+  int requestCount = 0;
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    requestCount++;
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return location ??
+        const CurrentLocation(latitude: 37.3028, longitude: 126.8665);
   }
 }
 

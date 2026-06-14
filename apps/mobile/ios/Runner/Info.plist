@@ -16,6 +16,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>easysubway_mobile</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>현재 위치 주변 역을 찾는 데 사용합니다.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
