@@ -5,5 +5,5 @@ logging:
 spring:
   batch:
     jdbc:
-      # 신규 운영 DB에서도 Batch 메타데이터 테이블이 준비되어 관리자 배치 실행이 실패하지 않게 한다.
-      initialize-schema: always
+      # 운영 DB 메타데이터 테이블은 배포 전 마이그레이션이나 운영 준비 절차에서 관리한다.
+      initialize-schema: never
