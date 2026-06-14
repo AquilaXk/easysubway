@@ -184,6 +184,27 @@ class TransitMasterServiceTest {
 	}
 
 	@Test
+	@DisplayName("관리자 시설 상태 수정은 값이 같으면 즐겨찾기 알림을 요청하지 않는다")
+	void updateFacilityStatusDoesNotRequestFavoriteAlertWhenStatusIsSame() {
+		var repository = new InMemoryTransitMasterRepository();
+		var alertUseCase = new RecordingFacilityStatusAlertUseCase();
+		var service = new TransitMasterService(
+			repository,
+			repository,
+			alertUseCase,
+			Clock.fixed(Instant.parse("2026-06-14T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+
+		service.updateFacilityStatus(new UpdateAccessibilityFacilityStatusCommand(
+			"facility-sangnoksu-elevator-1",
+			AccessibilityFacilityStatus.NORMAL,
+			"admin-user"
+		));
+
+		assertThat(alertUseCase.commands).isEmpty();
+	}
+
+	@Test
 	@DisplayName("시설 상태 수정은 상태값과 관리자 식별자를 요구한다")
 	void updateFacilityStatusRequiresStatusAndReviewer() {
 		var repository = new InMemoryTransitMasterRepository();

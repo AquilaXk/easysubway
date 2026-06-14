@@ -136,9 +136,11 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 		LocalDate updatedAt = LocalDate.now(clock);
 		// 관리자 직접 수정은 역 상세와 경로 추천이 함께 사용하는 운영 상태의 기준값을 바꾼다.
 		saveAccessibilityFacilityStatusPort.saveFacilityStatus(facility.id(), command.status(), updatedAt);
-		facilityStatusAlertUseCase.alertFacilityStatusChanged(
-			new FacilityStatusChangedAlertCommand(facility.id(), command.status())
-		);
+		if (facility.status() != command.status()) {
+			facilityStatusAlertUseCase.alertFacilityStatusChanged(
+				new FacilityStatusChangedAlertCommand(facility.id(), command.status())
+			);
+		}
 		return withStatus(facility, command.status(), updatedAt);
 	}
 

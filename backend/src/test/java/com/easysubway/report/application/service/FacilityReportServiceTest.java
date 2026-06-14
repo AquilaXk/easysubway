@@ -290,6 +290,32 @@ class FacilityReportServiceTest {
 	}
 
 	@Test
+	@DisplayName("이미 같은 상태인 신고 승인은 즐겨찾기 알림을 요청하지 않는다")
+	void acceptedReportWithSameFacilityStatusDoesNotRequestFavoriteAlert() {
+		var alertUseCase = new RecordingFacilityStatusAlertUseCase();
+		var transitRepository = new InMemoryTransitMasterRepository();
+		var repository = new InMemoryFacilityReportRepository();
+		var service = new FacilityReportService(
+			transitRepository,
+			transitRepository,
+			repository,
+			repository,
+			alertUseCase,
+			Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+
+		var report = service.createReport(reportCommand(
+			"anonymous-user-same-status",
+			FacilityReportType.RECOVERED,
+			"이미 정상 상태인 시설입니다."
+		));
+
+		service.reviewReport(reviewCommand(report.id(), FacilityReportReviewDecision.ACCEPT));
+
+		assertThat(alertUseCase.commands).isEmpty();
+	}
+
+	@Test
 	@DisplayName("반려와 중복 처리된 시설 신고는 시설 상태를 바꾸지 않는다")
 	void rejectedOrDuplicateReportDoesNotUpdateFacilityStatus() {
 		var transitRepository = new InMemoryTransitMasterRepository();

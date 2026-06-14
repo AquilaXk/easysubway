@@ -212,16 +212,29 @@ public class FacilityReportService implements FacilityReportUseCase {
 		}
 
 		toFacilityStatus(report.reportType()).ifPresent(status -> {
+			boolean statusChanged = isFacilityStatusChanged(report.facilityId(), status);
 			saveAccessibilityFacilityStatusPort.saveFacilityStatus(
 				report.facilityId(),
 				status,
 				LocalDate.now(clock)
 			);
+			if (!statusChanged) {
+				return;
+			}
 			// 신고 승인과 관리자 직접 수정은 같은 알림 정책을 사용해야 사용자 경험이 일관된다.
 			facilityStatusAlertUseCase.alertFacilityStatusChanged(
 				new FacilityStatusChangedAlertCommand(report.facilityId(), status)
 			);
 		});
+	}
+
+	private boolean isFacilityStatusChanged(String facilityId, AccessibilityFacilityStatus status) {
+		return loadTransitMasterPort.loadAccessibilityFacilities()
+			.stream()
+			.filter(facility -> facility.id().equals(facilityId))
+			.findFirst()
+			.map(facility -> facility.status() != status)
+			.orElseThrow(FacilityReportTargetNotFoundException::new);
 	}
 
 	private Optional<AccessibilityFacilityStatus> toFacilityStatus(FacilityReportType reportType) {

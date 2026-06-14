@@ -709,9 +709,11 @@ test("백엔드 시설 상태 변경 알림은 즐겨찾기와 푸시 outbox 경
   assert.match(service, /PushNotificationType\.FAVORITE_ROUTE_FACILITY/);
   assert.match(reportService, /FacilityStatusAlertUseCase/);
   assert.match(reportService, /FacilityStatusChangedAlertCommand/);
+  assert.match(reportService, /isFacilityStatusChanged/);
   assert.match(reportService, /alertFacilityStatusChanged/);
   assert.match(transitService, /FacilityStatusAlertUseCase/);
   assert.match(transitService, /FacilityStatusChangedAlertCommand/);
+  assert.match(transitService, /facility\.status\(\) != command\.status\(\)/);
   assert.match(transitService, /alertFacilityStatusChanged/);
 });
 
