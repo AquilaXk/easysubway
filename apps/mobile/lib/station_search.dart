@@ -950,6 +950,14 @@ class StationDetailController extends ChangeNotifier {
         exits: responses[1] as List<StationExitInfo>,
         facilities: responses[2] as List<StationFacilityInfo>,
       );
+    } on StationSearchException {
+      if (_isDisposed) {
+        return;
+      }
+      _state = const StationDetailState(
+        status: StationDetailStatus.failure,
+        message: '역 상세 정보를 불러오지 못했습니다.',
+      );
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '역 상세 화면 로드 중 예외가 발생했습니다.');
       if (_isDisposed) {
