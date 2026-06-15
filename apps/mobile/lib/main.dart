@@ -40,6 +40,8 @@ class EasySubwayApp extends StatelessWidget {
     OnboardingResultStore? onboardingStore,
     FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
+    SupportAccessInfo supportAccessInfo =
+        const SupportAccessInfo.fromEnvironment(),
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enableAnonymousAuth = true,
     Key? key,
@@ -61,6 +63,7 @@ class EasySubwayApp extends StatelessWidget {
          onboardingStore: onboardingStore,
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+         supportAccessInfo: supportAccessInfo,
          key: key,
        );
 
@@ -70,6 +73,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.supportAccessInfo,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -94,6 +98,7 @@ class EasySubwayApp extends StatelessWidget {
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final SupportAccessInfo supportAccessInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -152,9 +157,31 @@ class EasySubwayApp extends StatelessWidget {
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+        supportAccessInfo: supportAccessInfo,
       ),
     );
   }
+}
+
+class SupportAccessInfo {
+  const SupportAccessInfo({
+    required this.privacyPolicyUrl,
+    required this.supportEmail,
+    required this.dataDeletionEmail,
+  });
+
+  const SupportAccessInfo.fromEnvironment()
+    : privacyPolicyUrl = const String.fromEnvironment(
+        'EASYSUBWAY_PRIVACY_POLICY_URL',
+      ),
+      supportEmail = const String.fromEnvironment('EASYSUBWAY_SUPPORT_EMAIL'),
+      dataDeletionEmail = const String.fromEnvironment(
+        'EASYSUBWAY_DATA_DELETION_EMAIL',
+      );
+
+  final String privacyPolicyUrl;
+  final String supportEmail;
+  final String dataDeletionEmail;
 }
 
 class _EasySubwayHome extends StatefulWidget {
@@ -172,6 +199,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.supportAccessInfo,
   });
 
   final StationSearchRepository repository;
@@ -187,6 +215,7 @@ class _EasySubwayHome extends StatefulWidget {
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final SupportAccessInfo supportAccessInfo;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -249,6 +278,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         initialMobilityType: onboardingResult?.profile.mobilityType,
         simpleViewEnabled: preferences.simpleViewEnabled,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+        supportAccessInfo: widget.supportAccessInfo,
       ),
     );
   }
@@ -630,6 +660,7 @@ class HomeScreen extends StatelessWidget {
     required this.favoriteRouteRepository,
     required this.notificationRepository,
     required this.locationProvider,
+    required this.supportAccessInfo,
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
     String? initialMobilityType,
@@ -646,6 +677,7 @@ class HomeScreen extends StatelessWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
   final CurrentLocationProvider locationProvider;
+  final SupportAccessInfo supportAccessInfo;
   final String initialMobilityType;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -817,6 +849,20 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
+            OutlinedButton.icon(
+              key: const Key('helpButton'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        SupportAccessScreen(accessInfo: supportAccessInfo),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.help_outline),
+              label: const Text('도움말'),
+            ),
+            const SizedBox(height: 12),
             if (!simpleViewEnabled) ...[
               const SizedBox(height: 24),
               const FeatureTile(
@@ -837,6 +883,112 @@ class HomeScreen extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class SupportAccessScreen extends StatelessWidget {
+  const SupportAccessScreen({required this.accessInfo, super.key});
+
+  final SupportAccessInfo accessInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('도움말')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            _SupportAccessItem(
+              key: const Key('privacyPolicyAccessItem'),
+              icon: Icons.privacy_tip_outlined,
+              title: '개인정보처리방침',
+              value: accessInfo.privacyPolicyUrl,
+            ),
+            const SizedBox(height: 12),
+            _SupportAccessItem(
+              key: const Key('supportAccessItem'),
+              icon: Icons.support_agent,
+              title: '고객지원',
+              value: accessInfo.supportEmail,
+            ),
+            const SizedBox(height: 12),
+            _SupportAccessItem(
+              key: const Key('dataDeletionAccessItem'),
+              icon: Icons.delete_outline,
+              title: '데이터 삭제 요청',
+              value: accessInfo.dataDeletionEmail,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportAccessItem extends StatelessWidget {
+  const _SupportAccessItem({
+    required this.icon,
+    required this.title,
+    required this.value,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value.trim().isEmpty ? '앱 출시 전 연결됩니다.' : value;
+    return Semantics(
+      button: true,
+      label: '$title, $displayValue',
+      onTap: () => unawaited(_showDetail(context, displayValue)),
+      child: ExcludeSemantics(
+        child: OutlinedButton.icon(
+          onPressed: () => _showDetail(context, displayValue),
+          icon: Icon(icon),
+          label: Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title),
+                  const SizedBox(height: 4),
+                  Text(
+                    displayValue,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF29484B),
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDetail(BuildContext context, String displayValue) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SelectableText(displayValue),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('확인'),
+          ),
+        ],
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
@@ -380,6 +381,60 @@ void main() {
       expect(find.bySemanticsLabel('이동 프로필, 이동 조건 저장'), findsOneWidget);
       expect(find.bySemanticsLabel('시설 정보, 엘리베이터와 경사로'), findsOneWidget);
       expect(find.bySemanticsLabel('신고, 불편 신고'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          supportAccessInfo: const SupportAccessInfo(
+            privacyPolicyUrl: 'https://easysubway.example/privacy',
+            supportEmail: 'support@easysubway.example',
+            dataDeletionEmail: 'privacy@easysubway.example',
+          ),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.byKey(const Key('helpButton')), 120);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('helpButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('도움말'), findsOneWidget);
+      expect(find.text('개인정보처리방침'), findsOneWidget);
+      expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
+      expect(find.text('고객지원'), findsOneWidget);
+      expect(find.text('support@easysubway.example'), findsOneWidget);
+      expect(find.text('데이터 삭제 요청'), findsOneWidget);
+      expect(find.text('privacy@easysubway.example'), findsOneWidget);
+
+      final privacyButtonSize = tester.getSize(
+        find.byKey(const Key('privacyPolicyAccessItem')),
+      );
+      final deletionButtonSize = tester.getSize(
+        find.byKey(const Key('dataDeletionAccessItem')),
+      );
+
+      expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
+      expect(deletionButtonSize.height, greaterThanOrEqualTo(60));
+      final privacySemantics = tester
+          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
+          .getSemanticsData();
+      expect(
+        privacySemantics.label,
+        '개인정보처리방침, https://easysubway.example/privacy',
+      );
+      expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
     } finally {
       semanticsHandle.dispose();
     }
