@@ -1,10 +1,12 @@
 import CoreLocation
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, CLLocationManagerDelegate {
   private let locationChannelName = "com.easysubway.easysubway_mobile/location"
+  private let notificationChannelName = "com.easysubway.easysubway_mobile/notifications"
   private let locationManager = CLLocationManager()
   private var pendingLocationResult: FlutterResult?
 
@@ -37,6 +39,18 @@ import UIKit
         return
       }
       self?.handleCurrentLocation(result)
+    }
+
+    let notificationChannel = FlutterMethodChannel(
+      name: notificationChannelName,
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    notificationChannel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "requestNotificationPermission" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self?.requestNotificationPermission(result)
     }
   }
 
@@ -131,6 +145,21 @@ import UIKit
     }
     UIApplication.shared.open(url, options: [:]) { success in
       result(success)
+    }
+  }
+
+  private func requestNotificationPermission(_ result: @escaping FlutterResult) {
+    // iOS 권한 팝업은 사용자가 알림 켜기를 누른 뒤에만 띄운다.
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) {
+      granted,
+      error in
+      DispatchQueue.main.async {
+        if error != nil {
+          result(FlutterError(code: "notificationUnavailable", message: nil, details: nil))
+          return
+        }
+        result(granted)
+      }
     }
   }
 

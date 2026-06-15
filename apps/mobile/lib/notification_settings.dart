@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
@@ -11,6 +12,7 @@ const _notificationSettingsTimeout = Duration(seconds: 8);
 const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했습니다.';
 const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했습니다.';
 const _deviceRegistrationErrorMessage = '기기 알림 등록을 마치지 못했습니다.';
+const _notificationPermissionErrorMessage = '알림 권한을 확인하지 못했습니다.';
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -22,6 +24,39 @@ abstract class NotificationSettingsRepository {
 
 abstract class DeviceRegistrationRepository {
   Future<RegisteredDevice> registerDevice(DeviceRegistrationRequest request);
+}
+
+abstract class NotificationPermissionProvider {
+  Future<NotificationPermissionStatus> requestNotificationPermission();
+}
+
+enum NotificationPermissionStatus { granted, denied }
+
+class MethodChannelNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  MethodChannelNotificationPermissionProvider({MethodChannel? channel})
+    : _channel =
+          channel ??
+          const MethodChannel('com.easysubway.easysubway_mobile/notifications');
+
+  final MethodChannel _channel;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    try {
+      final granted =
+          await _channel.invokeMethod<bool>('requestNotificationPermission') ??
+          false;
+      return granted
+          ? NotificationPermissionStatus.granted
+          : NotificationPermissionStatus.denied;
+    } on PlatformException catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '알림 권한 요청 중 예외가 발생했습니다.');
+      throw const NotificationSettingsException(
+        _notificationPermissionErrorMessage,
+      );
+    }
+  }
 }
 
 class NotificationSettingsApiRepository
@@ -309,10 +344,7 @@ class DeviceRegistrationRequest {
   final String deviceToken;
 
   Map<String, Object?> toJson() {
-    return {
-      'platform': platform.apiValue,
-      'deviceToken': deviceToken.trim(),
-    };
+    return {'platform': platform.apiValue, 'deviceToken': deviceToken.trim()};
   }
 }
 
@@ -564,9 +596,14 @@ class NotificationSettingsController extends ChangeNotifier {
 }
 
 class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({required this.repository, super.key});
+  const NotificationSettingsScreen({
+    required this.repository,
+    this.notificationPermissionProvider,
+    super.key,
+  });
 
   final NotificationSettingsRepository repository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
 
   @override
   State<NotificationSettingsScreen> createState() =>
@@ -576,6 +613,8 @@ class NotificationSettingsScreen extends StatefulWidget {
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   late final NotificationSettingsController _controller;
+  bool _isRequestingNotificationPermission = false;
+  String _notificationPermissionMessage = '';
 
   @override
   void initState() {
@@ -612,6 +651,12 @@ class _NotificationSettingsScreenState
             }
             return _NotificationSettingsContent(
               state: state,
+              notificationPermissionProvider:
+                  widget.notificationPermissionProvider,
+              isRequestingNotificationPermission:
+                  _isRequestingNotificationPermission,
+              notificationPermissionMessage: _notificationPermissionMessage,
+              onRequestNotificationPermission: _requestNotificationPermission,
               onFavoriteStationFacilityAlertsChanged:
                   _controller.updateFavoriteStationFacilityAlerts,
               onFavoriteRouteFacilityAlertsChanged:
@@ -625,11 +670,86 @@ class _NotificationSettingsScreenState
       ),
     );
   }
+
+  Future<void> _requestNotificationPermission() async {
+    final provider = widget.notificationPermissionProvider;
+    if (provider == null || _isRequestingNotificationPermission) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('알림 받기'),
+        content: const Text('시설 상태와 신고 결과를 알려드립니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('나중에'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('켜기'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _isRequestingNotificationPermission = true;
+      _notificationPermissionMessage = '';
+    });
+
+    try {
+      final status = await provider.requestNotificationPermission();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationPermissionMessage =
+            status == NotificationPermissionStatus.granted
+            ? '기기 알림이 켜졌습니다.'
+            : '기기 알림 권한을 켜 주세요.';
+      });
+    } on NotificationSettingsException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationPermissionMessage = error.message;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림 권한 요청 화면 처리 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationPermissionMessage = _notificationPermissionErrorMessage;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequestingNotificationPermission = false;
+        });
+      }
+    }
+  }
 }
 
 class _NotificationSettingsContent extends StatelessWidget {
   const _NotificationSettingsContent({
     required this.state,
+    required this.notificationPermissionProvider,
+    required this.isRequestingNotificationPermission,
+    required this.notificationPermissionMessage,
+    required this.onRequestNotificationPermission,
     required this.onFavoriteStationFacilityAlertsChanged,
     required this.onFavoriteRouteFacilityAlertsChanged,
     required this.onReportStatusAlertsChanged,
@@ -638,6 +758,10 @@ class _NotificationSettingsContent extends StatelessWidget {
   });
 
   final NotificationSettingsState state;
+  final NotificationPermissionProvider? notificationPermissionProvider;
+  final bool isRequestingNotificationPermission;
+  final String notificationPermissionMessage;
+  final VoidCallback onRequestNotificationPermission;
   final ValueChanged<bool> onFavoriteStationFacilityAlertsChanged;
   final ValueChanged<bool> onFavoriteRouteFacilityAlertsChanged;
   final ValueChanged<bool> onReportStatusAlertsChanged;
@@ -652,6 +776,40 @@ class _NotificationSettingsContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
+        if (notificationPermissionProvider != null) ...[
+          Semantics(
+            label: isRequestingNotificationPermission
+                ? '기기 알림 권한 확인 중'
+                : '기기 알림 켜기',
+            child: OutlinedButton.icon(
+              key: const Key('notificationPermissionButton'),
+              onPressed: isRequestingNotificationPermission
+                  ? null
+                  : onRequestNotificationPermission,
+              icon: isRequestingNotificationPermission
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    )
+                  : const Icon(Icons.notifications_active_outlined),
+              label: Text(
+                isRequestingNotificationPermission ? '확인 중' : '기기 알림 켜기',
+              ),
+            ),
+          ),
+          if (notificationPermissionMessage.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _NotificationSettingsMessage(
+              message: notificationPermissionMessage,
+            ),
+          ],
+          const SizedBox(height: 12),
+        ],
+        if (state.message.isNotEmpty) ...[
+          _NotificationSettingsMessage(message: state.message),
+          const SizedBox(height: 12),
+        ],
         _NotificationSwitchTile(
           key: const Key('notificationSwitch-favoriteStationFacilityAlerts'),
           title: '역 시설 알림',
@@ -696,25 +854,32 @@ class _NotificationSettingsContent extends StatelessWidget {
             label: Text(isSaving ? '저장 중' : '저장'),
           ),
         ),
-        if (state.message.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Semantics(
-            container: true,
-            excludeSemantics: true,
-            liveRegion: true,
-            label: state.message,
-            child: Text(
-              state.message,
-              key: const Key('notificationSettingsMessage'),
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
       ],
+    );
+  }
+}
+
+class _NotificationSettingsMessage extends StatelessWidget {
+  const _NotificationSettingsMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      excludeSemantics: true,
+      liveRegion: true,
+      label: message,
+      child: Text(
+        message,
+        key: const Key('notificationSettingsMessage'),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: const Color(0xFF102A2C),
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+        ),
+      ),
     );
   }
 }

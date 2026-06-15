@@ -35,6 +35,7 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
     NotificationSettingsRepository? notificationRepository,
+    NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     AnonymousAuthRepository? anonymousAuthRepository,
     OnboardingResultStore? onboardingStore,
@@ -55,6 +56,7 @@ class EasySubwayApp extends StatelessWidget {
            favoriteFacilityRepository: favoriteFacilityRepository,
            favoriteRouteRepository: favoriteRouteRepository,
            notificationRepository: notificationRepository,
+           notificationPermissionProvider: notificationPermissionProvider,
            locationProvider: locationProvider,
            anonymousAuthRepository: anonymousAuthRepository,
            enableAnonymousAuth: enableAnonymousAuth,
@@ -83,6 +85,8 @@ class EasySubwayApp extends StatelessWidget {
        favoriteFacilityRepository = dependencies.favoriteFacilityRepository,
        favoriteRouteRepository = dependencies.favoriteRouteRepository,
        notificationRepository = dependencies.notificationRepository,
+       notificationPermissionProvider =
+           dependencies.notificationPermissionProvider,
        locationProvider = dependencies.locationProvider;
 
   final StationSearchRepository repository;
@@ -93,6 +97,7 @@ class EasySubwayApp extends StatelessWidget {
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
@@ -152,6 +157,7 @@ class EasySubwayApp extends StatelessWidget {
         favoriteFacilityRepository: favoriteFacilityRepository,
         favoriteRouteRepository: favoriteRouteRepository,
         notificationRepository: notificationRepository,
+        notificationPermissionProvider: notificationPermissionProvider,
         locationProvider: locationProvider,
         initialOnboardingState: initialOnboardingState,
         onboardingStore: onboardingStore,
@@ -194,6 +200,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
     required this.notificationRepository,
+    required this.notificationPermissionProvider,
     required this.locationProvider,
     required this.initialOnboardingState,
     required this.onboardingStore,
@@ -210,6 +217,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
@@ -274,6 +282,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         favoriteFacilityRepository: widget.favoriteFacilityRepository,
         favoriteRouteRepository: widget.favoriteRouteRepository,
         notificationRepository: widget.notificationRepository,
+        notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
         initialMobilityType: onboardingResult?.profile.mobilityType,
         simpleViewEnabled: preferences.simpleViewEnabled,
@@ -491,6 +500,7 @@ class _EasySubwayAppDependencies {
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
     required this.notificationRepository,
+    required this.notificationPermissionProvider,
     required this.locationProvider,
   });
 
@@ -503,6 +513,7 @@ class _EasySubwayAppDependencies {
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
     NotificationSettingsRepository? notificationRepository,
+    NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     AnonymousAuthRepository? anonymousAuthRepository,
     required bool enableAnonymousAuth,
@@ -554,6 +565,9 @@ class _EasySubwayAppDependencies {
             baseUri: baseUri,
             authProvider: sharedAuthProvider,
           ),
+      notificationPermissionProvider:
+          notificationPermissionProvider ??
+          MethodChannelNotificationPermissionProvider(),
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
     );
@@ -567,6 +581,7 @@ class _EasySubwayAppDependencies {
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
 }
 
@@ -659,6 +674,7 @@ class HomeScreen extends StatelessWidget {
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
     required this.notificationRepository,
+    required this.notificationPermissionProvider,
     required this.locationProvider,
     required this.supportAccessInfo,
     this.simpleViewEnabled = true,
@@ -676,6 +692,7 @@ class HomeScreen extends StatelessWidget {
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final SupportAccessInfo supportAccessInfo;
   final String initialMobilityType;
@@ -690,6 +707,7 @@ class HomeScreen extends StatelessWidget {
     final favoriteRouteRepository = this.favoriteRouteRepository;
     final routeFeedbackRepository = this.routeFeedbackRepository;
     final notificationRepository = this.notificationRepository;
+    final notificationPermissionProvider = this.notificationPermissionProvider;
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
@@ -840,6 +858,8 @@ class HomeScreen extends StatelessWidget {
                     MaterialPageRoute<void>(
                       builder: (_) => NotificationSettingsScreen(
                         repository: notificationRepository,
+                        notificationPermissionProvider:
+                            notificationPermissionProvider,
                       ),
                     ),
                   );
