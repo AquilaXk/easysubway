@@ -1299,6 +1299,11 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
     return location ??
         const CurrentLocation(latitude: 37.3028, longitude: 126.8665);
   }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    return true;
+  }
 }
 
 class FakeFavoriteStationRepository implements FavoriteStationRepository {
