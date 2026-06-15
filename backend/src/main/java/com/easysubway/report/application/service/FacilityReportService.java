@@ -145,6 +145,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 
 	@Override
 	public FacilityReport createReport(CreateFacilityReportCommand command) {
+		requireReporter(command);
 		requireReportType(command);
 		requireActiveStation(command.stationId());
 		// 신고 대상 시설이 요청한 역에 속해야 다른 역 시설 상태가 잘못 갱신되는 일을 막을 수 있다.
@@ -179,7 +180,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 	public List<FacilityReport> listUserReports(String userId) {
 		return sortedReports()
 			.stream()
-			.filter(report -> report.userId().equals(userId))
+			.filter(report -> userId.equals(report.userId()))
 			.toList();
 	}
 
@@ -221,6 +222,12 @@ public class FacilityReportService implements FacilityReportUseCase {
 		// 승인된 상태 신고만 실제 시설 운영 상태에 반영한다.
 		applyAcceptedReportToFacilityStatus(report, command.decision());
 		return saved;
+	}
+
+	private void requireReporter(CreateFacilityReportCommand command) {
+		if (command.userId() == null || command.userId().isBlank()) {
+			throw new InvalidFacilityReportException("사용자 식별자가 필요합니다.");
+		}
 	}
 
 	private List<FacilityReport> sortedReports() {

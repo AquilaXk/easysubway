@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.easysubway.report.adapter.out.persistence.InMemoryFacilityReportRepository;
 import com.easysubway.report.application.port.in.CreateFacilityReportCommand;
 import com.easysubway.report.application.port.in.ReviewFacilityReportCommand;
+import com.easysubway.report.domain.FacilityReport;
 import com.easysubway.report.domain.FacilityReportNotFoundException;
 import com.easysubway.report.domain.FacilityReportReviewDecision;
 import com.easysubway.report.domain.FacilityReportStatus;
@@ -116,6 +117,23 @@ class FacilityReportServiceTest {
 	}
 
 	@Test
+	@DisplayName("시설 신고는 사용자 식별자를 요구한다")
+	void createReportRequiresUserId() {
+		assertThatThrownBy(() -> service.createReport(new CreateFacilityReportCommand(
+			"",
+			"station-sangnoksu",
+			"facility-sangnoksu-elevator-1",
+			FacilityReportType.BROKEN,
+			"신고 작성자 식별자가 없는 요청입니다.",
+			null,
+			null,
+			null
+		)))
+			.isInstanceOf(InvalidFacilityReportException.class)
+			.hasMessage("사용자 식별자가 필요합니다.");
+	}
+
+	@Test
 	@DisplayName("존재하지 않는 신고는 조회할 수 없다")
 	void getReportRequiresExistingReport() {
 		assertThatThrownBy(() -> service.getReport("missing-report"))
@@ -151,6 +169,29 @@ class FacilityReportServiceTest {
 		assertThat(serviceWithTickingClock.listUserReports("report-owner"))
 			.extracting("id")
 			.doesNotContain(otherUserReport.id());
+	}
+
+	@Test
+	@DisplayName("내 신고 목록은 소유자 없는 신고가 있어도 실패하지 않는다")
+	void listUserReportsIgnoresReportsWithoutOwner() {
+		reportRepository.saveReport(new FacilityReport(
+			"report-without-owner",
+			null,
+			"station-sangnoksu",
+			"facility-sangnoksu-elevator-1",
+			FacilityReportType.BROKEN,
+			"소유자 없는 기존 신고입니다.",
+			null,
+			null,
+			null,
+			FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 12, 9, 0),
+			null,
+			null
+		));
+
+		assertThatNoException().isThrownBy(() -> service.listUserReports("anonymous-user-1"));
+		assertThat(service.listUserReports("anonymous-user-1")).isEmpty();
 	}
 
 	@Test
