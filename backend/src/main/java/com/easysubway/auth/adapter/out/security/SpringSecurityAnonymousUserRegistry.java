@@ -63,6 +63,18 @@ public class SpringSecurityAnonymousUserRegistry implements RegisterAnonymousUse
 		evictOldestAnonymousUsers();
 	}
 
+	@Override
+	public synchronized boolean deleteAnonymousUser(String userId) {
+		if (!issuedAnonymousUserIdSet.remove(userId)) {
+			return false;
+		}
+		issuedAnonymousUserIds.remove(userId);
+		if (userDetailsManager.userExists(userId)) {
+			userDetailsManager.deleteUser(userId);
+		}
+		return true;
+	}
+
 	private void evictOldestAnonymousUsers() {
 		// 공개 발급 API가 프로세스 메모리에 익명 계정을 무한히 쌓지 않게 런타임 발급분만 정리한다.
 		while (issuedAnonymousUserIds.size() > maxAnonymousUsers) {
