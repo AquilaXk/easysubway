@@ -1095,7 +1095,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _photoMessage = '';
   String _locationMessage = '';
   bool _isLoadingLocation = false;
-  bool _isLocationPreflightRunning = false;
   bool _isLocationFailure = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
@@ -1139,7 +1138,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         isLoading ||
         hasSubmittedReport ||
         _isLoadingLocation ||
-        _isLocationPreflightRunning ||
         _isLocationFailure ||
         (widget.locationLoader != null && _attachedLocation == null);
 
@@ -1233,8 +1231,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                     onPressed:
                         isLoading ||
                             _isOpeningLocationSettings ||
-                            _isLoadingLocation ||
-                            _isLocationPreflightRunning
+                            _isLoadingLocation
                         ? null
                         : _openLocationSettings,
                     icon: _isOpeningLocationSettings
@@ -1252,11 +1249,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                   key: const Key('facilityReportRetryLocationButton'),
                   onPressed:
                       isLoading ||
-                          _isLoadingLocation ||
-                          _isLocationPreflightRunning
+                          _isOpeningLocationSettings ||
+                          _isLoadingLocation
                       ? null
                       : _requestCurrentLocation,
-                  icon: _isLoadingLocation || _isLocationPreflightRunning
+                  icon: _isLoadingLocation
                       ? const SizedBox(
                           width: 22,
                           height: 22,
@@ -1344,27 +1341,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     return confirmed ?? false;
   }
 
-  Future<bool> _confirmLocationPermissionUse() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('위치 확인'),
-        content: const Text('가까운 역과 신고 위치를 확인합니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('나중에'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('계속'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
   Future<bool> _confirmPhotoUse() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1395,32 +1371,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   }
 
   Future<void> _requestCurrentLocation() async {
-    if (widget.locationLoader == null ||
-        _isLoadingLocation ||
-        _isLocationPreflightRunning) {
+    if (widget.locationLoader == null || _isLoadingLocation) {
       return;
     }
-    setState(() => _isLocationPreflightRunning = true);
-    try {
-      final needsPermissionRequest = await _needsLocationPermissionRequest();
-      if (!mounted) {
-        return;
-      }
-      if (needsPermissionRequest && !await _confirmLocationPermissionUse()) {
-        setState(() {
-          _attachedLocation = null;
-          _locationMessage = '위치 권한을 확인해 주세요.';
-          _isLocationFailure = true;
-        });
-        return;
-      }
-      // 권한 요청과 GPS 상태 확인은 네이티브 채널이 맡고, 화면은 실패 안내만 보여준다.
-      await _loadCurrentLocation();
-    } finally {
-      if (mounted) {
-        setState(() => _isLocationPreflightRunning = false);
-      }
-    }
+    // 권한 요청과 GPS 상태 확인은 네이티브 채널이 맡고, 화면은 실패 안내만 보여준다.
+    await _loadCurrentLocation();
   }
 
   Future<void> _openLocationSettings() async {
@@ -1436,14 +1391,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         setState(() => _isOpeningLocationSettings = false);
       }
     }
-  }
-
-  Future<bool> _needsLocationPermissionRequest() async {
-    final checker = widget.needsLocationPermissionRequest;
-    if (checker == null) {
-      return true;
-    }
-    return checker();
   }
 
   Future<void> _pickPhoto() async {
