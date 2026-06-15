@@ -2175,6 +2175,68 @@ void main() {
     }
   });
 
+  testWidgets('시설 신고 화면은 위치 실패 후 다시 확인할 수 있다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    var requestCount = 0;
+
+    Future<FacilityReportLocation> locationLoader() async {
+      requestCount++;
+      if (requestCount == 1) {
+        throw const FacilityReportLocationException('기기 위치를 켜 주세요.');
+      }
+      return const FacilityReportLocation(
+        latitude: 37.302421,
+        longitude: 126.866221,
+      );
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: locationLoader,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportSubmitButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('기기 위치를 켜 주세요.'), findsOneWidget);
+    final failedLocationSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(failedLocationSubmitButton.onPressed, isNull);
+    expect(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 2);
+    expect(find.text('위치 확인됨'), findsOneWidget);
+    final readySubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(readySubmitButton.onPressed, isNotNull);
+  });
+
   testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(

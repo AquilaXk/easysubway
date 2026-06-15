@@ -1084,6 +1084,23 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 message: _locationMessage,
                 isFailure: _isLocationFailure,
               ),
+              if (_isLocationFailure && !hasSubmittedReport) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  key: const Key('facilityReportRetryLocationButton'),
+                  onPressed: isLoading || _isLoadingLocation
+                      ? null
+                      : _loadCurrentLocation,
+                  icon: _isLoadingLocation
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : const Icon(Icons.my_location),
+                  label: const Text('위치 다시 확인'),
+                ),
+              ],
             ],
             const SizedBox(height: 16),
             if (state.message.isNotEmpty) _FacilityReportMessage(state: state),
