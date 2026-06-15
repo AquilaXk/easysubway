@@ -1259,7 +1259,7 @@ void main() {
   testWidgets('역 검색은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -1281,7 +1281,10 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
+    expect(
+      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
       findsOneWidget,
@@ -2957,7 +2960,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(find.text('사진과 현재 위치를 함께 보냅니다.'), findsOneWidget);
+    expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsOneWidget);
     expect(reportRepository.requests, isEmpty);
 
     await tester.tap(find.text('취소'));
@@ -3005,7 +3008,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('신고할 역을 확인하는 데 필요합니다.'), findsOneWidget);
+    expect(find.text('현재 위치로 가까운 역을 찾습니다.'), findsOneWidget);
     expect(requestCount, 0);
 
     await tester.tap(find.text('취소'));
@@ -3112,7 +3115,7 @@ void main() {
       requestCount++;
       if (requestCount == 1) {
         throw const FacilityReportLocationException(
-          '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+          '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
         );
       }
       return const FacilityReportLocation(
@@ -3146,7 +3149,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
+    expect(
+      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      findsOneWidget,
+    );
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
@@ -3176,7 +3182,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -3243,7 +3249,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
+    expect(
+      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      findsOneWidget,
+    );
     expect(find.text('현재 위치 첨부됨'), findsNothing);
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
     expect(find.text('위치 확인됨'), findsNothing);
@@ -3270,7 +3279,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -3335,7 +3344,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
+    expect(
+      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       findsOneWidget,
