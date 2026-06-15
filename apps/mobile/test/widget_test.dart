@@ -641,6 +641,80 @@ void main() {
     }
   });
 
+  testWidgets('알림 설정 화면은 기기 알림 권한을 사용자 확인 뒤 요청한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.granted,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('notificationSettingsButton')),
+      120,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('notificationSettingsButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notificationPermissionButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('알림 받기'), findsOneWidget);
+    expect(find.text('시설 상태와 신고 결과를 알려드립니다.'), findsOneWidget);
+    expect(notificationPermissionProvider.requestCount, 0);
+
+    await tester.tap(find.text('켜기'));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('기기 알림이 켜졌습니다.'), findsOneWidget);
+    expect(find.bySemanticsLabel('기기 알림이 켜졌습니다.'), findsOneWidget);
+  });
+
+  testWidgets('알림 설정 화면은 기기 알림 권한 거부를 짧게 안내한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.denied,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('notificationSettingsButton')),
+      120,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('notificationSettingsButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('notificationPermissionButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('켜기'));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('기기 알림 권한을 켜 주세요.'), findsOneWidget);
+    expect(find.bySemanticsLabel('기기 알림 권한을 켜 주세요.'), findsOneWidget);
+  });
+
   testWidgets('홈 즐겨찾기는 저장한 역을 큰 목록으로 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteRepository = FakeFavoriteStationRepository(
@@ -4186,6 +4260,20 @@ class FakeNotificationSettingsRepository
     }
     this.settings = settings.copyWith(updatedAt: '2026-06-14T09:05:00');
     return this.settings;
+  }
+}
+
+class FakeNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  FakeNotificationPermissionProvider({required this.nextStatus});
+
+  final NotificationPermissionStatus nextStatus;
+  int requestCount = 0;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    requestCount++;
+    return nextStatus;
   }
 }
 
