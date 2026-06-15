@@ -1313,8 +1313,7 @@ class StationDetailState {
     // 역 전체 구조를 짧게 보여주기 위해 엘리베이터 연결 출구를 우선 시작점으로 삼는다.
     final accessibleExit = exits
         .where((exit) => exit.hasElevatorConnection)
-        .cast<StationExitInfo?>()
-        .firstWhere((exit) => exit != null, orElse: () => null);
+        .firstOrNull;
     final firstExit = exits.isNotEmpty ? exits.first : null;
     final exit = accessibleExit ?? firstExit;
     if (exit != null) {
@@ -1370,8 +1369,7 @@ class StationDetailState {
     });
 
     for (final facility in candidates) {
-      if (!facility.isLayoutSummaryTarget ||
-          seenTypes.contains(facility.type)) {
+      if (seenTypes.contains(facility.type)) {
         continue;
       }
       seenTypes.add(facility.type);
