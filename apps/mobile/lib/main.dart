@@ -640,6 +640,7 @@ class HomeScreen extends StatelessWidget {
                         repository: favoriteRepository,
                         stationRepository: repository,
                         reportRepository: reportRepository,
+                        locationProvider: locationProvider,
                       ),
                     ),
                   );
