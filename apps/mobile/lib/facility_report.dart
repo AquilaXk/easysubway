@@ -1441,7 +1441,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   Future<bool> _needsLocationPermissionRequest() async {
     final checker = widget.needsLocationPermissionRequest;
     if (checker == null) {
-      return false;
+      return true;
     }
     return checker();
   }

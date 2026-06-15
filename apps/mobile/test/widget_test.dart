@@ -2591,6 +2591,7 @@ void main() {
             latitude: 37.302421,
             longitude: 126.866221,
           ),
+          needsLocationPermissionRequest: () async => false,
           photoPicker: () async {
             pickerCallCount++;
             return const FacilityReportPhotoAttachment(
@@ -2653,6 +2654,7 @@ void main() {
             latitude: 37.302421,
             longitude: 126.866221,
           ),
+          needsLocationPermissionRequest: () async => false,
           photoPicker: () async {
             pickerCallCount++;
             return const FacilityReportPhotoAttachment(
@@ -2710,6 +2712,7 @@ void main() {
               latitude: 37.302421,
               longitude: 126.866221,
             ),
+            needsLocationPermissionRequest: () async => false,
             photoPicker: () async => const FacilityReportPhotoAttachment(
               fileName: 'elevator-door.jpg',
               contentType: 'image/jpeg',
@@ -3041,6 +3044,7 @@ void main() {
             latitude: 37.302421,
             longitude: 126.866221,
           ),
+          needsLocationPermissionRequest: () async => false,
           photoPicker: () async => const FacilityReportPhotoAttachment(
             fileName: 'elevator-door.jpg',
             contentType: 'image/jpeg',
@@ -3120,6 +3124,7 @@ void main() {
               longitude: 126.866221,
             );
           },
+          needsLocationPermissionRequest: () async => false,
         ),
       ),
     );
@@ -3206,6 +3211,7 @@ void main() {
               longitude: 126.866221,
             );
           },
+          needsLocationPermissionRequest: () async => false,
         ),
       ),
     );
@@ -3266,6 +3272,7 @@ void main() {
             facilityStatusLabel: '정상',
           ),
           locationLoader: locationLoader,
+          needsLocationPermissionRequest: () async => false,
         ),
       ),
     );
@@ -3591,6 +3598,7 @@ void main() {
             facilityStatusLabel: '정상',
           ),
           locationLoader: () => locationCompleter.future,
+          needsLocationPermissionRequest: () async => false,
         ),
       ),
     );
