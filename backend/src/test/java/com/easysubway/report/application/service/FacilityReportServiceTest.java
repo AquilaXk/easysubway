@@ -137,6 +137,23 @@ class FacilityReportServiceTest {
 	}
 
 	@Test
+	@DisplayName("내 신고 목록은 요청 사용자 신고만 최신순으로 반환한다")
+	void listUserReportsReturnsOnlyUserReportsByNewestFirst() {
+		FacilityReportService serviceWithTickingClock = serviceWithClock(new TickingClock());
+
+		var older = serviceWithTickingClock.createReport(reportCommand("report-owner", "먼저 접수한 내 신고"));
+		var otherUserReport = serviceWithTickingClock.createReport(reportCommand("other-user", "다른 사용자의 신고"));
+		var newer = serviceWithTickingClock.createReport(reportCommand("report-owner", "나중에 접수한 내 신고"));
+
+		assertThat(serviceWithTickingClock.listUserReports("report-owner"))
+			.extracting("id")
+			.containsExactly(newer.id(), older.id());
+		assertThat(serviceWithTickingClock.listUserReports("report-owner"))
+			.extracting("id")
+			.doesNotContain(otherUserReport.id());
+	}
+
+	@Test
 	@DisplayName("신고 목록은 상태별로 필터링한다")
 	void listReportsCanFilterByStatus() {
 		FacilityReportService serviceWithTickingClock = serviceWithClock(new TickingClock());

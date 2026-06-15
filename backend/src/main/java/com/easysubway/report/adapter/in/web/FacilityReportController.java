@@ -42,6 +42,15 @@ class FacilityReportController {
 		return ApiResponse.ok(FacilityReportResponse.from(facilityReportUseCase.getReport(reportId)));
 	}
 
+	@GetMapping("/api/v1/me/reports")
+	ApiResponse<List<FacilityReportResponse>> myReports(Principal principal) {
+		List<FacilityReportResponse> reports = facilityReportUseCase.listUserReports(principal.getName())
+			.stream()
+			.map(FacilityReportResponse::from)
+			.toList();
+		return ApiResponse.ok(reports);
+	}
+
 	@GetMapping("/admin/reports")
 	ApiResponse<List<FacilityReportResponse>> adminReports(@RequestParam(required = false) FacilityReportStatus status) {
 		List<FacilityReportResponse> reports = facilityReportUseCase.listReports(status)

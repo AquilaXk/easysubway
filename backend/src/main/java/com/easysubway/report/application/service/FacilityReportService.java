@@ -176,11 +176,18 @@ public class FacilityReportService implements FacilityReportUseCase {
 	}
 
 	@Override
+	public List<FacilityReport> listUserReports(String userId) {
+		return sortedReports()
+			.stream()
+			.filter(report -> report.userId().equals(userId))
+			.toList();
+	}
+
+	@Override
 	public List<FacilityReport> listReports(FacilityReportStatus status) {
-		return loadFacilityReportPort.loadReports()
+		return sortedReports()
 			.stream()
 			.filter(report -> status == null || report.status() == status)
-			.sorted(Comparator.comparing(FacilityReport::createdAt).reversed())
 			.toList();
 	}
 
@@ -214,6 +221,14 @@ public class FacilityReportService implements FacilityReportUseCase {
 		// 승인된 상태 신고만 실제 시설 운영 상태에 반영한다.
 		applyAcceptedReportToFacilityStatus(report, command.decision());
 		return saved;
+	}
+
+	private List<FacilityReport> sortedReports() {
+		// 사용자 화면과 관리자 화면 모두 최신 처리 상태를 먼저 보도록 같은 정렬 기준을 쓴다.
+		return loadFacilityReportPort.loadReports()
+			.stream()
+			.sorted(Comparator.comparing(FacilityReport::createdAt).reversed())
+			.toList();
 	}
 
 	private void alertReportStatusChanged(FacilityReport saved) {

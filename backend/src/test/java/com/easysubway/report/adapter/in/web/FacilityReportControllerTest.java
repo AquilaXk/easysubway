@@ -136,6 +136,37 @@ class FacilityReportControllerTest {
 	}
 
 	@Test
+	@DisplayName("내 신고 이력은 인증 사용자 신고만 최신순으로 반환한다")
+	void myReportListReturnsOnlyAuthenticatedUserReportsByNewestFirst() throws Exception {
+		String olderReportId = createReport("basic-user", "먼저 접수한 내 신고");
+		String otherUserReportId = createReport("other-user", "다른 사용자의 신고");
+		String newerReportId = createReport("basic-user", "나중에 접수한 내 신고");
+
+		String response = mockMvc.perform(get("/api/v1/me/reports")
+				.with(httpBasic("basic-user", "user-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.data").isArray())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		List<String> reportIds = JsonPath.read(response, "$.data[*].id");
+		Assertions.assertThat(reportIds)
+			.contains(newerReportId, olderReportId)
+			.doesNotContain(otherUserReportId);
+		Assertions.assertThat(reportIds.indexOf(newerReportId))
+			.isLessThan(reportIds.indexOf(olderReportId));
+	}
+
+	@Test
+	@DisplayName("내 신고 이력은 인증된 사용자만 조회할 수 있다")
+	void myReportListRequiresAuthentication() throws Exception {
+		mockMvc.perform(get("/api/v1/me/reports"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
 	@DisplayName("관리자는 신고를 승인하고 조회 결과에서 검수 상태를 확인할 수 있다")
 	void reviewReportStoresAcceptedStatusAndCanBeRead() throws Exception {
 		String response = mockMvc.perform(post("/api/v1/reports")

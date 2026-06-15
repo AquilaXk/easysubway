@@ -38,6 +38,7 @@ public class SecurityConfig {
 		return http
 			.securityMatcher(
 				"/api/v1/me",
+				"/api/v1/me/reports",
 				"/api/v1/me/favorites/**",
 				"/api/v1/devices",
 				"/api/v1/me/notification-settings"
