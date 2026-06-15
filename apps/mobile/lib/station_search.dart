@@ -11,7 +11,8 @@ import 'mobile_error_reporter.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
-const _currentLocationDisabledMessage = '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.';
+const _currentLocationDisabledMessage =
+    '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
@@ -1983,7 +1984,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         return;
       }
       if (needsPermissionRequest &&
-          !await _confirmLocationUse(context, message: '가까운 역을 찾는 데 사용합니다.')) {
+          !await _confirmLocationUse(context, message: '현재 위치로 가까운 역을 찾습니다.')) {
         return;
       }
       if (!mounted) {
