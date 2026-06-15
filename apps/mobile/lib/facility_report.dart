@@ -1344,7 +1344,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('현재 위치 사용'),
-        content: const Text('현재 위치로 신고할 역을 확인합니다.'),
+        content: const Text('신고할 역을 확인하는 데 필요합니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),

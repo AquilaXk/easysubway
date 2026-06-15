@@ -116,6 +116,107 @@ void main() {
     expect(results.single.nameKo, '상록수');
   });
 
+  test('역 API 저장소는 선택한 노선으로 역 검색을 좁힌다', () async {
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'station-sangnoksu',
+                'nameKo': '상록수',
+                'nameEn': 'Sangnoksu',
+                'region': '수도권',
+                'dataQualityLevel': 'LEVEL_1',
+                'dataSourceType': 'OFFICIAL_FILE',
+                'lastVerifiedAt': '2026-06-12',
+                'lines': [
+                  {
+                    'id': 'seoul-4',
+                    'operatorId': 'seoul-metro',
+                    'name': '수도권 4호선',
+                    'color': '#00A5DE',
+                    'stationCode': '448',
+                    'sequence': 48,
+                    'platformInfo': '당고개 방면 / 오이도 방면',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final results = await repository.searchStationsOnLine('상록수', 'seoul-4');
+
+    expect(requestedUri.path, '/api/v1/stations');
+    expect(requestedUri.queryParameters['query'], '상록수');
+    expect(requestedUri.queryParameters['lineId'], 'seoul-4');
+    expect(results.single.nameKo, '상록수');
+  });
+
+  test('역 API 저장소는 노선 목록을 요청하고 쉬운 라벨로 파싱한다', () async {
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'seoul-4',
+                'operatorId': 'seoul-metro',
+                'name': '수도권 4호선',
+                'color': '#00A5DE',
+                'region': '수도권',
+                'lineCode': '4',
+                'active': true,
+              },
+              {
+                'id': 'korail-gyeongui-jungang',
+                'operatorId': 'korail',
+                'name': '경의중앙선',
+                'color': '#75C5A1',
+                'region': '수도권',
+                'lineCode': '경의중앙',
+                'active': true,
+              },
+            ],
+          }),
+        )
+        ..close();
+    });
+
+    final repository = StationSearchApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final lines = await repository.listLines();
+
+    expect(requestedUri.path, '/api/v1/lines');
+    expect(lines.map((line) => line.shortLabel), ['4', '경의중앙']);
+    expect(lines.first.semanticLabel, '수도권 4호선');
+  });
+
   test('역 API 저장소는 현재 위치 기준 가까운 역을 요청하고 거리를 파싱한다', () async {
     late Uri requestedUri;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -649,6 +750,18 @@ void main() {
     expect(controller.state.results, isEmpty);
   });
 
+  test('역 검색 컨트롤러는 선택한 노선으로 결과를 요청한다', () async {
+    final repository = FakeStationSearchRepository()
+      ..nextResults = [_stationResult(id: 'station-sangnoksu', name: '상록수')];
+    final controller = StationSearchController(repository: repository);
+
+    await controller.search('상록수', lineId: 'seoul-4');
+
+    expect(repository.requestedQueries, ['상록수']);
+    expect(repository.requestedLineIds, ['seoul-4']);
+    expect(controller.state.status, StationSearchStatus.success);
+  });
+
   test('역 검색 컨트롤러는 늦게 도착한 이전 응답을 무시한다', () async {
     final repository = ControlledStationSearchRepository();
     final controller = StationSearchController(repository: repository);
@@ -1058,9 +1171,12 @@ StationFacilityInfo _stationFacility({
   );
 }
 
-class FakeStationSearchRepository implements StationSearchRepository {
+class FakeStationSearchRepository
+    implements StationSearchRepository, StationLineFilterRepository {
   final requestedQueries = <String>[];
+  final requestedLineIds = <String?>[];
   final requestedNearbyLocations = <CurrentLocation>[];
+  List<SubwayLineOption> lineOptions = const [];
   Object? error;
   List<StationSearchResult> nextResults = const [];
   List<StationSearchResult> nextNearbyResults = const [];
@@ -1068,11 +1184,35 @@ class FakeStationSearchRepository implements StationSearchRepository {
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
+    requestedLineIds.add(null);
     final currentError = error;
     if (currentError != null) {
       throw currentError;
     }
     return nextResults;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchStationsOnLine(
+    String query,
+    String lineId,
+  ) async {
+    requestedQueries.add(query);
+    requestedLineIds.add(lineId);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return nextResults;
+  }
+
+  @override
+  Future<List<SubwayLineOption>> listLines() async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return lineOptions;
   }
 
   @override
