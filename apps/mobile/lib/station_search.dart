@@ -2263,7 +2263,12 @@ class _StationDetailContent extends StatelessWidget {
       return null;
     }
     return () async {
-      final location = await provider.currentLocation();
+      final CurrentLocation location;
+      try {
+        location = await provider.currentLocation();
+      } on CurrentLocationException catch (error) {
+        throw FacilityReportLocationException(error.message);
+      }
       return FacilityReportLocation(
         latitude: location.latitude,
         longitude: location.longitude,

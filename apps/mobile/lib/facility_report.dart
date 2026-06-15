@@ -311,6 +311,15 @@ class FacilityReportLocation {
   final double longitude;
 }
 
+class FacilityReportLocationException implements Exception {
+  const FacilityReportLocationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 typedef FacilityReportLocationLoader =
     Future<FacilityReportLocation> Function();
 
@@ -889,6 +898,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
+    final isSubmitDisabled =
+        isLoading || hasSubmittedReport || _isLoadingLocation;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 신고')),
@@ -996,7 +1007,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             ],
             FilledButton.icon(
               key: const Key('facilityReportSubmitButton'),
-              onPressed: isLoading || hasSubmittedReport ? null : _submit,
+              onPressed: isSubmitDisabled ? null : _submit,
               icon: isLoading
                   ? const SizedBox(
                       width: 22,
@@ -1049,6 +1060,15 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = location;
         _locationMessage = '현재 위치가 첨부되었습니다.';
         _isLocationFailure = false;
+      });
+    } on FacilityReportLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = error.message;
+        _isLocationFailure = true;
       });
     } catch (error, stackTrace) {
       reportMobileError(

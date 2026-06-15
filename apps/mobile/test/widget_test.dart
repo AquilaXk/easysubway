@@ -2187,6 +2187,141 @@ void main() {
     expect(reportRepository.requests.single.latitude, 37.302421);
     expect(reportRepository.requests.single.longitude, 126.866221);
   });
+
+  testWidgets('시설 신고 화면은 현재 위치 첨부 중 제출을 막는다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final locationCompleter = Completer<FacilityReportLocation>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () => locationCompleter.future,
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportPhotoUrlInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pump();
+
+    final loadingSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(loadingSubmitButton.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pump();
+    expect(reportRepository.requests, isEmpty);
+
+    locationCompleter.complete(
+      const FacilityReportLocation(latitude: 37.302421, longitude: 126.866221),
+    );
+    await tester.pumpAndSettle();
+
+    final readySubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(readySubmitButton.onPressed, isNotNull);
+  });
+
+  testWidgets('시설 신고 화면은 현재 위치 실패 안내를 그대로 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          error: const CurrentLocationException('위치 권한을 허용해 주세요.'),
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportPhotoUrlInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('위치 권한을 허용해 주세요.'), findsOneWidget);
+    expect(find.text('현재 위치를 확인하지 못했습니다.'), findsNothing);
+    expect(reportRepository.requests, isEmpty);
+  });
 }
 
 FavoriteStation _favoriteStation({required String id, required String name}) {
