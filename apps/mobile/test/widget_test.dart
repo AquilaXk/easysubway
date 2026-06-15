@@ -177,6 +177,16 @@ void main() {
 
     await tester.tap(find.byKey(const Key('myReportsButton')));
     await tester.pumpAndSettle();
+    final reportSemantics = tester.getSemantics(
+      find.bySemanticsLabel(
+        '내 신고, 폐쇄, 접수번호 report-2, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
+      ),
+    );
+    expect(
+      reportSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+
     await tester.tap(find.byKey(const Key('myReport-report-2')));
     await tester.pumpAndSettle();
 

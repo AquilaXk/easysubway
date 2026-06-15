@@ -976,11 +976,19 @@ class _MyReportListItem extends StatelessWidget {
         ? report.reportTypeLabel
         : report.description;
     final createdAtLabel = _reportDateLabel(report.createdAt);
+    void openReportDetail() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MyFacilityReportDetailScreen(report: report),
+        ),
+      );
+    }
 
     return Semantics(
       label:
           '내 신고, ${report.reportTypeLabel}, 접수번호 ${report.id}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
       button: true,
+      onTap: openReportDetail,
       child: ExcludeSemantics(
         child: Material(
           color: Colors.white,
@@ -991,11 +999,7 @@ class _MyReportListItem extends StatelessWidget {
           child: InkWell(
             key: Key('myReport-${report.id}'),
             borderRadius: BorderRadius.circular(8),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => MyFacilityReportDetailScreen(report: report),
-              ),
-            ),
+            onTap: openReportDetail,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
