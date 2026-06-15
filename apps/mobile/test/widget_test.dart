@@ -1257,7 +1257,7 @@ void main() {
   testWidgets('역 검색은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
+        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -1280,7 +1280,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
       findsOneWidget,
     );
     expect(
@@ -3200,7 +3200,7 @@ void main() {
             requestCount++;
             if (requestCount == 1) {
               throw const FacilityReportLocationException(
-                '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
+                '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
               );
             }
             if (requestCount == 2) {
@@ -3250,7 +3250,7 @@ void main() {
       requestCount++;
       if (requestCount == 1) {
         throw const FacilityReportLocationException(
-          '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
+          '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
         );
       }
       return const FacilityReportLocation(
@@ -3285,7 +3285,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
       findsOneWidget,
     );
     final failedLocationSubmitButton = tester.widget<FilledButton>(
@@ -3314,7 +3314,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
+        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -3382,7 +3382,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
       findsOneWidget,
     );
     expect(find.text('현재 위치 첨부됨'), findsNothing);
@@ -3411,7 +3411,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
+        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -3477,7 +3477,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.'),
+      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
       findsOneWidget,
     );
     expect(
