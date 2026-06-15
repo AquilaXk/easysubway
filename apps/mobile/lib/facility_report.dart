@@ -16,7 +16,7 @@ const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습
 const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportLocationDisabledMessage =
-    '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.';
+    '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
 
@@ -1323,7 +1323,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('사진·위치 확인'),
-        content: const Text('사진과 현재 위치를 함께 보냅니다.'),
+        content: const Text('사진과 신고 위치를 함께 보냅니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1344,7 +1344,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('현재 위치 사용'),
-        content: const Text('신고할 역을 확인하는 데 필요합니다.'),
+        content: const Text('현재 위치로 가까운 역을 찾습니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
