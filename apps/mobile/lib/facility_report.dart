@@ -1247,7 +1247,10 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 ],
                 OutlinedButton.icon(
                   key: const Key('facilityReportRetryLocationButton'),
-                  onPressed: isLoading || _isLoadingLocation
+                  onPressed:
+                      isLoading ||
+                          _isOpeningLocationSettings ||
+                          _isLoadingLocation
                       ? null
                       : _requestCurrentLocation,
                   icon: _isLoadingLocation
