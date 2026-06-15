@@ -1351,6 +1351,25 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
 });
 
+test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한다", () => {
+  const privacyManifestPath = "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy";
+  assert.ok(existsSync(path.join(root, privacyManifestPath)));
+
+  const privacyManifest = read(privacyManifestPath);
+  const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+
+  assert.match(privacyManifest, /<key>NSPrivacyTracking<\/key>[\s\S]*?<false\/>/);
+  assert.match(privacyManifest, /<key>NSPrivacyTrackingDomains<\/key>[\s\S]*?<array\/>/);
+  assert.match(privacyManifest, /<key>NSPrivacyAccessedAPITypes<\/key>[\s\S]*?<array\/>/);
+  assert.match(privacyManifest, /NSPrivacyCollectedDataTypePreciseLocation/);
+  assert.match(privacyManifest, /NSPrivacyCollectedDataTypePhotosorVideos/);
+  assert.match(privacyManifest, /NSPrivacyCollectedDataTypeOtherUserContent/);
+  assert.match(privacyManifest, /NSPrivacyCollectedDataTypeUserID/);
+  assert.match(privacyManifest, /NSPrivacyCollectedDataTypePurposeAppFunctionality/);
+  assert.match(project, /PrivacyInfo\.xcprivacy \*\/ = \{isa = PBXFileReference;[\s\S]*?path = PrivacyInfo\.xcprivacy;/);
+  assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+});
+
 test("Android 런처 아이콘은 원형 마스크 안전 여백을 가진다", () => {
   const densities = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"];
 
