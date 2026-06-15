@@ -927,6 +927,83 @@ void main() {
     }
   });
 
+  testWidgets('역 검색은 검색 중 노선 선택을 바꾸지 않는다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final searchCompleter = Completer<List<StationSearchResult>>();
+    final repository = FakeStationSearchRepository(
+      lineOptions: const [
+        SubwayLineOption(
+          id: 'seoul-4',
+          name: '수도권 4호선',
+          color: '#00A5DE',
+          region: '수도권',
+          lineCode: '4',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'korail-gyeongui-jungang',
+          name: '경의중앙선',
+          color: '#75C5A1',
+          region: '수도권',
+          lineCode: '경의중앙',
+          active: true,
+        ),
+      ],
+      searchCompleter: searchCompleter,
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('수도권 4호선 선택됨')),
+        isSemantics(
+          label: '수도권 4호선 선택됨',
+          isButton: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pump();
+
+      await tester.tap(
+        find.byKey(const Key('stationLineFilter-korail-gyeongui-jungang')),
+      );
+      await tester.pump();
+
+      expect(find.bySemanticsLabel('수도권 4호선 선택됨'), findsOneWidget);
+      expect(find.bySemanticsLabel('경의중앙선 선택 안 됨'), findsOneWidget);
+
+      searchCompleter.complete([
+        _stationResult(id: 'station-sangnoksu', name: '상록수'),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(repository.requestedLineIds, ['seoul-4']);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
@@ -3477,6 +3554,7 @@ class FakeStationSearchRepository
     this.nearbyResults = const [],
     this.queryResults = const {},
     this.lineOptions = const [],
+    this.searchCompleter,
     StationDetail? stationDetail,
     this.stationExits = const [],
     this.stationFacilities = const [],
@@ -3488,6 +3566,7 @@ class FakeStationSearchRepository
   final List<StationSearchResult> nearbyResults;
   final Map<String, List<StationSearchResult>> queryResults;
   final List<SubwayLineOption> lineOptions;
+  final Completer<List<StationSearchResult>>? searchCompleter;
   final StationDetail stationDetail;
   final List<StationExitInfo> stationExits;
   final List<StationFacilityInfo> stationFacilities;
@@ -3502,6 +3581,10 @@ class FakeStationSearchRepository
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
     requestedLineIds.add(null);
+    final delayedResults = searchCompleter;
+    if (delayedResults != null) {
+      return delayedResults.future;
+    }
     return queryResults[query] ?? nextResults;
   }
 
@@ -3512,6 +3595,10 @@ class FakeStationSearchRepository
   ) async {
     requestedQueries.add(query);
     requestedLineIds.add(lineId);
+    final delayedResults = searchCompleter;
+    if (delayedResults != null) {
+      return delayedResults.future;
+    }
     return queryResults[query] ?? nextResults;
   }
 

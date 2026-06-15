@@ -1867,10 +1867,18 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
             if (_lineOptionsFuture != null) ...[
-              _StationLineFilterSection(
-                linesFuture: _lineOptionsFuture!,
-                selectedLine: _selectedLine,
-                onLineSelected: _selectLine,
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final isSearching =
+                      _controller.state.status == StationSearchStatus.loading;
+                  return _StationLineFilterSection(
+                    linesFuture: _lineOptionsFuture!,
+                    selectedLine: _selectedLine,
+                    enabled: !isSearching && !_isLocationPreflightRunning,
+                    onLineSelected: _selectLine,
+                  );
+                },
               ),
               const SizedBox(height: 16),
             ],
@@ -2047,11 +2055,13 @@ class _StationLineFilterSection extends StatelessWidget {
   const _StationLineFilterSection({
     required this.linesFuture,
     required this.selectedLine,
+    required this.enabled,
     required this.onLineSelected,
   });
 
   final Future<List<SubwayLineOption>> linesFuture;
   final SubwayLineOption? selectedLine;
+  final bool enabled;
   final ValueChanged<SubwayLineOption?> onLineSelected;
 
   @override
@@ -2108,7 +2118,7 @@ class _StationLineFilterSection extends StatelessWidget {
                   label: '전체',
                   semanticLabel: '전체 노선',
                   selected: selectedLine == null,
-                  onPressed: () => onLineSelected(null),
+                  onPressed: enabled ? () => onLineSelected(null) : null,
                 ),
                 for (final line in lines)
                   _StationLineFilterButton(
@@ -2118,7 +2128,7 @@ class _StationLineFilterSection extends StatelessWidget {
                     selected: selectedLine?.id == line.id,
                     badgeText: line.shortLabel,
                     badgeColor: line.badgeColor,
-                    onPressed: () => onLineSelected(line),
+                    onPressed: enabled ? () => onLineSelected(line) : null,
                   ),
               ],
             ),
@@ -2143,7 +2153,7 @@ class _StationLineFilterButton extends StatelessWidget {
   final String label;
   final String semanticLabel;
   final bool selected;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final String? badgeText;
   final Color? badgeColor;
 
@@ -2159,6 +2169,7 @@ class _StationLineFilterButton extends StatelessWidget {
       label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
       button: true,
       selected: selected,
+      onTap: onPressed,
       child: ExcludeSemantics(
         child: OutlinedButton(
           onPressed: onPressed,
