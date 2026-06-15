@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
@@ -18,36 +19,22 @@ abstract class FacilityReportRepository {
 }
 
 class FacilityReportApiRepository implements FacilityReportRepository {
-  FacilityReportApiRepository({required this.baseUri, HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  FacilityReportApiRepository({
+    required this.baseUri,
+    this.authProvider,
+    HttpClient? httpClient,
+  }) : _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
+  final AuthorizationHeaderProvider? authProvider;
   final HttpClient _httpClient;
 
   @override
   Future<FacilityReportResult> createReport(
     FacilityReportRequest reportRequest,
   ) async {
-    final uri = baseUri.resolve('/api/v1/reports');
-
     try {
-      final request = await _httpClient
-          .postUrl(uri)
-          .timeout(_facilityReportTimeout);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(reportRequest.toJson()));
-
-      final response = await request.close().timeout(_facilityReportTimeout);
-      if (response.statusCode != HttpStatus.created &&
-          response.statusCode != HttpStatus.ok) {
-        throw const FacilityReportException(_facilityReportErrorMessage);
-      }
-
-      // 응답 파싱 실패도 repository 예외 문구로 통일되도록 try 블록 안에서 완료한다.
-      return await _readReportResult(
-        response,
-        errorMessage: _facilityReportErrorMessage,
-      );
+      return await _postReportWithAuthorizationRetry(reportRequest);
     } on FacilityReportException {
       rethrow;
     } catch (error, stackTrace) {
@@ -58,6 +45,53 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       );
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
+  }
+
+  Future<FacilityReportResult> _postReportWithAuthorizationRetry(
+    FacilityReportRequest reportRequest,
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final request = await _httpClient
+          .postUrl(baseUri.resolve('/api/v1/reports'))
+          .timeout(_facilityReportTimeout);
+      final authorizationHeader = await authProvider
+          ?.authorizationHeader()
+          .timeout(_facilityReportTimeout);
+      if (authorizationHeader != null) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          authorizationHeader,
+        );
+      }
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode(reportRequest.toJson()));
+
+      final response = await request.close().timeout(_facilityReportTimeout);
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_facilityReportTimeout);
+
+      if (response.statusCode == HttpStatus.unauthorized &&
+          authorizationHeader != null &&
+          attempt == 0) {
+        // 만료된 익명 인증은 비우고 새 인증으로 한 번만 다시 시도한다.
+        await authProvider!.invalidateAuthorization().timeout(
+          _facilityReportTimeout,
+        );
+        continue;
+      }
+
+      if (response.statusCode != HttpStatus.created &&
+          response.statusCode != HttpStatus.ok) {
+        throw const FacilityReportException(_facilityReportErrorMessage);
+      }
+
+      return _reportResultFromBody(
+        body,
+        errorMessage: _facilityReportErrorMessage,
+      );
+    }
+    throw const FacilityReportException(_facilityReportErrorMessage);
   }
 
   @override
@@ -81,9 +115,11 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         throw const FacilityReportException(_facilityReportStatusErrorMessage);
       }
 
-      // 상태 확인 응답도 파싱 오류까지 사용자가 이해할 수 있는 문구로 바꾼다.
-      return await _readReportResult(
-        response,
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_facilityReportTimeout);
+      return _reportResultFromBody(
+        body,
         errorMessage: _facilityReportStatusErrorMessage,
       );
     } on FacilityReportException {
@@ -98,13 +134,10 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     }
   }
 
-  Future<FacilityReportResult> _readReportResult(
-    HttpClientResponse response, {
+  FacilityReportResult _reportResultFromBody(
+    String body, {
     required String errorMessage,
-  }) async {
-    final body = await utf8
-        .decodeStream(response)
-        .timeout(_facilityReportTimeout);
+  }) {
     final decoded = jsonDecode(body);
     if (decoded is! Map<String, Object?> || decoded['success'] != true) {
       throw FacilityReportException(errorMessage);

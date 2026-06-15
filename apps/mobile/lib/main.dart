@@ -350,7 +350,11 @@ class _EasySubwayAppDependencies {
     return _EasySubwayAppDependencies(
       repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
       reportRepository:
-          reportRepository ?? FacilityReportApiRepository(baseUri: baseUri),
+          reportRepository ??
+          FacilityReportApiRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
       routeRepository:
           routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
       favoriteRepository:
