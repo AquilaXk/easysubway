@@ -608,15 +608,13 @@ void main() {
       expect(find.text('즐겨찾기 역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.text('기본 정보만 있음'), findsOneWidget);
       expect(
         find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel(
-          '즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 기본 정보만 확인됨, 출처 공식 파일',
-        ),
+        find.bySemanticsLabel('즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 기본 정보만 있음, 출처 공식 파일'),
         findsOneWidget,
       );
       expect(find.text('출처 공식 파일'), findsOneWidget);
@@ -854,18 +852,18 @@ void main() {
       );
       expect(find.text('경의중앙'), findsOneWidget);
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
-      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.text('기본 정보만 있음'), findsOneWidget);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨'),
+          find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
         ),
         isSemantics(
-          label: '상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 확인됨',
+          label: '상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
           isButton: true,
           hasTapAction: true,
         ),
@@ -1127,7 +1125,7 @@ void main() {
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('230m 거리'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
 
@@ -1377,12 +1375,12 @@ void main() {
       expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('수도권 2호선'), findsOneWidget);
-      expect(find.text('기본 정보만 확인됨'), findsOneWidget);
+      expect(find.text('기본 정보만 있음'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsWidgets);
       expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 확인됨, 출처 공식 파일, 마지막 확인 2026-06-13',
+          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 출처 공식 파일, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
@@ -1880,10 +1878,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
         ),
         isSemantics(
-          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 확인됨',
+          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음',
           isButton: true,
           hasTapAction: true,
         ),
@@ -1940,11 +1938,11 @@ void main() {
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('도착역 선택됨, 사당, 수도권 2호선, 수도권, 기본 정보만 확인됨'),
+        find.bySemanticsLabel('도착역 선택됨, 사당, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
       expect(

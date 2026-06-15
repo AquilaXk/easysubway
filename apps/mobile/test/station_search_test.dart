@@ -8,6 +8,30 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('역 데이터 품질은 내부 레벨을 쉬운 안내 문구로 바꾼다', () {
+    final labels = ['LEVEL_1', 'LEVEL_2', 'LEVEL_3', 'LEVEL_4', 'UNKNOWN']
+        .map(
+          (level) => StationSearchResult(
+            id: 'station-$level',
+            nameKo: '상록수',
+            nameEn: 'Sangnoksu',
+            region: '수도권',
+            dataQualityLevel: level,
+            lastVerifiedAt: '2026-06-12',
+            lines: const [],
+          ).dataQualityLabel,
+        )
+        .toList(growable: false);
+
+    expect(labels, [
+      '기본 정보만 있음',
+      '시설 정보 확인됨',
+      '쉬운 길 안내 가능',
+      '고장·공사 반영됨',
+      '정보 확인 필요',
+    ]);
+  });
+
   test('역 API 저장소는 백엔드 역 목록을 요청하고 결과를 파싱한다', () async {
     late Uri requestedUri;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -60,7 +84,7 @@ void main() {
     expect(results.single.id, 'station-sangnoksu');
     expect(results.single.nameKo, '상록수');
     expect(results.single.region, '수도권');
-    expect(results.single.dataQualityLabel, '기본 정보만 확인됨');
+    expect(results.single.dataQualityLabel, '기본 정보만 있음');
     expect(results.single.dataSourceLabel, '출처 공식 파일');
     expect(results.single.lines.single.name, '수도권 4호선');
   });
@@ -451,7 +475,7 @@ void main() {
     expect(detail.nameKo, '상록수');
     expect(detail.latitude, 37.302795);
     expect(detail.longitude, 126.866489);
-    expect(detail.dataQualityLabel, '기본 정보만 확인됨');
+    expect(detail.dataQualityLabel, '기본 정보만 있음');
     expect(detail.dataSourceLabel, '출처 공식 파일');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
@@ -530,7 +554,7 @@ void main() {
     expect(favorites.single.stationId, 'station-sangnoksu');
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
-    expect(favorites.single.dataQualityLabel, '기본 정보만 확인됨');
+    expect(favorites.single.dataQualityLabel, '기본 정보만 있음');
     expect(favorites.single.dataSourceLabel, '출처 공식 파일');
   });
 
