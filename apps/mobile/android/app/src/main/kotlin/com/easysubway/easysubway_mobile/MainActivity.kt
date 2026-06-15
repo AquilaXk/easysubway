@@ -1,6 +1,7 @@
 package com.easysubway.easysubway_mobile
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -224,10 +225,10 @@ class MainActivity : FlutterActivity() {
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            result.success(true)
+            result.success(areAppNotificationsEnabled())
             return
         }
-        if (hasNotificationPermission()) {
+        if (hasNotificationPermission() && areAppNotificationsEnabled()) {
             result.success(true)
             return
         }
@@ -249,6 +250,15 @@ class MainActivity : FlutterActivity() {
             return true
         }
         return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun areAppNotificationsEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return true
+        }
+        // Android 12 이하에서도 사용자가 앱 알림을 꺼두면 실제 푸시가 표시되지 않는다.
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        return notificationManager.areNotificationsEnabled()
     }
 
     private fun LocationManager.safeLastKnownLocation(provider: String): Location? {
