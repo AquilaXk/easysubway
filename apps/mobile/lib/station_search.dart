@@ -835,6 +835,43 @@ class StationFacilityInfo {
     };
   }
 
+  bool get isLayoutSummaryTarget {
+    return switch (type) {
+      'ELEVATOR' ||
+      'WHEELCHAIR_LIFT' ||
+      'RAMP' ||
+      'ACCESSIBLE_TOILET' ||
+      'NURSING_ROOM' ||
+      'CUSTOMER_CENTER' ||
+      'STATION_OFFICE' => true,
+      _ => false,
+    };
+  }
+
+  IconData get layoutSummaryIcon {
+    return switch (type) {
+      'ELEVATOR' => Icons.elevator,
+      'WHEELCHAIR_LIFT' => Icons.accessible_forward,
+      'RAMP' => Icons.accessible,
+      'ACCESSIBLE_TOILET' => Icons.wc,
+      'NURSING_ROOM' => Icons.child_care,
+      'CUSTOMER_CENTER' || 'STATION_OFFICE' => Icons.support_agent,
+      _ => Icons.place,
+    };
+  }
+
+  int get layoutSummaryPriority {
+    return switch (type) {
+      'ELEVATOR' => 10,
+      'WHEELCHAIR_LIFT' => 20,
+      'RAMP' => 30,
+      'ACCESSIBLE_TOILET' => 40,
+      'NURSING_ROOM' => 50,
+      'CUSTOMER_CENTER' || 'STATION_OFFICE' => 60,
+      _ => 90,
+    };
+  }
+
   String get statusLabel {
     return switch (status) {
       'NORMAL' => '정상',
@@ -882,6 +919,13 @@ class StationFacilityInfo {
   String get semanticLabel {
     return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel';
   }
+}
+
+class StationLayoutSummaryItem {
+  const StationLayoutSummaryItem({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
 }
 
 class StationSearchLine {
@@ -1262,6 +1306,81 @@ class StationDetailState {
       return '확인이 필요한 시설 없음';
     }
     return '확인이 필요한 시설 $count개';
+  }
+
+  List<StationLayoutSummaryItem> get layoutSummaryItems {
+    final items = <StationLayoutSummaryItem>[];
+    // 역 전체 구조를 짧게 보여주기 위해 엘리베이터 연결 출구를 우선 시작점으로 삼는다.
+    final accessibleExit = exits
+        .where((exit) => exit.hasElevatorConnection)
+        .cast<StationExitInfo?>()
+        .firstWhere((exit) => exit != null, orElse: () => null);
+    final firstExit = exits.isNotEmpty ? exits.first : null;
+    final exit = accessibleExit ?? firstExit;
+    if (exit != null) {
+      items.add(
+        StationLayoutSummaryItem(icon: Icons.exit_to_app, text: exit.name),
+      );
+    }
+
+    for (final facility in _layoutSummaryFacilities()) {
+      items.add(
+        StationLayoutSummaryItem(
+          icon: facility.layoutSummaryIcon,
+          text: facility.typeLabel,
+        ),
+      );
+    }
+
+    if (items.isNotEmpty) {
+      items.add(const StationLayoutSummaryItem(icon: Icons.train, text: '승강장'));
+    }
+    return List.unmodifiable(items);
+  }
+
+  String get layoutSummarySemanticLabel {
+    final items = layoutSummaryItems;
+    if (items.isEmpty) {
+      return '이동 구조 정보 없음';
+    }
+    return '이동 구조, ${items.map((item) => item.text).join(', ')}';
+  }
+
+  List<StationFacilityInfo> _layoutSummaryFacilities() {
+    final seenTypes = <String>{};
+    final summaryFacilities = <StationFacilityInfo>[];
+    final candidates = facilities
+        .where((facility) => facility.isLayoutSummaryTarget)
+        .toList();
+    candidates.sort((left, right) {
+      // 고장 여부보다 시설 유형 순서를 먼저 고정해 이동 흐름이 매번 같은 순서로 보이게 한다.
+      final typePriority = left.layoutSummaryPriority.compareTo(
+        right.layoutSummaryPriority,
+      );
+      if (typePriority != 0) {
+        return typePriority;
+      }
+      final statusPriority = left.statusPriority.compareTo(
+        right.statusPriority,
+      );
+      if (statusPriority != 0) {
+        return statusPriority;
+      }
+      return left.name.compareTo(right.name);
+    });
+
+    for (final facility in candidates) {
+      if (!facility.isLayoutSummaryTarget ||
+          seenTypes.contains(facility.type)) {
+        continue;
+      }
+      seenTypes.add(facility.type);
+      summaryFacilities.add(facility);
+      if (summaryFacilities.length == 3) {
+        break;
+      }
+    }
+    return summaryFacilities;
   }
 }
 
@@ -2233,6 +2352,8 @@ class _StationDetailBody extends StatelessWidget {
         facilities: state.prioritizedFacilities,
         facilityAttentionSummary: state.facilityAttentionSummary,
         facilityAttentionSemanticLabel: state.facilityAttentionSemanticLabel,
+        layoutSummaryItems: state.layoutSummaryItems,
+        layoutSummarySemanticLabel: state.layoutSummarySemanticLabel,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
         locationProvider: locationProvider,
@@ -2248,6 +2369,8 @@ class _StationDetailContent extends StatelessWidget {
     required this.facilities,
     required this.facilityAttentionSummary,
     required this.facilityAttentionSemanticLabel,
+    required this.layoutSummaryItems,
+    required this.layoutSummarySemanticLabel,
     required this.reportRepository,
     required this.favoriteController,
     required this.locationProvider,
@@ -2258,6 +2381,8 @@ class _StationDetailContent extends StatelessWidget {
   final List<StationFacilityInfo> facilities;
   final String facilityAttentionSummary;
   final String facilityAttentionSemanticLabel;
+  final List<StationLayoutSummaryItem> layoutSummaryItems;
+  final String layoutSummarySemanticLabel;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
   final CurrentLocationProvider? locationProvider;
@@ -2276,6 +2401,15 @@ class _StationDetailContent extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 24),
+        if (layoutSummaryItems.isNotEmpty) ...[
+          const _StationDetailSectionTitle(title: '이동 구조'),
+          const SizedBox(height: 12),
+          _StationLayoutSummary(
+            items: layoutSummaryItems,
+            semanticLabel: layoutSummarySemanticLabel,
+          ),
+          const SizedBox(height: 24),
+        ],
         const _StationDetailSectionTitle(title: '출구'),
         const SizedBox(height: 12),
         if (exits.isEmpty)
@@ -2349,6 +2483,87 @@ class _StationDetailContent extends StatelessWidget {
       return null;
     }
     return provider.needsLocationPermissionRequest;
+  }
+}
+
+class _StationLayoutSummary extends StatelessWidget {
+  const _StationLayoutSummary({
+    required this.items,
+    required this.semanticLabel,
+  });
+
+  final List<StationLayoutSummaryItem> items;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = (constraints.maxWidth - 12) / 2;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final item in items)
+                  _StationLayoutStep(
+                    item: item,
+                    textTheme: textTheme,
+                    width: itemWidth,
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _StationLayoutStep extends StatelessWidget {
+  const _StationLayoutStep({
+    required this.item,
+    required this.textTheme,
+    required this.width,
+  });
+
+  final StationLayoutSummaryItem item;
+  final TextTheme textTheme;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(minHeight: 82),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF6F4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFB9D7D2)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.icon, color: const Color(0xFF006D77), size: 26),
+          const SizedBox(height: 8),
+          Text(
+            item.text,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyLarge?.copyWith(
+              color: const Color(0xFF102A2C),
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
