@@ -56,7 +56,9 @@ void main() {
         facilityId: 'facility-sangnoksu-elevator-1',
         reportType: 'BROKEN',
         description: ' 문이 열리지 않습니다. ',
-        photoUrl: ' https://cdn.example.test/reports/elevator-door.jpg ',
+        photoFileName: 'elevator-door.jpg',
+        photoContentType: 'image/jpeg',
+        photoDataBase64: 'aW1hZ2UtYnl0ZXM=',
         latitude: 37.302421,
         longitude: 126.866221,
       ),
@@ -66,10 +68,10 @@ void main() {
     expect(requestBody['facilityId'], 'facility-sangnoksu-elevator-1');
     expect(requestBody['reportType'], 'BROKEN');
     expect(requestBody['description'], '문이 열리지 않습니다.');
-    expect(
-      requestBody['photoUrl'],
-      'https://cdn.example.test/reports/elevator-door.jpg',
-    );
+    expect(requestBody['photoFileName'], 'elevator-door.jpg');
+    expect(requestBody['photoContentType'], 'image/jpeg');
+    expect(requestBody['photoDataBase64'], 'aW1hZ2UtYnl0ZXM=');
+    expect(requestBody, isNot(contains('photoUrl')));
     expect(requestBody['latitude'], 37.302421);
     expect(requestBody['longitude'], 126.866221);
     expect(
@@ -80,17 +82,19 @@ void main() {
     expect(result.statusLabel, '접수됨');
   });
 
-  test('시설 신고 요청은 사진 링크가 비어 있으면 전송하지 않는다', () {
+  test('시설 신고 요청은 사진이 없으면 사진 데이터를 전송하지 않는다', () {
     final request = const FacilityReportRequest(
       userId: 'anonymous-mobile-user',
       stationId: 'station-sangnoksu',
       facilityId: 'facility-sangnoksu-elevator-1',
       reportType: 'BROKEN',
       description: '문이 열리지 않습니다.',
-      photoUrl: '   ',
     );
 
     expect(request.toJson(), isNot(contains('photoUrl')));
+    expect(request.toJson(), isNot(contains('photoFileName')));
+    expect(request.toJson(), isNot(contains('photoContentType')));
+    expect(request.toJson(), isNot(contains('photoDataBase64')));
   });
 
   test('시설 신고 요청은 현재 위치가 없으면 좌표를 전송하지 않는다', () {
