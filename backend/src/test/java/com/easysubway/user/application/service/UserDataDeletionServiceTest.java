@@ -80,6 +80,9 @@ class UserDataDeletionServiceTest {
 		assertThatThrownBy(() -> service.deleteUserData(" "))
 			.isInstanceOf(InvalidUserDataDeletionException.class)
 			.hasMessage("사용자 식별자가 필요합니다.");
+		assertThatThrownBy(() -> service.deleteUserData(null))
+			.isInstanceOf(InvalidUserDataDeletionException.class)
+			.hasMessage("사용자 식별자가 필요합니다.");
 	}
 
 	private static final class RecordingAnonymousUserRegistry implements RegisterAnonymousUserPort {

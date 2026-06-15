@@ -65,13 +65,14 @@ public class SpringSecurityAnonymousUserRegistry implements RegisterAnonymousUse
 
 	@Override
 	public synchronized boolean deleteAnonymousUser(String userId) {
-		if (!issuedAnonymousUserIdSet.remove(userId)) {
+		if (!issuedAnonymousUserIdSet.contains(userId)) {
 			return false;
 		}
-		issuedAnonymousUserIds.remove(userId);
 		if (userDetailsManager.userExists(userId)) {
 			userDetailsManager.deleteUser(userId);
 		}
+		issuedAnonymousUserIdSet.remove(userId);
+		issuedAnonymousUserIds.remove(userId);
 		return true;
 	}
 
