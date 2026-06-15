@@ -182,6 +182,39 @@ class FacilityReportControllerTest {
 	}
 
 	@Test
+	@DisplayName("신고 목록은 사진 본문을 제외하고 메타데이터만 반환한다")
+	void reportListsReturnPhotoMetadataWithoutPayload() throws Exception {
+		createReportWithPhoto("basic-user", "user-test-password", "spoofed-user", "사진이 있는 신고");
+
+		String myReportsResponse = mockMvc.perform(get("/api/v1/me/reports")
+				.with(httpBasic("basic-user", "user-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		// 목록 화면에서는 사진 존재만 알면 충분하므로 실제 이미지 본문은 상세에서만 내려준다.
+		Assertions.assertThat(myReportsResponse)
+			.contains("photoFileName")
+			.contains("photoContentType")
+			.doesNotContain("photoDataBase64");
+
+		String adminReportsResponse = mockMvc.perform(get("/admin/reports")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		Assertions.assertThat(adminReportsResponse)
+			.contains("photoFileName")
+			.contains("photoContentType")
+			.doesNotContain("photoDataBase64");
+	}
+
+	@Test
 	@DisplayName("내 신고 이력은 인증된 사용자만 조회할 수 있다")
 	void myReportListRequiresAuthentication() throws Exception {
 		mockMvc.perform(get("/api/v1/me/reports"))
@@ -424,6 +457,36 @@ class FacilityReportControllerTest {
 		String userId,
 		String description
 	) throws Exception {
+		return createReport(username, password, userId, description, "");
+	}
+
+	private String createReportWithPhoto(
+		String username,
+		String password,
+		String userId,
+		String description
+	) throws Exception {
+		return createReport(
+			username,
+			password,
+			userId,
+			description,
+			"""
+				,
+					  "photoFileName": "elevator-notice.jpg",
+					  "photoContentType": "image/jpeg",
+					  "photoDataBase64": "aW1hZ2UtYnl0ZXM="
+				"""
+		);
+	}
+
+	private String createReport(
+		String username,
+		String password,
+		String userId,
+		String description,
+		String photoJson
+	) throws Exception {
 		String response = mockMvc.perform(post("/api/v1/reports")
 				.with(httpBasic(username, password))
 				.contentType(MediaType.APPLICATION_JSON)
@@ -434,8 +497,9 @@ class FacilityReportControllerTest {
 					  "facilityId": "facility-sangnoksu-elevator-1",
 					  "reportType": "BROKEN",
 					  "description": "%s"
+					  %s
 					}
-					""".formatted(userId, description)))
+					""".formatted(userId, description, photoJson)))
 			.andExpect(status().isCreated())
 			.andReturn()
 			.getResponse()

@@ -13,6 +13,7 @@ const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
 const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
+const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
@@ -327,6 +328,15 @@ class FacilityReportPhotoAttachment {
   final String dataBase64;
 }
 
+class FacilityReportPhotoException implements Exception {
+  const FacilityReportPhotoException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class FacilityReportLocation {
   const FacilityReportLocation({
     required this.latitude,
@@ -356,6 +366,10 @@ class ImagePickerFacilityReportPhotoPicker {
   ImagePickerFacilityReportPhotoPicker({ImagePicker? imagePicker})
     : _imagePicker = imagePicker ?? ImagePicker();
 
+  static const int _maxPhotoBytes = 900 * 1024;
+  static const double _maxPhotoDimension = 1600;
+  static const int _imageQuality = 72;
+
   final ImagePicker _imagePicker;
 
   Future<FacilityReportPhotoAttachment?> pickFromGallery() {
@@ -367,11 +381,21 @@ class ImagePickerFacilityReportPhotoPicker {
   }
 
   Future<FacilityReportPhotoAttachment?> _pick(ImageSource source) async {
-    final image = await _imagePicker.pickImage(source: source);
+    final image = await _imagePicker.pickImage(
+      source: source,
+      maxWidth: _maxPhotoDimension,
+      maxHeight: _maxPhotoDimension,
+      imageQuality: _imageQuality,
+    );
     if (image == null) {
       return null;
     }
     final bytes = await image.readAsBytes();
+    if (bytes.lengthInBytes > _maxPhotoBytes) {
+      throw const FacilityReportPhotoException(
+        _facilityReportPhotoTooLargeMessage,
+      );
+    }
     return FacilityReportPhotoAttachment(
       fileName: image.name.isEmpty ? 'facility-report.jpg' : image.name,
       contentType: _contentTypeFromName(image.name),
@@ -945,9 +969,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   FacilityReportTypeOption _selectedType = FacilityReportTypeOption.broken;
   FacilityReportLocation? _attachedLocation;
   FacilityReportPhotoAttachment? _photoAttachment;
+  String _photoMessage = '';
   String _locationMessage = '';
   bool _isLoadingLocation = false;
   bool _isLocationFailure = false;
+  bool _isPhotoFailure = false;
   bool _isPickingPhoto = false;
 
   @override
@@ -1045,11 +1071,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                   : const Icon(Icons.add_a_photo),
               label: Text(_photoAttachment == null ? '사진 추가' : '사진 바꾸기'),
             ),
-            if (_photoAttachment != null) ...[
+            if (_photoMessage.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const _FacilityReportLocationMessage(
-                message: '사진 1장 추가됨',
-                isFailure: false,
+              _FacilityReportLocationMessage(
+                message: _photoMessage,
+                isFailure: _isPhotoFailure,
               ),
             ],
             if (_locationMessage.isNotEmpty) ...[
@@ -1109,14 +1135,30 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     if (_isPickingPhoto) {
       return;
     }
-    setState(() => _isPickingPhoto = true);
+    setState(() {
+      _isPickingPhoto = true;
+      _photoMessage = '';
+      _isPhotoFailure = false;
+    });
     try {
       final picker = widget.photoPicker ?? _pickPhotoWithDevicePicker;
       final photo = await picker();
       if (!mounted || photo == null) {
         return;
       }
-      setState(() => _photoAttachment = photo);
+      setState(() {
+        _photoAttachment = photo;
+        _photoMessage = '사진 1장 추가됨';
+        _isPhotoFailure = false;
+      });
+    } on FacilityReportPhotoException catch (error) {
+      if (mounted) {
+        setState(() {
+          _photoAttachment = null;
+          _photoMessage = error.message;
+          _isPhotoFailure = true;
+        });
+      }
     } catch (error, stackTrace) {
       reportMobileError(
         error,
@@ -1124,7 +1166,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         context: '시설 신고 사진 첨부 중 예외가 발생했습니다.',
       );
       if (mounted) {
-        setState(() => _photoAttachment = null);
+        setState(() {
+          _photoAttachment = null;
+          _photoMessage = '사진을 추가하지 못했습니다.';
+          _isPhotoFailure = true;
+        });
       }
     } finally {
       if (mounted) {

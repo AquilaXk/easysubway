@@ -46,19 +46,19 @@ class FacilityReportController {
 	}
 
 	@GetMapping("/api/v1/me/reports")
-	ApiResponse<List<FacilityReportResponse>> myReports(Principal principal) {
-		List<FacilityReportResponse> reports = facilityReportUseCase.listUserReports(principal.getName())
+	ApiResponse<List<FacilityReportListResponse>> myReports(Principal principal) {
+		List<FacilityReportListResponse> reports = facilityReportUseCase.listUserReports(principal.getName())
 			.stream()
-			.map(FacilityReportResponse::from)
+			.map(FacilityReportListResponse::from)
 			.toList();
 		return ApiResponse.ok(reports);
 	}
 
 	@GetMapping("/admin/reports")
-	ApiResponse<List<FacilityReportResponse>> adminReports(@RequestParam(required = false) FacilityReportStatus status) {
-		List<FacilityReportResponse> reports = facilityReportUseCase.listReports(status)
+	ApiResponse<List<FacilityReportListResponse>> adminReports(@RequestParam(required = false) FacilityReportStatus status) {
+		List<FacilityReportListResponse> reports = facilityReportUseCase.listReports(status)
 			.stream()
-			.map(FacilityReportResponse::from)
+			.map(FacilityReportListResponse::from)
 			.toList();
 		return ApiResponse.ok(reports);
 	}
@@ -113,6 +113,43 @@ class FacilityReportController {
 
 		ReviewFacilityReportCommand toCommand(String reportId, String reviewedBy) {
 			return new ReviewFacilityReportCommand(reportId, decision, reviewedBy);
+		}
+	}
+
+	record FacilityReportListResponse(
+		String id,
+		String userId,
+		String stationId,
+		String facilityId,
+		FacilityReportType reportType,
+		String description,
+		String photoFileName,
+		String photoContentType,
+		BigDecimal latitude,
+		BigDecimal longitude,
+		FacilityReportStatus status,
+		LocalDateTime createdAt,
+		LocalDateTime reviewedAt,
+		String reviewedBy
+	) {
+
+		static FacilityReportListResponse from(FacilityReport report) {
+			return new FacilityReportListResponse(
+				report.id(),
+				report.userId(),
+				report.stationId(),
+				report.facilityId(),
+				report.reportType(),
+				report.description(),
+				report.photoFileName(),
+				report.photoContentType(),
+				report.latitude(),
+				report.longitude(),
+				report.status(),
+				report.createdAt(),
+				report.reviewedAt(),
+				report.reviewedBy()
+			);
 		}
 	}
 
