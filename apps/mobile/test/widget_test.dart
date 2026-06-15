@@ -1062,29 +1062,34 @@ void main() {
       expect(find.text('기본 정보만 확인됨'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsWidgets);
       expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
-      expect(find.text('출구'), findsOneWidget);
-      expect(find.text('1번 출구'), findsOneWidget);
-      expect(find.text('엘리베이터 연결'), findsOneWidget);
-      expect(find.text('계단 없는 이동 가능'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
           '상록수역 상세 정보, 수도권 2호선, 기본 정보만 확인됨, 출처 공식 파일, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
+      expect(find.text('이동 구조'), findsOneWidget);
+      expect(find.text('승강장'), findsOneWidget);
+      expect(find.bySemanticsLabel('이동 구조, 1번 출구, 엘리베이터, 승강장'), findsOneWidget);
+      await tester.drag(find.byType(ListView), const Offset(0, -260));
+      await tester.pumpAndSettle();
+      expect(find.text('출구'), findsOneWidget);
+      expect(find.text('1번 출구'), findsWidgets);
+      expect(find.text('엘리베이터 연결'), findsOneWidget);
+      expect(find.text('계단 없는 이동 가능'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
           '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일',
         ),
         findsOneWidget,
       );
-      await tester.drag(find.byType(ListView), const Offset(0, -260));
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
       expect(find.text('확인 필요 1개'), findsOneWidget);
       expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsOneWidget);
       expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('엘리베이터'), findsOneWidget);
+      expect(find.text('엘리베이터'), findsWidgets);
       expect(find.text('고장'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(
@@ -2087,6 +2092,8 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(
           const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -2574,6 +2581,8 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -520));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(
         const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -2701,6 +2710,8 @@ void main() {
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(
