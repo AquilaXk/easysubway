@@ -887,6 +887,8 @@ void main() {
       expect(searchInput.decoration?.hintText, '역 이름을 입력해 주세요');
       expect(searchInput.decoration?.hintText, isNot('예: 상록수'));
       expect(find.text('역 이름을 입력해 주세요.'), findsNothing);
+      expect(find.bySemanticsLabel('역 이름을 입력해 주세요'), findsOneWidget);
+      expect(find.bySemanticsLabel('역 이름 입력'), findsNothing);
       expect(
         searchInput.decoration?.floatingLabelBehavior,
         FloatingLabelBehavior.always,
