@@ -105,6 +105,62 @@ void main() {
     expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
   });
 
+  testWidgets('홈에서 내 신고 화면으로 이동한다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository(
+      reports: [
+        const FacilityReportResult(
+          id: 'report-2',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'CLOSED',
+          description: '출입문이 막혀 있습니다.',
+          status: 'ACCEPTED',
+          createdAt: '2026-06-15T09:00:00',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('myReportsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('내 신고'), findsOneWidget);
+    expect(find.text('반영됨'), findsOneWidget);
+    expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '내 신고, 폐쇄, 접수번호 report-2, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
+      ),
+      findsOneWidget,
+    );
+    expect(reportRepository.listMyReportsCount, 1);
+  });
+
+  testWidgets('내 신고 화면은 접수한 신고가 없으면 짧은 빈 상태를 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyFacilityReportListScreen(
+          repository: FakeFacilityReportRepository(reports: const []),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('접수한 신고가 없습니다.'), findsOneWidget);
+    expect(find.byKey(const Key('myReportsRetryButton')), findsNothing);
+  });
+
   testWidgets('앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다', (tester) async {
     final reportedErrors = <FlutterErrorDetails>[];
 
@@ -258,8 +314,8 @@ void main() {
       expect(find.text('역 찾기'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '경로 검색'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '내 신고'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '즐겨찾기 역'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
       expect(find.textContaining('빠른 길보다'), findsNothing);
       expect(find.textContaining('고령자'), findsNothing);
@@ -274,6 +330,16 @@ void main() {
       final profileButtonSize = tester.getSize(
         find.byKey(const Key('mobilityProfileButton')),
       );
+      final myReportsButtonSize = tester.getSize(
+        find.byKey(const Key('myReportsButton')),
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('notificationSettingsButton')),
+        120,
+      );
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
       final notificationButtonSize = tester.getSize(
         find.byKey(const Key('notificationSettingsButton')),
       );
@@ -282,6 +348,7 @@ void main() {
       expect(routeButtonSize.height, greaterThanOrEqualTo(60));
       expect(notificationButtonSize.height, greaterThanOrEqualTo(60));
       expect(profileButtonSize.height, greaterThanOrEqualTo(60));
+      expect(myReportsButtonSize.height, greaterThanOrEqualTo(60));
 
       await tester.drag(find.byType(ListView), const Offset(0, -620));
       await tester.pumpAndSettle();
@@ -331,6 +398,11 @@ void main() {
     expect(find.widgetWithText(FilledButton, '즐겨찾기 경로'), findsOneWidget);
     expect(find.byKey(const Key('favoriteStationsButton')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '즐겨찾기 역'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('notificationSettingsButton')),
+      120,
+    );
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('notificationSettingsButton')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
   });
@@ -392,8 +464,9 @@ void main() {
         ),
       );
 
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const Key('notificationSettingsButton')),
+        120,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('notificationSettingsButton')));
@@ -503,6 +576,11 @@ void main() {
         ),
       );
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('favoriteFacilitiesButton')),
+        120,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('favoriteFacilitiesButton')));
       await tester.pumpAndSettle();
 
@@ -2038,9 +2116,13 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
 }
 
 class FakeFacilityReportRepository implements FacilityReportRepository {
+  FakeFacilityReportRepository({this.reports = const []});
+
   final requests = <FacilityReportRequest>[];
   final loadedReportIds = <String>[];
+  final List<FacilityReportResult> reports;
   String nextReportStatus = 'SUBMITTED';
+  int listMyReportsCount = 0;
   Object? error;
 
   @override
@@ -2079,6 +2161,16 @@ class FakeFacilityReportRepository implements FacilityReportRepository {
       status: nextReportStatus,
       createdAt: '2026-06-13T10:00:00',
     );
+  }
+
+  @override
+  Future<List<FacilityReportResult>> listMyReports() async {
+    listMyReportsCount++;
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return reports;
   }
 }
 

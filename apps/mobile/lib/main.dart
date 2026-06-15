@@ -564,6 +564,21 @@ class HomeScreen extends StatelessWidget {
               label: const Text('이동 조건'),
             ),
             const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('myReportsButton'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MyFacilityReportListScreen(
+                      repository: reportRepository,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('내 신고'),
+            ),
+            const SizedBox(height: 12),
             if (favoriteRouteRepository != null) ...[
               FilledButton.icon(
                 key: const Key('favoriteRoutesButton'),
