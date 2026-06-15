@@ -213,7 +213,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
-  assert.match(workflow, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
@@ -348,15 +348,15 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   }
 });
 
-test("모바일 변경 CI는 원본 예외 catch 계약을 실행한다", () => {
+test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const mobileJob = jobBlock(workflow, "mobile-app", "android");
 
   assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
-  assert.match(mobileJob, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
