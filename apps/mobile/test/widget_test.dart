@@ -138,6 +138,12 @@ void main() {
     expect(find.text('내 신고'), findsOneWidget);
     expect(find.text('반영됨'), findsOneWidget);
     expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '내 신고, 폐쇄, 접수번호 report-2, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
+      ),
+      findsOneWidget,
+    );
     expect(reportRepository.listMyReportsCount, 1);
   });
 

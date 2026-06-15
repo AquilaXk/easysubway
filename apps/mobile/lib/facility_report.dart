@@ -708,9 +708,11 @@ class _MyReportListItem extends StatelessWidget {
     final description = report.description.isEmpty
         ? report.reportTypeLabel
         : report.description;
+    final createdAtLabel = _reportDateLabel(report.createdAt);
 
     return Semantics(
-      label: '내 신고, 접수번호 ${report.id}, ${report.statusLabel}, $description',
+      label:
+          '내 신고, ${report.reportTypeLabel}, 접수번호 ${report.id}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
       button: false,
       child: ExcludeSemantics(
         child: DecoratedBox(
@@ -757,10 +759,7 @@ class _MyReportListItem extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     _MyReportMetaText(label: '접수번호', value: report.id),
-                    _MyReportMetaText(
-                      label: '접수일',
-                      value: _reportDateLabel(report.createdAt),
-                    ),
+                    _MyReportMetaText(label: '접수일', value: createdAtLabel),
                   ],
                 ),
               ],
