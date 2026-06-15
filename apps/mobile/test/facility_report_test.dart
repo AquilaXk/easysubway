@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:flutter/foundation.dart';
@@ -9,11 +10,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('시설 신고 API 저장소는 백엔드 계약에 맞춰 신고를 전송한다', () async {
+    late String? authorizationHeader;
     late Map<String, Object?> requestBody;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) async {
+      authorizationHeader = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
       requestBody =
           jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
       request.response
@@ -38,6 +43,10 @@ void main() {
 
     final repository = FacilityReportApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const BasicAuthorizationHeaderProvider(
+        username: 'anonymous-user-1',
+        password: 'user-test-password',
+      ),
     );
 
     final result = await repository.createReport(
@@ -54,8 +63,75 @@ void main() {
     expect(requestBody['facilityId'], 'facility-sangnoksu-elevator-1');
     expect(requestBody['reportType'], 'BROKEN');
     expect(requestBody['description'], '문이 열리지 않습니다.');
+    expect(
+      authorizationHeader,
+      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
+    );
     expect(result.id, 'report-1');
     expect(result.statusLabel, '접수됨');
+  });
+
+  test('시설 신고 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
+    final authorizationHeaders = <String?>[];
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestCount++;
+      authorizationHeaders.add(
+        request.headers.value(HttpHeaders.authorizationHeader),
+      );
+      await utf8.decodeStream(request);
+      request.response.headers.contentType = ContentType.json;
+
+      if (requestCount == 1) {
+        request.response
+          ..statusCode = HttpStatus.unauthorized
+          ..write(jsonEncode({'success': false}))
+          ..close();
+        return;
+      }
+
+      request.response
+        ..statusCode = HttpStatus.created
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'id': 'report-1',
+              'stationId': 'station-sangnoksu',
+              'facilityId': 'facility-sangnoksu-elevator-1',
+              'reportType': 'BROKEN',
+              'description': '문이 열리지 않습니다.',
+              'status': 'SUBMITTED',
+              'createdAt': '2026-06-13T10:00:00',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final authProvider = RetryAuthorizationHeaderProvider();
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: authProvider,
+    );
+
+    final result = await repository.createReport(
+      const FacilityReportRequest(
+        userId: 'anonymous-mobile-user',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+      ),
+    );
+
+    expect(result.id, 'report-1');
+    expect(authorizationHeaders, ['Basic stale-token', 'Basic fresh-token']);
+    expect(authProvider.authorizationCount, 2);
+    expect(authProvider.invalidateCount, 1);
   });
 
   test('시설 신고 API 저장소는 잘못된 접수 응답도 쉬운 실패 문구로 바꾼다', () async {
@@ -405,5 +481,24 @@ class FailingRefreshFacilityReportRepository
   Future<FacilityReportResult> getReport(String reportId) {
     loadedReportIds.add(reportId);
     return Future.error(const FacilityReportException('처리 상태를 확인하지 못했습니다.'));
+  }
+}
+
+class RetryAuthorizationHeaderProvider implements AuthorizationHeaderProvider {
+  int authorizationCount = 0;
+  int invalidateCount = 0;
+
+  @override
+  Future<String?> authorizationHeader() async {
+    authorizationCount++;
+    if (authorizationCount == 1) {
+      return 'Basic stale-token';
+    }
+    return 'Basic fresh-token';
+  }
+
+  @override
+  Future<void> invalidateAuthorization() async {
+    invalidateCount++;
   }
 }
