@@ -833,6 +833,100 @@ void main() {
     }
   });
 
+  testWidgets('역 검색은 노선을 선택해 결과를 좁힌다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      lineOptions: const [
+        SubwayLineOption(
+          id: 'seoul-4',
+          name: '수도권 4호선',
+          color: '#00A5DE',
+          region: '수도권',
+          lineCode: '4',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'korail-gyeongui-jungang',
+          name: '경의중앙선',
+          color: '#75C5A1',
+          region: '수도권',
+          lineCode: '경의중앙',
+          active: true,
+        ),
+      ],
+      nextResults: [
+        const StationSearchResult(
+          id: 'station-sangnoksu',
+          nameKo: '상록수',
+          nameEn: 'Sangnoksu',
+          region: '수도권',
+          dataQualityLevel: 'LEVEL_1',
+          lastVerifiedAt: '2026-06-12',
+          lines: [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stationLineFilter-all')), findsOneWidget);
+      expect(
+        find.byKey(const Key('stationLineFilter-seoul-4')),
+        findsOneWidget,
+      );
+      expect(find.text('4'), findsOneWidget);
+      expect(find.bySemanticsLabel('수도권 4호선 선택 안 됨'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('수도권 4호선 선택됨'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(repository.requestedQueries, ['상록수']);
+      expect(repository.requestedLineIds, ['seoul-4']);
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('stationLineFilter-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(repository.requestedQueries, ['상록수', '상록수']);
+      expect(repository.requestedLineIds, ['seoul-4', null]);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
@@ -1000,6 +1094,46 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 검색은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException(
+        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+      ),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.openSettingsCount, 1);
+    expect(repository.requestedNearbyLocations, isEmpty);
   });
 
   testWidgets('역 검색 결과를 누르면 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
@@ -3336,11 +3470,13 @@ FavoriteRoute _favoriteRoute() {
   );
 }
 
-class FakeStationSearchRepository implements StationSearchRepository {
+class FakeStationSearchRepository
+    implements StationSearchRepository, StationLineFilterRepository {
   FakeStationSearchRepository({
     this.nextResults = const [],
     this.nearbyResults = const [],
     this.queryResults = const {},
+    this.lineOptions = const [],
     StationDetail? stationDetail,
     this.stationExits = const [],
     this.stationFacilities = const [],
@@ -3351,10 +3487,12 @@ class FakeStationSearchRepository implements StationSearchRepository {
   final List<StationSearchResult> nextResults;
   final List<StationSearchResult> nearbyResults;
   final Map<String, List<StationSearchResult>> queryResults;
+  final List<SubwayLineOption> lineOptions;
   final StationDetail stationDetail;
   final List<StationExitInfo> stationExits;
   final List<StationFacilityInfo> stationFacilities;
   final requestedQueries = <String>[];
+  final requestedLineIds = <String?>[];
   final requestedNearbyLocations = <CurrentLocation>[];
   final requestedDetailStationIds = <String>[];
   final requestedExitStationIds = <String>[];
@@ -3363,7 +3501,23 @@ class FakeStationSearchRepository implements StationSearchRepository {
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
     requestedQueries.add(query);
+    requestedLineIds.add(null);
     return queryResults[query] ?? nextResults;
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchStationsOnLine(
+    String query,
+    String lineId,
+  ) async {
+    requestedQueries.add(query);
+    requestedLineIds.add(lineId);
+    return queryResults[query] ?? nextResults;
+  }
+
+  @override
+  Future<List<SubwayLineOption>> listLines() async {
+    return lineOptions;
   }
 
   @override

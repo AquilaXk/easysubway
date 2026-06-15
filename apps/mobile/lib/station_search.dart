@@ -11,6 +11,7 @@ import 'mobile_error_reporter.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
+const _currentLocationDisabledMessage = '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
@@ -30,6 +31,15 @@ abstract class StationSearchRepository {
   Future<List<StationExitInfo>> listStationExits(String stationId);
 
   Future<List<StationFacilityInfo>> listStationFacilities(String stationId);
+}
+
+abstract class StationLineFilterRepository {
+  Future<List<SubwayLineOption>> listLines();
+
+  Future<List<StationSearchResult>> searchStationsOnLine(
+    String query,
+    String lineId,
+  );
 }
 
 class CurrentLocation {
@@ -132,14 +142,15 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
   String _locationErrorMessage(String code) {
     return switch (code) {
       'permissionDenied' => '위치 권한을 확인해 주세요.',
-      'locationDisabled' => '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+      'locationDisabled' => _currentLocationDisabledMessage,
       'locationUnavailable' => '현재 위치를 확인하지 못했습니다.',
       _ => '현재 위치를 확인하지 못했습니다.',
     };
   }
 }
 
-class StationSearchApiRepository implements StationSearchRepository {
+class StationSearchApiRepository
+    implements StationSearchRepository, StationLineFilterRepository {
   StationSearchApiRepository({required this.baseUri, HttpClient? httpClient})
     : _httpClient = httpClient ?? HttpClient();
 
@@ -148,9 +159,23 @@ class StationSearchApiRepository implements StationSearchRepository {
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
+    return _searchStations({'query': query});
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchStationsOnLine(
+    String query,
+    String lineId,
+  ) {
+    return _searchStations({'query': query, 'lineId': lineId});
+  }
+
+  Future<List<StationSearchResult>> _searchStations(
+    Map<String, String> queryParameters,
+  ) async {
     final uri = baseUri
         .resolve('/api/v1/stations')
-        .replace(queryParameters: {'query': query});
+        .replace(queryParameters: queryParameters);
 
     final data = await _getData(uri);
     if (data is! List) {
@@ -171,6 +196,32 @@ class StationSearchApiRepository implements StationSearchRepository {
         error,
         stackTrace,
         context: '역 검색 목록 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<List<SubwayLineOption>> listLines() async {
+    final data = await _getData(baseUri.resolve('/api/v1/lines'));
+    if (data is! List) {
+      throw const StationSearchException(_stationSearchErrorMessage);
+    }
+
+    try {
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid line payload');
+            }
+            return SubwayLineOption.fromJson(item);
+          })
+          .toList(growable: false);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선 목록 응답 처리 중 예외가 발생했습니다.',
       );
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -974,28 +1025,7 @@ class StationSearchLine {
   final String color;
   final String stationCode;
 
-  String get badgeText {
-    for (final entry in _knownBadgeLabels.entries) {
-      if (name.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-
-    final numberedLine = RegExp(r'(\d+)\s*호선').firstMatch(name);
-    if (numberedLine != null) {
-      return numberedLine.group(1) ?? name;
-    }
-
-    final compactName = name
-        .replaceAll('수도권 ', '')
-        .replaceAll('광역 ', '')
-        .replaceAll('선', '')
-        .trim();
-    if (compactName.length <= 4) {
-      return compactName;
-    }
-    return compactName.substring(0, 4);
-  }
+  String get badgeText => _lineBadgeText(name);
 
   Color get badgeColor {
     final normalized = color.trim().replaceFirst('#', '');
@@ -1007,6 +1037,78 @@ class StationSearchLine {
     }
     return const Color(0xFF006D77);
   }
+}
+
+class SubwayLineOption {
+  const SubwayLineOption({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.region,
+    required this.lineCode,
+    required this.active,
+  });
+
+  factory SubwayLineOption.fromJson(Map<String, Object?> json) {
+    return SubwayLineOption(
+      id: _requiredString(json, 'id'),
+      name: _requiredString(json, 'name'),
+      color: _requiredString(json, 'color'),
+      region: _requiredString(json, 'region'),
+      lineCode: _stringOrEmpty(json, 'lineCode'),
+      active: _requiredBool(json, 'active'),
+    );
+  }
+
+  final String id;
+  final String name;
+  final String color;
+  final String region;
+  final String lineCode;
+  final bool active;
+
+  String get shortLabel {
+    if (lineCode.trim().isNotEmpty) {
+      return lineCode.trim();
+    }
+    return _lineBadgeText(name);
+  }
+
+  String get semanticLabel => name;
+
+  Color get badgeColor {
+    final normalized = color.trim().replaceFirst('#', '');
+    if (normalized.length == 6) {
+      final parsed = int.tryParse(normalized, radix: 16);
+      if (parsed != null) {
+        return Color(0xFF000000 | parsed);
+      }
+    }
+    return const Color(0xFF006D77);
+  }
+}
+
+String _lineBadgeText(String name) {
+  for (final entry in StationSearchLine._knownBadgeLabels.entries) {
+    if (name.contains(entry.key)) {
+      return entry.value;
+    }
+  }
+
+  final numberedLine = RegExp(r'(\d+)\s*호선').firstMatch(name);
+  if (numberedLine != null) {
+    return numberedLine.group(1) ?? name;
+  }
+
+  final compactName = name
+      .replaceAll('수도권 ', '')
+      .replaceAll('광역 ', '')
+      .replaceAll('선', '')
+      .trim();
+  if (compactName.length <= 4) {
+    return compactName;
+  }
+  return compactName.substring(0, 4);
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
@@ -1132,7 +1234,7 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState get state => _state;
 
-  Future<void> search(String query) async {
+  Future<void> search(String query, {String? lineId}) async {
     final requestId = ++_searchRequestId;
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
@@ -1148,7 +1250,14 @@ class StationSearchController extends ChangeNotifier {
     _notifyIfActive(requestId);
 
     try {
-      final results = await repository.searchStations(trimmedQuery);
+      final selectedLineId = lineId?.trim();
+      final results =
+          selectedLineId != null &&
+              selectedLineId.isNotEmpty &&
+              repository is StationLineFilterRepository
+          ? await (repository as StationLineFilterRepository)
+                .searchStationsOnLine(trimmedQuery, selectedLineId)
+          : await repository.searchStations(trimmedQuery);
       if (!_isActiveRequest(requestId)) {
         return;
       }
@@ -1727,12 +1836,19 @@ class StationSearchScreen extends StatefulWidget {
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
+  Future<List<SubwayLineOption>>? _lineOptionsFuture;
+  SubwayLineOption? _selectedLine;
   bool _isLocationPreflightRunning = false;
+  bool _isOpeningLocationSettings = false;
 
   @override
   void initState() {
     super.initState();
     _controller = StationSearchController(repository: widget.repository);
+    final lineRepository = _lineFilterRepository;
+    if (lineRepository != null) {
+      _lineOptionsFuture = lineRepository.listLines();
+    }
   }
 
   @override
@@ -1750,6 +1866,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            if (_lineOptionsFuture != null) ...[
+              _StationLineFilterSection(
+                linesFuture: _lineOptionsFuture!,
+                selectedLine: _selectedLine,
+                onLineSelected: _selectLine,
+              ),
+              const SizedBox(height: 16),
+            ],
             Semantics(
               label: '역 이름 입력',
               textField: true,
@@ -1808,6 +1932,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 return _StationSearchBody(
                   state: _controller.state,
                   onResultTap: _openStationDetail,
+                  isOpeningLocationSettings: _isOpeningLocationSettings,
+                  onOpenLocationSettings: _openLocationSettings,
                 );
               },
             ),
@@ -1821,7 +1947,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (_controller.state.status == StationSearchStatus.loading) {
       return;
     }
-    _controller.search(query);
+    _controller.search(query, lineId: _selectedLine?.id);
+  }
+
+  StationLineFilterRepository? get _lineFilterRepository {
+    final Object repository = widget.repository;
+    if (repository is StationLineFilterRepository) {
+      return repository;
+    }
+    return null;
+  }
+
+  void _selectLine(SubwayLineOption? line) {
+    setState(() => _selectedLine = line);
   }
 
   Future<void> _searchNearby() async {
@@ -1847,6 +1985,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     } finally {
       if (mounted) {
         setState(() => _isLocationPreflightRunning = false);
+      }
+    }
+  }
+
+  Future<void> _openLocationSettings() async {
+    if (_isOpeningLocationSettings) {
+      return;
+    }
+    setState(() => _isOpeningLocationSettings = true);
+    try {
+      await widget.locationProvider.openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningLocationSettings = false);
       }
     }
   }
@@ -1891,11 +2043,199 @@ Future<bool> _confirmLocationUse(
   return confirmed ?? false;
 }
 
+class _StationLineFilterSection extends StatelessWidget {
+  const _StationLineFilterSection({
+    required this.linesFuture,
+    required this.selectedLine,
+    required this.onLineSelected,
+  });
+
+  final Future<List<SubwayLineOption>> linesFuture;
+  final SubwayLineOption? selectedLine;
+  final ValueChanged<SubwayLineOption?> onLineSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<SubwayLineOption>>(
+      future: linesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            height: 56,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Text(
+            '노선을 불러오지 못했습니다.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: const Color(0xFF29484B),
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          );
+        }
+
+        final lines = (snapshot.data ?? const <SubwayLineOption>[])
+            .where((line) => line.active)
+            .toList(growable: false);
+        if (lines.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '노선',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: const Color(0xFF102A2C),
+                fontWeight: FontWeight.w900,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _StationLineFilterButton(
+                  key: const Key('stationLineFilter-all'),
+                  label: '전체',
+                  semanticLabel: '전체 노선',
+                  selected: selectedLine == null,
+                  onPressed: () => onLineSelected(null),
+                ),
+                for (final line in lines)
+                  _StationLineFilterButton(
+                    key: Key('stationLineFilter-${line.id}'),
+                    label: line.name,
+                    semanticLabel: line.semanticLabel,
+                    selected: selectedLine?.id == line.id,
+                    badgeText: line.shortLabel,
+                    badgeColor: line.badgeColor,
+                    onPressed: () => onLineSelected(line),
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StationLineFilterButton extends StatelessWidget {
+  const _StationLineFilterButton({
+    required this.label,
+    required this.semanticLabel,
+    required this.selected,
+    required this.onPressed,
+    this.badgeText,
+    this.badgeColor,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final bool selected;
+  final VoidCallback onPressed;
+  final String? badgeText;
+  final Color? badgeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = selected ? const Color(0xFF007A80) : Colors.white;
+    final foregroundColor = selected ? Colors.white : const Color(0xFF102A2C);
+    final borderColor = selected
+        ? const Color(0xFF007A80)
+        : const Color(0xFF93C7C2);
+
+    return Semantics(
+      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
+      button: true,
+      selected: selected,
+      child: ExcludeSemantics(
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(96, 56),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            side: BorderSide(color: borderColor, width: selected ? 2 : 1.5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (badgeText != null && badgeColor != null) ...[
+                _LineFilterBadge(text: badgeText!, color: badgeColor!),
+                const SizedBox(width: 8),
+              ],
+              Text(label),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LineFilterBadge extends StatelessWidget {
+  const _LineFilterBadge({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = _higherContrastTextColor(color);
+    final fontSize = RegExp(r'^\d+$').hasMatch(text) ? 20.0 : 12.0;
+
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: Text(
+        text,
+        maxLines: 2,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: textColor,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w900,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
 class _StationSearchBody extends StatelessWidget {
-  const _StationSearchBody({required this.state, required this.onResultTap});
+  const _StationSearchBody({
+    required this.state,
+    required this.onResultTap,
+    required this.isOpeningLocationSettings,
+    required this.onOpenLocationSettings,
+  });
 
   final StationSearchState state;
   final ValueChanged<StationSearchResult> onResultTap;
+  final bool isOpeningLocationSettings;
+  final VoidCallback onOpenLocationSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -1911,8 +2251,12 @@ class _StationSearchBody extends StatelessWidget {
           ),
         ),
       ),
-      StationSearchStatus.empty || StationSearchStatus.failure =>
-        _StationSearchMessage(message: state.message, liveRegion: true),
+      StationSearchStatus.empty ||
+      StationSearchStatus.failure => _StationSearchFailureMessage(
+        message: state.message,
+        isOpeningLocationSettings: isOpeningLocationSettings,
+        onOpenLocationSettings: onOpenLocationSettings,
+      ),
       StationSearchStatus.success => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1929,6 +2273,48 @@ class _StationSearchBody extends StatelessWidget {
         ],
       ),
     };
+  }
+}
+
+class _StationSearchFailureMessage extends StatelessWidget {
+  const _StationSearchFailureMessage({
+    required this.message,
+    required this.isOpeningLocationSettings,
+    required this.onOpenLocationSettings,
+  });
+
+  final String message;
+  final bool isOpeningLocationSettings;
+  final VoidCallback onOpenLocationSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final shouldShowLocationSettings =
+        message == _currentLocationDisabledMessage;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StationSearchMessage(message: message, liveRegion: true),
+        if (shouldShowLocationSettings) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('stationSearchOpenLocationSettingsButton'),
+            onPressed: isOpeningLocationSettings
+                ? null
+                : onOpenLocationSettings,
+            icon: isOpeningLocationSettings
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : const Icon(Icons.settings),
+            label: const Text('위치 설정 열기'),
+          ),
+        ],
+      ],
+    );
   }
 }
 
