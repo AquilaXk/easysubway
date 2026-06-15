@@ -359,6 +359,9 @@ class FacilityReportLocationException implements Exception {
 typedef FacilityReportLocationLoader =
     Future<FacilityReportLocation> Function();
 
+typedef FacilityReportLocationPermissionRequestChecker =
+    Future<bool> Function();
+
 typedef FacilityReportPhotoPicker =
     Future<FacilityReportPhotoAttachment?> Function();
 
@@ -696,6 +699,7 @@ class FacilityReportScreen extends StatefulWidget {
     required this.repository,
     required this.target,
     this.locationLoader,
+    this.needsLocationPermissionRequest,
     this.photoPicker,
     super.key,
   });
@@ -703,6 +707,8 @@ class FacilityReportScreen extends StatefulWidget {
   final FacilityReportRepository repository;
   final FacilityReportTarget target;
   final FacilityReportLocationLoader? locationLoader;
+  final FacilityReportLocationPermissionRequestChecker?
+  needsLocationPermissionRequest;
   final FacilityReportPhotoPicker? photoPicker;
 
   @override
@@ -982,7 +988,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     _controller = FacilityReportController(repository: widget.repository)
       ..addListener(_onReportStateChanged);
     _defaultPhotoPicker = ImagePickerFacilityReportPhotoPicker();
-    unawaited(_loadCurrentLocation());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(_requestCurrentLocation());
+      }
+    });
   }
 
   @override
@@ -1090,7 +1100,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                   key: const Key('facilityReportRetryLocationButton'),
                   onPressed: isLoading || _isLoadingLocation
                       ? null
-                      : _loadCurrentLocation,
+                      : _requestCurrentLocation,
                   icon: _isLoadingLocation
                       ? const SizedBox(
                           width: 22,
@@ -1173,6 +1183,54 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       ),
     );
     return confirmed ?? false;
+  }
+
+  Future<bool> _confirmLocationUse() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('현재 위치 사용'),
+        content: const Text('신고 위치를 확인하는 데 사용합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('위치 사용'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _requestCurrentLocation() async {
+    if (widget.locationLoader == null || _isLoadingLocation) {
+      return;
+    }
+    final needsPermissionRequest = await _needsLocationPermissionRequest();
+    if (!mounted) {
+      return;
+    }
+    if (needsPermissionRequest && !await _confirmLocationUse()) {
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = '현재 위치 확인이 필요합니다.';
+        _isLocationFailure = true;
+      });
+      return;
+    }
+    await _loadCurrentLocation();
+  }
+
+  Future<bool> _needsLocationPermissionRequest() async {
+    final checker = widget.needsLocationPermissionRequest;
+    if (checker == null) {
+      return true;
+    }
+    return checker();
   }
 
   Future<void> _pickPhoto() async {

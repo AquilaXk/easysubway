@@ -26,10 +26,10 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, locationChannelName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "currentLocation") {
-                    handleCurrentLocation(result)
-                } else {
-                    result.notImplemented()
+                when (call.method) {
+                    "currentLocation" -> handleCurrentLocation(result)
+                    "needsLocationPermissionRequest" -> result.success(!hasLocationPermission())
+                    else -> result.notImplemented()
                 }
             }
     }
