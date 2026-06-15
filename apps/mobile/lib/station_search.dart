@@ -1710,6 +1710,7 @@ class StationSearchScreen extends StatefulWidget {
     required this.reportRepository,
     required this.locationProvider,
     this.favoriteRepository,
+    this.facilityReportDraftTargetStore,
     super.key,
   });
 
@@ -1717,6 +1718,7 @@ class StationSearchScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -1858,6 +1860,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           favoriteRepository: widget.favoriteRepository,
           locationProvider: widget.locationProvider,
           stationId: result.id,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         ),
       ),
     );
@@ -2047,6 +2050,7 @@ class FavoriteStationListScreen extends StatefulWidget {
     required this.stationRepository,
     required this.reportRepository,
     this.locationProvider,
+    this.facilityReportDraftTargetStore,
     super.key,
   });
 
@@ -2054,6 +2058,7 @@ class FavoriteStationListScreen extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   State<FavoriteStationListScreen> createState() =>
@@ -2104,6 +2109,7 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
           favoriteRepository: widget.repository,
           locationProvider: widget.locationProvider,
           stationId: favorite.stationId,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
           initiallyFavorite: true,
         ),
@@ -2269,6 +2275,7 @@ class StationDetailScreen extends StatefulWidget {
     this.favoriteRepository,
     this.locationProvider,
     this.initiallyFavorite,
+    this.facilityReportDraftTargetStore,
     super.key,
   });
 
@@ -2278,6 +2285,7 @@ class StationDetailScreen extends StatefulWidget {
   final CurrentLocationProvider? locationProvider;
   final String stationId;
   final bool? initiallyFavorite;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -2327,6 +2335,8 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
               reportRepository: widget.reportRepository,
               favoriteController: _favoriteController,
               locationProvider: widget.locationProvider,
+              facilityReportDraftTargetStore:
+                  widget.facilityReportDraftTargetStore,
             );
           },
         ),
@@ -2341,12 +2351,14 @@ class _StationDetailBody extends StatelessWidget {
     required this.reportRepository,
     required this.favoriteController,
     required this.locationProvider,
+    required this.facilityReportDraftTargetStore,
   });
 
   final StationDetailState state;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
   final CurrentLocationProvider? locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   Widget build(BuildContext context) {
@@ -2371,6 +2383,7 @@ class _StationDetailBody extends StatelessWidget {
         reportRepository: reportRepository,
         favoriteController: favoriteController,
         locationProvider: locationProvider,
+        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
       ),
     };
   }
@@ -2388,6 +2401,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.reportRepository,
     required this.favoriteController,
     required this.locationProvider,
+    required this.facilityReportDraftTargetStore,
   });
 
   final StationDetail detail;
@@ -2400,6 +2414,7 @@ class _StationDetailContent extends StatelessWidget {
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
   final CurrentLocationProvider? locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   Widget build(BuildContext context) {
@@ -2459,7 +2474,7 @@ class _StationDetailContent extends StatelessWidget {
           locationLoader: _locationLoader(),
           needsLocationPermissionRequest: _locationPermissionRequestChecker(),
           openLocationSettings: _locationSettingsOpener(),
-          draftTargetStore: const SecureFacilityReportDraftTargetStore(),
+          draftTargetStore: facilityReportDraftTargetStore,
           target: FacilityReportTarget(
             stationId: detail.id,
             stationName: detail.nameKo,

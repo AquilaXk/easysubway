@@ -200,6 +200,27 @@ void main() {
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
   });
 
+  testWidgets('기본 앱은 사진 복구 저장소가 없어도 플랫폼 오류 없이 홈을 보여준다', (tester) async {
+    final reportedErrors = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+    });
+
+    expect(reportedErrors, isEmpty);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+  });
+
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -1123,6 +1144,79 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 상세에서 연 시설 신고는 앱에 주입한 사진 복구 대상을 저장한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'BROKEN',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-14',
+        ),
+      ],
+    );
+    final draftTargetStore = MemoryFacilityReportDraftTargetStore();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        facilityReportDraftTargetStore: draftTargetStore,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+    await tester.pump();
+
+    expect(draftTargetStore.saveCount, 1);
+    expect(
+      draftTargetStore.savedTargets.single.facilityId,
+      'facility-sangnoksu-elevator-1',
+    );
   });
 
   testWidgets('역 상세는 시설 목록이 없으면 확인 필요 요약을 숨긴다', (tester) async {

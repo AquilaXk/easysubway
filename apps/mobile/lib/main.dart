@@ -14,7 +14,15 @@ import 'station_search.dart';
 import 'mobile_error_reporter.dart';
 
 void main() {
-  runApp(EasySubwayApp(onboardingStore: const SecureOnboardingResultStore()));
+  final photoPicker = ImagePickerFacilityReportPhotoPicker();
+  runApp(
+    EasySubwayApp(
+      onboardingStore: const SecureOnboardingResultStore(),
+      facilityReportDraftTargetStore:
+          const SecureFacilityReportDraftTargetStore(),
+      facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+    ),
+  );
 }
 
 class EasySubwayApp extends StatelessWidget {
@@ -51,12 +59,8 @@ class EasySubwayApp extends StatelessWidget {
          ),
          initialOnboardingState: initialOnboardingState,
          onboardingStore: onboardingStore,
-         facilityReportDraftTargetStore:
-             facilityReportDraftTargetStore ??
-             const SecureFacilityReportDraftTargetStore(),
-         facilityReportLostPhotoRestorer:
-             facilityReportLostPhotoRestorer ??
-             ImagePickerFacilityReportPhotoPicker().retrieveLostPhoto,
+         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
          key: key,
        );
 
@@ -89,7 +93,7 @@ class EasySubwayApp extends StatelessWidget {
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
-  final FacilityReportLostPhotoRestorer facilityReportLostPhotoRestorer;
+  final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +186,7 @@ class _EasySubwayHome extends StatefulWidget {
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
-  final FacilityReportLostPhotoRestorer facilityReportLostPhotoRestorer;
+  final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -244,6 +248,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         locationProvider: widget.locationProvider,
         initialMobilityType: onboardingResult?.profile.mobilityType,
         simpleViewEnabled: preferences.simpleViewEnabled,
+        facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
       ),
     );
   }
@@ -303,7 +308,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     }
 
     final draftTargetStore = widget.facilityReportDraftTargetStore;
-    if (draftTargetStore == null) {
+    final lostPhotoRestorer = widget.facilityReportLostPhotoRestorer;
+    if (draftTargetStore == null || lostPhotoRestorer == null) {
       return;
     }
     _pendingFacilityReportPhotoRecoveryStarted = true;
@@ -316,7 +322,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         return;
       }
 
-      photoAttachment = await widget.facilityReportLostPhotoRestorer();
+      photoAttachment = await lostPhotoRestorer();
       await draftTargetStore.clearTarget();
     } catch (error, stackTrace) {
       reportMobileError(
@@ -624,6 +630,7 @@ class HomeScreen extends StatelessWidget {
     required this.notificationRepository,
     required this.locationProvider,
     this.simpleViewEnabled = true,
+    this.facilityReportDraftTargetStore,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -640,6 +647,7 @@ class HomeScreen extends StatelessWidget {
   final CurrentLocationProvider locationProvider;
   final String initialMobilityType;
   final bool simpleViewEnabled;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   Widget build(BuildContext context) {
@@ -678,6 +686,8 @@ class HomeScreen extends StatelessWidget {
                       reportRepository: reportRepository,
                       favoriteRepository: favoriteRepository,
                       locationProvider: locationProvider,
+                      facilityReportDraftTargetStore:
+                          facilityReportDraftTargetStore,
                     ),
                   ),
                 );
@@ -761,6 +771,8 @@ class HomeScreen extends StatelessWidget {
                         stationRepository: repository,
                         reportRepository: reportRepository,
                         locationProvider: locationProvider,
+                        facilityReportDraftTargetStore:
+                            facilityReportDraftTargetStore,
                       ),
                     ),
                   );
