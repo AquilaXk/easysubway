@@ -1010,6 +1010,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
+    // 현장 좌표가 없으면 역·시설 판단이 흔들릴 수 있어 위치 확인 전 제출을 막는다.
     final isSubmitDisabled =
         isLoading ||
         hasSubmittedReport ||
