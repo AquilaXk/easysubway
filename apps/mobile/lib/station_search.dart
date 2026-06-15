@@ -1592,6 +1592,7 @@ class StationSearchScreen extends StatefulWidget {
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
+  bool _isLocationPreflightRunning = false;
 
   @override
   void initState() {
@@ -1655,7 +1656,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               animation: _controller,
               builder: (context, _) {
                 final isLoading =
-                    _controller.state.status == StationSearchStatus.loading;
+                    _controller.state.status == StationSearchStatus.loading ||
+                    _isLocationPreflightRunning;
                 return OutlinedButton.icon(
                   key: const Key('nearbyStationSearchButton'),
                   onPressed: isLoading ? null : _searchNearby,
@@ -1688,19 +1690,30 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   Future<void> _searchNearby() async {
-    if (_controller.state.status == StationSearchStatus.loading) {
+    if (_controller.state.status == StationSearchStatus.loading ||
+        _isLocationPreflightRunning) {
       return;
     }
-    final needsPermissionRequest = await widget.locationProvider
-        .needsLocationPermissionRequest();
-    if (!mounted) {
-      return;
+    setState(() => _isLocationPreflightRunning = true);
+    try {
+      final needsPermissionRequest = await widget.locationProvider
+          .needsLocationPermissionRequest();
+      if (!mounted) {
+        return;
+      }
+      if (needsPermissionRequest &&
+          !await _confirmLocationUse(context, message: '가까운 역을 찾는 데 사용합니다.')) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      await _controller.searchNearby(widget.locationProvider);
+    } finally {
+      if (mounted) {
+        setState(() => _isLocationPreflightRunning = false);
+      }
     }
-    if (needsPermissionRequest &&
-        !await _confirmLocationUse(context, message: '가까운 역을 찾는 데 사용합니다.')) {
-      return;
-    }
-    _controller.searchNearby(widget.locationProvider);
   }
 
   void _openStationDetail(StationSearchResult result) {

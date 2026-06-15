@@ -899,6 +899,49 @@ void main() {
     expect(find.text('현재 위치 사용'), findsNothing);
   });
 
+  testWidgets('역 검색은 위치 권한 확인 중 중복 탭을 무시한다', (tester) async {
+    final permissionCompleter = Completer<bool>();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      needsPermissionRequestLoader: () => permissionCompleter.future,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.pump();
+
+    expect(locationProvider.permissionCheckCount, 1);
+    expect(locationProvider.requestCount, 0);
+
+    permissionCompleter.complete(false);
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, hasLength(1));
+  });
+
   testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
@@ -2339,12 +2382,81 @@ void main() {
     await tester.tap(
       find.byKey(const Key('facilityReportRetryLocationButton')),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.text('위치 사용'));
     await tester.pumpAndSettle();
 
     expect(requestCount, 1);
     expect(find.text('현재 위치 확인이 필요합니다.'), findsNothing);
+  });
+
+  testWidgets('시설 신고 화면은 위치 재확인 중 중복 탭을 무시한다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final permissionChecks = <Completer<bool>>[
+      Completer<bool>(),
+      Completer<bool>(),
+    ];
+    var permissionCheckCount = 0;
+    var requestCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          needsLocationPermissionRequest: () {
+            final check = permissionChecks[permissionCheckCount];
+            permissionCheckCount++;
+            return check.future;
+          },
+          locationLoader: () async {
+            requestCount++;
+            return const FacilityReportLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(permissionCheckCount, 1);
+
+    permissionChecks.first.complete(true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+    );
+    await tester.tap(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+    );
+    await tester.pump();
+
+    expect(permissionCheckCount, 2);
+    expect(requestCount, 0);
+
+    permissionChecks.last.complete(false);
+    await tester.pumpAndSettle();
+
+    expect(permissionCheckCount, 2);
+    expect(requestCount, 1);
   });
 
   testWidgets('시설 신고 화면은 위치 실패 후 다시 확인할 수 있다', (tester) async {
@@ -2400,7 +2512,8 @@ void main() {
     await tester.tap(
       find.byKey(const Key('facilityReportRetryLocationButton')),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.text('위치 사용'));
     await tester.pumpAndSettle();
 
@@ -3135,15 +3248,23 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
     this.location,
     this.error,
     this.needsPermissionRequest = true,
+    this.needsPermissionRequestLoader,
   });
 
   final CurrentLocation? location;
   final Object? error;
   final bool needsPermissionRequest;
+  final Future<bool> Function()? needsPermissionRequestLoader;
+  int permissionCheckCount = 0;
   int requestCount = 0;
 
   @override
   Future<bool> needsLocationPermissionRequest() async {
+    permissionCheckCount++;
+    final loader = needsPermissionRequestLoader;
+    if (loader != null) {
+      return loader();
+    }
     return needsPermissionRequest;
   }
 

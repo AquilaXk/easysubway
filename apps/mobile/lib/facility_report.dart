@@ -978,6 +978,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _photoMessage = '';
   String _locationMessage = '';
   bool _isLoadingLocation = false;
+  bool _isLocationPreflightRunning = false;
   bool _isLocationFailure = false;
   bool _isPhotoFailure = false;
   bool _isPickingPhoto = false;
@@ -1013,6 +1014,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         isLoading ||
         hasSubmittedReport ||
         _isLoadingLocation ||
+        _isLocationPreflightRunning ||
         _isLocationFailure ||
         (widget.locationLoader != null && _attachedLocation == null);
 
@@ -1098,10 +1100,13 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   key: const Key('facilityReportRetryLocationButton'),
-                  onPressed: isLoading || _isLoadingLocation
+                  onPressed:
+                      isLoading ||
+                          _isLoadingLocation ||
+                          _isLocationPreflightRunning
                       ? null
                       : _requestCurrentLocation,
-                  icon: _isLoadingLocation
+                  icon: _isLoadingLocation || _isLocationPreflightRunning
                       ? const SizedBox(
                           width: 22,
                           height: 22,
@@ -1207,22 +1212,31 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   }
 
   Future<void> _requestCurrentLocation() async {
-    if (widget.locationLoader == null || _isLoadingLocation) {
+    if (widget.locationLoader == null ||
+        _isLoadingLocation ||
+        _isLocationPreflightRunning) {
       return;
     }
-    final needsPermissionRequest = await _needsLocationPermissionRequest();
-    if (!mounted) {
-      return;
+    setState(() => _isLocationPreflightRunning = true);
+    try {
+      final needsPermissionRequest = await _needsLocationPermissionRequest();
+      if (!mounted) {
+        return;
+      }
+      if (needsPermissionRequest && !await _confirmLocationUse()) {
+        setState(() {
+          _attachedLocation = null;
+          _locationMessage = '현재 위치 확인이 필요합니다.';
+          _isLocationFailure = true;
+        });
+        return;
+      }
+      await _loadCurrentLocation();
+    } finally {
+      if (mounted) {
+        setState(() => _isLocationPreflightRunning = false);
+      }
     }
-    if (needsPermissionRequest && !await _confirmLocationUse()) {
-      setState(() {
-        _attachedLocation = null;
-        _locationMessage = '현재 위치 확인이 필요합니다.';
-        _isLocationFailure = true;
-      });
-      return;
-    }
-    await _loadCurrentLocation();
   }
 
   Future<bool> _needsLocationPermissionRequest() async {
