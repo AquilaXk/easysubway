@@ -11,16 +11,20 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val locationChannelName = "com.easysubway.easysubway_mobile/location"
+    private val notificationChannelName = "com.easysubway.easysubway_mobile/notifications"
     private val locationPermissionRequestCode = 2401
+    private val notificationPermissionRequestCode = 2402
     private val locationTimeoutMillis = 10_000L
 
     private var pendingLocationResult: MethodChannel.Result? = null
+    private var pendingNotificationPermissionResult: MethodChannel.Result? = null
     private var pendingLocationListener: LocationListener? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -32,6 +36,13 @@ class MainActivity : FlutterActivity() {
                     "currentLocation" -> handleCurrentLocation(result)
                     "needsLocationPermissionRequest" -> result.success(!hasLocationPermission())
                     "openLocationSettings" -> openLocationSettings(result)
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, notificationChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "requestNotificationPermission" -> requestNotificationPermission(result)
                     else -> result.notImplemented()
                 }
             }
@@ -84,6 +95,15 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == notificationPermissionRequestCode) {
+            val result = pendingNotificationPermissionResult ?: return
+            pendingNotificationPermissionResult = null
+            result.success(
+                grantResults.any { it == PackageManager.PERMISSION_GRANTED } &&
+                    areAppNotificationsEnabled(),
+            )
+            return
+        }
         if (requestCode != locationPermissionRequestCode) {
             return
         }
@@ -204,6 +224,40 @@ class MainActivity : FlutterActivity() {
             return true
         }
         return checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(areAppNotificationsEnabled())
+            return
+        }
+        if (hasNotificationPermission() && areAppNotificationsEnabled()) {
+            result.success(true)
+            return
+        }
+        if (pendingNotificationPermissionResult != null) {
+            result.error("notificationUnavailable", "notification request already running", null)
+            return
+        }
+
+        // Android 13 이상은 알림도 런타임 권한이라 사용자가 누른 직후에만 요청한다.
+        pendingNotificationPermissionResult = result
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            notificationPermissionRequestCode,
+        )
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return true
+        }
+        return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun areAppNotificationsEnabled(): Boolean {
+        // Android 12 이하에서도 사용자가 앱 알림을 꺼두면 실제 푸시가 표시되지 않는다.
+        return NotificationManagerCompat.from(this).areNotificationsEnabled()
     }
 
     private fun LocationManager.safeLastKnownLocation(provider: String): Location? {
