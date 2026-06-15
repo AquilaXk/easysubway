@@ -2094,6 +2094,99 @@ void main() {
       semanticsHandle.dispose();
     }
   });
+
+  testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(
+        latitude: 37.302421,
+        longitude: 126.866221,
+      ),
+    );
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('시설 신고'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportPhotoUrlInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('현재 위치가 첨부되었습니다.'), findsOneWidget);
+    expect(locationProvider.requestCount, 1);
+
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '승강기 앞에서 확인했습니다.',
+    );
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.latitude, 37.302421);
+    expect(reportRepository.requests.single.longitude, 126.866221);
+  });
 }
 
 FavoriteStation _favoriteStation({required String id, required String name}) {
