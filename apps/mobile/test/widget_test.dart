@@ -2473,7 +2473,7 @@ void main() {
     Future<FacilityReportLocation> locationLoader() async {
       requestCount++;
       if (requestCount == 1) {
-        throw const FacilityReportLocationException('기기 위치를 켜 주세요.');
+        throw const FacilityReportLocationException('기기 위치를 켜고 다시 확인해 주세요.');
       }
       return const FacilityReportLocation(
         latitude: 37.302421,
@@ -2506,7 +2506,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜 주세요.'), findsOneWidget);
+    expect(find.text('기기 위치를 켜고 다시 확인해 주세요.'), findsOneWidget);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
@@ -2530,6 +2530,98 @@ void main() {
       find.byKey(const Key('facilityReportSubmitButton')),
     );
     expect(readySubmitButton.onPressed, isNotNull);
+  });
+
+  testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 확인을 요청하고 제출을 막는다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException('기기 위치를 켜고 다시 확인해 주세요.'),
+      needsPermissionRequest: false,
+    );
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -520));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 1);
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('기기 위치를 켜고 다시 확인해 주세요.'), findsOneWidget);
+    expect(find.text('현재 위치 첨부됨'), findsNothing);
+    expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
+    expect(find.text('위치 확인됨'), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '위치가 다르게 표시됩니다.',
+    );
+    final failedLocationSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(failedLocationSubmitButton.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pump();
+
+    expect(reportRepository.requests, isEmpty);
   });
 
   testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {

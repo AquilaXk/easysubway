@@ -20,4 +20,28 @@ void main() {
     expect(await provider.needsLocationPermissionRequest(), isFalse);
     expect(requestedMethods, ['needsLocationPermissionRequest']);
   });
+
+  test('현재 위치 제공자는 GPS 꺼짐 오류를 쉬운 안내 문구로 바꾼다', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('test/current-location-disabled');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(code: 'locationDisabled');
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final provider = MethodChannelCurrentLocationProvider(channel: channel);
+
+    await expectLater(
+      provider.currentLocation(),
+      throwsA(
+        isA<CurrentLocationException>().having(
+          (error) => error.message,
+          'message',
+          '기기 위치를 켜고 다시 확인해 주세요.',
+        ),
+      ),
+    );
+  });
 }
