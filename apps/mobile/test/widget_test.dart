@@ -2636,6 +2636,63 @@ void main() {
     expect(find.text('사진 1장 추가됨'), findsOneWidget);
   });
 
+  testWidgets('시설 신고 화면은 사진 확인 중 빠른 중복 탭을 무시한다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    var pickerCallCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () async => const FacilityReportLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
+          ),
+          needsLocationPermissionRequest: () async => false,
+          photoPicker: () async {
+            pickerCallCount++;
+            return const FacilityReportPhotoAttachment(
+              fileName: 'elevator-door.jpg',
+              contentType: 'image/jpeg',
+              dataBase64: 'aW1hZ2UtYnl0ZXM=',
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final addPhotoButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+    );
+    addPhotoButton.onPressed!();
+    addPhotoButton.onPressed!();
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진 확인'), findsOneWidget);
+
+    await tester.tap(find.text('계속'));
+    await tester.pumpAndSettle();
+
+    expect(pickerCallCount, 1);
+    expect(find.text('사진 확인'), findsNothing);
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+  });
+
   testWidgets('시설 신고 화면은 사진을 직접 추가해서 보낸다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository();
