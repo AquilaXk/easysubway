@@ -148,6 +148,52 @@ void main() {
     expect(reportRepository.listMyReportsCount, 1);
   });
 
+  testWidgets('내 신고 항목을 누르면 상세 상태 화면으로 이동한다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository(
+      reports: [
+        const FacilityReportResult(
+          id: 'report-2',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'CLOSED',
+          description: '출입문이 막혀 있습니다.',
+          status: 'ACCEPTED',
+          createdAt: '2026-06-15T09:00:00',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('myReportsButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('myReport-report-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('신고 상세'), findsOneWidget);
+    expect(find.text('폐쇄'), findsOneWidget);
+    expect(find.text('반영됨'), findsOneWidget);
+    expect(find.text('접수번호'), findsOneWidget);
+    expect(find.text('report-2'), findsOneWidget);
+    expect(find.text('접수일'), findsOneWidget);
+    expect(find.text('2026.06.15'), findsOneWidget);
+    expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('내 신고 상세, 폐쇄, 현재 상태 반영됨, 접수번호 report-2'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('내 신고 화면은 접수한 신고가 없으면 짧은 빈 상태를 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -1279,10 +1325,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
-      findsOneWidget,
-    );
+    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
       findsOneWidget,
@@ -3298,10 +3341,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
-      findsOneWidget,
-    );
+    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
@@ -3395,10 +3435,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
-      findsOneWidget,
-    );
+    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(find.text('현재 위치 첨부됨'), findsNothing);
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
     expect(find.text('위치 확인됨'), findsNothing);
@@ -3490,10 +3527,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'),
-      findsOneWidget,
-    );
+    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       findsOneWidget,
@@ -3551,7 +3585,9 @@ void main() {
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportRetryLocationButton')),
     );
-    await tester.tap(find.byKey(const Key('facilityReportRetryLocationButton')));
+    await tester.tap(
+      find.byKey(const Key('facilityReportRetryLocationButton')),
+    );
     await tester.pump();
 
     expect(requestCount, 1);
