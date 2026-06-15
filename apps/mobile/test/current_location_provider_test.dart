@@ -39,7 +39,7 @@ void main() {
         isA<CurrentLocationException>().having(
           (error) => error.message,
           'message',
-          '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+          '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.',
         ),
       ),
     );
