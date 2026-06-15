@@ -1360,6 +1360,35 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     return confirmed ?? false;
   }
 
+  Future<bool> _confirmPhotoUse() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('사진 확인'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('사진은 신고 확인에만 사용됩니다.'),
+            SizedBox(height: 8),
+            Text('얼굴이나 전화번호가 보이면 가려 주세요.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('계속'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _requestCurrentLocation() async {
     if (widget.locationLoader == null ||
         _isLoadingLocation ||
@@ -1413,6 +1442,12 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
 
   Future<void> _pickPhoto() async {
     if (_isPickingPhoto) {
+      return;
+    }
+    if (!await _confirmPhotoUse()) {
+      return;
+    }
+    if (!mounted) {
       return;
     }
     setState(() {
