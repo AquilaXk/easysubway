@@ -253,6 +253,7 @@ class FacilityReportRequest {
     required this.facilityId,
     required this.reportType,
     required this.description,
+    this.photoUrl,
   });
 
   final String userId;
@@ -260,6 +261,7 @@ class FacilityReportRequest {
   final String facilityId;
   final String reportType;
   final String description;
+  final String? photoUrl;
 
   FacilityReportRequest trimmed() {
     return FacilityReportRequest(
@@ -268,18 +270,23 @@ class FacilityReportRequest {
       facilityId: facilityId.trim(),
       reportType: reportType.trim(),
       description: description.trim(),
+      photoUrl: photoUrl?.trim(),
     );
   }
 
   Map<String, Object?> toJson() {
     final request = trimmed();
-    return {
+    final json = <String, Object?>{
       'userId': request.userId,
       'stationId': request.stationId,
       'facilityId': request.facilityId,
       'reportType': request.reportType,
       'description': request.description,
     };
+    if (request.photoUrl != null && request.photoUrl!.isNotEmpty) {
+      json['photoUrl'] = request.photoUrl;
+    }
+    return json;
   }
 }
 
@@ -434,6 +441,7 @@ class FacilityReportController extends ChangeNotifier {
     required FacilityReportTarget target,
     required FacilityReportTypeOption selectedType,
     required String description,
+    String? photoUrl,
   }) async {
     if (_disposed || _state.status == FacilityReportViewStatus.loading) {
       return;
@@ -454,6 +462,7 @@ class FacilityReportController extends ChangeNotifier {
           facilityId: target.facilityId,
           reportType: selectedType.reportType,
           description: description,
+          photoUrl: photoUrl,
         ),
       );
       _emitState(
@@ -821,6 +830,7 @@ class _MyReportMetaText extends StatelessWidget {
 class _FacilityReportScreenState extends State<FacilityReportScreen> {
   late final FacilityReportController _controller;
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _photoUrlController = TextEditingController();
   FacilityReportTypeOption _selectedType = FacilityReportTypeOption.broken;
 
   @override
@@ -835,6 +845,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     _controller.removeListener(_onReportStateChanged);
     _controller.dispose();
     _descriptionController.dispose();
+    _photoUrlController.dispose();
     super.dispose();
   }
 
@@ -896,6 +907,23 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            TextField(
+              key: const Key('facilityReportPhotoUrlInput'),
+              controller: _photoUrlController,
+              enabled: !isLoading && !hasSubmittedReport,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(fontSize: 18, height: 1.35),
+              decoration: const InputDecoration(
+                labelText: '사진 링크',
+                hintText: '사진 주소를 붙여 넣어 주세요',
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             if (state.message.isNotEmpty) _FacilityReportMessage(state: state),
             const SizedBox(height: 16),
             if (reportResult != null) ...[
@@ -935,6 +963,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       target: widget.target,
       selectedType: _selectedType,
       description: _descriptionController.text,
+      photoUrl: _photoUrlController.text,
     );
   }
 }
