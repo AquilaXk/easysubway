@@ -16,7 +16,7 @@ const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습
 const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportLocationDisabledMessage =
-    '기기 위치를 켜고 다시 확인해 주세요. 위치가 없으면 가까운 역을 찾기 어렵습니다.';
+    '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
 
