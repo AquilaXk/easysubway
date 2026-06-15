@@ -2465,6 +2465,7 @@ void main() {
               latitude: 37.302421,
               longitude: 126.866221,
             ),
+            needsPermissionRequest: false,
           ),
           initialOnboardingState: _completedOnboardingState(),
         ),
@@ -3133,6 +3134,46 @@ void main() {
     );
   });
 
+  testWidgets('시설 신고 화면은 첫 위치 권한 요청 전에 짧은 목적 안내를 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    var requestCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          needsLocationPermissionRequest: () async => true,
+          locationLoader: () async {
+            requestCount++;
+            return const FacilityReportLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('위치 확인'), findsOneWidget);
+    expect(find.text('가까운 역과 신고 위치를 확인합니다.'), findsOneWidget);
+    expect(requestCount, 0);
+
+    await tester.tap(find.text('계속'));
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 1);
+    expect(find.text('위치 확인'), findsNothing);
+  });
+
   testWidgets('시설 신고 화면은 위치 재확인 중 중복 탭을 무시한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var requestCount = 0;
@@ -3609,6 +3650,7 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         locationProvider: FakeCurrentLocationProvider(
           error: const CurrentLocationException('위치 권한을 허용해 주세요.'),
+          needsPermissionRequest: false,
         ),
         initialOnboardingState: _completedOnboardingState(),
       ),

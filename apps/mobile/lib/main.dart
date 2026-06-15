@@ -377,6 +377,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
           locationLoader: _facilityReportLocationLoader(
             widget.locationProvider,
           ),
+          needsLocationPermissionRequest:
+              widget.locationProvider.needsLocationPermissionRequest,
           openLocationSettings: widget.locationProvider.openLocationSettings,
           draftTargetStore: draftTargetStore,
           initialPhotoAttachment: photoAttachment,

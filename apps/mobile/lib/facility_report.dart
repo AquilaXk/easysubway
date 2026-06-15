@@ -364,6 +364,9 @@ class FacilityReportLocationException implements Exception {
 typedef FacilityReportLocationLoader =
     Future<FacilityReportLocation> Function();
 
+typedef FacilityReportLocationPermissionRequestChecker =
+    Future<bool> Function();
+
 typedef FacilityReportLocationSettingsOpener = Future<bool> Function();
 
 typedef FacilityReportPhotoPicker =
@@ -805,6 +808,7 @@ class FacilityReportScreen extends StatefulWidget {
     required this.repository,
     required this.target,
     this.locationLoader,
+    this.needsLocationPermissionRequest,
     this.openLocationSettings,
     this.photoPicker,
     this.lostPhotoRestorer,
@@ -816,6 +820,8 @@ class FacilityReportScreen extends StatefulWidget {
   final FacilityReportRepository repository;
   final FacilityReportTarget target;
   final FacilityReportLocationLoader? locationLoader;
+  final FacilityReportLocationPermissionRequestChecker?
+  needsLocationPermissionRequest;
   final FacilityReportLocationSettingsOpener? openLocationSettings;
   final FacilityReportPhotoPicker? photoPicker;
   final FacilityReportLostPhotoRestorer? lostPhotoRestorer;
@@ -1338,6 +1344,27 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     return confirmed ?? false;
   }
 
+  Future<bool> _confirmLocationPermissionUse() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('위치 확인'),
+        content: const Text('가까운 역과 신고 위치를 확인합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('나중에'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('계속'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<bool> _confirmPhotoUse() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1375,7 +1402,16 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     }
     setState(() => _isLocationPreflightRunning = true);
     try {
+      final needsPermissionRequest = await _needsLocationPermissionRequest();
       if (!mounted) {
+        return;
+      }
+      if (needsPermissionRequest && !await _confirmLocationPermissionUse()) {
+        setState(() {
+          _attachedLocation = null;
+          _locationMessage = '위치 권한을 확인해 주세요.';
+          _isLocationFailure = true;
+        });
         return;
       }
       // 권한 요청과 GPS 상태 확인은 네이티브 채널이 맡고, 화면은 실패 안내만 보여준다.
@@ -1400,6 +1436,14 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         setState(() => _isOpeningLocationSettings = false);
       }
     }
+  }
+
+  Future<bool> _needsLocationPermissionRequest() async {
+    final checker = widget.needsLocationPermissionRequest;
+    if (checker == null) {
+      return false;
+    }
+    return checker();
   }
 
   Future<void> _pickPhoto() async {

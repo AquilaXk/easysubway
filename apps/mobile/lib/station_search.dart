@@ -2871,6 +2871,7 @@ class _StationDetailContent extends StatelessWidget {
         builder: (_) => FacilityReportScreen(
           repository: reportRepository,
           locationLoader: _locationLoader(),
+          needsLocationPermissionRequest: _locationPermissionRequestChecker(),
           openLocationSettings: _locationSettingsOpener(),
           draftTargetStore: facilityReportDraftTargetStore,
           target: FacilityReportTarget(
@@ -2903,6 +2904,15 @@ class _StationDetailContent extends StatelessWidget {
         longitude: location.longitude,
       );
     };
+  }
+
+  FacilityReportLocationPermissionRequestChecker?
+  _locationPermissionRequestChecker() {
+    final provider = locationProvider;
+    if (provider == null) {
+      return null;
+    }
+    return provider.needsLocationPermissionRequest;
   }
 
   FacilityReportLocationSettingsOpener? _locationSettingsOpener() {
