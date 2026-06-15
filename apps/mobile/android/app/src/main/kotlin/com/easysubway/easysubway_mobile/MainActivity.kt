@@ -1,6 +1,7 @@
 package com.easysubway.easysubway_mobile
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
@@ -9,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
@@ -29,9 +31,25 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "currentLocation" -> handleCurrentLocation(result)
                     "needsLocationPermissionRequest" -> result.success(!hasLocationPermission())
+                    "openLocationSettings" -> openLocationSettings(result)
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun openLocationSettings(result: MethodChannel.Result) {
+        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        if (intent.resolveActivity(packageManager) == null) {
+            result.success(false)
+            return
+        }
+
+        try {
+            startActivity(intent)
+            result.success(true)
+        } catch (exception: RuntimeException) {
+            result.success(false)
+        }
     }
 
     private fun handleCurrentLocation(result: MethodChannel.Result) {
