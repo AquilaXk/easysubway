@@ -534,6 +534,123 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
 });
 
+test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
+  const result = read("backend/src/main/java/com/easysubway/user/domain/UserDataDeletionResult.java");
+  const invalidDeletion = read("backend/src/main/java/com/easysubway/user/domain/InvalidUserDataDeletionException.java");
+  const useCase = read("backend/src/main/java/com/easysubway/user/application/port/in/UserDataDeletionUseCase.java");
+  const favoriteStationPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserFavoriteStationPort.java",
+  );
+  const favoriteFacilityPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserFavoriteFacilityPort.java",
+  );
+  const favoriteRoutePort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserFavoriteRoutePort.java",
+  );
+  const routeFeedbackPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/AnonymizeUserRouteFeedbackPort.java",
+  );
+  const notificationPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserNotificationPreferencePort.java",
+  );
+  const pushNotificationPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserPushNotificationPort.java",
+  );
+  const mobilityProfilePort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserMobilityProfilePort.java",
+  );
+  const reportPort = read(
+    "backend/src/main/java/com/easysubway/user/application/port/out/AnonymizeUserFacilityReportPort.java",
+  );
+  const service = read("backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java");
+  const controller = read("backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java");
+  const registry = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/SpringSecurityAnonymousUserRegistry.java");
+  const favoriteStationRepository = read(
+    "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteStationRepository.java",
+  );
+  const favoriteFacilityRepository = read(
+    "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteFacilityRepository.java",
+  );
+  const favoriteRouteRepository = read(
+    "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteRouteRepository.java",
+  );
+  const routeSearchRepository = read(
+    "backend/src/main/java/com/easysubway/route/adapter/out/persistence/InMemoryRouteSearchRepository.java",
+  );
+  const notificationRepository = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryNotificationPreferenceRepository.java",
+  );
+  const pushNotificationRepository = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryPushNotificationOutboxRepository.java",
+  );
+  const profileRepository = read(
+    "backend/src/main/java/com/easysubway/profile/adapter/out/persistence/InMemoryMobilityProfileRepository.java",
+  );
+  const reportRepository = read(
+    "backend/src/main/java/com/easysubway/report/adapter/out/persistence/InMemoryFacilityReportRepository.java",
+  );
+  const facilityReport = read("backend/src/main/java/com/easysubway/report/domain/FacilityReport.java");
+  const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(result, /record UserDataDeletionResult/);
+  assert.match(result, /deletedFavoriteStationCount/);
+  assert.match(result, /deletedFavoriteFacilityCount/);
+  assert.match(result, /deletedFavoriteRouteCount/);
+  assert.match(result, /anonymizedRouteFeedbackCount/);
+  assert.match(result, /notificationSettingsDeleted/);
+  assert.match(result, /deletedRegisteredDeviceCount/);
+  assert.match(result, /deletedPushNotificationCount/);
+  assert.match(result, /mobilityProfileDeleted/);
+  assert.match(result, /anonymizedReportCount/);
+  assert.match(result, /anonymousCredentialsDeleted/);
+  assert.match(invalidDeletion, /extends RuntimeException/);
+  assert.match(useCase, /interface UserDataDeletionUseCase/);
+  assert.match(useCase, /deleteUserData\(String userId\)/);
+  assert.match(favoriteStationPort, /deleteFavoriteStationsByUserId/);
+  assert.match(favoriteFacilityPort, /deleteFavoriteFacilitiesByUserId/);
+  assert.match(favoriteRoutePort, /deleteFavoriteRoutesByUserId/);
+  assert.match(routeFeedbackPort, /anonymizeRouteFeedbacksByUserId/);
+  assert.match(notificationPort, /deleteNotificationSettings/);
+  assert.match(notificationPort, /deleteRegisteredDevices/);
+  assert.match(pushNotificationPort, /deletePushNotifications/);
+  assert.match(mobilityProfilePort, /deleteMobilityProfile/);
+  assert.match(reportPort, /anonymizeFacilityReportsByUserId/);
+  assert.match(service, /implements UserDataDeletionUseCase/);
+  assert.match(service, /RegisterAnonymousUserPort/);
+  assert.match(service, /DeleteUserFavoriteStationPort/);
+  assert.match(service, /DeleteUserFavoriteFacilityPort/);
+  assert.match(service, /DeleteUserFavoriteRoutePort/);
+  assert.match(service, /AnonymizeUserRouteFeedbackPort/);
+  assert.match(service, /DeleteUserNotificationPreferencePort/);
+  assert.match(service, /DeleteUserPushNotificationPort/);
+  assert.match(service, /DeleteUserMobilityProfilePort/);
+  assert.match(service, /AnonymizeUserFacilityReportPort/);
+  assert.match(service, /deleteAnonymousUser\(normalizedUserId\)/);
+  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me"\)/);
+  assert.match(controller, /Principal principal/);
+  assert.match(controller, /principal\.getName\(\)/);
+  assert.match(controller, /UserDataDeletionUseCase/);
+  assert.match(registry, /boolean deleteAnonymousUser\(String userId\)/);
+  assert.match(favoriteStationRepository, /DeleteUserFavoriteStationPort/);
+  assert.match(favoriteFacilityRepository, /DeleteUserFavoriteFacilityPort/);
+  assert.match(favoriteRouteRepository, /DeleteUserFavoriteRoutePort/);
+  assert.match(routeSearchRepository, /AnonymizeUserRouteFeedbackPort/);
+  assert.match(routeSearchRepository, /DELETED_USER_ID = "deleted-user"/);
+  assert.match(routeSearchRepository, /DELETED_COMMENT = "사용자 데이터 삭제로 경로 피드백 내용이 삭제되었습니다\."/);
+  assert.match(notificationRepository, /DeleteUserNotificationPreferencePort/);
+  assert.match(pushNotificationRepository, /DeleteUserPushNotificationPort/);
+  assert.match(profileRepository, /DeleteUserMobilityProfilePort/);
+  assert.match(reportRepository, /AnonymizeUserFacilityReportPort/);
+  assert.match(facilityReport, /ANONYMIZED_USER_ID = "__easysubway_deleted_facility_report__"/);
+  assert.match(facilityReport, /boolean isAnonymizedUserData\(\)/);
+  assert.match(reportRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
+  assert.match(reportRepository, /DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다\."/);
+  assert.match(reportRepository, /null,\s*\n\s*null,\s*\n\s*null,\s*\n\s*null,\s*\n\s*null,/);
+  assert.match(reportService, /!report\.isAnonymizedUserData\(\)/);
+  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
+});
+
 test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {
   const operator = read("backend/src/main/java/com/easysubway/transit/domain/TransitOperator.java");
   const line = read("backend/src/main/java/com/easysubway/transit/domain/SubwayLine.java");
@@ -665,7 +782,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(service, /FacilityReportStatus\.ACCEPTED/);
   assert.match(service, /FacilityReportStatus\.REJECTED/);
   assert.match(service, /FacilityReportStatus\.DUPLICATE/);
-  assert.match(repository, /implements LoadFacilityReportPort, SaveFacilityReportPort/);
+  assert.match(repository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort/);
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
   assert.match(transitRepository, /implements LoadTransitMasterPort, SaveAccessibilityFacilityStatusPort/);
   assert.match(transitRepository, /saveFacilityStatus\(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt\)/);
@@ -718,7 +835,7 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   assert.match(service, /implements MobilityProfileUseCase/);
   assert.match(service, /defaultProfile/);
   assert.match(service, /MobilityType\.WHEELCHAIR/);
-  assert.match(repository, /implements LoadMobilityProfilePort, SaveMobilityProfilePort/);
+  assert.match(repository, /implements[\s\S]*LoadMobilityProfilePort[\s\S]*SaveMobilityProfilePort/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/mobility-profile"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/mobility-profile"\)/);
 });
