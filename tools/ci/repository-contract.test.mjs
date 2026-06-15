@@ -302,7 +302,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
-  assert.doesNotMatch(envExample, /prod|production|secret|token|key/i);
+  assert.doesNotMatch(envExample, /prod|production|secret|token/i);
 });
 
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
@@ -1195,6 +1195,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
@@ -1226,6 +1228,18 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidManifest, /android:allowBackup="false"/);
   assert.match(androidManifest, /android:fullBackupContent="false"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
+  assert.match(androidBuildGradle, /create\("release"\)/);
+  assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
+  assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEYSTORE_PATH"/);
+  assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_STORE_PASSWORD"/);
+  assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEY_ALIAS"/);
+  assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEY_PASSWORD"/);
+  assert.match(androidBuildGradle, /providers\.environmentVariable\(name\)/);
+  assert.match(androidBuildGradle, /throw GradleException\([\s\S]*Android release signing values are missing:/);
+  assert.match(envExample, /^EASYSUBWAY_ANDROID_KEYSTORE_PATH=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ANDROID_STORE_PASSWORD=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_ALIAS=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(main, /역 찾기/);
