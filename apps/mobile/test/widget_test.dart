@@ -3139,7 +3139,7 @@ void main() {
     );
   });
 
-  testWidgets('시설 신고 화면은 첫 위치 권한 요청 전에 짧은 목적 안내를 보여준다', (tester) async {
+  testWidgets('시설 신고 화면은 첫 위치 권한 요청도 화면 진입 시 자동으로 진행한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var requestCount = 0;
 
@@ -3168,15 +3168,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('위치 확인'), findsOneWidget);
-    expect(find.text('가까운 역과 신고 위치를 확인합니다.'), findsOneWidget);
-    expect(requestCount, 0);
-
-    await tester.tap(find.text('계속'));
-    await tester.pumpAndSettle();
-
     expect(requestCount, 1);
     expect(find.text('위치 확인'), findsNothing);
+    expect(find.text('가까운 역과 신고 위치를 확인합니다.'), findsNothing);
+    expect(find.text('현재 위치 첨부됨'), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '권한 요청 후 바로 확인된 위치입니다.',
+    );
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.latitude, 37.302421);
+    expect(reportRepository.requests.single.longitude, 126.866221);
   });
 
   testWidgets('시설 신고 화면은 위치 재확인 중 중복 탭을 무시한다', (tester) async {
