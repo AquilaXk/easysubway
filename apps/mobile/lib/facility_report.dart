@@ -1099,6 +1099,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   bool _isLocationFailure = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
+  bool _isConfirmingPhotoUse = false;
   bool _isPickingPhoto = false;
 
   @override
@@ -1195,7 +1196,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               key: const Key('facilityReportAddPhotoButton'),
-              onPressed: isLoading || hasSubmittedReport || _isPickingPhoto
+              onPressed:
+                  isLoading ||
+                      hasSubmittedReport ||
+                      _isConfirmingPhotoUse ||
+                      _isPickingPhoto
                   ? null
                   : _pickPhoto,
               icon: _isPickingPhoto
@@ -1441,16 +1446,20 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    if (_isPickingPhoto) {
+    if (_isConfirmingPhotoUse || _isPickingPhoto) {
       return;
     }
-    if (!await _confirmPhotoUse()) {
-      return;
-    }
+    setState(() => _isConfirmingPhotoUse = true);
+    final confirmed = await _confirmPhotoUse();
     if (!mounted) {
       return;
     }
+    if (!confirmed) {
+      setState(() => _isConfirmingPhotoUse = false);
+      return;
+    }
     setState(() {
+      _isConfirmingPhotoUse = false;
       _isPickingPhoto = true;
       _photoMessage = '';
       _isPhotoFailure = false;
