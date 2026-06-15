@@ -40,7 +40,7 @@ public class InMemoryFacilityReportRepository implements
 	public int anonymizeFacilityReportsByUserId(String userId) {
 		int anonymizedCount = 0;
 		for (FacilityReport report : loadReports()) {
-			if (!report.userId().equals(userId)) {
+			if (!userId.equals(report.userId())) {
 				continue;
 			}
 			reports.put(report.id(), anonymized(report));
