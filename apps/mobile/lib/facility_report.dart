@@ -1344,20 +1344,20 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     return confirmed ?? false;
   }
 
-  Future<bool> _confirmLocationUse() async {
+  Future<bool> _confirmLocationPermissionUse() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('현재 위치 사용'),
-        content: const Text('현재 위치로 가까운 역을 찾습니다.'),
+        title: const Text('위치 확인'),
+        content: const Text('가까운 역과 신고 위치를 확인합니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
+            child: const Text('나중에'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('위치 사용'),
+            child: const Text('계속'),
           ),
         ],
       ),
@@ -1406,14 +1406,15 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (!mounted) {
         return;
       }
-      if (needsPermissionRequest && !await _confirmLocationUse()) {
+      if (needsPermissionRequest && !await _confirmLocationPermissionUse()) {
         setState(() {
           _attachedLocation = null;
-          _locationMessage = '현재 위치 확인이 필요합니다.';
+          _locationMessage = '위치 권한을 확인해 주세요.';
           _isLocationFailure = true;
         });
         return;
       }
+      // 권한 요청과 GPS 상태 확인은 네이티브 채널이 맡고, 화면은 실패 안내만 보여준다.
       await _loadCurrentLocation();
     } finally {
       if (mounted) {
