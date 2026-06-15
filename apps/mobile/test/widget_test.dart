@@ -853,6 +853,14 @@ void main() {
           lineCode: '경의중앙',
           active: true,
         ),
+        SubwayLineOption(
+          id: 'inactive-line',
+          name: '운행 중지 노선',
+          color: '#777777',
+          region: '수도권',
+          lineCode: '중지',
+          active: false,
+        ),
       ],
       nextResults: [
         const StationSearchResult(
@@ -893,6 +901,11 @@ void main() {
         find.byKey(const Key('stationLineFilter-seoul-4')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('stationLineFilter-inactive-line')),
+        findsNothing,
+      );
+      expect(find.text('운행 중지 노선'), findsNothing);
       expect(find.text('4'), findsOneWidget);
       expect(find.bySemanticsLabel('수도권 4호선 선택 안 됨'), findsOneWidget);
 
@@ -948,6 +961,14 @@ void main() {
           lineCode: '경의중앙',
           active: true,
         ),
+        SubwayLineOption(
+          id: 'inactive-line',
+          name: '운행 중지 노선',
+          color: '#777777',
+          region: '수도권',
+          lineCode: '중지',
+          active: false,
+        ),
       ],
       searchCompleter: searchCompleter,
     );
@@ -965,6 +986,13 @@ void main() {
 
       await tester.tap(find.byKey(const Key('stationSearchButton')));
       await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('stationLineFilter-inactive-line')),
+        findsNothing,
+      );
+      expect(find.text('운행 중지 노선'), findsNothing);
+
       await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));
       await tester.pumpAndSettle();
 
@@ -2922,7 +2950,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('현재 위치로 신고할 역을 확인합니다.'), findsOneWidget);
+    expect(find.text('신고할 역을 확인하는 데 필요합니다.'), findsOneWidget);
     expect(requestCount, 0);
 
     await tester.tap(find.text('취소'));

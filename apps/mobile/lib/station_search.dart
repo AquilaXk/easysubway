@@ -2169,6 +2169,7 @@ class _StationLineFilterButton extends StatelessWidget {
       label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
       button: true,
       selected: selected,
+      enabled: onPressed != null,
       onTap: onPressed,
       child: ExcludeSemantics(
         child: OutlinedButton(
