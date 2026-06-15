@@ -2263,6 +2263,68 @@ void main() {
     }
   });
 
+  testWidgets('시설 신고 화면은 복구된 사진을 첨부 상태로 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    var restoreCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          lostPhotoRestorer: () async {
+            restoreCount++;
+            return const FacilityReportPhotoAttachment(
+              fileName: 'restored-photo.webp',
+              contentType: 'image/webp',
+              dataBase64: 'cmVzdG9yZWQ=',
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(restoreCount, 1);
+    await tester.dragUntilVisible(
+      find.bySemanticsLabel('사진 1장 추가됨'),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '선택했던 사진입니다.',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(
+      reportRepository.requests.single.photoFileName,
+      'restored-photo.webp',
+    );
+    expect(reportRepository.requests.single.photoContentType, 'image/webp');
+    expect(reportRepository.requests.single.photoDataBase64, 'cmVzdG9yZWQ=');
+  });
+
   testWidgets('시설 신고 화면은 사진과 위치를 보내기 전에 확인한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
 
@@ -2367,7 +2429,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('신고 위치를 확인하는 데 사용합니다.'), findsOneWidget);
+    expect(find.text('현재 위치로 신고할 역을 확인합니다.'), findsOneWidget);
     expect(requestCount, 0);
 
     await tester.tap(find.text('취소'));
@@ -2473,7 +2535,9 @@ void main() {
     Future<FacilityReportLocation> locationLoader() async {
       requestCount++;
       if (requestCount == 1) {
-        throw const FacilityReportLocationException('기기 위치를 켜고 다시 확인해 주세요.');
+        throw const FacilityReportLocationException(
+          '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+        );
       }
       return const FacilityReportLocation(
         latitude: 37.302421,
@@ -2506,7 +2570,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜고 다시 확인해 주세요.'), findsOneWidget);
+    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
@@ -2535,7 +2599,9 @@ void main() {
   testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 확인을 요청하고 제출을 막는다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
-      error: const CurrentLocationException('기기 위치를 켜고 다시 확인해 주세요.'),
+      error: const CurrentLocationException(
+        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+      ),
       needsPermissionRequest: false,
     );
     final stationRepository = FakeStationSearchRepository(
@@ -2601,7 +2667,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜고 다시 확인해 주세요.'), findsOneWidget);
+    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
     expect(find.text('현재 위치 첨부됨'), findsNothing);
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
     expect(find.text('위치 확인됨'), findsNothing);
@@ -2627,7 +2693,9 @@ void main() {
   testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
-      error: const CurrentLocationException('기기 위치를 켜고 다시 확인해 주세요.'),
+      error: const CurrentLocationException(
+        '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
+      ),
       needsPermissionRequest: false,
     );
     final stationRepository = FakeStationSearchRepository(
@@ -2691,7 +2759,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치를 켜고 다시 확인해 주세요.'), findsOneWidget);
+    expect(find.text('기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       findsOneWidget,

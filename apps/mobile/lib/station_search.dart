@@ -132,7 +132,7 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
   String _locationErrorMessage(String code) {
     return switch (code) {
       'permissionDenied' => '위치 권한을 확인해 주세요.',
-      'locationDisabled' => '기기 위치를 켜고 다시 확인해 주세요.',
+      'locationDisabled' => '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.',
       'locationUnavailable' => '현재 위치를 확인하지 못했습니다.',
       _ => '현재 위치를 확인하지 못했습니다.',
     };

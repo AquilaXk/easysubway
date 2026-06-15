@@ -6,9 +6,68 @@ import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
+  test('시설 신고 사진 선택기는 복구된 사진을 첨부 데이터로 바꾼다', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'facility-report-photo-',
+    );
+    addTearDown(() => tempDir.delete(recursive: true));
+    final photoFile = File('${tempDir.path}/restored-photo.png');
+    await photoFile.writeAsBytes([1, 2, 3, 4]);
+
+    final picker = ImagePickerFacilityReportPhotoPicker(
+      imagePicker: FakeLostDataImagePicker(
+        LostDataResponse(
+          file: XFile(photoFile.path, name: 'restored-photo.png'),
+          type: RetrieveType.image,
+        ),
+      ),
+    );
+
+    final attachment = await picker.retrieveLostPhoto();
+
+    expect(attachment, isNotNull);
+    expect(attachment!.fileName, 'restored-photo.png');
+    expect(attachment.contentType, 'image/png');
+    expect(attachment.dataBase64, 'AQIDBA==');
+  });
+
+  test('시설 신고 사진 선택기는 복구할 사진이 없으면 첨부하지 않는다', () async {
+    final picker = ImagePickerFacilityReportPhotoPicker(
+      imagePicker: FakeLostDataImagePicker(LostDataResponse.empty()),
+    );
+
+    final attachment = await picker.retrieveLostPhoto();
+
+    expect(attachment, isNull);
+  });
+
+  test('시설 신고 사진 선택기는 복구 오류를 쉬운 안내로 바꾼다', () async {
+    final picker = ImagePickerFacilityReportPhotoPicker(
+      imagePicker: FakeLostDataImagePicker(
+        LostDataResponse(
+          exception: PlatformException(code: 'lost_data_error'),
+          type: RetrieveType.image,
+        ),
+      ),
+    );
+
+    await expectLater(
+      picker.retrieveLostPhoto(),
+      throwsA(
+        isA<FacilityReportPhotoException>().having(
+          (error) => error.message,
+          'message',
+          '사진을 다시 선택해 주세요.',
+        ),
+      ),
+    );
+  });
+
   test('시설 신고 API 저장소는 백엔드 계약에 맞춰 신고를 전송한다', () async {
     late String? authorizationHeader;
     late Map<String, Object?> requestBody;
@@ -529,6 +588,15 @@ void main() {
     expect(controller.state.result?.id, 'report-1');
     expect(controller.state.result?.statusLabel, '접수됨');
   });
+}
+
+class FakeLostDataImagePicker extends ImagePicker {
+  FakeLostDataImagePicker(this.response);
+
+  final LostDataResponse response;
+
+  @override
+  Future<LostDataResponse> retrieveLostData() async => response;
 }
 
 List<FlutterErrorDetails> _captureReportedErrors() {
