@@ -79,7 +79,7 @@ class UserDataControllerTest {
 		mockMvc.perform(get("/admin/reports/{reportId}", reportId)
 				.with(httpBasic("admin-user", "admin-test-password")))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.userId").value("deleted-user"))
+			.andExpect(jsonPath("$.data.userId").value("__easysubway_deleted_facility_report__"))
 			.andExpect(jsonPath("$.data.description").value("사용자 데이터 삭제로 신고 내용이 삭제되었습니다."))
 			.andExpect(jsonPath("$.data.photoFileName").doesNotExist())
 			.andExpect(jsonPath("$.data.photoDataBase64").doesNotExist())

@@ -16,7 +16,6 @@ public class InMemoryFacilityReportRepository implements
 	SaveFacilityReportPort,
 	AnonymizeUserFacilityReportPort {
 
-	private static final String DELETED_USER_ID = "deleted-user";
 	private static final String DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다.";
 
 	private final Map<String, FacilityReport> reports = new ConcurrentHashMap<>();
@@ -54,7 +53,7 @@ public class InMemoryFacilityReportRepository implements
 		// 삭제 요청 이후에는 운영 검수 이력만 남기고 사용자가 남긴 본문, 사진, 위치는 제거한다.
 		return new FacilityReport(
 			report.id(),
-			DELETED_USER_ID,
+			FacilityReport.ANONYMIZED_USER_ID,
 			report.stationId(),
 			report.facilityId(),
 			report.reportType(),

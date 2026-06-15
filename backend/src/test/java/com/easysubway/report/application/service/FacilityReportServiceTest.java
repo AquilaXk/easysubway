@@ -238,6 +238,31 @@ class FacilityReportServiceTest {
 	}
 
 	@Test
+	@DisplayName("내 신고 목록은 익명화된 신고가 사용자명과 같아도 반환하지 않는다")
+	void listUserReportsExcludeAnonymizedReportsEvenWhenTombstoneMatchesUserId() {
+		reportRepository.saveReport(new FacilityReport(
+			"report-anonymized",
+			FacilityReport.ANONYMIZED_USER_ID,
+			"station-sangnoksu",
+			"facility-sangnoksu-elevator-1",
+			FacilityReportType.BROKEN,
+			"사용자 데이터 삭제로 신고 내용이 삭제되었습니다.",
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 12, 9, 0),
+			null,
+			null
+		));
+
+		assertThat(service.listUserReports(FacilityReport.ANONYMIZED_USER_ID)).isEmpty();
+	}
+
+	@Test
 	@DisplayName("내 신고 목록은 소유자 없는 신고가 있어도 실패하지 않는다")
 	void listUserReportsIgnoresReportsWithoutOwner() {
 		reportRepository.saveReport(new FacilityReport(
