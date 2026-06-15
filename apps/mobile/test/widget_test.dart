@@ -385,6 +385,47 @@ void main() {
     }
   });
 
+  testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: 'https://easysubway.example/privacy',
+          supportEmail: 'support@easysubway.example',
+          dataDeletionEmail: 'privacy@easysubway.example',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.scrollUntilVisible(find.byKey(const Key('helpButton')), 120);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('helpButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('도움말'), findsOneWidget);
+    expect(find.text('개인정보처리방침'), findsOneWidget);
+    expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
+    expect(find.text('고객지원'), findsOneWidget);
+    expect(find.text('support@easysubway.example'), findsOneWidget);
+    expect(find.text('데이터 삭제 요청'), findsOneWidget);
+    expect(find.text('privacy@easysubway.example'), findsOneWidget);
+
+    final privacyButtonSize = tester.getSize(
+      find.byKey(const Key('privacyPolicyAccessItem')),
+    );
+    final deletionButtonSize = tester.getSize(
+      find.byKey(const Key('dataDeletionAccessItem')),
+    );
+
+    expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
+    expect(deletionButtonSize.height, greaterThanOrEqualTo(60));
+  });
+
   testWidgets('인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
