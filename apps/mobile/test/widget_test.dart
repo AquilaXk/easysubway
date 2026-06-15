@@ -1508,6 +1508,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
     await tester.pump();
+    await _continuePhotoUse(tester, settle: false);
 
     expect(draftTargetStore.saveCount, 1);
     expect(
@@ -2572,6 +2573,69 @@ void main() {
     }
   });
 
+  testWidgets('시설 신고 화면은 사진 선택 전에 짧은 개인정보 안내를 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    var pickerCallCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () async => const FacilityReportLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
+          ),
+          needsLocationPermissionRequest: () async => false,
+          photoPicker: () async {
+            pickerCallCount++;
+            return const FacilityReportPhotoAttachment(
+              fileName: 'elevator-door.jpg',
+              contentType: 'image/jpeg',
+              dataBase64: 'aW1hZ2UtYnl0ZXM=',
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진 확인'), findsOneWidget);
+    expect(find.text('사진은 신고 확인에만 사용됩니다.'), findsOneWidget);
+    expect(find.text('얼굴이나 전화번호가 보이면 가려 주세요.'), findsOneWidget);
+    expect(pickerCallCount, 0);
+
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진 1장 추가됨'), findsNothing);
+    expect(pickerCallCount, 0);
+
+    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('계속'));
+    await tester.pumpAndSettle();
+
+    expect(pickerCallCount, 1);
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+  });
+
   testWidgets('시설 신고 화면은 사진을 직접 추가해서 보낸다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository();
@@ -2619,6 +2683,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
       await tester.pumpAndSettle();
+      await _continuePhotoUse(tester);
 
       expect(find.text('사진 1장 추가됨'), findsOneWidget);
 
@@ -2751,6 +2816,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
     await tester.pumpAndSettle();
+    await _continuePhotoUse(tester);
 
     expect(draftTargetStore.saveCount, 1);
     expect(draftTargetStore.clearCount, 1);
@@ -2942,6 +3008,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
     await tester.pumpAndSettle();
+    await _continuePhotoUse(tester);
 
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportDescriptionInput')),
@@ -3578,6 +3645,19 @@ Future<void> _acceptLocationUse(WidgetTester tester) async {
   expect(find.text('현재 위치 사용'), findsOneWidget);
   await tester.tap(find.text('위치 사용'));
   await tester.pumpAndSettle();
+}
+
+Future<void> _continuePhotoUse(
+  WidgetTester tester, {
+  bool settle = true,
+}) async {
+  expect(find.text('사진 확인'), findsOneWidget);
+  await tester.tap(find.text('계속'));
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 FavoriteStation _favoriteStation({required String id, required String name}) {
