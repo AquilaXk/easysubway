@@ -1176,11 +1176,11 @@ int? _optionalInt(Map<String, Object?> json, String key) {
 
 String _dataQualityLabel(String dataQualityLevel) {
   return switch (dataQualityLevel) {
-    'LEVEL_1' => '기본 정보만 확인됨',
-    'LEVEL_2' => '접근성 시설 확인됨',
-    'LEVEL_3' => '쉬운 경로 안내 가능',
-    'LEVEL_4' => '실시간 상태 반영됨',
-    _ => '확인 정보 부족',
+    'LEVEL_1' => '기본 정보만 있음',
+    'LEVEL_2' => '시설 정보 확인됨',
+    'LEVEL_3' => '쉬운 길 안내 가능',
+    'LEVEL_4' => '고장·공사 반영됨',
+    _ => '정보 확인 필요',
   };
 }
 
