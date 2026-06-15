@@ -52,6 +52,8 @@ class FacilityReportServiceTest {
 			FacilityReportType.BROKEN,
 			"엘리베이터 문이 열리지 않습니다.",
 			null,
+			null,
+			null,
 			new BigDecimal("37.302421"),
 			new BigDecimal("126.866221")
 		));
@@ -76,6 +78,8 @@ class FacilityReportServiceTest {
 			"엘리베이터가 멈춰 있습니다.",
 			null,
 			null,
+			null,
+			null,
 			null
 		)))
 			.isInstanceOf(StationNotFoundException.class)
@@ -91,6 +95,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			FacilityReportType.BROKEN,
 			"다른 역 시설로 신고할 수 없습니다.",
+			null,
+			null,
 			null,
 			null,
 			null
@@ -110,6 +116,8 @@ class FacilityReportServiceTest {
 			"신고 유형이 없는 요청입니다.",
 			null,
 			null,
+			null,
+			null,
 			null
 		)))
 			.isInstanceOf(InvalidFacilityReportException.class)
@@ -125,6 +133,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			FacilityReportType.BROKEN,
 			"신고 작성자 식별자가 없는 요청입니다.",
+			null,
+			null,
 			null,
 			null,
 			null
@@ -184,6 +194,8 @@ class FacilityReportServiceTest {
 			null,
 			null,
 			null,
+			null,
+			null,
 			FacilityReportStatus.SUBMITTED,
 			LocalDateTime.of(2026, 6, 12, 9, 0),
 			null,
@@ -227,6 +239,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			FacilityReportType.BROKEN,
 			"엘리베이터 문이 열리지 않습니다.",
+			null,
+			null,
 			null,
 			null,
 			null
@@ -502,6 +516,8 @@ class FacilityReportServiceTest {
 			"기존 정보가 맞습니다.",
 			null,
 			null,
+			null,
+			null,
 			null
 		));
 		var duplicated = service.createReport(new CreateFacilityReportCommand(
@@ -510,6 +526,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			FacilityReportType.BROKEN,
 			"이미 접수된 신고입니다.",
+			null,
+			null,
 			null,
 			null,
 			null
@@ -536,6 +554,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			FacilityReportType.BROKEN,
 			"검수 대상 신고입니다.",
+			null,
+			null,
 			null,
 			null,
 			null
@@ -584,6 +604,8 @@ class FacilityReportServiceTest {
 			"facility-sangnoksu-elevator-1",
 			reportType,
 			description,
+			null,
+			null,
 			null,
 			null,
 			null

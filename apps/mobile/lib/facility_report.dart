@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
@@ -253,7 +254,9 @@ class FacilityReportRequest {
     required this.facilityId,
     required this.reportType,
     required this.description,
-    this.photoUrl,
+    this.photoFileName,
+    this.photoContentType,
+    this.photoDataBase64,
     this.latitude,
     this.longitude,
   });
@@ -263,7 +266,9 @@ class FacilityReportRequest {
   final String facilityId;
   final String reportType;
   final String description;
-  final String? photoUrl;
+  final String? photoFileName;
+  final String? photoContentType;
+  final String? photoDataBase64;
   final double? latitude;
   final double? longitude;
 
@@ -274,7 +279,9 @@ class FacilityReportRequest {
       facilityId: facilityId.trim(),
       reportType: reportType.trim(),
       description: description.trim(),
-      photoUrl: photoUrl?.trim(),
+      photoFileName: photoFileName?.trim(),
+      photoContentType: photoContentType?.trim(),
+      photoDataBase64: photoDataBase64?.trim(),
       latitude: latitude,
       longitude: longitude,
     );
@@ -289,8 +296,15 @@ class FacilityReportRequest {
       'reportType': request.reportType,
       'description': request.description,
     };
-    if (request.photoUrl != null && request.photoUrl!.isNotEmpty) {
-      json['photoUrl'] = request.photoUrl;
+    if (request.photoFileName != null &&
+        request.photoFileName!.isNotEmpty &&
+        request.photoContentType != null &&
+        request.photoContentType!.isNotEmpty &&
+        request.photoDataBase64 != null &&
+        request.photoDataBase64!.isNotEmpty) {
+      json['photoFileName'] = request.photoFileName;
+      json['photoContentType'] = request.photoContentType;
+      json['photoDataBase64'] = request.photoDataBase64;
     }
     // 좌표 한쪽만 저장되면 현장 위치를 잘못 해석할 수 있어 한 쌍일 때만 보낸다.
     if (request.latitude != null && request.longitude != null) {
@@ -299,6 +313,18 @@ class FacilityReportRequest {
     }
     return json;
   }
+}
+
+class FacilityReportPhotoAttachment {
+  const FacilityReportPhotoAttachment({
+    required this.fileName,
+    required this.contentType,
+    required this.dataBase64,
+  });
+
+  final String fileName;
+  final String contentType;
+  final String dataBase64;
 }
 
 class FacilityReportLocation {
@@ -322,6 +348,48 @@ class FacilityReportLocationException implements Exception {
 
 typedef FacilityReportLocationLoader =
     Future<FacilityReportLocation> Function();
+
+typedef FacilityReportPhotoPicker =
+    Future<FacilityReportPhotoAttachment?> Function();
+
+class ImagePickerFacilityReportPhotoPicker {
+  ImagePickerFacilityReportPhotoPicker({ImagePicker? imagePicker})
+    : _imagePicker = imagePicker ?? ImagePicker();
+
+  final ImagePicker _imagePicker;
+
+  Future<FacilityReportPhotoAttachment?> pickFromGallery() {
+    return _pick(ImageSource.gallery);
+  }
+
+  Future<FacilityReportPhotoAttachment?> takePhoto() {
+    return _pick(ImageSource.camera);
+  }
+
+  Future<FacilityReportPhotoAttachment?> _pick(ImageSource source) async {
+    final image = await _imagePicker.pickImage(source: source);
+    if (image == null) {
+      return null;
+    }
+    final bytes = await image.readAsBytes();
+    return FacilityReportPhotoAttachment(
+      fileName: image.name.isEmpty ? 'facility-report.jpg' : image.name,
+      contentType: _contentTypeFromName(image.name),
+      dataBase64: base64Encode(bytes),
+    );
+  }
+
+  String _contentTypeFromName(String fileName) {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lowerName.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    return 'image/jpeg';
+  }
+}
 
 class FacilityReportResult {
   const FacilityReportResult({
@@ -474,7 +542,7 @@ class FacilityReportController extends ChangeNotifier {
     required FacilityReportTarget target,
     required FacilityReportTypeOption selectedType,
     required String description,
-    String? photoUrl,
+    FacilityReportPhotoAttachment? photoAttachment,
     double? latitude,
     double? longitude,
   }) async {
@@ -497,7 +565,9 @@ class FacilityReportController extends ChangeNotifier {
           facilityId: target.facilityId,
           reportType: selectedType.reportType,
           description: description,
-          photoUrl: photoUrl,
+          photoFileName: photoAttachment?.fileName,
+          photoContentType: photoAttachment?.contentType,
+          photoDataBase64: photoAttachment?.dataBase64,
           latitude: latitude,
           longitude: longitude,
         ),
@@ -602,12 +672,14 @@ class FacilityReportScreen extends StatefulWidget {
     required this.repository,
     required this.target,
     this.locationLoader,
+    this.photoPicker,
     super.key,
   });
 
   final FacilityReportRepository repository;
   final FacilityReportTarget target;
   final FacilityReportLocationLoader? locationLoader;
+  final FacilityReportPhotoPicker? photoPicker;
 
   @override
   State<FacilityReportScreen> createState() => _FacilityReportScreenState();
@@ -868,19 +940,23 @@ class _MyReportMetaText extends StatelessWidget {
 
 class _FacilityReportScreenState extends State<FacilityReportScreen> {
   late final FacilityReportController _controller;
+  late final ImagePickerFacilityReportPhotoPicker _defaultPhotoPicker;
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _photoUrlController = TextEditingController();
   FacilityReportTypeOption _selectedType = FacilityReportTypeOption.broken;
   FacilityReportLocation? _attachedLocation;
+  FacilityReportPhotoAttachment? _photoAttachment;
   String _locationMessage = '';
   bool _isLoadingLocation = false;
   bool _isLocationFailure = false;
+  bool _isPickingPhoto = false;
 
   @override
   void initState() {
     super.initState();
     _controller = FacilityReportController(repository: widget.repository)
       ..addListener(_onReportStateChanged);
+    _defaultPhotoPicker = ImagePickerFacilityReportPhotoPicker();
+    unawaited(_loadCurrentLocation());
   }
 
   @override
@@ -888,7 +964,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     _controller.removeListener(_onReportStateChanged);
     _controller.dispose();
     _descriptionController.dispose();
-    _photoUrlController.dispose();
     super.dispose();
   }
 
@@ -899,7 +974,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
     final isSubmitDisabled =
-        isLoading || hasSubmittedReport || _isLoadingLocation;
+        isLoading ||
+        hasSubmittedReport ||
+        _isLoadingLocation ||
+        _isLocationFailure ||
+        (widget.locationLoader != null && _attachedLocation == null);
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 신고')),
@@ -952,41 +1031,27 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              key: const Key('facilityReportPhotoUrlInput'),
-              controller: _photoUrlController,
-              enabled: !isLoading && !hasSubmittedReport,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              style: const TextStyle(fontSize: 18, height: 1.35),
-              decoration: const InputDecoration(
-                labelText: '사진 링크',
-                hintText: '사진 주소를 붙여 넣어 주세요',
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             OutlinedButton.icon(
-              key: const Key('facilityReportAttachLocationButton'),
-              onPressed:
-                  isLoading ||
-                      hasSubmittedReport ||
-                      _isLoadingLocation ||
-                      widget.locationLoader == null
+              key: const Key('facilityReportAddPhotoButton'),
+              onPressed: isLoading || hasSubmittedReport || _isPickingPhoto
                   ? null
-                  : _attachLocation,
-              icon: _isLoadingLocation
+                  : _pickPhoto,
+              icon: _isPickingPhoto
                   ? const SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     )
-                  : const Icon(Icons.my_location),
-              label: Text(_attachedLocation == null ? '현재 위치 첨부' : '현재 위치 첨부됨'),
+                  : const Icon(Icons.add_a_photo),
+              label: Text(_photoAttachment == null ? '사진 추가' : '사진 바꾸기'),
             ),
+            if (_photoAttachment != null) ...[
+              const SizedBox(height: 10),
+              const _FacilityReportLocationMessage(
+                message: '사진 1장 추가됨',
+                isFailure: false,
+              ),
+            ],
             if (_locationMessage.isNotEmpty) ...[
               const SizedBox(height: 10),
               _FacilityReportLocationMessage(
@@ -1034,13 +1099,69 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       target: widget.target,
       selectedType: _selectedType,
       description: _descriptionController.text,
-      photoUrl: _photoUrlController.text,
+      photoAttachment: _photoAttachment,
       latitude: _attachedLocation?.latitude,
       longitude: _attachedLocation?.longitude,
     );
   }
 
-  Future<void> _attachLocation() async {
+  Future<void> _pickPhoto() async {
+    if (_isPickingPhoto) {
+      return;
+    }
+    setState(() => _isPickingPhoto = true);
+    try {
+      final picker = widget.photoPicker ?? _pickPhotoWithDevicePicker;
+      final photo = await picker();
+      if (!mounted || photo == null) {
+        return;
+      }
+      setState(() => _photoAttachment = photo);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 사진 첨부 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        setState(() => _photoAttachment = null);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPickingPhoto = false);
+      }
+    }
+  }
+
+  Future<FacilityReportPhotoAttachment?> _pickPhotoWithDevicePicker() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('사진 찍기'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('앨범에서 선택'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    return switch (source) {
+      ImageSource.camera => _defaultPhotoPicker.takePhoto(),
+      ImageSource.gallery => _defaultPhotoPicker.pickFromGallery(),
+      null => null,
+    };
+  }
+
+  Future<void> _loadCurrentLocation() async {
     final locationLoader = widget.locationLoader;
     if (locationLoader == null || _isLoadingLocation) {
       return;
@@ -1058,7 +1179,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       }
       setState(() {
         _attachedLocation = location;
-        _locationMessage = '현재 위치가 첨부되었습니다.';
+        _locationMessage = '위치 확인됨';
         _isLocationFailure = false;
       });
     } on FacilityReportLocationException catch (error) {
@@ -1074,7 +1195,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 현재 위치 첨부 중 예외가 발생했습니다.',
+        context: '시설 신고 현재 위치 확인 중 예외가 발생했습니다.',
       );
       if (!mounted) {
         return;

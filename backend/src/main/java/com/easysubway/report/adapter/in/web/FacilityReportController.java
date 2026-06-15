@@ -84,7 +84,9 @@ class FacilityReportController {
 		String facilityId,
 		FacilityReportType reportType,
 		String description,
-		String photoUrl,
+		String photoFileName,
+		String photoContentType,
+		String photoDataBase64,
 		BigDecimal latitude,
 		BigDecimal longitude
 	) {
@@ -96,7 +98,9 @@ class FacilityReportController {
 				facilityId,
 				reportType,
 				description,
-				photoUrl,
+				photoFileName,
+				photoContentType,
+				photoDataBase64,
 				latitude,
 				longitude
 			);
@@ -119,7 +123,9 @@ class FacilityReportController {
 		String facilityId,
 		FacilityReportType reportType,
 		String description,
-		String photoUrl,
+		String photoFileName,
+		String photoContentType,
+		String photoDataBase64,
 		BigDecimal latitude,
 		BigDecimal longitude,
 		FacilityReportStatus status,
@@ -136,7 +142,9 @@ class FacilityReportController {
 				report.facilityId(),
 				report.reportType(),
 				report.description(),
-				report.photoUrl(),
+				report.photoFileName(),
+				report.photoContentType(),
+				report.photoDataBase64(),
 				report.latitude(),
 				report.longitude(),
 				report.status(),

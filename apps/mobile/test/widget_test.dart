@@ -1988,6 +1988,12 @@ void main() {
           reportRepository: reportRepository,
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          locationProvider: FakeCurrentLocationProvider(
+            location: const CurrentLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            ),
+          ),
           initialOnboardingState: _completedOnboardingState(),
         ),
       );
@@ -2033,13 +2039,9 @@ void main() {
         find.byKey(const Key('facilityReportDescriptionInput')),
         '출입문이 막혀 있습니다.',
       );
-      await tester.ensureVisible(
+      expect(
         find.byKey(const Key('facilityReportPhotoUrlInput')),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('facilityReportPhotoUrlInput')),
-        'https://cdn.example.test/reports/closed-door.jpg',
+        findsNothing,
       );
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
@@ -2052,10 +2054,9 @@ void main() {
       );
       expect(reportRepository.requests.single.reportType, 'CLOSED');
       expect(reportRepository.requests.single.description, '출입문이 막혀 있습니다.');
-      expect(
-        reportRepository.requests.single.photoUrl,
-        'https://cdn.example.test/reports/closed-door.jpg',
-      );
+      expect(reportRepository.requests.single.photoFileName, isNull);
+      expect(reportRepository.requests.single.photoContentType, isNull);
+      expect(reportRepository.requests.single.photoDataBase64, isNull);
       expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
       expect(find.bySemanticsLabel('신고가 접수되었습니다.'), findsOneWidget);
       expect(find.text('접수번호'), findsOneWidget);
@@ -2066,10 +2067,10 @@ void main() {
         find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 접수됨'),
         findsOneWidget,
       );
-      final submittedPhotoUrlInput = tester.widget<TextField>(
+      expect(
         find.byKey(const Key('facilityReportPhotoUrlInput')),
+        findsNothing,
       );
-      expect(submittedPhotoUrlInput.enabled, isFalse);
 
       reportRepository.nextReportStatus = 'ACCEPTED';
       await tester.ensureVisible(
@@ -2093,6 +2094,71 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('시설 신고 화면은 사진을 직접 추가해서 보낸다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () async => const FacilityReportLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
+          ),
+          photoPicker: () async => const FacilityReportPhotoAttachment(
+            fileName: 'elevator-door.jpg',
+            contentType: 'image/jpeg',
+            dataBase64: 'aW1hZ2UtYnl0ZXM=',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('facilityReportPhotoUrlInput')), findsNothing);
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '문이 열리지 않습니다.',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.photoFileName, 'elevator-door.jpg');
+    expect(reportRepository.requests.single.photoContentType, 'image/jpeg');
+    expect(
+      reportRepository.requests.single.photoDataBase64,
+      'aW1hZ2UtYnl0ZXM=',
+    );
   });
 
   testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {
@@ -2161,19 +2227,10 @@ void main() {
       find.byKey(const Key('facilityReportDescriptionInput')),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportPhotoUrlInput')),
-    );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('현재 위치가 첨부되었습니다.'), findsOneWidget);
+    expect(find.text('현재 위치 첨부됨'), findsNothing);
+    expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
+    expect(find.text('위치 확인됨'), findsOneWidget);
     expect(locationProvider.requestCount, 1);
 
     await tester.enterText(
@@ -2188,7 +2245,7 @@ void main() {
     expect(reportRepository.requests.single.longitude, 126.866221);
   });
 
-  testWidgets('시설 신고 화면은 현재 위치 첨부 중 제출을 막는다', (tester) async {
+  testWidgets('시설 신고 화면은 현재 위치 확인 중 제출을 막는다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationCompleter = Completer<FacilityReportLocation>();
 
@@ -2208,23 +2265,12 @@ void main() {
         ),
       ),
     );
+    await tester.pump();
 
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportDescriptionInput')),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportPhotoUrlInput')),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
-    await tester.pump();
 
     final loadingSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
@@ -2305,21 +2351,16 @@ void main() {
       find.byKey(const Key('facilityReportDescriptionInput')),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportPhotoUrlInput')),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('facilityReportAttachLocationButton')),
-    );
     await tester.pumpAndSettle();
 
     expect(find.text('위치 권한을 허용해 주세요.'), findsOneWidget);
     expect(find.text('현재 위치를 확인하지 못했습니다.'), findsNothing);
+    final failedLocationSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(failedLocationSubmitButton.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pump();
     expect(reportRepository.requests, isEmpty);
   });
 }

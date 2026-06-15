@@ -350,7 +350,7 @@ class FacilityReportControllerTest {
 	}
 
 	@Test
-	@DisplayName("관리자는 신고 상세에서 사진과 위치 정보를 확인한다")
+	@DisplayName("관리자는 신고 상세에서 사진 첨부와 위치 정보를 확인한다")
 	void adminReadsReportDetailWithPhotoAndLocation() throws Exception {
 		String response = mockMvc.perform(post("/api/v1/reports")
 				.with(httpBasic("basic-user", "user-test-password"))
@@ -362,7 +362,9 @@ class FacilityReportControllerTest {
 					  "facilityId": "facility-sangnoksu-elevator-1",
 					  "reportType": "BROKEN",
 					  "description": "엘리베이터 앞 안내문이 떨어져 있습니다.",
-					  "photoUrl": "https://cdn.example.test/reports/elevator-notice.jpg",
+					  "photoFileName": "elevator-notice.jpg",
+					  "photoContentType": "image/jpeg",
+					  "photoDataBase64": "aW1hZ2UtYnl0ZXM=",
 					  "latitude": 37.302421,
 					  "longitude": 126.866221
 					}
@@ -381,7 +383,10 @@ class FacilityReportControllerTest {
 			.andExpect(jsonPath("$.data.id").value(reportId))
 			.andExpect(jsonPath("$.data.userId").value("basic-user"))
 			.andExpect(jsonPath("$.data.description").value("엘리베이터 앞 안내문이 떨어져 있습니다."))
-			.andExpect(jsonPath("$.data.photoUrl").value("https://cdn.example.test/reports/elevator-notice.jpg"))
+			.andExpect(jsonPath("$.data.photoFileName").value("elevator-notice.jpg"))
+			.andExpect(jsonPath("$.data.photoContentType").value("image/jpeg"))
+			.andExpect(jsonPath("$.data.photoDataBase64").value("aW1hZ2UtYnl0ZXM="))
+			.andExpect(jsonPath("$.data.photoUrl").doesNotExist())
 			.andExpect(jsonPath("$.data.latitude").value(37.302421))
 			.andExpect(jsonPath("$.data.longitude").value(126.866221))
 			.andExpect(jsonPath("$.data.status").value("SUBMITTED"));
