@@ -1220,11 +1220,21 @@ class FailingStationDetailRepository implements StationSearchRepository {
 }
 
 class FakeCurrentLocationProvider implements CurrentLocationProvider {
-  FakeCurrentLocationProvider({this.location, this.error});
+  FakeCurrentLocationProvider({
+    this.location,
+    this.error,
+    this.needsPermissionRequest = true,
+  });
 
   final CurrentLocation? location;
   final Object? error;
+  final bool needsPermissionRequest;
   int requestCount = 0;
+
+  @override
+  Future<bool> needsLocationPermissionRequest() async {
+    return needsPermissionRequest;
+  }
 
   @override
   Future<CurrentLocation> currentLocation() async {
