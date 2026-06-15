@@ -26,6 +26,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +142,44 @@ class FacilityReportServiceTest {
 		)))
 			.isInstanceOf(InvalidFacilityReportException.class)
 			.hasMessage("사용자 식별자가 필요합니다.");
+	}
+
+	@Test
+	@DisplayName("시설 신고 사진은 허용된 이미지 형식만 저장한다")
+	void createReportRequiresAllowedPhotoContentType() {
+		assertThatThrownBy(() -> service.createReport(photoReportCommand(
+			"memo.txt",
+			"text/plain",
+			"aW1hZ2UtYnl0ZXM="
+		)))
+			.isInstanceOf(InvalidFacilityReportException.class)
+			.hasMessage("사진 파일 형식을 확인해야 합니다.");
+	}
+
+	@Test
+	@DisplayName("시설 신고 사진은 서버 크기 제한을 넘을 수 없다")
+	void createReportRejectsOversizedPhotoPayload() {
+		String largePhotoBase64 = Base64.getEncoder().encodeToString(new byte[(900 * 1024) + 1]);
+
+		assertThatThrownBy(() -> service.createReport(photoReportCommand(
+			"large.jpg",
+			"image/jpeg",
+			largePhotoBase64
+		)))
+			.isInstanceOf(InvalidFacilityReportException.class)
+			.hasMessage("사진 파일 크기를 줄여야 합니다.");
+	}
+
+	@Test
+	@DisplayName("시설 신고 사진은 올바른 base64 본문을 요구한다")
+	void createReportRequiresValidPhotoPayload() {
+		assertThatThrownBy(() -> service.createReport(photoReportCommand(
+			"broken.jpg",
+			"image/jpeg",
+			"not-base64"
+		)))
+			.isInstanceOf(InvalidFacilityReportException.class)
+			.hasMessage("사진 첨부 정보를 확인해야 합니다.");
 	}
 
 	@Test
@@ -591,6 +630,25 @@ class FacilityReportServiceTest {
 
 	private CreateFacilityReportCommand reportCommand(String userId, String description) {
 		return reportCommand(userId, FacilityReportType.BROKEN, description);
+	}
+
+	private CreateFacilityReportCommand photoReportCommand(
+		String photoFileName,
+		String photoContentType,
+		String photoDataBase64
+	) {
+		return new CreateFacilityReportCommand(
+			"anonymous-user-photo",
+			"station-sangnoksu",
+			"facility-sangnoksu-elevator-1",
+			FacilityReportType.BROKEN,
+			"사진 첨부 신고입니다.",
+			photoFileName,
+			photoContentType,
+			photoDataBase64,
+			null,
+			null
+		);
 	}
 
 	private CreateFacilityReportCommand reportCommand(
