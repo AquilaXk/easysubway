@@ -10,12 +10,15 @@ import 'mobile_error_reporter.dart';
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
+const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
 
   Future<FacilityReportResult> getReport(String reportId);
+
+  Future<List<FacilityReportResult>> listMyReports();
 }
 
 class FacilityReportApiRepository implements FacilityReportRepository {
@@ -134,6 +137,65 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     }
   }
 
+  @override
+  Future<List<FacilityReportResult>> listMyReports() async {
+    try {
+      return await _getMyReportsWithAuthorizationRetry();
+    } on FacilityReportException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '내 시설 신고 목록 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const FacilityReportException(_facilityReportListErrorMessage);
+    }
+  }
+
+  Future<List<FacilityReportResult>>
+  _getMyReportsWithAuthorizationRetry() async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final request = await _httpClient
+          .getUrl(baseUri.resolve('/api/v1/me/reports'))
+          .timeout(_facilityReportTimeout);
+      final authorizationHeader = await authProvider
+          ?.authorizationHeader()
+          .timeout(_facilityReportTimeout);
+      if (authorizationHeader != null) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          authorizationHeader,
+        );
+      }
+
+      final response = await request.close().timeout(_facilityReportTimeout);
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_facilityReportTimeout);
+
+      if (response.statusCode == HttpStatus.unauthorized &&
+          authorizationHeader != null &&
+          attempt == 0) {
+        // 목록 조회도 접수와 같은 익명 인증을 쓰므로 만료 시 한 번만 갱신한다.
+        await authProvider!.invalidateAuthorization().timeout(
+          _facilityReportTimeout,
+        );
+        continue;
+      }
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw const FacilityReportException(_facilityReportListErrorMessage);
+      }
+
+      return _reportListFromBody(
+        body,
+        errorMessage: _facilityReportListErrorMessage,
+      );
+    }
+    throw const FacilityReportException(_facilityReportListErrorMessage);
+  }
+
   FacilityReportResult _reportResultFromBody(
     String body, {
     required String errorMessage,
@@ -149,6 +211,29 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     }
 
     return FacilityReportResult.fromJson(data);
+  }
+
+  List<FacilityReportResult> _reportListFromBody(
+    String body, {
+    required String errorMessage,
+  }) {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+      throw FacilityReportException(errorMessage);
+    }
+
+    final data = decoded['data'];
+    if (data is! List<Object?>) {
+      throw FacilityReportException(errorMessage);
+    }
+
+    return [
+      for (final item in data)
+        if (item is Map<String, Object?>)
+          FacilityReportResult.fromJson(item)
+        else
+          throw FacilityReportException(errorMessage),
+    ];
   }
 }
 
@@ -238,6 +323,18 @@ class FacilityReportResult {
       'DUPLICATE' => '중복 신고',
       'RESOLVED' => '처리 완료',
       _ => '접수 상태 확인 필요',
+    };
+  }
+
+  String get reportTypeLabel {
+    return switch (reportType) {
+      'BROKEN' => '고장',
+      'UNDER_CONSTRUCTION' => '공사 중',
+      'CLOSED' => '폐쇄',
+      'LOCATION_WRONG' => '위치가 달라요',
+      'INFORMATION_WRONG' => '정보가 달라요',
+      'RECOVERED' => '다시 정상',
+      _ => '시설 신고',
     };
   }
 }
@@ -466,6 +563,259 @@ class FacilityReportScreen extends StatefulWidget {
 
   @override
   State<FacilityReportScreen> createState() => _FacilityReportScreenState();
+}
+
+class MyFacilityReportListScreen extends StatefulWidget {
+  const MyFacilityReportListScreen({required this.repository, super.key});
+
+  final FacilityReportRepository repository;
+
+  @override
+  State<MyFacilityReportListScreen> createState() =>
+      _MyFacilityReportListScreenState();
+}
+
+class _MyFacilityReportListScreenState
+    extends State<MyFacilityReportListScreen> {
+  late Future<List<FacilityReportResult>> _reportsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsFuture = widget.repository.listMyReports();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 신고')),
+      body: SafeArea(
+        child: FutureBuilder<List<FacilityReportResult>>(
+          future: _reportsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const _MyReportLoading();
+            }
+            if (snapshot.hasError) {
+              return _MyReportError(onRetry: _retry);
+            }
+
+            final reports = snapshot.data ?? const <FacilityReportResult>[];
+            if (reports.isEmpty) {
+              return const _MyReportEmpty();
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              itemCount: reports.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                return _MyReportListItem(report: reports[index]);
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _retry() {
+    setState(() {
+      _reportsFuture = widget.repository.listMyReports();
+    });
+  }
+}
+
+class _MyReportLoading extends StatelessWidget {
+  const _MyReportLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '신고 내역 불러오는 중',
+      liveRegion: true,
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _MyReportEmpty extends StatelessWidget {
+  const _MyReportEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          '접수한 신고가 없습니다.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w900,
+            height: 1.3,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportError extends StatelessWidget {
+  const _MyReportError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _facilityReportListErrorMessage,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: const Color(0xFF102A2C),
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              key: const Key('myReportsRetryButton'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportListItem extends StatelessWidget {
+  const _MyReportListItem({required this.report});
+
+  final FacilityReportResult report;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final description = report.description.isEmpty
+        ? report.reportTypeLabel
+        : report.description;
+    final createdAtLabel = _reportDateLabel(report.createdAt);
+
+    return Semantics(
+      label:
+          '내 신고, ${report.reportTypeLabel}, 접수번호 ${report.id}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
+      button: false,
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          key: Key('myReport-${report.id}'),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFD5E2E4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        report.reportTypeLabel,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF102A2C),
+                          fontWeight: FontWeight.w900,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _MyReportStatusPill(label: report.statusLabel),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  description,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    _MyReportMetaText(label: '접수번호', value: report.id),
+                    _MyReportMetaText(label: '접수일', value: createdAtLabel),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportStatusPill extends StatelessWidget {
+  const _MyReportStatusPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF93C7C2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportMetaText extends StatelessWidget {
+  const _MyReportMetaText({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$label $value',
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: const Color(0xFF29484B),
+        fontWeight: FontWeight.w700,
+        height: 1.3,
+      ),
+    );
+  }
 }
 
 class _FacilityReportScreenState extends State<FacilityReportScreen> {
@@ -865,4 +1215,14 @@ String _optionalReportString(Map<String, Object?> json, String key) {
     return value;
   }
   return '';
+}
+
+String _reportDateLabel(String createdAt) {
+  final parsed = DateTime.tryParse(createdAt);
+  if (parsed == null) {
+    return createdAt;
+  }
+  final month = parsed.month.toString().padLeft(2, '0');
+  final day = parsed.day.toString().padLeft(2, '0');
+  return '${parsed.year}.$month.$day';
 }
