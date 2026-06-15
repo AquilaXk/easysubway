@@ -2033,6 +2033,14 @@ void main() {
         find.byKey(const Key('facilityReportDescriptionInput')),
         '출입문이 막혀 있습니다.',
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('facilityReportPhotoUrlInput')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('facilityReportPhotoUrlInput')),
+        'https://cdn.example.test/reports/closed-door.jpg',
+      );
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
 
@@ -2044,6 +2052,10 @@ void main() {
       );
       expect(reportRepository.requests.single.reportType, 'CLOSED');
       expect(reportRepository.requests.single.description, '출입문이 막혀 있습니다.');
+      expect(
+        reportRepository.requests.single.photoUrl,
+        'https://cdn.example.test/reports/closed-door.jpg',
+      );
       expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
       expect(find.bySemanticsLabel('신고가 접수되었습니다.'), findsOneWidget);
       expect(find.text('접수번호'), findsOneWidget);
@@ -2054,6 +2066,10 @@ void main() {
         find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 접수됨'),
         findsOneWidget,
       );
+      final submittedPhotoUrlInput = tester.widget<TextField>(
+        find.byKey(const Key('facilityReportPhotoUrlInput')),
+      );
+      expect(submittedPhotoUrlInput.enabled, isFalse);
 
       reportRepository.nextReportStatus = 'ACCEPTED';
       await tester.ensureVisible(
