@@ -1884,7 +1884,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               const SizedBox(height: 16),
             ],
             Semantics(
-              label: '역 이름 입력',
+              label: '역 이름을 입력해 주세요',
               textField: true,
               child: TextField(
                 key: const Key('stationSearchInput'),
