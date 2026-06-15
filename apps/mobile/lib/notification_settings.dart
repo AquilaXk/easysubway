@@ -10,6 +10,7 @@ import 'mobile_error_reporter.dart';
 const _notificationSettingsTimeout = Duration(seconds: 8);
 const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했습니다.';
 const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했습니다.';
+const _deviceRegistrationErrorMessage = '기기 알림 등록을 마치지 못했습니다.';
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -17,6 +18,10 @@ abstract class NotificationSettingsRepository {
   Future<NotificationSettings> saveNotificationSettings(
     NotificationSettings settings,
   );
+}
+
+abstract class DeviceRegistrationRepository {
+  Future<RegisteredDevice> registerDevice(DeviceRegistrationRequest request);
 }
 
 class NotificationSettingsApiRepository
@@ -155,6 +160,117 @@ class NotificationSettingsApiRepository
   }
 }
 
+class DeviceRegistrationApiRepository implements DeviceRegistrationRepository {
+  DeviceRegistrationApiRepository({
+    required this.baseUri,
+    required this.authProvider,
+    HttpClient? httpClient,
+  }) : _httpClient = httpClient ?? HttpClient();
+
+  final Uri baseUri;
+  final AuthorizationHeaderProvider authProvider;
+  final HttpClient _httpClient;
+
+  @override
+  Future<RegisteredDevice> registerDevice(
+    DeviceRegistrationRequest registrationRequest,
+  ) async {
+    try {
+      return await _postDeviceWithAuthorizationRetry(registrationRequest);
+    } on NotificationSettingsException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기기 알림 등록 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const NotificationSettingsException(
+        _deviceRegistrationErrorMessage,
+      );
+    }
+  }
+
+  Future<RegisteredDevice> _postDeviceWithAuthorizationRetry(
+    DeviceRegistrationRequest registrationRequest,
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final request = await _httpClient
+          .postUrl(baseUri.resolve('/api/v1/devices'))
+          .timeout(_notificationSettingsTimeout);
+      final authorizationHeader = await authProvider
+          .authorizationHeader()
+          .timeout(_notificationSettingsTimeout);
+      if (authorizationHeader != null) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          authorizationHeader,
+        );
+      }
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode(registrationRequest.toJson()));
+
+      final response = await request.close().timeout(
+        _notificationSettingsTimeout,
+      );
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(_notificationSettingsTimeout);
+
+      if (response.statusCode == HttpStatus.unauthorized &&
+          authorizationHeader != null &&
+          attempt == 0) {
+        // 기기 등록도 익명 인증 사용자에 묶이므로 만료 시 한 번만 새 인증으로 재시도한다.
+        await authProvider.invalidateAuthorization().timeout(
+          _notificationSettingsTimeout,
+        );
+        continue;
+      }
+
+      if (response.statusCode < HttpStatus.ok ||
+          response.statusCode >= HttpStatus.multipleChoices) {
+        throw const NotificationSettingsException(
+          _deviceRegistrationErrorMessage,
+        );
+      }
+
+      return _registeredDeviceFromBody(body);
+    }
+    throw const NotificationSettingsException(_deviceRegistrationErrorMessage);
+  }
+
+  RegisteredDevice _registeredDeviceFromBody(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const NotificationSettingsException(
+          _deviceRegistrationErrorMessage,
+        );
+      }
+
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const NotificationSettingsException(
+          _deviceRegistrationErrorMessage,
+        );
+      }
+
+      return RegisteredDevice.fromJson(data);
+    } on NotificationSettingsException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기기 알림 등록 응답 파싱 중 예외가 발생했습니다.',
+      );
+      throw const NotificationSettingsException(
+        _deviceRegistrationErrorMessage,
+      );
+    }
+  }
+}
+
 class NotificationSettingsException implements Exception {
   const NotificationSettingsException(this.message);
 
@@ -162,6 +278,65 @@ class NotificationSettingsException implements Exception {
 
   @override
   String toString() => message;
+}
+
+enum DevicePlatform {
+  android('ANDROID'),
+  ios('IOS');
+
+  const DevicePlatform(this.apiValue);
+
+  factory DevicePlatform.fromJson(String value) {
+    return switch (value) {
+      'ANDROID' => DevicePlatform.android,
+      'IOS' => DevicePlatform.ios,
+      _ => throw const NotificationSettingsException(
+        _deviceRegistrationErrorMessage,
+      ),
+    };
+  }
+
+  final String apiValue;
+}
+
+class DeviceRegistrationRequest {
+  const DeviceRegistrationRequest({
+    required this.platform,
+    required this.deviceToken,
+  });
+
+  final DevicePlatform platform;
+  final String deviceToken;
+
+  Map<String, Object?> toJson() {
+    return {
+      'platform': platform.apiValue,
+      'deviceToken': deviceToken.trim(),
+    };
+  }
+}
+
+class RegisteredDevice {
+  const RegisteredDevice({
+    required this.userId,
+    required this.platform,
+    required this.deviceToken,
+    required this.registeredAt,
+  });
+
+  factory RegisteredDevice.fromJson(Map<String, Object?> json) {
+    return RegisteredDevice(
+      userId: _requiredString(json, 'userId'),
+      platform: DevicePlatform.fromJson(_requiredString(json, 'platform')),
+      deviceToken: _requiredString(json, 'deviceToken'),
+      registeredAt: _requiredString(json, 'registeredAt'),
+    );
+  }
+
+  final String userId;
+  final DevicePlatform platform;
+  final String deviceToken;
+  final String registeredAt;
 }
 
 class NotificationSettings {

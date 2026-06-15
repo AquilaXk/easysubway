@@ -6,6 +6,162 @@ import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('기기 등록 API 저장소는 인증 헤더와 함께 플랫폼과 토큰을 보낸다', () async {
+    late String requestedMethod;
+    late Uri requestedUri;
+    late String? authorizationHeader;
+    late Map<String, Object?> requestBody;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestedMethod = request.method;
+      requestedUri = request.uri;
+      authorizationHeader = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
+      requestBody =
+          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'userId': 'anonymous-user-1',
+              'platform': 'ANDROID',
+              'deviceToken': 'android-device-token-1',
+              'registeredAt': '2026-06-15T09:00:00',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = DeviceRegistrationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const BasicAuthorizationHeaderProvider(
+        username: 'anonymous-user-1',
+        password: 'user-test-password',
+      ),
+    );
+
+    final registeredDevice = await repository.registerDevice(
+      const DeviceRegistrationRequest(
+        platform: DevicePlatform.android,
+        deviceToken: ' android-device-token-1 ',
+      ),
+    );
+
+    expect(requestedMethod, 'POST');
+    expect(requestedUri.path, '/api/v1/devices');
+    expect(
+      authorizationHeader,
+      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
+    );
+    expect(requestBody, {
+      'platform': 'ANDROID',
+      'deviceToken': 'android-device-token-1',
+    });
+    expect(registeredDevice.userId, 'anonymous-user-1');
+    expect(registeredDevice.platform, DevicePlatform.android);
+    expect(registeredDevice.deviceToken, 'android-device-token-1');
+    expect(registeredDevice.registeredAt, '2026-06-15T09:00:00');
+  });
+
+  test('기기 등록 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
+    final authorizationHeaders = <String?>[];
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestCount++;
+      authorizationHeaders.add(
+        request.headers.value(HttpHeaders.authorizationHeader),
+      );
+      await utf8.decodeStream(request);
+      request.response.headers.contentType = ContentType.json;
+
+      if (requestCount == 1) {
+        request.response
+          ..statusCode = HttpStatus.unauthorized
+          ..write(jsonEncode({'success': false}))
+          ..close();
+        return;
+      }
+
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'userId': 'anonymous-user-1',
+              'platform': 'IOS',
+              'deviceToken': 'ios-device-token-1',
+              'registeredAt': '2026-06-15T09:05:00',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final authProvider = RetryAuthorizationHeaderProvider();
+    final repository = DeviceRegistrationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: authProvider,
+    );
+
+    final registeredDevice = await repository.registerDevice(
+      const DeviceRegistrationRequest(
+        platform: DevicePlatform.ios,
+        deviceToken: 'ios-device-token-1',
+      ),
+    );
+
+    expect(registeredDevice.platform, DevicePlatform.ios);
+    expect(authorizationHeaders, ['Basic stale-token', 'Basic fresh-token']);
+    expect(authProvider.authorizationCount, 2);
+    expect(authProvider.invalidateCount, 1);
+  });
+
+  test('기기 등록 API 저장소는 실패 응답을 쉬운 안내로 바꾼다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      await utf8.decodeStream(request);
+      request.response
+        ..statusCode = HttpStatus.badRequest
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'success': false}))
+        ..close();
+    });
+
+    final repository = DeviceRegistrationApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const NoAuthorizationHeaderProvider(),
+    );
+
+    await expectLater(
+      repository.registerDevice(
+        const DeviceRegistrationRequest(
+          platform: DevicePlatform.android,
+          deviceToken: 'android-device-token-1',
+        ),
+      ),
+      throwsA(
+        isA<NotificationSettingsException>().having(
+          (error) => error.message,
+          'message',
+          '기기 알림 등록을 마치지 못했습니다.',
+        ),
+      ),
+    );
+  });
+
   test('알림 설정 API 저장소는 인증 헤더와 함께 현재 설정을 요청한다', () async {
     late String? authorizationHeader;
     late Uri requestedUri;
