@@ -18,6 +18,10 @@
 	<string>easysubway_mobile</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>현재 위치 주변 역을 찾는 데 사용합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>시설 상태를 신고할 때 사진을 첨부하는 데 사용합니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>시설 상태를 신고할 때 사진을 촬영하는 데 사용합니다.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
