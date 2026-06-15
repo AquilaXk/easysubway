@@ -2459,6 +2459,7 @@ class _StationDetailContent extends StatelessWidget {
           locationLoader: _locationLoader(),
           needsLocationPermissionRequest: _locationPermissionRequestChecker(),
           openLocationSettings: _locationSettingsOpener(),
+          draftTargetStore: const SecureFacilityReportDraftTargetStore(),
           target: FacilityReportTarget(
             stationId: detail.id,
             stationName: detail.nameKo,

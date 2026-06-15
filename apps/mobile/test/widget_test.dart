@@ -2325,6 +2325,139 @@ void main() {
     expect(reportRepository.requests.single.photoDataBase64, 'cmVzdG9yZWQ=');
   });
 
+  testWidgets('시설 신고 화면은 사진 선택 전 대상 정보를 저장하고 정상 복귀하면 지운다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final draftTargetStore = MemoryFacilityReportDraftTargetStore();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-toilet-1',
+            facilityName: '장애인 화장실',
+            facilityTypeLabel: '장애인 화장실',
+            facilityStatusLabel: '확인 필요',
+          ),
+          draftTargetStore: draftTargetStore,
+          photoPicker: () async => const FacilityReportPhotoAttachment(
+            fileName: 'toilet-door.jpg',
+            contentType: 'image/jpeg',
+            dataBase64: 'cGhvdG8=',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+    await tester.pumpAndSettle();
+
+    expect(draftTargetStore.saveCount, 1);
+    expect(draftTargetStore.clearCount, 1);
+    expect(
+      draftTargetStore.savedTargets.single.facilityId,
+      'facility-sangnoksu-toilet-1',
+    );
+    expect(draftTargetStore.target, isNull);
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+  });
+
+  testWidgets('앱은 재시작 후 복구된 사진을 저장된 시설 신고 화면에 연결한다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final draftTargetStore = MemoryFacilityReportDraftTargetStore(
+      const FacilityReportTarget(
+        stationId: 'station-sangnoksu',
+        stationName: '상록수',
+        facilityId: 'facility-sangnoksu-toilet-1',
+        facilityName: '장애인 화장실',
+        facilityTypeLabel: '장애인 화장실',
+        facilityStatusLabel: '확인 필요',
+      ),
+    );
+    var restoreCount = 0;
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: const CurrentLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
+          ),
+          needsPermissionRequest: false,
+        ),
+        facilityReportDraftTargetStore: draftTargetStore,
+        facilityReportLostPhotoRestorer: () async {
+          restoreCount++;
+          return const FacilityReportPhotoAttachment(
+            fileName: 'restored-toilet.webp',
+            contentType: 'image/webp',
+            dataBase64: 'cmVzdG9yZWQ=',
+          );
+        },
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(restoreCount, 1);
+    expect(draftTargetStore.clearCount, 1);
+    expect(find.text('시설 신고'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
+      findsOneWidget,
+    );
+
+    await tester.dragUntilVisible(
+      find.bySemanticsLabel('사진 1장 추가됨'),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '앱 재시작 후 복구된 사진입니다.',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('보내기'));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.stationId, 'station-sangnoksu');
+    expect(
+      reportRepository.requests.single.facilityId,
+      'facility-sangnoksu-toilet-1',
+    );
+    expect(
+      reportRepository.requests.single.photoFileName,
+      'restored-toilet.webp',
+    );
+  });
+
   testWidgets('시설 신고 화면은 사진과 위치를 보내기 전에 확인한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
 
@@ -3453,6 +3586,36 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
   @override
   Future<void> clearResult() async {
     savedResult = null;
+  }
+}
+
+class MemoryFacilityReportDraftTargetStore
+    implements FacilityReportDraftTargetStore {
+  MemoryFacilityReportDraftTargetStore([this.target]);
+
+  FacilityReportTarget? target;
+  final savedTargets = <FacilityReportTarget>[];
+  int readCount = 0;
+  int saveCount = 0;
+  int clearCount = 0;
+
+  @override
+  Future<FacilityReportTarget?> readTarget() async {
+    readCount++;
+    return target;
+  }
+
+  @override
+  Future<void> saveTarget(FacilityReportTarget target) async {
+    saveCount++;
+    savedTargets.add(target);
+    this.target = target;
+  }
+
+  @override
+  Future<void> clearTarget() async {
+    clearCount++;
+    target = null;
   }
 }
 
