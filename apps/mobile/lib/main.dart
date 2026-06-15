@@ -20,6 +20,7 @@ class EasySubwayApp extends StatelessWidget {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    RouteFeedbackRepository? routeFeedbackRepository,
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
@@ -35,6 +36,7 @@ class EasySubwayApp extends StatelessWidget {
            repository: repository,
            reportRepository: reportRepository,
            routeRepository: routeRepository,
+           routeFeedbackRepository: routeFeedbackRepository,
            favoriteRepository: favoriteRepository,
            favoriteFacilityRepository: favoriteFacilityRepository,
            favoriteRouteRepository: favoriteRouteRepository,
@@ -56,6 +58,7 @@ class EasySubwayApp extends StatelessWidget {
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
        routeRepository = dependencies.routeRepository,
+       routeFeedbackRepository = dependencies.routeFeedbackRepository,
        favoriteRepository = dependencies.favoriteRepository,
        favoriteFacilityRepository = dependencies.favoriteFacilityRepository,
        favoriteRouteRepository = dependencies.favoriteRouteRepository,
@@ -65,6 +68,7 @@ class EasySubwayApp extends StatelessWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -120,6 +124,7 @@ class EasySubwayApp extends StatelessWidget {
         repository: repository,
         reportRepository: reportRepository,
         routeRepository: routeRepository,
+        routeFeedbackRepository: routeFeedbackRepository,
         favoriteRepository: favoriteRepository,
         favoriteFacilityRepository: favoriteFacilityRepository,
         favoriteRouteRepository: favoriteRouteRepository,
@@ -137,6 +142,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
+    required this.routeFeedbackRepository,
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
@@ -149,6 +155,7 @@ class _EasySubwayHome extends StatefulWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -206,6 +213,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         repository: widget.repository,
         reportRepository: widget.reportRepository,
         routeRepository: widget.routeRepository,
+        routeFeedbackRepository: widget.routeFeedbackRepository,
         favoriteRepository: widget.favoriteRepository,
         favoriteFacilityRepository: widget.favoriteFacilityRepository,
         favoriteRouteRepository: widget.favoriteRouteRepository,
@@ -321,6 +329,7 @@ class _EasySubwayAppDependencies {
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
+    required this.routeFeedbackRepository,
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
@@ -332,6 +341,7 @@ class _EasySubwayAppDependencies {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    RouteFeedbackRepository? routeFeedbackRepository,
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
@@ -357,6 +367,12 @@ class _EasySubwayAppDependencies {
           ),
       routeRepository:
           routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
+      routeFeedbackRepository:
+          routeFeedbackRepository ??
+          _defaultRouteFeedbackRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
       favoriteRepository:
           favoriteRepository ??
           _defaultFavoriteStationRepository(
@@ -389,6 +405,7 @@ class _EasySubwayAppDependencies {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -449,6 +466,19 @@ FavoriteRouteRepository? _defaultFavoriteRouteRepository({
   );
 }
 
+RouteFeedbackRepository? _defaultRouteFeedbackRepository({
+  required Uri baseUri,
+  required AuthorizationHeaderProvider? authProvider,
+}) {
+  if (authProvider == null) {
+    return null;
+  }
+  return RouteFeedbackApiRepository(
+    baseUri: baseUri,
+    authProvider: authProvider,
+  );
+}
+
 NotificationSettingsRepository? _defaultNotificationSettingsRepository({
   required Uri baseUri,
   required AuthorizationHeaderProvider? authProvider,
@@ -467,6 +497,7 @@ class HomeScreen extends StatelessWidget {
     required this.repository,
     required this.reportRepository,
     required this.routeRepository,
+    required this.routeFeedbackRepository,
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
@@ -481,6 +512,7 @@ class HomeScreen extends StatelessWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -495,6 +527,7 @@ class HomeScreen extends StatelessWidget {
     final favoriteRepository = this.favoriteRepository;
     final favoriteFacilityRepository = this.favoriteFacilityRepository;
     final favoriteRouteRepository = this.favoriteRouteRepository;
+    final routeFeedbackRepository = this.routeFeedbackRepository;
     final notificationRepository = this.notificationRepository;
 
     return Scaffold(
@@ -541,6 +574,7 @@ class HomeScreen extends StatelessWidget {
                     builder: (_) => RouteSearchScreen(
                       repository: routeRepository,
                       stationRepository: repository,
+                      routeFeedbackRepository: routeFeedbackRepository,
                       favoriteRouteRepository: favoriteRouteRepository,
                       initialMobilityType: initialMobilityType,
                     ),

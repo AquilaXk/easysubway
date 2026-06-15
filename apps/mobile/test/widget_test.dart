@@ -1555,6 +1555,147 @@ void main() {
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
   });
 
+  testWidgets('경로 검색 결과는 큰 버튼으로 추천 피드백을 보낸다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeFeedbackRepository = FakeRouteFeedbackRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        routeFeedbackRepository: routeFeedbackRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeFeedbackHelpfulButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeFeedbackHelpfulButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeFeedbackRepository.requests, hasLength(1));
+    expect(routeFeedbackRepository.requests.single.routeSearchId, 'route-1');
+    expect(
+      routeFeedbackRepository.requests.single.rating,
+      RouteFeedbackRating.helpful,
+    );
+    expect(routeFeedbackRepository.requests.single.comment, '추천이 도움이 됐어요');
+    expect(find.text('의견을 보냈습니다.'), findsOneWidget);
+
+    final helpfulButton = tester.widget<FilledButton>(
+      find.byKey(const Key('routeFeedbackHelpfulButton')),
+    );
+    expect(helpfulButton.onPressed, isNull);
+  });
+
+  testWidgets('경로 피드백 실패는 짧은 오류 문구로 알린다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeFeedbackRepository = FakeRouteFeedbackRepository()
+      ..error = const RouteFeedbackException('의견을 보내지 못했습니다.');
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        routeFeedbackRepository: routeFeedbackRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeFeedbackNotHelpfulButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeFeedbackNotHelpfulButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      routeFeedbackRepository.requests.single.rating,
+      RouteFeedbackRating.notHelpful,
+    );
+    expect(find.text('의견을 보내지 못했습니다.'), findsOneWidget);
+  });
+
   testWidgets('경로 안내 칩은 좁은 화면과 큰 글자에서도 넘치지 않는다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
@@ -2112,6 +2253,20 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
     return result;
+  }
+}
+
+class FakeRouteFeedbackRepository implements RouteFeedbackRepository {
+  final requests = <RouteFeedbackRequest>[];
+  Object? error;
+
+  @override
+  Future<void> submitRouteFeedback(RouteFeedbackRequest request) async {
+    requests.add(request);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
   }
 }
 

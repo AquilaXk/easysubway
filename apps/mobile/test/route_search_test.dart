@@ -250,6 +250,64 @@ void main() {
     expect(saved.mobilityLabel, '고령자');
     expect(saved.scoreLabel, '이동 점수 92점');
   });
+
+  test('경로 피드백 API 저장소는 익명 사용자 식별자와 평가를 전송한다', () async {
+    late Uri requestedUri;
+    late String requestedBody;
+    late String? requestedAuthorization;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestedUri = request.uri;
+      requestedAuthorization = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
+      requestedBody = await utf8.decoder.bind(request).join();
+
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'feedbackId': 'route-feedback-1',
+              'routeSearchId': 'route-1',
+              'userId': 'anonymous-user-1',
+              'rating': 'HELPFUL',
+              'comment': '추천이 도움이 됐어요',
+              'createdAt': '2026-06-15T12:00:00',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = RouteFeedbackApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const BasicAuthorizationHeaderProvider(
+        username: 'anonymous-user-1',
+        password: 'password',
+      ),
+    );
+
+    await repository.submitRouteFeedback(
+      const RouteFeedbackRequest(
+        routeSearchId: 'route-1',
+        rating: RouteFeedbackRating.helpful,
+        comment: '추천이 도움이 됐어요',
+      ),
+    );
+
+    expect(requestedUri.path, '/api/v1/routes/route-1/feedback');
+    expect(requestedAuthorization, startsWith('Basic '));
+    expect(jsonDecode(requestedBody), {
+      'userId': 'anonymous-user-1',
+      'rating': 'HELPFUL',
+      'comment': '추천이 도움이 됐어요',
+    });
+  });
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
