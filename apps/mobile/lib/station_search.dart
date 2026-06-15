@@ -1682,6 +1682,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           repository: widget.repository,
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
+          locationProvider: widget.locationProvider,
           stationId: result.id,
         ),
       ),
@@ -1847,12 +1848,14 @@ class FavoriteStationListScreen extends StatefulWidget {
     required this.repository,
     required this.stationRepository,
     required this.reportRepository,
+    this.locationProvider,
     super.key,
   });
 
   final FavoriteStationRepository repository;
   final StationSearchRepository stationRepository;
   final FacilityReportRepository reportRepository;
+  final CurrentLocationProvider? locationProvider;
 
   @override
   State<FavoriteStationListScreen> createState() =>
@@ -1901,6 +1904,7 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
           repository: widget.stationRepository,
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.repository,
+          locationProvider: widget.locationProvider,
           stationId: favorite.stationId,
           // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
           initiallyFavorite: true,
@@ -2065,6 +2069,7 @@ class StationDetailScreen extends StatefulWidget {
     required this.reportRepository,
     required this.stationId,
     this.favoriteRepository,
+    this.locationProvider,
     this.initiallyFavorite,
     super.key,
   });
@@ -2072,6 +2077,7 @@ class StationDetailScreen extends StatefulWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final CurrentLocationProvider? locationProvider;
   final String stationId;
   final bool? initiallyFavorite;
 
@@ -2122,6 +2128,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
               state: _controller.state,
               reportRepository: widget.reportRepository,
               favoriteController: _favoriteController,
+              locationProvider: widget.locationProvider,
             );
           },
         ),
@@ -2135,11 +2142,13 @@ class _StationDetailBody extends StatelessWidget {
     required this.state,
     required this.reportRepository,
     required this.favoriteController,
+    required this.locationProvider,
   });
 
   final StationDetailState state;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final CurrentLocationProvider? locationProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -2161,6 +2170,7 @@ class _StationDetailBody extends StatelessWidget {
         facilityAttentionSemanticLabel: state.facilityAttentionSemanticLabel,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
+        locationProvider: locationProvider,
       ),
     };
   }
@@ -2175,6 +2185,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.facilityAttentionSemanticLabel,
     required this.reportRepository,
     required this.favoriteController,
+    required this.locationProvider,
   });
 
   final StationDetail detail;
@@ -2184,6 +2195,7 @@ class _StationDetailContent extends StatelessWidget {
   final String facilityAttentionSemanticLabel;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final CurrentLocationProvider? locationProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -2231,6 +2243,7 @@ class _StationDetailContent extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => FacilityReportScreen(
           repository: reportRepository,
+          locationLoader: _locationLoader(),
           target: FacilityReportTarget(
             stationId: detail.id,
             stationName: detail.nameKo,
@@ -2242,6 +2255,25 @@ class _StationDetailContent extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  FacilityReportLocationLoader? _locationLoader() {
+    final provider = locationProvider;
+    if (provider == null) {
+      return null;
+    }
+    return () async {
+      final CurrentLocation location;
+      try {
+        location = await provider.currentLocation();
+      } on CurrentLocationException catch (error) {
+        throw FacilityReportLocationException(error.message);
+      }
+      return FacilityReportLocation(
+        latitude: location.latitude,
+        longitude: location.longitude,
+      );
+    };
   }
 }
 

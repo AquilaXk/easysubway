@@ -254,6 +254,8 @@ class FacilityReportRequest {
     required this.reportType,
     required this.description,
     this.photoUrl,
+    this.latitude,
+    this.longitude,
   });
 
   final String userId;
@@ -262,6 +264,8 @@ class FacilityReportRequest {
   final String reportType;
   final String description;
   final String? photoUrl;
+  final double? latitude;
+  final double? longitude;
 
   FacilityReportRequest trimmed() {
     return FacilityReportRequest(
@@ -271,6 +275,8 @@ class FacilityReportRequest {
       reportType: reportType.trim(),
       description: description.trim(),
       photoUrl: photoUrl?.trim(),
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
@@ -286,9 +292,36 @@ class FacilityReportRequest {
     if (request.photoUrl != null && request.photoUrl!.isNotEmpty) {
       json['photoUrl'] = request.photoUrl;
     }
+    // 좌표 한쪽만 저장되면 현장 위치를 잘못 해석할 수 있어 한 쌍일 때만 보낸다.
+    if (request.latitude != null && request.longitude != null) {
+      json['latitude'] = request.latitude;
+      json['longitude'] = request.longitude;
+    }
     return json;
   }
 }
+
+class FacilityReportLocation {
+  const FacilityReportLocation({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final double latitude;
+  final double longitude;
+}
+
+class FacilityReportLocationException implements Exception {
+  const FacilityReportLocationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+typedef FacilityReportLocationLoader =
+    Future<FacilityReportLocation> Function();
 
 class FacilityReportResult {
   const FacilityReportResult({
@@ -442,6 +475,8 @@ class FacilityReportController extends ChangeNotifier {
     required FacilityReportTypeOption selectedType,
     required String description,
     String? photoUrl,
+    double? latitude,
+    double? longitude,
   }) async {
     if (_disposed || _state.status == FacilityReportViewStatus.loading) {
       return;
@@ -463,6 +498,8 @@ class FacilityReportController extends ChangeNotifier {
           reportType: selectedType.reportType,
           description: description,
           photoUrl: photoUrl,
+          latitude: latitude,
+          longitude: longitude,
         ),
       );
       _emitState(
@@ -564,11 +601,13 @@ class FacilityReportScreen extends StatefulWidget {
   const FacilityReportScreen({
     required this.repository,
     required this.target,
+    this.locationLoader,
     super.key,
   });
 
   final FacilityReportRepository repository;
   final FacilityReportTarget target;
+  final FacilityReportLocationLoader? locationLoader;
 
   @override
   State<FacilityReportScreen> createState() => _FacilityReportScreenState();
@@ -832,6 +871,10 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _photoUrlController = TextEditingController();
   FacilityReportTypeOption _selectedType = FacilityReportTypeOption.broken;
+  FacilityReportLocation? _attachedLocation;
+  String _locationMessage = '';
+  bool _isLoadingLocation = false;
+  bool _isLocationFailure = false;
 
   @override
   void initState() {
@@ -855,6 +898,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
+    final isSubmitDisabled =
+        isLoading || hasSubmittedReport || _isLoadingLocation;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 신고')),
@@ -923,6 +968,32 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('facilityReportAttachLocationButton'),
+              onPressed:
+                  isLoading ||
+                      hasSubmittedReport ||
+                      _isLoadingLocation ||
+                      widget.locationLoader == null
+                  ? null
+                  : _attachLocation,
+              icon: _isLoadingLocation
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Icon(Icons.my_location),
+              label: Text(_attachedLocation == null ? '현재 위치 첨부' : '현재 위치 첨부됨'),
+            ),
+            if (_locationMessage.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _FacilityReportLocationMessage(
+                message: _locationMessage,
+                isFailure: _isLocationFailure,
+              ),
+            ],
             const SizedBox(height: 16),
             if (state.message.isNotEmpty) _FacilityReportMessage(state: state),
             const SizedBox(height: 16),
@@ -936,7 +1007,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             ],
             FilledButton.icon(
               key: const Key('facilityReportSubmitButton'),
-              onPressed: isLoading || hasSubmittedReport ? null : _submit,
+              onPressed: isSubmitDisabled ? null : _submit,
               icon: isLoading
                   ? const SizedBox(
                       width: 22,
@@ -964,7 +1035,60 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       selectedType: _selectedType,
       description: _descriptionController.text,
       photoUrl: _photoUrlController.text,
+      latitude: _attachedLocation?.latitude,
+      longitude: _attachedLocation?.longitude,
     );
+  }
+
+  Future<void> _attachLocation() async {
+    final locationLoader = widget.locationLoader;
+    if (locationLoader == null || _isLoadingLocation) {
+      return;
+    }
+    setState(() {
+      _isLoadingLocation = true;
+      _locationMessage = '';
+      _isLocationFailure = false;
+    });
+
+    try {
+      final location = await locationLoader();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachedLocation = location;
+        _locationMessage = '현재 위치가 첨부되었습니다.';
+        _isLocationFailure = false;
+      });
+    } on FacilityReportLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = error.message;
+        _isLocationFailure = true;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 현재 위치 첨부 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = '현재 위치를 확인하지 못했습니다.';
+        _isLocationFailure = true;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
   }
 }
 
@@ -1216,6 +1340,45 @@ class _FacilityReportMessage extends StatelessWidget {
             Expanded(
               child: Text(
                 state.message,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FacilityReportLocationMessage extends StatelessWidget {
+  const _FacilityReportLocationMessage({
+    required this.message,
+    required this.isFailure,
+  });
+
+  final String message;
+  final bool isFailure;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isFailure ? const Color(0xFF8A4B00) : const Color(0xFF006D77);
+    final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
+
+    return Semantics(
+      label: message,
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: const Color(0xFF102A2C),
                   fontWeight: FontWeight.w800,

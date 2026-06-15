@@ -57,6 +57,8 @@ void main() {
         reportType: 'BROKEN',
         description: ' 문이 열리지 않습니다. ',
         photoUrl: ' https://cdn.example.test/reports/elevator-door.jpg ',
+        latitude: 37.302421,
+        longitude: 126.866221,
       ),
     );
 
@@ -68,6 +70,8 @@ void main() {
       requestBody['photoUrl'],
       'https://cdn.example.test/reports/elevator-door.jpg',
     );
+    expect(requestBody['latitude'], 37.302421);
+    expect(requestBody['longitude'], 126.866221);
     expect(
       authorizationHeader,
       'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
@@ -87,6 +91,19 @@ void main() {
     );
 
     expect(request.toJson(), isNot(contains('photoUrl')));
+  });
+
+  test('시설 신고 요청은 현재 위치가 없으면 좌표를 전송하지 않는다', () {
+    final request = const FacilityReportRequest(
+      userId: 'anonymous-mobile-user',
+      stationId: 'station-sangnoksu',
+      facilityId: 'facility-sangnoksu-elevator-1',
+      reportType: 'BROKEN',
+      description: '문이 열리지 않습니다.',
+    );
+
+    expect(request.toJson(), isNot(contains('latitude')));
+    expect(request.toJson(), isNot(contains('longitude')));
   });
 
   test('시설 신고 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
