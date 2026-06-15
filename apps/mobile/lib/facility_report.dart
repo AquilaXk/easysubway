@@ -1137,7 +1137,13 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_photoAttachment != null && _attachedLocation != null) {
+      final confirmed = await _confirmReportUpload();
+      if (!confirmed) {
+        return;
+      }
+    }
     _controller.submit(
       target: widget.target,
       selectedType: _selectedType,
@@ -1146,6 +1152,27 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       latitude: _attachedLocation?.latitude,
       longitude: _attachedLocation?.longitude,
     );
+  }
+
+  Future<bool> _confirmReportUpload() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('사진·위치 확인'),
+        content: const Text('사진과 현재 위치를 함께 보냅니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('보내기'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   Future<void> _pickPhoto() async {
@@ -1242,7 +1269,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       }
       setState(() {
         _attachedLocation = location;
-        _locationMessage = '위치 확인됨';
+        _locationMessage = '';
         _isLocationFailure = false;
       });
     } on FacilityReportLocationException catch (error) {
