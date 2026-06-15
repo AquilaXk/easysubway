@@ -2097,68 +2097,82 @@ void main() {
   });
 
   testWidgets('시설 신고 화면은 사진을 직접 추가해서 보낸다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: FacilityReportScreen(
-          repository: reportRepository,
-          target: const FacilityReportTarget(
-            stationId: 'station-sangnoksu',
-            stationName: '상록수',
-            facilityId: 'facility-sangnoksu-elevator-1',
-            facilityName: '1번 출구 엘리베이터',
-            facilityTypeLabel: '엘리베이터',
-            facilityStatusLabel: '정상',
-          ),
-          locationLoader: () async => const FacilityReportLocation(
-            latitude: 37.302421,
-            longitude: 126.866221,
-          ),
-          photoPicker: () async => const FacilityReportPhotoAttachment(
-            fileName: 'elevator-door.jpg',
-            contentType: 'image/jpeg',
-            dataBase64: 'aW1hZ2UtYnl0ZXM=',
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FacilityReportScreen(
+            repository: reportRepository,
+            target: const FacilityReportTarget(
+              stationId: 'station-sangnoksu',
+              stationName: '상록수',
+              facilityId: 'facility-sangnoksu-elevator-1',
+              facilityName: '1번 출구 엘리베이터',
+              facilityTypeLabel: '엘리베이터',
+              facilityStatusLabel: '정상',
+            ),
+            locationLoader: () async => const FacilityReportLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            ),
+            photoPicker: () async => const FacilityReportPhotoAttachment(
+              fileName: 'elevator-door.jpg',
+              contentType: 'image/jpeg',
+              dataBase64: 'aW1hZ2UtYnl0ZXM=',
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('facilityReportPhotoUrlInput')), findsNothing);
-    await tester.dragUntilVisible(
-      find.byKey(const Key('facilityReportAddPhotoButton')),
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
-    await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('facilityReportPhotoUrlInput')),
+        findsNothing,
+      );
+      await tester.dragUntilVisible(
+        find.byKey(const Key('facilityReportAddPhotoButton')),
+        find.byType(Scrollable).first,
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('사진 1장 추가됨'), findsOneWidget);
+      expect(find.bySemanticsLabel('사진 추가'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-      '문이 열리지 않습니다.',
-    );
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportSubmitButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('facilityReportAddPhotoButton')));
+      await tester.pumpAndSettle();
 
-    expect(reportRepository.requests, hasLength(1));
-    expect(reportRepository.requests.single.photoFileName, 'elevator-door.jpg');
-    expect(reportRepository.requests.single.photoContentType, 'image/jpeg');
-    expect(
-      reportRepository.requests.single.photoDataBase64,
-      'aW1hZ2UtYnl0ZXM=',
-    );
+      expect(find.text('사진 1장 추가됨'), findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('facilityReportDescriptionInput')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('facilityReportDescriptionInput')),
+        '문이 열리지 않습니다.',
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('facilityReportSubmitButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(reportRepository.requests, hasLength(1));
+      expect(
+        reportRepository.requests.single.photoFileName,
+        'elevator-door.jpg',
+      );
+      expect(reportRepository.requests.single.photoContentType, 'image/jpeg');
+      expect(
+        reportRepository.requests.single.photoDataBase64,
+        'aW1hZ2UtYnl0ZXM=',
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {

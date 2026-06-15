@@ -160,6 +160,9 @@ public class FacilityReportService implements FacilityReportUseCase {
 		// 신고 대상 시설이 요청한 역에 속해야 다른 역 시설 상태가 잘못 갱신되는 일을 막을 수 있다.
 		requireFacilityInStation(command.stationId(), command.facilityId());
 		validatePhotoAttachment(command);
+		String photoFileName = normalizePhotoFileName(command.photoFileName());
+		String photoContentType = normalizePhotoContentType(command.photoContentType());
+		String photoDataBase64 = normalizePhotoDataBase64(command.photoDataBase64());
 
 		FacilityReport report = new FacilityReport(
 			"report-" + UUID.randomUUID(),
@@ -168,9 +171,9 @@ public class FacilityReportService implements FacilityReportUseCase {
 			command.facilityId(),
 			command.reportType(),
 			command.description(),
-			command.photoFileName(),
-			command.photoContentType(),
-			command.photoDataBase64(),
+			photoFileName,
+			photoContentType,
+			photoDataBase64,
 			command.latitude(),
 			command.longitude(),
 			FacilityReportStatus.SUBMITTED,
@@ -278,6 +281,18 @@ public class FacilityReportService implements FacilityReportUseCase {
 
 	private boolean hasText(String value) {
 		return value != null && !value.isBlank();
+	}
+
+	private String normalizePhotoFileName(String value) {
+		return hasText(value) ? value.trim() : null;
+	}
+
+	private String normalizePhotoContentType(String value) {
+		return hasText(value) ? value.trim().toLowerCase() : null;
+	}
+
+	private String normalizePhotoDataBase64(String value) {
+		return hasText(value) ? value.trim() : null;
 	}
 
 	private List<FacilityReport> sortedReports() {

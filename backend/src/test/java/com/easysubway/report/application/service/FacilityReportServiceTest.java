@@ -157,6 +157,20 @@ class FacilityReportServiceTest {
 	}
 
 	@Test
+	@DisplayName("시설 신고 사진은 저장 전에 공백과 형식을 정리한다")
+	void createReportNormalizesPhotoFieldsBeforeSaving() {
+		FacilityReport report = service.createReport(photoReportCommand(
+			" elevator.jpg ",
+			" IMAGE/JPEG ",
+			" aW1hZ2UtYnl0ZXM= "
+		));
+
+		assertThat(report.photoFileName()).isEqualTo("elevator.jpg");
+		assertThat(report.photoContentType()).isEqualTo("image/jpeg");
+		assertThat(report.photoDataBase64()).isEqualTo("aW1hZ2UtYnl0ZXM=");
+	}
+
+	@Test
 	@DisplayName("시설 신고 사진은 서버 크기 제한을 넘을 수 없다")
 	void createReportRejectsOversizedPhotoPayload() {
 		String largePhotoBase64 = Base64.getEncoder().encodeToString(new byte[(900 * 1024) + 1]);
