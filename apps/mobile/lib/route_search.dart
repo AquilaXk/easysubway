@@ -11,6 +11,7 @@ import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.';
+const _routeFeedbackErrorMessage = '의견을 보내지 못했습니다.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 
@@ -25,6 +26,49 @@ String _mobilityLabelFor(String mobilityType) {
 
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
+}
+
+abstract class RouteFeedbackRepository {
+  Future<void> submitRouteFeedback(RouteFeedbackRequest request);
+}
+
+enum RouteFeedbackRating {
+  helpful('HELPFUL'),
+  notHelpful('NOT_HELPFUL'),
+  blockedByRealWorld('BLOCKED_BY_REAL_WORLD');
+
+  const RouteFeedbackRating(this.serverValue);
+
+  final String serverValue;
+}
+
+class RouteFeedbackRequest {
+  const RouteFeedbackRequest({
+    required this.routeSearchId,
+    required this.rating,
+    required this.comment,
+  });
+
+  final String routeSearchId;
+  final RouteFeedbackRating rating;
+  final String comment;
+
+  RouteFeedbackRequest trimmed() {
+    return RouteFeedbackRequest(
+      routeSearchId: routeSearchId.trim(),
+      rating: rating,
+      comment: comment.trim(),
+    );
+  }
+
+  Map<String, Object?> toJson({required String userId}) {
+    final trimmedRequest = trimmed();
+    return {
+      'userId': userId.trim(),
+      'rating': trimmedRequest.rating.serverValue,
+      'comment': trimmedRequest.comment,
+    };
+  }
 }
 
 class RouteSearchApiRepository implements RouteSearchRepository {
@@ -76,6 +120,122 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       throw const RouteSearchException(_routeSearchErrorMessage);
     }
   }
+}
+
+class RouteFeedbackApiRepository implements RouteFeedbackRepository {
+  RouteFeedbackApiRepository({
+    required this.baseUri,
+    required this.authProvider,
+    HttpClient? httpClient,
+  }) : _httpClient = httpClient ?? HttpClient();
+
+  final Uri baseUri;
+  final AuthorizationHeaderProvider authProvider;
+  final HttpClient _httpClient;
+
+  @override
+  Future<void> submitRouteFeedback(RouteFeedbackRequest feedbackRequest) async {
+    final trimmedRequest = feedbackRequest.trimmed();
+    if (trimmedRequest.routeSearchId.isEmpty) {
+      throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+    }
+
+    final uri = baseUri.resolve(
+      '/api/v1/routes/${Uri.encodeComponent(trimmedRequest.routeSearchId)}/feedback',
+    );
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final authorizationHeader = await authProvider
+            .authorizationHeader()
+            .timeout(_routeSearchTimeout);
+        // 익명 인증 API는 Basic 인증의 username을 사용자 식별자로 사용한다.
+        final userId = _userIdFromAuthorizationHeader(authorizationHeader);
+        if (userId == null) {
+          throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+        }
+
+        final request = await _httpClient
+            .postUrl(uri)
+            .timeout(_routeSearchTimeout);
+        request.headers.contentType = ContentType.json;
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          authorizationHeader!,
+        );
+        request.write(jsonEncode(trimmedRequest.toJson(userId: userId)));
+
+        final response = await request.close().timeout(_routeSearchTimeout);
+        final body = await utf8
+            .decodeStream(response)
+            .timeout(_routeSearchTimeout);
+
+        // 저장된 익명 인증이 만료된 경우 새 인증을 발급받아 한 번만 재시도한다.
+        if (response.statusCode == HttpStatus.unauthorized && attempt == 0) {
+          await authProvider.invalidateAuthorization().timeout(
+            _routeSearchTimeout,
+          );
+          continue;
+        }
+
+        if (response.statusCode != HttpStatus.ok) {
+          throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+          throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+        }
+        return;
+      } on RouteFeedbackException {
+        rethrow;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '경로 피드백 API 요청 처리 중 예외가 발생했습니다.',
+        );
+        throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+      }
+    }
+    throw const RouteFeedbackException(_routeFeedbackErrorMessage);
+  }
+
+  String? _userIdFromAuthorizationHeader(String? authorizationHeader) {
+    const prefix = 'Basic ';
+    if (authorizationHeader == null ||
+        !authorizationHeader.startsWith(prefix)) {
+      return null;
+    }
+
+    try {
+      final decoded = utf8.decode(
+        base64Decode(authorizationHeader.substring(prefix.length)),
+      );
+      final separatorIndex = decoded.indexOf(':');
+      if (separatorIndex <= 0) {
+        return null;
+      }
+      final userId = decoded.substring(0, separatorIndex).trim();
+      return userId.isEmpty ? null : userId;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 피드백 사용자 식별자 처리 중 예외가 발생했습니다.',
+      );
+      return null;
+    }
+  }
+}
+
+class RouteFeedbackException implements Exception {
+  const RouteFeedbackException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 abstract class FavoriteRouteRepository {
@@ -689,6 +849,7 @@ class RouteSearchScreen extends StatefulWidget {
   RouteSearchScreen({
     required this.repository,
     required this.stationRepository,
+    this.routeFeedbackRepository,
     this.favoriteRouteRepository,
     String? initialMobilityType,
     super.key,
@@ -696,6 +857,7 @@ class RouteSearchScreen extends StatefulWidget {
 
   final RouteSearchRepository repository;
   final StationSearchRepository stationRepository;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final String initialMobilityType;
 
@@ -822,6 +984,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               animation: _controller,
               builder: (context, _) => _RouteSearchBody(
                 state: _controller.state,
+                routeFeedbackRepository: widget.routeFeedbackRepository,
                 favoriteRouteRepository: widget.favoriteRouteRepository,
               ),
             ),
@@ -1211,10 +1374,12 @@ class _RouteStationOptionTile extends StatelessWidget {
 class _RouteSearchBody extends StatelessWidget {
   const _RouteSearchBody({
     required this.state,
+    required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
   });
 
   final RouteSearchState state;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
 
   @override
@@ -1237,6 +1402,7 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
+        routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
       ),
     };
@@ -1268,10 +1434,12 @@ class _RouteSearchMessage extends StatelessWidget {
 class _RouteSearchResultCard extends StatelessWidget {
   const _RouteSearchResultCard({
     required this.result,
+    required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
   });
 
   final RouteSearchResult result;
+  final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
 
   @override
@@ -1282,6 +1450,13 @@ class _RouteSearchResultCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _RouteSearchResultSummaryCard(result: result),
+        if (routeFeedbackRepository != null) ...[
+          const SizedBox(height: 12),
+          _RouteFeedbackButtons(
+            result: result,
+            repository: routeFeedbackRepository!,
+          ),
+        ],
         if (canSaveRoute) ...[
           const SizedBox(height: 12),
           _RouteFavoriteSaveButton(
@@ -1621,6 +1796,131 @@ class _RouteStepTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _RouteFeedbackButtons extends StatefulWidget {
+  const _RouteFeedbackButtons({required this.result, required this.repository});
+
+  final RouteSearchResult result;
+  final RouteFeedbackRepository repository;
+
+  @override
+  State<_RouteFeedbackButtons> createState() => _RouteFeedbackButtonsState();
+}
+
+class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
+  bool _submitting = false;
+  bool _submitted = false;
+  String _message = '';
+
+  @override
+  void didUpdateWidget(_RouteFeedbackButtons oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.result.routeSearchId != widget.result.routeSearchId) {
+      _submitting = false;
+      _submitted = false;
+      _message = '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('routeFeedbackHelpfulButton'),
+                onPressed: _canSubmit
+                    ? () => _submit(RouteFeedbackRating.helpful, '추천이 도움이 됐어요')
+                    : null,
+                icon: const Icon(Icons.thumb_up_alt_outlined),
+                label: Text(_submitting ? '보내는 중' : '도움 됐어요'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('routeFeedbackNotHelpfulButton'),
+                onPressed: _canSubmit
+                    ? () => _submit(
+                        RouteFeedbackRating.notHelpful,
+                        '경로가 실제 이동과 맞지 않아요',
+                      )
+                    : null,
+                icon: const Icon(Icons.report_problem_outlined),
+                label: const Text('맞지 않아요'),
+              ),
+            ),
+          ],
+        ),
+        if (_message.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _message,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF29484B),
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool get _canSubmit => !_submitting && !_submitted;
+
+  Future<void> _submit(RouteFeedbackRating rating, String comment) async {
+    setState(() {
+      _submitting = true;
+      _message = '';
+    });
+
+    try {
+      await widget.repository.submitRouteFeedback(
+        RouteFeedbackRequest(
+          routeSearchId: widget.result.routeSearchId,
+          rating: rating,
+          comment: comment,
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitting = false;
+        _submitted = true;
+        _message = '의견을 보냈습니다.';
+      });
+    } on RouteFeedbackException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitting = false;
+        _message = error.message;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 피드백 화면 처리 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitting = false;
+        _message = _routeFeedbackErrorMessage;
+      });
+    }
   }
 }
 
