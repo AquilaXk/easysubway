@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { inflateSync } from "node:zlib";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -50,6 +51,136 @@ function assertMobileCatchPolicy(file, source) {
   }
 }
 
+function readPngPixelBounds(relativePath) {
+  const png = readFileSync(path.join(root, relativePath));
+  const signature = png.subarray(0, 8);
+  assert.equal(signature.toString("hex"), "89504e470d0a1a0a", `${relativePath} must be a PNG file`);
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idatChunks = [];
+
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.subarray(offset + 4, offset + 8).toString("ascii");
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    const data = png.subarray(dataStart, dataEnd);
+
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === "IDAT") {
+      idatChunks.push(data);
+    } else if (type === "IEND") {
+      break;
+    }
+
+    offset = dataEnd + 4;
+  }
+
+  assert.ok(width > 0 && height > 0, `${relativePath} must declare image size`);
+  assert.ok([8, 16].includes(bitDepth), `${relativePath} must use 8-bit or 16-bit channels`);
+  assert.ok([2, 6].includes(colorType), `${relativePath} must use RGB or RGBA pixels`);
+
+  const hasAlpha = colorType === 6;
+  const channels = hasAlpha ? 4 : 3;
+  const bytesPerSample = bitDepth / 8;
+  const bytesPerPixel = channels * bytesPerSample;
+  const stride = width * bytesPerPixel;
+  const inflated = inflateSync(Buffer.concat(idatChunks));
+  const pixels = Buffer.alloc(height * stride);
+
+  for (let y = 0; y < height; y++) {
+    const sourceOffset = y * (stride + 1);
+    const filter = inflated[sourceOffset];
+    const source = inflated.subarray(sourceOffset + 1, sourceOffset + 1 + stride);
+    const targetOffset = y * stride;
+
+    for (let x = 0; x < stride; x++) {
+      const left = x >= bytesPerPixel ? pixels[targetOffset + x - bytesPerPixel] : 0;
+      const up = y > 0 ? pixels[targetOffset + x - stride] : 0;
+      const upperLeft = y > 0 && x >= bytesPerPixel ? pixels[targetOffset + x - stride - bytesPerPixel] : 0;
+      let reconstructed;
+
+      if (filter === 0) {
+        reconstructed = source[x];
+      } else if (filter === 1) {
+        reconstructed = source[x] + left;
+      } else if (filter === 2) {
+        reconstructed = source[x] + up;
+      } else if (filter === 3) {
+        reconstructed = source[x] + Math.floor((left + up) / 2);
+      } else if (filter === 4) {
+        const p = left + up - upperLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upperLeft);
+        const predictor = pa <= pb && pa <= pc ? left : pb <= pc ? up : upperLeft;
+        reconstructed = source[x] + predictor;
+      } else {
+        throw new Error(`${relativePath} uses unsupported PNG filter ${filter}`);
+      }
+
+      pixels[targetOffset + x] = reconstructed & 0xff;
+    }
+  }
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let maxCenterDistance = 0;
+  const centerX = (width - 1) / 2;
+  const centerY = (height - 1) / 2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixelOffset = y * stride + x * bytesPerPixel;
+      const visible = hasAlpha
+        ? pixels[pixelOffset + (channels - 1) * bytesPerSample] > 0
+        : true;
+
+      if (visible) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        maxCenterDistance = Math.max(maxCenterDistance, Math.hypot(x - centerX, y - centerY));
+      }
+    }
+  }
+
+  return {
+    width,
+    height,
+    hasAlpha,
+    bounds: { minX, minY, maxX, maxY },
+    maxCenterDistance,
+  };
+}
+
+function assertAndroidLauncherIconSafeArea(relativePath, minimumInsetRatio) {
+  const info = readPngPixelBounds(relativePath);
+  assert.equal(info.width, info.height, `${relativePath} must be square`);
+  assert.equal(info.hasAlpha, true, `${relativePath} must keep transparent launcher padding`);
+
+  const minimumInset = info.width * minimumInsetRatio;
+  assert.ok(info.bounds.minX >= minimumInset, `${relativePath} left padding is too small`);
+  assert.ok(info.bounds.minY >= minimumInset, `${relativePath} top padding is too small`);
+  assert.ok(info.width - 1 - info.bounds.maxX >= minimumInset, `${relativePath} right padding is too small`);
+  assert.ok(info.height - 1 - info.bounds.maxY >= minimumInset, `${relativePath} bottom padding is too small`);
+  assert.ok(
+    info.maxCenterDistance <= info.width * 0.45,
+    `${relativePath} has visible pixels too close to a circular launcher mask`,
+  );
+}
+
 test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적되지 않는다", () => {
   const gitignore = read(".gitignore");
 
@@ -82,7 +213,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
-  assert.match(workflow, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
@@ -217,15 +348,15 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   }
 });
 
-test("모바일 변경 CI는 원본 예외 catch 계약을 실행한다", () => {
+test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const mobileJob = jobBlock(workflow, "mobile-app", "android");
 
   assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
-  assert.match(mobileJob, /Mobile App CI \/ Run mobile catch contract/);
+  assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
@@ -1218,6 +1349,21 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
+});
+
+test("Android 런처 아이콘은 원형 마스크 안전 여백을 가진다", () => {
+  const densities = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"];
+
+  for (const density of densities) {
+    assertAndroidLauncherIconSafeArea(
+      `apps/mobile/android/app/src/main/res/mipmap-${density}/ic_launcher.png`,
+      0.12,
+    );
+    assertAndroidLauncherIconSafeArea(
+      `apps/mobile/android/app/src/main/res/mipmap-${density}/ic_launcher_foreground.png`,
+      0.18,
+    );
+  }
 });
 
 test("경로 분류기는 README를 문서 전용 변경으로 처리한다", async () => {
