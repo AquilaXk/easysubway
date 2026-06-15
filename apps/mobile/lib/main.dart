@@ -323,7 +323,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       }
 
       photoAttachment = await lostPhotoRestorer();
-      await draftTargetStore.clearTarget();
     } catch (error, stackTrace) {
       reportMobileError(
         error,
@@ -333,6 +332,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       await _clearFacilityReportDraftTargetQuietly(draftTargetStore);
       return;
     }
+
+    await _clearFacilityReportDraftTargetQuietly(draftTargetStore);
 
     if (!mounted || photoAttachment == null) {
       return;
