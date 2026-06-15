@@ -819,6 +819,52 @@ void main() {
     expect(state.facilityAttentionSemanticLabel, '확인이 필요한 시설 3개');
   });
 
+  test('역 상세 상태는 쉬운 이동 구조 요약을 만든다', () {
+    final state = StationDetailState(
+      status: StationDetailStatus.success,
+      detail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      exits: [
+        _stationExit(
+          id: 'exit-sangnoksu-1',
+          name: '1번 출구',
+          hasElevatorConnection: true,
+        ),
+        _stationExit(
+          id: 'exit-sangnoksu-2',
+          name: '2번 출구',
+          hasElevatorConnection: false,
+          hasStairOnlyPath: true,
+        ),
+      ],
+      facilities: [
+        _stationFacility(
+          id: 'facility-sangnoksu-elevator-1',
+          name: '1번 출구 엘리베이터',
+          type: 'ELEVATOR',
+          exitId: 'exit-sangnoksu-1',
+        ),
+        _stationFacility(
+          id: 'facility-sangnoksu-toilet-1',
+          name: '장애인 화장실',
+          type: 'ACCESSIBLE_TOILET',
+          exitId: '',
+          status: 'BROKEN',
+        ),
+      ],
+    );
+
+    expect(state.layoutSummaryItems.map((item) => item.text), [
+      '1번 출구',
+      '엘리베이터',
+      '장애인 화장실',
+      '승강장',
+    ]);
+    expect(
+      state.layoutSummarySemanticLabel,
+      '이동 구조, 1번 출구, 엘리베이터, 장애인 화장실, 승강장',
+    );
+  });
+
   test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
     final repository = FakeFavoriteStationRepository();
     final controller = FavoriteStationListController(repository: repository);
@@ -973,14 +1019,19 @@ StationDetail _stationDetail({required String id, required String name}) {
   );
 }
 
-StationExitInfo _stationExit() {
-  return const StationExitInfo(
-    id: 'exit-sangnoksu-1',
+StationExitInfo _stationExit({
+  String id = 'exit-sangnoksu-1',
+  String name = '1번 출구',
+  bool hasElevatorConnection = true,
+  bool hasStairOnlyPath = false,
+}) {
+  return StationExitInfo(
+    id: id,
     stationId: 'station-sangnoksu',
     exitNumber: '1',
-    name: '1번 출구',
-    hasElevatorConnection: true,
-    hasStairOnlyPath: false,
+    name: name,
+    hasElevatorConnection: hasElevatorConnection,
+    hasStairOnlyPath: hasStairOnlyPath,
     dataConfidence: 'HIGH',
   );
 }
@@ -988,13 +1039,15 @@ StationExitInfo _stationExit() {
 StationFacilityInfo _stationFacility({
   String id = 'facility-sangnoksu-elevator-1',
   String name = '1번 출구 엘리베이터',
+  String type = 'ELEVATOR',
+  String exitId = 'exit-sangnoksu-1',
   String status = 'NORMAL',
 }) {
   return StationFacilityInfo(
     id: id,
     stationId: 'station-sangnoksu',
-    exitId: 'exit-sangnoksu-1',
-    type: 'ELEVATOR',
+    exitId: exitId,
+    type: type,
     name: name,
     floorFrom: '지상',
     floorTo: '대합실',
