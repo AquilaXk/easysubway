@@ -32,12 +32,12 @@ class FacilityReportController {
 
 	@PostMapping("/api/v1/reports")
 	@ResponseStatus(HttpStatus.CREATED)
-	ApiResponse<FacilityReportResponse> createReport(
+	ApiResponse<FacilityReportStatusResponse> createReport(
 		@RequestBody CreateFacilityReportRequest request,
 		Principal principal
 	) {
 		FacilityReport report = facilityReportUseCase.createReport(request.toCommand(principal.getName()));
-		return ApiResponse.ok(FacilityReportResponse.from(report));
+		return ApiResponse.ok(FacilityReportStatusResponse.from(report));
 	}
 
 	@GetMapping("/api/v1/reports/{reportId}")

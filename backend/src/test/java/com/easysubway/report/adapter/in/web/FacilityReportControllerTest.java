@@ -409,6 +409,9 @@ class FacilityReportControllerTest {
 			.getContentAsString();
 
 		String reportId = JsonPath.read(response, "$.data.id");
+		Assertions.assertThat(response)
+			.doesNotContain("photoDataBase64")
+			.doesNotContain("aW1hZ2UtYnl0ZXM=");
 
 		mockMvc.perform(get("/admin/reports/{reportId}", reportId)
 				.with(httpBasic("admin-test", "admin-test-password")))
