@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'auth_headers.dart';
@@ -14,7 +15,10 @@ const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했�
 const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
-const _facilityReportLocationDisabledMessage = '기기 위치를 켜고 다시 확인해 주세요.';
+const _facilityReportLocationDisabledMessage =
+    '기기 위치를 켜 주세요. 위치가 없으면 역 확인이 어렵습니다.';
+const _facilityReportDraftTargetStorageKey =
+    'easysubway.facilityReport.draftTarget';
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
@@ -368,6 +372,9 @@ typedef FacilityReportLocationSettingsOpener = Future<bool> Function();
 typedef FacilityReportPhotoPicker =
     Future<FacilityReportPhotoAttachment?> Function();
 
+typedef FacilityReportLostPhotoRestorer =
+    Future<FacilityReportPhotoAttachment?> Function();
+
 class ImagePickerFacilityReportPhotoPicker {
   ImagePickerFacilityReportPhotoPicker({ImagePicker? imagePicker})
     : _imagePicker = imagePicker ?? ImagePicker();
@@ -386,6 +393,20 @@ class ImagePickerFacilityReportPhotoPicker {
     return _pick(ImageSource.camera);
   }
 
+  Future<FacilityReportPhotoAttachment?> retrieveLostPhoto() async {
+    final response = await _imagePicker.retrieveLostData();
+    if (response.isEmpty) {
+      return null;
+    }
+    if (response.exception != null) {
+      throw const FacilityReportPhotoException('사진을 다시 선택해 주세요.');
+    }
+    if (response.type != RetrieveType.image || response.file == null) {
+      return null;
+    }
+    return _attachmentFromFile(response.file!);
+  }
+
   Future<FacilityReportPhotoAttachment?> _pick(ImageSource source) async {
     final image = await _imagePicker.pickImage(
       source: source,
@@ -396,6 +417,10 @@ class ImagePickerFacilityReportPhotoPicker {
     if (image == null) {
       return null;
     }
+    return _attachmentFromFile(image);
+  }
+
+  Future<FacilityReportPhotoAttachment> _attachmentFromFile(XFile image) async {
     final bytes = await image.readAsBytes();
     if (bytes.lengthInBytes > _maxPhotoBytes) {
       throw const FacilityReportPhotoException(
@@ -487,12 +512,93 @@ class FacilityReportTarget {
     required this.facilityStatusLabel,
   });
 
+  factory FacilityReportTarget.fromJson(Map<String, Object?> json) {
+    return FacilityReportTarget(
+      stationId: _requiredReportString(json, 'stationId'),
+      stationName: _requiredReportString(json, 'stationName'),
+      facilityId: _requiredReportString(json, 'facilityId'),
+      facilityName: _requiredReportString(json, 'facilityName'),
+      facilityTypeLabel: _requiredReportString(json, 'facilityTypeLabel'),
+      facilityStatusLabel: _requiredReportString(json, 'facilityStatusLabel'),
+    );
+  }
+
+  factory FacilityReportTarget.decode(String value) {
+    final decoded = jsonDecode(value);
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('Invalid facility report target payload');
+    }
+    return FacilityReportTarget.fromJson(decoded);
+  }
+
   final String stationId;
   final String stationName;
   final String facilityId;
   final String facilityName;
   final String facilityTypeLabel;
   final String facilityStatusLabel;
+
+  Map<String, Object?> toJson() {
+    return {
+      'stationId': stationId,
+      'stationName': stationName,
+      'facilityId': facilityId,
+      'facilityName': facilityName,
+      'facilityTypeLabel': facilityTypeLabel,
+      'facilityStatusLabel': facilityStatusLabel,
+    };
+  }
+
+  String encode() => jsonEncode(toJson());
+}
+
+abstract class FacilityReportDraftTargetStore {
+  Future<FacilityReportTarget?> readTarget();
+
+  Future<void> saveTarget(FacilityReportTarget target);
+
+  Future<void> clearTarget();
+}
+
+class SecureFacilityReportDraftTargetStore
+    implements FacilityReportDraftTargetStore {
+  const SecureFacilityReportDraftTargetStore({
+    this.storage = const FlutterSecureStorage(),
+  });
+
+  final FlutterSecureStorage storage;
+
+  @override
+  Future<FacilityReportTarget?> readTarget() async {
+    final value = await storage.read(key: _facilityReportDraftTargetStorageKey);
+    if (value == null) {
+      return null;
+    }
+    try {
+      return FacilityReportTarget.decode(value);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '저장된 시설 신고 대상을 읽는 중 예외가 발생했습니다.',
+      );
+      await clearTarget();
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveTarget(FacilityReportTarget target) async {
+    await storage.write(
+      key: _facilityReportDraftTargetStorageKey,
+      value: target.encode(),
+    );
+  }
+
+  @override
+  Future<void> clearTarget() async {
+    await storage.delete(key: _facilityReportDraftTargetStorageKey);
+  }
 }
 
 enum FacilityReportTypeOption {
@@ -705,6 +811,9 @@ class FacilityReportScreen extends StatefulWidget {
     this.needsLocationPermissionRequest,
     this.openLocationSettings,
     this.photoPicker,
+    this.lostPhotoRestorer,
+    this.draftTargetStore,
+    this.initialPhotoAttachment,
     super.key,
   });
 
@@ -715,6 +824,9 @@ class FacilityReportScreen extends StatefulWidget {
   needsLocationPermissionRequest;
   final FacilityReportLocationSettingsOpener? openLocationSettings;
   final FacilityReportPhotoPicker? photoPicker;
+  final FacilityReportLostPhotoRestorer? lostPhotoRestorer;
+  final FacilityReportDraftTargetStore? draftTargetStore;
+  final FacilityReportPhotoAttachment? initialPhotoAttachment;
 
   @override
   State<FacilityReportScreen> createState() => _FacilityReportScreenState();
@@ -995,8 +1107,13 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     _controller = FacilityReportController(repository: widget.repository)
       ..addListener(_onReportStateChanged);
     _defaultPhotoPicker = ImagePickerFacilityReportPhotoPicker();
+    _photoAttachment = widget.initialPhotoAttachment;
+    if (_photoAttachment != null) {
+      _photoMessage = '사진 1장 추가됨';
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        unawaited(_restoreLostPhoto());
         unawaited(_requestCurrentLocation());
       }
     });
@@ -1227,7 +1344,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('현재 위치 사용'),
-        content: const Text('신고 위치를 확인하는 데 사용합니다.'),
+        content: const Text('현재 위치로 신고할 역을 확인합니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1304,6 +1421,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _isPhotoFailure = false;
     });
     try {
+      await _saveDraftTargetForPhotoPicker();
       final picker = widget.photoPicker ?? _pickPhotoWithDevicePicker;
       final photo = await picker();
       if (!mounted || photo == null) {
@@ -1336,9 +1454,74 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         });
       }
     } finally {
+      await _clearDraftTargetForPhotoPicker();
       if (mounted) {
         setState(() => _isPickingPhoto = false);
       }
+    }
+  }
+
+  Future<void> _restoreLostPhoto() async {
+    if (_photoAttachment != null) {
+      return;
+    }
+    final restorer = widget.lostPhotoRestorer;
+    if (restorer == null) {
+      return;
+    }
+    try {
+      final photo = await restorer();
+      if (!mounted || photo == null || _photoAttachment != null) {
+        return;
+      }
+      setState(() {
+        _photoAttachment = photo;
+        _photoMessage = '사진 1장 추가됨';
+        _isPhotoFailure = false;
+      });
+    } on FacilityReportPhotoException catch (error) {
+      if (mounted) {
+        setState(() {
+          _photoMessage = error.message;
+          _isPhotoFailure = true;
+        });
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 사진 선택 복구 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        setState(() {
+          _photoMessage = '사진을 다시 선택해 주세요.';
+          _isPhotoFailure = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveDraftTargetForPhotoPicker() async {
+    try {
+      await widget.draftTargetStore?.saveTarget(widget.target);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 사진 선택 대상 저장 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _clearDraftTargetForPhotoPicker() async {
+    try {
+      await widget.draftTargetStore?.clearTarget();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 사진 선택 대상 정리 중 예외가 발생했습니다.',
+      );
     }
   }
 
