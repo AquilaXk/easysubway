@@ -40,6 +40,8 @@ class CurrentLocation {
 }
 
 abstract class CurrentLocationProvider {
+  Future<bool> needsLocationPermissionRequest();
+
   Future<CurrentLocation> currentLocation();
 }
 
@@ -59,6 +61,23 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
           const MethodChannel('com.easysubway.easysubway_mobile/location');
 
   final MethodChannel _channel;
+
+  @override
+  Future<bool> needsLocationPermissionRequest() async {
+    try {
+      return await _channel.invokeMethod<bool>(
+            'needsLocationPermissionRequest',
+          ) ??
+          true;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '현재 위치 권한 상태 확인 중 예외가 발생했습니다.',
+      );
+      return true;
+    }
+  }
 
   @override
   Future<CurrentLocation> currentLocation() async {
@@ -1573,6 +1592,7 @@ class StationSearchScreen extends StatefulWidget {
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
+  bool _isLocationPreflightRunning = false;
 
   @override
   void initState() {
@@ -1636,7 +1656,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               animation: _controller,
               builder: (context, _) {
                 final isLoading =
-                    _controller.state.status == StationSearchStatus.loading;
+                    _controller.state.status == StationSearchStatus.loading ||
+                    _isLocationPreflightRunning;
                 return OutlinedButton.icon(
                   key: const Key('nearbyStationSearchButton'),
                   onPressed: isLoading ? null : _searchNearby,
@@ -1668,11 +1689,31 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     _controller.search(query);
   }
 
-  void _searchNearby() {
-    if (_controller.state.status == StationSearchStatus.loading) {
+  Future<void> _searchNearby() async {
+    if (_controller.state.status == StationSearchStatus.loading ||
+        _isLocationPreflightRunning) {
       return;
     }
-    _controller.searchNearby(widget.locationProvider);
+    setState(() => _isLocationPreflightRunning = true);
+    try {
+      final needsPermissionRequest = await widget.locationProvider
+          .needsLocationPermissionRequest();
+      if (!mounted) {
+        return;
+      }
+      if (needsPermissionRequest &&
+          !await _confirmLocationUse(context, message: '가까운 역을 찾는 데 사용합니다.')) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      await _controller.searchNearby(widget.locationProvider);
+    } finally {
+      if (mounted) {
+        setState(() => _isLocationPreflightRunning = false);
+      }
+    }
   }
 
   void _openStationDetail(StationSearchResult result) {
@@ -1688,6 +1729,30 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ),
     );
   }
+}
+
+Future<bool> _confirmLocationUse(
+  BuildContext context, {
+  required String message,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('현재 위치 사용'),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('위치 사용'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
 }
 
 class _StationSearchBody extends StatelessWidget {
@@ -2244,6 +2309,7 @@ class _StationDetailContent extends StatelessWidget {
         builder: (_) => FacilityReportScreen(
           repository: reportRepository,
           locationLoader: _locationLoader(),
+          needsLocationPermissionRequest: _locationPermissionRequestChecker(),
           target: FacilityReportTarget(
             stationId: detail.id,
             stationName: detail.nameKo,
@@ -2274,6 +2340,15 @@ class _StationDetailContent extends StatelessWidget {
         longitude: location.longitude,
       );
     };
+  }
+
+  FacilityReportLocationPermissionRequestChecker?
+  _locationPermissionRequestChecker() {
+    final provider = locationProvider;
+    if (provider == null) {
+      return null;
+    }
+    return provider.needsLocationPermissionRequest;
   }
 }
 

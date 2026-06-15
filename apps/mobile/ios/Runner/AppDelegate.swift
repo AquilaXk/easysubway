@@ -24,6 +24,10 @@ import UIKit
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     channel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "needsLocationPermissionRequest" {
+        result(self?.needsLocationPermissionRequest() ?? true)
+        return
+      }
       guard call.method == "currentLocation" else {
         result(FlutterMethodNotImplemented)
         return
@@ -103,6 +107,17 @@ import UIKit
       return manager.authorizationStatus
     }
     return CLLocationManager.authorizationStatus()
+  }
+
+  private func needsLocationPermissionRequest() -> Bool {
+    switch currentAuthorizationStatus(for: locationManager) {
+    case .authorizedAlways, .authorizedWhenInUse:
+      return false
+    case .notDetermined, .restricted, .denied:
+      return true
+    @unknown default:
+      return true
+    }
   }
 
   private func finishLocationRequest(value: Any? = nil, errorCode: String? = nil) {
