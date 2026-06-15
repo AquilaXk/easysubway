@@ -14,6 +14,7 @@ const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했�
 const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
+const _facilityReportLocationDisabledMessage = '기기 위치를 켜고 다시 확인해 주세요.';
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
@@ -362,6 +363,8 @@ typedef FacilityReportLocationLoader =
 typedef FacilityReportLocationPermissionRequestChecker =
     Future<bool> Function();
 
+typedef FacilityReportLocationSettingsOpener = Future<bool> Function();
+
 typedef FacilityReportPhotoPicker =
     Future<FacilityReportPhotoAttachment?> Function();
 
@@ -700,6 +703,7 @@ class FacilityReportScreen extends StatefulWidget {
     required this.target,
     this.locationLoader,
     this.needsLocationPermissionRequest,
+    this.openLocationSettings,
     this.photoPicker,
     super.key,
   });
@@ -709,6 +713,7 @@ class FacilityReportScreen extends StatefulWidget {
   final FacilityReportLocationLoader? locationLoader;
   final FacilityReportLocationPermissionRequestChecker?
   needsLocationPermissionRequest;
+  final FacilityReportLocationSettingsOpener? openLocationSettings;
   final FacilityReportPhotoPicker? photoPicker;
 
   @override
@@ -980,6 +985,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   bool _isLoadingLocation = false;
   bool _isLocationPreflightRunning = false;
   bool _isLocationFailure = false;
+  bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
   bool _isPickingPhoto = false;
 
@@ -1099,6 +1105,27 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
               ),
               if (_isLocationFailure && !hasSubmittedReport) ...[
                 const SizedBox(height: 10),
+                if (_canOpenLocationSettings) ...[
+                  OutlinedButton.icon(
+                    key: const Key('facilityReportOpenLocationSettingsButton'),
+                    onPressed:
+                        isLoading ||
+                            _isOpeningLocationSettings ||
+                            _isLoadingLocation ||
+                            _isLocationPreflightRunning
+                        ? null
+                        : _openLocationSettings,
+                    icon: _isOpeningLocationSettings
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : const Icon(Icons.settings),
+                    label: const Text('위치 설정 열기'),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 OutlinedButton.icon(
                   key: const Key('facilityReportRetryLocationButton'),
                   onPressed:
@@ -1152,6 +1179,10 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       setState(() {});
     }
   }
+
+  bool get _canOpenLocationSettings =>
+      widget.openLocationSettings != null &&
+      _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
     if (_photoAttachment != null && _attachedLocation != null) {
@@ -1236,6 +1267,21 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     } finally {
       if (mounted) {
         setState(() => _isLocationPreflightRunning = false);
+      }
+    }
+  }
+
+  Future<void> _openLocationSettings() async {
+    final openLocationSettings = widget.openLocationSettings;
+    if (openLocationSettings == null || _isOpeningLocationSettings) {
+      return;
+    }
+    setState(() => _isOpeningLocationSettings = true);
+    try {
+      await openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningLocationSettings = false);
       }
     }
   }

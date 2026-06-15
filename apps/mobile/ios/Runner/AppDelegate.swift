@@ -28,6 +28,10 @@ import UIKit
         result(self?.needsLocationPermissionRequest() ?? true)
         return
       }
+      if call.method == "openLocationSettings" {
+        self?.openLocationSettings(result)
+        return
+      }
       guard call.method == "currentLocation" else {
         result(FlutterMethodNotImplemented)
         return
@@ -117,6 +121,16 @@ import UIKit
       return true
     @unknown default:
       return true
+    }
+  }
+
+  private func openLocationSettings(_ result: @escaping FlutterResult) {
+    guard let url = URL(string: UIApplication.openSettingsURLString) else {
+      result(false)
+      return
+    }
+    UIApplication.shared.open(url, options: [:]) { success in
+      result(success)
     }
   }
 

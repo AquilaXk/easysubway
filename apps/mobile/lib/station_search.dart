@@ -43,6 +43,8 @@ abstract class CurrentLocationProvider {
   Future<bool> needsLocationPermissionRequest();
 
   Future<CurrentLocation> currentLocation();
+
+  Future<bool> openLocationSettings();
 }
 
 class CurrentLocationException implements Exception {
@@ -99,6 +101,20 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '현재 위치 조회 중 예외가 발생했습니다.');
       throw const CurrentLocationException('현재 위치를 확인하지 못했습니다.');
+    }
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    try {
+      return await _channel.invokeMethod<bool>('openLocationSettings') ?? false;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '위치 설정 화면 이동 중 예외가 발생했습니다.',
+      );
+      return false;
     }
   }
 
@@ -2442,6 +2458,7 @@ class _StationDetailContent extends StatelessWidget {
           repository: reportRepository,
           locationLoader: _locationLoader(),
           needsLocationPermissionRequest: _locationPermissionRequestChecker(),
+          openLocationSettings: _locationSettingsOpener(),
           target: FacilityReportTarget(
             stationId: detail.id,
             stationName: detail.nameKo,
@@ -2481,6 +2498,14 @@ class _StationDetailContent extends StatelessWidget {
       return null;
     }
     return provider.needsLocationPermissionRequest;
+  }
+
+  FacilityReportLocationSettingsOpener? _locationSettingsOpener() {
+    final provider = locationProvider;
+    if (provider == null) {
+      return null;
+    }
+    return provider.openLocationSettings;
   }
 }
 
