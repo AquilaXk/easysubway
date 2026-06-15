@@ -162,6 +162,7 @@
 	<form class="review-form"
 	      th:action="@{/admin/reports/{reportId}/page/review(reportId=${report.id})}"
 	      method="post">
+		<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 		<button type="submit" name="decision" value="ACCEPT">승인</button>
 		<button class="danger" type="submit" name="decision" value="REJECT">반려</button>
 		<button class="secondary" type="submit" name="decision" value="MARK_DUPLICATE">중복 처리</button>

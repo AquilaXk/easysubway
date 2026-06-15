@@ -103,6 +103,16 @@ class FacilityReportAdminPageController {
 		return "%s, %s".formatted(latitude.toPlainString(), longitude.toPlainString());
 	}
 
+	private static boolean hasCompletePhoto(FacilityReport report) {
+		return hasText(report.photoFileName())
+			&& hasText(report.photoContentType())
+			&& hasText(report.photoDataBase64());
+	}
+
+	private static boolean hasText(String value) {
+		return value != null && !value.isBlank();
+	}
+
 	record FacilityReportListPageRow(
 		String id,
 		String stationId,
@@ -124,7 +134,7 @@ class FacilityReportAdminPageController {
 				report.description(),
 				FacilityReportAdminPageController.statusLabel(report.status()),
 				report.createdAt(),
-				report.photoFileName() != null && !report.photoFileName().isBlank(),
+				FacilityReportAdminPageController.hasCompletePhoto(report),
 				FacilityReportAdminPageController.coordinateLabel(report.latitude(), report.longitude())
 			);
 		}
@@ -167,7 +177,9 @@ class FacilityReportAdminPageController {
 		}
 
 		public boolean hasPhoto() {
-			return photoFileName != null && !photoFileName.isBlank();
+			return FacilityReportAdminPageController.hasText(photoFileName)
+				&& FacilityReportAdminPageController.hasText(photoContentType)
+				&& FacilityReportAdminPageController.hasText(photoDataBase64);
 		}
 	}
 

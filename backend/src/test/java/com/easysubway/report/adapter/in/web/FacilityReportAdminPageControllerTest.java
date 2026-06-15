@@ -1,6 +1,7 @@
 package com.easysubway.report.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,6 +80,7 @@ class FacilityReportAdminPageControllerTest {
 
 		mockMvc.perform(post("/admin/reports/{reportId}/page/review", reportId)
 				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf())
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("decision", "ACCEPT"))
 			.andExpect(status().is3xxRedirection())
@@ -99,11 +101,33 @@ class FacilityReportAdminPageControllerTest {
 	@Test
 	@DisplayName("관리자 신고 화면은 관리자 인증을 요구한다")
 	void adminReportPagesRequireAdminAuthentication() throws Exception {
+		String reportId = createReport("인증 검증용 신고");
+
 		mockMvc.perform(get("/admin/reports/page"))
 			.andExpect(status().isUnauthorized());
 
 		mockMvc.perform(get("/admin/reports/page")
 				.with(httpBasic("basic-user", "user-test-password")))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/admin/reports/{reportId}/page", reportId))
+			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(get("/admin/reports/{reportId}/page", reportId)
+				.with(httpBasic("basic-user", "user-test-password")))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(post("/admin/reports/{reportId}/page/review", reportId)
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("decision", "ACCEPT"))
+			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(post("/admin/reports/{reportId}/page/review", reportId)
+				.with(httpBasic("basic-user", "user-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("decision", "ACCEPT"))
 			.andExpect(status().isForbidden());
 	}
 
