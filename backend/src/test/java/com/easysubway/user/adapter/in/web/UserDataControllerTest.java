@@ -48,6 +48,7 @@ class UserDataControllerTest {
 			.andExpect(jsonPath("$.data.deletedFavoriteStationCount").value(1))
 			.andExpect(jsonPath("$.data.deletedFavoriteFacilityCount").value(1))
 			.andExpect(jsonPath("$.data.deletedFavoriteRouteCount").value(1))
+			.andExpect(jsonPath("$.data.anonymizedRouteFeedbackCount").value(1))
 			.andExpect(jsonPath("$.data.notificationSettingsDeleted").value(true))
 			.andExpect(jsonPath("$.data.deletedRegisteredDeviceCount").value(1))
 			.andExpect(jsonPath("$.data.deletedPushNotificationCount").value(1))
@@ -109,6 +110,16 @@ class UserDataControllerTest {
 					  "routeSearchId": "%s"
 					}
 					""".formatted(routeSearchId)))
+			.andExpect(status().isOk());
+		mockMvc.perform(post("/api/v1/routes/{routeSearchId}/feedback", routeSearchId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "userId": "configured-user",
+					  "rating": "NOT_HELPFUL",
+					  "comment": "전화번호 010-1111-2222가 포함된 의견입니다."
+					}
+					"""))
 			.andExpect(status().isOk());
 		mockMvc.perform(post("/api/v1/devices")
 				.with(httpBasic("configured-user", "configured-password"))

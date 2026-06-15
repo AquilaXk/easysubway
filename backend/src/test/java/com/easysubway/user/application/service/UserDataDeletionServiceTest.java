@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.easysubway.auth.application.port.out.RegisterAnonymousUserPort;
 import com.easysubway.auth.domain.AnonymousUserCredentials;
 import com.easysubway.user.application.port.out.AnonymizeUserFacilityReportPort;
+import com.easysubway.user.application.port.out.AnonymizeUserRouteFeedbackPort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteFacilityPort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteRoutePort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteStationPort;
@@ -26,6 +27,7 @@ class UserDataDeletionServiceTest {
 		var favoriteStations = new RecordingDeleteUserFavoriteStationPort(2);
 		var favoriteFacilities = new RecordingDeleteUserFavoriteFacilityPort(1);
 		var favoriteRoutes = new RecordingDeleteUserFavoriteRoutePort(3);
+		var routeFeedbacks = new RecordingAnonymizeUserRouteFeedbackPort(6);
 		var notificationPreferences = new RecordingDeleteUserNotificationPreferencePort(true, 2);
 		var pushNotifications = new RecordingDeleteUserPushNotificationPort(4);
 		var mobilityProfile = new RecordingDeleteUserMobilityProfilePort(true);
@@ -35,6 +37,7 @@ class UserDataDeletionServiceTest {
 			favoriteStations,
 			favoriteFacilities,
 			favoriteRoutes,
+			routeFeedbacks,
 			notificationPreferences,
 			pushNotifications,
 			mobilityProfile,
@@ -47,6 +50,7 @@ class UserDataDeletionServiceTest {
 		assertThat(result.deletedFavoriteStationCount()).isEqualTo(2);
 		assertThat(result.deletedFavoriteFacilityCount()).isEqualTo(1);
 		assertThat(result.deletedFavoriteRouteCount()).isEqualTo(3);
+		assertThat(result.anonymizedRouteFeedbackCount()).isEqualTo(6);
 		assertThat(result.notificationSettingsDeleted()).isTrue();
 		assertThat(result.deletedRegisteredDeviceCount()).isEqualTo(2);
 		assertThat(result.deletedPushNotificationCount()).isEqualTo(4);
@@ -54,6 +58,7 @@ class UserDataDeletionServiceTest {
 		assertThat(result.anonymizedReportCount()).isEqualTo(5);
 		assertThat(result.anonymousCredentialsDeleted()).isTrue();
 		assertThat(favoriteStations.requestedUserId).isEqualTo("anonymous-user-1");
+		assertThat(routeFeedbacks.requestedUserId).isEqualTo("anonymous-user-1");
 		assertThat(reports.requestedUserId).isEqualTo("anonymous-user-1");
 	}
 
@@ -65,6 +70,7 @@ class UserDataDeletionServiceTest {
 			new RecordingDeleteUserFavoriteStationPort(0),
 			new RecordingDeleteUserFavoriteFacilityPort(0),
 			new RecordingDeleteUserFavoriteRoutePort(0),
+			new RecordingAnonymizeUserRouteFeedbackPort(0),
 			new RecordingDeleteUserNotificationPreferencePort(false, 0),
 			new RecordingDeleteUserPushNotificationPort(0),
 			new RecordingDeleteUserMobilityProfilePort(false),
@@ -144,6 +150,22 @@ class UserDataDeletionServiceTest {
 
 		@Override
 		public int deleteFavoriteRoutesByUserId(String userId) {
+			return count;
+		}
+	}
+
+	private static final class RecordingAnonymizeUserRouteFeedbackPort implements AnonymizeUserRouteFeedbackPort {
+
+		private final int count;
+		private String requestedUserId;
+
+		private RecordingAnonymizeUserRouteFeedbackPort(int count) {
+			this.count = count;
+		}
+
+		@Override
+		public int anonymizeRouteFeedbacksByUserId(String userId) {
+			requestedUserId = userId;
 			return count;
 		}
 	}

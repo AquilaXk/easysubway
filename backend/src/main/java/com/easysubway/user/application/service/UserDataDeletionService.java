@@ -3,6 +3,7 @@ package com.easysubway.user.application.service;
 import com.easysubway.auth.application.port.out.RegisterAnonymousUserPort;
 import com.easysubway.user.application.port.in.UserDataDeletionUseCase;
 import com.easysubway.user.application.port.out.AnonymizeUserFacilityReportPort;
+import com.easysubway.user.application.port.out.AnonymizeUserRouteFeedbackPort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteFacilityPort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteRoutePort;
 import com.easysubway.user.application.port.out.DeleteUserFavoriteStationPort;
@@ -20,6 +21,7 @@ public class UserDataDeletionService implements UserDataDeletionUseCase {
 	private final DeleteUserFavoriteStationPort deleteUserFavoriteStationPort;
 	private final DeleteUserFavoriteFacilityPort deleteUserFavoriteFacilityPort;
 	private final DeleteUserFavoriteRoutePort deleteUserFavoriteRoutePort;
+	private final AnonymizeUserRouteFeedbackPort anonymizeUserRouteFeedbackPort;
 	private final DeleteUserNotificationPreferencePort deleteUserNotificationPreferencePort;
 	private final DeleteUserPushNotificationPort deleteUserPushNotificationPort;
 	private final DeleteUserMobilityProfilePort deleteUserMobilityProfilePort;
@@ -30,6 +32,7 @@ public class UserDataDeletionService implements UserDataDeletionUseCase {
 		DeleteUserFavoriteStationPort deleteUserFavoriteStationPort,
 		DeleteUserFavoriteFacilityPort deleteUserFavoriteFacilityPort,
 		DeleteUserFavoriteRoutePort deleteUserFavoriteRoutePort,
+		AnonymizeUserRouteFeedbackPort anonymizeUserRouteFeedbackPort,
 		DeleteUserNotificationPreferencePort deleteUserNotificationPreferencePort,
 		DeleteUserPushNotificationPort deleteUserPushNotificationPort,
 		DeleteUserMobilityProfilePort deleteUserMobilityProfilePort,
@@ -39,6 +42,7 @@ public class UserDataDeletionService implements UserDataDeletionUseCase {
 		this.deleteUserFavoriteStationPort = deleteUserFavoriteStationPort;
 		this.deleteUserFavoriteFacilityPort = deleteUserFavoriteFacilityPort;
 		this.deleteUserFavoriteRoutePort = deleteUserFavoriteRoutePort;
+		this.anonymizeUserRouteFeedbackPort = anonymizeUserRouteFeedbackPort;
 		this.deleteUserNotificationPreferencePort = deleteUserNotificationPreferencePort;
 		this.deleteUserPushNotificationPort = deleteUserPushNotificationPort;
 		this.deleteUserMobilityProfilePort = deleteUserMobilityProfilePort;
@@ -51,6 +55,7 @@ public class UserDataDeletionService implements UserDataDeletionUseCase {
 		int deletedFavoriteStationCount = deleteUserFavoriteStationPort.deleteFavoriteStationsByUserId(normalizedUserId);
 		int deletedFavoriteFacilityCount = deleteUserFavoriteFacilityPort.deleteFavoriteFacilitiesByUserId(normalizedUserId);
 		int deletedFavoriteRouteCount = deleteUserFavoriteRoutePort.deleteFavoriteRoutesByUserId(normalizedUserId);
+		int anonymizedRouteFeedbackCount = anonymizeUserRouteFeedbackPort.anonymizeRouteFeedbacksByUserId(normalizedUserId);
 		boolean notificationSettingsDeleted =
 			deleteUserNotificationPreferencePort.deleteNotificationSettings(normalizedUserId);
 		int deletedRegisteredDeviceCount =
@@ -65,6 +70,7 @@ public class UserDataDeletionService implements UserDataDeletionUseCase {
 			deletedFavoriteStationCount,
 			deletedFavoriteFacilityCount,
 			deletedFavoriteRouteCount,
+			anonymizedRouteFeedbackCount,
 			notificationSettingsDeleted,
 			deletedRegisteredDeviceCount,
 			deletedPushNotificationCount,

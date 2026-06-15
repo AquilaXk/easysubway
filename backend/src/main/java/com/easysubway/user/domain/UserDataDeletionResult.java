@@ -5,6 +5,7 @@ public record UserDataDeletionResult(
 	int deletedFavoriteStationCount,
 	int deletedFavoriteFacilityCount,
 	int deletedFavoriteRouteCount,
+	int anonymizedRouteFeedbackCount,
 	boolean notificationSettingsDeleted,
 	int deletedRegisteredDeviceCount,
 	int deletedPushNotificationCount,
