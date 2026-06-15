@@ -976,64 +976,185 @@ class _MyReportListItem extends StatelessWidget {
         ? report.reportTypeLabel
         : report.description;
     final createdAtLabel = _reportDateLabel(report.createdAt);
+    void openReportDetail() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MyFacilityReportDetailScreen(report: report),
+        ),
+      );
+    }
 
     return Semantics(
       label:
           '내 신고, ${report.reportTypeLabel}, 접수번호 ${report.id}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
-      button: false,
+      button: true,
+      onTap: openReportDetail,
       child: ExcludeSemantics(
-        child: DecoratedBox(
-          key: Key('myReport-${report.id}'),
-          decoration: BoxDecoration(
-            color: Colors.white,
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFD5E2E4)),
+            side: const BorderSide(color: Color(0xFFD5E2E4)),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        report.reportTypeLabel,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF102A2C),
-                          fontWeight: FontWeight.w900,
-                          height: 1.25,
+          child: InkWell(
+            key: Key('myReport-${report.id}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: openReportDetail,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          report.reportTypeLabel,
+                          style: textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF102A2C),
+                            fontWeight: FontWeight.w900,
+                            height: 1.25,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    _MyReportStatusPill(label: report.statusLabel),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  description,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF102A2C),
-                    fontWeight: FontWeight.w700,
-                    height: 1.35,
+                      const SizedBox(width: 12),
+                      _MyReportStatusPill(label: report.statusLabel),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
-                  children: [
-                    _MyReportMetaText(label: '접수번호', value: report.id),
-                    _MyReportMetaText(label: '접수일', value: createdAtLabel),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Text(
+                    description,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    children: [
+                      _MyReportMetaText(label: '접수번호', value: report.id),
+                      _MyReportMetaText(label: '접수일', value: createdAtLabel),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class MyFacilityReportDetailScreen extends StatelessWidget {
+  const MyFacilityReportDetailScreen({required this.report, super.key});
+
+  final FacilityReportResult report;
+
+  @override
+  Widget build(BuildContext context) {
+    final description = report.description.isEmpty
+        ? report.reportTypeLabel
+        : report.description;
+    final createdAtLabel = _reportDateLabel(report.createdAt);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('신고 상세')),
+      body: SafeArea(
+        child: Semantics(
+          label:
+              '내 신고 상세, ${report.reportTypeLabel}, 현재 상태 ${report.statusLabel}, 접수번호 ${report.id}',
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            children: [
+              Text(
+                report.reportTypeLabel,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _MyReportDetailStatus(label: report.statusLabel),
+              const SizedBox(height: 24),
+              _MyReportDetailRow(label: '접수번호', value: report.id),
+              const Divider(height: 32),
+              _MyReportDetailRow(label: '접수일', value: createdAtLabel),
+              const Divider(height: 32),
+              _MyReportDetailRow(label: '신고 내용', value: description),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportDetailStatus extends StatelessWidget {
+  const _MyReportDetailStatus({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6F2F0),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF93C7C2)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: const Color(0xFF102A2C),
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MyReportDetailRow extends StatelessWidget {
+  const _MyReportDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFF29484B),
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w800,
+            height: 1.3,
+          ),
+        ),
+      ],
     );
   }
 }
