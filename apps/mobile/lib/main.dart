@@ -946,6 +946,7 @@ class _SupportAccessItem extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$title, $displayValue',
+      onTap: () => unawaited(_showDetail(context, displayValue)),
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
           onPressed: () => _showDetail(context, displayValue),
