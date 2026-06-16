@@ -1445,8 +1445,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('사진 확인'),
-        content: const Text('사진과 위치를 함께 보냅니다.'),
+        title: const Text('사진 보내기'),
+        content: const Text('이 사진을 함께 보낼까요?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
