@@ -1178,6 +1178,10 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   const saveSettingsPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SaveNotificationSettingsPort.java");
   const service = read("backend/src/main/java/com/easysubway/notification/application/service/NotificationPreferenceService.java");
   const repository = read("backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryNotificationPreferenceRepository.java");
+  const jdbcRepository = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcNotificationPreferenceRepository.java",
+  );
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1202,6 +1206,20 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   assert.match(saveSettingsPort, /interface SaveNotificationSettingsPort/);
   assert.match(service, /implements NotificationPreferenceUseCase/);
   assert.match(repository, /implements[\s\S]*LoadNotificationPreferencePort[\s\S]*SaveRegisteredDevicePort[\s\S]*SaveNotificationSettingsPort/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadNotificationPreferencePort[\s\S]*SaveRegisteredDevicePort[\s\S]*SaveNotificationSettingsPort[\s\S]*DeleteUserNotificationPreferencePort/);
+  assert.match(jdbcRepository, /Optional<NotificationSettings> loadNotificationSettings\(String userId\)/);
+  assert.match(jdbcRepository, /List<RegisteredDevice> loadDevices\(String userId\)/);
+  assert.match(jdbcRepository, /RegisteredDevice saveRegisteredDevice\(RegisteredDevice device\)/);
+  assert.match(jdbcRepository, /ON CONFLICT \(platform, device_token\) DO UPDATE/);
+  assert.match(jdbcRepository, /NotificationSettings saveNotificationSettings\(NotificationSettings settings\)/);
+  assert.match(jdbcRepository, /boolean deleteNotificationSettings\(String userId\)/);
+  assert.match(jdbcRepository, /int deleteRegisteredDevices\(String userId\)/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS notification_settings/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS registered_devices/);
+  assert.match(batchPostgresSchema, /CONSTRAINT uq_registered_devices_platform_token/);
+  assert.match(batchPostgresSchema, /CHECK \(platform IN \('ANDROID', 'IOS'\)\)/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_registered_devices_user_registered/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/devices"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/notification-settings"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/notification-settings"\)/);
@@ -1222,6 +1240,10 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   const saveOutboxPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SavePushNotificationOutboxPort.java");
   const service = read("backend/src/main/java/com/easysubway/notification/application/service/PushNotificationDispatchService.java");
   const repository = read("backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryPushNotificationOutboxRepository.java");
+  const jdbcRepository = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcPushNotificationOutboxRepository.java",
+  );
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1244,6 +1266,16 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(service, /LoadNotificationPreferencePort/);
   assert.match(service, /SavePushNotificationOutboxPort/);
   assert.match(repository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*DeleteUserPushNotificationPort/);
+  assert.match(jdbcRepository, /List<PushNotification> loadPushNotifications\(String userId\)/);
+  assert.match(jdbcRepository, /PushNotification savePushNotification\(PushNotification notification\)/);
+  assert.match(jdbcRepository, /int deletePushNotifications\(String userId\)/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS push_notification_outbox/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_platform/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_type/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_status/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_push_notification_outbox_user_created/);
   assert.match(controller, /@PostMapping\("\/admin\/notifications\/push"\)/);
   assert.match(controller, /PushNotificationDispatchUseCase/);
   assert.doesNotMatch(controller, /deviceToken/);
