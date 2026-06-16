@@ -115,6 +115,7 @@ class EasySubwayApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'EasySubway',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF006D77)),
         scaffoldBackgroundColor: const Color(0xFFF6F8F9),
@@ -839,101 +840,84 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 22),
             const Divider(height: 1),
             const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                const spacing = 10.0;
-                final itemWidth = (constraints.maxWidth - spacing) / 2;
-                return Wrap(
-                  key: const Key('homeSecondaryActionsGroup'),
-                  spacing: spacing,
-                  runSpacing: spacing,
-                  children: [
-                    SizedBox(
-                      width: itemWidth,
-                      height: 56,
-                      child: _HomeSecondaryActionButton(
-                        key: const Key('mobilityProfileButton'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<MobilityProfileOption>(
-                              builder: (_) => const MobilityProfileScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.accessibility_new),
-                        label: '이동 조건',
+            _HomeActionSection(
+              title: '개인 설정',
+              groupKey: const Key('homeSettingsActionsGroup'),
+              children: [
+                _HomeSecondaryActionButton(
+                  key: const Key('mobilityProfileButton'),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<MobilityProfileOption>(
+                        builder: (_) => const MobilityProfileScreen(),
                       ),
-                    ),
-                    if (hasFavorites)
-                      SizedBox(
-                        width: itemWidth,
-                        height: 56,
-                        child: _HomeSecondaryActionButton(
-                          key: const Key('favoritesButton'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => FavoriteHomeScreen(
-                                  favoriteRepository: favoriteRepository,
-                                  favoriteFacilityRepository:
-                                      favoriteFacilityRepository,
-                                  favoriteRouteRepository:
-                                      favoriteRouteRepository,
-                                  stationRepository: repository,
-                                  reportRepository: reportRepository,
-                                  locationProvider: locationProvider,
-                                  facilityReportDraftTargetStore:
-                                      facilityReportDraftTargetStore,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.star_outline),
-                          label: '즐겨찾기',
+                    );
+                  },
+                  icon: const Icon(Icons.accessibility_new),
+                  label: '이동 조건',
+                ),
+                if (notificationRepository != null)
+                  _HomeSecondaryActionButton(
+                    key: const Key('notificationSettingsButton'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => NotificationSettingsScreen(
+                            repository: notificationRepository,
+                            notificationPermissionProvider:
+                                notificationPermissionProvider,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.notifications_active_outlined),
+                    label: '알림 설정',
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _HomeActionSection(
+              title: '내 정보',
+              groupKey: const Key('homeMyInfoActionsGroup'),
+              children: [
+                if (hasFavorites)
+                  _HomeSecondaryActionButton(
+                    key: const Key('favoritesButton'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => FavoriteHomeScreen(
+                            favoriteRepository: favoriteRepository,
+                            favoriteFacilityRepository:
+                                favoriteFacilityRepository,
+                            favoriteRouteRepository: favoriteRouteRepository,
+                            stationRepository: repository,
+                            reportRepository: reportRepository,
+                            locationProvider: locationProvider,
+                            facilityReportDraftTargetStore:
+                                facilityReportDraftTargetStore,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.star_outline),
+                    label: '즐겨찾기',
+                  ),
+                _HomeSecondaryActionButton(
+                  key: const Key('myReportsButton'),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MyFacilityReportListScreen(
+                          repository: reportRepository,
                         ),
                       ),
-                    SizedBox(
-                      width: itemWidth,
-                      height: 56,
-                      child: _HomeSecondaryActionButton(
-                        key: const Key('myReportsButton'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => MyFacilityReportListScreen(
-                                repository: reportRepository,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.receipt_long_outlined),
-                        label: '내 신고',
-                      ),
-                    ),
-                    if (notificationRepository != null)
-                      SizedBox(
-                        width: itemWidth,
-                        height: 56,
-                        child: _HomeSecondaryActionButton(
-                          key: const Key('notificationSettingsButton'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => NotificationSettingsScreen(
-                                  repository: notificationRepository,
-                                  notificationPermissionProvider:
-                                      notificationPermissionProvider,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.notifications_active_outlined),
-                          label: '알림 설정',
-                        ),
-                      ),
-                  ],
-                );
-              },
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: '내 신고',
+                ),
+              ],
             ),
           ],
         ),
@@ -966,6 +950,52 @@ class _HomePrimaryActionButton extends StatelessWidget {
       ),
       icon: IconTheme.merge(data: const IconThemeData(size: 30), child: icon),
       label: Text(label, maxLines: 1),
+    );
+  }
+}
+
+class _HomeActionSection extends StatelessWidget {
+  const _HomeActionSection({
+    required this.title,
+    required this.groupKey,
+    required this.children,
+  });
+
+  final String title;
+  final Key groupKey;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: textTheme.titleMedium?.copyWith(
+            color: const Color(0xFF102A2C),
+            fontWeight: FontWeight.w800,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 10.0;
+            final itemWidth = (constraints.maxWidth - spacing) / 2;
+            return Wrap(
+              key: groupKey,
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final child in children)
+                  SizedBox(width: itemWidth, height: 56, child: child),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
