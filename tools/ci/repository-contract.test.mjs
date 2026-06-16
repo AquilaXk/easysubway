@@ -1211,6 +1211,7 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   assert.match(jdbcRepository, /Optional<NotificationSettings> loadNotificationSettings\(String userId\)/);
   assert.match(jdbcRepository, /List<RegisteredDevice> loadDevices\(String userId\)/);
   assert.match(jdbcRepository, /RegisteredDevice saveRegisteredDevice\(RegisteredDevice device\)/);
+  assert.match(jdbcRepository, /ON CONFLICT \(platform, device_token\) DO UPDATE/);
   assert.match(jdbcRepository, /NotificationSettings saveNotificationSettings\(NotificationSettings settings\)/);
   assert.match(jdbcRepository, /boolean deleteNotificationSettings\(String userId\)/);
   assert.match(jdbcRepository, /int deleteRegisteredDevices\(String userId\)/);
