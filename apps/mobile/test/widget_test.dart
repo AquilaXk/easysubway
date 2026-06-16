@@ -3273,7 +3273,7 @@ void main() {
     expect(find.text('사진 1장 추가됨'), findsOneWidget);
   });
 
-  testWidgets('시설 신고 화면은 사진과 위치를 보내기 전에 확인한다', (tester) async {
+  testWidgets('시설 신고 화면은 사진을 보내기 전에 쉬운 문구로 확인한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
 
     await tester.pumpWidget(
@@ -3329,8 +3329,10 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('사진 확인'), findsOneWidget);
-    expect(find.text('사진과 위치를 함께 보냅니다.'), findsOneWidget);
+    expect(find.text('사진 보내기'), findsOneWidget);
+    expect(find.text('이 사진을 함께 보낼까요?'), findsOneWidget);
+    expect(find.text('사진 확인'), findsNothing);
+    expect(find.text('사진과 위치를 함께 보냅니다.'), findsNothing);
     expect(find.text('사진·위치 확인'), findsNothing);
     expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsNothing);
     expect(reportRepository.requests, isEmpty);
