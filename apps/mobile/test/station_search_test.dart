@@ -8,6 +8,75 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다', () {
+    expect(
+      () => stationApiBaseUriForEnvironment(
+        configuredBaseUrl: '',
+        isAndroid: true,
+        isReleaseMode: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Release API base URL must be configured.',
+        ),
+      ),
+    );
+  });
+
+  test('릴리즈 빌드는 HTTPS API 주소만 사용한다', () {
+    expect(
+      () => stationApiBaseUriForEnvironment(
+        configuredBaseUrl: 'http://api.easysubway.example',
+        isAndroid: false,
+        isReleaseMode: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Release API base URL must use HTTPS.',
+        ),
+      ),
+    );
+
+    final baseUri = stationApiBaseUriForEnvironment(
+      configuredBaseUrl: 'https://api.easysubway.example',
+      isAndroid: false,
+      isReleaseMode: true,
+    );
+
+    expect(baseUri, Uri.parse('https://api.easysubway.example'));
+  });
+
+  test('릴리즈 빌드는 호스트가 없는 API 주소를 거부한다', () {
+    expect(
+      () => stationApiBaseUriForEnvironment(
+        configuredBaseUrl: 'https://',
+        isAndroid: false,
+        isReleaseMode: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Release API base URL must include a host.',
+        ),
+      ),
+    );
+  });
+
+  test('개발 빌드는 Android 에뮬레이터 로컬 API 주소를 유지한다', () {
+    final baseUri = stationApiBaseUriForEnvironment(
+      configuredBaseUrl: '',
+      isAndroid: true,
+      isReleaseMode: false,
+    );
+
+    expect(baseUri, Uri.parse('http://10.0.2.2:8080'));
+  });
+
   test('역 데이터 품질은 내부 레벨을 쉬운 안내 문구로 바꾼다', () {
     final labels = ['LEVEL_1', 'LEVEL_2', 'LEVEL_3', 'LEVEL_4', 'UNKNOWN']
         .map(
