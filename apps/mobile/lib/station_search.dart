@@ -1839,7 +1839,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   final TextEditingController _queryController = TextEditingController();
   Future<List<SubwayLineOption>>? _lineOptionsFuture;
   SubwayLineOption? _selectedLine;
-  bool _isLocationPreflightRunning = false;
+  bool _isNearbySearchRunning = false;
   bool _isOpeningLocationSettings = false;
 
   @override
@@ -1876,7 +1876,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                   return _StationLineFilterSection(
                     linesFuture: _lineOptionsFuture!,
                     selectedLine: _selectedLine,
-                    enabled: !isSearching && !_isLocationPreflightRunning,
+                    enabled: !isSearching && !_isNearbySearchRunning,
                     onLineSelected: _selectLine,
                   );
                 },
@@ -1925,7 +1925,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               builder: (context, _) {
                 final isLoading =
                     _controller.state.status == StationSearchStatus.loading ||
-                    _isLocationPreflightRunning;
+                    _isNearbySearchRunning;
                 return OutlinedButton.icon(
                   key: const Key('nearbyStationSearchButton'),
                   onPressed: isLoading ? null : _searchNearby,
@@ -1973,27 +1973,17 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   Future<void> _searchNearby() async {
     if (_controller.state.status == StationSearchStatus.loading ||
-        _isLocationPreflightRunning) {
+        _isNearbySearchRunning) {
       return;
     }
-    setState(() => _isLocationPreflightRunning = true);
+    setState(() => _isNearbySearchRunning = true);
+    // OS 권한 요청과 GPS 상태 확인은 네이티브 위치 조회에 맡기고,
+    // 사용자가 누른 즉시 가까운 역을 찾는 흐름으로 유지한다.
     try {
-      final needsPermissionRequest = await widget.locationProvider
-          .needsLocationPermissionRequest();
-      if (!mounted) {
-        return;
-      }
-      if (needsPermissionRequest &&
-          !await _confirmLocationUse(context, message: '현재 위치로 가까운 역을 찾습니다.')) {
-        return;
-      }
-      if (!mounted) {
-        return;
-      }
       await _controller.searchNearby(widget.locationProvider);
     } finally {
       if (mounted) {
-        setState(() => _isLocationPreflightRunning = false);
+        setState(() => _isNearbySearchRunning = false);
       }
     }
   }
@@ -2026,30 +2016,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ),
     );
   }
-}
-
-Future<bool> _confirmLocationUse(
-  BuildContext context, {
-  required String message,
-}) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('현재 위치 사용'),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('위치 사용'),
-        ),
-      ],
-    ),
-  );
-  return confirmed ?? false;
 }
 
 class _StationLineFilterSection extends StatelessWidget {
