@@ -515,7 +515,12 @@ void main() {
         ),
       );
 
+      expect(find.text('안녕하세요'), findsOneWidget);
       expect(find.text('어디로 가시나요?'), findsOneWidget);
+      expect(
+        find.byKey(const Key('homeSecondaryActionsGroup')),
+        findsOneWidget,
+      );
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
@@ -550,8 +555,11 @@ void main() {
         find.byKey(const Key('notificationSettingsButton')),
       );
 
-      expect(stationButtonSize.height, greaterThanOrEqualTo(76));
-      expect(routeButtonSize.height, greaterThanOrEqualTo(76));
+      expect(stationButtonSize.height, greaterThanOrEqualTo(88));
+      expect(routeButtonSize.height, greaterThanOrEqualTo(88));
+      expect(profileButtonSize.height, lessThanOrEqualTo(58));
+      expect(myReportsButtonSize.height, lessThanOrEqualTo(58));
+      expect(notificationButtonSize.height, lessThanOrEqualTo(58));
       expect(profileButtonSize.height, lessThan(stationButtonSize.height));
       expect(myReportsButtonSize.height, lessThan(stationButtonSize.height));
       expect(notificationButtonSize.height, lessThan(stationButtonSize.height));
