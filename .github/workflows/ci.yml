@@ -235,6 +235,8 @@ jobs:
 
       - name: Mobile App CI / Run mobile contracts
         if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
+        env:
+          EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"
         run: node --test --test-name-pattern "모바일 generic catch|Android 릴리즈 권한|iOS 앱은 개인정보 매니페스트|Android 런처 아이콘" tools/ci/repository-contract.test.mjs
 
       - name: Mobile App CI / Run Flutter analyzer and tests
