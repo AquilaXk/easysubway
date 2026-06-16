@@ -14,6 +14,7 @@ const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.
 const _routeFeedbackErrorMessage = '의견을 보내지 못했습니다.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
+const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -648,6 +649,7 @@ class RouteSearchResult {
         '이동 안내 ${steps.map((step) => '${step.sequence}번 ${step.title}, ${step.burdenLabel}, ${step.description}').join(', ')}',
       );
     }
+    parts.add('안전 안내 $_routeSafetyGuidanceNotice');
     return parts.join(', ');
   }
 }
@@ -1719,8 +1721,13 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  const _RouteNotice(
+                    title: '안전 안내',
+                    text: _routeSafetyGuidanceNotice,
+                    icon: Icons.info_outline,
+                  ),
                   if (result.blockedReasons.isNotEmpty) ...[
-                    const SizedBox(height: 16),
                     for (final reason in result.blockedReasons)
                       _RouteNotice(
                         title: '안내 불가 이유',
