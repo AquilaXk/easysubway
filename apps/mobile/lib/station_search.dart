@@ -3548,6 +3548,9 @@ Uri stationApiBaseUriForEnvironment({
     if (isReleaseMode && baseUri.scheme != 'https') {
       throw StateError('Release API base URL must use HTTPS.');
     }
+    if (isReleaseMode && baseUri.host.isEmpty) {
+      throw StateError('Release API base URL must include a host.');
+    }
     return baseUri;
   }
   if (isReleaseMode) {

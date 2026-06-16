@@ -50,6 +50,23 @@ void main() {
     expect(baseUri, Uri.parse('https://api.easysubway.example'));
   });
 
+  test('릴리즈 빌드는 호스트가 없는 API 주소를 거부한다', () {
+    expect(
+      () => stationApiBaseUriForEnvironment(
+        configuredBaseUrl: 'https://',
+        isAndroid: false,
+        isReleaseMode: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Release API base URL must include a host.',
+        ),
+      ),
+    );
+  });
+
   test('개발 빌드는 Android 에뮬레이터 로컬 API 주소를 유지한다', () {
     final baseUri = stationApiBaseUriForEnvironment(
       configuredBaseUrl: '',
