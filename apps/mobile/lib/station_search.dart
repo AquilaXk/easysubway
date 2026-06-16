@@ -703,9 +703,9 @@ class StationSearchResult {
   String get semanticLabel {
     final distance = distanceLabel;
     if (distance.isEmpty) {
-      return '$nameKo, $lineLabel';
+      return '$nameKo, $lineLabel, $region, $dataQualityLabel';
     }
-    return '$nameKo, $distance, $lineLabel';
+    return '$nameKo, $distance, $lineLabel, $region, $dataQualityLabel';
   }
 }
 
@@ -1864,6 +1864,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   void _handleQueryChanged() {
     if (!mounted) {
       return;
+    }
+    if (!_hasSearchQuery &&
+        _controller.state.status != StationSearchStatus.idle) {
+      _controller.search('');
     }
     setState(() {});
   }

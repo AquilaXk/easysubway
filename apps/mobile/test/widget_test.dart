@@ -1112,11 +1112,16 @@ void main() {
       expect(find.text('수도권'), findsNothing);
       expect(find.text('기본 정보만 있음'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
-      expect(find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선'), findsOneWidget);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선')),
+        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+        ),
         isSemantics(
-          label: '상록수, 수도권 4호선, 경의중앙선',
+          label: '상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
           isButton: true,
           hasTapAction: true,
         ),
@@ -1138,6 +1143,19 @@ void main() {
 
       final namedLine = tester.widget<Text>(find.text('경의중앙'));
       expect(namedLine.style?.fontSize, 12);
+
+      await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
+      expect(
+        find.byKey(const Key('nearbyStationSearchButton')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsNothing,
+      );
     } finally {
       semanticsHandle.dispose();
     }
@@ -1452,7 +1470,10 @@ void main() {
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 2호선 · 230m 거리'), findsOneWidget);
-      expect(find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        findsOneWidget,
+      );
 
       final nearbyButtonSize = tester.getSize(
         find.byKey(const Key('nearbyStationSearchButton')),
