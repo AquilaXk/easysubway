@@ -515,6 +515,7 @@ class RouteSearchResult {
     required this.score,
     required this.steps,
     required this.warnings,
+    this.recommendationReasons = const [],
     required this.blockedReasons,
     required this.createdAt,
   });
@@ -522,9 +523,12 @@ class RouteSearchResult {
   factory RouteSearchResult.fromJson(Map<String, Object?> json) {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
+    final rawRecommendationReasons = json['recommendationReasons'];
     final rawBlockedReasons = json['blockedReasons'];
     if (rawSteps is! List ||
         rawWarnings is! List ||
+        (rawRecommendationReasons != null &&
+            rawRecommendationReasons is! List) ||
         rawBlockedReasons is! List) {
       throw const FormatException('Invalid route payload');
     }
@@ -559,6 +563,10 @@ class RouteSearchResult {
             return RouteSearchWarning.fromJson(item);
           })
           .toList(growable: false),
+      recommendationReasons: _routeStringList(
+        rawRecommendationReasons,
+        'recommendation reason',
+      ),
       blockedReasons: rawBlockedReasons
           .map((item) {
             if (item is! String || item.trim().isEmpty) {
@@ -583,6 +591,7 @@ class RouteSearchResult {
   final int score;
   final List<RouteSearchStep> steps;
   final List<RouteSearchWarning> warnings;
+  final List<String> recommendationReasons;
   final List<String> blockedReasons;
   final String createdAt;
 
@@ -658,6 +667,9 @@ class RouteSearchResult {
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
+    }
+    if (!isBlocked && recommendationReasons.isNotEmpty) {
+      parts.add('추천 이유 ${recommendationReasons.join(', ')}');
     }
     final arrivalStep = arrivalGuidanceStep;
     if (arrivalStep != null) {
@@ -1748,6 +1760,13 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  if (!result.isBlocked &&
+                      result.recommendationReasons.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _RouteRecommendationReasons(
+                      reasons: result.recommendationReasons,
+                    ),
+                  ],
                   if (arrivalStep != null) ...[
                     const SizedBox(height: 16),
                     _RouteArrivalGuidance(step: arrivalStep),
@@ -1783,6 +1802,63 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteRecommendationReasons extends StatelessWidget {
+  const _RouteRecommendationReasons({required this.reasons});
+
+  final List<String> reasons;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2F0),
+        border: Border.all(color: const Color(0xFF9FCACE)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF004A50),
+                  size: 26,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '추천 이유',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF004A50),
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final reason in reasons.take(3))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  reason,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -2711,6 +2787,23 @@ String _optionalRouteString(Map<String, Object?> json, String key) {
     return value.trim();
   }
   return '';
+}
+
+List<String> _routeStringList(Object? value, String label) {
+  if (value == null) {
+    return const [];
+  }
+  if (value is! List) {
+    throw FormatException('Invalid $label payload');
+  }
+  return value
+      .map((item) {
+        if (item is! String || item.trim().isEmpty) {
+          throw FormatException('Invalid $label payload');
+        }
+        return item.trim();
+      })
+      .toList(growable: false);
 }
 
 int _requiredRouteInt(Map<String, Object?> json, String key) {
