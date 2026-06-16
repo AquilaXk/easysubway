@@ -894,6 +894,10 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   const savePort = read("backend/src/main/java/com/easysubway/profile/application/port/out/SaveMobilityProfilePort.java");
   const service = read("backend/src/main/java/com/easysubway/profile/application/service/MobilityProfileService.java");
   const repository = read("backend/src/main/java/com/easysubway/profile/adapter/out/persistence/InMemoryMobilityProfileRepository.java");
+  const jdbcRepository = read(
+    "backend/src/main/java/com/easysubway/profile/adapter/out/persistence/JdbcMobilityProfileRepository.java",
+  );
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java");
 
   assert.match(profile, /record MobilityProfile/);
@@ -917,6 +921,16 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   assert.match(service, /defaultProfile/);
   assert.match(service, /MobilityType\.WHEELCHAIR/);
   assert.match(repository, /implements[\s\S]*LoadMobilityProfilePort[\s\S]*SaveMobilityProfilePort/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadMobilityProfilePort[\s\S]*SaveMobilityProfilePort[\s\S]*DeleteUserMobilityProfilePort/);
+  assert.match(jdbcRepository, /Optional<MobilityProfile> loadProfile\(String userId\)/);
+  assert.match(jdbcRepository, /MobilityProfile saveProfile\(MobilityProfile profile\)/);
+  assert.match(jdbcRepository, /boolean deleteMobilityProfile\(String userId\)/);
+  assert.match(jdbcRepository, /mobility_profiles/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS mobility_profiles/);
+  assert.match(batchPostgresSchema, /user_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
+  assert.match(batchPostgresSchema, /mobility_type VARCHAR\(40\) NOT NULL/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_mobility_profiles_updated_at/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/mobility-profile"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/mobility-profile"\)/);
 });
