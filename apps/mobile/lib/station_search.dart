@@ -13,6 +13,7 @@ import 'mobile_error_reporter.dart';
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
@@ -2838,6 +2839,8 @@ class _StationDetailContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _StationDetailHeader(detail: detail),
+        const SizedBox(height: 12),
+        const _StationSafetyGuidanceNotice(),
         if (favoriteController != null) ...[
           const SizedBox(height: 16),
           _StationFavoriteControl(
@@ -3093,6 +3096,23 @@ class _StationDetailHeader extends StatelessWidget {
               text: '마지막 확인 ${detail.lastVerifiedAt}',
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StationSafetyGuidanceNotice extends StatelessWidget {
+  const _StationSafetyGuidanceNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '안전 안내, $_stationSafetyGuidanceNotice',
+      child: const ExcludeSemantics(
+        child: _StationDetailInfoRow(
+          icon: Icons.info_outline,
+          text: _stationSafetyGuidanceNotice,
         ),
       ),
     );
