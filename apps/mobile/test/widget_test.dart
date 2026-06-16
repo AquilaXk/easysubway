@@ -1081,11 +1081,22 @@ void main() {
         searchInput.decoration?.floatingLabelBehavior,
         FloatingLabelBehavior.always,
       );
+      expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
+      expect(
+        find.byKey(const Key('nearbyStationSearchButton')),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('stationSearchSubmitButton')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
 
@@ -1098,7 +1109,8 @@ void main() {
       );
       expect(find.text('경의중앙'), findsOneWidget);
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
-      expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.text('수도권'), findsNothing);
+      expect(find.text('기본 정보만 있음'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
         find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
@@ -1114,22 +1126,108 @@ void main() {
           hasTapAction: true,
         ),
       );
+      final resultTileSize = tester.getSize(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      expect(resultTileSize.height, lessThanOrEqualTo(112));
 
       final lineBadgeSize = tester.getSize(
         find.byKey(const Key('stationLineBadge-seoul-4')),
       );
-      expect(lineBadgeSize.width, 40);
-      expect(lineBadgeSize.height, 40);
+      expect(lineBadgeSize.width, 32);
+      expect(lineBadgeSize.height, 32);
 
       final lineNumber = tester.widget<Text>(find.text('4'));
-      expect(lineNumber.style?.fontSize, 24);
+      expect(lineNumber.style?.fontSize, 20);
       expect(lineNumber.style?.color, const Color(0xFF102A2C));
 
       final namedLine = tester.widget<Text>(find.text('경의중앙'));
-      expect(namedLine.style?.fontSize, 15);
+      expect(namedLine.style?.fontSize, 12);
+
+      await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
+      expect(
+        find.byKey(const Key('nearbyStationSearchButton')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsNothing,
+      );
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      nextResults: [
+        const StationSearchResult(
+          id: 'station-transfer',
+          nameKo: '환승역',
+          nameEn: 'Transfer',
+          region: '수도권',
+          dataQualityLevel: 'LEVEL_1',
+          lastVerifiedAt: '2026-06-12',
+          lines: [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+            StationSearchLine(
+              id: 'korail-gyeongui-jungang',
+              name: '경의중앙선',
+              color: '#75C5A1',
+              stationCode: 'K232',
+            ),
+            StationSearchLine(
+              id: 'suin-bundang',
+              name: '수인분당선',
+              color: '#F5A200',
+              stationCode: 'K249',
+            ),
+            StationSearchLine(
+              id: 'shinbundang',
+              name: '신분당선',
+              color: '#D4003B',
+              stationCode: 'D14',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '환승');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('+3'), findsOneWidget);
+    expect(find.text('경의중앙'), findsNothing);
+
+    final resultTileSize = tester.getSize(
+      find.byKey(const Key('stationSearchResult-station-transfer')),
+    );
+    expect(resultTileSize.height, lessThanOrEqualTo(112));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
 
   testWidgets('역 검색은 노선을 선택해 결과를 좁힌다', (tester) async {
@@ -1217,6 +1315,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
 
@@ -1309,6 +1408,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pump();
 
@@ -1369,7 +1469,7 @@ void main() {
       expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수'), findsOneWidget);
-      expect(find.text('230m 거리'), findsOneWidget);
+      expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
       expect(
         find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
@@ -1466,6 +1566,52 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.requestedNearbyLocations, hasLength(1));
+  });
+
+  testWidgets('역 검색은 주변 역 확인 중 입력을 지워도 결과를 유지한다', (tester) async {
+    final locationCompleter = Completer<CurrentLocation>();
+    final locationProvider = FakeCurrentLocationProvider(
+      locationLoader: () => locationCompleter.future,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.pump();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상');
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
+    await tester.pump();
+
+    locationCompleter.complete(
+      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNearbyLocations, hasLength(1));
+    expect(find.text('상록수'), findsOneWidget);
+    expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
   });
 
   testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {
@@ -1611,6 +1757,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -1726,6 +1873,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -1800,6 +1948,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -1844,6 +1993,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -1899,6 +2049,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -1930,6 +2081,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -2006,6 +2158,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pump();
 
@@ -2725,6 +2878,7 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -3615,6 +3769,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -3709,6 +3864,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -3848,6 +4004,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -3978,6 +4135,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(
