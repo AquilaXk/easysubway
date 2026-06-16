@@ -33,8 +33,9 @@ function assertPrivacyCollectedDataType(privacyManifest, dataType) {
 }
 
 function androidManifestPermissions(androidManifest) {
-  return [...androidManifest.matchAll(/<uses-permission android:name="([^"]+)"\/>/g)]
+  return [...androidManifest.matchAll(/<uses-permission\s+android:name="([^"]+)"\s*\/>/g)]
     .map((match) => match[1])
+    .filter((permission) => permission.startsWith("android.permission."))
     .sort();
 }
 
@@ -376,6 +377,14 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   const mobileJob = jobBlock(workflow, "mobile-app", "android");
 
   assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
+  assert.match(mobileJob, /Mobile App CI \/ Generate Android release merged manifest/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: ci-release-manifest-only\.jks/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-manifest-only/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release-manifest-only/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-manifest-only/);
+  assert.match(mobileJob, /flutter pub get/);
+  assert.match(mobileJob, /flutter build apk --config-only/);
+  assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
   assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
   assert.match(
     mobileJob,
@@ -1536,7 +1545,13 @@ test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한�
 });
 
 test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다", () => {
-  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const mergedManifestPath = "apps/mobile/build/app/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml";
+  assert.ok(
+    existsSync(path.join(root, mergedManifestPath)),
+    "Android release merged manifest must be generated before running this contract.",
+  );
+
+  const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
 
   assert.deepEqual(permissions, [
