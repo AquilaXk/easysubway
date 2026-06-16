@@ -877,8 +877,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS facility_reports/);
   assert.match(batchPostgresSchema, /photo_data_base64 TEXT/);
+  assert.match(batchPostgresSchema, /CONSTRAINT fk_facility_reports_duplicate/);
+  assert.match(batchPostgresSchema, /FOREIGN KEY \(duplicate_of_report_id\) REFERENCES facility_reports\(report_id\)/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_facility_reports_report_type/);
+  assert.match(batchPostgresSchema, /CHECK \(report_type IN \('BROKEN', 'UNDER_CONSTRUCTION', 'CLOSED', 'LOCATION_WRONG', 'INFORMATION_WRONG', 'RECOVERED'\)\)/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_facility_reports_status/);
+  assert.match(batchPostgresSchema, /CHECK \(status IN \('SUBMITTED', 'DUPLICATE', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'RESOLVED'\)\)/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_created/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_user/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_status_created/);
   assert.match(transitRepository, /implements LoadTransitMasterPort, SaveAccessibilityFacilityStatusPort/);
   assert.match(transitRepository, /saveFacilityStatus\(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
