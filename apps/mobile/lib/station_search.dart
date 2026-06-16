@@ -2339,10 +2339,12 @@ class _StationSearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final stationName = _stationResultDisplayName(result.nameKo);
+    final semanticLabel = _stationResultSemanticLabel(result);
 
     return MergeSemantics(
       child: Semantics(
-        label: result.semanticLabel,
+        label: semanticLabel,
         button: true,
         onTap: onTap,
         child: ExcludeSemantics(
@@ -2383,7 +2385,7 @@ class _StationSearchResultTile extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              result.nameKo,
+                              stationName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.headlineSmall?.copyWith(
@@ -2424,6 +2426,24 @@ class _StationSearchResultTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _stationResultDisplayName(String name) {
+  final trimmedName = name.trim();
+  // 백엔드 역 이름은 접미사 없이 내려올 수 있어 검색 결과 화면에서만 보정한다.
+  if (trimmedName.endsWith('역')) {
+    return trimmedName;
+  }
+  return '$trimmedName역';
+}
+
+String _stationResultSemanticLabel(StationSearchResult result) {
+  final stationName = _stationResultDisplayName(result.nameKo);
+  final distance = result.distanceLabel;
+  if (distance.isEmpty) {
+    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+  }
+  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
 }
 
 class FavoriteStationListScreen extends StatefulWidget {
