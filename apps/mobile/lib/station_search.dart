@@ -3458,7 +3458,7 @@ class StationLineBadges extends StatelessWidget {
     final maxCount = maxBadgeCount;
     final shouldCollapse = maxCount != null && lines.length > maxCount;
     final visibleLineCount = shouldCollapse
-        ? (maxCount - 1).clamp(1, lines.length)
+        ? (maxCount - 1).clamp(1, lines.length).toInt()
         : lines.length;
     final hiddenLineCount = lines.length - visibleLineCount;
 
