@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
@@ -11,8 +12,7 @@ import 'mobile_error_reporter.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
-const _currentLocationDisabledMessage =
-    '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
@@ -3530,10 +3530,34 @@ double _contrastRatio(Color first, Color second) {
 
 Uri defaultStationApiBaseUri() {
   const configuredBaseUrl = String.fromEnvironment('EASYSUBWAY_API_BASE_URL');
-  if (configuredBaseUrl.isNotEmpty) {
-    return Uri.parse(configuredBaseUrl);
+  return stationApiBaseUriForEnvironment(
+    configuredBaseUrl: configuredBaseUrl,
+    isAndroid: Platform.isAndroid,
+    isReleaseMode: kReleaseMode,
+  );
+}
+
+Uri stationApiBaseUriForEnvironment({
+  required String configuredBaseUrl,
+  required bool isAndroid,
+  required bool isReleaseMode,
+}) {
+  final trimmedBaseUrl = configuredBaseUrl.trim();
+  if (trimmedBaseUrl.isNotEmpty) {
+    final baseUri = Uri.parse(trimmedBaseUrl);
+    if (isReleaseMode && baseUri.scheme != 'https') {
+      throw StateError('Release API base URL must use HTTPS.');
+    }
+    if (isReleaseMode && baseUri.host.isEmpty) {
+      throw StateError('Release API base URL must include a host.');
+    }
+    return baseUri;
   }
-  if (Platform.isAndroid) {
+  if (isReleaseMode) {
+    // 운영 빌드는 로컬 개발 주소로 조용히 떨어지지 않게 빌드 설정 누락을 즉시 드러낸다.
+    throw StateError('Release API base URL must be configured.');
+  }
+  if (isAndroid) {
     return Uri.parse('http://10.0.2.2:8080');
   }
   return Uri.parse('http://127.0.0.1:8080');
