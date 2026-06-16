@@ -1866,6 +1866,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       return;
     }
     if (!_hasSearchQuery &&
+        !_isNearbySearchRunning &&
         _controller.state.status != StationSearchStatus.idle) {
       _controller.search('');
     }

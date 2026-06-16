@@ -1568,6 +1568,52 @@ void main() {
     expect(repository.requestedNearbyLocations, hasLength(1));
   });
 
+  testWidgets('역 검색은 주변 역 확인 중 입력을 지워도 결과를 유지한다', (tester) async {
+    final locationCompleter = Completer<CurrentLocation>();
+    final locationProvider = FakeCurrentLocationProvider(
+      locationLoader: () => locationCompleter.future,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.pump();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상');
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
+    await tester.pump();
+
+    locationCompleter.complete(
+      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNearbyLocations, hasLength(1));
+    expect(find.text('상록수'), findsOneWidget);
+    expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
+  });
+
   testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
