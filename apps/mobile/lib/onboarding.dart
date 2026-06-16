@@ -438,7 +438,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() {
         _notificationMessage = status == NotificationPermissionStatus.granted
             ? '알림 준비 완료'
-            : '알림 권한을 켜 주세요.';
+            : '설정에서 알림 권한을 켜 주세요.';
         _isNotificationFailure = status != NotificationPermissionStatus.granted;
       });
     } on NotificationSettingsException catch (error) {
@@ -576,7 +576,7 @@ class _OnboardingNotificationSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          '시설 고장과 신고 결과를 알려드려요.',
+          '시설 고장, 신고 결과, 공사 안내를 알려드려요.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xFF29484B),
             fontWeight: FontWeight.w700,
