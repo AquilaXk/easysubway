@@ -930,9 +930,12 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               onSelected: _updateDestinationStation,
             ),
             const SizedBox(height: 12),
-            // 단순 보기에서는 온보딩에서 고른 이동 조건을 그대로 적용해 선택 부담을 줄인다.
+            // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
             if (widget.simpleViewEnabled)
-              _RouteMobilityTypeSummary(mobilityType: _selectedMobilityType)
+              _RouteMobilityTypeSummary(
+                mobilityType: _selectedMobilityType,
+                onChangeRequested: _showMobilityTypePicker,
+              )
             else
               InputDecorator(
                 key: const Key('routeMobilityTypeInput'),
@@ -1040,64 +1043,173 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     });
     _controller.reset();
   }
+
+  Future<void> _showMobilityTypePicker() async {
+    final selectedMobilityType = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            children: [
+              Text(
+                '이동 조건',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final option in mobilityProfileOptions)
+                _RouteMobilityTypeOptionButton(
+                  key: Key('routeMobilityOption-${option.mobilityType}'),
+                  option: option,
+                  selected: option.mobilityType == _selectedMobilityType,
+                  onSelected: () =>
+                      Navigator.of(context).pop(option.mobilityType),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selectedMobilityType == null) {
+      return;
+    }
+    setState(() {
+      _selectedMobilityType = selectedMobilityType;
+    });
+    _controller.reset();
+  }
 }
 
 class _RouteMobilityTypeSummary extends StatelessWidget {
-  const _RouteMobilityTypeSummary({required this.mobilityType});
+  const _RouteMobilityTypeSummary({
+    required this.mobilityType,
+    required this.onChangeRequested,
+  });
 
   final String mobilityType;
+  final VoidCallback onChangeRequested;
 
   @override
   Widget build(BuildContext context) {
     final option = _mobilityOptionFor(mobilityType);
-    return MergeSemantics(
-      child: Semantics(
-        label: '적용 중인 이동 조건, ${option.title}',
-        liveRegion: true,
-        child: ExcludeSemantics(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFFE9F5F6),
-              border: Border.all(color: const Color(0xFFB9D4D8)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(option.icon, color: const Color(0xFF006D77), size: 26),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '적용 중인 이동 조건',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: const Color(0xFF29484B),
-                                fontWeight: FontWeight.w700,
-                                height: 1.25,
-                              ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          option.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: const Color(0xFF102A2C),
-                                fontWeight: FontWeight.w900,
-                                height: 1.25,
-                              ),
-                        ),
-                      ],
+    return Semantics(
+      button: true,
+      label: '이동 조건 바꾸기, 현재 ${option.title}',
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const Key('routeSimpleMobilityTypeButton'),
+            onTap: onChangeRequested,
+            borderRadius: BorderRadius.circular(8),
+            child: Ink(
+              decoration: BoxDecoration(
+                color: const Color(0xFFE9F5F6),
+                border: Border.all(color: const Color(0xFFB9D4D8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Icon(option.icon, color: const Color(0xFF006D77), size: 26),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '적용 중인 이동 조건',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF29484B),
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            option.title,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF102A2C),
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.25,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    Text(
+                      '바꾸기',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF006D77),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RouteMobilityTypeOptionButton extends StatelessWidget {
+  const _RouteMobilityTypeOptionButton({
+    required this.option,
+    required this.selected,
+    required this.onSelected,
+    super.key,
+  });
+
+  final MobilityProfileOption option;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = selected
+        ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(64))
+        : OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(64));
+    final label = Row(
+      children: [
+        Icon(option.icon),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            option.title,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        if (selected) const Icon(Icons.check_circle),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        label: option.semanticsLabel(selected),
+        button: true,
+        selected: selected,
+        child: selected
+            ? FilledButton(onPressed: onSelected, style: style, child: label)
+            : OutlinedButton(onPressed: onSelected, style: style, child: label),
       ),
     );
   }

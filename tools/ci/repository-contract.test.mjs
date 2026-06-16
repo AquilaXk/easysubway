@@ -1445,7 +1445,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
   assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
-  assert.match(routeSearch, /_RouteMobilityTypeSummary\(mobilityType: _selectedMobilityType\)/);
+  assert.match(routeSearch, /_RouteMobilityTypeSummary\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeRequested: _showMobilityTypePicker/);
+  assert.match(routeSearch, /routeSimpleMobilityTypeButton/);
+  assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
   assert.match(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
