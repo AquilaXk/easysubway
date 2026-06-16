@@ -600,6 +600,9 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
 
 test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {
   const files = inMemoryRepositoryFiles();
+  const readinessConfiguration = read(
+    "backend/src/main/java/com/easysubway/common/persistence/ProductionPersistenceReadinessConfiguration.java",
+  );
 
   assert.ok(files.length >= 1, "InMemory repository files must be discovered");
   for (const file of files) {
@@ -607,6 +610,9 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
     assert.match(source, /import org\.springframework\.context\.annotation\.Profile;/, `${file} must import Profile`);
     assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
   }
+  assert.match(readinessConfiguration, /@Profile\("prod"\)/);
+  assert.match(readinessConfiguration, /BeanFactoryPostProcessor/);
+  assert.match(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
 });
 
 test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
