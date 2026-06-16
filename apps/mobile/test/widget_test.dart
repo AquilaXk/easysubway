@@ -103,6 +103,88 @@ void main() {
     expect(find.text('위치 준비 완료'), findsOneWidget);
   });
 
+  testWidgets('첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.granted,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        onboardingStore: MemoryOnboardingResultStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 준비 완료'), findsOneWidget);
+  });
+
+  testWidgets('첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        onboardingStore: MemoryOnboardingResultStore(),
+        enableAnonymousAuth: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -1300));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboardingNotificationButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '알림 켜기'), findsNothing);
+  });
+
+  testWidgets('첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.granted,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        onboardingStore: MemoryOnboardingResultStore(),
+        enableAnonymousAuth: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 준비 완료'), findsOneWidget);
+  });
+
   testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(

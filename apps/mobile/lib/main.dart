@@ -257,6 +257,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     if (!_onboardingState.isCompleted) {
       return OnboardingScreen(
         locationProvider: widget.locationProvider,
+        notificationPermissionProvider: widget.notificationPermissionProvider,
         onCompleted: (result) async {
           await _saveOnboardingResult(result);
           setState(() {
@@ -525,6 +526,17 @@ class _EasySubwayAppDependencies {
       anonymousAuthRepository: anonymousAuthRepository,
       enableAnonymousAuth: enableAnonymousAuth,
     );
+    final resolvedNotificationRepository =
+        notificationRepository ??
+        _defaultNotificationSettingsRepository(
+          baseUri: baseUri,
+          authProvider: sharedAuthProvider,
+        );
+    final resolvedNotificationPermissionProvider =
+        notificationPermissionProvider ??
+        (resolvedNotificationRepository == null
+            ? null
+            : MethodChannelNotificationPermissionProvider());
 
     return _EasySubwayAppDependencies(
       repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
@@ -560,15 +572,8 @@ class _EasySubwayAppDependencies {
             baseUri: baseUri,
             authProvider: sharedAuthProvider,
           ),
-      notificationRepository:
-          notificationRepository ??
-          _defaultNotificationSettingsRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      notificationPermissionProvider:
-          notificationPermissionProvider ??
-          MethodChannelNotificationPermissionProvider(),
+      notificationRepository: resolvedNotificationRepository,
+      notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
     );
