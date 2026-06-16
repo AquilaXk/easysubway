@@ -1846,6 +1846,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   void initState() {
     super.initState();
     _controller = StationSearchController(repository: widget.repository);
+    _queryController.addListener(_handleQueryChanged);
     final lineRepository = _lineFilterRepository;
     if (lineRepository != null) {
       _lineOptionsFuture = lineRepository.listLines();
@@ -1855,9 +1856,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
     super.dispose();
   }
+
+  void _handleQueryChanged() {
+    if (!mounted) {
+      return;
+    }
+    if (!_hasSearchQuery &&
+        !_isNearbySearchRunning &&
+        _controller.state.status != StationSearchStatus.idle) {
+      _controller.search('');
+    }
+    setState(() {});
+  }
+
+  bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -1907,28 +1923,22 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
-                final isLoading =
+                final isSearching =
                     _controller.state.status == StationSearchStatus.loading;
-                return FilledButton.icon(
-                  key: const Key('stationSearchSubmitButton'),
-                  onPressed: isLoading
-                      ? null
-                      : () => _submit(_queryController.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('검색'),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final isLoading =
-                    _controller.state.status == StationSearchStatus.loading ||
-                    _isNearbySearchRunning;
+                final isNearbyDisabled = isSearching || _isNearbySearchRunning;
+                if (_hasSearchQuery) {
+                  return FilledButton.icon(
+                    key: const Key('stationSearchSubmitButton'),
+                    onPressed: isSearching
+                        ? null
+                        : () => _submit(_queryController.text),
+                    icon: const Icon(Icons.search),
+                    label: const Text('검색'),
+                  );
+                }
                 return OutlinedButton.icon(
                   key: const Key('nearbyStationSearchButton'),
-                  onPressed: isLoading ? null : _searchNearby,
+                  onPressed: isNearbyDisabled ? null : _searchNearby,
                   icon: const Icon(Icons.my_location),
                   label: const Text('내 주변 역 찾기'),
                 );
@@ -2336,7 +2346,7 @@ class _StationSearchResultTile extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 8),
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -2347,58 +2357,64 @@ class _StationSearchResultTile extends StatelessWidget {
               key: Key('stationSearchResult-${result.id}'),
               borderRadius: BorderRadius.circular(8),
               onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.nameKo,
-                      style: textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF102A2C),
-                        fontWeight: FontWeight.w800,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    StationLineBadges(lines: result.lines),
-                    if (result.distanceLabel.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        result.distanceLabel,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: const Color(0xFF006D77),
-                          fontWeight: FontWeight.w800,
-                          height: 1.3,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 88),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 72),
+                        child: StationLineBadges(
+                          lines: result.lines,
+                          size: 32,
+                          maxBadgeCount: 2,
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              result.nameKo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.headlineSmall?.copyWith(
+                                color: const Color(0xFF102A2C),
+                                fontWeight: FontWeight.w900,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              result.distanceLabel.isEmpty
+                                  ? result.lineLabel
+                                  : '${result.distanceLabel} · ${result.lineLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: const Color(0xFF29484B),
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFF405A5D),
+                        size: 30,
+                      ),
                     ],
-                    const SizedBox(height: 8),
-                    Text(
-                      result.lineLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF29484B),
-                        fontWeight: FontWeight.w700,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      result.region,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF405A5D),
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      result.dataQualityLabel,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF405A5D),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -3427,9 +3443,16 @@ class _StationDetailTextPill extends StatelessWidget {
 }
 
 class StationLineBadges extends StatelessWidget {
-  const StationLineBadges({required this.lines, super.key});
+  const StationLineBadges({
+    required this.lines,
+    this.size = 40,
+    this.maxBadgeCount,
+    super.key,
+  });
 
   final List<StationSearchLine> lines;
+  final double size;
+  final int? maxBadgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -3437,30 +3460,46 @@ class StationLineBadges extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final maxCount = maxBadgeCount;
+    final shouldCollapse = maxCount != null && lines.length > maxCount;
+    final visibleLineCount = shouldCollapse
+        ? (maxCount - 1).clamp(1, lines.length).toInt()
+        : lines.length;
+    final hiddenLineCount = lines.length - visibleLineCount;
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: [for (final line in lines) StationLineBadge(line: line)],
+      children: [
+        for (final line in lines.take(visibleLineCount))
+          StationLineBadge(line: line, size: size),
+        if (hiddenLineCount > 0)
+          _StationLineOverflowBadge(count: hiddenLineCount, size: size),
+      ],
     );
   }
 }
 
 class StationLineBadge extends StatelessWidget {
-  const StationLineBadge({required this.line, super.key});
+  const StationLineBadge({required this.line, this.size = 40, super.key});
 
   final StationSearchLine line;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final backgroundColor = line.badgeColor;
     final foregroundColor = _higherContrastTextColor(backgroundColor);
     final badgeText = line.badgeText;
-    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText) ? 24.0 : 15.0;
+    final scale = size / 40;
+    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText)
+        ? 25.0 * scale
+        : 15.0 * scale;
 
     return Container(
       key: Key('stationLineBadge-${line.id}'),
-      width: 40,
-      height: 40,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
       child: Text(
@@ -3472,6 +3511,38 @@ class StationLineBadge extends StatelessWidget {
           fontSize: badgeFontSize,
           fontWeight: FontWeight.w900,
           height: 1.05,
+        ),
+      ),
+    );
+  }
+}
+
+class _StationLineOverflowBadge extends StatelessWidget {
+  const _StationLineOverflowBadge({required this.count, required this.size});
+
+  final int count;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('stationLineBadgeOverflow'),
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0F1),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFB8CACC)),
+      ),
+      child: Text(
+        '+$count',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: const Color(0xFF29484B),
+          fontSize: 13 * (size / 32),
+          fontWeight: FontWeight.w900,
+          height: 1.0,
         ),
       ),
     );
