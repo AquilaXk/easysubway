@@ -2447,6 +2447,44 @@ class FavoriteStationListScreen extends StatefulWidget {
 }
 
 class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기 역')),
+      body: FavoriteStationListContent(
+        repository: widget.repository,
+        stationRepository: widget.stationRepository,
+        reportRepository: widget.reportRepository,
+        locationProvider: widget.locationProvider,
+        facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+      ),
+    );
+  }
+}
+
+class FavoriteStationListContent extends StatefulWidget {
+  const FavoriteStationListContent({
+    required this.repository,
+    required this.stationRepository,
+    required this.reportRepository,
+    this.locationProvider,
+    this.facilityReportDraftTargetStore,
+    super.key,
+  });
+
+  final FavoriteStationRepository repository;
+  final StationSearchRepository stationRepository;
+  final FacilityReportRepository reportRepository;
+  final CurrentLocationProvider? locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+
+  @override
+  State<FavoriteStationListContent> createState() =>
+      _FavoriteStationListContentState();
+}
+
+class _FavoriteStationListContentState
+    extends State<FavoriteStationListContent> {
   late final FavoriteStationListController _controller;
 
   @override
@@ -2464,19 +2502,16 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('즐겨찾기 역')),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return _FavoriteStationListBody(
-              state: _controller.state,
-              onRetry: _controller.load,
-              onFavoriteTap: _openStationDetail,
-            );
-          },
-        ),
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return _FavoriteStationListBody(
+            state: _controller.state,
+            onRetry: _controller.load,
+            onFavoriteTap: _openStationDetail,
+          );
+        },
       ),
     );
   }

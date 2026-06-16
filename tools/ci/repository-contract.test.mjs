@@ -1408,8 +1408,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(main, /역 찾기/);
   assert.match(main, /역 검색/);
+  assert.match(main, /길찾기/);
   assert.match(main, /이동 조건/);
   assert.match(main, /알림 설정/);
   assert.match(main, /AnonymousAuthSession/);
@@ -1424,8 +1424,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
   assert.match(main, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
-  assert.match(main, /if \(!simpleViewEnabled\)/);
-  assert.match(main, /semanticLabel: '시설 정보, 엘리베이터와 경사로'/);
+  assert.match(main, /label: '즐겨찾기'/);
+  assert.match(main, /FavoriteHomeScreen/);
+  assert.match(main, /FavoriteRouteListContent/);
+  assert.match(main, /FavoriteStationListContent/);
+  assert.match(main, /FavoriteFacilityListContent/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
@@ -1537,7 +1540,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettingsTest, /알림 설정 컨트롤러는 조회와 저장 상태를 구분한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
-  assert.match(widgetTest, /홈 화면은 핵심 행동만 간결하게 보여준다/);
+  assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
+  assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
