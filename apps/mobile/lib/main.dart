@@ -984,10 +984,7 @@ class FavoriteHomeScreen extends StatelessWidget {
           bottom: TabBar(tabs: [for (final section in sections) section.tab]),
         ),
         body: TabBarView(
-          children: [
-            for (final section in sections)
-              _FavoriteSectionEntry(section: section),
-          ],
+          children: [for (final section in sections) section.content],
         ),
       ),
     );
@@ -1002,18 +999,9 @@ class FavoriteHomeScreen extends StatelessWidget {
       sections.add(
         _FavoriteSection(
           tab: const Tab(key: Key('favoriteRoutesTabButton'), text: '경로'),
-          icon: Icons.route,
-          buttonLabel: '즐겨찾기 경로 보기',
-          buttonKey: const Key('favoriteRoutesButton'),
-          open: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => FavoriteRouteListScreen(
-                  repository: favoriteRouteRepository,
-                ),
-              ),
-            );
-          },
+          content: FavoriteRouteListContent(
+            repository: favoriteRouteRepository,
+          ),
         ),
       );
     }
@@ -1021,23 +1009,13 @@ class FavoriteHomeScreen extends StatelessWidget {
       sections.add(
         _FavoriteSection(
           tab: const Tab(key: Key('favoriteStationsTabButton'), text: '역'),
-          icon: Icons.train,
-          buttonLabel: '즐겨찾기 역 보기',
-          buttonKey: const Key('favoriteStationsButton'),
-          open: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => FavoriteStationListScreen(
-                  repository: favoriteRepository,
-                  stationRepository: stationRepository,
-                  reportRepository: reportRepository,
-                  locationProvider: locationProvider,
-                  facilityReportDraftTargetStore:
-                      facilityReportDraftTargetStore,
-                ),
-              ),
-            );
-          },
+          content: FavoriteStationListContent(
+            repository: favoriteRepository,
+            stationRepository: stationRepository,
+            reportRepository: reportRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+          ),
         ),
       );
     }
@@ -1045,18 +1023,9 @@ class FavoriteHomeScreen extends StatelessWidget {
       sections.add(
         _FavoriteSection(
           tab: const Tab(key: Key('favoriteFacilitiesTabButton'), text: '시설'),
-          icon: Icons.elevator_outlined,
-          buttonLabel: '즐겨찾기 시설 보기',
-          buttonKey: const Key('favoriteFacilitiesButton'),
-          open: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => FavoriteFacilityListScreen(
-                  repository: favoriteFacilityRepository,
-                ),
-              ),
-            );
-          },
+          content: FavoriteFacilityListContent(
+            repository: favoriteFacilityRepository,
+          ),
         ),
       );
     }
@@ -1065,47 +1034,10 @@ class FavoriteHomeScreen extends StatelessWidget {
 }
 
 class _FavoriteSection {
-  const _FavoriteSection({
-    required this.tab,
-    required this.icon,
-    required this.buttonLabel,
-    required this.buttonKey,
-    required this.open,
-  });
+  const _FavoriteSection({required this.tab, required this.content});
 
   final Tab tab;
-  final IconData icon;
-  final String buttonLabel;
-  final Key buttonKey;
-  final VoidCallback open;
-}
-
-class _FavoriteSectionEntry extends StatelessWidget {
-  const _FavoriteSectionEntry({required this.section});
-
-  final _FavoriteSection section;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          OutlinedButton.icon(
-            key: section.buttonKey,
-            onPressed: section.open,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(72),
-              backgroundColor: Colors.white,
-              side: BorderSide(color: Theme.of(context).colorScheme.outline),
-            ),
-            icon: Icon(section.icon),
-            label: Text(section.buttonLabel),
-          ),
-        ],
-      ),
-    );
-  }
+  final Widget content;
 }
 
 class SupportAccessScreen extends StatelessWidget {
