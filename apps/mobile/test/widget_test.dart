@@ -71,6 +71,38 @@ void main() {
     expect(onboardingStore.saveCount, 1);
   });
 
+  testWidgets('첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        onboardingStore: MemoryOnboardingResultStore(),
+        locationProvider: locationProvider,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingLocationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingLocationButton')));
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 1);
+    expect(find.text('위치 준비 완료'), findsOneWidget);
+  });
+
   testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(

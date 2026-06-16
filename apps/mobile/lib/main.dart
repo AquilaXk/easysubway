@@ -256,6 +256,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
 
     if (!_onboardingState.isCompleted) {
       return OnboardingScreen(
+        locationProvider: widget.locationProvider,
         onCompleted: (result) async {
           await _saveOnboardingResult(result);
           setState(() {

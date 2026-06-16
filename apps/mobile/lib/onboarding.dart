@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mobility_profile.dart';
 import 'mobile_error_reporter.dart';
+import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
 
@@ -164,9 +165,14 @@ class OnboardingState {
 }
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({required this.onCompleted, super.key});
+  const OnboardingScreen({
+    required this.onCompleted,
+    this.locationProvider,
+    super.key,
+  });
 
   final ValueChanged<OnboardingResult> onCompleted;
+  final CurrentLocationProvider? locationProvider;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -176,6 +182,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   MobilityProfileOption? _selectedProfile;
   OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
+  String _locationMessage = '';
+  bool _isLocationFailure = false;
+  bool _isCheckingLocation = false;
+  bool _isOpeningLocationSettings = false;
 
   @override
   Widget build(BuildContext context) {
@@ -242,6 +252,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   });
                 },
               ),
+            if (widget.locationProvider != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '현재 위치',
+                style: textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _OnboardingLocationSection(
+                message: _locationMessage,
+                isFailure: _isLocationFailure,
+                isChecking: _isCheckingLocation,
+                isOpeningSettings: _isOpeningLocationSettings,
+                onPrepareLocation: _prepareLocation,
+                onOpenSettings: _openLocationSettings,
+              ),
+            ],
             const SizedBox(height: 12),
             Text(
               '보기 설정',
@@ -284,6 +313,191 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   );
                 });
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _prepareLocation() async {
+    final locationProvider = widget.locationProvider;
+    if (locationProvider == null ||
+        _isCheckingLocation ||
+        _isOpeningLocationSettings) {
+      return;
+    }
+    setState(() {
+      _isCheckingLocation = true;
+      _locationMessage = '';
+      _isLocationFailure = false;
+    });
+    try {
+      // 온보딩에서는 좌표를 저장하지 않고, 이후 주변 역 찾기에서 바로 쓸 권한과 GPS 상태만 준비한다.
+      await locationProvider.currentLocation();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _locationMessage = '위치 준비 완료';
+        _isLocationFailure = false;
+      });
+    } on CurrentLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _locationMessage = error.message;
+        _isLocationFailure = true;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 현재 위치 준비 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _locationMessage = '현재 위치를 확인하지 못했습니다.';
+        _isLocationFailure = true;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingLocation = false);
+      }
+    }
+  }
+
+  Future<void> _openLocationSettings() async {
+    final locationProvider = widget.locationProvider;
+    if (locationProvider == null ||
+        _isOpeningLocationSettings ||
+        _isCheckingLocation) {
+      return;
+    }
+    setState(() => _isOpeningLocationSettings = true);
+    try {
+      await locationProvider.openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningLocationSettings = false);
+      }
+    }
+  }
+}
+
+class _OnboardingLocationSection extends StatelessWidget {
+  const _OnboardingLocationSection({
+    required this.message,
+    required this.isFailure,
+    required this.isChecking,
+    required this.isOpeningSettings,
+    required this.onPrepareLocation,
+    required this.onOpenSettings,
+  });
+
+  final String message;
+  final bool isFailure;
+  final bool isChecking;
+  final bool isOpeningSettings;
+  final VoidCallback onPrepareLocation;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '가까운 역을 자동으로 찾으려면 GPS가 필요합니다.',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: const Color(0xFF29484B),
+            fontWeight: FontWeight.w700,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('onboardingLocationButton'),
+          onPressed: isChecking || isOpeningSettings ? null : onPrepareLocation,
+          icon: isChecking
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              : const Icon(Icons.my_location),
+          label: const Text('위치 켜기'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(60),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _OnboardingLocationMessage(message: message, isFailure: isFailure),
+        ],
+        if (isFailure) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            key: const Key('onboardingOpenLocationSettingsButton'),
+            onPressed: isOpeningSettings || isChecking ? null : onOpenSettings,
+            icon: isOpeningSettings
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : const Icon(Icons.settings),
+            label: const Text('위치 설정 열기'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(60),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _OnboardingLocationMessage extends StatelessWidget {
+  const _OnboardingLocationMessage({
+    required this.message,
+    required this.isFailure,
+  });
+
+  final String message;
+  final bool isFailure;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isFailure ? const Color(0xFF8A4B00) : const Color(0xFF006D77);
+    final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
+
+    return Semantics(
+      label: message,
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
             ),
           ],
         ),
