@@ -1274,11 +1274,19 @@ void main() {
     }
   });
 
-  testWidgets('역 검색은 현재 위치 안내를 취소하면 위치를 요청하지 않는다', (tester) async {
+  testWidgets('역 검색은 현재 위치 확인창 없이 바로 주변 역을 찾는다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
     );
-    final repository = FakeStationSearchRepository();
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
 
     await tester.pumpWidget(
       EasySubwayApp(
@@ -1296,19 +1304,17 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('취소'));
-    await tester.pumpAndSettle();
-
-    expect(locationProvider.requestCount, 0);
-    expect(repository.requestedNearbyLocations, isEmpty);
+    expect(locationProvider.permissionCheckCount, 0);
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('현재 위치 사용'), findsNothing);
+    expect(find.text('상록수'), findsOneWidget);
   });
 
-  testWidgets('역 검색은 위치 권한 확인 중 중복 탭을 무시한다', (tester) async {
-    final permissionCompleter = Completer<bool>();
+  testWidgets('역 검색은 주변 역 확인 중 중복 탭을 무시한다', (tester) async {
+    final locationCompleter = Completer<CurrentLocation>();
     final locationProvider = FakeCurrentLocationProvider(
-      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
-      needsPermissionRequestLoader: () => permissionCompleter.future,
+      locationLoader: () => locationCompleter.future,
     );
     final repository = FakeStationSearchRepository(
       nearbyResults: [
@@ -1337,13 +1343,14 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
 
-    expect(locationProvider.permissionCheckCount, 1);
-    expect(locationProvider.requestCount, 0);
+    expect(locationProvider.permissionCheckCount, 0);
+    expect(locationProvider.requestCount, 1);
 
-    permissionCompleter.complete(false);
+    locationCompleter.complete(
+      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
     await tester.pumpAndSettle();
 
-    expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
   });
 
@@ -1369,8 +1376,6 @@ void main() {
       await tester.tap(find.byKey(const Key('stationSearchButton')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('위치 사용'));
       await tester.pumpAndSettle();
 
       expect(locationProvider.requestCount, 1);
@@ -3211,7 +3216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진 확인'), findsOneWidget);
-    expect(find.text('사진을 함께 보냅니다.'), findsOneWidget);
+    expect(find.text('사진과 위치를 함께 보냅니다.'), findsOneWidget);
     expect(find.text('사진·위치 확인'), findsNothing);
     expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsNothing);
     expect(reportRepository.requests, isEmpty);
@@ -4494,12 +4499,14 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
   FakeCurrentLocationProvider({
     this.location,
     this.error,
+    this.locationLoader,
     this.needsPermissionRequest = true,
     this.needsPermissionRequestLoader,
   });
 
   final CurrentLocation? location;
   final Object? error;
+  final Future<CurrentLocation> Function()? locationLoader;
   final bool needsPermissionRequest;
   final Future<bool> Function()? needsPermissionRequestLoader;
   int permissionCheckCount = 0;
@@ -4519,6 +4526,10 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
   @override
   Future<CurrentLocation> currentLocation() async {
     requestCount++;
+    final loader = locationLoader;
+    if (loader != null) {
+      return loader();
+    }
     final currentError = error;
     if (currentError != null) {
       throw currentError;

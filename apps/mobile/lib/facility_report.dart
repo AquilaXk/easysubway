@@ -1446,7 +1446,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('사진 확인'),
-        content: const Text('사진을 함께 보냅니다.'),
+        content: const Text('사진과 위치를 함께 보냅니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
