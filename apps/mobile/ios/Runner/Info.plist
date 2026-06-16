@@ -17,7 +17,7 @@
 	<key>CFBundleName</key>
 	<string>easysubway_mobile</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>가까운 역을 찾고 시설 신고 위치를 확인하는 데 사용합니다.</string>
+	<string>앱을 사용하는 동안 가까운 역을 찾고 시설 신고 위치를 확인하는 데 사용합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>시설 상태를 신고할 때 사진을 첨부하는 데 사용합니다.</string>
 	<key>NSCameraUsageDescription</key>
