@@ -1091,6 +1091,8 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteRoutePort.java");
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteRouteService.java");
   const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteRouteRepository.java");
+  const jdbcRepository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteRouteRepository.java");
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1118,6 +1120,20 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   assert.match(service, /RouteSearchNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*LoadFavoriteRouteAlertTargetPort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort/);
   assert.match(repository, /loadUserIdsByRouteStationId/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*LoadFavoriteRouteAlertTargetPort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort[\s\S]*DeleteUserFavoriteRoutePort/);
+  assert.match(jdbcRepository, /List<FavoriteRoute> loadFavoriteRoutes\(String userId\)/);
+  assert.match(jdbcRepository, /Optional<FavoriteRoute> loadFavoriteRoute\(String userId, String routeSearchId\)/);
+  assert.match(jdbcRepository, /List<String> loadUserIdsByRouteStationId\(String stationId\)/);
+  assert.match(jdbcRepository, /FavoriteRoute saveFavoriteRoute\(FavoriteRoute favoriteRoute\)/);
+  assert.match(jdbcRepository, /int deleteFavoriteRoutesByUserId\(String userId\)/);
+  assert.match(jdbcRepository, /favorite_routes/);
+  assert.match(jdbcRepository, /favorite_route_stations/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS favorite_routes/);
+  assert.match(batchPostgresSchema, /PRIMARY KEY \(user_id, route_search_id\)/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS favorite_route_stations/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_routes_user_added/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_route_stations_station_user/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/routes\/\{favoriteRouteId\}"\)/);
