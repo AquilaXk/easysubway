@@ -2232,9 +2232,11 @@ void main() {
       await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
       await tester.pumpAndSettle();
       expect(
-        tester.getSemantics(find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선')),
+        tester.getSemantics(
+          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        ),
         isSemantics(
-          label: '출발역 선택, 상록수, 수도권 2호선',
+          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음',
           isButton: true,
           hasTapAction: true,
         ),
@@ -2290,8 +2292,14 @@ void main() {
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
-      expect(find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선'), findsOneWidget);
-      expect(find.bySemanticsLabel('도착역 선택됨, 사당, 수도권 2호선'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('도착역 선택됨, 사당, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        findsOneWidget,
+      );
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
