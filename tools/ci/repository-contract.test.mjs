@@ -33,8 +33,9 @@ function assertPrivacyCollectedDataType(privacyManifest, dataType) {
 }
 
 function androidManifestPermissions(androidManifest) {
-  return [...androidManifest.matchAll(/<uses-permission\s+android:name="([^"]+)"\s*\/>/g)]
-    .map((match) => match[1])
+  return [...androidManifest.matchAll(/<uses-permission\b[^>]*>/g)]
+    .map((match) => match[0].match(/\bandroid:name="([^"]+)"/)?.[1])
+    .filter(Boolean)
     .filter((permission) => permission.startsWith("android.permission."))
     .sort();
 }
@@ -370,6 +371,21 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   for (const file of mobileFiles) {
     assertMobileCatchPolicy(file, read(file));
   }
+});
+
+test("Android 권한 파서는 속성 순서와 추가 속성이 달라도 권한명을 추출한다", () => {
+  const permissions = androidManifestPermissions(`
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <uses-permission android:maxSdkVersion="32" android:name="android.permission.READ_EXTERNAL_STORAGE" />
+      <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="35" />
+      <uses-permission android:name="com.easysubway.easysubway_mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    </manifest>
+  `);
+
+  assert.deepEqual(permissions, [
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.READ_EXTERNAL_STORAGE",
+  ]);
 });
 
 test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => {
