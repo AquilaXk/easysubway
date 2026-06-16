@@ -3210,8 +3210,10 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsOneWidget);
+    expect(find.text('사진 확인'), findsOneWidget);
+    expect(find.text('사진을 함께 보냅니다.'), findsOneWidget);
+    expect(find.text('사진·위치 확인'), findsNothing);
+    expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsNothing);
     expect(reportRepository.requests, isEmpty);
 
     await tester.tap(find.text('취소'));
