@@ -322,7 +322,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _prepareLocation() async {
     final locationProvider = widget.locationProvider;
-    if (locationProvider == null || _isCheckingLocation) {
+    if (locationProvider == null ||
+        _isCheckingLocation ||
+        _isOpeningLocationSettings) {
       return;
     }
     setState(() {
@@ -370,7 +372,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _openLocationSettings() async {
     final locationProvider = widget.locationProvider;
-    if (locationProvider == null || _isOpeningLocationSettings) {
+    if (locationProvider == null ||
+        _isOpeningLocationSettings ||
+        _isCheckingLocation) {
       return;
     }
     setState(() => _isOpeningLocationSettings = true);
@@ -417,7 +421,7 @@ class _OnboardingLocationSection extends StatelessWidget {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           key: const Key('onboardingLocationButton'),
-          onPressed: isChecking ? null : onPrepareLocation,
+          onPressed: isChecking || isOpeningSettings ? null : onPrepareLocation,
           icon: isChecking
               ? const SizedBox(
                   width: 22,
@@ -441,7 +445,7 @@ class _OnboardingLocationSection extends StatelessWidget {
           const SizedBox(height: 10),
           OutlinedButton.icon(
             key: const Key('onboardingOpenLocationSettingsButton'),
-            onPressed: isOpeningSettings ? null : onOpenSettings,
+            onPressed: isOpeningSettings || isChecking ? null : onOpenSettings,
             icon: isOpeningSettings
                 ? const SizedBox(
                     width: 22,

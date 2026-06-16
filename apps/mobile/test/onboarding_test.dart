@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/station_search.dart';
@@ -147,6 +149,48 @@ void main() {
     expect(locationProvider.openSettingsCount, 1);
   });
 
+  testWidgets('온보딩은 위치 설정을 여는 동안 위치 확인을 다시 시작하지 않는다', (tester) async {
+    final openSettingsCompleter = Completer<bool>();
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException(
+        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+      ),
+      openSettingsLoader: () => openSettingsCompleter.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          onCompleted: (_) {},
+        ),
+      ),
+    );
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingLocationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingLocationButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('onboardingOpenLocationSettingsButton')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('onboardingLocationButton')));
+    await tester.pump();
+
+    expect(locationProvider.requestCount, 1);
+    expect(locationProvider.openSettingsCount, 1);
+
+    openSettingsCompleter.complete(true);
+    await tester.pumpAndSettle();
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
@@ -211,10 +255,15 @@ void main() {
 }
 
 class FakeCurrentLocationProvider implements CurrentLocationProvider {
-  FakeCurrentLocationProvider({this.location, this.error});
+  FakeCurrentLocationProvider({
+    this.location,
+    this.error,
+    this.openSettingsLoader,
+  });
 
   final CurrentLocation? location;
   final Object? error;
+  final Future<bool> Function()? openSettingsLoader;
   int requestCount = 0;
   int openSettingsCount = 0;
 
@@ -235,6 +284,10 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
   @override
   Future<bool> openLocationSettings() async {
     openSettingsCount++;
+    final loader = openSettingsLoader;
+    if (loader != null) {
+      return loader();
+    }
     return true;
   }
 }
