@@ -714,6 +714,10 @@ class HomeScreen extends StatelessWidget {
     final routeFeedbackRepository = this.routeFeedbackRepository;
     final notificationRepository = this.notificationRepository;
     final notificationPermissionProvider = this.notificationPermissionProvider;
+    final hasFavorites =
+        favoriteRepository != null ||
+        favoriteFacilityRepository != null ||
+        favoriteRouteRepository != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
@@ -724,7 +728,7 @@ class HomeScreen extends StatelessWidget {
             Semantics(
               header: true,
               child: Text(
-                '역 찾기',
+                '어디로 가시나요?',
                 style: textTheme.headlineSmall?.copyWith(
                   color: const Color(0xFF102A2C),
                   fontWeight: FontWeight.w800,
@@ -732,8 +736,8 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
+            const SizedBox(height: 20),
+            _HomePrimaryActionButton(
               key: const Key('stationSearchButton'),
               onPressed: () {
                 Navigator.of(context).push(
@@ -750,10 +754,10 @@ class HomeScreen extends StatelessWidget {
                 );
               },
               icon: const Icon(Icons.search),
-              label: const Text('역 검색'),
+              label: '역 검색',
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
+            _HomePrimaryActionButton(
               key: const Key('routeSearchButton'),
               onPressed: () {
                 Navigator.of(context).push(
@@ -769,146 +773,336 @@ class HomeScreen extends StatelessWidget {
                 );
               },
               icon: const Icon(Icons.route),
-              label: const Text('경로 검색'),
+              label: '길찾기',
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: const Key('mobilityProfileButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<MobilityProfileOption>(
-                    builder: (_) => const MobilityProfileScreen(),
-                  ),
+            const SizedBox(height: 20),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 10.0;
+                final itemWidth = (constraints.maxWidth - spacing) / 2;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      height: 64,
+                      child: _HomeSecondaryActionButton(
+                        key: const Key('mobilityProfileButton'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<MobilityProfileOption>(
+                              builder: (_) => const MobilityProfileScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.accessibility_new),
+                        label: '이동 조건',
+                      ),
+                    ),
+                    if (hasFavorites)
+                      SizedBox(
+                        width: itemWidth,
+                        height: 64,
+                        child: _HomeSecondaryActionButton(
+                          key: const Key('favoritesButton'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => FavoriteHomeScreen(
+                                  favoriteRepository: favoriteRepository,
+                                  favoriteFacilityRepository:
+                                      favoriteFacilityRepository,
+                                  favoriteRouteRepository:
+                                      favoriteRouteRepository,
+                                  stationRepository: repository,
+                                  reportRepository: reportRepository,
+                                  locationProvider: locationProvider,
+                                  facilityReportDraftTargetStore:
+                                      facilityReportDraftTargetStore,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.star_outline),
+                          label: '즐겨찾기',
+                        ),
+                      ),
+                    SizedBox(
+                      width: itemWidth,
+                      height: 64,
+                      child: _HomeSecondaryActionButton(
+                        key: const Key('myReportsButton'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => MyFacilityReportListScreen(
+                                repository: reportRepository,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: '내 신고',
+                      ),
+                    ),
+                    if (notificationRepository != null)
+                      SizedBox(
+                        width: itemWidth,
+                        height: 64,
+                        child: _HomeSecondaryActionButton(
+                          key: const Key('notificationSettingsButton'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => NotificationSettingsScreen(
+                                  repository: notificationRepository,
+                                  notificationPermissionProvider:
+                                      notificationPermissionProvider,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.notifications_active_outlined),
+                          label: '알림 설정',
+                        ),
+                      ),
+                    SizedBox(
+                      width: itemWidth,
+                      height: 64,
+                      child: _HomeSecondaryActionButton(
+                        key: const Key('helpButton'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => SupportAccessScreen(
+                                accessInfo: supportAccessInfo,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.help_outline),
+                        label: '도움말',
+                      ),
+                    ),
+                  ],
                 );
               },
-              icon: const Icon(Icons.accessibility_new),
-              label: const Text('이동 조건'),
             ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              key: const Key('myReportsButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MyFacilityReportListScreen(
-                      repository: reportRepository,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('내 신고'),
-            ),
-            const SizedBox(height: 12),
-            if (favoriteRouteRepository != null) ...[
-              FilledButton.icon(
-                key: const Key('favoriteRoutesButton'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => FavoriteRouteListScreen(
-                        repository: favoriteRouteRepository,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.bookmarks_outlined),
-                label: const Text('즐겨찾기 경로'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (favoriteRepository != null) ...[
-              FilledButton.icon(
-                key: const Key('favoriteStationsButton'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => FavoriteStationListScreen(
-                        repository: favoriteRepository,
-                        stationRepository: repository,
-                        reportRepository: reportRepository,
-                        locationProvider: locationProvider,
-                        facilityReportDraftTargetStore:
-                            facilityReportDraftTargetStore,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.star),
-                label: const Text('즐겨찾기 역'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (favoriteFacilityRepository != null) ...[
-              FilledButton.icon(
-                key: const Key('favoriteFacilitiesButton'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => FavoriteFacilityListScreen(
-                        repository: favoriteFacilityRepository,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.elevator_outlined),
-                label: const Text('즐겨찾기 시설'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (notificationRepository != null) ...[
-              FilledButton.icon(
-                key: const Key('notificationSettingsButton'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => NotificationSettingsScreen(
-                        repository: notificationRepository,
-                        notificationPermissionProvider:
-                            notificationPermissionProvider,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text('알림 설정'),
-              ),
-              const SizedBox(height: 12),
-            ],
-            OutlinedButton.icon(
-              key: const Key('helpButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        SupportAccessScreen(accessInfo: supportAccessInfo),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.help_outline),
-              label: const Text('도움말'),
-            ),
-            const SizedBox(height: 12),
-            if (!simpleViewEnabled) ...[
-              const SizedBox(height: 24),
-              const FeatureTile(
-                icon: Icons.accessible_forward,
-                title: '이동 프로필',
-                semanticLabel: '이동 프로필, 이동 조건 저장',
-              ),
-              const FeatureTile(
-                icon: Icons.elevator,
-                title: '시설 정보',
-                semanticLabel: '시설 정보, 엘리베이터와 경사로',
-              ),
-              const FeatureTile(
-                icon: Icons.report_outlined,
-                title: '신고',
-                semanticLabel: '신고, 불편 신고',
-              ),
-            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomePrimaryActionButton extends StatelessWidget {
+  const _HomePrimaryActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    super.key,
+  });
+
+  final VoidCallback onPressed;
+  final Widget icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(82),
+        textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+      ),
+      icon: icon,
+      label: Text(label),
+    );
+  }
+}
+
+class _HomeSecondaryActionButton extends StatelessWidget {
+  const _HomeSecondaryActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    super.key,
+  });
+
+  final VoidCallback onPressed;
+  final Widget icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.center,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF006D77),
+        side: BorderSide(color: colorScheme.outlineVariant),
+        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      icon: icon,
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+class FavoriteHomeScreen extends StatelessWidget {
+  const FavoriteHomeScreen({
+    required this.favoriteRepository,
+    required this.favoriteFacilityRepository,
+    required this.favoriteRouteRepository,
+    required this.stationRepository,
+    required this.reportRepository,
+    required this.locationProvider,
+    required this.facilityReportDraftTargetStore,
+    super.key,
+  });
+
+  final FavoriteStationRepository? favoriteRepository;
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
+  final FavoriteRouteRepository? favoriteRouteRepository;
+  final StationSearchRepository stationRepository;
+  final FacilityReportRepository reportRepository;
+  final CurrentLocationProvider locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = _favoriteSections(context);
+    return DefaultTabController(
+      length: sections.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('즐겨찾기'),
+          bottom: TabBar(tabs: [for (final section in sections) section.tab]),
+        ),
+        body: TabBarView(
+          children: [
+            for (final section in sections)
+              _FavoriteSectionEntry(section: section),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_FavoriteSection> _favoriteSections(BuildContext context) {
+    final sections = <_FavoriteSection>[];
+    final favoriteRouteRepository = this.favoriteRouteRepository;
+    final favoriteRepository = this.favoriteRepository;
+    final favoriteFacilityRepository = this.favoriteFacilityRepository;
+    if (favoriteRouteRepository != null) {
+      sections.add(
+        _FavoriteSection(
+          tab: const Tab(key: Key('favoriteRoutesTabButton'), text: '경로'),
+          icon: Icons.route,
+          buttonLabel: '즐겨찾기 경로 보기',
+          buttonKey: const Key('favoriteRoutesButton'),
+          open: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => FavoriteRouteListScreen(
+                  repository: favoriteRouteRepository,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (favoriteRepository != null) {
+      sections.add(
+        _FavoriteSection(
+          tab: const Tab(key: Key('favoriteStationsTabButton'), text: '역'),
+          icon: Icons.train,
+          buttonLabel: '즐겨찾기 역 보기',
+          buttonKey: const Key('favoriteStationsButton'),
+          open: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => FavoriteStationListScreen(
+                  repository: favoriteRepository,
+                  stationRepository: stationRepository,
+                  reportRepository: reportRepository,
+                  locationProvider: locationProvider,
+                  facilityReportDraftTargetStore:
+                      facilityReportDraftTargetStore,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (favoriteFacilityRepository != null) {
+      sections.add(
+        _FavoriteSection(
+          tab: const Tab(key: Key('favoriteFacilitiesTabButton'), text: '시설'),
+          icon: Icons.elevator_outlined,
+          buttonLabel: '즐겨찾기 시설 보기',
+          buttonKey: const Key('favoriteFacilitiesButton'),
+          open: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => FavoriteFacilityListScreen(
+                  repository: favoriteFacilityRepository,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    return sections;
+  }
+}
+
+class _FavoriteSection {
+  const _FavoriteSection({
+    required this.tab,
+    required this.icon,
+    required this.buttonLabel,
+    required this.buttonKey,
+    required this.open,
+  });
+
+  final Tab tab;
+  final IconData icon;
+  final String buttonLabel;
+  final Key buttonKey;
+  final VoidCallback open;
+}
+
+class _FavoriteSectionEntry extends StatelessWidget {
+  const _FavoriteSectionEntry({required this.section});
+
+  final _FavoriteSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        children: [
+          OutlinedButton.icon(
+            key: section.buttonKey,
+            onPressed: section.open,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(72),
+              backgroundColor: Colors.white,
+              side: BorderSide(color: Theme.of(context).colorScheme.outline),
+            ),
+            icon: Icon(section.icon),
+            label: Text(section.buttonLabel),
+          ),
+        ],
       ),
     );
   }
