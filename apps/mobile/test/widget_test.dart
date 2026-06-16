@@ -1143,6 +1143,75 @@ void main() {
     }
   });
 
+  testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      nextResults: [
+        const StationSearchResult(
+          id: 'station-transfer',
+          nameKo: '환승역',
+          nameEn: 'Transfer',
+          region: '수도권',
+          dataQualityLevel: 'LEVEL_1',
+          lastVerifiedAt: '2026-06-12',
+          lines: [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+            StationSearchLine(
+              id: 'korail-gyeongui-jungang',
+              name: '경의중앙선',
+              color: '#75C5A1',
+              stationCode: 'K232',
+            ),
+            StationSearchLine(
+              id: 'suin-bundang',
+              name: '수인분당선',
+              color: '#F5A200',
+              stationCode: 'K249',
+            ),
+            StationSearchLine(
+              id: 'shinbundang',
+              name: '신분당선',
+              color: '#D4003B',
+              stationCode: 'D14',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '환승');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('+3'), findsOneWidget);
+    expect(find.text('경의중앙'), findsNothing);
+
+    final resultTileSize = tester.getSize(
+      find.byKey(const Key('stationSearchResult-station-transfer')),
+    );
+    expect(resultTileSize.height, lessThanOrEqualTo(112));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+  });
+
   testWidgets('역 검색은 노선을 선택해 결과를 좁힌다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(

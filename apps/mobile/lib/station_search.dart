@@ -2362,7 +2362,14 @@ class _StationSearchResultTile extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      StationLineBadges(lines: result.lines, size: 32),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 72),
+                        child: StationLineBadges(
+                          lines: result.lines,
+                          size: 32,
+                          maxBadgeCount: 2,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -3431,10 +3438,16 @@ class _StationDetailTextPill extends StatelessWidget {
 }
 
 class StationLineBadges extends StatelessWidget {
-  const StationLineBadges({required this.lines, this.size = 40, super.key});
+  const StationLineBadges({
+    required this.lines,
+    this.size = 40,
+    this.maxBadgeCount,
+    super.key,
+  });
 
   final List<StationSearchLine> lines;
   final double size;
+  final int? maxBadgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -3442,11 +3455,21 @@ class StationLineBadges extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final maxCount = maxBadgeCount;
+    final shouldCollapse = maxCount != null && lines.length > maxCount;
+    final visibleLineCount = shouldCollapse
+        ? (maxCount - 1).clamp(1, lines.length)
+        : lines.length;
+    final hiddenLineCount = lines.length - visibleLineCount;
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final line in lines) StationLineBadge(line: line, size: size),
+        for (final line in lines.take(visibleLineCount))
+          StationLineBadge(line: line, size: size),
+        if (hiddenLineCount > 0)
+          _StationLineOverflowBadge(count: hiddenLineCount, size: size),
       ],
     );
   }
@@ -3483,6 +3506,38 @@ class StationLineBadge extends StatelessWidget {
           fontSize: badgeFontSize,
           fontWeight: FontWeight.w900,
           height: 1.05,
+        ),
+      ),
+    );
+  }
+}
+
+class _StationLineOverflowBadge extends StatelessWidget {
+  const _StationLineOverflowBadge({required this.count, required this.size});
+
+  final int count;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('stationLineBadgeOverflow'),
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0F1),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFB8CACC)),
+      ),
+      child: Text(
+        '+$count',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: const Color(0xFF29484B),
+          fontSize: 13 * (size / 32),
+          fontWeight: FontWeight.w900,
+          height: 1.0,
         ),
       ),
     );
