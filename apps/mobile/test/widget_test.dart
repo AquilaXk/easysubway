@@ -652,6 +652,133 @@ void main() {
     }
   });
 
+  testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
+    final launcher = RecordingSupportAccessLauncher();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessLauncher: launcher,
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: 'https://easysubway.example/privacy',
+          supportEmail: 'support@easysubway.example',
+          dataDeletionEmail: 'privacy@easysubway.example',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+      launcher.openedUris.single.toString(),
+      'https://easysubway.example/privacy',
+    );
+  });
+
+  testWidgets('도움말은 고객지원과 데이터 삭제 요청을 메일 앱으로 연결한다', (tester) async {
+    final launcher = RecordingSupportAccessLauncher();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessLauncher: launcher,
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: 'https://easysubway.example/privacy',
+          supportEmail: 'support@easysubway.example',
+          dataDeletionEmail: 'privacy@easysubway.example',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
+    await tester.pumpAndSettle();
+
+    expect(launcher.openedUris, hasLength(2));
+    expect(launcher.openedUris.first.scheme, 'mailto');
+    expect(launcher.openedUris.first.path, 'support@easysubway.example');
+    expect(launcher.openedUris.last.scheme, 'mailto');
+    expect(launcher.openedUris.last.path, 'privacy@easysubway.example');
+  });
+
+  testWidgets('도움말은 연결값이 비어 있으면 준비 중으로 보여주고 실행하지 않는다', (tester) async {
+    final launcher = RecordingSupportAccessLauncher();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessLauncher: launcher,
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: '',
+          supportEmail: '',
+          dataDeletionEmail: '',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('준비 중입니다.'), findsNWidgets(3));
+
+    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
+    await tester.pumpAndSettle();
+
+    expect(launcher.openedUris, isEmpty);
+  });
+
+  testWidgets('도움말은 외부 연결 실패를 짧게 안내한다', (tester) async {
+    final launcher = RecordingSupportAccessLauncher(openResult: false);
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessLauncher: launcher,
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: 'https://easysubway.example/privacy',
+          supportEmail: 'support@easysubway.example',
+          dataDeletionEmail: 'privacy@easysubway.example',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.pump();
+
+    expect(find.text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+  });
+
   testWidgets('인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -4927,6 +5054,19 @@ class MemoryFacilityReportDraftTargetStore
       throw StateError('draft target clear failed');
     }
     target = null;
+  }
+}
+
+class RecordingSupportAccessLauncher implements SupportAccessLauncher {
+  RecordingSupportAccessLauncher({this.openResult = true});
+
+  final bool openResult;
+  final openedUris = <Uri>[];
+
+  @override
+  Future<bool> open(Uri uri) async {
+    openedUris.add(uri);
+    return openResult;
   }
 }
 
