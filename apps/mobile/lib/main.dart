@@ -526,6 +526,17 @@ class _EasySubwayAppDependencies {
       anonymousAuthRepository: anonymousAuthRepository,
       enableAnonymousAuth: enableAnonymousAuth,
     );
+    final resolvedNotificationRepository =
+        notificationRepository ??
+        _defaultNotificationSettingsRepository(
+          baseUri: baseUri,
+          authProvider: sharedAuthProvider,
+        );
+    final resolvedNotificationPermissionProvider =
+        resolvedNotificationRepository == null
+        ? null
+        : notificationPermissionProvider ??
+              MethodChannelNotificationPermissionProvider();
 
     return _EasySubwayAppDependencies(
       repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
@@ -561,15 +572,8 @@ class _EasySubwayAppDependencies {
             baseUri: baseUri,
             authProvider: sharedAuthProvider,
           ),
-      notificationRepository:
-          notificationRepository ??
-          _defaultNotificationSettingsRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      notificationPermissionProvider:
-          notificationPermissionProvider ??
-          MethodChannelNotificationPermissionProvider(),
+      notificationRepository: resolvedNotificationRepository,
+      notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
     );

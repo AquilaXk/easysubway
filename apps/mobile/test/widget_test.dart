@@ -135,6 +135,25 @@ void main() {
     expect(find.text('알림 준비 완료'), findsOneWidget);
   });
 
+  testWidgets('첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        onboardingStore: MemoryOnboardingResultStore(),
+        enableAnonymousAuth: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -1300));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboardingNotificationButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '알림 켜기'), findsNothing);
+  });
+
   testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
