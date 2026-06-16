@@ -533,10 +533,10 @@ class _EasySubwayAppDependencies {
           authProvider: sharedAuthProvider,
         );
     final resolvedNotificationPermissionProvider =
-        resolvedNotificationRepository == null
-        ? null
-        : notificationPermissionProvider ??
-              MethodChannelNotificationPermissionProvider();
+        notificationPermissionProvider ??
+        (resolvedNotificationRepository == null
+            ? null
+            : MethodChannelNotificationPermissionProvider());
 
     return _EasySubwayAppDependencies(
       repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
