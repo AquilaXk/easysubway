@@ -524,6 +524,7 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '도움말'), findsNothing);
       expect(find.byKey(const Key('homeHelpActionButton')), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '도움말'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '내 신고'), findsNothing);
       expect(find.widgetWithText(FilledButton, '알림 설정'), findsNothing);
       expect(find.text('즐겨찾기 경로'), findsNothing);
