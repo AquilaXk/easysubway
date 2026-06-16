@@ -1469,7 +1469,7 @@ void main() {
       expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수'), findsOneWidget);
-      expect(find.text('수도권 2호선 · 230m 거리'), findsOneWidget);
+      expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
       expect(
         find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,

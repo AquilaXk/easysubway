@@ -2394,7 +2394,7 @@ class _StationSearchResultTile extends StatelessWidget {
                             Text(
                               result.distanceLabel.isEmpty
                                   ? result.lineLabel
-                                  : '${result.lineLabel} · ${result.distanceLabel}',
+                                  : '${result.distanceLabel} · ${result.lineLabel}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodyLarge?.copyWith(
