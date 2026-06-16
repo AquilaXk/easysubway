@@ -1231,26 +1231,46 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
 test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 따른다", () => {
   const notification = read("backend/src/main/java/com/easysubway/notification/domain/PushNotification.java");
   const result = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationDispatchResult.java");
+  const dashboardSummary = read(
+    "backend/src/main/java/com/easysubway/notification/domain/PushNotificationDashboardSummary.java",
+  );
   const type = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationType.java");
   const status = read("backend/src/main/java/com/easysubway/notification/domain/PushNotificationStatus.java");
   const invalidPush = read("backend/src/main/java/com/easysubway/notification/domain/InvalidPushNotificationException.java");
   const useCase = read("backend/src/main/java/com/easysubway/notification/application/port/in/PushNotificationDispatchUseCase.java");
+  const dashboardUseCase = read(
+    "backend/src/main/java/com/easysubway/notification/application/port/in/PushNotificationDashboardUseCase.java",
+  );
   const command = read("backend/src/main/java/com/easysubway/notification/application/port/in/DispatchPushNotificationCommand.java");
   const loadOutboxPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/LoadPushNotificationOutboxPort.java");
   const saveOutboxPort = read("backend/src/main/java/com/easysubway/notification/application/port/out/SavePushNotificationOutboxPort.java");
+  const summarizeOutboxPort = read(
+    "backend/src/main/java/com/easysubway/notification/application/port/out/SummarizePushNotificationOutboxPort.java",
+  );
   const service = read("backend/src/main/java/com/easysubway/notification/application/service/PushNotificationDispatchService.java");
+  const dashboardService = read(
+    "backend/src/main/java/com/easysubway/notification/application/service/PushNotificationDashboardService.java",
+  );
   const repository = read("backend/src/main/java/com/easysubway/notification/adapter/out/persistence/InMemoryPushNotificationOutboxRepository.java");
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcPushNotificationOutboxRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
+  const dashboardController = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
+  );
+  const dashboardTemplate = read("backend/src/main/resources/templates/admin/notifications/push.html");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(notification, /record PushNotification/);
   assert.match(notification, /deviceToken/);
   assert.match(notification, /PushNotificationStatus/);
   assert.match(result, /record PushNotificationDispatchResult/);
+  assert.match(dashboardSummary, /record PushNotificationDashboardSummary/);
+  assert.match(dashboardSummary, /pendingCount/);
+  assert.match(dashboardSummary, /sentCount/);
+  assert.match(dashboardSummary, /failedCount/);
   assert.match(type, /FAVORITE_STATION_FACILITY/);
   assert.match(type, /FAVORITE_ROUTE_FACILITY/);
   assert.match(type, /REPORT_STATUS/);
@@ -1259,17 +1279,24 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(invalidPush, /extends InvalidRequestException/);
   assert.match(useCase, /interface PushNotificationDispatchUseCase/);
   assert.match(useCase, /dispatch/);
+  assert.match(dashboardUseCase, /interface PushNotificationDashboardUseCase/);
+  assert.match(dashboardUseCase, /summarizePushNotifications/);
   assert.match(command, /record DispatchPushNotificationCommand/);
   assert.match(loadOutboxPort, /interface LoadPushNotificationOutboxPort/);
   assert.match(saveOutboxPort, /interface SavePushNotificationOutboxPort/);
+  assert.match(summarizeOutboxPort, /interface SummarizePushNotificationOutboxPort/);
+  assert.match(summarizeOutboxPort, /summarizePushNotificationOutbox/);
   assert.match(service, /implements PushNotificationDispatchUseCase/);
   assert.match(service, /LoadNotificationPreferencePort/);
   assert.match(service, /SavePushNotificationOutboxPort/);
-  assert.match(repository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort/);
+  assert.match(dashboardService, /implements PushNotificationDashboardUseCase/);
+  assert.match(dashboardService, /SummarizePushNotificationOutboxPort/);
+  assert.match(repository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*SummarizePushNotificationOutboxPort/);
   assert.match(jdbcRepository, /@Profile\("prod"\)/);
-  assert.match(jdbcRepository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*DeleteUserPushNotificationPort/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*SummarizePushNotificationOutboxPort[\s\S]*DeleteUserPushNotificationPort/);
   assert.match(jdbcRepository, /List<PushNotification> loadPushNotifications\(String userId\)/);
   assert.match(jdbcRepository, /PushNotification savePushNotification\(PushNotification notification\)/);
+  assert.match(jdbcRepository, /PushNotificationDashboardSummary summarizePushNotificationOutbox\(\)/);
   assert.match(jdbcRepository, /int deletePushNotifications\(String userId\)/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS push_notification_outbox/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_platform/);
@@ -1279,6 +1306,12 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(controller, /@PostMapping\("\/admin\/notifications\/push"\)/);
   assert.match(controller, /PushNotificationDispatchUseCase/);
   assert.doesNotMatch(controller, /deviceToken/);
+  assert.match(dashboardController, /@GetMapping\("\/admin\/notifications\/push\/page"\)/);
+  assert.match(dashboardController, /PushNotificationDashboardUseCase/);
+  assert.match(dashboardTemplate, /푸시 알림 현황/);
+  assert.match(dashboardTemplate, /전체 알림/);
+  assert.match(dashboardTemplate, /상태별 알림/);
+  assert.doesNotMatch(dashboardTemplate, /deviceToken/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
 
