@@ -730,12 +730,18 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
         actions: [
-          IconButton(
+          TextButton.icon(
             key: const Key('homeHelpActionButton'),
-            tooltip: '도움말',
             onPressed: openSupportAccess,
             icon: const Icon(Icons.help_outline),
+            label: const Text('도움말'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              minimumSize: const Size(96, 48),
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
