@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mobility_profile.dart';
 import 'mobile_error_reporter.dart';
+import 'notification_settings.dart';
 import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
@@ -168,11 +169,13 @@ class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     required this.onCompleted,
     this.locationProvider,
+    this.notificationPermissionProvider,
     super.key,
   });
 
   final ValueChanged<OnboardingResult> onCompleted;
   final CurrentLocationProvider? locationProvider;
+  final NotificationPermissionProvider? notificationPermissionProvider;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -186,6 +189,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _isLocationFailure = false;
   bool _isCheckingLocation = false;
   bool _isOpeningLocationSettings = false;
+  String _notificationMessage = '';
+  bool _isNotificationFailure = false;
+  bool _isRequestingNotificationPermission = false;
 
   @override
   Widget build(BuildContext context) {
@@ -267,8 +273,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 isFailure: _isLocationFailure,
                 isChecking: _isCheckingLocation,
                 isOpeningSettings: _isOpeningLocationSettings,
+                isBlocked: _isRequestingNotificationPermission,
                 onPrepareLocation: _prepareLocation,
                 onOpenSettings: _openLocationSettings,
+              ),
+            ],
+            if (widget.notificationPermissionProvider != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '알림',
+                style: textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _OnboardingNotificationSection(
+                message: _notificationMessage,
+                isFailure: _isNotificationFailure,
+                isRequesting: _isRequestingNotificationPermission,
+                isBlocked: _isCheckingLocation || _isOpeningLocationSettings,
+                onPrepareNotification: _prepareNotification,
               ),
             ],
             const SizedBox(height: 12),
@@ -324,7 +349,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final locationProvider = widget.locationProvider;
     if (locationProvider == null ||
         _isCheckingLocation ||
-        _isOpeningLocationSettings) {
+        _isOpeningLocationSettings ||
+        _isRequestingNotificationPermission) {
       return;
     }
     setState(() {
@@ -374,7 +400,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final locationProvider = widget.locationProvider;
     if (locationProvider == null ||
         _isOpeningLocationSettings ||
-        _isCheckingLocation) {
+        _isCheckingLocation ||
+        _isRequestingNotificationPermission) {
       return;
     }
     setState(() => _isOpeningLocationSettings = true);
@@ -386,6 +413,61 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
     }
   }
+
+  Future<void> _prepareNotification() async {
+    final notificationPermissionProvider =
+        widget.notificationPermissionProvider;
+    if (notificationPermissionProvider == null ||
+        _isRequestingNotificationPermission ||
+        _isCheckingLocation ||
+        _isOpeningLocationSettings) {
+      return;
+    }
+    setState(() {
+      _isRequestingNotificationPermission = true;
+      _notificationMessage = '';
+      _isNotificationFailure = false;
+    });
+    try {
+      // 온보딩에서는 토큰을 등록하지 않고, 이후 알림 설정에서 쓸 기기 권한만 준비한다.
+      final status = await notificationPermissionProvider
+          .requestNotificationPermission();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationMessage = status == NotificationPermissionStatus.granted
+            ? '알림 준비 완료'
+            : '알림 권한을 켜 주세요.';
+        _isNotificationFailure = status != NotificationPermissionStatus.granted;
+      });
+    } on NotificationSettingsException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationMessage = error.message;
+        _isNotificationFailure = true;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 알림 권한 준비 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _notificationMessage = '알림 권한을 확인하지 못했습니다.';
+        _isNotificationFailure = true;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isRequestingNotificationPermission = false);
+      }
+    }
+  }
 }
 
 class _OnboardingLocationSection extends StatelessWidget {
@@ -394,6 +476,7 @@ class _OnboardingLocationSection extends StatelessWidget {
     required this.isFailure,
     required this.isChecking,
     required this.isOpeningSettings,
+    required this.isBlocked,
     required this.onPrepareLocation,
     required this.onOpenSettings,
   });
@@ -402,6 +485,7 @@ class _OnboardingLocationSection extends StatelessWidget {
   final bool isFailure;
   final bool isChecking;
   final bool isOpeningSettings;
+  final bool isBlocked;
   final VoidCallback onPrepareLocation;
   final VoidCallback onOpenSettings;
 
@@ -421,7 +505,9 @@ class _OnboardingLocationSection extends StatelessWidget {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           key: const Key('onboardingLocationButton'),
-          onPressed: isChecking || isOpeningSettings ? null : onPrepareLocation,
+          onPressed: isChecking || isOpeningSettings || isBlocked
+              ? null
+              : onPrepareLocation,
           icon: isChecking
               ? const SizedBox(
                   width: 22,
@@ -439,13 +525,15 @@ class _OnboardingLocationSection extends StatelessWidget {
         ),
         if (message.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _OnboardingLocationMessage(message: message, isFailure: isFailure),
+          _OnboardingStatusMessage(message: message, isFailure: isFailure),
         ],
         if (isFailure) ...[
           const SizedBox(height: 10),
           OutlinedButton.icon(
             key: const Key('onboardingOpenLocationSettingsButton'),
-            onPressed: isOpeningSettings || isChecking ? null : onOpenSettings,
+            onPressed: isOpeningSettings || isChecking || isBlocked
+                ? null
+                : onOpenSettings,
             icon: isOpeningSettings
                 ? const SizedBox(
                     width: 22,
@@ -467,8 +555,64 @@ class _OnboardingLocationSection extends StatelessWidget {
   }
 }
 
-class _OnboardingLocationMessage extends StatelessWidget {
-  const _OnboardingLocationMessage({
+class _OnboardingNotificationSection extends StatelessWidget {
+  const _OnboardingNotificationSection({
+    required this.message,
+    required this.isFailure,
+    required this.isRequesting,
+    required this.isBlocked,
+    required this.onPrepareNotification,
+  });
+
+  final String message;
+  final bool isFailure;
+  final bool isRequesting;
+  final bool isBlocked;
+  final VoidCallback onPrepareNotification;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '시설 고장과 신고 결과를 알려드려요.',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: const Color(0xFF29484B),
+            fontWeight: FontWeight.w700,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('onboardingNotificationButton'),
+          onPressed: isRequesting || isBlocked ? null : onPrepareNotification,
+          icon: isRequesting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              : const Icon(Icons.notifications_active_outlined),
+          label: const Text('알림 켜기'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(60),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _OnboardingStatusMessage(message: message, isFailure: isFailure),
+        ],
+      ],
+    );
+  }
+}
+
+class _OnboardingStatusMessage extends StatelessWidget {
+  const _OnboardingStatusMessage({
     required this.message,
     required this.isFailure,
   });

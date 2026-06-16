@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
@@ -191,6 +192,64 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('온보딩은 사용자가 누르면 알림 권한 준비를 시작한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      status: NotificationPermissionStatus.granted,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (_) {},
+        ),
+      ),
+    );
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('시설 고장과 신고 결과를 알려드려요.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 준비 완료'), findsOneWidget);
+  });
+
+  testWidgets('온보딩은 알림 권한을 거부하면 짧게 안내한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      status: NotificationPermissionStatus.denied,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (_) {},
+        ),
+      ),
+    );
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 권한을 켜 주세요.'), findsOneWidget);
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
@@ -289,5 +348,19 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
       return loader();
     }
     return true;
+  }
+}
+
+class FakeNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  FakeNotificationPermissionProvider({required this.status});
+
+  final NotificationPermissionStatus status;
+  int requestCount = 0;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    requestCount++;
+    return status;
   }
 }

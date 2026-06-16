@@ -103,6 +103,38 @@ void main() {
     expect(find.text('위치 준비 완료'), findsOneWidget);
   });
 
+  testWidgets('첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.granted,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        onboardingStore: MemoryOnboardingResultStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 준비 완료'), findsOneWidget);
+  });
+
   testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
