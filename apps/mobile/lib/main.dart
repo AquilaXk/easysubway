@@ -718,9 +718,32 @@ class HomeScreen extends StatelessWidget {
         favoriteRepository != null ||
         favoriteFacilityRepository != null ||
         favoriteRouteRepository != null;
+    void openSupportAccess() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SupportAccessScreen(accessInfo: supportAccessInfo),
+        ),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('쉬운 지하철')),
+      appBar: AppBar(
+        title: const Text('쉬운 지하철'),
+        actions: [
+          TextButton.icon(
+            key: const Key('homeHelpActionButton'),
+            onPressed: openSupportAccess,
+            icon: const Icon(Icons.help_outline),
+            label: const Text('도움말'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              minimumSize: const Size(96, 48),
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -868,24 +891,6 @@ class HomeScreen extends StatelessWidget {
                           label: '알림 설정',
                         ),
                       ),
-                    SizedBox(
-                      width: itemWidth,
-                      height: 64,
-                      child: _HomeSecondaryActionButton(
-                        key: const Key('helpButton'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => SupportAccessScreen(
-                                accessInfo: supportAccessInfo,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.help_outline),
-                        label: '도움말',
-                      ),
-                    ),
                   ],
                 );
               },
