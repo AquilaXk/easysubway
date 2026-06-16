@@ -1018,6 +1018,10 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   const deletePort = read("backend/src/main/java/com/easysubway/favorite/application/port/out/DeleteFavoriteFacilityPort.java");
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteFacilityService.java");
   const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteFacilityRepository.java");
+  const jdbcRepository = read(
+    "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteFacilityRepository.java",
+  );
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1048,6 +1052,18 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   assert.match(service, /FavoriteFacilityNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*LoadFavoriteFacilityAlertTargetPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort/);
   assert.match(repository, /loadUserIdsByFavoriteFacilityId/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*LoadFavoriteFacilityAlertTargetPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort[\s\S]*DeleteUserFavoriteFacilityPort/);
+  assert.match(jdbcRepository, /List<FavoriteFacility> loadFavoriteFacilities\(String userId\)/);
+  assert.match(jdbcRepository, /Optional<FavoriteFacility> loadFavoriteFacility\(String userId, String facilityId\)/);
+  assert.match(jdbcRepository, /List<String> loadUserIdsByFavoriteFacilityId\(String facilityId\)/);
+  assert.match(jdbcRepository, /FavoriteFacility saveFavoriteFacility\(FavoriteFacility favoriteFacility\)/);
+  assert.match(jdbcRepository, /int deleteFavoriteFacilitiesByUserId\(String userId\)/);
+  assert.match(jdbcRepository, /favorite_facilities/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS favorite_facilities/);
+  assert.match(batchPostgresSchema, /PRIMARY KEY \(user_id, facility_id\)/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_facilities_facility_user/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_facilities_user_added/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/facilities"\)/);
   assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
