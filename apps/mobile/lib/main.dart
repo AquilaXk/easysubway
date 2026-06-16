@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'anonymous_auth.dart';
 import 'auth_headers.dart';
@@ -43,6 +44,8 @@ class EasySubwayApp extends StatelessWidget {
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
     SupportAccessInfo supportAccessInfo =
         const SupportAccessInfo.fromEnvironment(),
+    SupportAccessLauncher supportAccessLauncher =
+        const UrlLauncherSupportAccessLauncher(),
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enableAnonymousAuth = true,
     Key? key,
@@ -66,6 +69,7 @@ class EasySubwayApp extends StatelessWidget {
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
          supportAccessInfo: supportAccessInfo,
+         supportAccessLauncher: supportAccessLauncher,
          key: key,
        );
 
@@ -76,6 +80,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
     required this.supportAccessInfo,
+    required this.supportAccessLauncher,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -104,6 +109,7 @@ class EasySubwayApp extends StatelessWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
   final SupportAccessInfo supportAccessInfo;
+  final SupportAccessLauncher supportAccessLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -164,8 +170,22 @@ class EasySubwayApp extends StatelessWidget {
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
         supportAccessInfo: supportAccessInfo,
+        supportAccessLauncher: supportAccessLauncher,
       ),
     );
+  }
+}
+
+abstract interface class SupportAccessLauncher {
+  Future<bool> open(Uri uri);
+}
+
+class UrlLauncherSupportAccessLauncher implements SupportAccessLauncher {
+  const UrlLauncherSupportAccessLauncher();
+
+  @override
+  Future<bool> open(Uri uri) {
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
 
@@ -207,6 +227,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
     required this.supportAccessInfo,
+    required this.supportAccessLauncher,
   });
 
   final StationSearchRepository repository;
@@ -224,6 +245,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
   final SupportAccessInfo supportAccessInfo;
+  final SupportAccessLauncher supportAccessLauncher;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -290,6 +312,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         simpleViewEnabled: preferences.simpleViewEnabled,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         supportAccessInfo: widget.supportAccessInfo,
+        supportAccessLauncher: widget.supportAccessLauncher,
       ),
     );
   }
@@ -683,6 +706,7 @@ class HomeScreen extends StatelessWidget {
     required this.notificationPermissionProvider,
     required this.locationProvider,
     required this.supportAccessInfo,
+    required this.supportAccessLauncher,
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
     String? initialMobilityType,
@@ -701,6 +725,7 @@ class HomeScreen extends StatelessWidget {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final SupportAccessInfo supportAccessInfo;
+  final SupportAccessLauncher supportAccessLauncher;
   final String initialMobilityType;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -721,7 +746,10 @@ class HomeScreen extends StatelessWidget {
     void openSupportAccess() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => SupportAccessScreen(accessInfo: supportAccessInfo),
+          builder: (_) => SupportAccessScreen(
+            accessInfo: supportAccessInfo,
+            launcher: supportAccessLauncher,
+          ),
         ),
       );
     }
@@ -1047,9 +1075,14 @@ class _FavoriteSection {
 }
 
 class SupportAccessScreen extends StatelessWidget {
-  const SupportAccessScreen({required this.accessInfo, super.key});
+  const SupportAccessScreen({
+    required this.accessInfo,
+    required this.launcher,
+    super.key,
+  });
 
   final SupportAccessInfo accessInfo;
+  final SupportAccessLauncher launcher;
 
   @override
   Widget build(BuildContext context) {
@@ -1064,6 +1097,8 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.privacy_tip_outlined,
               title: '개인정보처리방침',
               value: accessInfo.privacyPolicyUrl,
+              uri: _httpsUri(accessInfo.privacyPolicyUrl),
+              launcher: launcher,
             ),
             const SizedBox(height: 12),
             _SupportAccessItem(
@@ -1071,6 +1106,8 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.support_agent,
               title: '고객지원',
               value: accessInfo.supportEmail,
+              uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
+              launcher: launcher,
             ),
             const SizedBox(height: 12),
             _SupportAccessItem(
@@ -1078,6 +1115,8 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.delete_outline,
               title: '데이터 삭제 요청',
               value: accessInfo.dataDeletionEmail,
+              uri: _mailtoUri(accessInfo.dataDeletionEmail, '쉬운 지하철 데이터 삭제 요청'),
+              launcher: launcher,
             ),
           ],
         ),
@@ -1091,23 +1130,33 @@ class _SupportAccessItem extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
+    required this.uri,
+    required this.launcher,
     super.key,
   });
 
   final IconData icon;
   final String title;
   final String value;
+  final Uri? uri;
+  final SupportAccessLauncher launcher;
 
   @override
   Widget build(BuildContext context) {
-    final displayValue = value.trim().isEmpty ? '앱 출시 전 연결됩니다.' : value;
+    final displayValue = value.trim().isEmpty ? '준비 중입니다.' : value.trim();
+    final targetUri = uri;
     return Semantics(
       button: true,
+      enabled: targetUri != null,
       label: '$title, $displayValue',
-      onTap: () => unawaited(_showDetail(context, displayValue)),
+      onTap: targetUri == null
+          ? null
+          : () => unawaited(_openTarget(context, targetUri)),
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
-          onPressed: () => _showDetail(context, displayValue),
+          onPressed: targetUri == null
+              ? null
+              : () => unawaited(_openTarget(context, targetUri)),
           icon: Icon(icon),
           label: Align(
             alignment: Alignment.centerLeft,
@@ -1135,21 +1184,46 @@ class _SupportAccessItem extends StatelessWidget {
     );
   }
 
-  Future<void> _showDetail(BuildContext context, String displayValue) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SelectableText(displayValue),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
+  Future<void> _openTarget(BuildContext context, Uri uri) async {
+    bool opened = false;
+    try {
+      opened = await launcher.open(uri);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '도움말 외부 연결 실행 중 예외가 발생했습니다.',
+      );
+    }
+
+    if (!context.mounted || opened) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.')),
     );
   }
+}
+
+Uri? _httpsUri(String value) {
+  final uri = Uri.tryParse(value.trim());
+  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+    return null;
+  }
+  return uri;
+}
+
+Uri? _mailtoUri(String value, String subject) {
+  final email = value.trim();
+  if (email.isEmpty) {
+    return null;
+  }
+  return Uri(
+    scheme: 'mailto',
+    path: email,
+    queryParameters: {'subject': subject},
+  );
 }
 
 class FeatureTile extends StatelessWidget {
