@@ -39,6 +39,21 @@ OnboardingState _completedOnboardingStateWithPreferences({
   );
 }
 
+Future<void> _openFavoriteList(
+  WidgetTester tester, {
+  required Key listButtonKey,
+  Key? tabKey,
+}) async {
+  await tester.tap(find.byKey(const Key('favoritesButton')));
+  await tester.pumpAndSettle();
+  if (tabKey != null) {
+    await tester.tap(find.byKey(tabKey));
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.byKey(listButtonKey));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore();
@@ -64,7 +79,7 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('역 찾기'), findsOneWidget);
+    expect(find.text('어디로 가시나요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
     expect(onboardingStore.savedResult?.profile.id, 'elderly');
@@ -483,7 +498,7 @@ void main() {
     expect(find.text('신고'), findsNothing);
   });
 
-  testWidgets('홈 화면은 핵심 행동만 간결하게 보여준다', (tester) async {
+  testWidgets('홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -493,6 +508,9 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
               largeTextEnabled: true,
@@ -503,12 +521,18 @@ void main() {
         ),
       );
 
-      expect(find.text('역 찾기'), findsOneWidget);
+      expect(find.text('어디로 가시나요?'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '경로 검색'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '내 신고'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '즐겨찾기 역'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '내 신고'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '내 신고'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '알림 설정'), findsNothing);
+      expect(find.text('즐겨찾기 경로'), findsNothing);
+      expect(find.text('즐겨찾기 역'), findsNothing);
+      expect(find.text('즐겨찾기 시설'), findsNothing);
       expect(find.textContaining('빠른 길보다'), findsNothing);
       expect(find.textContaining('고령자'), findsNothing);
       expect(find.textContaining('휠체어'), findsNothing);
@@ -525,35 +549,55 @@ void main() {
       final myReportsButtonSize = tester.getSize(
         find.byKey(const Key('myReportsButton')),
       );
-
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('notificationSettingsButton')),
-        120,
-      );
-      await tester.pumpAndSettle();
-      expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
       final notificationButtonSize = tester.getSize(
         find.byKey(const Key('notificationSettingsButton')),
       );
 
-      expect(stationButtonSize.height, greaterThanOrEqualTo(60));
-      expect(routeButtonSize.height, greaterThanOrEqualTo(60));
-      expect(notificationButtonSize.height, greaterThanOrEqualTo(60));
-      expect(profileButtonSize.height, greaterThanOrEqualTo(60));
-      expect(myReportsButtonSize.height, greaterThanOrEqualTo(60));
+      expect(stationButtonSize.height, greaterThanOrEqualTo(76));
+      expect(routeButtonSize.height, greaterThanOrEqualTo(76));
+      expect(profileButtonSize.height, lessThan(stationButtonSize.height));
+      expect(myReportsButtonSize.height, lessThan(stationButtonSize.height));
+      expect(notificationButtonSize.height, lessThan(stationButtonSize.height));
 
       await tester.drag(find.byType(ListView), const Offset(0, -620));
       await tester.pumpAndSettle();
 
-      expect(find.text('이동 프로필'), findsOneWidget);
-      expect(find.text('시설 정보'), findsOneWidget);
-      expect(find.text('신고'), findsOneWidget);
-      expect(find.bySemanticsLabel('이동 프로필, 이동 조건 저장'), findsOneWidget);
-      expect(find.bySemanticsLabel('시설 정보, 엘리베이터와 경사로'), findsOneWidget);
-      expect(find.bySemanticsLabel('신고, 불편 신고'), findsOneWidget);
+      expect(find.text('이동 프로필'), findsNothing);
+      expect(find.text('시설 정보'), findsNothing);
+      expect(find.text('신고'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('홈 즐겨찾기는 하나의 진입점에서 종류를 고르게 한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    expect(find.byKey(const Key('favoritesButton')), findsOneWidget);
+    expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('favoritesButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(find.byKey(const Key('favoriteRoutesTabButton')), findsOneWidget);
+    expect(find.byKey(const Key('favoriteStationsTabButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('favoriteFacilitiesTabButton')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
@@ -621,12 +665,10 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
-    expect(find.widgetWithText(FilledButton, '즐겨찾기 역'), findsNothing);
-    expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
-    expect(find.widgetWithText(FilledButton, '즐겨찾기 경로'), findsNothing);
+    expect(find.byKey(const Key('favoritesButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsNothing);
     expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
-    expect(find.widgetWithText(FilledButton, '알림 설정'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
   });
 
   testWidgets('기본 홈 화면은 익명 인증으로 즐겨찾기를 노출한다', (tester) async {
@@ -640,17 +682,10 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('favoriteRoutesButton')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '즐겨찾기 경로'), findsOneWidget);
-    expect(find.byKey(const Key('favoriteStationsButton')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '즐겨찾기 역'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('notificationSettingsButton')),
-      120,
-    );
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('favoritesButton')), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsOneWidget);
     expect(find.byKey(const Key('notificationSettingsButton')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '알림 설정'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsOneWidget);
   });
 
   test('기본 앱은 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
@@ -846,8 +881,11 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('favoriteStationsButton')));
-      await tester.pumpAndSettle();
+      await _openFavoriteList(
+        tester,
+        listButtonKey: const Key('favoriteStationsButton'),
+        tabKey: const Key('favoriteStationsTabButton'),
+      );
 
       expect(find.text('즐겨찾기 역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
@@ -894,13 +932,11 @@ void main() {
         ),
       );
 
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('favoriteFacilitiesButton')),
-        120,
+      await _openFavoriteList(
+        tester,
+        listButtonKey: const Key('favoriteFacilitiesButton'),
+        tabKey: const Key('favoriteFacilitiesTabButton'),
       );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('favoriteFacilitiesButton')));
-      await tester.pumpAndSettle();
 
       expect(find.text('즐겨찾기 시설'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
@@ -956,8 +992,10 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('favoriteRoutesButton')));
-      await tester.pumpAndSettle();
+      await _openFavoriteList(
+        tester,
+        listButtonKey: const Key('favoriteRoutesButton'),
+      );
 
       expect(find.text('즐겨찾기 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
@@ -1004,8 +1042,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('favoriteRoutesButton')));
-    await tester.pumpAndSettle();
+    await _openFavoriteList(
+      tester,
+      listButtonKey: const Key('favoriteRoutesButton'),
+    );
 
     final removeButton = find.byKey(const Key('favoriteRouteRemove-route-1'));
     await tester.tap(removeButton);
@@ -2120,8 +2160,11 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('favoriteStationsButton')));
-    await tester.pumpAndSettle();
+    await _openFavoriteList(
+      tester,
+      listButtonKey: const Key('favoriteStationsButton'),
+      tabKey: const Key('favoriteStationsTabButton'),
+    );
     await tester.tap(
       find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
     );
