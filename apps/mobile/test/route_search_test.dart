@@ -78,6 +78,11 @@ void main() {
                       '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
                 },
               ],
+              'recommendationReasons': [
+                '엘리베이터 동선을 우선했어요',
+                '계단 없는 출구를 확인했어요',
+                '휠체어 이동에 맞춰 계단을 피했어요',
+              ],
               'blockedReasons': [],
               'createdAt': '2026-06-13T04:20:00',
             },
@@ -109,6 +114,11 @@ void main() {
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
     expect(result.scoreLabel, '이동 점수 92점');
+    expect(result.recommendationReasons, [
+      '엘리베이터 동선을 우선했어요',
+      '계단 없는 출구를 확인했어요',
+      '휠체어 이동에 맞춰 계단을 피했어요',
+    ]);
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
@@ -395,6 +405,11 @@ RouteSearchResult _sampleRouteSearchResult({String status = 'FOUND'}) {
         code: 'LOW_DATA_CONFIDENCE',
         message: '일부 시설 정보는 확인이 필요합니다.',
       ),
+    ],
+    recommendationReasons: const [
+      '엘리베이터 동선을 우선했어요',
+      '계단 없는 출구를 확인했어요',
+      '천천히 이동하기 쉬운 동선을 확인했어요',
     ],
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',

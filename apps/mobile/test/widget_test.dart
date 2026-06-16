@@ -2539,6 +2539,10 @@ void main() {
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('이동 점수 92점'), findsOneWidget);
+      expect(find.text('추천 이유'), findsOneWidget);
+      expect(find.text('엘리베이터 동선을 우선했어요'), findsOneWidget);
+      expect(find.text('계단 없는 출구를 확인했어요'), findsOneWidget);
+      expect(find.text('천천히 이동하기 쉬운 동선을 확인했어요'), findsOneWidget);
       expect(find.text('도착 안내'), findsOneWidget);
       expect(find.text('2번 출구의 엘리베이터를 먼저 확인하세요.'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
@@ -2562,6 +2566,7 @@ void main() {
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
+          '추천 이유 엘리베이터 동선을 우선했어요, 계단 없는 출구를 확인했어요, 천천히 이동하기 쉬운 동선을 확인했어요, '
           '도착 안내 2번 출구의 엘리베이터를 먼저 확인하세요., '
           '주의 일부 시설 정보는 확인이 필요합니다., 접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요., '
           '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다., '
@@ -3191,6 +3196,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
+      expect(find.text('추천 이유'), findsNothing);
+      expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
@@ -5234,6 +5241,11 @@ StationDetail _stationDetail({required String id, required String name}) {
 RouteSearchResult _sampleRouteSearchResult({
   String status = 'FOUND',
   String mobilityType = 'SENIOR',
+  List<String> recommendationReasons = const [
+    '엘리베이터 동선을 우선했어요',
+    '계단 없는 출구를 확인했어요',
+    '천천히 이동하기 쉬운 동선을 확인했어요',
+  ],
 }) {
   return RouteSearchResult(
     routeSearchId: 'route-1',
@@ -5284,6 +5296,7 @@ RouteSearchResult _sampleRouteSearchResult({
         message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
       ),
     ],
+    recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
   );
@@ -5303,6 +5316,7 @@ RouteSearchResult _blockedRouteSearchResult() {
     score: 0,
     steps: [],
     warnings: [],
+    recommendationReasons: [],
     blockedReasons: ['휠체어로 이동 가능한 엘리베이터가 없습니다.'],
     createdAt: '2026-06-13T04:25:00',
   );
