@@ -32,6 +32,14 @@ function assertPrivacyCollectedDataType(privacyManifest, dataType) {
   assert.match(entry, /<key>NSPrivacyCollectedDataTypePurposes<\/key>\s*<array>[\s\S]*?<string>NSPrivacyCollectedDataTypePurposeAppFunctionality<\/string>[\s\S]*?<\/array>/);
 }
 
+function androidManifestPermissions(androidManifest) {
+  return [...androidManifest.matchAll(/<uses-permission\b[^>]*>/g)]
+    .map((match) => match[0].match(/\bandroid:name="([^"]+)"/)?.[1])
+    .filter(Boolean)
+    .filter((permission) => permission.startsWith("android.permission."))
+    .sort();
+}
+
 function jobBlock(workflow, startJob, nextJob) {
   const pattern = new RegExp(`  ${startJob}:[\\s\\S]*?\\n  ${nextJob}:`);
   const match = workflow.match(pattern);
@@ -365,15 +373,39 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   }
 });
 
+test("Android 권한 파서는 속성 순서와 추가 속성이 달라도 권한명을 추출한다", () => {
+  const permissions = androidManifestPermissions(`
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      <uses-permission android:maxSdkVersion="32" android:name="android.permission.READ_EXTERNAL_STORAGE" />
+      <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="35" />
+      <uses-permission android:name="com.easysubway.easysubway_mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    </manifest>
+  `);
+
+  assert.deepEqual(permissions, [
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.READ_EXTERNAL_STORAGE",
+  ]);
+});
+
 test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const mobileJob = jobBlock(workflow, "mobile-app", "android");
 
   assert.match(mobileJob, /Mobile App CI \/ Set up Node\.js for mobile contracts/);
+  assert.match(mobileJob, /Mobile App CI \/ Generate Android release merged manifest/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: ci-release-manifest-only\.jks/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-manifest-only/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release-manifest-only/);
+  assert.match(mobileJob, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-manifest-only/);
+  assert.match(mobileJob, /flutter pub get/);
+  assert.match(mobileJob, /flutter build apk --config-only/);
+  assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
   assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
+  assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
@@ -1527,6 +1559,36 @@ test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한�
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeUserID");
   assert.match(project, /PrivacyInfo\.xcprivacy \*\/ = \{isa = PBXFileReference;[\s\S]*?path = PrivacyInfo\.xcprivacy;/);
   assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+});
+
+test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다", () => {
+  const mergedManifestPath = "apps/mobile/build/app/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml";
+  const expectsGeneratedManifest = process.env.EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST === "true";
+  // Repository CI는 산출물을 만들지 않으므로, Mobile App CI에서만 생성 결과를 필수로 검사한다.
+  if (!existsSync(path.join(root, mergedManifestPath)) && !expectsGeneratedManifest) {
+    return;
+  }
+
+  assert.ok(
+    existsSync(path.join(root, mergedManifestPath)),
+    "Android release merged manifest must be generated before running this contract.",
+  );
+
+  const androidManifest = read(mergedManifestPath);
+  const permissions = androidManifestPermissions(androidManifest);
+
+  assert.deepEqual(permissions, [
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.INTERNET",
+    "android.permission.POST_NOTIFICATIONS",
+  ]);
+  assert.doesNotMatch(androidManifest, /android\.permission\.ACCESS_BACKGROUND_LOCATION/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.CAMERA/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.READ_EXTERNAL_STORAGE/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.READ_MEDIA_IMAGES/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.READ_MEDIA_VIDEO/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.WRITE_EXTERNAL_STORAGE/);
 });
 
 test("Android 런처 아이콘은 원형 마스크 안전 여백을 가진다", () => {
