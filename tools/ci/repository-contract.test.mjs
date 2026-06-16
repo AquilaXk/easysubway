@@ -823,9 +823,11 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   );
   const service = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
   const repository = read("backend/src/main/java/com/easysubway/report/adapter/out/persistence/InMemoryFacilityReportRepository.java");
+  const jdbcRepository = read("backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepository.java");
   const transitRepository = read(
     "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/InMemoryTransitMasterRepository.java",
   );
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -865,6 +867,25 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(service, /FacilityReportStatus\.DUPLICATE/);
   assert.match(repository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort/);
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
+  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort/);
+  assert.match(jdbcRepository, /Optional<FacilityReport> loadReport\(String reportId\)/);
+  assert.match(jdbcRepository, /List<FacilityReport> loadReports\(\)/);
+  assert.match(jdbcRepository, /FacilityReport saveReport\(FacilityReport report\)/);
+  assert.match(jdbcRepository, /int anonymizeFacilityReportsByUserId\(String userId\)/);
+  assert.match(jdbcRepository, /ON CONFLICT \(report_id\) DO UPDATE/);
+  assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS facility_reports/);
+  assert.match(batchPostgresSchema, /photo_data_base64 TEXT/);
+  assert.match(batchPostgresSchema, /CONSTRAINT fk_facility_reports_duplicate/);
+  assert.match(batchPostgresSchema, /FOREIGN KEY \(duplicate_of_report_id\) REFERENCES facility_reports\(report_id\)/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_facility_reports_report_type/);
+  assert.match(batchPostgresSchema, /CHECK \(report_type IN \('BROKEN', 'UNDER_CONSTRUCTION', 'CLOSED', 'LOCATION_WRONG', 'INFORMATION_WRONG', 'RECOVERED'\)\)/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_facility_reports_status/);
+  assert.match(batchPostgresSchema, /CHECK \(status IN \('SUBMITTED', 'DUPLICATE', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'RESOLVED'\)\)/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_created/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_user/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_facility_reports_status_created/);
   assert.match(transitRepository, /implements LoadTransitMasterPort, SaveAccessibilityFacilityStatusPort/);
   assert.match(transitRepository, /saveFacilityStatus\(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
