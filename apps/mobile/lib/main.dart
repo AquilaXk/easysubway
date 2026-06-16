@@ -776,18 +776,27 @@ class HomeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            Text(
+              '안녕하세요',
+              style: textTheme.titleLarge?.copyWith(
+                color: const Color(0xFF466467),
+                fontWeight: FontWeight.w800,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 6),
             Semantics(
               header: true,
               child: Text(
                 '어디로 가시나요?',
-                style: textTheme.headlineSmall?.copyWith(
+                style: textTheme.headlineMedium?.copyWith(
                   color: const Color(0xFF102A2C),
                   fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             _HomePrimaryActionButton(
               key: const Key('stationSearchButton'),
               onPressed: () {
@@ -827,18 +836,21 @@ class HomeScreen extends StatelessWidget {
               icon: const Icon(Icons.route),
               label: '길찾기',
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
             LayoutBuilder(
               builder: (context, constraints) {
                 const spacing = 10.0;
                 final itemWidth = (constraints.maxWidth - spacing) / 2;
                 return Wrap(
+                  key: const Key('homeSecondaryActionsGroup'),
                   spacing: spacing,
                   runSpacing: spacing,
                   children: [
                     SizedBox(
                       width: itemWidth,
-                      height: 64,
+                      height: 56,
                       child: _HomeSecondaryActionButton(
                         key: const Key('mobilityProfileButton'),
                         onPressed: () {
@@ -855,7 +867,7 @@ class HomeScreen extends StatelessWidget {
                     if (hasFavorites)
                       SizedBox(
                         width: itemWidth,
-                        height: 64,
+                        height: 56,
                         child: _HomeSecondaryActionButton(
                           key: const Key('favoritesButton'),
                           onPressed: () {
@@ -882,7 +894,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     SizedBox(
                       width: itemWidth,
-                      height: 64,
+                      height: 56,
                       child: _HomeSecondaryActionButton(
                         key: const Key('myReportsButton'),
                         onPressed: () {
@@ -901,7 +913,7 @@ class HomeScreen extends StatelessWidget {
                     if (notificationRepository != null)
                       SizedBox(
                         width: itemWidth,
-                        height: 64,
+                        height: 56,
                         child: _HomeSecondaryActionButton(
                           key: const Key('notificationSettingsButton'),
                           onPressed: () {
@@ -947,11 +959,13 @@ class _HomePrimaryActionButton extends StatelessWidget {
     return FilledButton.icon(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(82),
-        textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        alignment: Alignment.centerLeft,
+        minimumSize: const Size.fromHeight(92),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
       ),
-      icon: icon,
-      label: Text(label),
+      icon: IconTheme.merge(data: const IconThemeData(size: 30), child: icon),
+      label: Text(label, maxLines: 1),
     );
   }
 }
@@ -978,10 +992,10 @@ class _HomeSecondaryActionButton extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF006D77),
         side: BorderSide(color: colorScheme.outlineVariant),
-        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
       ),
-      icon: icon,
+      icon: IconTheme.merge(data: const IconThemeData(size: 22), child: icon),
       label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
