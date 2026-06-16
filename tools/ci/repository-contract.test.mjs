@@ -1424,6 +1424,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
   assert.match(main, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
+  assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /label: '즐겨찾기'/);
   assert.match(main, /FavoriteHomeScreen/);
   assert.match(main, /FavoriteRouteListContent/);
@@ -1441,8 +1442,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /단순 보기/);
   assert.match(onboarding, /onTap: \(\) => onChanged\(!value\)/);
   assert.match(routeSearch, /final String initialMobilityType/);
+  assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
   assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
+  assert.match(routeSearch, /_RouteMobilityTypeSummary\(mobilityType: _selectedMobilityType\)/);
   assert.match(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);

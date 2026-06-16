@@ -2300,7 +2300,9 @@ void main() {
       expect(find.text('도착역'), findsOneWidget);
       expect(find.text('출발역 ID'), findsNothing);
       expect(find.text('도착역 ID'), findsNothing);
-      expect(find.text('이동 조건'), findsOneWidget);
+      expect(find.text('적용 중인 이동 조건'), findsOneWidget);
+      expect(find.text('고령자'), findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsNothing);
 
       final originInput = tester.widget<TextField>(
         find.byKey(const Key('routeOriginStationInput')),
@@ -2397,6 +2399,74 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('경로 검색 단순 보기를 끄면 화면에서 이동 조건을 바꿀 수 있다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: routeRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingStateWithPreferences(
+          preferences: const OnboardingViewPreferences(
+            largeTextEnabled: true,
+            highContrastEnabled: false,
+            simpleViewEnabled: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이동 조건'), findsOneWidget);
+    expect(find.byType(DropdownButton<String>), findsOneWidget);
+
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('휠체어').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('경로 검색 결과는 이동 가능한 경로만 즐겨찾기에 저장한다', (tester) async {

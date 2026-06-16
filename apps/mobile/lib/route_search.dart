@@ -851,6 +851,7 @@ class RouteSearchScreen extends StatefulWidget {
     required this.stationRepository,
     this.routeFeedbackRepository,
     this.favoriteRouteRepository,
+    this.simpleViewEnabled = true,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -860,6 +861,7 @@ class RouteSearchScreen extends StatefulWidget {
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final String initialMobilityType;
+  final bool simpleViewEnabled;
 
   @override
   State<RouteSearchScreen> createState() => _RouteSearchScreenState();
@@ -928,36 +930,40 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               onSelected: _updateDestinationStation,
             ),
             const SizedBox(height: 12),
-            InputDecorator(
-              key: const Key('routeMobilityTypeInput'),
-              decoration: const InputDecoration(
-                labelText: '이동 조건',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
+            // 단순 보기에서는 온보딩에서 고른 이동 조건을 그대로 적용해 선택 부담을 줄인다.
+            if (widget.simpleViewEnabled)
+              _RouteMobilityTypeSummary(mobilityType: _selectedMobilityType)
+            else
+              InputDecorator(
+                key: const Key('routeMobilityTypeInput'),
+                decoration: const InputDecoration(
+                  labelText: '이동 조건',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedMobilityType,
+                    isExpanded: true,
+                    items: [
+                      for (final option in mobilityProfileOptions)
+                        DropdownMenuItem<String>(
+                          value: option.mobilityType,
+                          child: Text(option.title),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _selectedMobilityType = value;
+                      });
+                    },
+                  ),
                 ),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedMobilityType,
-                  isExpanded: true,
-                  items: [
-                    for (final option in mobilityProfileOptions)
-                      DropdownMenuItem<String>(
-                        value: option.mobilityType,
-                        child: Text(option.title),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    setState(() {
-                      _selectedMobilityType = value;
-                    });
-                  },
-                ),
-              ),
-            ),
             const SizedBox(height: 12),
             AnimatedBuilder(
               animation: _controller,
@@ -1034,6 +1040,74 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     });
     _controller.reset();
   }
+}
+
+class _RouteMobilityTypeSummary extends StatelessWidget {
+  const _RouteMobilityTypeSummary({required this.mobilityType});
+
+  final String mobilityType;
+
+  @override
+  Widget build(BuildContext context) {
+    final option = _mobilityOptionFor(mobilityType);
+    return MergeSemantics(
+      child: Semantics(
+        label: '적용 중인 이동 조건, ${option.title}',
+        liveRegion: true,
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9F5F6),
+              border: Border.all(color: const Color(0xFFB9D4D8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(option.icon, color: const Color(0xFF006D77), size: 26),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '적용 중인 이동 조건',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: const Color(0xFF29484B),
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                              ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          option.title,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: const Color(0xFF102A2C),
+                                fontWeight: FontWeight.w900,
+                                height: 1.25,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+MobilityProfileOption _mobilityOptionFor(String mobilityType) {
+  return mobilityProfileOptions.firstWhere(
+    (option) => option.mobilityType == mobilityType,
+    orElse: () => mobilityProfileOptions.first,
+  );
 }
 
 class _RouteStationPicker extends StatefulWidget {
