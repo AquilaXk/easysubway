@@ -76,6 +76,13 @@ function assertMobileCatchPolicy(file, source) {
   }
 }
 
+function inMemoryRepositoryFiles() {
+  return execFileSync("git", ["ls-files", "backend/src/main/java/**/InMemory*Repository.java"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+}
+
 function readPngPixelBounds(relativePath) {
   const png = readFileSync(path.join(root, relativePath));
   const signature = png.subarray(0, 8);
@@ -589,6 +596,17 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
   assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
   assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
+});
+
+test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {
+  const files = inMemoryRepositoryFiles();
+
+  assert.ok(files.length >= 1, "InMemory repository files must be discovered");
+  for (const file of files) {
+    const source = read(file);
+    assert.match(source, /import org\.springframework\.context\.annotation\.Profile;/, `${file} must import Profile`);
+    assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
+  }
 });
 
 test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
