@@ -1103,6 +1103,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
       button: true,
       label: '이동 조건 바꾸기, 현재 ${option.title}',
       liveRegion: true,
+      onTap: onChangeRequested,
       child: ExcludeSemantics(
         child: Material(
           color: Colors.transparent,

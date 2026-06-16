@@ -2533,6 +2533,36 @@ void main() {
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
 
+  testWidgets('경로 검색 단순 보기 이동 조건은 스크린리더로도 바꿀 수 있다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('routeSearchButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 고령자')),
+        isSemantics(
+          label: '이동 조건 바꾸기, 현재 고령자',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('경로 검색 결과는 이동 가능한 경로만 즐겨찾기에 저장한다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
