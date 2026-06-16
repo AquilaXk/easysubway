@@ -1932,6 +1932,11 @@ void main() {
       expect(find.text('기본 정보만 있음'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsWidgets);
       expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('안전 안내, 이동 전 현장 안내와 역무원 안내를 확인해 주세요.'),
+        findsOneWidget,
+      );
       expect(
         find.bySemanticsLabel(
           '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 출처 공식 파일, 마지막 확인 2026-06-13',
@@ -2504,6 +2509,7 @@ void main() {
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
@@ -2516,7 +2522,8 @@ void main() {
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
           '주의 일부 시설 정보는 확인이 필요합니다., '
-          '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다.',
+          '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다., '
+          '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
         ),
         findsOneWidget,
       );
@@ -3143,10 +3150,12 @@ void main() {
       );
       expect(find.text('안내할 수 있는 경로가 없습니다'), findsOneWidget);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 다른 경로가 필요합니다, 휠체어, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
-          '안내 불가 이유 휠체어로 이동 가능한 엘리베이터가 없습니다.',
+          '안내 불가 이유 휠체어로 이동 가능한 엘리베이터가 없습니다., '
+          '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
         ),
         findsOneWidget,
       );
