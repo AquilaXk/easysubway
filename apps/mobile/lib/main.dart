@@ -768,6 +768,7 @@ class HomeScreen extends StatelessWidget {
                       routeFeedbackRepository: routeFeedbackRepository,
                       favoriteRouteRepository: favoriteRouteRepository,
                       initialMobilityType: initialMobilityType,
+                      simpleViewEnabled: simpleViewEnabled,
                     ),
                   ),
                 );
