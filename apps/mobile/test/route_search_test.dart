@@ -72,6 +72,11 @@ void main() {
                   'code': 'LOW_DATA_CONFIDENCE',
                   'message': '일부 시설 정보는 확인이 필요합니다.',
                 },
+                {
+                  'code': 'STALE_ACCESSIBILITY_DATA',
+                  'message':
+                      '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
+                },
               ],
               'blockedReasons': [],
               'createdAt': '2026-06-13T04:20:00',
@@ -111,7 +116,14 @@ void main() {
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
     expect(result.steps.first.burdenLabel, '약 4분 · 180m · 접근성 확인');
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
-    expect(result.warnings.single.message, '일부 시설 정보는 확인이 필요합니다.');
+    expect(
+      result.warnings.map((warning) => warning.code),
+      containsAll(['LOW_DATA_CONFIDENCE', 'STALE_ACCESSIBILITY_DATA']),
+    );
+    expect(
+      result.warnings.map((warning) => warning.message),
+      contains('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
+    );
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {
