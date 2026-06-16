@@ -327,6 +327,8 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
   assert.doesNotMatch(envExample, /prod|production|secret|token/i);
 });
 
@@ -575,9 +577,15 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Principal principal/);
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
+  assert.match(security, /Environment environment/);
+  assert.match(security, /validateProdAdminCredentials/);
+  assert.match(security, /getActiveProfiles\(\)/);
+  assert.match(security, /운영 관리자 계정 설정이 필요합니다\./);
   assert.match(applicationDev, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST:localhost\}/);
   assert.match(applicationDev, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
   assert.match(applicationDev, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS:\}/);
+  assert.match(applicationProd, /admin:[\s\S]*username: \$\{EASYSUBWAY_ADMIN_USERNAME\}/);
+  assert.match(applicationProd, /admin:[\s\S]*password: \$\{EASYSUBWAY_ADMIN_PASSWORD\}/);
   assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
   assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
   assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
