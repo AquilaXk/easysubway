@@ -2546,6 +2546,10 @@ void main() {
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
+      expect(
+        find.text('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
+        findsOneWidget,
+      );
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
@@ -2559,7 +2563,7 @@ void main() {
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
           '도착 안내 2번 출구의 엘리베이터를 먼저 확인하세요., '
-          '주의 일부 시설 정보는 확인이 필요합니다., '
+          '주의 일부 시설 정보는 확인이 필요합니다., 접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요., '
           '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다., '
           '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
         ),
@@ -5274,6 +5278,10 @@ RouteSearchResult _sampleRouteSearchResult({
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
         message: '일부 시설 정보는 확인이 필요합니다.',
+      ),
+      RouteSearchWarning(
+        code: 'STALE_ACCESSIBILITY_DATA',
+        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
       ),
     ],
     blockedReasons: [],
