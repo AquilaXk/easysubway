@@ -1126,6 +1126,7 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   assert.match(jdbcRepository, /Optional<FavoriteRoute> loadFavoriteRoute\(String userId, String routeSearchId\)/);
   assert.match(jdbcRepository, /List<String> loadUserIdsByRouteStationId\(String stationId\)/);
   assert.match(jdbcRepository, /FavoriteRoute saveFavoriteRoute\(FavoriteRoute favoriteRoute\)/);
+  assert.match(jdbcRepository, /ON CONFLICT \(user_id, route_search_id\) DO UPDATE/);
   assert.match(jdbcRepository, /int deleteFavoriteRoutesByUserId\(String userId\)/);
   assert.match(jdbcRepository, /favorite_routes/);
   assert.match(jdbcRepository, /favorite_route_stations/);
