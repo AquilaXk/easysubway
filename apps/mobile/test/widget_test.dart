@@ -1272,15 +1272,15 @@ void main() {
       expect(find.text('기본 정보만 있음'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+          find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
         ),
         isSemantics(
-          label: '상록수, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
+          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
           isButton: true,
           hasTapAction: true,
         ),
@@ -1627,10 +1627,10 @@ void main() {
       expect(locationProvider.requestCount, 1);
       expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
-      expect(find.text('상록수'), findsOneWidget);
+      expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('상록수역, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
         findsOneWidget,
       );
 
@@ -1681,7 +1681,7 @@ void main() {
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('현재 위치 사용'), findsNothing);
-    expect(find.text('상록수'), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
   });
 
   testWidgets('역 검색은 주변 역 확인 중 중복 탭을 무시한다', (tester) async {
@@ -1769,7 +1769,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.requestedNearbyLocations, hasLength(1));
-    expect(find.text('상록수'), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
     expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
   });
 
@@ -2257,7 +2257,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
 
-    expect(find.text('상록수역'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 출처 공식 파일, 마지막 확인 2026-06-13',
+      ),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(OutlinedButton, '확인 중'), findsOneWidget);
 
     favoriteRepository.complete([
