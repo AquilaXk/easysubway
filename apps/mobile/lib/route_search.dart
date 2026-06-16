@@ -602,6 +602,27 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
 
+  RouteSearchStep? get arrivalGuidanceStep {
+    for (final step in steps.reversed) {
+      final isDestinationAccessStep =
+          step.requiresAccessibilityCheck &&
+          step.fromStationId == destinationStationId &&
+          step.toStationId == destinationStationId;
+      if (isDestinationAccessStep) {
+        return step;
+      }
+    }
+    return null;
+  }
+
+  List<RouteSearchStep> get movementSteps {
+    final arrivalStep = arrivalGuidanceStep;
+    if (arrivalStep == null) {
+      return steps;
+    }
+    return steps.where((step) => !identical(step, arrivalStep)).toList();
+  }
+
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get guidanceLabel {
@@ -638,15 +659,20 @@ class RouteSearchResult {
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
     }
+    final arrivalStep = arrivalGuidanceStep;
+    if (arrivalStep != null) {
+      parts.add('도착 안내 ${arrivalStep.description}');
+    }
     if (blockedReasons.isNotEmpty) {
       parts.add('안내 불가 이유 ${blockedReasons.join(', ')}');
     }
     if (warnings.isNotEmpty) {
       parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
     }
-    if (steps.isNotEmpty) {
+    final stepsForGuidance = movementSteps;
+    if (stepsForGuidance.isNotEmpty) {
       parts.add(
-        '이동 안내 ${steps.map((step) => '${step.sequence}번 ${step.title}, ${step.burdenLabel}, ${step.description}').join(', ')}',
+        '이동 안내 ${stepsForGuidance.map((step) => '${step.sequence}번 ${step.title}, ${step.burdenLabel}, ${step.description}').join(', ')}',
       );
     }
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
@@ -1666,6 +1692,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final arrivalStep = result.arrivalGuidanceStep;
 
     return MergeSemantics(
       child: Semantics(
@@ -1721,6 +1748,10 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  if (arrivalStep != null) ...[
+                    const SizedBox(height: 16),
+                    _RouteArrivalGuidance(step: arrivalStep),
+                  ],
                   const SizedBox(height: 16),
                   const _RouteNotice(
                     title: '안전 안내',
@@ -1744,9 +1775,9 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                         icon: Icons.warning_amber,
                       ),
                   ],
-                  if (result.steps.isNotEmpty) ...[
+                  if (result.movementSteps.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    _RouteStepSection(steps: result.steps),
+                    _RouteStepSection(steps: result.movementSteps),
                   ],
                 ],
               ),
@@ -1787,6 +1818,57 @@ class _RouteResultStatusHeader extends StatelessWidget {
             label: result.attentionLabel,
           ),
       ],
+    );
+  }
+}
+
+class _RouteArrivalGuidance extends StatelessWidget {
+  const _RouteArrivalGuidance({required this.step});
+
+  final RouteSearchStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2F0),
+        border: Border.all(color: const Color(0xFF9FCACE)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.exit_to_app, color: Color(0xFF004A50), size: 30),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '도착 안내',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF004A50),
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    step.description,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

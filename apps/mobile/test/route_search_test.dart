@@ -53,6 +53,19 @@ void main() {
                   'includesStairs': false,
                   'requiresAccessibilityCheck': true,
                 },
+                {
+                  'sequence': 2,
+                  'title': '사당역에서 출구 접근성 정보를 확인',
+                  'description': '2번 출구의 엘리베이터를 먼저 확인하세요.',
+                  'lineId': 'seoul-4',
+                  'lineName': '수도권 4호선',
+                  'fromStationId': 'station-sadang',
+                  'toStationId': 'station-sadang',
+                  'estimatedMinutes': 3,
+                  'distanceMeters': 120,
+                  'includesStairs': false,
+                  'requiresAccessibilityCheck': true,
+                },
               ],
               'warnings': [
                 {
@@ -91,12 +104,13 @@ void main() {
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
     expect(result.scoreLabel, '이동 점수 92점');
-    expect(result.steps.single.title, '상록수역에서 4호선 승강장으로 이동');
-    expect(result.steps.single.estimatedMinutes, 4);
-    expect(result.steps.single.distanceMeters, 180);
-    expect(result.steps.single.includesStairs, isFalse);
-    expect(result.steps.single.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.single.burdenLabel, '약 4분 · 180m · 접근성 확인');
+    expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
+    expect(result.steps.first.estimatedMinutes, 4);
+    expect(result.steps.first.distanceMeters, 180);
+    expect(result.steps.first.includesStairs, isFalse);
+    expect(result.steps.first.requiresAccessibilityCheck, isTrue);
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 접근성 확인');
+    expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
     expect(result.warnings.single.message, '일부 시설 정보는 확인이 필요합니다.');
   });
 
