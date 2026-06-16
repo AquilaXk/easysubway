@@ -2539,6 +2539,8 @@ void main() {
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('이동 점수 92점'), findsOneWidget);
+      expect(find.text('도착 안내'), findsOneWidget);
+      expect(find.text('2번 출구의 엘리베이터를 먼저 확인하세요.'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
@@ -2556,6 +2558,7 @@ void main() {
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '
+          '도착 안내 2번 출구의 엘리베이터를 먼저 확인하세요., '
           '주의 일부 시설 정보는 확인이 필요합니다., '
           '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다., '
           '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
@@ -5250,6 +5253,19 @@ RouteSearchResult _sampleRouteSearchResult({
         toStationId: 'station-sadang',
         estimatedMinutes: 4,
         distanceMeters: 180,
+        includesStairs: false,
+        requiresAccessibilityCheck: true,
+      ),
+      RouteSearchStep(
+        sequence: 2,
+        title: '사당역에서 출구 접근성 정보를 확인',
+        description: '2번 출구의 엘리베이터를 먼저 확인하세요.',
+        lineId: 'seoul-4',
+        lineName: '수도권 4호선',
+        fromStationId: 'station-sadang',
+        toStationId: 'station-sadang',
+        estimatedMinutes: 3,
+        distanceMeters: 120,
         includesStairs: false,
         requiresAccessibilityCheck: true,
       ),
