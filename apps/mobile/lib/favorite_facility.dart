@@ -337,6 +337,27 @@ class FavoriteFacilityListScreen extends StatefulWidget {
 
 class _FavoriteFacilityListScreenState
     extends State<FavoriteFacilityListScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기 시설')),
+      body: FavoriteFacilityListContent(repository: widget.repository),
+    );
+  }
+}
+
+class FavoriteFacilityListContent extends StatefulWidget {
+  const FavoriteFacilityListContent({required this.repository, super.key});
+
+  final FavoriteFacilityRepository repository;
+
+  @override
+  State<FavoriteFacilityListContent> createState() =>
+      _FavoriteFacilityListContentState();
+}
+
+class _FavoriteFacilityListContentState
+    extends State<FavoriteFacilityListContent> {
   late final FavoriteFacilityListController _controller;
 
   @override
@@ -354,18 +375,15 @@ class _FavoriteFacilityListScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('즐겨찾기 시설')),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return _FavoriteFacilityListBody(
-              state: _controller.state,
-              onRetry: _controller.load,
-            );
-          },
-        ),
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return _FavoriteFacilityListBody(
+            state: _controller.state,
+            onRetry: _controller.load,
+          );
+        },
       ),
     );
   }

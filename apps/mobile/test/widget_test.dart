@@ -39,19 +39,13 @@ OnboardingState _completedOnboardingStateWithPreferences({
   );
 }
 
-Future<void> _openFavoriteList(
-  WidgetTester tester, {
-  required Key listButtonKey,
-  Key? tabKey,
-}) async {
+Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
   await tester.tap(find.byKey(const Key('favoritesButton')));
   await tester.pumpAndSettle();
   if (tabKey != null) {
     await tester.tap(find.byKey(tabKey));
     await tester.pumpAndSettle();
   }
-  await tester.tap(find.byKey(listButtonKey));
-  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -570,7 +564,7 @@ void main() {
     }
   });
 
-  testWidgets('홈 즐겨찾기는 하나의 진입점에서 종류를 고르게 한다', (tester) async {
+  testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -598,6 +592,9 @@ void main() {
       find.byKey(const Key('favoriteFacilitiesTabButton')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
   });
 
   testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
@@ -877,17 +874,17 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: favoriteRepository,
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
           initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
       await _openFavoriteList(
         tester,
-        listButtonKey: const Key('favoriteStationsButton'),
         tabKey: const Key('favoriteStationsTabButton'),
       );
 
-      expect(find.text('즐겨찾기 역'), findsOneWidget);
+      expect(find.text('역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('기본 정보만 있음'), findsOneWidget);
@@ -928,17 +925,17 @@ void main() {
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
           favoriteFacilityRepository: favoriteFacilityRepository,
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
           initialOnboardingState: _completedOnboardingState(),
         ),
       );
 
       await _openFavoriteList(
         tester,
-        listButtonKey: const Key('favoriteFacilitiesButton'),
         tabKey: const Key('favoriteFacilitiesTabButton'),
       );
 
-      expect(find.text('즐겨찾기 시설'), findsOneWidget);
+      expect(find.text('시설'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
@@ -992,12 +989,9 @@ void main() {
         ),
       );
 
-      await _openFavoriteList(
-        tester,
-        listButtonKey: const Key('favoriteRoutesButton'),
-      );
+      await _openFavoriteList(tester);
 
-      expect(find.text('즐겨찾기 경로'), findsOneWidget);
+      expect(find.text('경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('고령자'), findsOneWidget);
@@ -1042,10 +1036,7 @@ void main() {
       ),
     );
 
-    await _openFavoriteList(
-      tester,
-      listButtonKey: const Key('favoriteRoutesButton'),
-    );
+    await _openFavoriteList(tester);
 
     final removeButton = find.byKey(const Key('favoriteRouteRemove-route-1'));
     await tester.tap(removeButton);
@@ -2082,6 +2073,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -2114,6 +2106,7 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -2156,13 +2149,13 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: favoriteRepository,
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
 
     await _openFavoriteList(
       tester,
-      listButtonKey: const Key('favoriteStationsButton'),
       tabKey: const Key('favoriteStationsTabButton'),
     );
     await tester.tap(

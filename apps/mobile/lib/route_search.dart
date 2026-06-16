@@ -2185,6 +2185,26 @@ class FavoriteRouteListScreen extends StatefulWidget {
 }
 
 class _FavoriteRouteListScreenState extends State<FavoriteRouteListScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기 경로')),
+      body: FavoriteRouteListContent(repository: widget.repository),
+    );
+  }
+}
+
+class FavoriteRouteListContent extends StatefulWidget {
+  const FavoriteRouteListContent({required this.repository, super.key});
+
+  final FavoriteRouteRepository repository;
+
+  @override
+  State<FavoriteRouteListContent> createState() =>
+      _FavoriteRouteListContentState();
+}
+
+class _FavoriteRouteListContentState extends State<FavoriteRouteListContent> {
   late final FavoriteRouteListController _controller;
 
   @override
@@ -2202,16 +2222,13 @@ class _FavoriteRouteListScreenState extends State<FavoriteRouteListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('즐겨찾기 경로')),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) => _FavoriteRouteListBody(
-            state: _controller.state,
-            onRetry: _controller.load,
-            onRemove: _controller.remove,
-          ),
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => _FavoriteRouteListBody(
+          state: _controller.state,
+          onRetry: _controller.load,
+          onRemove: _controller.remove,
         ),
       ),
     );
