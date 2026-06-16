@@ -517,10 +517,11 @@ void main() {
 
       expect(find.text('안녕하세요'), findsOneWidget);
       expect(find.text('어디로 가시나요?'), findsOneWidget);
-      expect(
-        find.byKey(const Key('homeSecondaryActionsGroup')),
-        findsOneWidget,
-      );
+      expect(find.text('개인 설정'), findsOneWidget);
+      expect(find.text('내 정보'), findsOneWidget);
+      expect(find.byKey(const Key('homeSecondaryActionsGroup')), findsNothing);
+      expect(find.byKey(const Key('homeSettingsActionsGroup')), findsOneWidget);
+      expect(find.byKey(const Key('homeMyInfoActionsGroup')), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
@@ -563,6 +564,27 @@ void main() {
       expect(profileButtonSize.height, lessThan(stationButtonSize.height));
       expect(myReportsButtonSize.height, lessThan(stationButtonSize.height));
       expect(notificationButtonSize.height, lessThan(stationButtonSize.height));
+
+      final settingsTop = tester.getTopLeft(find.text('개인 설정')).dy;
+      final myInfoTop = tester.getTopLeft(find.text('내 정보')).dy;
+      expect(
+        tester.getTopLeft(find.byKey(const Key('mobilityProfileButton'))).dy,
+        greaterThan(settingsTop),
+      );
+      expect(
+        tester
+            .getTopLeft(find.byKey(const Key('notificationSettingsButton')))
+            .dy,
+        greaterThan(settingsTop),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('favoritesButton'))).dy,
+        greaterThan(myInfoTop),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('myReportsButton'))).dy,
+        greaterThan(myInfoTop),
+      );
 
       await tester.drag(find.byType(ListView), const Offset(0, -620));
       await tester.pumpAndSettle();
