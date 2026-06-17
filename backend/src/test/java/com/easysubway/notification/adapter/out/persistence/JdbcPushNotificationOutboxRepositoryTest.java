@@ -37,6 +37,7 @@ class JdbcPushNotificationOutboxRepositoryTest {
 				title VARCHAR(120) NOT NULL,
 				body VARCHAR(1000) NOT NULL,
 				status VARCHAR(40) NOT NULL,
+				failure_reason VARCHAR(1000),
 				created_at TIMESTAMP NOT NULL,
 				CONSTRAINT chk_push_notification_outbox_platform CHECK (platform IN ('ANDROID', 'IOS')),
 				CONSTRAINT chk_push_notification_outbox_type CHECK (notification_type IN ('FAVORITE_STATION_FACILITY', 'FAVORITE_ROUTE_FACILITY', 'REPORT_STATUS', 'DATA_QUALITY')),
@@ -74,6 +75,23 @@ class JdbcPushNotificationOutboxRepositoryTest {
 		repository.savePushNotification(updatedNotification);
 
 		assertThat(repository.loadPushNotifications("anonymous-user-1")).containsExactly(updatedNotification);
+	}
+
+	@Test
+	@DisplayName("실패한 푸시 알림은 실패 사유를 저장하고 조회한다")
+	void savePushNotificationStoresFailureReasonForFailedNotification() {
+		var failedNotification = failedNotification(
+			"push-1",
+			"anonymous-user-1",
+			PushNotificationType.REPORT_STATUS,
+			"외부 발송 어댑터가 설정되지 않았습니다.",
+			9
+		);
+
+		repository.savePushNotification(failedNotification);
+
+		assertThat(repository.loadPushNotifications("anonymous-user-1"))
+			.containsExactly(failedNotification);
 	}
 
 	@Test
@@ -170,6 +188,27 @@ class JdbcPushNotificationOutboxRepositoryTest {
 			"알림 제목 " + notificationId,
 			"알림 본문 " + notificationId,
 			status,
+			LocalDateTime.of(2026, 6, 17, hour, 0)
+		);
+	}
+
+	private PushNotification failedNotification(
+		String notificationId,
+		String userId,
+		PushNotificationType type,
+		String failureReason,
+		int hour
+	) {
+		return new PushNotification(
+			notificationId,
+			userId,
+			DevicePlatform.ANDROID,
+			"device-token-" + notificationId,
+			type,
+			"알림 제목 " + notificationId,
+			"알림 본문 " + notificationId,
+			PushNotificationStatus.FAILED,
+			failureReason,
 			LocalDateTime.of(2026, 6, 17, hour, 0)
 		);
 	}

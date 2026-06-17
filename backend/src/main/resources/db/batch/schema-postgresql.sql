@@ -279,6 +279,7 @@ CREATE TABLE IF NOT EXISTS push_notification_outbox (
 	title VARCHAR(120) NOT NULL,
 	body VARCHAR(1000) NOT NULL,
 	status VARCHAR(40) NOT NULL,
+	failure_reason VARCHAR(1000),
 	created_at TIMESTAMP NOT NULL,
 	CONSTRAINT chk_push_notification_outbox_platform
 		CHECK (platform IN ('ANDROID', 'IOS')),
@@ -290,6 +291,9 @@ CREATE TABLE IF NOT EXISTS push_notification_outbox (
 
 ALTER TABLE push_notification_outbox
 	DROP CONSTRAINT IF EXISTS chk_push_notification_outbox_status;
+
+ALTER TABLE push_notification_outbox
+	ADD COLUMN IF NOT EXISTS failure_reason VARCHAR(1000);
 
 ALTER TABLE push_notification_outbox
 	ADD CONSTRAINT chk_push_notification_outbox_status
