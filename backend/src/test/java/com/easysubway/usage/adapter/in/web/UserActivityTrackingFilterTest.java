@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -49,6 +51,21 @@ class UserActivityTrackingFilterTest {
 		filter.doFilter(apiRequest("/api/v1/auth/anonymous", "anonymous-user-1"), new MockHttpServletResponse(), successfulChain());
 		filter.doFilter(apiRequest("/admin/routes/searches/page", "admin-user"), new MockHttpServletResponse(), successfulChain());
 		filter.doFilter(apiRequest("/api/v1/routes/search", null), new MockHttpServletResponse(), successfulChain());
+
+		assertThat(port.records).isEmpty();
+	}
+
+	@Test
+	@DisplayName("Spring Security 익명 인증 사용자의 공개 API 요청은 기록하지 않는다")
+	void anonymousAuthenticationIsIgnored() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/routes/search");
+		request.setUserPrincipal(new AnonymousAuthenticationToken(
+			"anonymous-key",
+			"anonymousUser",
+			AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")
+		));
+
+		filter.doFilter(request, new MockHttpServletResponse(), successfulChain());
 
 		assertThat(port.records).isEmpty();
 	}

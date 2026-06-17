@@ -11,6 +11,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.authentication.AuthenticationTrustResolver;
+import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,6 +25,7 @@ class UserActivityTrackingFilter extends OncePerRequestFilter {
 
 	private final RecordUserActivityPort recordUserActivityPort;
 	private final Clock clock;
+	private final AuthenticationTrustResolver authenticationTrustResolver;
 
 	@Autowired
 	UserActivityTrackingFilter(RecordUserActivityPort recordUserActivityPort, ObjectProvider<Clock> clockProvider) {
@@ -31,6 +35,7 @@ class UserActivityTrackingFilter extends OncePerRequestFilter {
 	UserActivityTrackingFilter(RecordUserActivityPort recordUserActivityPort, Clock clock) {
 		this.recordUserActivityPort = recordUserActivityPort;
 		this.clock = clock;
+		this.authenticationTrustResolver = new AuthenticationTrustResolverImpl();
 	}
 
 	@Override
@@ -52,8 +57,14 @@ class UserActivityTrackingFilter extends OncePerRequestFilter {
 		Principal principal = request.getUserPrincipal();
 		String path = request.getRequestURI();
 		return principal != null
+			&& isAuthenticatedUser(principal)
 			&& response.getStatus() < 400
 			&& path.startsWith(API_PREFIX)
 			&& !path.equals(ANONYMOUS_AUTH_PATH);
+	}
+
+	private boolean isAuthenticatedUser(Principal principal) {
+		return !(principal instanceof Authentication authentication
+			&& authenticationTrustResolver.isAnonymous(authentication));
 	}
 }
