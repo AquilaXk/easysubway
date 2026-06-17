@@ -1863,6 +1863,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
   assert.match(notificationSettingsTest, /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(notificationSettingsTest, /알림 설정 컨트롤러는 조회와 저장 상태를 구분한다/);
+  assert.match(stationSearch, /가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다/);
+  assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
+  assert.match(widgetTest, /역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
+  assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
