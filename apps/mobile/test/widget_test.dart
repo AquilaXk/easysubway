@@ -2007,6 +2007,11 @@ void main() {
       expect(repository.requestedNearbyLocations, isEmpty);
       expect(find.text('위치 권한을 확인해 주세요.'), findsOneWidget);
       expect(find.bySemanticsLabel('위치 권한을 확인해 주세요.'), findsOneWidget);
+      expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+        findsOneWidget,
+      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));

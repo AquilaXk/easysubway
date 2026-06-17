@@ -18,6 +18,7 @@ const _locationPermissionRationalePurpose =
     '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
 const _locationPermissionRationaleFallback =
     '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
+const _stationSearchFailureNextAction = '역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.';
 const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
@@ -2339,6 +2340,21 @@ class _StationSearchFailureMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StationSearchMessage(message: message, liveRegion: true),
+        const SizedBox(height: 8),
+        Semantics(
+          key: const Key('stationSearchFailureNextAction'),
+          container: true,
+          excludeSemantics: true,
+          label: '다음 행동, $_stationSearchFailureNextAction',
+          child: Text(
+            _stationSearchFailureNextAction,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF506B6F),
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ),
         if (shouldShowLocationSettings) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -2370,6 +2386,7 @@ class _StationSearchMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       liveRegion: liveRegion,
       child: Text(
         message,
