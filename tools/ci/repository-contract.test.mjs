@@ -1272,6 +1272,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
 
   assert.match(notification, /record PushNotification/);
   assert.match(notification, /deviceToken/);
+  assert.match(notification, /failureReason/);
   assert.match(notification, /PushNotificationStatus/);
   assert.match(result, /record PushNotificationDispatchResult/);
   assert.match(dashboardSummary, /record PushNotificationDashboardSummary/);
@@ -1306,9 +1307,12 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(jdbcRepository, /PushNotificationDashboardSummary summarizePushNotificationOutbox\(\)/);
   assert.match(jdbcRepository, /int deletePushNotifications\(String userId\)/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS push_notification_outbox/);
+  assert.match(batchPostgresSchema, /failure_reason VARCHAR\(1000\)/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_platform/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_type/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_status/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_failure_reason/);
+  assert.match(batchPostgresSchema, /failure_reason IS NULL OR status = 'FAILED'/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_push_notification_outbox_user_created/);
   assert.match(controller, /@PostMapping\("\/admin\/notifications\/push"\)/);
   assert.match(controller, /PushNotificationDispatchUseCase/);
@@ -1318,6 +1322,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(dashboardTemplate, /푸시 알림 현황/);
   assert.match(dashboardTemplate, /전체 알림/);
   assert.match(dashboardTemplate, /상태별 알림/);
+  assert.match(dashboardTemplate, /최근 실패/);
   assert.doesNotMatch(dashboardTemplate, /deviceToken/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
