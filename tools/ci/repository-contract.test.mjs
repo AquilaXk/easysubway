@@ -1875,6 +1875,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /EasySubwayApp/);
   assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
+  assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
+  assert.match(main, /개인정보 사용 안내/);
+  assert.match(main, /현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다/);
+  assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 알림 토큰, 신고자 연결 정보를 지웁니다/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);

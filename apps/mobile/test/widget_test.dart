@@ -682,6 +682,60 @@ void main() {
     }
   });
 
+  testWidgets('도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          supportAccessInfo: const SupportAccessInfo(
+            privacyPolicyUrl: 'https://easysubway.example/privacy',
+            supportEmail: 'support@easysubway.example',
+            dataDeletionEmail: 'privacy@easysubway.example',
+          ),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('개인정보 사용 안내'), findsOneWidget);
+      expect(
+        find.text('현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('즐겨찾기, 이동 조건, 신고 내용과 사진, 알림 설정은 앱 기능 제공에 사용됩니다.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('데이터 삭제 요청 시 즐겨찾기, 알림 토큰, 신고자 연결 정보를 지웁니다.'),
+        findsOneWidget,
+      );
+      expect(find.text('법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.'), findsOneWidget);
+
+      final summarySize = tester.getSize(
+        find.byKey(const Key('privacyDataUseSummary')),
+      );
+      expect(summarySize.height, greaterThanOrEqualTo(120));
+
+      final summarySemantics = tester
+          .getSemantics(find.byKey(const Key('privacyDataUseSummary')))
+          .getSemanticsData();
+      expect(
+        summarySemantics.label,
+        contains('개인정보 사용 안내, 현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.'),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
     final launcher = RecordingSupportAccessLauncher();
 
