@@ -1690,6 +1690,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
   const notificationSettingsTest = read("apps/mobile/test/notification_settings_test.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const accessibilityBaselineTest = read("apps/mobile/test/accessibility_baseline_test.dart");
 
   assert.ok(existsSync(path.join(root, "apps/mobile/android")));
   assert.ok(existsSync(path.join(root, "apps/mobile/ios")));
@@ -1763,6 +1764,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
   assert.match(widgetTest, /MediaQuery\.textScalerOf/);
+  assert.match(accessibilityBaselineTest, /모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다/);
+  assert.match(accessibilityBaselineTest, /tester\.ensureSemantics\(\)/);
+  assert.match(accessibilityBaselineTest, /androidTapTargetGuideline/);
+  assert.match(accessibilityBaselineTest, /iOSTapTargetGuideline/);
+  assert.match(accessibilityBaselineTest, /labeledTapTargetGuideline/);
+  assert.match(accessibilityBaselineTest, /textContrastGuideline/);
   assert.match(onboardingTest, /온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다/);
   assert.match(onboardingTest, /hasTapAction: true/);
   assert.match(authHeaders, /abstract class AuthorizationHeaderProvider/);
