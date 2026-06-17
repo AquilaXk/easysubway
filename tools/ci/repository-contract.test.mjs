@@ -1672,6 +1672,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const androidDebugManifest = read("apps/mobile/android/app/src/debug/AndroidManifest.xml");
+  const androidProfileManifest = read("apps/mobile/android/app/src/profile/AndroidManifest.xml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
@@ -1705,6 +1707,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
   assert.match(androidManifest, /android:allowBackup="false"/);
   assert.match(androidManifest, /android:fullBackupContent="false"/);
+  assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
+  assert.match(androidDebugManifest, /xmlns:tools="http:\/\/schemas\.android\.com\/tools"/);
+  assert.match(androidDebugManifest, /android:usesCleartextTraffic="true"/);
+  assert.match(androidDebugManifest, /tools:replace="android:usesCleartextTraffic"/);
+  assert.match(androidProfileManifest, /xmlns:tools="http:\/\/schemas\.android\.com\/tools"/);
+  assert.match(androidProfileManifest, /android:usesCleartextTraffic="true"/);
+  assert.match(androidProfileManifest, /tools:replace="android:usesCleartextTraffic"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
   assert.match(androidBuildGradle, /create\("release"\)/);
   assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
