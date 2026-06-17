@@ -17,6 +17,9 @@ const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못�
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
 const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
+const _favoriteRouteSaveFailureNextAction =
+    '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
+const _favoriteRouteLoadFailureNextAction = '네트워크 상태를 확인한 뒤 다시 불러와 주세요.';
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -2364,6 +2367,7 @@ class _RouteFavoriteSaveButton extends StatefulWidget {
 class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
   bool _saving = false;
   String _message = '';
+  bool _isFailure = false;
 
   @override
   void didUpdateWidget(_RouteFavoriteSaveButton oldWidget) {
@@ -2371,11 +2375,14 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
     if (oldWidget.result.routeSearchId != widget.result.routeSearchId) {
       _saving = false;
       _message = '';
+      _isFailure = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final shouldShowNextAction = _isFailure && _message.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2399,6 +2406,24 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
             ),
           ),
         ],
+        if (shouldShowNextAction) ...[
+          const SizedBox(height: 6),
+          Semantics(
+            key: const Key('favoriteRouteSaveFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_favoriteRouteSaveFailureNextAction',
+            child: Text(
+              _favoriteRouteSaveFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2407,6 +2432,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
     setState(() {
       _saving = true;
       _message = '';
+      _isFailure = false;
     });
 
     try {
@@ -2417,6 +2443,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
       setState(() {
         _saving = false;
         _message = '자주 쓰는 경로에 저장했습니다.';
+        _isFailure = false;
       });
     } on FavoriteRouteException catch (error) {
       if (!mounted) {
@@ -2425,6 +2452,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
       setState(() {
         _saving = false;
         _message = error.message;
+        _isFailure = true;
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2438,6 +2466,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
       setState(() {
         _saving = false;
         _message = _favoriteRouteErrorMessage;
+        _isFailure = true;
       });
     }
   }
@@ -2693,6 +2722,22 @@ class _FavoriteRouteListBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _RouteSearchMessage(message: state.message, liveRegion: true),
+              const SizedBox(height: 6),
+              Semantics(
+                key: const Key('favoriteRouteLoadFailureNextAction'),
+                container: true,
+                excludeSemantics: true,
+                liveRegion: true,
+                label: '다음 행동, $_favoriteRouteLoadFailureNextAction',
+                child: Text(
+                  _favoriteRouteLoadFailureNextAction,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF506B6F),
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('favoriteRoutesRetryButton'),
