@@ -2021,6 +2021,35 @@ void main() {
     }
   });
 
+  testWidgets('역명 검색 빈 결과에는 위치 권한 대안 안내를 보여주지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '없는역');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, ['없는역']);
+    expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
+    expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsNothing);
+    expect(
+      find.bySemanticsLabel('다음 행동, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('역 검색은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(

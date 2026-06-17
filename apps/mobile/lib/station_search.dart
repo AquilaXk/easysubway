@@ -2335,26 +2335,30 @@ class _StationSearchFailureMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowLocationSettings =
         message == _currentLocationDisabledMessage;
+    final shouldShowStationSearchFallback =
+        _shouldShowStationSearchFailureNextAction(message);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StationSearchMessage(message: message, liveRegion: true),
-        const SizedBox(height: 8),
-        Semantics(
-          key: const Key('stationSearchFailureNextAction'),
-          container: true,
-          excludeSemantics: true,
-          label: '다음 행동, $_stationSearchFailureNextAction',
-          child: Text(
-            _stationSearchFailureNextAction,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF506B6F),
-              fontWeight: FontWeight.w700,
-              height: 1.35,
+        if (shouldShowStationSearchFallback) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            key: const Key('stationSearchFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            label: '다음 행동, $_stationSearchFailureNextAction',
+            child: Text(
+              _stationSearchFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
             ),
           ),
-        ),
+        ],
         if (shouldShowLocationSettings) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -2375,6 +2379,13 @@ class _StationSearchFailureMessage extends StatelessWidget {
       ],
     );
   }
+}
+
+bool _shouldShowStationSearchFailureNextAction(String message) {
+  return message == '위치 권한을 확인해 주세요.' ||
+      message == _currentLocationDisabledMessage ||
+      message == '현재 위치를 확인하지 못했습니다.' ||
+      message == '주변 역을 찾지 못했습니다.';
 }
 
 class _StationSearchMessage extends StatelessWidget {
