@@ -1560,9 +1560,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
-  assert.match(jdbcRepository, /UPDATE route_search_results/);
   assert.match(jdbcRepository, /INSERT INTO route_feedbacks/);
-  assert.match(jdbcRepository, /UPDATE route_feedbacks/);
+  assert.match(jdbcRepository, /ON CONFLICT \(route_search_id\) DO UPDATE/);
+  assert.match(jdbcRepository, /ON CONFLICT \(feedback_id\) DO UPDATE/);
   assert.match(jdbcRepository, /steps_json/);
   assert.match(jdbcRepository, /warnings_json/);
   assert.match(jdbcRepository, /blocked_reasons_json/);
