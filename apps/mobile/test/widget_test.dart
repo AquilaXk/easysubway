@@ -3327,6 +3327,10 @@ void main() {
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
 
+      expect(find.text('사진·위치 확인'), findsOneWidget);
+      await tester.tap(find.text('보내기'));
+      await tester.pumpAndSettle();
+
       expect(reportRepository.requests, hasLength(1));
       expect(reportRepository.requests.single.stationId, 'station-sangnoksu');
       expect(
@@ -3633,6 +3637,10 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
+    expect(find.text('사진·위치 확인'), findsOneWidget);
+    await tester.tap(find.text('보내기'));
+    await tester.pumpAndSettle();
+
     expect(reportRepository.requests, hasLength(1));
     expect(
       reportRepository.requests.single.photoFileName,
@@ -3831,7 +3839,7 @@ void main() {
     expect(find.text('사진 1장 추가됨'), findsOneWidget);
   });
 
-  testWidgets('시설 신고 화면은 사진을 보내기 전에 쉬운 문구로 확인한다', (tester) async {
+  testWidgets('시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
 
     await tester.pumpWidget(
@@ -3887,12 +3895,13 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('사진 보내기'), findsOneWidget);
-    expect(find.text('이 사진을 함께 보낼까요?'), findsOneWidget);
+    expect(find.text('사진·위치 확인'), findsOneWidget);
+    expect(find.text('사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.'), findsOneWidget);
+    expect(
+      find.text('신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
+      findsOneWidget,
+    );
     expect(find.text('사진 확인'), findsNothing);
-    expect(find.text('사진과 위치를 함께 보냅니다.'), findsNothing);
-    expect(find.text('사진·위치 확인'), findsNothing);
-    expect(find.text('사진과 신고 위치를 함께 보냅니다.'), findsNothing);
     expect(reportRepository.requests, isEmpty);
 
     await tester.tap(find.text('취소'));
@@ -4006,6 +4015,10 @@ void main() {
       '권한 요청 후 바로 확인된 위치입니다.',
     );
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진·위치 확인'), findsOneWidget);
+    await tester.tap(find.text('보내기'));
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -4375,7 +4388,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('시설 신고 화면은 현재 위치를 함께 보낸다', (tester) async {
+  testWidgets('시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       location: const CurrentLocation(
@@ -4456,6 +4469,17 @@ void main() {
       '승강기 앞에서 확인했습니다.',
     );
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사진·위치 확인'), findsOneWidget);
+    expect(find.text('사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.'), findsOneWidget);
+    expect(
+      find.text('신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
+      findsOneWidget,
+    );
+    expect(reportRepository.requests, isEmpty);
+
+    await tester.tap(find.text('보내기'));
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));

@@ -22,6 +22,11 @@ const _facilityReportLocationRationalePurpose =
     '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
 const _facilityReportLocationRationaleFallback =
     '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
+const _facilityReportUploadDisclosureTitle = '사진·위치 확인';
+const _facilityReportUploadDisclosurePurpose =
+    '사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.';
+const _facilityReportUploadDisclosureScope =
+    '신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
 
@@ -1430,7 +1435,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
-    if (_photoAttachment != null && _attachedLocation != null) {
+    if (_photoAttachment != null || _attachedLocation != null) {
       final confirmed = await _confirmReportUpload();
       if (!confirmed) {
         return;
@@ -1450,8 +1455,16 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('사진 보내기'),
-        content: const Text('이 사진을 함께 보낼까요?'),
+        title: const Text(_facilityReportUploadDisclosureTitle),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_facilityReportUploadDisclosurePurpose),
+            SizedBox(height: 8),
+            Text(_facilityReportUploadDisclosureScope),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
