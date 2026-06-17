@@ -1568,7 +1568,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /blocked_reasons_json/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS route_search_results/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS route_feedbacks/);
-  assert.match(batchPostgresSchema, /CHECK \(status IN \('FOUND', 'BLOCKED', 'NEEDS_VERIFICATION'\)\)/);
+  assert.match(batchPostgresSchema, /CHECK \(status IN \('FOUND', 'BLOCKED'\)\)/);
   assert.match(batchPostgresSchema, /CHECK \(rating IN \('HELPFUL', 'NOT_HELPFUL', 'BLOCKED_BY_REAL_WORLD'\)\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/routes\/search"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/routes\/\{routeSearchId\}"\)/);
