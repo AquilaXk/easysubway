@@ -1676,6 +1676,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(summarizeSearchPort, /summarizeRouteSearches/);
   assert.match(summarizeSearchPort, /loadRouteSearchStationPairsForDashboard/);
   assert.match(summarizeSearchPort, /record RouteSearchStationPair/);
+  assert.match(summarizeSearchPort, /loadRouteSearchBlockedReasonsForDashboard/);
+  assert.match(summarizeSearchPort, /record RouteSearchBlockedReasons/);
   assert.match(summarizeFeedbackPort, /interface SummarizeRouteFeedbackPort/);
   assert.match(summarizeFeedbackPort, /summarizeRouteFeedbacks/);
   assert.match(service, /implements RouteSearchUseCase/);
@@ -1689,6 +1691,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(searchDashboardService, /LoadTransitMasterPort/);
   assert.match(searchDashboardService, /Station::region/);
   assert.match(searchDashboardService, /RegionUsageCount/);
+  assert.match(searchDashboardService, /BlockedReasonCount/);
   assert.match(feedbackDashboardService, /implements RouteFeedbackDashboardUseCase/);
   assert.match(feedbackDashboardService, /SummarizeRouteFeedbackPort/);
   assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort/);
@@ -1701,6 +1704,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /RouteSearchDashboardSummary summarizeRouteSearches\(\)/);
   assert.match(jdbcRepository, /List<RouteSearchStationPair> loadRouteSearchStationPairsForDashboard\(\)/);
   assert.match(jdbcRepository, /SELECT origin_station_id,\s+destination_station_id/);
+  assert.match(jdbcRepository, /List<RouteSearchBlockedReasons> loadRouteSearchBlockedReasonsForDashboard\(\)/);
+  assert.match(jdbcRepository, /SELECT blocked_reasons_json/);
   assert.match(jdbcRepository, /GROUP BY status, mobility_type/);
   assert.match(jdbcRepository, /same DB statement snapshot|같은 DB statement snapshot/);
   assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);
