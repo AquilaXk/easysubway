@@ -3659,6 +3659,66 @@ void main() {
     }
   });
 
+  testWidgets('시설 신고 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final reportRepository = FakeFacilityReportRepository()
+      ..error = const FacilityReportException('신고를 보내지 못했습니다.');
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FacilityReportScreen(
+            repository: reportRepository,
+            target: const FacilityReportTarget(
+              stationId: 'station-sangnoksu',
+              stationName: '상록수',
+              facilityId: 'facility-sangnoksu-elevator-1',
+              facilityName: '1번 출구 엘리베이터',
+              facilityTypeLabel: '엘리베이터',
+              facilityStatusLabel: '정상',
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('facilityReportDescriptionInput')),
+        '출입문이 막혀 있습니다.',
+      );
+      await tester.dragUntilVisible(
+        find.byKey(const Key('facilityReportSubmitButton')),
+        find.byType(Scrollable).first,
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(reportRepository.requests, hasLength(1));
+      expect(find.text('신고를 보내지 못했습니다.'), findsOneWidget);
+      expect(find.text('내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('facilityReportFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.',
+          isLiveRegion: true,
+        ),
+      );
+      expect(
+        find.byKey(const Key('facilityReportRefreshButton')),
+        findsNothing,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('시설 신고 화면은 사진 선택 전에 짧은 개인정보 안내를 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var pickerCallCount = 0;
