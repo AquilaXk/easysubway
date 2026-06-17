@@ -13,6 +13,8 @@ const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못
 const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했습니다.';
 const _deviceRegistrationErrorMessage = '기기 알림 등록을 마치지 못했습니다.';
 const _notificationPermissionErrorMessage = '알림 권한을 확인하지 못했습니다.';
+const _notificationRegistrationFailureNextAction =
+    '기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.';
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -868,22 +870,53 @@ class _NotificationSettingsMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      excludeSemantics: true,
-      liveRegion: true,
-      label: message,
-      child: Text(
-        message,
-        key: const Key('notificationSettingsMessage'),
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: const Color(0xFF102A2C),
-          fontWeight: FontWeight.w700,
-          height: 1.35,
+    final shouldShowNextAction =
+        _shouldShowNotificationRegistrationFailureNextAction(message);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          container: true,
+          excludeSemantics: true,
+          liveRegion: true,
+          label: message,
+          child: Text(
+            message,
+            key: const Key('notificationSettingsMessage'),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: const Color(0xFF102A2C),
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
         ),
-      ),
+        if (shouldShowNextAction) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            key: const Key('notificationRegistrationFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_notificationRegistrationFailureNextAction',
+            child: Text(
+              _notificationRegistrationFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
+}
+
+bool _shouldShowNotificationRegistrationFailureNextAction(String message) {
+  return message == _deviceRegistrationErrorMessage ||
+      message == _notificationPermissionErrorMessage;
 }
 
 class _NotificationSwitchTile extends StatelessWidget {
