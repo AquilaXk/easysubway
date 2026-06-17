@@ -1,0 +1,148 @@
+import 'dart:ui';
+
+import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/main.dart';
+import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/onboarding.dart';
+import 'package:easysubway_mobile/route_search.dart';
+import 'package:easysubway_mobile/station_search.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: _AccessibilityStationSearchRepository(),
+          reportRepository: _AccessibilityFacilityReportRepository(),
+          routeRepository: _AccessibilityRouteSearchRepository(),
+          locationProvider: _AccessibilityCurrentLocationProvider(),
+          enableAnonymousAuth: false,
+          initialOnboardingState: _completedOnboardingState(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: true,
+              simpleViewEnabled: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final homeContext = tester.element(find.byType(HomeScreen));
+      expect(MediaQuery.of(homeContext).highContrast, isTrue);
+      expect(
+        MediaQuery.textScalerOf(homeContext).scale(20),
+        closeTo(23.6, 0.01),
+      );
+      expect(
+        Theme.of(homeContext).colorScheme.primary,
+        const Color(0xFF003D40),
+      );
+      expect(find.bySemanticsLabel('역 검색'), findsOneWidget);
+      expect(find.bySemanticsLabel('길찾기'), findsOneWidget);
+
+      final stationSearchSemantics = tester
+          .getSemantics(find.byKey(const Key('stationSearchButton')))
+          .getSemanticsData();
+      final routeSearchSemantics = tester
+          .getSemantics(find.byKey(const Key('routeSearchButton')))
+          .getSemanticsData();
+
+      expect(stationSearchSemantics.label, contains('역 검색'));
+      expect(stationSearchSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(routeSearchSemantics.label, contains('길찾기'));
+      expect(routeSearchSemantics.hasAction(SemanticsAction.tap), isTrue);
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+}
+
+OnboardingState _completedOnboardingState({
+  required OnboardingViewPreferences preferences,
+}) {
+  return OnboardingState.completed(
+    result: OnboardingResult(
+      profile: mobilityProfileOptions.first,
+      preferences: preferences,
+    ),
+  );
+}
+
+class _AccessibilityStationSearchRepository implements StationSearchRepository {
+  @override
+  Future<List<StationSearchResult>> searchStations(String query) {
+    throw UnimplementedError('접근성 기준선 테스트는 역 검색 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchNearbyStations(
+    CurrentLocation location, {
+    int radiusMeters = 2000,
+    int limit = 10,
+  }) {
+    throw UnimplementedError('접근성 기준선 테스트는 주변 역 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<StationDetail> getStationDetail(String stationId) {
+    throw UnimplementedError('접근성 기준선 테스트는 역 상세 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<List<StationExitInfo>> listStationExits(String stationId) {
+    throw UnimplementedError('접근성 기준선 테스트는 출구 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<List<StationFacilityInfo>> listStationFacilities(String stationId) {
+    throw UnimplementedError('접근성 기준선 테스트는 시설 API를 호출하지 않는다.');
+  }
+}
+
+class _AccessibilityRouteSearchRepository implements RouteSearchRepository {
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
+    throw UnimplementedError('접근성 기준선 테스트는 경로 검색 API를 호출하지 않는다.');
+  }
+}
+
+class _AccessibilityFacilityReportRepository
+    implements FacilityReportRepository {
+  @override
+  Future<FacilityReportResult> createReport(FacilityReportRequest request) {
+    throw UnimplementedError('접근성 기준선 테스트는 신고 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) {
+    throw UnimplementedError('접근성 기준선 테스트는 신고 상세 API를 호출하지 않는다.');
+  }
+
+  @override
+  Future<List<FacilityReportResult>> listMyReports() {
+    throw UnimplementedError('접근성 기준선 테스트는 내 신고 API를 호출하지 않는다.');
+  }
+}
+
+class _AccessibilityCurrentLocationProvider implements CurrentLocationProvider {
+  @override
+  Future<bool> needsLocationPermissionRequest() async => false;
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    return const CurrentLocation(latitude: 37.3028, longitude: 126.8665);
+  }
+
+  @override
+  Future<bool> openLocationSettings() async => true;
+}
