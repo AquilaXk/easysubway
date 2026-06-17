@@ -17,6 +17,11 @@ const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportLocationDisabledMessage =
     '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _facilityReportLocationRationaleTitle = '현재 위치 사용';
+const _facilityReportLocationRationalePurpose =
+    '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
+const _facilityReportLocationRationaleFallback =
+    '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
 
@@ -1495,8 +1500,67 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     if (widget.locationLoader == null || _isLoadingLocation) {
       return;
     }
-    // 권한 요청과 GPS 상태 확인은 네이티브 채널이 맡고, 화면은 실패 안내만 보여준다.
+    final shouldContinue = await _confirmLocationUseIfNeeded();
+    if (!shouldContinue) {
+      if (mounted) {
+        setState(() {
+          _attachedLocation = null;
+          _locationMessage = '위치 안내를 확인한 뒤 신고 위치를 첨부해 주세요.';
+          _isLocationFailure = true;
+        });
+      }
+      return;
+    }
     await _loadCurrentLocation();
+  }
+
+  Future<bool> _confirmLocationUseIfNeeded() async {
+    final checker = widget.needsLocationPermissionRequest;
+    if (checker == null) {
+      return true;
+    }
+    var needsPermissionRequest = true;
+    try {
+      needsPermissionRequest = await checker();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 위치 권한 사전 확인 중 예외가 발생했습니다.',
+      );
+    }
+    if (!needsPermissionRequest) {
+      return true;
+    }
+    if (!mounted) {
+      return false;
+    }
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text(_facilityReportLocationRationaleTitle),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_facilityReportLocationRationalePurpose),
+                SizedBox(height: 8),
+                Text(_facilityReportLocationRationaleFallback),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('계속'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   Future<void> _openLocationSettings() async {
