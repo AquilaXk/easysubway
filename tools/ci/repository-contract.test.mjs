@@ -1643,6 +1643,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(searchSummary, /foundCount/);
   assert.match(searchSummary, /blockedCount/);
   assert.match(searchSummary, /MobilityTypeCount/);
+  assert.match(searchSummary, /RegionUsageCount/);
+  assert.match(searchSummary, /originCount/);
+  assert.match(searchSummary, /destinationCount/);
   assert.match(feedbackSummary, /record RouteFeedbackDashboardSummary/);
   assert.match(feedbackSummary, /helpfulCount/);
   assert.match(feedbackSummary, /notHelpfulCount/);
@@ -1671,6 +1674,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(savePort, /interface SaveRouteSearchPort/);
   assert.match(summarizeSearchPort, /interface SummarizeRouteSearchPort/);
   assert.match(summarizeSearchPort, /summarizeRouteSearches/);
+  assert.match(summarizeSearchPort, /loadRouteSearchStationPairsForDashboard/);
+  assert.match(summarizeSearchPort, /record RouteSearchStationPair/);
   assert.match(summarizeFeedbackPort, /interface SummarizeRouteFeedbackPort/);
   assert.match(summarizeFeedbackPort, /summarizeRouteFeedbacks/);
   assert.match(service, /implements RouteSearchUseCase/);
@@ -1681,6 +1686,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(service, /routeScore/);
   assert.match(searchDashboardService, /implements RouteSearchDashboardUseCase/);
   assert.match(searchDashboardService, /SummarizeRouteSearchPort/);
+  assert.match(searchDashboardService, /LoadTransitMasterPort/);
+  assert.match(searchDashboardService, /Station::region/);
+  assert.match(searchDashboardService, /RegionUsageCount/);
   assert.match(feedbackDashboardService, /implements RouteFeedbackDashboardUseCase/);
   assert.match(feedbackDashboardService, /SummarizeRouteFeedbackPort/);
   assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort/);
@@ -1691,6 +1699,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
   assert.match(jdbcRepository, /INSERT INTO route_feedbacks/);
   assert.match(jdbcRepository, /RouteSearchDashboardSummary summarizeRouteSearches\(\)/);
+  assert.match(jdbcRepository, /List<RouteSearchStationPair> loadRouteSearchStationPairsForDashboard\(\)/);
+  assert.match(jdbcRepository, /SELECT origin_station_id,\s+destination_station_id/);
   assert.match(jdbcRepository, /GROUP BY status, mobility_type/);
   assert.match(jdbcRepository, /same DB statement snapshot|같은 DB statement snapshot/);
   assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);
@@ -1711,6 +1721,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(searchDashboardTemplate, /경로 검색 현황/);
   assert.match(searchDashboardTemplate, /전체 검색/);
   assert.match(searchDashboardTemplate, /이동 프로필별 검색/);
+  assert.match(searchDashboardTemplate, /지역별 사용량/);
+  assert.match(searchDashboardTemplate, /출발 검색/);
+  assert.match(searchDashboardTemplate, /도착 검색/);
   assert.doesNotMatch(searchDashboardTemplate, /routeSearchId/);
   assert.match(feedbackDashboardController, /@GetMapping\("\/admin\/routes\/feedback\/page"\)/);
   assert.match(feedbackDashboardController, /RouteFeedbackDashboardUseCase/);
