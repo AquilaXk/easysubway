@@ -177,7 +177,6 @@ public class JdbcRouteSearchRepository
 				SELECT blocked_reasons_json
 				FROM route_search_results
 				WHERE status = 'BLOCKED'
-				ORDER BY created_at DESC, route_search_id
 				""",
 			(resultSet, rowNumber) -> new RouteSearchBlockedReasons(
 				readJson(resultSet.getString("blocked_reasons_json"), STRING_LIST_TYPE)
