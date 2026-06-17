@@ -16,6 +16,7 @@ const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했�
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
+const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -2209,6 +2210,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
   bool _submitting = false;
   bool _submitted = false;
   String _message = '';
+  bool _isFailure = false;
 
   @override
   void didUpdateWidget(_RouteFeedbackButtons oldWidget) {
@@ -2217,11 +2219,14 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
       _submitting = false;
       _submitted = false;
       _message = '';
+      _isFailure = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final shouldShowNextAction = _isFailure && _message.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2267,6 +2272,24 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
             ),
           ),
         ],
+        if (shouldShowNextAction) ...[
+          const SizedBox(height: 6),
+          Semantics(
+            key: const Key('routeFeedbackFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_routeFeedbackFailureNextAction',
+            child: Text(
+              _routeFeedbackFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2277,6 +2300,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
     setState(() {
       _submitting = true;
       _message = '';
+      _isFailure = false;
     });
 
     try {
@@ -2294,6 +2318,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
         _submitting = false;
         _submitted = true;
         _message = '의견을 보냈습니다.';
+        _isFailure = false;
       });
     } on RouteFeedbackException catch (error) {
       if (!mounted) {
@@ -2302,6 +2327,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
       setState(() {
         _submitting = false;
         _message = error.message;
+        _isFailure = true;
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2315,6 +2341,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
       setState(() {
         _submitting = false;
         _message = _routeFeedbackErrorMessage;
+        _isFailure = true;
       });
     }
   }

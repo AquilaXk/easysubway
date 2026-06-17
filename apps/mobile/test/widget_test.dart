@@ -3187,7 +3187,8 @@ void main() {
     expect(helpfulButton.onPressed, isNull);
   });
 
-  testWidgets('경로 피드백 실패는 짧은 오류 문구로 알린다', (tester) async {
+  testWidgets('경로 피드백 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -3197,55 +3198,75 @@ void main() {
     final routeFeedbackRepository = FakeRouteFeedbackRepository()
       ..error = const RouteFeedbackException('의견을 보내지 못했습니다.');
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        routeFeedbackRepository: routeFeedbackRepository,
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          routeFeedbackRepository: routeFeedbackRepository,
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
 
-    await tester.tap(find.byKey(const Key('routeSearchButton')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeSearchButton')));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('routeOriginStationInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('routeDestinationStationInput')),
+        '사당',
+      );
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationSearchButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -360));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pumpAndSettle();
 
-    await tester.ensureVisible(
-      find.byKey(const Key('routeFeedbackNotHelpfulButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeFeedbackNotHelpfulButton')));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('routeFeedbackNotHelpfulButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeFeedbackNotHelpfulButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('의견을 보내지 못했습니다.'), findsOneWidget);
+      expect(find.text('잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('routeFeedbackFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.',
+          isLiveRegion: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
 
     expect(
       routeFeedbackRepository.requests.single.rating,
