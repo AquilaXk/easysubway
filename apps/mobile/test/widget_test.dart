@@ -3262,6 +3262,77 @@ void main() {
 
     expect(routeRepository.requests, isEmpty);
     expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsOneWidget);
+    expect(find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'), findsNothing);
+  });
+
+  testWidgets('경로 검색 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository(
+      error: const RouteSearchException('경로 정보를 불러오지 못했습니다.'),
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: routeRepository,
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('routeSearchButton')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('routeOriginStationInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('routeDestinationStationInput')),
+        '사당',
+      );
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationSearchButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(ListView), const Offset(0, -360));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(routeRepository.requests, hasLength(1));
+      expect(find.text('경로 정보를 불러오지 못했습니다.'), findsOneWidget);
+      expect(
+        find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
+        findsOneWidget,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('경로 검색은 역 선택이 바뀌면 이전 결과를 숨긴다', (tester) async {
@@ -3415,6 +3486,7 @@ void main() {
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
+      expect(find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'), findsNothing);
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 다른 경로가 필요합니다, 휠체어, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
@@ -5015,15 +5087,20 @@ class ControlledStationSearchRepository implements StationSearchRepository {
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
-  FakeRouteSearchRepository({RouteSearchResult? result})
+  FakeRouteSearchRepository({RouteSearchResult? result, this.error})
     : result = result ?? _sampleRouteSearchResult();
 
   final RouteSearchResult result;
+  final Object? error;
   final requests = <RouteSearchRequest>[];
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
     return result;
   }
 }
