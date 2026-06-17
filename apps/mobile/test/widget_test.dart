@@ -714,7 +714,9 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('데이터 삭제 요청 시 즐겨찾기, 알림 토큰, 신고자 연결 정보를 지웁니다.'),
+        find.text(
+          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+        ),
         findsOneWidget,
       );
       expect(find.text('법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.'), findsOneWidget);

@@ -1178,7 +1178,8 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
   static const _appDataPurpose =
       '즐겨찾기, 이동 조건, 신고 내용과 사진, 알림 설정은 앱 기능 제공에 사용됩니다.';
-  static const _deletionScope = '데이터 삭제 요청 시 즐겨찾기, 알림 토큰, 신고자 연결 정보를 지웁니다.';
+  static const _deletionScope =
+      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
 
   @override
