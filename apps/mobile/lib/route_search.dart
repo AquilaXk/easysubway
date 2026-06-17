@@ -15,6 +15,7 @@ const _routeFeedbackErrorMessage = '의견을 보내지 못했습니다.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
+const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1623,9 +1624,8 @@ class _RouteSearchBody extends StatelessWidget {
           ),
         ),
       ),
-      RouteSearchViewStatus.failure => _RouteSearchMessage(
+      RouteSearchViewStatus.failure => _RouteSearchFailureMessage(
         message: state.message,
-        liveRegion: true,
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
@@ -1634,6 +1634,49 @@ class _RouteSearchBody extends StatelessWidget {
       ),
     };
   }
+}
+
+class _RouteSearchFailureMessage extends StatelessWidget {
+  const _RouteSearchFailureMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final shouldShowNextAction = _shouldShowRouteSearchFailureNextAction(
+      message,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _RouteSearchMessage(message: message, liveRegion: true),
+        if (shouldShowNextAction) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            key: const Key('routeSearchFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_routeSearchFailureNextAction',
+            child: Text(
+              _routeSearchFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+bool _shouldShowRouteSearchFailureNextAction(String message) {
+  return message != '출발역과 도착역을 입력해 주세요.' &&
+      message != '출발역과 도착역을 검색 결과에서 선택해 주세요.';
 }
 
 class _RouteSearchMessage extends StatelessWidget {
@@ -1645,6 +1688,7 @@ class _RouteSearchMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       liveRegion: liveRegion,
       child: Text(
         message,
