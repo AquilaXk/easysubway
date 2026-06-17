@@ -1830,6 +1830,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /Release API base URL must use HTTPS\./);
   assert.match(stationSearch, /baseUri\.host\.isEmpty/);
   assert.match(stationSearch, /Release API base URL must include a host\./);
+  assert.match(stationSearch, /result\.dataQualityLabel\} · \$\{result\.dataSourceLabel/);
+  assert.match(stationSearch, /result\.dataQualityLabel\}, \$\{result\.dataSourceLabel/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);
