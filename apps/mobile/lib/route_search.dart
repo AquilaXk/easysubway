@@ -1657,6 +1657,7 @@ class _RouteSearchFailureMessage extends StatelessWidget {
             key: const Key('routeSearchFailureNextAction'),
             container: true,
             excludeSemantics: true,
+            liveRegion: true,
             label: '다음 행동, $_routeSearchFailureNextAction',
             child: Text(
               _routeSearchFailureNextAction,

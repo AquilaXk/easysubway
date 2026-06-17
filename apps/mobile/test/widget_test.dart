@@ -3330,6 +3330,15 @@ void main() {
         find.bySemanticsLabel('다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
       );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('routeSearchFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.',
+          isLiveRegion: true,
+        ),
+      );
     } finally {
       semanticsHandle.dispose();
     }
