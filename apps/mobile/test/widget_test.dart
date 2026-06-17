@@ -1361,17 +1361,20 @@ void main() {
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
       expect(find.text('수도권'), findsNothing);
       expect(find.text('기본 정보만 있음'), findsNothing);
+      expect(find.text('기본 정보만 있음 · 출처 확인 필요'), findsOneWidget);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음, 출처 확인 필요'),
         findsOneWidget,
       );
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+          find.bySemanticsLabel(
+            '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음, 출처 확인 필요',
+          ),
         ),
         isSemantics(
-          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
+          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음, 출처 확인 필요',
           isButton: true,
           hasTapAction: true,
         ),
@@ -1721,7 +1724,9 @@ void main() {
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수역, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel(
+          '상록수역, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일',
+        ),
         findsOneWidget,
       );
 
@@ -2023,6 +2028,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
+      expect(find.text('기본 정보만 있음 · 출처 공식 파일'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('상록수역, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일'),
+        findsOneWidget,
+      );
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );

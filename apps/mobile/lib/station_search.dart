@@ -2460,6 +2460,17 @@ class _StationSearchResultTile extends StatelessWidget {
                                 height: 1.25,
                               ),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${result.dataQualityLabel} · ${result.dataSourceLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF405A5D),
+                                fontWeight: FontWeight.w800,
+                                height: 1.25,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -2494,9 +2505,9 @@ String _stationResultSemanticLabel(StationSearchResult result) {
   final stationName = _stationResultDisplayName(result.nameKo);
   final distance = result.distanceLabel;
   if (distance.isEmpty) {
-    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}, ${result.dataSourceLabel}';
   }
-  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}, ${result.dataSourceLabel}';
 }
 
 class FavoriteStationListScreen extends StatefulWidget {
