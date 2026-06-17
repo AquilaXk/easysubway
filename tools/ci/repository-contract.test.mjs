@@ -904,10 +904,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /Principal principal/);
   assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
+  assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
+  assert.match(security, /@Order\(2\)[\s\S]*?securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
+  assert.match(security, /@Order\(3\)[\s\S]*?securityMatcher\([\s\S]*?"\/api\/v1\/me"/);
+  assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
   assert.match(security, /roles\("OPERATOR_ADMIN"\)/);
