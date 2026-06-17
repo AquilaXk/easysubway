@@ -1136,6 +1136,8 @@ class SupportAccessScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            const _PrivacyDataUseSummary(),
+            const SizedBox(height: 12),
             _SupportAccessItem(
               key: const Key('privacyPolicyAccessItem'),
               icon: Icons.privacy_tip_outlined,
@@ -1164,6 +1166,91 @@ class SupportAccessScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PrivacyDataUseSummary extends StatelessWidget {
+  const _PrivacyDataUseSummary();
+
+  static const _title = '개인정보 사용 안내';
+  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
+  static const _appDataPurpose =
+      '즐겨찾기, 이동 조건, 신고 내용과 사진, 알림 설정은 앱 기능 제공에 사용됩니다.';
+  static const _deletionScope =
+      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
+  static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      key: const Key('privacyDataUseSummary'),
+      container: true,
+      label:
+          '$_title, $_locationPurpose $_appDataPurpose $_deletionScope $_retentionNotice',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF5F4),
+            border: Border.all(color: const Color(0xFFB7D7D3)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _title,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const _PrivacyDataUseLine(text: _locationPurpose),
+                const _PrivacyDataUseLine(text: _appDataPurpose),
+                const _PrivacyDataUseLine(text: _deletionScope),
+                const _PrivacyDataUseLine(text: _retentionNotice),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyDataUseLine extends StatelessWidget {
+  const _PrivacyDataUseLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 7, color: Color(0xFF006D77)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF29484B),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
