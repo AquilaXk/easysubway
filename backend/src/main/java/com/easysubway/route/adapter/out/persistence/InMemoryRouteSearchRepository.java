@@ -91,6 +91,13 @@ public class InMemoryRouteSearchRepository
 	}
 
 	@Override
+	public List<RouteSearchResult> loadRouteSearchesForDashboard() {
+		synchronized (routeSearches) {
+			return List.copyOf(routeSearches.values());
+		}
+	}
+
+	@Override
 	public int anonymizeRouteFeedbacksByUserId(String userId) {
 		synchronized (routeFeedbacks) {
 			int anonymizedCount = 0;

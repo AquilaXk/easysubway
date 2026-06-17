@@ -25,6 +25,10 @@ class InMemoryRouteSearchRepositoryTest {
 		assertThat(repository.loadRouteSearch("route-0")).isEmpty();
 		assertThat(repository.loadRouteSearch("route-" + InMemoryRouteSearchRepository.MAX_STORED_ROUTE_SEARCHES))
 			.isPresent();
+		assertThat(repository.loadRouteSearchesForDashboard())
+			.extracting(RouteSearchResult::routeSearchId)
+			.doesNotContain("route-0")
+			.contains("route-" + InMemoryRouteSearchRepository.MAX_STORED_ROUTE_SEARCHES);
 	}
 
 	private RouteSearchResult routeSearchResult(String routeSearchId) {

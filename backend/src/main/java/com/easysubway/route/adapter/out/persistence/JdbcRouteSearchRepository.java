@@ -153,6 +153,31 @@ public class JdbcRouteSearchRepository
 	}
 
 	@Override
+	public List<RouteSearchResult> loadRouteSearchesForDashboard() {
+		return jdbcTemplate.query(
+			"""
+				SELECT route_search_id,
+					origin_station_id,
+					origin_station_name,
+					destination_station_id,
+					destination_station_name,
+					mobility_type,
+					status,
+					line_id,
+					line_name,
+					score,
+					steps_json,
+					warnings_json,
+					blocked_reasons_json,
+					created_at
+				FROM route_search_results
+				ORDER BY created_at DESC, route_search_id
+				""",
+			this::mapRouteSearchResult
+		);
+	}
+
+	@Override
 	public int anonymizeRouteFeedbacksByUserId(String userId) {
 		return jdbcTemplate.update(
 			"""
