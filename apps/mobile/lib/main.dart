@@ -1138,6 +1138,8 @@ class SupportAccessScreen extends StatelessWidget {
           children: [
             const _PrivacyDataUseSummary(),
             const SizedBox(height: 12),
+            const _SafetyDataNotice(),
+            const SizedBox(height: 12),
             _SupportAccessItem(
               key: const Key('privacyPolicyAccessItem'),
               icon: Icons.privacy_tip_outlined,
@@ -1166,6 +1168,99 @@ class SupportAccessScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SafetyDataNotice extends StatelessWidget {
+  const _SafetyDataNotice();
+
+  static const _title = '안전과 데이터 안내';
+  static const _referenceNotice = '경로와 시설 정보는 이동을 돕는 참고 정보입니다.';
+  static const _fieldNotice = '실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.';
+  static const _limitationNotice = '실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.';
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      key: const Key('safetyDataNotice'),
+      container: true,
+      label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7E8),
+            border: Border.all(color: const Color(0xFFE3C37D)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Color(0xFF6B4D00),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _title,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF2C2200),
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const _SafetyDataNoticeLine(text: _referenceNotice),
+                const _SafetyDataNoticeLine(text: _fieldNotice),
+                const _SafetyDataNoticeLine(text: _limitationNotice),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyDataNoticeLine extends StatelessWidget {
+  const _SafetyDataNoticeLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 7, color: Color(0xFF8A6400)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF3A2A00),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

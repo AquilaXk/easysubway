@@ -657,6 +657,12 @@ void main() {
       expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
       expect(find.text('고객지원'), findsOneWidget);
       expect(find.text('support@easysubway.example'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('dataDeletionAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('데이터 삭제 요청'), findsOneWidget);
       expect(find.text('privacy@easysubway.example'), findsOneWidget);
 
@@ -738,6 +744,53 @@ void main() {
     }
   });
 
+  testWidgets('도움말은 안전 고지와 데이터 한계를 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          supportAccessInfo: const SupportAccessInfo(
+            privacyPolicyUrl: 'https://easysubway.example/privacy',
+            supportEmail: 'support@easysubway.example',
+            dataDeletionEmail: 'privacy@easysubway.example',
+          ),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('안전과 데이터 안내'), findsOneWidget);
+      expect(find.text('경로와 시설 정보는 이동을 돕는 참고 정보입니다.'), findsOneWidget);
+      expect(
+        find.text('실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.'),
+        findsOneWidget,
+      );
+      expect(find.text('실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.'), findsOneWidget);
+
+      final noticeSize = tester.getSize(
+        find.byKey(const Key('safetyDataNotice')),
+      );
+      expect(noticeSize.height, greaterThanOrEqualTo(120));
+
+      final noticeSemantics = tester
+          .getSemantics(find.byKey(const Key('safetyDataNotice')))
+          .getSemanticsData();
+      expect(
+        noticeSemantics.label,
+        '안전과 데이터 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
     final launcher = RecordingSupportAccessLauncher();
 
@@ -792,7 +845,19 @@ void main() {
 
     await tester.tap(find.byKey(const Key('homeHelpActionButton')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('supportAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('dataDeletionAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.pumpAndSettle();
@@ -827,10 +892,42 @@ void main() {
     await tester.tap(find.byKey(const Key('homeHelpActionButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('준비 중입니다.'), findsNWidgets(3));
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
+          .getSemanticsData()
+          .label,
+      '개인정보처리방침, 준비 중입니다.',
+    );
 
     await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('supportAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('supportAccessItem')))
+          .getSemanticsData()
+          .label,
+      '고객지원, 준비 중입니다.',
+    );
     await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('dataDeletionAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
+          .getSemanticsData()
+          .label,
+      '데이터 삭제 요청, 준비 중입니다.',
+    );
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.pumpAndSettle();
 
