@@ -1878,8 +1878,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /정보 갱신 알림/);
   assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 상태/);
   assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
+  assert.match(notificationSettings, /notificationRegistrationFailureNextAction/);
+  assert.match(notificationSettings, /기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요\./);
   assert.match(notificationSettingsTest, /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(notificationSettingsTest, /알림 설정 컨트롤러는 조회와 저장 상태를 구분한다/);
+  assert.match(widgetTest, /알림 설정 화면은 기기 알림 실패 다음 행동을 안내한다/);
   assert.match(stationSearch, /가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다/);
   assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
   assert.match(facilityReport, /사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다/);
