@@ -1859,6 +1859,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /경로 시설 알림/);
   assert.match(notificationSettings, /신고 처리 알림/);
   assert.match(notificationSettings, /정보 갱신 알림/);
+  assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 상태/);
+  assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
   assert.match(notificationSettingsTest, /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(notificationSettingsTest, /알림 설정 컨트롤러는 조회와 저장 상태를 구분한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);

@@ -681,7 +681,9 @@ class _NotificationSettingsScreenState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('알림 받기'),
-        content: const Text('시설 상태와 신고 결과를 알려드립니다.'),
+        content: const Text(
+          '즐겨찾는 역과 경로의 시설 상태, 내 신고 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
