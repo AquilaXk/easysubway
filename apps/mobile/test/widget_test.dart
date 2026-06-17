@@ -1682,7 +1682,7 @@ void main() {
     }
   });
 
-  testWidgets('역 검색은 현재 위치 확인창 없이 바로 주변 역을 찾는다', (tester) async {
+  testWidgets('역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
     );
@@ -1712,10 +1712,20 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(locationProvider.permissionCheckCount, 0);
+    expect(locationProvider.permissionCheckCount, 1);
+    expect(locationProvider.requestCount, 0);
+    expect(find.text('현재 위치 사용'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+    expect(
+      find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('계속'));
+    await tester.pumpAndSettle();
+
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
-    expect(find.text('현재 위치 사용'), findsNothing);
     expect(find.text('상록수역'), findsOneWidget);
   });
 
@@ -1723,6 +1733,7 @@ void main() {
     final locationCompleter = Completer<CurrentLocation>();
     final locationProvider = FakeCurrentLocationProvider(
       locationLoader: () => locationCompleter.future,
+      needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
       nearbyResults: [
@@ -1751,7 +1762,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
 
-    expect(locationProvider.permissionCheckCount, 0);
+    expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 1);
 
     locationCompleter.complete(
@@ -1766,6 +1777,7 @@ void main() {
     final locationCompleter = Completer<CurrentLocation>();
     final locationProvider = FakeCurrentLocationProvider(
       locationLoader: () => locationCompleter.future,
+      needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
       nearbyResults: [
@@ -1812,6 +1824,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException('위치 권한을 확인해 주세요.'),
+      needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository();
 
@@ -3936,9 +3949,10 @@ void main() {
     );
   });
 
-  testWidgets('시설 신고 화면은 첫 위치 권한 요청도 화면 진입 시 자동으로 진행한다', (tester) async {
+  testWidgets('시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var requestCount = 0;
+    var permissionCheckCount = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -3953,9 +3967,8 @@ void main() {
             facilityStatusLabel: '정상',
           ),
           needsLocationPermissionRequest: () async {
-            throw AssertionError(
-              '시설 신고 화면은 위치 preflight checker를 호출하지 않아야 합니다.',
-            );
+            permissionCheckCount++;
+            return true;
           },
           locationLoader: () async {
             requestCount++;
@@ -3969,10 +3982,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(requestCount, 1);
-    expect(find.text('위치 확인'), findsNothing);
-    expect(find.text('가까운 역과 신고 위치를 확인합니다.'), findsNothing);
+    expect(permissionCheckCount, 1);
+    expect(requestCount, 0);
+    expect(find.text('현재 위치 사용'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+    expect(
+      find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
+      findsOneWidget,
+    );
     expect(find.text('현재 위치 첨부됨'), findsNothing);
+
+    await tester.tap(find.text('계속'));
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 1);
 
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportDescriptionInput')),

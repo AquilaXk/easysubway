@@ -13,6 +13,11 @@ import 'mobile_error_reporter.dart';
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _locationPermissionRationaleTitle = '현재 위치 사용';
+const _locationPermissionRationalePurpose =
+    '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
+const _locationPermissionRationaleFallback =
+    '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
 const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _favoriteStationTimeout = Duration(seconds: 8);
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
@@ -1988,15 +1993,63 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       return;
     }
     setState(() => _isNearbySearchRunning = true);
-    // OS 권한 요청과 GPS 상태 확인은 네이티브 위치 조회에 맡기고,
-    // 사용자가 누른 즉시 가까운 역을 찾는 흐름으로 유지한다.
     try {
+      final shouldContinue = await _confirmLocationUseIfNeeded();
+      if (!shouldContinue) {
+        return;
+      }
       await _controller.searchNearby(widget.locationProvider);
     } finally {
       if (mounted) {
         setState(() => _isNearbySearchRunning = false);
       }
     }
+  }
+
+  Future<bool> _confirmLocationUseIfNeeded() async {
+    var needsPermissionRequest = true;
+    try {
+      needsPermissionRequest = await widget.locationProvider
+          .needsLocationPermissionRequest();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '주변 역 위치 권한 사전 확인 중 예외가 발생했습니다.',
+      );
+    }
+    if (!needsPermissionRequest) {
+      return true;
+    }
+    if (!mounted) {
+      return false;
+    }
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text(_locationPermissionRationaleTitle),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_locationPermissionRationalePurpose),
+                SizedBox(height: 8),
+                Text(_locationPermissionRationaleFallback),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('계속'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   Future<void> _openLocationSettings() async {
