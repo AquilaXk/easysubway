@@ -1738,6 +1738,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /NotificationSettingsApiRepository/);
   assert.match(main, /OnboardingScreen/);
   assert.match(main, /initialOnboardingState/);
+  assert.match(stationSearch, /stationSearchFailureNextAction/);
+  assert.match(stationSearch, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
+  assert.match(widgetTest, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
   assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /_OnboardingPreferenceScope/);
