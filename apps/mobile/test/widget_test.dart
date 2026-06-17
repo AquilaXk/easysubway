@@ -1175,6 +1175,60 @@ void main() {
     expect(notificationPermissionProvider.requestCount, 1);
     expect(find.text('기기 알림 권한을 켜 주세요.'), findsOneWidget);
     expect(find.bySemanticsLabel('기기 알림 권한을 켜 주세요.'), findsOneWidget);
+    expect(find.text('기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'), findsNothing);
+  });
+
+  testWidgets('알림 설정 화면은 기기 알림 실패 다음 행동을 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.denied,
+      error: const NotificationSettingsException('기기 알림 등록을 마치지 못했습니다.'),
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          notificationPermissionProvider: notificationPermissionProvider,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('notificationSettingsButton')),
+        120,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('notificationSettingsButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('notificationPermissionButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('켜기'));
+      await tester.pumpAndSettle();
+
+      expect(notificationPermissionProvider.requestCount, 1);
+      expect(find.text('기기 알림 등록을 마치지 못했습니다.'), findsOneWidget);
+      expect(find.text('기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('notificationRegistrationFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+          isLiveRegion: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('홈 즐겨찾기는 저장한 역을 큰 목록으로 보여준다', (tester) async {
@@ -5327,14 +5381,19 @@ class FakeNotificationSettingsRepository
 
 class FakeNotificationPermissionProvider
     implements NotificationPermissionProvider {
-  FakeNotificationPermissionProvider({required this.nextStatus});
+  FakeNotificationPermissionProvider({required this.nextStatus, this.error});
 
   final NotificationPermissionStatus nextStatus;
+  final Object? error;
   int requestCount = 0;
 
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     requestCount++;
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
     return nextStatus;
   }
 }
