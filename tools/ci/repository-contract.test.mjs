@@ -1860,9 +1860,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReport, /처리 상태 확인 중/);
   assert.match(facilityReport, /접수번호/);
   assert.match(facilityReport, /facilityReportRefreshButton/);
+  assert.match(facilityReport, /facilityReportFailureNextAction/);
+  assert.match(facilityReport, /내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요\./);
   assert.match(facilityReportTest, /접수번호로 처리 상태를 조회한다/);
   assert.match(facilityReportTest, /접수 후 처리 상태를 다시 확인한다/);
   assert.match(widgetTest, /신고 접수번호 report-1, 현재 상태 반영됨/);
+  assert.match(widgetTest, /시설 신고 실패는 다음 행동을 쉬운 문구로 안내한다/);
   assert.match(notificationSettings, /class NotificationSettingsApiRepository/);
   assert.match(notificationSettings, /\/api\/v1\/me\/notification-settings/);
   assert.match(notificationSettings, /AuthorizationHeaderProvider/);

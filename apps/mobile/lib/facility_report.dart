@@ -13,6 +13,7 @@ const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
 const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
+const _facilityReportFailureNextAction = '내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.';
 const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportLocationDisabledMessage =
@@ -2031,30 +2032,62 @@ class _FacilityReportMessage extends StatelessWidget {
     final isFailure = state.status == FacilityReportViewStatus.failure;
     final color = isFailure ? const Color(0xFF8A4B00) : const Color(0xFF006D77);
     final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
+    final shouldShowNextAction = _shouldShowFacilityReportFailureNextAction(
+      state,
+    );
 
-    return Semantics(
-      label: state.message,
-      liveRegion: true,
-      child: ExcludeSemantics(
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                state.message,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w800,
-                  height: 1.3,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          container: true,
+          label: state.message,
+          liveRegion: true,
+          child: ExcludeSemantics(
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 26),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    state.message,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          ),
+        ),
+        if (shouldShowNextAction) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            key: const Key('facilityReportFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_facilityReportFailureNextAction',
+            child: Text(
+              _facilityReportFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF506B6F),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
+}
+
+bool _shouldShowFacilityReportFailureNextAction(FacilityReportState state) {
+  return state.status == FacilityReportViewStatus.failure &&
+      state.result == null;
 }
 
 class _FacilityReportLocationMessage extends StatelessWidget {
