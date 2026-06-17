@@ -6,6 +6,7 @@ import com.easysubway.route.application.port.out.SaveRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SaveRouteSearchPort;
 import com.easysubway.route.application.port.out.SummarizeRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SummarizeRouteSearchPort;
+import com.easysubway.route.application.port.out.SummarizeRouteSearchPort.RouteSearchStationPair;
 import com.easysubway.route.domain.RouteFeedback;
 import com.easysubway.route.domain.RouteFeedbackDashboardSummary;
 import com.easysubway.route.domain.RouteSearchDashboardSummary;
@@ -153,27 +154,18 @@ public class JdbcRouteSearchRepository
 	}
 
 	@Override
-	public List<RouteSearchResult> loadRouteSearchesForDashboard() {
+	public List<RouteSearchStationPair> loadRouteSearchStationPairsForDashboard() {
 		return jdbcTemplate.query(
 			"""
-				SELECT route_search_id,
-					origin_station_id,
-					origin_station_name,
-					destination_station_id,
-					destination_station_name,
-					mobility_type,
-					status,
-					line_id,
-					line_name,
-					score,
-					steps_json,
-					warnings_json,
-					blocked_reasons_json,
-					created_at
+				SELECT origin_station_id,
+					destination_station_id
 				FROM route_search_results
 				ORDER BY created_at DESC, route_search_id
 				""",
-			this::mapRouteSearchResult
+			(resultSet, rowNumber) -> new RouteSearchStationPair(
+				resultSet.getString("origin_station_id"),
+				resultSet.getString("destination_station_id")
+			)
 		);
 	}
 

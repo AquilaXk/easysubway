@@ -2,9 +2,9 @@ package com.easysubway.route.application.service;
 
 import com.easysubway.route.application.port.in.RouteSearchDashboardUseCase;
 import com.easysubway.route.application.port.out.SummarizeRouteSearchPort;
+import com.easysubway.route.application.port.out.SummarizeRouteSearchPort.RouteSearchStationPair;
 import com.easysubway.route.domain.RouteSearchDashboardSummary;
 import com.easysubway.route.domain.RouteSearchDashboardSummary.RegionUsageCount;
-import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.domain.Station;
 import java.util.Comparator;
@@ -38,18 +38,19 @@ public class RouteSearchDashboardService implements RouteSearchDashboardUseCase 
 			summary.foundCount(),
 			summary.blockedCount(),
 			summary.mobilityTypeCounts(),
-			regionUsageCounts(summarizeRouteSearchPort.loadRouteSearchesForDashboard())
+			regionUsageCounts(summarizeRouteSearchPort.loadRouteSearchStationPairsForDashboard())
 		);
 	}
 
-	private List<RegionUsageCount> regionUsageCounts(List<RouteSearchResult> routeSearches) {
+	private List<RegionUsageCount> regionUsageCounts(List<RouteSearchStationPair> stationPairs) {
 		Map<String, String> stationRegionsById = loadTransitMasterPort.loadStations()
 			.stream()
+			.filter(station -> station.region() != null && !station.region().isBlank())
 			.collect(Collectors.toMap(Station::id, Station::region));
 		Map<String, MutableRegionUsageCount> countsByRegion = new HashMap<>();
-		for (RouteSearchResult routeSearch : routeSearches) {
-			countOriginRegion(stationRegionsById.get(routeSearch.originStationId()), countsByRegion);
-			countDestinationRegion(stationRegionsById.get(routeSearch.destinationStationId()), countsByRegion);
+		for (RouteSearchStationPair stationPair : stationPairs) {
+			countOriginRegion(stationRegionsById.get(stationPair.originStationId()), countsByRegion);
+			countDestinationRegion(stationRegionsById.get(stationPair.destinationStationId()), countsByRegion);
 		}
 		return countsByRegion.values()
 			.stream()

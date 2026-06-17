@@ -1674,7 +1674,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(savePort, /interface SaveRouteSearchPort/);
   assert.match(summarizeSearchPort, /interface SummarizeRouteSearchPort/);
   assert.match(summarizeSearchPort, /summarizeRouteSearches/);
-  assert.match(summarizeSearchPort, /loadRouteSearchesForDashboard/);
+  assert.match(summarizeSearchPort, /loadRouteSearchStationPairsForDashboard/);
+  assert.match(summarizeSearchPort, /record RouteSearchStationPair/);
   assert.match(summarizeFeedbackPort, /interface SummarizeRouteFeedbackPort/);
   assert.match(summarizeFeedbackPort, /summarizeRouteFeedbacks/);
   assert.match(service, /implements RouteSearchUseCase/);
@@ -1698,7 +1699,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
   assert.match(jdbcRepository, /INSERT INTO route_feedbacks/);
   assert.match(jdbcRepository, /RouteSearchDashboardSummary summarizeRouteSearches\(\)/);
-  assert.match(jdbcRepository, /List<RouteSearchResult> loadRouteSearchesForDashboard\(\)/);
+  assert.match(jdbcRepository, /List<RouteSearchStationPair> loadRouteSearchStationPairsForDashboard\(\)/);
+  assert.match(jdbcRepository, /SELECT origin_station_id,\s+destination_station_id/);
   assert.match(jdbcRepository, /GROUP BY status, mobility_type/);
   assert.match(jdbcRepository, /same DB statement snapshot|같은 DB statement snapshot/);
   assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);

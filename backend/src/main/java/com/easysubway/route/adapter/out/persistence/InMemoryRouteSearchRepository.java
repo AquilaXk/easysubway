@@ -6,6 +6,7 @@ import com.easysubway.route.application.port.out.SaveRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SaveRouteSearchPort;
 import com.easysubway.route.application.port.out.SummarizeRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SummarizeRouteSearchPort;
+import com.easysubway.route.application.port.out.SummarizeRouteSearchPort.RouteSearchStationPair;
 import com.easysubway.route.domain.RouteFeedback;
 import com.easysubway.route.domain.RouteFeedbackDashboardSummary;
 import com.easysubway.route.domain.RouteFeedbackRating;
@@ -91,9 +92,15 @@ public class InMemoryRouteSearchRepository
 	}
 
 	@Override
-	public List<RouteSearchResult> loadRouteSearchesForDashboard() {
+	public List<RouteSearchStationPair> loadRouteSearchStationPairsForDashboard() {
 		synchronized (routeSearches) {
-			return List.copyOf(routeSearches.values());
+			return routeSearches.values()
+				.stream()
+				.map(routeSearch -> new RouteSearchStationPair(
+					routeSearch.originStationId(),
+					routeSearch.destinationStationId()
+				))
+				.toList();
 		}
 	}
 

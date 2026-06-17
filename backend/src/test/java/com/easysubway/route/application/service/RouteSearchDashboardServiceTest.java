@@ -74,7 +74,7 @@ class RouteSearchDashboardServiceTest {
 			"route-search-3",
 			MobilityType.PREGNANT,
 			RouteSearchStatus.BLOCKED,
-			"station-missing",
+			"station-null-region",
 			"미확인",
 			"station-busan",
 			"부산"
@@ -151,7 +151,8 @@ class RouteSearchDashboardServiceTest {
 			return List.of(
 				station("station-sangnoksu", "상록수", "수도권"),
 				station("station-sadang", "사당", "수도권"),
-				station("station-busan", "부산", "부산권")
+				station("station-busan", "부산", "부산권"),
+				station("station-null-region", "미확인", null)
 			);
 		}
 
