@@ -9,6 +9,7 @@ import 'notification_settings.dart';
 import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
+const _onboardingNotificationFailureNextAction = '나중에 알림 설정에서 다시 켤 수 있습니다.';
 
 abstract class OnboardingResultStore {
   Future<OnboardingResult?> readResult();
@@ -572,6 +573,10 @@ class _OnboardingNotificationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showNextAction = _shouldShowOnboardingNotificationFailureNextAction(
+      message,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -606,9 +611,31 @@ class _OnboardingNotificationSection extends StatelessWidget {
           const SizedBox(height: 10),
           _OnboardingStatusMessage(message: message, isFailure: isFailure),
         ],
+        if (showNextAction) ...[
+          const SizedBox(height: 6),
+          Semantics(
+            key: const Key('onboardingNotificationFailureNextAction'),
+            container: true,
+            excludeSemantics: true,
+            liveRegion: true,
+            label: '다음 행동, $_onboardingNotificationFailureNextAction',
+            child: Text(
+              _onboardingNotificationFailureNextAction,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF29484B),
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
+}
+
+bool _shouldShowOnboardingNotificationFailureNextAction(String message) {
+  return message == '알림 권한을 확인하지 못했습니다.';
 }
 
 class _OnboardingStatusMessage extends StatelessWidget {

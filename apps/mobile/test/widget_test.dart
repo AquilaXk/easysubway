@@ -144,6 +144,40 @@ void main() {
     expect(find.text('알림 준비 완료'), findsOneWidget);
   });
 
+  testWidgets('첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다', (tester) async {
+    final notificationPermissionProvider = FakeNotificationPermissionProvider(
+      nextStatus: NotificationPermissionStatus.denied,
+      error: const NotificationSettingsException('알림 권한을 확인하지 못했습니다.'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        notificationPermissionProvider: notificationPermissionProvider,
+        onboardingStore: MemoryOnboardingResultStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('onboardingNotificationButton')),
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+    await tester.pumpAndSettle();
+
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(find.text('알림 권한을 확인하지 못했습니다.'), findsOneWidget);
+    expect(find.text('나중에 알림 설정에서 다시 켤 수 있습니다.'), findsOneWidget);
+  });
+
   testWidgets('첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(

@@ -248,34 +248,54 @@ void main() {
 
     expect(notificationPermissionProvider.requestCount, 1);
     expect(find.text('설정에서 알림 권한을 켜 주세요.'), findsOneWidget);
+    expect(find.text('나중에 알림 설정에서 다시 켤 수 있습니다.'), findsNothing);
   });
 
-  testWidgets('온보딩은 알림 권한 요청 실패를 짧게 안내한다', (tester) async {
+  testWidgets('온보딩은 알림 권한 요청 실패 다음 행동을 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final notificationPermissionProvider = FakeNotificationPermissionProvider(
       error: const NotificationSettingsException('알림 권한을 확인하지 못했습니다.'),
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingScreen(
-          notificationPermissionProvider: notificationPermissionProvider,
-          onCompleted: (_) {},
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OnboardingScreen(
+            notificationPermissionProvider: notificationPermissionProvider,
+            onCompleted: (_) {},
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.dragUntilVisible(
-      find.byKey(const Key('onboardingNotificationButton')),
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
-    );
-    await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.byKey(const Key('onboardingNotificationButton')),
+        find.byType(Scrollable).first,
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('onboardingNotificationButton')));
+      await tester.pumpAndSettle();
 
-    expect(notificationPermissionProvider.requestCount, 1);
-    expect(find.text('알림 권한을 확인하지 못했습니다.'), findsOneWidget);
+      expect(notificationPermissionProvider.requestCount, 1);
+      expect(find.text('알림 권한을 확인하지 못했습니다.'), findsOneWidget);
+      expect(find.text('나중에 알림 설정에서 다시 켤 수 있습니다.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 나중에 알림 설정에서 다시 켤 수 있습니다.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('onboardingNotificationFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 나중에 알림 설정에서 다시 켤 수 있습니다.',
+          isLiveRegion: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('온보딩은 알림 권한 요청 실패가 있어도 완료를 막지 않는다', (tester) async {
