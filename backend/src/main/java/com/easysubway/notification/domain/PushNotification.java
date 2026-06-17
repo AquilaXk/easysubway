@@ -15,11 +15,15 @@ public record PushNotification(
 	LocalDateTime createdAt
 ) {
 
+	private static final int FAILURE_REASON_MAX_LENGTH = 1000;
+
 	public PushNotification {
 		if (failureReason != null) {
 			failureReason = failureReason.trim();
 			if (failureReason.isBlank()) {
 				failureReason = null;
+			} else if (failureReason.length() > FAILURE_REASON_MAX_LENGTH) {
+				failureReason = failureReason.substring(0, FAILURE_REASON_MAX_LENGTH);
 			}
 		}
 		if (notificationId == null || notificationId.isBlank()) {

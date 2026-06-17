@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class PushNotificationDeliveryService implements PushNotificationDeliveryUseCase {
 
+	private static final String DEFAULT_SEND_EXCEPTION_FAILURE_REASON = "푸시 발송 중 예외가 발생했습니다.";
+
 	private final LoadPendingPushNotificationOutboxPort loadPendingPushNotificationOutboxPort;
 	private final SavePushNotificationOutboxPort savePushNotificationOutboxPort;
 	private final PushNotificationSenderPort pushNotificationSenderPort;
@@ -57,7 +59,15 @@ public class PushNotificationDeliveryService implements PushNotificationDelivery
 		try {
 			return pushNotificationSenderPort.send(notification);
 		} catch (RuntimeException exception) {
-			return PushNotificationSendResult.failed("푸시 발송 중 예외가 발생했습니다.");
+			return PushNotificationSendResult.failed(sendExceptionFailureReason(exception));
 		}
+	}
+
+	private String sendExceptionFailureReason(RuntimeException exception) {
+		String message = exception.getMessage();
+		if (message == null || message.isBlank()) {
+			return DEFAULT_SEND_EXCEPTION_FAILURE_REASON;
+		}
+		return message;
 	}
 }

@@ -103,7 +103,7 @@ class PushNotificationDeliveryServiceTest {
 		assertThat(outboxRepository.loadPushNotifications("anonymous-user-1"))
 			.extracting("notificationId", "status", "failureReason")
 			.containsExactly(
-				tuple("push-1", PushNotificationStatus.FAILED, "푸시 발송 중 예외가 발생했습니다."),
+				tuple("push-1", PushNotificationStatus.FAILED, "푸시 발송 실패"),
 				tuple("push-2", PushNotificationStatus.SENT, null)
 			);
 	}

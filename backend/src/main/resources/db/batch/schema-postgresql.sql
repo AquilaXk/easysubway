@@ -286,11 +286,16 @@ CREATE TABLE IF NOT EXISTS push_notification_outbox (
 	CONSTRAINT chk_push_notification_outbox_type
 		CHECK (notification_type IN ('FAVORITE_STATION_FACILITY', 'FAVORITE_ROUTE_FACILITY', 'REPORT_STATUS', 'DATA_QUALITY')),
 	CONSTRAINT chk_push_notification_outbox_status
-		CHECK (status IN ('PENDING', 'SENT', 'FAILED'))
+		CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+	CONSTRAINT chk_push_notification_outbox_failure_reason
+		CHECK (failure_reason IS NULL OR status = 'FAILED')
 );
 
 ALTER TABLE push_notification_outbox
 	DROP CONSTRAINT IF EXISTS chk_push_notification_outbox_status;
+
+ALTER TABLE push_notification_outbox
+	DROP CONSTRAINT IF EXISTS chk_push_notification_outbox_failure_reason;
 
 ALTER TABLE push_notification_outbox
 	ADD COLUMN IF NOT EXISTS failure_reason VARCHAR(1000);
@@ -298,6 +303,10 @@ ALTER TABLE push_notification_outbox
 ALTER TABLE push_notification_outbox
 	ADD CONSTRAINT chk_push_notification_outbox_status
 		CHECK (status IN ('PENDING', 'SENT', 'FAILED'));
+
+ALTER TABLE push_notification_outbox
+	ADD CONSTRAINT chk_push_notification_outbox_failure_reason
+		CHECK (failure_reason IS NULL OR status = 'FAILED');
 
 CREATE INDEX IF NOT EXISTS idx_push_notification_outbox_user_created
 	ON push_notification_outbox (user_id, created_at ASC, notification_id ASC);

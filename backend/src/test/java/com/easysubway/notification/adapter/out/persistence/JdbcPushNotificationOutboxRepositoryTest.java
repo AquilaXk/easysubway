@@ -41,7 +41,8 @@ class JdbcPushNotificationOutboxRepositoryTest {
 				created_at TIMESTAMP NOT NULL,
 				CONSTRAINT chk_push_notification_outbox_platform CHECK (platform IN ('ANDROID', 'IOS')),
 				CONSTRAINT chk_push_notification_outbox_type CHECK (notification_type IN ('FAVORITE_STATION_FACILITY', 'FAVORITE_ROUTE_FACILITY', 'REPORT_STATUS', 'DATA_QUALITY')),
-				CONSTRAINT chk_push_notification_outbox_status CHECK (status IN ('PENDING', 'SENT', 'FAILED'))
+				CONSTRAINT chk_push_notification_outbox_status CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+				CONSTRAINT chk_push_notification_outbox_failure_reason CHECK (failure_reason IS NULL OR status = 'FAILED')
 			)
 			""");
 		repository = new JdbcPushNotificationOutboxRepository(jdbcTemplate);
@@ -130,11 +131,11 @@ class JdbcPushNotificationOutboxRepositoryTest {
 			PushNotificationStatus.SENT,
 			11
 		));
-		repository.savePushNotification(notification(
+		repository.savePushNotification(failedNotification(
 			"push-4",
 			"anonymous-user-3",
 			PushNotificationType.FAVORITE_STATION_FACILITY,
-			PushNotificationStatus.FAILED,
+			"외부 발송 어댑터가 설정되지 않았습니다.",
 			12
 		));
 
@@ -144,6 +145,7 @@ class JdbcPushNotificationOutboxRepositoryTest {
 		assertThat(summary.pendingCount()).isEqualTo(2);
 		assertThat(summary.sentCount()).isEqualTo(1);
 		assertThat(summary.failedCount()).isEqualTo(1);
+		assertThat(summary.latestFailureReason()).isEqualTo("외부 발송 어댑터가 설정되지 않았습니다.");
 	}
 
 	@Test
