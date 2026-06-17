@@ -1610,8 +1610,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
   assert.match(jdbcRepository, /INSERT INTO route_feedbacks/);
   assert.match(jdbcRepository, /RouteSearchDashboardSummary summarizeRouteSearches\(\)/);
-  assert.match(jdbcRepository, /GROUP BY status/);
-  assert.match(jdbcRepository, /GROUP BY mobility_type/);
+  assert.match(jdbcRepository, /GROUP BY status, mobility_type/);
+  assert.match(jdbcRepository, /same DB statement snapshot|같은 DB statement snapshot/);
   assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);
   assert.match(jdbcRepository, /SUM\(CASE WHEN rating = 'HELPFUL' THEN 1 ELSE 0 END\)/);
   assert.match(jdbcRepository, /ON CONFLICT \(route_search_id\) DO UPDATE/);
