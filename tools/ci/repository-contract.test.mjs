@@ -1509,6 +1509,7 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
 
 test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const result = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchResult.java");
+  const feedbackSummary = read("backend/src/main/java/com/easysubway/route/domain/RouteFeedbackDashboardSummary.java");
   const status = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchStatus.java");
   const warning = read("backend/src/main/java/com/easysubway/route/domain/RouteWarning.java");
   const warningCode = read("backend/src/main/java/com/easysubway/route/domain/RouteWarningCode.java");
@@ -1518,18 +1519,35 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const routeNotFound = read("backend/src/main/java/com/easysubway/route/domain/RouteNotFoundException.java");
   const searchNotFound = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchNotFoundException.java");
   const useCase = read("backend/src/main/java/com/easysubway/route/application/port/in/RouteSearchUseCase.java");
+  const dashboardUseCase = read(
+    "backend/src/main/java/com/easysubway/route/application/port/in/RouteFeedbackDashboardUseCase.java",
+  );
   const command = read("backend/src/main/java/com/easysubway/route/application/port/in/SearchRouteCommand.java");
   const loadPort = read("backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteSearchPort.java");
   const savePort = read("backend/src/main/java/com/easysubway/route/application/port/out/SaveRouteSearchPort.java");
+  const summarizeFeedbackPort = read(
+    "backend/src/main/java/com/easysubway/route/application/port/out/SummarizeRouteFeedbackPort.java",
+  );
   const service = read("backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java");
+  const dashboardService = read(
+    "backend/src/main/java/com/easysubway/route/application/service/RouteFeedbackDashboardService.java",
+  );
   const repository = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/InMemoryRouteSearchRepository.java");
   const jdbcRepository = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteSearchRepository.java");
   const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const dashboardController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackAdminPageController.java",
+  );
+  const dashboardTemplate = read("backend/src/main/resources/templates/admin/routes/feedback.html");
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
 
   assert.match(result, /record RouteSearchResult/);
   assert.match(result, /mobilityType/);
   assert.match(result, /blockedReasons/);
+  assert.match(feedbackSummary, /record RouteFeedbackDashboardSummary/);
+  assert.match(feedbackSummary, /helpfulCount/);
+  assert.match(feedbackSummary, /notHelpfulCount/);
+  assert.match(feedbackSummary, /blockedByRealWorldCount/);
   assert.match(status, /FOUND/);
   assert.match(status, /BLOCKED/);
   assert.match(warning, /record RouteWarning/);
@@ -1545,22 +1563,30 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(useCase, /interface RouteSearchUseCase/);
   assert.match(useCase, /searchRoute/);
   assert.match(useCase, /getRouteSearch/);
+  assert.match(dashboardUseCase, /interface RouteFeedbackDashboardUseCase/);
+  assert.match(dashboardUseCase, /summarizeRouteFeedbacks/);
   assert.match(command, /record SearchRouteCommand/);
   assert.match(loadPort, /interface LoadRouteSearchPort/);
   assert.match(savePort, /interface SaveRouteSearchPort/);
+  assert.match(summarizeFeedbackPort, /interface SummarizeRouteFeedbackPort/);
+  assert.match(summarizeFeedbackPort, /summarizeRouteFeedbacks/);
   assert.match(service, /implements RouteSearchUseCase/);
   assert.match(service, /LoadTransitMasterPort/);
   assert.match(service, /RouteProfileWeight\.from/);
   assert.match(service, /RouteSearchStatus\.BLOCKED/);
   assert.match(service, /hasStairOnlyAccess/);
   assert.match(service, /routeScore/);
-  assert.match(repository, /implements LoadRouteSearchPort, SaveRouteSearchPort/);
+  assert.match(dashboardService, /implements RouteFeedbackDashboardUseCase/);
+  assert.match(dashboardService, /SummarizeRouteFeedbackPort/);
+  assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort/);
   assert.match(repository, /@Profile\("!prod"\)/);
   assert.match(jdbcRepository, /@Profile\("prod"\)/);
-  assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
   assert.match(jdbcRepository, /INSERT INTO route_feedbacks/);
+  assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);
+  assert.match(jdbcRepository, /SUM\(CASE WHEN rating = 'HELPFUL' THEN 1 ELSE 0 END\)/);
   assert.match(jdbcRepository, /ON CONFLICT \(route_search_id\) DO UPDATE/);
   assert.match(jdbcRepository, /ON CONFLICT \(feedback_id\) DO UPDATE/);
   assert.match(jdbcRepository, /steps_json/);
@@ -1572,6 +1598,12 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(batchPostgresSchema, /CHECK \(rating IN \('HELPFUL', 'NOT_HELPFUL', 'BLOCKED_BY_REAL_WORLD'\)\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/routes\/search"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/routes\/\{routeSearchId\}"\)/);
+  assert.match(dashboardController, /@GetMapping\("\/admin\/routes\/feedback\/page"\)/);
+  assert.match(dashboardController, /RouteFeedbackDashboardUseCase/);
+  assert.match(dashboardTemplate, /경로 피드백 현황/);
+  assert.match(dashboardTemplate, /전체 피드백/);
+  assert.match(dashboardTemplate, /평점별 피드백/);
+  assert.doesNotMatch(dashboardTemplate, /userId/);
 });
 
 test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다", () => {
