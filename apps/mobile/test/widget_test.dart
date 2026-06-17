@@ -1461,6 +1461,51 @@ void main() {
     expect(find.text('저장한 경로가 없습니다.'), findsOneWidget);
   });
 
+  testWidgets('즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final favoriteRouteRepository = FakeFavoriteRouteRepository()
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: favoriteRouteRepository,
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await _openFavoriteList(tester);
+
+      expect(find.text('즐겨찾기 경로를 불러오지 못했습니다.'), findsOneWidget);
+      expect(find.text('네트워크 상태를 확인한 뒤 다시 불러와 주세요.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('다음 행동, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('favoriteRouteLoadFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.',
+          isLiveRegion: true,
+        ),
+      );
+      expect(
+        find.byKey(const Key('favoriteRoutesRetryButton')),
+        findsOneWidget,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색은 접근성 표시가 포함된 백엔드 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
@@ -3111,6 +3156,93 @@ void main() {
 
     expect(favoriteRouteRepository.savedRouteSearchIds, ['route-1']);
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
+  });
+
+  testWidgets('즐겨찾기 경로 저장 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final favoriteRouteRepository = FakeFavoriteRouteRepository()
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했습니다.');
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          favoriteRouteRepository: favoriteRouteRepository,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('routeSearchButton')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('routeOriginStationInput')),
+        '상록수',
+      );
+      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('routeDestinationStationInput')),
+        '사당',
+      );
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationSearchButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(ListView), const Offset(0, -360));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('routeFavoriteSaveButton')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeFavoriteSaveButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('즐겨찾기 경로를 처리하지 못했습니다.'), findsOneWidget);
+      expect(
+        find.text('네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('다음 행동, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(
+          find.byKey(const Key('favoriteRouteSaveFailureNextAction')),
+        ),
+        isSemantics(
+          label: '다음 행동, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.',
+          isLiveRegion: true,
+        ),
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+
+    expect(favoriteRouteRepository.savedRouteSearchIds, ['route-1']);
   });
 
   testWidgets('경로 검색 결과는 큰 버튼으로 추천 피드백을 보낸다', (tester) async {
