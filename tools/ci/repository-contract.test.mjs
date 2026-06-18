@@ -931,6 +931,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorDataCollectionFailuresController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresController.java",
   );
+  const operatorDataCollectionFailuresPageController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresPageController.java",
+  );
   const operatorDataCollectionFailuresAssembler = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresAssembler.java",
   );
@@ -940,6 +943,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
   const operatorRepeatedBrokenFacilitiesTemplate = read(
     "backend/src/main/resources/templates/operator/repeated-broken-facilities.html",
+  );
+  const operatorDataCollectionFailuresTemplate = read(
+    "backend/src/main/resources/templates/operator/data-collection-failures.html",
   );
 
   assert.match(report, /record FacilityReport/);
@@ -1069,6 +1075,13 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   );
   assert.match(operatorDataCollectionFailuresController, /ApiResponse<OperatorDataCollectionFailuresView>/);
   assert.match(operatorDataCollectionFailuresController, /dataCollectionFailuresAssembler\.assemble\(\)/);
+  assert.match(
+    operatorDataCollectionFailuresPageController,
+    /@GetMapping\("\/operator\/data-collection-failures\/page"\)/,
+  );
+  assert.match(operatorDataCollectionFailuresPageController, /OperatorDataCollectionFailuresAssembler/);
+  assert.match(operatorDataCollectionFailuresPageController, /dataCollectionFailuresAssembler\.assemble\(\)/);
+  assert.match(operatorDataCollectionFailuresPageController, /return "operator\/data-collection-failures"/);
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionUseCase/);
   assert.match(operatorDataCollectionFailuresAssembler, /listRecentRuns/);
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionStatus\.FAILED/);
@@ -1090,6 +1103,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(
     operatorRepeatedBrokenFacilitiesTemplate,
     /<form|_csrf|stationId|facilityId|userId|description|\/admin\/reports/,
+  );
+  assert.match(operatorDataCollectionFailuresTemplate, /운영기관 데이터 수집 실패 현황/);
+  assert.match(operatorDataCollectionFailuresTemplate, /읽기 전용 리포트/);
+  assert.match(operatorDataCollectionFailuresTemplate, /전체 수집 실행/);
+  assert.match(operatorDataCollectionFailuresTemplate, /최근 수집 실행/);
+  assert.doesNotMatch(
+    operatorDataCollectionFailuresTemplate,
+    /<form|_csrf|runId|requestedBy|\/admin\/collections/,
   );
 });
 
