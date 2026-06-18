@@ -1400,6 +1400,12 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   const dashboardController = read(
     "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
   );
+  const dashboardApiController = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminApiController.java",
+  );
+  const dashboardView = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationDashboardView.java",
+  );
   const operatorPushNotificationReportController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportController.java",
   );
@@ -1461,11 +1467,16 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.doesNotMatch(controller, /deviceToken/);
   assert.match(dashboardController, /@GetMapping\("\/admin\/notifications\/push\/page"\)/);
   assert.match(dashboardController, /PushNotificationDashboardUseCase/);
-  assert.match(dashboardController, /deliveryAttemptCount/);
-  assert.match(dashboardController, /successRateLabel/);
-  assert.match(dashboardController, /failureRateLabel/);
-  assert.match(dashboardController, /failureAlertLabel/);
-  assert.match(dashboardController, /failureAlertClass/);
+  assert.match(dashboardApiController, /@GetMapping\("\/admin\/notifications\/push\/summary"\)/);
+  assert.match(dashboardApiController, /ApiResponse<PushNotificationDashboardView>/);
+  assert.match(dashboardView, /record PushNotificationDashboardView/);
+  assert.match(dashboardView, /deliveryAttemptCount/);
+  assert.match(dashboardView, /successRateLabel/);
+  assert.match(dashboardView, /failureRateLabel/);
+  assert.match(dashboardView, /failureAlertLabel/);
+  assert.match(dashboardView, /failureAlertClass/);
+  assert.match(dashboardView, /StatusCountRow/);
+  assert.doesNotMatch(dashboardView, /notificationId|userId|deviceToken/);
   assert.match(operatorPushNotificationReportController, /@GetMapping\("\/operator\/api\/push-notification-report"\)/);
   assert.match(operatorPushNotificationReportController, /ApiResponse<OperatorPushNotificationReportView>/);
   assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
