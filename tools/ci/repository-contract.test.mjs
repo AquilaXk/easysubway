@@ -849,6 +849,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorReportView = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportView.java",
   );
+  const operatorRepeatedBrokenFacilitiesController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesController.java",
+  );
+  const operatorRepeatedBrokenFacilitiesAssembler = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesAssembler.java",
+  );
+  const operatorRepeatedBrokenFacilitiesView = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesView.java",
+  );
   const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
 
   assert.match(report, /record FacilityReport/);
@@ -944,6 +953,20 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorReportAssembler, /TransitMasterQueryUseCase/);
   assert.match(operatorReportView, /record AccessibilityImprovementPriorityRow\([\s\S]*String stationName,[\s\S]*String facilityName,[\s\S]*int priorityScore,[\s\S]*List<String> reasons/);
   assert.doesNotMatch(operatorReportView, /facilityId/);
+  assert.match(
+    operatorRepeatedBrokenFacilitiesController,
+    /@GetMapping\("\/operator\/api\/repeated-broken-facilities"\)/,
+  );
+  assert.match(operatorRepeatedBrokenFacilitiesController, /ApiResponse<OperatorRepeatedBrokenFacilitiesView>/);
+  assert.match(operatorRepeatedBrokenFacilitiesController, /repeatedBrokenFacilitiesAssembler\.assemble\(\)/);
+  assert.match(operatorRepeatedBrokenFacilitiesAssembler, /FacilityReportUseCase/);
+  assert.match(operatorRepeatedBrokenFacilitiesAssembler, /TransitMasterQueryUseCase/);
+  assert.match(operatorRepeatedBrokenFacilitiesAssembler, /listRepeatedBrokenReportFacilities/);
+  assert.match(operatorRepeatedBrokenFacilitiesAssembler, /StationNotFoundException/);
+  assert.match(operatorRepeatedBrokenFacilitiesView, /record OperatorRepeatedBrokenFacilitiesView/);
+  assert.match(operatorRepeatedBrokenFacilitiesView, /int totalRepeatedFacilityCount/);
+  assert.match(operatorRepeatedBrokenFacilitiesView, /record RepeatedBrokenFacilityRow/);
+  assert.doesNotMatch(operatorRepeatedBrokenFacilitiesView, /stationId|facilityId|userId|description/);
   assert.match(operatorReportTemplate, /운영기관 접근성 시설 현황/);
   assert.match(operatorReportTemplate, /읽기 전용 리포트/);
   assert.match(operatorReportTemplate, /역별 접근성 점수/);
