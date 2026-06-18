@@ -838,7 +838,16 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const operatorReportController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
+  );
+  const operatorReportPageController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportPageController.java",
+  );
+  const operatorReportAssembler = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportAssembler.java",
+  );
+  const operatorReportView = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportView.java",
   );
   const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
 
@@ -925,10 +934,16 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
   assert.match(security, /passwordEncoder\.encode\(operatorPassword\)/);
-  assert.match(operatorReportController, /@GetMapping\("\/operator\/accessibility-report\/page"\)/);
-  assert.match(operatorReportController, /DataQualityUseCase/);
-  assert.match(operatorReportController, /TransitMasterQueryUseCase/);
-  assert.match(operatorReportController, /return "operator\/accessibility-report"/);
+  assert.match(operatorReportController, /@GetMapping\("\/operator\/api\/accessibility-report"\)/);
+  assert.match(operatorReportController, /ApiResponse<OperatorAccessibilityReportView>/);
+  assert.match(operatorReportController, /reportAssembler\.assemble\(\)/);
+  assert.match(operatorReportPageController, /@GetMapping\("\/operator\/accessibility-report\/page"\)/);
+  assert.match(operatorReportPageController, /reportAssembler\.assemble\(\)/);
+  assert.match(operatorReportPageController, /return "operator\/accessibility-report"/);
+  assert.match(operatorReportAssembler, /DataQualityUseCase/);
+  assert.match(operatorReportAssembler, /TransitMasterQueryUseCase/);
+  assert.match(operatorReportView, /record AccessibilityImprovementPriorityRow\([\s\S]*String stationName,[\s\S]*String facilityName,[\s\S]*int priorityScore,[\s\S]*List<String> reasons/);
+  assert.doesNotMatch(operatorReportView, /facilityId/);
   assert.match(operatorReportTemplate, /운영기관 접근성 시설 현황/);
   assert.match(operatorReportTemplate, /읽기 전용 리포트/);
   assert.match(operatorReportTemplate, /역별 접근성 점수/);
