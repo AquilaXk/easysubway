@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -72,7 +73,9 @@ class EasySubwayApp extends StatelessWidget {
          onboardingStore: onboardingStore,
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
-         supportAccessInfo: supportAccessInfo,
+         supportAccessInfo: supportAccessInfo.validatedForBuild(
+           isReleaseMode: kReleaseMode,
+         ),
          supportAccessLauncher: supportAccessLauncher,
          key: key,
        );
@@ -219,6 +222,45 @@ class SupportAccessInfo {
   final String supportEmail;
   final String dataDeletionEmail;
   final String securityEmail;
+
+  SupportAccessInfo validatedForBuild({required bool isReleaseMode}) {
+    if (!isReleaseMode) {
+      return this;
+    }
+    _validateHttpsUrl(label: 'privacy policy URL', value: privacyPolicyUrl);
+    _validateEmail(label: 'support email', value: supportEmail);
+    _validateEmail(label: 'data deletion email', value: dataDeletionEmail);
+    _validateEmail(label: 'security email', value: securityEmail);
+    return this;
+  }
+
+  static void _validateHttpsUrl({
+    required String label,
+    required String value,
+  }) {
+    final normalizedValue = value.trim();
+    if (normalizedValue.isEmpty) {
+      throw StateError('Release $label must be configured.');
+    }
+    final uri = Uri.tryParse(normalizedValue);
+    if (uri == null || uri.scheme != 'https') {
+      throw StateError('Release $label must use HTTPS.');
+    }
+    if (uri.host.isEmpty) {
+      throw StateError('Release $label must include a host.');
+    }
+  }
+
+  static void _validateEmail({required String label, required String value}) {
+    final normalizedValue = value.trim();
+    if (normalizedValue.isEmpty) {
+      throw StateError('Release $label must be configured.');
+    }
+    final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    if (!emailPattern.hasMatch(normalizedValue)) {
+      throw StateError('Release $label must be a valid email address.');
+    }
+  }
 }
 
 class _EasySubwayHome extends StatefulWidget {
