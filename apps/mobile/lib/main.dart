@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -477,7 +478,10 @@ class _OnboardingPreferenceScope extends StatelessWidget {
         textScaler: textScaler,
       ),
       child: Theme(
-        data: _themeForPreferences(Theme.of(context), preferences),
+        data: _themeForPlatformAccessibility(
+          _themeForPreferences(Theme.of(context), preferences),
+          mediaQuery,
+        ),
         child: child,
       ),
     );
@@ -513,6 +517,74 @@ ThemeData _themeForPreferences(
         color: textColor,
       ),
     ),
+  );
+}
+
+ThemeData _themeForPlatformAccessibility(
+  ThemeData baseTheme,
+  MediaQueryData mediaQuery,
+) {
+  if (!mediaQuery.boldText) {
+    return baseTheme;
+  }
+
+  return baseTheme.copyWith(
+    textTheme: _boldTextTheme(baseTheme.textTheme),
+    primaryTextTheme: _boldTextTheme(baseTheme.primaryTextTheme),
+    appBarTheme: baseTheme.appBarTheme.copyWith(
+      titleTextStyle: _boldTextStyle(baseTheme.appBarTheme.titleTextStyle),
+      toolbarTextStyle: _boldTextStyle(baseTheme.appBarTheme.toolbarTextStyle),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: _boldButtonTextStyle(baseTheme.filledButtonTheme.style),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: _boldButtonTextStyle(baseTheme.outlinedButtonTheme.style),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: _boldButtonTextStyle(baseTheme.textButtonTheme.style),
+    ),
+  );
+}
+
+TextTheme _boldTextTheme(TextTheme textTheme) {
+  return textTheme.copyWith(
+    displayLarge: _boldTextStyle(textTheme.displayLarge),
+    displayMedium: _boldTextStyle(textTheme.displayMedium),
+    displaySmall: _boldTextStyle(textTheme.displaySmall),
+    headlineLarge: _boldTextStyle(textTheme.headlineLarge),
+    headlineMedium: _boldTextStyle(textTheme.headlineMedium),
+    headlineSmall: _boldTextStyle(textTheme.headlineSmall),
+    titleLarge: _boldTextStyle(textTheme.titleLarge),
+    titleMedium: _boldTextStyle(textTheme.titleMedium),
+    titleSmall: _boldTextStyle(textTheme.titleSmall),
+    bodyLarge: _boldTextStyle(textTheme.bodyLarge),
+    bodyMedium: _boldTextStyle(textTheme.bodyMedium),
+    bodySmall: _boldTextStyle(textTheme.bodySmall),
+    labelLarge: _boldTextStyle(textTheme.labelLarge),
+    labelMedium: _boldTextStyle(textTheme.labelMedium),
+    labelSmall: _boldTextStyle(textTheme.labelSmall),
+  );
+}
+
+ButtonStyle _boldButtonTextStyle(ButtonStyle? baseStyle) {
+  return (baseStyle ?? const ButtonStyle()).copyWith(
+    textStyle: WidgetStateProperty.resolveWith((states) {
+      return _boldTextStyle(baseStyle?.textStyle?.resolve(states));
+    }),
+  );
+}
+
+TextStyle _boldTextStyle(TextStyle? style) {
+  final currentWeight = style?.fontWeight ?? FontWeight.w400;
+  final currentIndex = FontWeight.values.indexOf(currentWeight);
+  final minimumBoldIndex = FontWeight.values.indexOf(FontWeight.w700);
+  final nextIndex = math.min(
+    FontWeight.values.length - 1,
+    math.max(currentIndex + 2, minimumBoldIndex),
+  );
+  return (style ?? const TextStyle()).copyWith(
+    fontWeight: FontWeight.values[nextIndex],
   );
 }
 
