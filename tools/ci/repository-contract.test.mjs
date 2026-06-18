@@ -2024,6 +2024,31 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
 });
 
+test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
+  const userActivityFilter = read("backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java");
+  const summary = read("backend/src/main/java/com/easysubway/usage/domain/UserActivityDashboardSummary.java");
+  const repository = read("backend/src/main/java/com/easysubway/usage/adapter/out/persistence/InMemoryUserActivityRepository.java");
+  const controller = read("backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityAdminPageController.java");
+  const template = read("backend/src/main/resources/templates/admin/usage/activity.html");
+  const filterTest = read("backend/src/test/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilterTest.java");
+  const repositoryTest = read("backend/src/test/java/com/easysubway/usage/adapter/out/persistence/InMemoryUserActivityRepositoryTest.java");
+
+  assert.match(userActivityFilter, /RecordApiTrafficPort/);
+  assert.match(userActivityFilter, /recordApiTraffic\(\s*response\.getStatus\(\),\s*LocalDateTime\.now\(clock\)\s*\)/);
+  assert.match(userActivityFilter, /response\.getStatus\(\) < 400/);
+  assert.match(summary, /totalApiRequests/);
+  assert.match(summary, /totalApiErrors/);
+  assert.match(summary, /apiErrorRatePercent\(\)/);
+  assert.match(repository, /recordApiTraffic\(int statusCode, LocalDateTime occurredAt\)/);
+  assert.match(repository, /statusCode >= 400/);
+  assert.match(controller, /apiErrorRatePercent/);
+  assert.match(template, /API 오류율/);
+  assert.match(template, /API 요청/);
+  assert.match(template, /오류 응답/);
+  assert.match(filterTest, /실패 응답은 API 오류율에 기록하고 활성 사용자 지표에서는 제외한다/);
+  assert.match(repositoryTest, /최근 기간의 API 요청 수와 오류율을 일별로 집계한다/);
+});
+
 test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한다", () => {
   const privacyManifestPath = "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy";
   assert.ok(existsSync(path.join(root, privacyManifestPath)));
