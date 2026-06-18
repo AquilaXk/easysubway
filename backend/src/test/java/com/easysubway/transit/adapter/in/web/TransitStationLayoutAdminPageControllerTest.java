@@ -130,4 +130,24 @@ class TransitStationLayoutAdminPageControllerTest {
 			.andExpect(jsonPath("$.data").doesNotExist())
 			.andExpect(jsonPath("$.message").value("역 정보를 찾을 수 없습니다."));
 	}
+
+	@Test
+	@DisplayName("역 구조도 상태 변경은 URL 역과 구조도 소속이 일치해야 한다")
+	void stationLayoutStatusUpdateRequiresLayoutInStation() throws Exception {
+		mockMvc.perform(post("/admin/stations/station-sadang/layouts/layout-sangnoksu-draft/page/status")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("status", "READY_FOR_REVIEW"))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.data").doesNotExist())
+			.andExpect(jsonPath("$.message").value("역 구조도 정보를 찾을 수 없습니다."));
+
+		mockMvc.perform(get("/admin/stations/station-sangnoksu/layouts")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].id").value("layout-sangnoksu-draft"))
+			.andExpect(jsonPath("$.data[0].status").value("DRAFT"));
+	}
 }

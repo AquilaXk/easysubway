@@ -6,6 +6,7 @@ import com.easysubway.transit.application.port.in.UpdateSimplifiedStationLayoutS
 import com.easysubway.transit.domain.RouteEdge;
 import com.easysubway.transit.domain.RouteNode;
 import com.easysubway.transit.domain.SimplifiedStationLayout;
+import com.easysubway.transit.domain.SimplifiedStationLayoutNotFoundException;
 import com.easysubway.transit.domain.SimplifiedStationLayoutStatus;
 import com.easysubway.transit.domain.StationLayoutSource;
 import com.easysubway.transit.domain.StationLineSummary;
@@ -54,12 +55,23 @@ class TransitStationLayoutAdminPageController {
 		@RequestParam SimplifiedStationLayoutStatus status,
 		Principal principal
 	) {
+		requireLayoutInStation(stationId, layoutId);
 		transitMasterAdminUseCase.updateSimplifiedStationLayoutStatus(new UpdateSimplifiedStationLayoutStatusCommand(
 			layoutId,
 			status,
 			principal.getName()
 		));
 		return "redirect:/admin/stations/%s/layouts/page".formatted(stationId);
+	}
+
+	private void requireLayoutInStation(String stationId, String layoutId) {
+		transitMasterQueryUseCase.getStation(stationId);
+		boolean matched = transitMasterQueryUseCase.listSimplifiedStationLayouts(stationId)
+			.stream()
+			.anyMatch(layout -> layout.id().equals(layoutId));
+		if (!matched) {
+			throw new SimplifiedStationLayoutNotFoundException();
+		}
 	}
 
 	private List<StationLayoutSourceRow> layoutSourceRows(String stationId) {
