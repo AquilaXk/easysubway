@@ -919,6 +919,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorRepeatedBrokenFacilitiesController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesController.java",
   );
+  const operatorRepeatedBrokenFacilitiesPageController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesPageController.java",
+  );
   const operatorRepeatedBrokenFacilitiesAssembler = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesAssembler.java",
   );
@@ -935,6 +938,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresView.java",
   );
   const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
+  const operatorRepeatedBrokenFacilitiesTemplate = read(
+    "backend/src/main/resources/templates/operator/repeated-broken-facilities.html",
+  );
 
   assert.match(report, /record FacilityReport/);
   assert.match(report, /reviewedAt/);
@@ -1042,6 +1048,13 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   );
   assert.match(operatorRepeatedBrokenFacilitiesController, /ApiResponse<OperatorRepeatedBrokenFacilitiesView>/);
   assert.match(operatorRepeatedBrokenFacilitiesController, /repeatedBrokenFacilitiesAssembler\.assemble\(\)/);
+  assert.match(
+    operatorRepeatedBrokenFacilitiesPageController,
+    /@GetMapping\("\/operator\/repeated-broken-facilities\/page"\)/,
+  );
+  assert.match(operatorRepeatedBrokenFacilitiesPageController, /OperatorRepeatedBrokenFacilitiesAssembler/);
+  assert.match(operatorRepeatedBrokenFacilitiesPageController, /repeatedBrokenFacilitiesAssembler\.assemble\(\)/);
+  assert.match(operatorRepeatedBrokenFacilitiesPageController, /return "operator\/repeated-broken-facilities"/);
   assert.match(operatorRepeatedBrokenFacilitiesAssembler, /FacilityReportUseCase/);
   assert.match(operatorRepeatedBrokenFacilitiesAssembler, /TransitMasterQueryUseCase/);
   assert.match(operatorRepeatedBrokenFacilitiesAssembler, /listRepeatedBrokenReportFacilities/);
@@ -1070,6 +1083,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorReportTemplate, /역별 접근성 점수/);
   assert.match(operatorReportTemplate, /접근성 개선 우선순위/);
   assert.doesNotMatch(operatorReportTemplate, /<form/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /운영기관 반복 고장 시설 통계/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /읽기 전용 리포트/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /반복 고장 시설/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /시설별 반복 신고/);
+  assert.doesNotMatch(
+    operatorRepeatedBrokenFacilitiesTemplate,
+    /<form|_csrf|stationId|facilityId|userId|description|\/admin\/reports/,
+  );
 });
 
 test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () => {
