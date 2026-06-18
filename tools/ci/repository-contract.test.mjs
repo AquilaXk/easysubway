@@ -1419,6 +1419,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
   assert.match(operatorPushNotificationReportAssembler, /PushNotificationDashboardUseCase/);
   assert.match(operatorPushNotificationReportAssembler, /summarizePushNotifications/);
+  assert.match(operatorPushNotificationReportAssembler, /OPERATOR_SAFE_FAILURE_REASON/);
+  assert.doesNotMatch(operatorPushNotificationReportAssembler, /summary\.latestFailureReason\(\),/);
+  assert.doesNotMatch(operatorPushNotificationReportAssembler, /" \+ summary\.latestFailureReason\(\)/);
   assert.match(operatorPushNotificationReportView, /record OperatorPushNotificationReportView/);
   assert.match(operatorPushNotificationReportView, /long totalCount/);
   assert.match(operatorPushNotificationReportView, /long pendingCount/);
