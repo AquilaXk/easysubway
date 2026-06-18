@@ -80,6 +80,19 @@ void main() {
     expect(storage.deletedKeys, hasLength(1));
   });
 
+  test('익명 인증 저장소는 secure storage 삭제 실패에도 null로 복구한다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+      deleteError: StateError('secure storage delete failed'),
+    );
+    final store = SecureAnonymousAuthCredentialStore(storage: storage);
+
+    final credentials = await store.readCredentials();
+
+    expect(credentials, isNull);
+    expect(storage.deletedKeys, isEmpty);
+  });
+
   test('익명 인증 세션은 저장된 인증 정보를 먼저 사용한다', () async {
     final repository = FakeAnonymousAuthRepository();
     final credentialStore = MemoryAnonymousAuthCredentialStore(

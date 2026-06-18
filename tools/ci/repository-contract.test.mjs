@@ -2347,12 +2347,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(anonymousAuthTest, /동시 인증 무효화 후 하나의 새 인증 정보를 공유한다/);
   assert.match(anonymousAuthTest, /원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다/);
   assert.match(anonymousAuthTest, /secure storage 복원 실패 시 저장값을 지운다/);
+  assert.match(anonymousAuthTest, /secure storage 삭제 실패에도 null로 복구한다/);
   assert.match(onboarding, /SecureKeyValueStorage/);
   assert.match(onboarding, /_clearResultAfterReadFailure/);
   assert.match(onboardingTest, /온보딩 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
+  assert.match(onboardingTest, /온보딩 저장소는 secure storage 삭제 실패에도 null로 복구한다/);
   assert.match(facilityReport, /SecureKeyValueStorage/);
   assert.match(facilityReport, /_clearTargetAfterReadFailure/);
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
+  assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
   assert.match(stationSearch, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
   assert.match(stationSearch, /final double\? latitude/);

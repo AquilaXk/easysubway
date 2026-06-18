@@ -1,9 +1,10 @@
 import 'package:easysubway_mobile/secure_key_value_storage.dart';
 
 class FakeSecureKeyValueStorage implements SecureKeyValueStorage {
-  FakeSecureKeyValueStorage({this.readError});
+  FakeSecureKeyValueStorage({this.readError, this.deleteError});
 
   final Object? readError;
+  final Object? deleteError;
   final values = <String, String>{};
   final deletedKeys = <String>[];
 
@@ -23,6 +24,10 @@ class FakeSecureKeyValueStorage implements SecureKeyValueStorage {
 
   @override
   Future<void> delete({required String key}) async {
+    final error = deleteError;
+    if (error != null) {
+      throw error;
+    }
     deletedKeys.add(key);
     values.remove(key);
   }

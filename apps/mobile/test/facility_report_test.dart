@@ -50,6 +50,19 @@ void main() {
     expect(storage.deletedKeys, hasLength(1));
   });
 
+  test('시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+      deleteError: StateError('secure storage delete failed'),
+    );
+    final store = SecureFacilityReportDraftTargetStore(storage: storage);
+
+    final target = await store.readTarget();
+
+    expect(target, isNull);
+    expect(storage.deletedKeys, isEmpty);
+  });
+
   test('시설 신고 사진 선택기는 복구할 사진이 없으면 첨부하지 않는다', () async {
     final picker = ImagePickerFacilityReportPhotoPicker(
       imagePicker: FakeLostDataImagePicker(LostDataResponse.empty()),
