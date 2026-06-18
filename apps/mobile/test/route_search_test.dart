@@ -3,11 +3,93 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
+import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('내부 경로 API 저장소는 노드 간 이동 경로를 요청하고 결과를 파싱한다', () async {
+    late Uri requestedUri;
+    late String requestedBody;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      expect(request.method, 'POST');
+      requestedUri = request.uri;
+      requestedBody = await utf8.decoder.bind(request).join();
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'stationId': 'station-sangnoksu',
+              'stationName': '상록수',
+              'fromNodeId': 'node-sangnoksu-elevator-1',
+              'fromNodeName': '1번 출구 엘리베이터',
+              'toNodeId': 'node-sangnoksu-faregate',
+              'toNodeName': '개찰구',
+              'mobilityType': 'WHEELCHAIR',
+              'status': 'FOUND',
+              'totalDistanceMeters': 28,
+              'totalEstimatedSeconds': 75,
+              'steps': [
+                {
+                  'sequence': 1,
+                  'edgeId': 'edge-sangnoksu-elevator-to-faregate',
+                  'fromNodeId': 'node-sangnoksu-elevator-1',
+                  'fromNodeName': '1번 출구 엘리베이터',
+                  'toNodeId': 'node-sangnoksu-faregate',
+                  'toNodeName': '개찰구',
+                  'edgeType': 'WALK',
+                  'distanceMeters': 28,
+                  'estimatedSeconds': 75,
+                  'includesStairs': false,
+                  'requiresElevator': true,
+                  'requiresEscalator': false,
+                  'slopeLevel': 1,
+                  'widthLevel': 2,
+                  'reliabilityScore': 92,
+                  'guidance': '엘리베이터에서 개찰구까지 이동합니다.',
+                },
+              ],
+              'warnings': [],
+              'blockedReasons': [],
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = InternalRouteApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final result = await repository.searchInternalRoute(
+      const InternalRouteRequest(
+        stationId: 'station-sangnoksu',
+        fromNodeId: 'node-sangnoksu-elevator-1',
+        toNodeId: 'node-sangnoksu-faregate',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(requestedUri.path, '/api/v1/routes/internal');
+    expect(jsonDecode(requestedBody), {
+      'stationId': 'station-sangnoksu',
+      'fromNodeId': 'node-sangnoksu-elevator-1',
+      'toNodeId': 'node-sangnoksu-faregate',
+      'mobilityType': 'WHEELCHAIR',
+    });
+    expect(result.statusLabel, '내부 이동 경로를 찾았습니다');
+    expect(result.summaryLabel, '1번 출구 엘리베이터에서 개찰구까지');
+    expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
+    expect(result.steps.single.burdenLabel, '약 1분 15초 · 28m · 엘리베이터 필요');
+  });
+
   test('경로 API 저장소는 백엔드 경로 검색을 요청하고 결과를 파싱한다', () async {
     late Uri requestedUri;
     late String requestedBody;

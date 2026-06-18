@@ -5,6 +5,7 @@ import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
+import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
@@ -2664,6 +2665,47 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 상세는 주입된 내부 이동 경로를 쉬운 단계 안내로 보여준다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+    final internalRouteRepository = FakeInternalRouteRepository(
+      result: _internalRouteResult(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          stationId: 'station-sangnoksu',
+          internalRouteRepository: internalRouteRepository,
+          internalRouteRequest: const InternalRouteRequest(
+            stationId: 'station-sangnoksu',
+            fromNodeId: 'node-sangnoksu-elevator-1',
+            toNodeId: 'node-sangnoksu-faregate',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(internalRouteRepository.requests, hasLength(1));
+    expect(find.text('내부 이동 안내'), findsOneWidget);
+    expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
+    expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
+    expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
+    expect(find.text('엘리베이터에서 개찰구까지 이동합니다.'), findsOneWidget);
+    expect(find.text('약 1분 15초 · 28m · 엘리베이터 필요'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '내부 이동 안내, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('역 상세는 현재 역을 즐겨찾기에 저장하고 해제한다', (tester) async {
@@ -5439,6 +5481,48 @@ FavoriteRoute _favoriteRoute() {
   );
 }
 
+InternalRouteResult _internalRouteResult({
+  String status = 'FOUND',
+  List<String> blockedReasons = const [],
+}) {
+  return InternalRouteResult(
+    stationId: 'station-sangnoksu',
+    stationName: '상록수',
+    fromNodeId: 'node-sangnoksu-elevator-1',
+    fromNodeName: '1번 출구 엘리베이터',
+    toNodeId: 'node-sangnoksu-faregate',
+    toNodeName: '개찰구',
+    mobilityType: 'WHEELCHAIR',
+    status: status,
+    totalDistanceMeters: status == 'FOUND' ? 28 : 0,
+    totalEstimatedSeconds: status == 'FOUND' ? 75 : 0,
+    steps: status == 'FOUND'
+        ? const [
+            InternalRouteStep(
+              sequence: 1,
+              edgeId: 'edge-sangnoksu-elevator-to-faregate',
+              fromNodeId: 'node-sangnoksu-elevator-1',
+              fromNodeName: '1번 출구 엘리베이터',
+              toNodeId: 'node-sangnoksu-faregate',
+              toNodeName: '개찰구',
+              edgeType: 'WALK',
+              distanceMeters: 28,
+              estimatedSeconds: 75,
+              includesStairs: false,
+              requiresElevator: true,
+              requiresEscalator: false,
+              slopeLevel: 1,
+              widthLevel: 2,
+              reliabilityScore: 92,
+              guidance: '엘리베이터에서 개찰구까지 이동합니다.',
+            ),
+          ]
+        : const [],
+    warnings: const [],
+    blockedReasons: blockedReasons,
+  );
+}
+
 class FakeStationSearchRepository
     implements StationSearchRepository, StationLineFilterRepository {
   FakeStationSearchRepository({
@@ -5527,6 +5611,26 @@ class FakeStationSearchRepository
   ) async {
     requestedFacilityStationIds.add(stationId);
     return stationFacilities;
+  }
+}
+
+class FakeInternalRouteRepository implements InternalRouteRepository {
+  FakeInternalRouteRepository({required this.result, this.error});
+
+  final InternalRouteResult result;
+  final InternalRouteException? error;
+  final requests = <InternalRouteRequest>[];
+
+  @override
+  Future<InternalRouteResult> searchInternalRoute(
+    InternalRouteRequest request,
+  ) async {
+    requests.add(request);
+    final routeError = error;
+    if (routeError != null) {
+      throw routeError;
+    }
+    return result;
   }
 }
 
