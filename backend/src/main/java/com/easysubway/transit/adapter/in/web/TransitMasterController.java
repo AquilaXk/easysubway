@@ -9,6 +9,7 @@ import com.easysubway.transit.application.port.in.TransitMasterAdminUseCase;
 import com.easysubway.transit.application.port.in.TransitMasterQueryUseCase;
 import com.easysubway.transit.application.port.in.UpdateAccessibilityFacilityCommand;
 import com.easysubway.transit.application.port.in.UpdateAccessibilityFacilityStatusCommand;
+import com.easysubway.transit.application.port.in.UpdateRouteNodeDisplayCommand;
 import com.easysubway.transit.application.port.in.UpdateSimplifiedStationLayoutStatusCommand;
 import com.easysubway.transit.domain.AccessibilityFacility;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
@@ -201,6 +202,19 @@ class TransitMasterController {
 	@GetMapping("/admin/stations/{stationId}/route-nodes")
 	ApiResponse<List<RouteNodeResponse>> routeNodes(@PathVariable String stationId) {
 		return ApiResponse.ok(routeNodeResponses(stationId));
+	}
+
+	@PatchMapping("/admin/stations/{stationId}/route-nodes/{nodeId}")
+	ApiResponse<RouteNodeResponse> updateRouteNodeDisplay(
+		@PathVariable String stationId,
+		@PathVariable String nodeId,
+		@RequestBody UpdateRouteNodeDisplayRequest request,
+		Principal principal
+	) {
+		RouteNode routeNode = transitMasterAdminUseCase.updateRouteNodeDisplay(
+			request.toCommand(stationId, nodeId, principal.getName())
+		);
+		return ApiResponse.ok(RouteNodeResponse.from(routeNode));
 	}
 
 	@GetMapping("/admin/stations/{stationId}/route-edges")
@@ -754,6 +768,26 @@ class TransitMasterController {
 
 		UpdateSimplifiedStationLayoutStatusCommand toCommand(String layoutId, String reviewedBy) {
 			return new UpdateSimplifiedStationLayoutStatusCommand(layoutId, status, reviewedBy);
+		}
+	}
+
+	record UpdateRouteNodeDisplayRequest(
+		int displayX,
+		int displayY,
+		String displayLabel,
+		String accessibilityNote
+	) {
+
+		UpdateRouteNodeDisplayCommand toCommand(String stationId, String nodeId, String updatedBy) {
+			return new UpdateRouteNodeDisplayCommand(
+				stationId,
+				nodeId,
+				displayX,
+				displayY,
+				displayLabel,
+				accessibilityNote,
+				updatedBy
+			);
 		}
 	}
 
