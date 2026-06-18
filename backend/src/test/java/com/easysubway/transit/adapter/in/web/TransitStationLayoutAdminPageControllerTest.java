@@ -65,6 +65,7 @@ class TransitStationLayoutAdminPageControllerTest {
 			.contains("name=\"displayY\"")
 			.contains("name=\"displayLabel\"")
 			.contains("name=\"accessibilityNote\"")
+			.doesNotContain("value=\"접근성 메모 없음\"")
 			.contains("내부 이동 간선")
 			.contains("node-sangnoksu-elevator-1")
 			.contains("node-sangnoksu-faregate")
@@ -126,6 +127,34 @@ class TransitStationLayoutAdminPageControllerTest {
 			.contains("1번 출구 승강기")
 			.contains("x 132, y 256")
 			.contains("휠체어와 유모차 이동 가능");
+	}
+
+	@Test
+	@DisplayName("관리자는 메모가 없는 내부 이동 노드의 좌표와 라벨만 변경한다")
+	@DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+	void adminUpdatesRouteNodeWithoutPersistingEmptyNotePlaceholderFromPage() throws Exception {
+		mockMvc.perform(post("/admin/stations/station-sangnoksu/route-nodes/node-sangnoksu-faregate/page")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("displayX", "288")
+				.param("displayY", "244")
+				.param("displayLabel", "대합실 개찰구"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/stations/station-sangnoksu/layouts/page"));
+
+		String html = mockMvc.perform(get("/admin/stations/station-sangnoksu/layouts/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("대합실 개찰구")
+			.contains("x 288, y 244")
+			.contains("접근성 메모 없음")
+			.doesNotContain("value=\"접근성 메모 없음\"");
 	}
 
 	@Test

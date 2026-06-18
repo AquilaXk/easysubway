@@ -593,6 +593,21 @@ class TransitMasterControllerTest {
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.data").doesNotExist())
 			.andExpect(jsonPath("$.message").value("노드 표시 라벨을 입력해야 합니다."));
+
+		mockMvc.perform(patch("/admin/stations/station-sangnoksu/route-nodes/node-sangnoksu-elevator-1")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "displayY": 256,
+					  "displayLabel": "1번 출구 승강기"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.data").doesNotExist())
+			.andExpect(jsonPath("$.message").value("노드 표시 좌표가 필요합니다."));
 	}
 
 	@Test

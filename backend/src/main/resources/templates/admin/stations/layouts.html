@@ -227,7 +227,7 @@
 						       th:value="${node.displayY}" min="0" required>
 						<label class="meta" th:for="|accessibility-note-${node.id}|">접근성 메모</label>
 						<input type="text" name="accessibilityNote" th:id="|accessibility-note-${node.id}|"
-						       th:value="${node.accessibilityNote}">
+						       th:value="${node.rawAccessibilityNote}">
 						<button type="submit">저장</button>
 						<span class="meta" th:text="${node.positionLabel}">x 120, y 240</span>
 						<span class="meta" th:text="${node.layoutId}">layout-sangnoksu-draft</span>

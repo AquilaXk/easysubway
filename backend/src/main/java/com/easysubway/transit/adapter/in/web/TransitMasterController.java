@@ -17,6 +17,7 @@ import com.easysubway.transit.domain.AccessibilityFacilityType;
 import com.easysubway.transit.domain.DataConfidenceLevel;
 import com.easysubway.transit.domain.DataQualityLevel;
 import com.easysubway.transit.domain.DataSourceType;
+import com.easysubway.transit.domain.InvalidRouteNodeException;
 import com.easysubway.transit.domain.NearbyStation;
 import com.easysubway.transit.domain.RouteEdge;
 import com.easysubway.transit.domain.RouteEdgeType;
@@ -772,13 +773,16 @@ class TransitMasterController {
 	}
 
 	record UpdateRouteNodeDisplayRequest(
-		int displayX,
-		int displayY,
+		Integer displayX,
+		Integer displayY,
 		String displayLabel,
 		String accessibilityNote
 	) {
 
 		UpdateRouteNodeDisplayCommand toCommand(String stationId, String nodeId, String updatedBy) {
+			if (displayX == null || displayY == null) {
+				throw new InvalidRouteNodeException("노드 표시 좌표가 필요합니다.");
+			}
 			return new UpdateRouteNodeDisplayCommand(
 				stationId,
 				nodeId,

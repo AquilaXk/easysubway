@@ -218,6 +218,7 @@ class TransitStationLayoutAdminPageController {
 		int displayY,
 		String displayLabel,
 		String positionLabel,
+		String rawAccessibilityNote,
 		String accessibilityNote
 	) {
 
@@ -232,6 +233,7 @@ class TransitStationLayoutAdminPageController {
 				node.displayY(),
 				node.displayLabel(),
 				"x %d, y %d".formatted(node.displayX(), node.displayY()),
+				node.accessibilityNote(),
 				node.accessibilityNote() == null ? "접근성 메모 없음" : node.accessibilityNote()
 			);
 		}
