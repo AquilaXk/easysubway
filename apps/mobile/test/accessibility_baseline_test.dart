@@ -12,6 +12,12 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   testWidgets('모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(
+          boldText: true,
+          disableAnimations: true,
+          reduceMotion: true,
+        );
 
     try {
       await tester.pumpWidget(
@@ -34,6 +40,8 @@ void main() {
 
       final homeContext = tester.element(find.byType(HomeScreen));
       expect(MediaQuery.of(homeContext).highContrast, isTrue);
+      expect(MediaQuery.boldTextOf(homeContext), isTrue);
+      expect(MediaQuery.disableAnimationsOf(homeContext), isTrue);
       expect(
         MediaQuery.textScalerOf(homeContext).scale(20),
         closeTo(23.6, 0.01),
@@ -41,6 +49,20 @@ void main() {
       expect(
         Theme.of(homeContext).colorScheme.primary,
         const Color(0xFF003D40),
+      );
+      expect(
+        Theme.of(homeContext).textTheme.bodyLarge?.fontWeight,
+        FontWeight.w700,
+      );
+      expect(
+        Theme.of(homeContext).appBarTheme.titleTextStyle?.fontWeight,
+        FontWeight.w900,
+      );
+      expect(
+        Theme.of(homeContext).filledButtonTheme.style?.textStyle
+            ?.resolve(<WidgetState>{})
+            ?.fontWeight,
+        FontWeight.w900,
       );
       expect(find.bySemanticsLabel('역 검색'), findsOneWidget);
       expect(find.bySemanticsLabel('길찾기'), findsOneWidget);
@@ -62,6 +84,7 @@ void main() {
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
     } finally {
+      tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
       semanticsHandle.dispose();
     }
   });
