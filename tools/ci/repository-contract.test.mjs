@@ -837,6 +837,10 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const operatorReportController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportPageController.java",
+  );
+  const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
 
   assert.match(report, /record FacilityReport/);
   assert.match(report, /reviewedAt/);
@@ -921,6 +925,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
   assert.match(security, /passwordEncoder\.encode\(operatorPassword\)/);
+  assert.match(operatorReportController, /@GetMapping\("\/operator\/accessibility-report\/page"\)/);
+  assert.match(operatorReportController, /DataQualityUseCase/);
+  assert.match(operatorReportController, /TransitMasterQueryUseCase/);
+  assert.match(operatorReportController, /return "operator\/accessibility-report"/);
+  assert.match(operatorReportTemplate, /운영기관 접근성 시설 현황/);
+  assert.match(operatorReportTemplate, /읽기 전용 리포트/);
+  assert.match(operatorReportTemplate, /역별 접근성 점수/);
+  assert.match(operatorReportTemplate, /접근성 개선 우선순위/);
+  assert.doesNotMatch(operatorReportTemplate, /<form/);
 });
 
 test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () => {
