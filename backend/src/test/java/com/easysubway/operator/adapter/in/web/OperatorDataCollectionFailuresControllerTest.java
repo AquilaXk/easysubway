@@ -135,6 +135,30 @@ class OperatorDataCollectionFailuresControllerTest {
 	}
 
 	@Test
+	@DisplayName("운영기관 데이터 수집 실패 현황 API는 최신 완료 수집이 정확히 24시간이면 점검 필요로 표시한다")
+	void dataCollectionFreshnessRequiresInspectionAtBoundary24Hours() throws Exception {
+		saveRun(new DataCollectionRun(
+			"collection-completed-boundary",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.COMPLETED,
+			"admin-user",
+			LocalDateTime.parse("2026-06-17T11:59:00"),
+			LocalDateTime.parse("2026-06-17T12:00:00"),
+			14,
+			null,
+			false,
+			"수집이 완료되었습니다. 최근 데이터 품질 화면에서 반영 결과를 확인하세요."
+		));
+
+		mockMvc.perform(get("/operator/api/data-collection-failures")
+				.with(httpBasic("operator-user", "operator-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.latestCompletedAtLabel").value("2026-06-17T12:00"))
+			.andExpect(jsonPath("$.data.freshnessAlertLabel").value("점검 필요"))
+			.andExpect(jsonPath("$.data.freshnessAlertClass").value("stale"));
+	}
+
+	@Test
 	@DisplayName("운영기관 데이터 수집 실패 현황 API는 운영기관 계정 인증을 요구한다")
 	void dataCollectionFailuresRequireOperatorAuthentication() throws Exception {
 		mockMvc.perform(get("/operator/api/data-collection-failures"))
