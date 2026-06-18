@@ -589,6 +589,7 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
   assert.match(compose, /grafana-data:\/var\/lib\/grafana/);
   assert.match(compose, /\.\/grafana\/provisioning:\/etc\/grafana\/provisioning:ro/);
+  assert.match(compose, /depends_on:\s*\n\s*prometheus:\s*\n\s*condition: service_healthy[\s\S]*loki:\s*\n\s*condition: service_healthy/);
 
   assert.match(prometheusConfig, /job_name: "easysubway-backend"/);
   assert.match(prometheusConfig, /metrics_path: "\/actuator\/prometheus"/);
