@@ -131,8 +131,8 @@
       "severity": "release-blocker",
       "titleKo": "출시 전 의존성 점검",
       "ownerKo": "모바일/백엔드 담당",
-      "readyWhenKo": "Flutter, Android Gradle, Java, Spring 의존성 lock과 빌드 파일을 출시 전 점검하고 Dependency Review가 moderate 이상 새 취약 의존성을 PR에서 차단한다.",
-      "evidence": ["pubspec-lock-review", "gradle-dependency-review", "dependency-review-ci-result", "github-actions-ci-result"],
+      "readyWhenKo": "Flutter, Android Gradle, Java, Spring 의존성 lock과 빌드 파일을 출시 전 점검하고 OSV Scanner PR scan이 새 취약 의존성을 PR에서 차단한다.",
+      "evidence": ["pubspec-lock-review", "gradle-dependency-review", "osv-scanner-pr-result", "github-actions-ci-result"],
       "linkedArtifacts": ["apps/mobile/pubspec.lock", "apps/mobile/android/app/build.gradle.kts", "backend/build.gradle", ".github/workflows/ci.yml"]
     },
     {
