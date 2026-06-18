@@ -1689,6 +1689,15 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const feedbackDashboardController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackAdminPageController.java",
   );
+  const feedbackDashboardAssembler = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackDashboardAssembler.java",
+  );
+  const feedbackDashboardView = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackDashboardView.java",
+  );
+  const operatorRouteFeedbackReportController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRouteFeedbackReportController.java",
+  );
   const searchDashboardTemplate = read("backend/src/main/resources/templates/admin/routes/searches.html");
   const feedbackDashboardTemplate = read("backend/src/main/resources/templates/admin/routes/feedback.html");
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
@@ -1793,9 +1802,19 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(searchDashboardTemplate, /도착 검색/);
   assert.doesNotMatch(searchDashboardTemplate, /routeSearchId/);
   assert.match(feedbackDashboardController, /@GetMapping\("\/admin\/routes\/feedback\/page"\)/);
-  assert.match(feedbackDashboardController, /RouteFeedbackDashboardUseCase/);
-  assert.match(feedbackDashboardController, /recentBlockedFeedbacks/);
-  assert.match(feedbackDashboardController, /mobilityTypeLabel/);
+  assert.match(feedbackDashboardController, /RouteFeedbackDashboardAssembler/);
+  assert.match(feedbackDashboardController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
+  assert.match(feedbackDashboardAssembler, /RouteFeedbackDashboardUseCase/);
+  assert.match(feedbackDashboardAssembler, /summarizeRouteFeedbacks/);
+  assert.match(feedbackDashboardAssembler, /recentBlockedFeedbacks/);
+  assert.match(feedbackDashboardAssembler, /mobilityTypeLabel/);
+  assert.match(feedbackDashboardView, /record RouteFeedbackDashboardView/);
+  assert.match(feedbackDashboardView, /record RatingCountRow/);
+  assert.match(feedbackDashboardView, /record RecentBlockedFeedbackRow/);
+  assert.doesNotMatch(feedbackDashboardView, /routeSearchId|userId|comment/);
+  assert.match(operatorRouteFeedbackReportController, /@GetMapping\("\/operator\/api\/route-feedback-report"\)/);
+  assert.match(operatorRouteFeedbackReportController, /ApiResponse<RouteFeedbackDashboardView>/);
+  assert.match(operatorRouteFeedbackReportController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
   assert.match(feedbackDashboardTemplate, /경로 피드백 현황/);
   assert.match(feedbackDashboardTemplate, /전체 피드백/);
   assert.match(feedbackDashboardTemplate, /평점별 피드백/);
