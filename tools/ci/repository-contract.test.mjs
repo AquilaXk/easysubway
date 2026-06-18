@@ -1679,6 +1679,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(feedbackSummary, /helpfulCount/);
   assert.match(feedbackSummary, /notHelpfulCount/);
   assert.match(feedbackSummary, /blockedByRealWorldCount/);
+  assert.match(feedbackSummary, /recentBlockedFeedbacks/);
+  assert.match(feedbackSummary, /RecentBlockedFeedback/);
   assert.match(status, /FOUND/);
   assert.match(status, /BLOCKED/);
   assert.match(warning, /record RouteWarning/);
@@ -1739,6 +1741,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /same DB statement snapshot|같은 DB statement snapshot/);
   assert.match(jdbcRepository, /RouteFeedbackDashboardSummary summarizeRouteFeedbacks\(\)/);
   assert.match(jdbcRepository, /SUM\(CASE WHEN rating = 'HELPFUL' THEN 1 ELSE 0 END\)/);
+  assert.match(jdbcRepository, /rating = 'BLOCKED_BY_REAL_WORLD'/);
+  assert.match(jdbcRepository, /JOIN route_search_results/);
+  assert.match(jdbcRepository, /ORDER BY feedback_created_at DESC/);
   assert.match(jdbcRepository, /ON CONFLICT \(route_search_id\) DO UPDATE/);
   assert.match(jdbcRepository, /ON CONFLICT \(feedback_id\) DO UPDATE/);
   assert.match(jdbcRepository, /steps_json/);
@@ -1761,10 +1766,18 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(searchDashboardTemplate, /routeSearchId/);
   assert.match(feedbackDashboardController, /@GetMapping\("\/admin\/routes\/feedback\/page"\)/);
   assert.match(feedbackDashboardController, /RouteFeedbackDashboardUseCase/);
+  assert.match(feedbackDashboardController, /recentBlockedFeedbacks/);
+  assert.match(feedbackDashboardController, /mobilityTypeLabel/);
   assert.match(feedbackDashboardTemplate, /경로 피드백 현황/);
   assert.match(feedbackDashboardTemplate, /전체 피드백/);
   assert.match(feedbackDashboardTemplate, /평점별 피드백/);
+  assert.match(feedbackDashboardTemplate, /최근 현장 차단 신고/);
+  assert.match(feedbackDashboardTemplate, /출발역/);
+  assert.match(feedbackDashboardTemplate, /도착역/);
+  assert.match(feedbackDashboardTemplate, /이동 프로필/);
   assert.doesNotMatch(feedbackDashboardTemplate, /userId/);
+  assert.doesNotMatch(feedbackDashboardTemplate, /routeSearchId/);
+  assert.doesNotMatch(feedbackDashboardTemplate, /comment/);
 });
 
 test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다", () => {
