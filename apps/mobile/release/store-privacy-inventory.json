@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "tracking": false,
+  "sharesDataWithThirdParties": false,
+  "encryptionInTransitRequired": true,
+  "userDataDeletionSupported": true,
+  "privacyPolicyUrlSource": "EASYSUBWAY_PRIVACY_POLICY_URL dart-define",
+  "dataTypes": [
+    {
+      "id": "precise_location",
+      "displayNameKo": "현재 위치",
+      "purposeKo": "가까운 역 검색과 시설 신고 위치 확인",
+      "storageLocations": ["mobile-memory", "backend-report"],
+      "retentionKo": "주변 역 검색은 저장하지 않고, 시설 신고 위치는 신고 처리와 운영 검수 기간 동안 보관",
+      "deletionKo": "데이터 삭제 요청 시 신고자 연결을 제거하고 위치를 익명화 또는 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Location",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypePreciseLocation",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "search_queries",
+      "displayNameKo": "역 검색어",
+      "purposeKo": "역명, 초성, 노선별 검색 결과 제공",
+      "storageLocations": ["backend-request"],
+      "retentionKo": "요청 처리와 운영 오류 분석에 필요한 최소 기간만 보관",
+      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 검색 기록을 삭제 또는 익명화",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": false
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeSearchHistory",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "favorite_stations_routes_facilities",
+      "displayNameKo": "즐겨찾기 역, 경로, 시설",
+      "purposeKo": "사용자가 자주 확인하는 이동 정보와 시설 상태를 빠르게 제공",
+      "storageLocations": ["backend-database"],
+      "retentionKo": "사용자가 삭제하거나 데이터 삭제를 요청할 때까지 보관",
+      "deletionKo": "앱 기능 또는 데이터 삭제 요청으로 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "mobility_profile",
+      "displayNameKo": "이동 조건",
+      "purposeKo": "계단 회피, 엘리베이터 우선 등 사용자 상황에 맞는 경로 안내",
+      "storageLocations": ["mobile-secure-storage", "backend-database"],
+      "retentionKo": "사용자가 변경하거나 데이터 삭제를 요청할 때까지 보관",
+      "deletionKo": "온보딩 재설정 또는 데이터 삭제 요청으로 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Personal info",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeSensitiveInfo",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "facility_report_content",
+      "displayNameKo": "시설 신고 내용",
+      "purposeKo": "엘리베이터 고장, 공사, 위치 오류 같은 시설 상태 검수",
+      "storageLocations": ["backend-database"],
+      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
+      "deletionKo": "데이터 삭제 요청 시 신고자 연결과 자유 입력 내용을 삭제 또는 익명화",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "User-generated content",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "facility_report_photo",
+      "displayNameKo": "시설 신고 사진",
+      "purposeKo": "시설 고장과 위치 오류를 운영자가 확인",
+      "storageLocations": ["mobile-memory", "backend-database"],
+      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
+      "deletionKo": "데이터 삭제 요청 시 사진을 삭제 또는 신고자 연결에서 분리",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Photos and videos",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "facility_report_location",
+      "displayNameKo": "시설 신고 위치",
+      "purposeKo": "신고 대상 시설 주변의 실제 위치를 운영 검수에 참고",
+      "storageLocations": ["backend-database"],
+      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
+      "deletionKo": "데이터 삭제 요청 시 위치를 삭제 또는 익명화",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Location",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypePreciseLocation",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "notification_settings",
+      "displayNameKo": "알림 설정",
+      "purposeKo": "즐겨찾는 역과 경로의 시설 상태 알림 수신 여부 저장",
+      "storageLocations": ["backend-database"],
+      "retentionKo": "사용자가 변경하거나 데이터 삭제를 요청할 때까지 보관",
+      "deletionKo": "알림 설정 화면 또는 데이터 삭제 요청으로 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "push_token",
+      "displayNameKo": "푸시 알림 토큰",
+      "purposeKo": "시설 상태와 신고 처리 결과 알림 발송",
+      "storageLocations": ["backend-database", "platform-push-service"],
+      "retentionKo": "알림 수신을 끄거나 데이터 삭제를 요청할 때까지 보관",
+      "deletionKo": "알림 설정 해제 또는 데이터 삭제 요청으로 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Device or other IDs",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeUserID",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "anonymous_user_id",
+      "displayNameKo": "익명 사용자 식별자",
+      "purposeKo": "즐겨찾기, 알림 설정, 신고 이력을 계정 없이 연결",
+      "storageLocations": ["mobile-secure-storage", "backend-database"],
+      "retentionKo": "앱 사용 기간 동안 보관하고 데이터 삭제 요청 시 삭제",
+      "deletionKo": "데이터 삭제 요청 시 삭제",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "User IDs",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": false
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeUserID",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "diagnostics_error_logs",
+      "displayNameKo": "오류 로그",
+      "purposeKo": "앱 오류와 서버 장애를 진단하고 접근성 흐름 회귀를 찾음",
+      "storageLocations": ["mobile-runtime", "backend-log"],
+      "retentionKo": "운영 장애 분석에 필요한 최소 기간만 보관",
+      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 로그를 삭제 또는 익명화",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Diagnostics",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": false
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeCrashData",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    }
+  ]
+}
