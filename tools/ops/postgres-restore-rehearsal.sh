@@ -13,7 +13,7 @@ if [[ -z "${BACKUP_FILE}" || ! -f "${BACKUP_FILE}" ]]; then
 fi
 
 cat "${BACKUP_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T -e RESTORE_DB="${RESTORE_DB}" postgres sh -lc '
-set -euo pipefail
+set -eu
 
 cleanup() {
 	dropdb --if-exists -U "$POSTGRES_USER" "$RESTORE_DB"
