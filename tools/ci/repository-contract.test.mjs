@@ -1478,6 +1478,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   const operatorPushNotificationReportController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportController.java",
   );
+  const operatorPushNotificationReportPageController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportPageController.java",
+  );
   const operatorPushNotificationReportAssembler = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportAssembler.java",
   );
@@ -1485,6 +1488,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportView.java",
   );
   const dashboardTemplate = read("backend/src/main/resources/templates/admin/notifications/push.html");
+  const operatorPushNotificationReportTemplate = read(
+    "backend/src/main/resources/templates/operator/push-notification-report.html",
+  );
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(notification, /record PushNotification/);
@@ -1549,6 +1555,13 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(operatorPushNotificationReportController, /@GetMapping\("\/operator\/api\/push-notification-report"\)/);
   assert.match(operatorPushNotificationReportController, /ApiResponse<OperatorPushNotificationReportView>/);
   assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
+  assert.match(
+    operatorPushNotificationReportPageController,
+    /@GetMapping\("\/operator\/push-notification-report\/page"\)/,
+  );
+  assert.match(operatorPushNotificationReportPageController, /OperatorPushNotificationReportAssembler/);
+  assert.match(operatorPushNotificationReportPageController, /pushNotificationReportAssembler\.assemble\(\)/);
+  assert.match(operatorPushNotificationReportPageController, /return "operator\/push-notification-report"/);
   assert.match(operatorPushNotificationReportAssembler, /PushNotificationDashboardUseCase/);
   assert.match(operatorPushNotificationReportAssembler, /summarizePushNotifications/);
   assert.match(operatorPushNotificationReportAssembler, /OPERATOR_SAFE_FAILURE_REASON/);
@@ -1572,6 +1585,15 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(dashboardTemplate, /상태별 알림/);
   assert.match(dashboardTemplate, /최근 실패/);
   assert.doesNotMatch(dashboardTemplate, /deviceToken/);
+  assert.match(operatorPushNotificationReportTemplate, /운영기관 알림 발송 현황/);
+  assert.match(operatorPushNotificationReportTemplate, /읽기 전용 리포트/);
+  assert.match(operatorPushNotificationReportTemplate, /전체 알림/);
+  assert.match(operatorPushNotificationReportTemplate, /상태별 발송 현황/);
+  assert.match(operatorPushNotificationReportTemplate, /최근 실패 안내/);
+  assert.doesNotMatch(
+    operatorPushNotificationReportTemplate,
+    /<form|_csrf|notificationId|userId|deviceToken|\/admin\/notifications/,
+  );
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
 
