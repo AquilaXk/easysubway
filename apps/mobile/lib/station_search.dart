@@ -1830,6 +1830,8 @@ class StationSearchScreen extends StatefulWidget {
     required this.locationProvider,
     this.favoriteRepository,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -1838,6 +1840,8 @@ class StationSearchScreen extends StatefulWidget {
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -2079,6 +2083,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           locationProvider: widget.locationProvider,
           stationId: result.id,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
         ),
       ),
     );
@@ -2547,6 +2553,8 @@ class FavoriteStationListScreen extends StatefulWidget {
     required this.reportRepository,
     this.locationProvider,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2555,6 +2563,8 @@ class FavoriteStationListScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<FavoriteStationListScreen> createState() =>
@@ -2572,6 +2582,8 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
         reportRepository: widget.reportRepository,
         locationProvider: widget.locationProvider,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+        internalRouteRepository: widget.internalRouteRepository,
+        internalRouteMobilityType: widget.internalRouteMobilityType,
       ),
     );
   }
@@ -2584,6 +2596,8 @@ class FavoriteStationListContent extends StatefulWidget {
     required this.reportRepository,
     this.locationProvider,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2592,6 +2606,8 @@ class FavoriteStationListContent extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<FavoriteStationListContent> createState() =>
@@ -2641,6 +2657,8 @@ class _FavoriteStationListContentState
           locationProvider: widget.locationProvider,
           stationId: favorite.stationId,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
           // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
           initiallyFavorite: true,
         ),
@@ -2809,6 +2827,7 @@ class StationDetailScreen extends StatefulWidget {
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteRequest,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2821,6 +2840,7 @@ class StationDetailScreen extends StatefulWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final InternalRouteRequest? internalRouteRequest;
+  final String internalRouteMobilityType;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -2837,10 +2857,18 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
     _controller = StationDetailController(repository: widget.repository);
     final internalRouteRepository = widget.internalRouteRepository;
     final internalRouteRequest = widget.internalRouteRequest;
-    if (internalRouteRepository != null && internalRouteRequest != null) {
+    if (internalRouteRepository != null) {
       _internalRouteController = InternalRouteController(
         repository: internalRouteRepository,
-      )..load(internalRouteRequest);
+      );
+      if (internalRouteRequest != null) {
+        _internalRouteController!.load(internalRouteRequest);
+      } else {
+        _internalRouteController!.loadDefault(
+          stationId: widget.stationId,
+          mobilityType: widget.internalRouteMobilityType,
+        );
+      }
     }
     final favoriteRepository = widget.favoriteRepository;
     if (favoriteRepository != null) {

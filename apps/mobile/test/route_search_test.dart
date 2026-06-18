@@ -9,20 +9,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('내부 경로 API 저장소는 노드 간 이동 경로를 요청하고 결과를 파싱한다', () async {
-    late Uri requestedUri;
-    late String requestedBody;
+  test('내부 경로 API 저장소는 노드 목록을 읽고 노드 간 이동 경로를 요청한다', () async {
+    final requestedUris = <Uri>[];
+    final requestedBodies = <String>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) async {
-      expect(request.method, 'POST');
-      requestedUri = request.uri;
-      requestedBody = await utf8.decoder.bind(request).join();
+      requestedUris.add(request.uri);
+      final requestBody = await utf8.decoder.bind(request).join();
+      requestedBodies.add(requestBody);
       request.response
         ..statusCode = HttpStatus.ok
-        ..headers.contentType = ContentType.json
-        ..write(
+        ..headers.contentType = ContentType.json;
+      if (request.method == 'GET') {
+        request.response.write(
+          jsonEncode({
+            'success': true,
+            'data': [
+              {
+                'id': 'node-sangnoksu-elevator-1',
+                'stationId': 'station-sangnoksu',
+                'type': 'ELEVATOR',
+                'name': '1번 출구 엘리베이터',
+                'facilityId': 'facility-sangnoksu-elevator-1',
+                'displayLabel': '1번 출구 승강기',
+              },
+              {
+                'id': 'node-sangnoksu-faregate',
+                'stationId': 'station-sangnoksu',
+                'type': 'FAREGATE',
+                'name': '개찰구',
+                'facilityId': null,
+                'displayLabel': '개찰구',
+              },
+            ],
+          }),
+        );
+      } else {
+        request.response.write(
           jsonEncode({
             'success': true,
             'data': {
@@ -60,25 +85,31 @@ void main() {
               'blockedReasons': [],
             },
           }),
-        )
-        ..close();
+        );
+      }
+      await request.response.close();
     });
 
     final repository = InternalRouteApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
     );
 
-    final result = await repository.searchInternalRoute(
-      const InternalRouteRequest(
-        stationId: 'station-sangnoksu',
-        fromNodeId: 'node-sangnoksu-elevator-1',
-        toNodeId: 'node-sangnoksu-faregate',
-        mobilityType: 'WHEELCHAIR',
-      ),
+    final nodes = await repository.listRouteNodes('station-sangnoksu');
+    final request = InternalRouteRequest.defaultForNodes(
+      stationId: 'station-sangnoksu',
+      mobilityType: 'WHEELCHAIR',
+      nodes: nodes,
     );
+    final result = await repository.searchInternalRoute(request!);
 
-    expect(requestedUri.path, '/api/v1/routes/internal');
-    expect(jsonDecode(requestedBody), {
+    expect(requestedUris.map((uri) => uri.path), [
+      '/api/v1/stations/station-sangnoksu/route-nodes',
+      '/api/v1/routes/internal',
+    ]);
+    expect(nodes.first.displayLabel, '1번 출구 승강기');
+    expect(request.fromNodeId, 'node-sangnoksu-elevator-1');
+    expect(request.toNodeId, 'node-sangnoksu-faregate');
+    expect(jsonDecode(requestedBodies.last), {
       'stationId': 'station-sangnoksu',
       'fromNodeId': 'node-sangnoksu-elevator-1',
       'toNodeId': 'node-sangnoksu-faregate',

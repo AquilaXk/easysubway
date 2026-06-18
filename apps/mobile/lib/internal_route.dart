@@ -10,6 +10,8 @@ const _internalRouteTimeout = Duration(seconds: 8);
 const _internalRouteErrorMessage = '내부 이동 안내를 불러오지 못했습니다.';
 
 abstract class InternalRouteRepository {
+  Future<List<InternalRouteNode>> listRouteNodes(String stationId);
+
   Future<InternalRouteResult> searchInternalRoute(InternalRouteRequest request);
 }
 
@@ -19,6 +21,37 @@ class InternalRouteApiRepository implements InternalRouteRepository {
 
   final Uri baseUri;
   final HttpClient _httpClient;
+
+  @override
+  Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
+    final uri = baseUri.resolve(
+      '/api/v1/stations/${Uri.encodeComponent(stationId.trim())}/route-nodes',
+    );
+
+    try {
+      final data = await _getData(uri);
+      if (data is! List) {
+        throw const InternalRouteException(_internalRouteErrorMessage);
+      }
+      return data
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid internal route node');
+            }
+            return InternalRouteNode.fromJson(item);
+          })
+          .toList(growable: false);
+    } on InternalRouteException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 내부 이동 노드 API 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const InternalRouteException(_internalRouteErrorMessage);
+    }
+  }
 
   @override
   Future<InternalRouteResult> searchInternalRoute(
@@ -33,21 +66,7 @@ class InternalRouteApiRepository implements InternalRouteRepository {
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode(routeRequest.toJson()));
 
-      final response = await request.close().timeout(_internalRouteTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_internalRouteTimeout);
-
-      if (response.statusCode != HttpStatus.ok) {
-        throw const InternalRouteException(_internalRouteErrorMessage);
-      }
-
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-        throw const InternalRouteException(_internalRouteErrorMessage);
-      }
-
-      final data = decoded['data'];
+      final data = await _readResponseData(request);
       if (data is! Map<String, Object?>) {
         throw const InternalRouteException(_internalRouteErrorMessage);
       }
@@ -63,6 +82,31 @@ class InternalRouteApiRepository implements InternalRouteRepository {
       );
       throw const InternalRouteException(_internalRouteErrorMessage);
     }
+  }
+
+  Future<Object?> _getData(Uri uri) async {
+    final request = await _httpClient
+        .getUrl(uri)
+        .timeout(_internalRouteTimeout);
+    return _readResponseData(request);
+  }
+
+  Future<Object?> _readResponseData(HttpClientRequest request) async {
+    final response = await request.close().timeout(_internalRouteTimeout);
+    final body = await utf8
+        .decodeStream(response)
+        .timeout(_internalRouteTimeout);
+
+    if (response.statusCode != HttpStatus.ok) {
+      throw const InternalRouteException(_internalRouteErrorMessage);
+    }
+
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+      throw const InternalRouteException(_internalRouteErrorMessage);
+    }
+
+    return decoded['data'];
   }
 }
 
@@ -88,6 +132,35 @@ class InternalRouteRequest {
   final String toNodeId;
   final String mobilityType;
 
+  static InternalRouteRequest? defaultForNodes({
+    required String stationId,
+    required String mobilityType,
+    required List<InternalRouteNode> nodes,
+  }) {
+    final stationNodes = nodes
+        .where((node) => node.stationId == stationId)
+        .toList(growable: false);
+    final fromNode = _firstNodeOfTypes(stationNodes, const [
+      'ELEVATOR',
+      'ENTRANCE',
+      'EXIT',
+    ]);
+    final toNode = _firstNodeOfTypes(stationNodes, const [
+      'FAREGATE',
+      'PLATFORM',
+      'CONCOURSE',
+    ]);
+    if (fromNode == null || toNode == null || fromNode.id == toNode.id) {
+      return null;
+    }
+    return InternalRouteRequest(
+      stationId: stationId,
+      fromNodeId: fromNode.id,
+      toNodeId: toNode.id,
+      mobilityType: mobilityType,
+    );
+  }
+
   InternalRouteRequest trimmed() {
     return InternalRouteRequest(
       stationId: stationId.trim(),
@@ -106,6 +179,35 @@ class InternalRouteRequest {
       'mobilityType': request.mobilityType,
     };
   }
+}
+
+class InternalRouteNode {
+  const InternalRouteNode({
+    required this.id,
+    required this.stationId,
+    required this.type,
+    required this.name,
+    required this.facilityId,
+    required this.displayLabel,
+  });
+
+  factory InternalRouteNode.fromJson(Map<String, Object?> json) {
+    return InternalRouteNode(
+      id: _requiredInternalRouteString(json, 'id'),
+      stationId: _requiredInternalRouteString(json, 'stationId'),
+      type: _requiredInternalRouteString(json, 'type'),
+      name: _requiredInternalRouteString(json, 'name'),
+      facilityId: _optionalInternalRouteString(json, 'facilityId'),
+      displayLabel: _requiredInternalRouteString(json, 'displayLabel'),
+    );
+  }
+
+  final String id;
+  final String stationId;
+  final String type;
+  final String name;
+  final String facilityId;
+  final String displayLabel;
 }
 
 class InternalRouteResult {
@@ -354,7 +456,65 @@ class InternalRouteController extends ChangeNotifier {
 
   InternalRouteState get state => _state;
 
+  Future<void> loadDefault({
+    required String stationId,
+    required String mobilityType,
+  }) async {
+    _state = const InternalRouteState.loading();
+    notifyListeners();
+
+    try {
+      final nodes = await repository.listRouteNodes(stationId);
+      final request = InternalRouteRequest.defaultForNodes(
+        stationId: stationId,
+        mobilityType: mobilityType,
+        nodes: nodes,
+      );
+      if (request == null) {
+        if (_disposed) {
+          return;
+        }
+        _state = const InternalRouteState(
+          status: InternalRouteViewStatus.failure,
+          message: '내부 이동 기준점을 아직 확인하지 못했습니다.',
+        );
+        notifyListeners();
+        return;
+      }
+      if (_disposed) {
+        return;
+      }
+      await load(request);
+    } on InternalRouteException catch (error) {
+      if (_disposed) {
+        return;
+      }
+      _state = InternalRouteState(
+        status: InternalRouteViewStatus.failure,
+        message: error.message,
+      );
+      notifyListeners();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '내부 이동 기본 안내 처리 중 예외가 발생했습니다.',
+      );
+      if (_disposed) {
+        return;
+      }
+      _state = const InternalRouteState(
+        status: InternalRouteViewStatus.failure,
+        message: _internalRouteErrorMessage,
+      );
+      notifyListeners();
+    }
+  }
+
   Future<void> load(InternalRouteRequest request) async {
+    if (_disposed) {
+      return;
+    }
     _state = const InternalRouteState.loading();
     notifyListeners();
 
@@ -422,6 +582,28 @@ bool _requiredInternalRouteBool(Map<String, Object?> json, String key) {
     throw FormatException('Missing $key');
   }
   return value;
+}
+
+String _optionalInternalRouteString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is! String) {
+    return '';
+  }
+  return value.trim();
+}
+
+InternalRouteNode? _firstNodeOfTypes(
+  List<InternalRouteNode> nodes,
+  List<String> types,
+) {
+  for (final type in types) {
+    for (final node in nodes) {
+      if (node.type == type) {
+        return node;
+      }
+    }
+  }
+  return null;
 }
 
 String _internalRouteDistanceLabel(int distanceMeters) {

@@ -2708,6 +2708,55 @@ void main() {
     );
   });
 
+  testWidgets('앱 역 검색 흐름은 내부 이동 노드로 기본 안내를 표시한다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+    final internalRouteRepository = FakeInternalRouteRepository(
+      nodes: _internalRouteNodes(),
+      result: _internalRouteResult(),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        internalRouteRepository: internalRouteRepository,
+        initialOnboardingState: _completedOnboardingState(
+          profileId: 'wheelchair',
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
+    expect(internalRouteRepository.requests, hasLength(1));
+    expect(
+      internalRouteRepository.requests.single.fromNodeId,
+      'node-sangnoksu-elevator-1',
+    );
+    expect(
+      internalRouteRepository.requests.single.toNodeId,
+      'node-sangnoksu-faregate',
+    );
+    expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
+    expect(find.text('내부 이동 안내'), findsOneWidget);
+    expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
+  });
+
   testWidgets('역 상세는 현재 역을 즐겨찾기에 저장하고 해제한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteRepository = FakeFavoriteStationRepository();
@@ -5523,6 +5572,27 @@ InternalRouteResult _internalRouteResult({
   );
 }
 
+List<InternalRouteNode> _internalRouteNodes() {
+  return const [
+    InternalRouteNode(
+      id: 'node-sangnoksu-elevator-1',
+      stationId: 'station-sangnoksu',
+      type: 'ELEVATOR',
+      name: '1번 출구 엘리베이터',
+      facilityId: 'facility-sangnoksu-elevator-1',
+      displayLabel: '1번 출구 승강기',
+    ),
+    InternalRouteNode(
+      id: 'node-sangnoksu-faregate',
+      stationId: 'station-sangnoksu',
+      type: 'FAREGATE',
+      name: '개찰구',
+      facilityId: '',
+      displayLabel: '개찰구',
+    ),
+  ];
+}
+
 class FakeStationSearchRepository
     implements StationSearchRepository, StationLineFilterRepository {
   FakeStationSearchRepository({
@@ -5615,11 +5685,27 @@ class FakeStationSearchRepository
 }
 
 class FakeInternalRouteRepository implements InternalRouteRepository {
-  FakeInternalRouteRepository({required this.result, this.error});
+  FakeInternalRouteRepository({
+    required this.result,
+    this.nodes = const [],
+    this.error,
+  });
 
   final InternalRouteResult result;
+  final List<InternalRouteNode> nodes;
   final InternalRouteException? error;
+  final nodeStationIds = <String>[];
   final requests = <InternalRouteRequest>[];
+
+  @override
+  Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
+    nodeStationIds.add(stationId);
+    final routeError = error;
+    if (routeError != null) {
+      throw routeError;
+    }
+    return nodes;
+  }
 
   @override
   Future<InternalRouteResult> searchInternalRoute(
