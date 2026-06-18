@@ -47,9 +47,9 @@ class FacilityReportAdminPageController {
 		Model model
 	) {
 		List<FacilityReport> allReports = facilityReportUseCase.listReports(null);
-		List<FacilityReport> filteredReports = status == null
-			? allReports
-			: facilityReportUseCase.listReports(status);
+		List<FacilityReport> filteredReports = allReports.stream()
+			.filter(report -> status == null || report.status() == status)
+			.toList();
 		List<FacilityReportListPageRow> reports = filteredReports
 			.stream()
 			.map(FacilityReportListPageRow::from)

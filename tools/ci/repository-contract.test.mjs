@@ -1316,6 +1316,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminPageController, /ReportSurgeAlertView/);
   assert.match(adminPageController, /reportSurgeAlert/);
   assert.match(adminPageController, /점검 필요/);
+  assert.doesNotMatch(adminPageController, /listReports\(status\)/);
   assert.match(adminReportListTemplate, /신고 급증/);
   assert.match(adminReportListTemplate, /최근 24시간 신고/);
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
