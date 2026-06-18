@@ -1353,6 +1353,15 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   const dashboardController = read(
     "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
   );
+  const operatorPushNotificationReportController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportController.java",
+  );
+  const operatorPushNotificationReportAssembler = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportAssembler.java",
+  );
+  const operatorPushNotificationReportView = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorPushNotificationReportView.java",
+  );
   const dashboardTemplate = read("backend/src/main/resources/templates/admin/notifications/push.html");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1405,6 +1414,22 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.doesNotMatch(controller, /deviceToken/);
   assert.match(dashboardController, /@GetMapping\("\/admin\/notifications\/push\/page"\)/);
   assert.match(dashboardController, /PushNotificationDashboardUseCase/);
+  assert.match(operatorPushNotificationReportController, /@GetMapping\("\/operator\/api\/push-notification-report"\)/);
+  assert.match(operatorPushNotificationReportController, /ApiResponse<OperatorPushNotificationReportView>/);
+  assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
+  assert.match(operatorPushNotificationReportAssembler, /PushNotificationDashboardUseCase/);
+  assert.match(operatorPushNotificationReportAssembler, /summarizePushNotifications/);
+  assert.match(operatorPushNotificationReportAssembler, /OPERATOR_SAFE_FAILURE_REASON/);
+  assert.doesNotMatch(operatorPushNotificationReportAssembler, /summary\.latestFailureReason\(\),/);
+  assert.doesNotMatch(operatorPushNotificationReportAssembler, /" \+ summary\.latestFailureReason\(\)/);
+  assert.match(operatorPushNotificationReportView, /record OperatorPushNotificationReportView/);
+  assert.match(operatorPushNotificationReportView, /long totalCount/);
+  assert.match(operatorPushNotificationReportView, /long pendingCount/);
+  assert.match(operatorPushNotificationReportView, /long sentCount/);
+  assert.match(operatorPushNotificationReportView, /long failedCount/);
+  assert.match(operatorPushNotificationReportView, /String latestFailureReason/);
+  assert.match(operatorPushNotificationReportView, /record StatusCountRow/);
+  assert.doesNotMatch(operatorPushNotificationReportView, /notificationId|userId|deviceToken/);
   assert.match(dashboardTemplate, /푸시 알림 현황/);
   assert.match(dashboardTemplate, /전체 알림/);
   assert.match(dashboardTemplate, /상태별 알림/);
