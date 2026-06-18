@@ -563,9 +563,12 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(backupScript, /set -euo pipefail/);
   assert.match(backupScript, /EASYSUBWAY_ENV_FILE:-\$\{ROOT_DIR\}\/\.env\.example/);
   assert.match(backupScript, /EASYSUBWAY_BACKUP_DIR:-\$\{ROOT_DIR\}\/\.codex\/backups/);
+  assert.match(backupScript, /umask 077/);
+  assert.match(backupScript, /chmod 700 "\$\{BACKUP_DIR\}"/);
+  assert.match(backupScript, /mktemp "\$\{BACKUP_DIR\}\/easysubway-postgres-\$\{timestamp\}\.XXXXXX"/);
+  assert.match(backupScript, /backup_file="\$\{temp_file\}\.dump"/);
   assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres sh -lc/);
   assert.match(backupScript, /pg_dump --format=custom --no-owner --no-privileges -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
-  assert.match(backupScript, /easysubway-postgres-\$\{timestamp\}\.dump/);
   assert.match(backupScript, /test -s "\$\{backup_file\}"/);
 
   assert.match(restoreScript, /set -euo pipefail/);

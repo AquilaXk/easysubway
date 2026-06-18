@@ -6,10 +6,15 @@ ENV_FILE="${EASYSUBWAY_ENV_FILE:-${ROOT_DIR}/.env.example}"
 COMPOSE_FILE="${EASYSUBWAY_COMPOSE_FILE:-${ROOT_DIR}/infra/docker-compose.yml}"
 BACKUP_DIR="${1:-${EASYSUBWAY_BACKUP_DIR:-${ROOT_DIR}/.codex/backups}}"
 
+umask 077
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-backup_file="${BACKUP_DIR}/easysubway-postgres-${timestamp}.dump"
 
 mkdir -p "${BACKUP_DIR}"
+chmod 700 "${BACKUP_DIR}"
+
+temp_file="$(mktemp "${BACKUP_DIR}/easysubway-postgres-${timestamp}.XXXXXX")"
+backup_file="${temp_file}.dump"
+mv "${temp_file}" "${backup_file}"
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres sh -lc \
 	'pg_dump --format=custom --no-owner --no-privileges -U "$POSTGRES_USER" "$POSTGRES_DB"' \
