@@ -55,14 +55,17 @@ class UserActivityTrackingFilter extends OncePerRequestFilter {
 		HttpServletResponse response,
 		FilterChain filterChain
 	) throws ServletException, IOException {
+		long startedAtMillis = clock.millis();
+		LocalDateTime requestedAt = LocalDateTime.now(clock);
 		filterChain.doFilter(request, response);
+		long durationMillis = Math.max(0, clock.millis() - startedAtMillis);
 		if (shouldRecordApiTraffic(request)) {
-			recordApiTrafficPort.recordApiTraffic(response.getStatus(), LocalDateTime.now(clock));
+			recordApiTrafficPort.recordApiTraffic(response.getStatus(), durationMillis, LocalDateTime.now(clock));
 		}
 		if (shouldRecord(request, response)) {
 			recordUserActivityPort.recordUserActivity(
 				request.getUserPrincipal().getName(),
-				LocalDateTime.now(clock)
+				requestedAt
 			);
 		}
 	}
