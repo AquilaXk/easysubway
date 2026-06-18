@@ -2526,6 +2526,26 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
   assert.doesNotMatch(infoPlist, /UIBackgroundModes/);
 });
 
+test("iOS 푸시 알림은 APNs entitlement와 사전 설명 흐름을 가진다", () => {
+  const entitlementsPath = "apps/mobile/ios/Runner/Runner.entitlements";
+  assert.ok(existsSync(path.join(root, entitlementsPath)));
+
+  const entitlements = read(entitlementsPath);
+  const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+  const appDelegate = read("apps/mobile/ios/Runner/AppDelegate.swift");
+  const main = read("apps/mobile/lib/main.dart");
+  const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
+
+  assert.match(entitlements, /<key>aps-environment<\/key>\s*<string>development<\/string>/);
+  assert.match(project, /Runner\.entitlements \*\/ = \{isa = PBXFileReference;[\s\S]*?path = Runner\.entitlements;/);
+  assert.match(project, /CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/);
+  assert.equal([...project.matchAll(/CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/g)].length, 3);
+  assert.match(appDelegate, /requestAuthorization\(options: \[\.alert, \.sound, \.badge\]\)/);
+  assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 상태/);
+  assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
+  assert.match(main, /알림 설정/);
+});
+
 test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다", () => {
   const mergedManifestPath = "apps/mobile/build/app/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml";
   const expectsGeneratedManifest = process.env.EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST === "true";
