@@ -2034,19 +2034,25 @@ test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시
   const repositoryTest = read("backend/src/test/java/com/easysubway/usage/adapter/out/persistence/InMemoryUserActivityRepositoryTest.java");
 
   assert.match(userActivityFilter, /RecordApiTrafficPort/);
-  assert.match(userActivityFilter, /recordApiTraffic\(\s*response\.getStatus\(\),\s*LocalDateTime\.now\(clock\)\s*\)/);
+  assert.match(userActivityFilter, /recordApiTraffic\(\s*response\.getStatus\(\),\s*durationMillis,\s*LocalDateTime\.now\(clock\)\s*\)/);
   assert.match(userActivityFilter, /response\.getStatus\(\) < 400/);
   assert.match(summary, /totalApiRequests/);
   assert.match(summary, /totalApiErrors/);
+  assert.match(summary, /totalApiResponseMillis/);
   assert.match(summary, /apiErrorRatePercent\(\)/);
-  assert.match(repository, /recordApiTraffic\(int statusCode, LocalDateTime occurredAt\)/);
+  assert.match(summary, /averageApiResponseTimeLabel\(\)/);
+  assert.match(repository, /recordApiTraffic\(int statusCode, long durationMillis, LocalDateTime occurredAt\)/);
   assert.match(repository, /statusCode >= 400/);
+  assert.match(repository, /durationMillis/);
   assert.match(controller, /apiErrorRatePercent/);
+  assert.match(controller, /averageApiResponseTimeLabel/);
   assert.match(template, /API 오류율/);
+  assert.match(template, /평균 응답 시간/);
   assert.match(template, /API 요청/);
   assert.match(template, /오류 응답/);
   assert.match(filterTest, /실패 응답은 API 오류율에 기록하고 활성 사용자 지표에서는 제외한다/);
   assert.match(repositoryTest, /최근 기간의 API 요청 수와 오류율을 일별로 집계한다/);
+  assert.match(repositoryTest, /음수 API 응답 시간은 운영 지표로 저장하지 않는다/);
 });
 
 test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한다", () => {
