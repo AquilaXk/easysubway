@@ -135,6 +135,47 @@ class OperatorDataCollectionFailuresControllerTest {
 	}
 
 	@Test
+	@DisplayName("운영기관 데이터 수집 실패 현황 API는 표시 목록 밖의 최신 완료 수집으로 미갱신 상태를 판단한다")
+	void dataCollectionFreshnessUsesLatestCompletedRunOutsideRecentRows() throws Exception {
+		saveRun(new DataCollectionRun(
+			"collection-completed-outside-recent-rows",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.COMPLETED,
+			"admin-user",
+			LocalDateTime.parse("2026-06-18T09:00:00"),
+			LocalDateTime.parse("2026-06-18T09:01:00"),
+			14,
+			null,
+			false,
+			"수집이 완료되었습니다. 최근 데이터 품질 화면에서 반영 결과를 확인하세요."
+		));
+		for (int index = 0; index < 20; index += 1) {
+			saveRun(new DataCollectionRun(
+				"collection-failed-" + index,
+				DataCollectionSource.TRANSIT_MASTER,
+				DataCollectionStatus.FAILED,
+				"admin-user",
+				LocalDateTime.parse("2026-06-18T09:10:00").plusMinutes(index),
+				LocalDateTime.parse("2026-06-18T09:10:30").plusMinutes(index),
+				0,
+				"공공데이터 응답 지연",
+				true,
+				"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요."
+			));
+		}
+
+		mockMvc.perform(get("/operator/api/data-collection-failures")
+				.with(httpBasic("operator-user", "operator-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.totalRunCount").value(20))
+			.andExpect(jsonPath("$.data.latestCompletedAtLabel").value("2026-06-18T09:01"))
+			.andExpect(jsonPath("$.data.freshnessAlertLabel").value("정상"))
+			.andExpect(jsonPath("$.data.freshnessAlertClass").value("ok"))
+			.andExpect(jsonPath("$.data.rows[0].statusLabel").value("실패"))
+			.andExpect(jsonPath("$.data.rows[19].statusLabel").value("실패"));
+	}
+
+	@Test
 	@DisplayName("운영기관 데이터 수집 실패 현황 API는 최신 완료 수집이 정확히 24시간이면 점검 필요로 표시한다")
 	void dataCollectionFreshnessRequiresInspectionAtBoundary24Hours() throws Exception {
 		saveRun(new DataCollectionRun(

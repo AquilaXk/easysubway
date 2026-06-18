@@ -46,7 +46,9 @@ class OperatorDataCollectionFailuresAssembler {
 		List<OperatorDataCollectionFailuresView.DataCollectionRunRow> rows = runs.stream()
 			.map(OperatorDataCollectionFailuresAssembler::row)
 			.toList();
-		Optional<LocalDateTime> latestCompletedAt = latestCompletedAt(runs);
+		Optional<LocalDateTime> latestCompletedAt = dataCollectionUseCase
+			.getLatestCompletedRun(DataCollectionSource.TRANSIT_MASTER)
+			.map(DataCollectionRun::completedAt);
 		return new OperatorDataCollectionFailuresView(
 			rows.size(),
 			failedRunCount,
@@ -57,14 +59,6 @@ class OperatorDataCollectionFailuresAssembler {
 			freshnessAlertClass(latestCompletedAt),
 			rows
 		);
-	}
-
-	private static Optional<LocalDateTime> latestCompletedAt(List<DataCollectionRun> runs) {
-		return runs.stream()
-			.filter(run -> run.status() == DataCollectionStatus.COMPLETED)
-			.map(DataCollectionRun::completedAt)
-			.filter(completedAt -> completedAt != null)
-			.max(LocalDateTime::compareTo);
 	}
 
 	private String freshnessAlertLabel(Optional<LocalDateTime> latestCompletedAt) {
