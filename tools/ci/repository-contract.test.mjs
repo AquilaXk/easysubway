@@ -1821,6 +1821,12 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const searchDashboardController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchAdminPageController.java",
   );
+  const searchDashboardApiController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchAdminApiController.java",
+  );
+  const searchDashboardView = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchDashboardView.java",
+  );
   const feedbackDashboardController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackAdminPageController.java",
   );
@@ -1932,6 +1938,16 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /@GetMapping\("\/api\/v1\/routes\/\{routeSearchId\}"\)/);
   assert.match(searchDashboardController, /@GetMapping\("\/admin\/routes\/searches\/page"\)/);
   assert.match(searchDashboardController, /RouteSearchDashboardUseCase/);
+  assert.match(searchDashboardController, /RouteSearchDashboardView\.from\(summary\)/);
+  assert.match(searchDashboardApiController, /@RestController/);
+  assert.match(searchDashboardApiController, /@GetMapping\("\/admin\/routes\/searches\/summary"\)/);
+  assert.match(searchDashboardApiController, /ApiResponse<RouteSearchDashboardView>/);
+  assert.match(searchDashboardApiController, /RouteSearchDashboardView\.from\(routeSearchDashboardUseCase\.summarizeRouteSearches\(\)\)/);
+  assert.match(searchDashboardView, /record RouteSearchDashboardView/);
+  assert.match(searchDashboardView, /record MobilityTypeCountRow/);
+  assert.match(searchDashboardView, /record RegionUsageCountRow/);
+  assert.match(searchDashboardView, /record BlockedReasonCountRow/);
+  assert.doesNotMatch(searchDashboardView, /routeSearchId|stationId/);
   assert.match(searchDashboardTemplate, /경로 검색 현황/);
   assert.match(searchDashboardTemplate, /전체 검색/);
   assert.match(searchDashboardTemplate, /이동 프로필별 검색/);
