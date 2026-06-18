@@ -19,6 +19,10 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function ignoredVulnBlocks(osvConfig) {
+  return osvConfig.split(/\[\[IgnoredVulns\]\]\n/).slice(1);
+}
+
 function privacyCollectedDataTypeEntry(privacyManifest, dataType) {
   const dataTypesStart = privacyManifest.indexOf("<key>NSPrivacyCollectedDataTypes</key>");
   assert.notEqual(dataTypesStart, -1, "PrivacyInfo.xcprivacy must declare collected data types");
@@ -45,7 +49,7 @@ function androidManifestPermissions(androidManifest) {
 }
 
 function jobBlock(workflow, startJob, nextJob) {
-  const pattern = new RegExp(`  ${startJob}:[\\s\\S]*?\\n  ${nextJob}:`);
+  const pattern = new RegExp(`(^|\\n)  ${startJob}:[\\s\\S]*?\\n  ${nextJob}:`);
   const match = workflow.match(pattern);
   assert.ok(match, `${startJob} job block not found`);
   return match[0];
@@ -421,6 +425,96 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
     mobileJob,
     /node --test --test-name-pattern "모바일 generic catch\|모바일 접근성 출시 QA\|릴리즈 보안 기준선\|모바일 스토어 심사 정보 기준선\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
+});
+
+test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const dependencyScanJob = jobBlock(workflow, "dependency-vulnerability-scan", "repository-contracts");
+
+  assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
+  assert.match(dependencyScanJob, /name: Dependency Vulnerability Scan/);
+  assert.match(dependencyScanJob, /needs: changes/);
+  assert.match(dependencyScanJob, /github\.event_name == 'pull_request'/);
+  assert.match(dependencyScanJob, /needs\.changes\.outputs\.docs_only != 'true'/);
+  assert.match(dependencyScanJob, /actions:\s*read/);
+  assert.match(dependencyScanJob, /security-events:\s*write/);
+  assert.match(dependencyScanJob, /contents:\s*read/);
+  assert.match(
+    dependencyScanJob,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+  );
+  assert.match(dependencyScanJob, /scan-args:\s*\|-/);
+  assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/pubspec\.lock/);
+  assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/android\/app\/gradle\.lockfile/);
+  assert.match(dependencyScanJob, /--lockfile=backend\/gradle\.lockfile/);
+  assert.doesNotMatch(dependencyScanJob, /--config=/);
+  assert.doesNotMatch(dependencyScanJob, /-r \.\/|--recursive/);
+});
+
+test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 추적한다", () => {
+  const backendBuild = read("backend/build.gradle");
+  const androidBuild = read("apps/mobile/android/build.gradle.kts");
+  const backendLockfile = read("backend/gradle.lockfile");
+  const androidLockfile = read("apps/mobile/android/app/gradle.lockfile");
+
+  assert.match(backendBuild, /dependencyLocking\s*\{\s*lockAllConfigurations\(\)\s*\}/);
+  assert.match(
+    androidBuild,
+    /dependencyLocking\s*\{[\s\S]*?lockAllConfigurations\(\)[\s\S]*?ignoredDependencies\.add\("io\.flutter:\*"\)[\s\S]*?\}/,
+  );
+  assert.match(backendLockfile, /This is a Gradle generated file for dependency locking/);
+  assert.match(androidLockfile, /This is a Gradle generated file for dependency locking/);
+  assert.match(backendLockfile, /\n[^#\n][^=\n]+=/);
+  assert.match(androidLockfile, /\n[^#\n][^=\n]+=/);
+  assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
+});
+
+test("OSV baseline은 기존 취약점 ID를 lockfile 위치별로 좁게 예외 처리한다", () => {
+  assert.equal(existsSync(path.join(root, ".github/osv-scanner-release-baseline.toml")), false);
+
+  const baselineConfigs = [
+    {
+      configPath: "apps/mobile/android/app/osv-scanner.toml",
+      lockfilePath: "apps/mobile/android/app/gradle.lockfile",
+      expectedCount: 33,
+      reasonPattern: /^reason = "기존 Android Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다\."/m,
+    },
+    {
+      configPath: "backend/osv-scanner.toml",
+      lockfilePath: "backend/gradle.lockfile",
+      expectedCount: 38,
+      reasonPattern: /^reason = "기존 backend Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다\."/m,
+    },
+  ];
+  const allIds = new Set();
+  let totalIds = 0;
+
+  for (const { configPath, lockfilePath, expectedCount, reasonPattern } of baselineConfigs) {
+    assert.equal(path.dirname(configPath), path.dirname(lockfilePath));
+    const config = read(configPath);
+    const blocks = ignoredVulnBlocks(config);
+    const ids = new Set();
+
+    assert.equal(blocks.length, expectedCount, `${configPath} must document the current vulnerable advisory IDs`);
+    assert.doesNotMatch(config, /\[\[PackageOverrides\]\]/);
+    assert.doesNotMatch(config, /^vulnerability\.ignore = true/m);
+    assert.doesNotMatch(config, /^ignore = true/m);
+
+    for (const block of blocks) {
+      const id = block.match(/^id = "([^"]+)"/m)?.[1];
+
+      assert.ok(id, "OSV baseline ignore must include a vulnerability id");
+      assert.match(id, /^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$/);
+      assert.ok(!ids.has(id), `${configPath} must not duplicate vulnerability IDs`);
+      assert.match(block, reasonPattern);
+      ids.add(id);
+      allIds.add(id);
+      totalIds += 1;
+    }
+  }
+
+  assert.equal(totalIds, 71, "OSV baseline must keep per-lockfile findings explicit");
+  assert.equal(allIds.size, 67, "OSV baseline must track the current unique advisory ID set");
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
@@ -2711,6 +2805,17 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(gitignore, /^\*.pem$/m);
   assert.match(gitignore, /^\*.key$/m);
   assert.match(gitignore, /^google-services\.json$/m);
+  const dependencyReview = items.get("repository_dependency_review");
+  assert.ok(dependencyReview.evidence.includes("osv-scanner-pr-result"));
+  assert.match(dependencyReview.readyWhenKo, /OSV Scanner|취약/);
+  assert.ok(dependencyReview.linkedArtifacts.includes(".github/workflows/ci.yml"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("backend/gradle.lockfile"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("backend/osv-scanner.toml"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("backend/build.gradle"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("apps/mobile/android/app/gradle.lockfile"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("apps/mobile/android/app/osv-scanner.toml"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("apps/mobile/android/app/build.gradle.kts"));
+  assert.ok(dependencyReview.linkedArtifacts.includes("apps/mobile/android/build.gradle.kts"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-submission-readiness.json"));
 });

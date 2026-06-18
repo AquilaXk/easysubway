@@ -3,6 +3,11 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    dependencyLocking {
+        lockAllConfigurations()
+        ignoredDependencies.add("io.flutter:*")
+    }
 }
 
 val newBuildDir: Directory =
