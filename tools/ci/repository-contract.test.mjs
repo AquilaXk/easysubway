@@ -423,6 +423,29 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   );
 });
 
+test("Dependency Review 게이트는 PR 의존성 취약점을 차단한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const dependencyReviewJob = jobBlock(workflow, "dependency-review", "repository-contracts");
+
+  assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
+  assert.match(dependencyReviewJob, /name: Dependency Review/);
+  assert.match(dependencyReviewJob, /runs-on: ubuntu-latest/);
+  assert.match(dependencyReviewJob, /needs: changes/);
+  assert.match(dependencyReviewJob, /Dependency Review \/ Skip non-PR or docs-only changes/);
+  assert.match(dependencyReviewJob, /github\.event_name != 'pull_request'/);
+  assert.match(dependencyReviewJob, /needs\.changes\.outputs\.docs_only == 'true'/);
+  assert.match(dependencyReviewJob, /Dependency Review \/ Checkout repository/);
+  assert.match(dependencyReviewJob, /uses: actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/);
+  assert.match(dependencyReviewJob, /fetch-depth: 0/);
+  assert.match(dependencyReviewJob, /Dependency Review \/ Block vulnerable dependency changes/);
+  assert.match(dependencyReviewJob, /uses: actions\/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294/);
+  assert.match(dependencyReviewJob, /fail-on-severity: moderate/);
+  assert.match(dependencyReviewJob, /fail-on-scopes: runtime, development, unknown/);
+  assert.match(dependencyReviewJob, /vulnerability-check: true/);
+  assert.match(dependencyReviewJob, /license-check: false/);
+  assert.match(dependencyReviewJob, /comment-summary-in-pr: never/);
+});
+
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
   const compose = read("infra/docker-compose.yml");
 
@@ -2711,6 +2734,9 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(gitignore, /^\*.pem$/m);
   assert.match(gitignore, /^\*.key$/m);
   assert.match(gitignore, /^google-services\.json$/m);
+  assert.ok(items.get("repository_dependency_review").evidence.includes("dependency-review-ci-result"));
+  assert.match(items.get("repository_dependency_review").readyWhenKo, /Dependency Review|취약/);
+  assert.ok(items.get("repository_dependency_review").linkedArtifacts.includes(".github/workflows/ci.yml"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-submission-readiness.json"));
 });
