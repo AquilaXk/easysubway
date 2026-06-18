@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mobility_profile.dart';
 import 'mobile_error_reporter.dart';
 import 'notification_settings.dart';
+import 'secure_key_value_storage.dart';
 import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
@@ -21,19 +21,18 @@ abstract class OnboardingResultStore {
 
 class SecureOnboardingResultStore implements OnboardingResultStore {
   const SecureOnboardingResultStore({
-    this.storage = const FlutterSecureStorage(),
+    this.storage = const FlutterSecureKeyValueStorage(),
   });
 
-  final FlutterSecureStorage storage;
+  final SecureKeyValueStorage storage;
 
   @override
   Future<OnboardingResult?> readResult() async {
-    final value = await storage.read(key: _onboardingResultStorageKey);
-    if (value == null) {
-      return null;
-    }
-
     try {
+      final value = await storage.read(key: _onboardingResultStorageKey);
+      if (value == null) {
+        return null;
+      }
       return OnboardingResult.decode(value);
     } catch (error, stackTrace) {
       reportMobileError(
@@ -41,7 +40,7 @@ class SecureOnboardingResultStore implements OnboardingResultStore {
         stackTrace,
         context: '저장된 온보딩 설정을 읽는 중 예외가 발생했습니다.',
       );
-      await clearResult();
+      await _clearResultAfterReadFailure();
       return null;
     }
   }
@@ -57,6 +56,18 @@ class SecureOnboardingResultStore implements OnboardingResultStore {
   @override
   Future<void> clearResult() async {
     await storage.delete(key: _onboardingResultStorageKey);
+  }
+
+  Future<void> _clearResultAfterReadFailure() async {
+    try {
+      await clearResult();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '손상된 온보딩 설정을 지우는 중 예외가 발생했습니다.',
+      );
+    }
   }
 }
 

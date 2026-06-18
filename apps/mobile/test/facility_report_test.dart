@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'fake_secure_key_value_storage.dart';
+
 void main() {
   test('시설 신고 사진 선택기는 복구된 사진을 첨부 데이터로 바꾼다', () async {
     final tempDir = await Directory.systemTemp.createTemp(
@@ -34,6 +36,31 @@ void main() {
     expect(attachment!.fileName, 'restored-photo.png');
     expect(attachment.contentType, 'image/png');
     expect(attachment.dataBase64, 'AQIDBA==');
+  });
+
+  test('시설 신고 임시 대상 저장소는 secure storage 복원 실패 시 저장값을 지운다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+    );
+    final store = SecureFacilityReportDraftTargetStore(storage: storage);
+
+    final target = await store.readTarget();
+
+    expect(target, isNull);
+    expect(storage.deletedKeys, hasLength(1));
+  });
+
+  test('시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+      deleteError: StateError('secure storage delete failed'),
+    );
+    final store = SecureFacilityReportDraftTargetStore(storage: storage);
+
+    final target = await store.readTarget();
+
+    expect(target, isNull);
+    expect(storage.deletedKeys, isEmpty);
   });
 
   test('시설 신고 사진 선택기는 복구할 사진이 없으면 첨부하지 않는다', () async {
