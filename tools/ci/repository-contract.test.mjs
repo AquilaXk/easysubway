@@ -419,7 +419,7 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|모바일 접근성 출시 QA\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
@@ -2498,6 +2498,59 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
+});
+
+test("모바일 접근성 출시 QA 기준선은 Android와 iOS 제출 전 확인 항목을 고정한다", () => {
+  const qaPath = "apps/mobile/release/accessibility-release-qa.json";
+  assert.ok(existsSync(path.join(root, qaPath)));
+
+  const qa = readJson(qaPath);
+
+  assert.equal(qa.schemaVersion, 1);
+  assert.equal(qa.applicationId, "easysubway");
+  assert.equal(qa.releaseGate, "store-accessibility-qa");
+  assert.ok(Array.isArray(qa.checks));
+
+  const checks = new Map(qa.checks.map((check) => [check.id, check]));
+  const requiredIds = [
+    "android_talkback_home_navigation",
+    "android_font_scale_150",
+    "android_high_contrast",
+    "android_location_permission_denied",
+    "android_network_error_recovery",
+    "android_server_error_recovery",
+    "android_push_opt_in_out",
+    "android_reinstall_secure_storage_restore",
+    "ios_voiceover_home_navigation",
+    "ios_dynamic_type_accessibility_size",
+    "ios_bold_text",
+    "ios_increase_contrast",
+    "ios_reduce_motion",
+    "ios_location_permission_denied",
+    "ios_network_error_recovery",
+    "ios_safe_area_small_screen_tap_targets",
+  ];
+  assert.deepEqual([...checks.keys()].sort(), requiredIds.toSorted());
+
+  for (const id of requiredIds) {
+    const check = checks.get(id);
+    assert.match(check.platform, /^(android|ios)$/);
+    assert.equal(typeof check.titleKo, "string", `${id} must have Korean title`);
+    assert.ok(check.titleKo.length > 0, `${id} title must not be empty`);
+    assert.equal(typeof check.environmentKo, "string", `${id} must describe environment`);
+    assert.equal(typeof check.flowKo, "string", `${id} must describe flow`);
+    assert.equal(typeof check.passCriteriaKo, "string", `${id} must describe pass criteria`);
+    assert.equal(typeof check.automation, "string", `${id} must describe automation level`);
+    assert.ok(Array.isArray(check.evidence), `${id} must list evidence`);
+    assert.ok(check.evidence.length > 0, `${id} must require evidence`);
+  }
+
+  assert.match(checks.get("android_talkback_home_navigation").environmentKo, /TalkBack/);
+  assert.match(checks.get("android_font_scale_150").environmentKo, /150%|1\.5/);
+  assert.match(checks.get("android_reinstall_secure_storage_restore").flowKo, /재설치|복원/);
+  assert.match(checks.get("ios_voiceover_home_navigation").environmentKo, /VoiceOver/);
+  assert.match(checks.get("ios_dynamic_type_accessibility_size").environmentKo, /Dynamic Type/);
+  assert.match(checks.get("ios_safe_area_small_screen_tap_targets").passCriteriaKo, /터치|safe area/);
 });
 
 test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
