@@ -19,6 +19,10 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function packageOverrideBlocks(osvConfig) {
+  return osvConfig.split(/\[\[PackageOverrides\]\]\n/).slice(1);
+}
+
 function privacyCollectedDataTypeEntry(privacyManifest, dataType) {
   const dataTypesStart = privacyManifest.indexOf("<key>NSPrivacyCollectedDataTypes</key>");
   assert.notEqual(dataTypesStart, -1, "PrivacyInfo.xcprivacy must declare collected data types");
@@ -439,6 +443,9 @@ test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한�
     dependencyScanJob,
     /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
   );
+  assert.match(dependencyScanJob, /scan-args:\s*\|-/);
+  assert.match(dependencyScanJob, /--config=\.github\/osv-scanner-release-baseline\.toml/);
+  assert.match(dependencyScanJob, /-r \.\//);
 });
 
 test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 추적한다", () => {
@@ -448,11 +455,43 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   const androidLockfile = read("apps/mobile/android/app/gradle.lockfile");
 
   assert.match(backendBuild, /dependencyLocking\s*\{\s*lockAllConfigurations\(\)\s*\}/);
-  assert.match(androidBuild, /dependencyLocking\s*\{\s*lockAllConfigurations\(\)\s*\}/);
+  assert.match(
+    androidBuild,
+    /dependencyLocking\s*\{[\s\S]*?lockAllConfigurations\(\)[\s\S]*?ignoredDependencies\.add\("io\.flutter:\*"\)[\s\S]*?\}/,
+  );
   assert.match(backendLockfile, /This is a Gradle generated file for dependency locking/);
   assert.match(androidLockfile, /This is a Gradle generated file for dependency locking/);
   assert.match(backendLockfile, /\n[^#\n][^=\n]+=/);
   assert.match(androidLockfile, /\n[^#\n][^=\n]+=/);
+  assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
+});
+
+test("OSV baseline은 기존 취약 패키지 버전만 좁게 예외 처리한다", () => {
+  const osvConfig = read(".github/osv-scanner-release-baseline.toml");
+  const lockfiles = [
+    read("backend/gradle.lockfile"),
+    read("apps/mobile/android/app/gradle.lockfile"),
+  ].join("\n");
+  const blocks = packageOverrideBlocks(osvConfig);
+  const packageVersions = new Set();
+
+  assert.equal(blocks.length, 32, "OSV baseline must document only the current vulnerable package versions");
+  for (const block of blocks) {
+    const packageName = block.match(/^name = "([^"]+)"/m)?.[1];
+    const packageVersion = block.match(/^version = "([^"]+)"/m)?.[1];
+
+    assert.ok(packageName, "OSV baseline package override must include a package name");
+    assert.ok(packageVersion, "OSV baseline package override must include a package version");
+    assert.doesNotMatch(packageName, /\*/, "OSV baseline package override names must not use wildcards");
+    assert.doesNotMatch(packageVersion, /\*/, "OSV baseline package override versions must not use wildcards");
+    assert.match(lockfiles, new RegExp(`^${packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:${packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=`, "m"));
+    assert.ok(!packageVersions.has(`${packageName}:${packageVersion}`), "OSV baseline package overrides must be unique");
+    packageVersions.add(`${packageName}:${packageVersion}`);
+    assert.match(block, /^ecosystem = "Maven"/m);
+    assert.match(block, /^vulnerability\.ignore = true/m);
+    assert.match(block, /^reason = "기존 Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다\."/m);
+    assert.doesNotMatch(block, /^ignore = true/m);
+  }
 });
 
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {

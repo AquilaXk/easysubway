@@ -6,6 +6,7 @@ allprojects {
 
     dependencyLocking {
         lockAllConfigurations()
+        ignoredDependencies.add("io.flutter:*")
     }
 }
 
