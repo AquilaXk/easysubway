@@ -1187,6 +1187,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+  const adminPageController = read(
+    "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
+  );
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const operatorReportController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
@@ -1231,6 +1234,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorDataCollectionFailuresTemplate = read(
     "backend/src/main/resources/templates/operator/data-collection-failures.html",
   );
+  const adminReportListTemplate = read("backend/src/main/resources/templates/admin/reports/list.html");
 
   assert.match(report, /record FacilityReport/);
   assert.match(report, /reviewedAt/);
@@ -1307,6 +1311,13 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /Principal principal/);
   assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
+  assert.match(adminPageController, /REPORT_SURGE_ALERT_THRESHOLD = 10/);
+  assert.match(adminPageController, /REPORT_SURGE_LOOKBACK_HOURS = 24/);
+  assert.match(adminPageController, /ReportSurgeAlertView/);
+  assert.match(adminPageController, /reportSurgeAlert/);
+  assert.match(adminPageController, /점검 필요/);
+  assert.match(adminReportListTemplate, /신고 급증/);
+  assert.match(adminReportListTemplate, /최근 24시간 신고/);
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
