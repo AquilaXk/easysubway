@@ -1824,6 +1824,9 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const feedbackDashboardController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackAdminPageController.java",
   );
+  const feedbackDashboardApiController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackAdminApiController.java",
+  );
   const feedbackDashboardAssembler = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteFeedbackDashboardAssembler.java",
   );
@@ -1939,6 +1942,10 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(feedbackDashboardController, /@GetMapping\("\/admin\/routes\/feedback\/page"\)/);
   assert.match(feedbackDashboardController, /RouteFeedbackDashboardAssembler/);
   assert.match(feedbackDashboardController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
+  assert.match(feedbackDashboardApiController, /@RestController/);
+  assert.match(feedbackDashboardApiController, /@GetMapping\("\/admin\/routes\/feedback\/summary"\)/);
+  assert.match(feedbackDashboardApiController, /ApiResponse<RouteFeedbackDashboardView>/);
+  assert.match(feedbackDashboardApiController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
   assert.match(feedbackDashboardAssembler, /RouteFeedbackDashboardUseCase/);
   assert.match(feedbackDashboardAssembler, /summarizeRouteFeedbacks/);
   assert.match(feedbackDashboardAssembler, /recentBlockedFeedbacks/);
