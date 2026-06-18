@@ -1987,6 +1987,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /_OnboardingPreferenceScope/);
   assert.match(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
   assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
+  assert.match(main, /mediaQuery\.boldText/);
+  assert.match(main, /_themeForPlatformAccessibility/);
+  assert.match(main, /WidgetStateProperty\.resolveWith/);
   assert.match(main, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
@@ -2019,6 +2022,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /MediaQuery\.textScalerOf/);
   assert.match(accessibilityBaselineTest, /모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다/);
   assert.match(accessibilityBaselineTest, /tester\.ensureSemantics\(\)/);
+  assert.match(accessibilityBaselineTest, /FakeAccessibilityFeatures\([\s\S]*boldText: true[\s\S]*disableAnimations: true[\s\S]*reduceMotion: true/);
+  assert.match(accessibilityBaselineTest, /MediaQuery\.boldTextOf/);
+  assert.match(accessibilityBaselineTest, /MediaQuery\.disableAnimationsOf/);
   assert.match(accessibilityBaselineTest, /androidTapTargetGuideline/);
   assert.match(accessibilityBaselineTest, /iOSTapTargetGuideline/);
   assert.match(accessibilityBaselineTest, /labeledTapTargetGuideline/);
