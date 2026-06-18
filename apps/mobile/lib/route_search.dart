@@ -1839,12 +1839,6 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                           icon: Icons.block,
                         ),
                     ],
-                    if (result.isBlocked)
-                      const _RouteNotice(
-                        title: '다음 행동',
-                        text: _routeSearchFailureNextAction,
-                        icon: Icons.refresh,
-                      ),
                     if (result.warnings.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       for (final warning in result.warnings)
@@ -1864,10 +1858,12 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
             ),
           ),
           if (result.isBlocked)
-            Semantics(
-              container: true,
-              label: '다음 행동, $_routeSearchFailureNextAction',
-              child: const SizedBox.shrink(),
+            const _RouteNotice(
+              key: Key('routeBlockedNextActionNotice'),
+              title: '다음 행동',
+              text: _routeSearchFailureNextAction,
+              icon: Icons.refresh,
+              semanticsLabel: '다음 행동, $_routeSearchFailureNextAction',
             ),
         ],
       ),
@@ -2070,18 +2066,21 @@ class _RouteGuidanceChip extends StatelessWidget {
 
 class _RouteNotice extends StatelessWidget {
   const _RouteNotice({
+    super.key,
     required this.title,
     required this.text,
     required this.icon,
+    this.semanticsLabel,
   });
 
   final String title;
   final String text;
   final IconData icon;
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final notice = Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -2124,6 +2123,15 @@ class _RouteNotice extends StatelessWidget {
           ),
         ),
       ),
+    );
+    final label = semanticsLabel;
+    if (label == null) {
+      return notice;
+    }
+    return Semantics(
+      container: true,
+      label: label,
+      child: ExcludeSemantics(child: notice),
     );
   }
 }
