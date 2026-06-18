@@ -3,6 +3,10 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    dependencyLocking {
+        lockAllConfigurations()
+    }
 }
 
 val newBuildDir: Directory =
