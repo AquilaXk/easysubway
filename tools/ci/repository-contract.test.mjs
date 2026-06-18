@@ -2234,6 +2234,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidProfileManifest, /android:usesCleartextTraffic="true"/);
   assert.match(androidProfileManifest, /tools:replace="android:usesCleartextTraffic"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
+  assert.match(androidBuildGradle, /targetSdk\s*=\s*maxOf\(35,\s*flutter\.targetSdkVersion\)/);
   assert.match(androidBuildGradle, /create\("release"\)/);
   assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
   assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEYSTORE_PATH"/);
