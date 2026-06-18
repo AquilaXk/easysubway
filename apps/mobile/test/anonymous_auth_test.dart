@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_secure_key_value_storage.dart';
+
 void main() {
   test('익명 인증 API 저장소는 발급 응답을 파싱한다', () async {
     late String requestedMethod;
@@ -64,6 +66,18 @@ void main() {
       firstHeader,
       'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
     );
+  });
+
+  test('익명 인증 저장소는 secure storage 복원 실패 시 저장값을 지운다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+    );
+    final store = SecureAnonymousAuthCredentialStore(storage: storage);
+
+    final credentials = await store.readCredentials();
+
+    expect(credentials, isNull);
+    expect(storage.deletedKeys, hasLength(1));
   });
 
   test('익명 인증 세션은 저장된 인증 정보를 먼저 사용한다', () async {

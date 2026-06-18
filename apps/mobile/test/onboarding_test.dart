@@ -7,6 +7,8 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_secure_key_value_storage.dart';
+
 void main() {
   test('온보딩 보기 설정은 쉬운 기본값으로 시작한다', () {
     const preferences = OnboardingViewPreferences.defaults();
@@ -14,6 +16,18 @@ void main() {
     expect(preferences.largeTextEnabled, isTrue);
     expect(preferences.highContrastEnabled, isFalse);
     expect(preferences.simpleViewEnabled, isTrue);
+  });
+
+  test('온보딩 저장소는 secure storage 복원 실패 시 저장값을 지운다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+    );
+    final store = SecureOnboardingResultStore(storage: storage);
+
+    final result = await store.readResult();
+
+    expect(result, isNull);
+    expect(storage.deletedKeys, hasLength(1));
   });
 
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
