@@ -1418,6 +1418,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(dashboardController, /successRateLabel/);
   assert.match(dashboardController, /failureRateLabel/);
   assert.match(dashboardController, /failureAlertLabel/);
+  assert.match(dashboardController, /failureAlertClass/);
   assert.match(operatorPushNotificationReportController, /@GetMapping\("\/operator\/api\/push-notification-report"\)/);
   assert.match(operatorPushNotificationReportController, /ApiResponse<OperatorPushNotificationReportView>/);
   assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
@@ -1440,6 +1441,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(dashboardTemplate, /발송 성공률/);
   assert.match(dashboardTemplate, /발송 실패율/);
   assert.match(dashboardTemplate, /점검 필요/);
+  assert.match(dashboardTemplate, /delivery-alert/);
   assert.match(dashboardTemplate, /상태별 알림/);
   assert.match(dashboardTemplate, /최근 실패/);
   assert.doesNotMatch(dashboardTemplate, /deviceToken/);
