@@ -86,7 +86,9 @@ CREATE TABLE IF NOT EXISTS data_collection_runs (
 	started_at TIMESTAMP NOT NULL,
 	completed_at TIMESTAMP,
 	collected_count INTEGER NOT NULL,
-	failure_message VARCHAR(1000)
+	failure_message VARCHAR(1000),
+	retryable BOOLEAN NOT NULL DEFAULT FALSE,
+	operator_action VARCHAR(500) NOT NULL DEFAULT '수집이 완료되었습니다. 최근 데이터 품질 화면에서 반영 결과를 확인하세요.'
 );
 
 CREATE INDEX IF NOT EXISTS idx_data_collection_runs_started_at
