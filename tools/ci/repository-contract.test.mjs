@@ -1893,8 +1893,14 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const operatorRouteFeedbackReportController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRouteFeedbackReportController.java",
   );
+  const operatorRouteFeedbackReportPageController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRouteFeedbackReportPageController.java",
+  );
   const searchDashboardTemplate = read("backend/src/main/resources/templates/admin/routes/searches.html");
   const feedbackDashboardTemplate = read("backend/src/main/resources/templates/admin/routes/feedback.html");
+  const operatorRouteFeedbackReportTemplate = read(
+    "backend/src/main/resources/templates/operator/route-feedback-report.html",
+  );
   const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
 
   assert.match(result, /record RouteSearchResult/);
@@ -2024,6 +2030,10 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorRouteFeedbackReportController, /@GetMapping\("\/operator\/api\/route-feedback-report"\)/);
   assert.match(operatorRouteFeedbackReportController, /ApiResponse<RouteFeedbackDashboardView>/);
   assert.match(operatorRouteFeedbackReportController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
+  assert.match(operatorRouteFeedbackReportPageController, /@GetMapping\("\/operator\/route-feedback-report\/page"\)/);
+  assert.match(operatorRouteFeedbackReportPageController, /RouteFeedbackDashboardAssembler/);
+  assert.match(operatorRouteFeedbackReportPageController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
+  assert.match(operatorRouteFeedbackReportPageController, /return "operator\/route-feedback-report"/);
   assert.match(feedbackDashboardTemplate, /경로 피드백 현황/);
   assert.match(feedbackDashboardTemplate, /전체 피드백/);
   assert.match(feedbackDashboardTemplate, /평점별 피드백/);
@@ -2034,6 +2044,11 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(feedbackDashboardTemplate, /userId/);
   assert.doesNotMatch(feedbackDashboardTemplate, /routeSearchId/);
   assert.doesNotMatch(feedbackDashboardTemplate, /comment/);
+  assert.match(operatorRouteFeedbackReportTemplate, /운영기관 이동 불편 신고 분석/);
+  assert.match(operatorRouteFeedbackReportTemplate, /읽기 전용 리포트/);
+  assert.match(operatorRouteFeedbackReportTemplate, /평점별 피드백/);
+  assert.match(operatorRouteFeedbackReportTemplate, /최근 현장 차단 신고/);
+  assert.doesNotMatch(operatorRouteFeedbackReportTemplate, /<form|_csrf|routeSearchId|userId|comment|\/admin\/reports/);
 });
 
 test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다", () => {
