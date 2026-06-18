@@ -2154,6 +2154,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
   assert.match(widgetTest, /도움말은 안전 고지와 데이터 한계를 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /도움말은 보안 문의와 취약점 접수 경로를 안내한다/);
+  assert.match(main, /보안 문의 안내/);
+  assert.match(main, /취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요\./);
+  assert.match(main, /EASYSUBWAY_SECURITY_EMAIL/);
+  assert.match(read("README.md"), /EASYSUBWAY_SECURITY_EMAIL/);
   assert.match(routeSearch, /routeSearchFailureNextAction/);
   assert.match(routeSearch, /역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요\./);
   assert.match(routeSearch, /다음 행동 \$_routeSearchFailureNextAction/);
