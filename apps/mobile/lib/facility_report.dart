@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
+import 'secure_key_value_storage.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
@@ -574,18 +574,20 @@ abstract class FacilityReportDraftTargetStore {
 class SecureFacilityReportDraftTargetStore
     implements FacilityReportDraftTargetStore {
   const SecureFacilityReportDraftTargetStore({
-    this.storage = const FlutterSecureStorage(),
+    this.storage = const FlutterSecureKeyValueStorage(),
   });
 
-  final FlutterSecureStorage storage;
+  final SecureKeyValueStorage storage;
 
   @override
   Future<FacilityReportTarget?> readTarget() async {
-    final value = await storage.read(key: _facilityReportDraftTargetStorageKey);
-    if (value == null) {
-      return null;
-    }
     try {
+      final value = await storage.read(
+        key: _facilityReportDraftTargetStorageKey,
+      );
+      if (value == null) {
+        return null;
+      }
       return FacilityReportTarget.decode(value);
     } catch (error, stackTrace) {
       reportMobileError(
@@ -593,7 +595,7 @@ class SecureFacilityReportDraftTargetStore
         stackTrace,
         context: '저장된 시설 신고 대상을 읽는 중 예외가 발생했습니다.',
       );
-      await clearTarget();
+      await _clearTargetAfterReadFailure();
       return null;
     }
   }
@@ -609,6 +611,18 @@ class SecureFacilityReportDraftTargetStore
   @override
   Future<void> clearTarget() async {
     await storage.delete(key: _facilityReportDraftTargetStorageKey);
+  }
+
+  Future<void> _clearTargetAfterReadFailure() async {
+    try {
+      await clearTarget();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '손상된 시설 신고 대상을 지우는 중 예외가 발생했습니다.',
+      );
+    }
   }
 }
 
