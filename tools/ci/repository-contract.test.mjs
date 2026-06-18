@@ -563,6 +563,43 @@ test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () =
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
 });
 
+test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다", () => {
+  const build = read("backend/build.gradle");
+  const applicationYml = read("backend/src/main/resources/application.yml");
+  const applicationDevYml = read("backend/src/main/resources/application-dev.yml");
+  const compose = read("infra/docker-compose.yml");
+  const prometheusConfig = read("infra/prometheus/prometheus.yml");
+  const grafanaDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
+
+  assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
+  assert.doesNotMatch(applicationYml, /prometheus/);
+  assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
+
+  assert.match(compose, /prometheus:\n/);
+  assert.match(compose, /image: prom\/prometheus:v[0-9]+\.[0-9]+\.[0-9]+/);
+  assert.match(compose, /\.\/prometheus\/prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
+  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
+  assert.match(compose, /prometheus-data:\/prometheus/);
+  assert.match(compose, /wget --spider -q http:\/\/localhost:9090\/-\/healthy/);
+
+  assert.match(compose, /grafana:\n/);
+  assert.match(compose, /image: grafana\/grafana:[0-9]+\.[0-9]+\.[0-9]+/);
+  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
+  assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
+  assert.match(compose, /grafana-data:\/var\/lib\/grafana/);
+  assert.match(compose, /\.\/grafana\/provisioning:\/etc\/grafana\/provisioning:ro/);
+
+  assert.match(prometheusConfig, /job_name: "easysubway-backend"/);
+  assert.match(prometheusConfig, /metrics_path: "\/actuator\/prometheus"/);
+  assert.match(prometheusConfig, /targets: \["host\.docker\.internal:8080"\]/);
+
+  assert.match(grafanaDatasource, /name: easysubway-prometheus/);
+  assert.match(grafanaDatasource, /type: prometheus/);
+  assert.match(grafanaDatasource, /url: http:\/\/prometheus:9090/);
+  assert.match(grafanaDatasource, /isDefault: true/);
+});
+
 test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 프로젝트다", () => {
   const build = read("backend/build.gradle");
   const wrapper = read("backend/gradle/wrapper/gradle-wrapper.properties");
