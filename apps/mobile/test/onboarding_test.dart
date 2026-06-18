@@ -30,6 +30,19 @@ void main() {
     expect(storage.deletedKeys, hasLength(1));
   });
 
+  test('온보딩 저장소는 secure storage 삭제 실패에도 null로 복구한다', () async {
+    final storage = FakeSecureKeyValueStorage(
+      readError: StateError('restored Android KeyStore value is invalid'),
+      deleteError: StateError('secure storage delete failed'),
+    );
+    final store = SecureOnboardingResultStore(storage: storage);
+
+    final result = await store.readResult();
+
+    expect(result, isNull);
+    expect(storage.deletedKeys, isEmpty);
+  });
+
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     OnboardingResult? completedResult;
