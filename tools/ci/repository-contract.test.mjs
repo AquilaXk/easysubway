@@ -419,7 +419,7 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch\|모바일 접근성 출시 QA\|모바일 스토어 심사 정보 기준선\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|모바일 접근성 출시 QA\|릴리즈 보안 기준선\|모바일 스토어 심사 정보 기준선\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
@@ -2631,6 +2631,88 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("appstore_backend_api_availability").readyWhenKo, /심사 기간|API/);
   assert.ok(items.get("cross_store_privacy_consistency").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("cross_store_accessibility_claims").linkedArtifacts.includes("apps/mobile/release/accessibility-release-qa.json"));
+});
+
+test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", () => {
+  const gatePath = "apps/mobile/release/release-security-gate.json";
+  assert.ok(existsSync(path.join(root, gatePath)));
+
+  const gate = readJson(gatePath);
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const androidDebugManifest = read("apps/mobile/android/app/src/debug/AndroidManifest.xml");
+  const androidProfileManifest = read("apps/mobile/android/app/src/profile/AndroidManifest.xml");
+  const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const gitignore = read(".gitignore");
+  const commonExceptionHandler = read("backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java");
+  const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const facilityReportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "release-security-gate");
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.match(gate.policyRefreshKo, /출시 전|최신/);
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO)\b|\.{3}/i);
+  assert.ok(Array.isArray(gate.items));
+
+  const items = new Map(gate.items.map((item) => [item.id, item]));
+  const requiredIds = [
+    "mobile_cleartext_disabled",
+    "mobile_debug_network_overrides_limited",
+    "mobile_release_signing_externalized",
+    "mobile_test_credentials_absent",
+    "mobile_error_stacktrace_sanitized",
+    "backend_admin_auth_required",
+    "backend_role_authorization",
+    "backend_report_photo_upload_limits",
+    "backend_error_response_sanitized",
+    "backend_rate_limiting",
+    "backend_sensitive_log_minimization",
+    "repository_secrets_not_tracked",
+    "repository_dependency_review",
+    "repository_codex_security_scan_before_release",
+    "cross_store_privacy_security_consistency",
+  ];
+  assert.deepEqual([...items.keys()].sort(), requiredIds.toSorted());
+
+  const areas = new Set(gate.items.map((item) => item.area));
+  assert.deepEqual([...areas].sort(), ["backend", "cross-store", "mobile", "repository"]);
+
+  for (const id of requiredIds) {
+    const item = items.get(id);
+    assert.match(item.area, /^(mobile|backend|repository|cross-store)$/);
+    assert.equal(item.severity, "release-blocker", `${id} must be release-blocker`);
+    assert.equal(typeof item.titleKo, "string", `${id} must have Korean title`);
+    assert.ok(item.titleKo.length > 0, `${id} title must not be empty`);
+    assert.equal(typeof item.ownerKo, "string", `${id} must have owner`);
+    assert.equal(typeof item.readyWhenKo, "string", `${id} must define ready state`);
+    assert.ok(Array.isArray(item.evidence), `${id} must list evidence`);
+    assert.ok(item.evidence.length > 0, `${id} must require evidence`);
+    assert.ok(Array.isArray(item.linkedArtifacts), `${id} must list linked artifacts`);
+    for (const artifact of item.linkedArtifacts) {
+      assert.ok(existsSync(path.join(root, artifact)), `${id} linked artifact must exist: ${artifact}`);
+    }
+  }
+
+  assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
+  assert.match(androidDebugManifest, /android:usesCleartextTraffic="true"/);
+  assert.match(androidProfileManifest, /android:usesCleartextTraffic="true"/);
+  assert.match(androidBuildGradle, /throw GradleException\([\s\S]*Android release signing values are missing:/);
+  assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
+  assert.match(commonExceptionHandler, /ApiResponse\.fail\("요청 값을 확인해야 합니다\."\)/);
+  assert.doesNotMatch(commonExceptionHandler, /StackTrace|printStackTrace|getStackTrace/);
+  assert.match(securityConfig, /securityMatcher\("\/admin\/\*\*"\)/);
+  assert.match(securityConfig, /hasRole\("ADMIN"\)/);
+  assert.match(securityConfig, /hasRole\("OPERATOR_ADMIN"\)/);
+  assert.match(securityConfig, /validateProdAdminCredentials/);
+  assert.match(facilityReportService, /MAX_PHOTO_BYTES = 900 \* 1024/);
+  assert.match(facilityReportService, /ALLOWED_PHOTO_CONTENT_TYPES/);
+  assert.match(facilityReportService, /Base64\.getDecoder\(\)\.decode/);
+  assert.match(gitignore, /^\*.pem$/m);
+  assert.match(gitignore, /^\*.key$/m);
+  assert.match(gitignore, /^google-services\.json$/m);
+  assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
+  assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-submission-readiness.json"));
 });
 
 test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
