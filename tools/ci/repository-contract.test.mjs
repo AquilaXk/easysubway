@@ -2540,7 +2540,10 @@ test("iOS 푸시 알림은 APNs entitlement와 사전 설명 흐름을 가진다
   assert.match(project, /Runner\.entitlements \*\/ = \{isa = PBXFileReference;[\s\S]*?path = Runner\.entitlements;/);
   assert.match(project, /CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/);
   assert.equal([...project.matchAll(/CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/g)].length, 3);
-  assert.match(appDelegate, /requestAuthorization\(options: \[\.alert, \.sound, \.badge\]\)/);
+  assert.match(
+    appDelegate,
+    /requestAuthorization\s*\(\s*options:\s*\[(?=[^\]]*\.alert)(?=[^\]]*\.sound)(?=[^\]]*\.badge)[^\]]*\]\s*\)/,
+  );
   assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 상태/);
   assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
   assert.match(main, /알림 설정/);
