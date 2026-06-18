@@ -743,6 +743,30 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("휠체어 역 내부 이동 경로는 해당 간선의 엘리베이터가 고장나면 다른 정상 시설이 있어도 차단한다")
+	void wheelchairInternalRouteBlocksBrokenEdgeElevatorEvenWithOtherNormalFacility() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeEdgeService = new RouteSearchService(
+			repository,
+			repository,
+			new BrokenElevatorWithOtherNormalFacilityInternalEdgeTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = routeEdgeService.searchInternalRoute(new SearchInternalRouteCommand(
+			"station-a",
+			"node-station-a-entrance",
+			"node-station-a-platform",
+			MobilityType.WHEELCHAIR
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.BLOCKED);
+		assertThat(result.steps()).isEmpty();
+		assertThat(result.blockedReasons())
+			.containsExactly("계단 없는 내부 이동 경로를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("유모차 역 내부 이동 경로는 계단 포함 구간을 경고로 표시한다")
 	void strollerInternalRouteWarnsStairIncludedInternalPath() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -1340,6 +1364,44 @@ class RouteSearchServiceTest {
 		}
 	}
 
+	private static class BrokenElevatorWithOtherNormalFacilityInternalEdgeTransitMasterPort
+		extends BrokenElevatorInternalEdgeTransitMasterPort {
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of(
+				facility(
+					"facility-a-elevator",
+					"station-a",
+					"exit-a-1",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.BROKEN
+				),
+				facility(
+					"facility-a-other-elevator",
+					"station-a",
+					"exit-a-2",
+					AccessibilityFacilityType.ELEVATOR,
+					AccessibilityFacilityStatus.NORMAL
+				)
+			);
+		}
+
+		@Override
+		public List<RouteNode> loadRouteNodes() {
+			return List.of(
+				routeNode(
+					"node-station-a-entrance",
+					"station-a",
+					RouteNodeType.ENTRANCE,
+					"출입구",
+					"facility-a-elevator"
+				),
+				routeNode("node-station-a-platform", "station-a", RouteNodeType.PLATFORM, "승강장")
+			);
+		}
+	}
+
 	private static class MixedInternalAndTrainEdgeTransitMasterPort extends ExitSummaryAccessibleTransitMasterPort {
 
 		@Override
@@ -1349,6 +1411,18 @@ class RouteSearchServiceTest {
 				trainEdge("edge-a-train", "station-a"),
 				stairEdge("edge-b-stair", "station-b"),
 				trainEdge("edge-b-train", "station-b")
+			);
+		}
+
+		@Override
+		public List<RouteNode> loadRouteNodes() {
+			return List.of(
+				routeNode("node-station-a-entrance", "station-a", RouteNodeType.ENTRANCE, "출입구"),
+				routeNode("node-station-a-platform", "station-a", RouteNodeType.PLATFORM, "승강장"),
+				routeNode("node-station-a-next-platform", "station-a", RouteNodeType.PLATFORM, "다음 승강장"),
+				routeNode("node-station-b-entrance", "station-b", RouteNodeType.ENTRANCE, "출입구"),
+				routeNode("node-station-b-platform", "station-b", RouteNodeType.PLATFORM, "승강장"),
+				routeNode("node-station-b-next-platform", "station-b", RouteNodeType.PLATFORM, "다음 승강장")
 			);
 		}
 	}
@@ -1491,6 +1565,10 @@ class RouteSearchServiceTest {
 	}
 
 	private static RouteNode routeNode(String id, String stationId, RouteNodeType type, String name) {
+		return routeNode(id, stationId, type, name, null);
+	}
+
+	private static RouteNode routeNode(String id, String stationId, RouteNodeType type, String name, String facilityId) {
 		return new RouteNode(
 			id,
 			stationId,
@@ -1499,7 +1577,7 @@ class RouteSearchServiceTest {
 			"B1",
 			null,
 			null,
-			null,
+			facilityId,
 			"layout-" + stationId,
 			10,
 			20,

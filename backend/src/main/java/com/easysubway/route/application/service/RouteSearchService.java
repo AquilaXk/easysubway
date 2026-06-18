@@ -188,7 +188,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			edges,
 			fromNode.id(),
 			toNode.id(),
-			edge -> isAllowedInternalEdge(station.id(), edge, profileWeight)
+			edge -> isAllowedInternalEdge(station.id(), edge, profileWeight, nodesById)
 		);
 		if (path.isEmpty()) {
 			if (profileWeight.blocksStairOnlyAccess() && hasAnyInternalPath(edges, fromNode.id(), toNode.id())) {
@@ -450,13 +450,37 @@ public class RouteSearchService implements RouteSearchUseCase {
 		if (activeStationEdges.isEmpty()) {
 			return Optional.empty();
 		}
+		Optional<Map<String, RouteNode>> nodesById = stationRouteNodesByIdIfSupported(stationId);
+		if (nodesById.isEmpty()) {
+			return Optional.empty();
+		}
+		List<RouteEdge> edgesWithNodes = activeStationEdges.stream()
+			.filter(edge -> nodesById.get().containsKey(edge.fromNodeId()) && nodesById.get().containsKey(edge.toNodeId()))
+			.toList();
+		if (edgesWithNodes.isEmpty()) {
+			return Optional.empty();
+		}
 		// 내부 이동 간선 데이터가 있으면 출구 요약보다 실제 승강장 연결 동선을 우선한다.
-		boolean hasUsableStepFreeInternalEdge = activeStationEdges.stream()
-			.anyMatch(edge -> isUsableStepFreeInternalEdge(stationId, edge));
+		boolean hasUsableStepFreeInternalEdge = edgesWithNodes.stream()
+			.anyMatch(edge -> isUsableStepFreeInternalEdge(stationId, edge, nodesById.get()));
 		return Optional.of(!hasUsableStepFreeInternalEdge);
 	}
 
-	private boolean isUsableStepFreeInternalEdge(String stationId, RouteEdge edge) {
+	private Optional<Map<String, RouteNode>> stationRouteNodesByIdIfSupported(String stationId) {
+		try {
+			return Optional.of(stationRouteNodes(stationId)
+				.stream()
+				.collect(Collectors.toMap(RouteNode::id, Function.identity())));
+		} catch (UnsupportedOperationException ignored) {
+			return Optional.empty();
+		}
+	}
+
+	private boolean isUsableStepFreeInternalEdge(
+		String stationId,
+		RouteEdge edge,
+		Map<String, RouteNode> nodesById
+	) {
 		if (edge.hasStairs()) {
 			return false;
 		}
@@ -464,7 +488,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			return false;
 		}
 		if (edge.requiresElevator()) {
-			return hasUsableStepFreeFacility(stationId);
+			return hasUsableStepFreeFacilityForInternalEdge(stationId, edge, nodesById);
 		}
 		return true;
 	}
@@ -562,14 +586,48 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.toList();
 	}
 
-	private boolean isAllowedInternalEdge(String stationId, RouteEdge edge, RouteProfileWeight profileWeight) {
+	private boolean isAllowedInternalEdge(
+		String stationId,
+		RouteEdge edge,
+		RouteProfileWeight profileWeight,
+		Map<String, RouteNode> nodesById
+	) {
 		if (!profileWeight.blocksStairOnlyAccess()) {
 			return true;
 		}
 		if (edge.hasStairs() || edge.requiresEscalator()) {
 			return false;
 		}
-		return !edge.requiresElevator() || hasUsableStepFreeFacility(stationId);
+		return !edge.requiresElevator() || hasUsableStepFreeFacilityForInternalEdge(stationId, edge, nodesById);
+	}
+
+	private boolean hasUsableStepFreeFacilityForInternalEdge(
+		String stationId,
+		RouteEdge edge,
+		Map<String, RouteNode> nodesById
+	) {
+		List<String> facilityIds = internalEdgeFacilityIds(edge, nodesById);
+		if (facilityIds.isEmpty()) {
+			return false;
+		}
+		return stationFacilities(stationId).stream()
+			.filter(facility -> facilityIds.contains(facility.id()))
+			.filter(facility -> facility.dataConfidence() == DataConfidenceLevel.HIGH)
+			.filter(this::isStepFreeFacility)
+			.anyMatch(this::hasUsableStatus);
+	}
+
+	private List<String> internalEdgeFacilityIds(RouteEdge edge, Map<String, RouteNode> nodesById) {
+		List<String> facilityIds = new ArrayList<>();
+		addFacilityId(facilityIds, nodesById.get(edge.fromNodeId()));
+		addFacilityId(facilityIds, nodesById.get(edge.toNodeId()));
+		return List.copyOf(facilityIds);
+	}
+
+	private void addFacilityId(List<String> facilityIds, RouteNode node) {
+		if (node != null && node.facilityId() != null) {
+			facilityIds.add(node.facilityId());
+		}
 	}
 
 	private Optional<List<RouteEdge>> findInternalRoutePath(
