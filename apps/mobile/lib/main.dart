@@ -196,6 +196,7 @@ class SupportAccessInfo {
     required this.privacyPolicyUrl,
     required this.supportEmail,
     required this.dataDeletionEmail,
+    this.securityEmail = '',
   });
 
   const SupportAccessInfo.fromEnvironment()
@@ -205,11 +206,13 @@ class SupportAccessInfo {
       supportEmail = const String.fromEnvironment('EASYSUBWAY_SUPPORT_EMAIL'),
       dataDeletionEmail = const String.fromEnvironment(
         'EASYSUBWAY_DATA_DELETION_EMAIL',
-      );
+      ),
+      securityEmail = const String.fromEnvironment('EASYSUBWAY_SECURITY_EMAIL');
 
   final String privacyPolicyUrl;
   final String supportEmail;
   final String dataDeletionEmail;
+  final String securityEmail;
 }
 
 class _EasySubwayHome extends StatefulWidget {
@@ -1230,6 +1233,17 @@ class SupportAccessScreen extends StatelessWidget {
               launcher: launcher,
             ),
             const SizedBox(height: 12),
+            const _SecurityContactNotice(),
+            const SizedBox(height: 12),
+            _SupportAccessItem(
+              key: const Key('securityContactAccessItem'),
+              icon: Icons.security_outlined,
+              title: '보안 문의',
+              value: accessInfo.securityEmail,
+              uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
+              launcher: launcher,
+            ),
+            const SizedBox(height: 12),
             _SupportAccessItem(
               key: const Key('dataDeletionAccessItem'),
               icon: Icons.delete_outline,
@@ -1240,6 +1254,97 @@ class SupportAccessScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SecurityContactNotice extends StatelessWidget {
+  const _SecurityContactNotice();
+
+  static const _title = '보안 문의 안내';
+  static const _contactNotice = '취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요.';
+  static const _scopeNotice = '위치, 신고 사진, 알림, 계정 접근 문제를 함께 접수할 수 있습니다.';
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      key: const Key('securityContactNotice'),
+      container: true,
+      label: '$_title, $_contactNotice $_scopeNotice',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F2FF),
+            border: Border.all(color: const Color(0xFFC3C9E8)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.security_outlined,
+                      color: Color(0xFF23306E),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _title,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF17204B),
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const _SecurityContactNoticeLine(text: _contactNotice),
+                const _SecurityContactNoticeLine(text: _scopeNotice),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecurityContactNoticeLine extends StatelessWidget {
+  const _SecurityContactNoticeLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 7, color: Color(0xFF30408F)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF27315C),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
