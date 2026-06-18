@@ -885,6 +885,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(useCase, /getReport/);
   assert.match(useCase, /listReports/);
   assert.match(useCase, /reviewReport/);
+  assert.match(useCase, /confirmReportResult\(String reportId, String userId\)/);
   assert.match(command, /record CreateFacilityReportCommand/);
   assert.match(reviewCommand, /record ReviewFacilityReportCommand/);
   assert.match(loadPort, /interface LoadFacilityReportPort/);
@@ -903,7 +904,10 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(service, /FacilityReportStatus\.SUBMITTED/);
   assert.match(service, /FacilityReportStatus\.ACCEPTED/);
   assert.match(service, /FacilityReportStatus\.REJECTED/);
+  assert.match(service, /FacilityReportStatus\.RESOLVED/);
   assert.match(service, /FacilityReportStatus\.DUPLICATE/);
+  assert.match(service, /confirmReportResult\(String reportId, String userId\)/);
+  assert.match(service, /requireConfirmableStatus/);
   assert.match(repository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort/);
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
   assert.match(jdbcRepository, /@Profile\("prod"\)/);
@@ -929,6 +933,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(transitRepository, /saveFacilityStatus\(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/reports"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/reports\/\{reportId\}"\)/);
+  assert.match(controller, /@PostMapping\("\/api\/v1\/reports\/\{reportId\}\/confirm"\)/);
+  assert.match(controller, /confirmReportResult\(reportId, principal\.getName\(\)\)/);
   assert.match(controller, /@GetMapping\("\/admin\/reports"\)/);
   assert.match(controller, /@GetMapping\("\/admin\/reports\/\{reportId\}"\)/);
   assert.match(controller, /@RequestParam\(required = false\) FacilityReportStatus status/);
@@ -943,6 +949,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
   assert.match(security, /@Order\(3\)[\s\S]*?securityMatcher\([\s\S]*?"\/api\/v1\/me"/);
+  assert.match(security, /"\/api\/v1\/reports\/\*\/confirm"/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
