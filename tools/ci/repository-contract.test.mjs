@@ -858,6 +858,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const operatorRepeatedBrokenFacilitiesView = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorRepeatedBrokenFacilitiesView.java",
   );
+  const operatorDataCollectionFailuresController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresController.java",
+  );
+  const operatorDataCollectionFailuresAssembler = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresAssembler.java",
+  );
+  const operatorDataCollectionFailuresView = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorDataCollectionFailuresView.java",
+  );
   const operatorReportTemplate = read("backend/src/main/resources/templates/operator/accessibility-report.html");
 
   assert.match(report, /record FacilityReport/);
@@ -967,6 +976,21 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorRepeatedBrokenFacilitiesView, /int totalRepeatedFacilityCount/);
   assert.match(operatorRepeatedBrokenFacilitiesView, /record RepeatedBrokenFacilityRow/);
   assert.doesNotMatch(operatorRepeatedBrokenFacilitiesView, /stationId|facilityId|userId|description/);
+  assert.match(
+    operatorDataCollectionFailuresController,
+    /@GetMapping\("\/operator\/api\/data-collection-failures"\)/,
+  );
+  assert.match(operatorDataCollectionFailuresController, /ApiResponse<OperatorDataCollectionFailuresView>/);
+  assert.match(operatorDataCollectionFailuresController, /dataCollectionFailuresAssembler\.assemble\(\)/);
+  assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionUseCase/);
+  assert.match(operatorDataCollectionFailuresAssembler, /listRecentRuns/);
+  assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionStatus\.FAILED/);
+  assert.match(operatorDataCollectionFailuresView, /record OperatorDataCollectionFailuresView/);
+  assert.match(operatorDataCollectionFailuresView, /int totalRunCount/);
+  assert.match(operatorDataCollectionFailuresView, /long failedRunCount/);
+  assert.match(operatorDataCollectionFailuresView, /long retryableRunCount/);
+  assert.match(operatorDataCollectionFailuresView, /record DataCollectionRunRow/);
+  assert.doesNotMatch(operatorDataCollectionFailuresView, /runId|requestedBy/);
   assert.match(operatorReportTemplate, /운영기관 접근성 시설 현황/);
   assert.match(operatorReportTemplate, /읽기 전용 리포트/);
   assert.match(operatorReportTemplate, /역별 접근성 점수/);
