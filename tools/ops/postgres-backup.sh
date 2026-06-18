@@ -14,11 +14,17 @@ chmod 700 "${BACKUP_DIR}"
 
 temp_file="$(mktemp "${BACKUP_DIR}/easysubway-postgres-${timestamp}.XXXXXX")"
 backup_file="${temp_file}.dump"
-mv "${temp_file}" "${backup_file}"
+
+cleanup() {
+	rm -f "${temp_file}"
+}
+trap cleanup EXIT
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres sh -lc \
 	'pg_dump --format=custom --no-owner --no-privileges -U "$POSTGRES_USER" "$POSTGRES_DB"' \
-	> "${backup_file}"
+	> "${temp_file}"
 
-test -s "${backup_file}"
+test -s "${temp_file}"
+mv "${temp_file}" "${backup_file}"
+trap - EXIT
 printf '%s\n' "${backup_file}"

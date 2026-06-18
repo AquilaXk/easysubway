@@ -19,6 +19,13 @@ cleanup() {
 	dropdb --if-exists -U "$POSTGRES_USER" "$RESTORE_DB"
 }
 
+case "$RESTORE_DB" in
+	"$POSTGRES_DB"|postgres|template0|template1)
+		printf 'Refusing to use protected restore database: %s\n' "$RESTORE_DB" >&2
+		exit 2
+		;;
+esac
+
 dropdb --if-exists -U "$POSTGRES_USER" "$RESTORE_DB"
 createdb -U "$POSTGRES_USER" "$RESTORE_DB"
 trap cleanup EXIT
