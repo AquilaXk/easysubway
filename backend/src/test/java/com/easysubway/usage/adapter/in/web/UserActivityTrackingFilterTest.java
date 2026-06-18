@@ -32,7 +32,8 @@ class UserActivityTrackingFilterTest {
 
 	private final RecordingUserActivityPort port = new RecordingUserActivityPort();
 	private final MutableClock clock = new MutableClock(FIXED_CLOCK.instant(), FIXED_CLOCK.getZone());
-	private final UserActivityTrackingFilter filter = new UserActivityTrackingFilter(port, port, clock);
+	private final TestTicker ticker = new TestTicker();
+	private final UserActivityTrackingFilter filter = new UserActivityTrackingFilter(port, port, clock, ticker::nanoTime);
 
 	@Test
 	@DisplayName("성공한 인증 사용자 API 요청은 활동으로 기록한다")
@@ -47,7 +48,7 @@ class UserActivityTrackingFilterTest {
 			.containsExactly("anonymous-user-1:2026-06-17T09:00");
 		assertThat(port.apiTrafficRecords)
 			.extracting(record -> record.statusCode() + ":" + record.durationMillis() + ":" + record.occurredAt())
-			.containsExactly("200:125:2026-06-17T09:00:00.125");
+			.containsExactly("200:125:2026-06-17T09:00");
 	}
 
 	@Test
@@ -62,7 +63,7 @@ class UserActivityTrackingFilterTest {
 		assertThat(port.records).isEmpty();
 		assertThat(port.apiTrafficRecords)
 			.extracting(record -> record.statusCode() + ":" + record.durationMillis() + ":" + record.occurredAt())
-			.containsExactly("500:480:2026-06-17T09:00:00.480");
+			.containsExactly("500:480:2026-06-17T09:00");
 	}
 
 	@Test
@@ -75,7 +76,7 @@ class UserActivityTrackingFilterTest {
 		assertThat(port.records).isEmpty();
 		assertThat(port.apiTrafficRecords)
 			.extracting(record -> record.statusCode() + ":" + record.durationMillis() + ":" + record.occurredAt())
-			.containsExactly("200:110:2026-06-17T09:00:00.295");
+			.containsExactly("200:110:2026-06-17T09:00");
 	}
 
 	@Test
@@ -103,13 +104,13 @@ class UserActivityTrackingFilterTest {
 
 	private FilterChain successfulChain(Duration duration) {
 		return (request, response) -> {
-			clock.advance(duration);
+			ticker.advance(duration);
 		};
 	}
 
 	private FilterChain failingChain(Duration duration) {
 		return (request, response) -> {
-			clock.advance(duration);
+			ticker.advance(duration);
 			((MockHttpServletResponse) response).setStatus(500);
 		};
 	}
@@ -157,6 +158,19 @@ class UserActivityTrackingFilterTest {
 
 		private void advance(Duration duration) {
 			instant = instant.plus(duration);
+		}
+	}
+
+	private static final class TestTicker {
+
+		private long nanos;
+
+		private long nanoTime() {
+			return nanos;
+		}
+
+		private void advance(Duration duration) {
+			nanos += duration.toNanos();
 		}
 	}
 
