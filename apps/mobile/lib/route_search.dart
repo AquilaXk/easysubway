@@ -683,6 +683,9 @@ class RouteSearchResult {
     if (blockedReasons.isNotEmpty) {
       parts.add('안내 불가 이유 ${blockedReasons.join(', ')}');
     }
+    if (isBlocked) {
+      parts.add('다음 행동 $_routeSearchFailureNextAction');
+    }
     if (warnings.isNotEmpty) {
       parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
     }
@@ -1754,103 +1757,119 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final arrivalStep = result.arrivalGuidanceStep;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: result.semanticLabel,
-        liveRegion: true,
-        child: ExcludeSemantics(
-          child: Card(
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _RouteResultStatusHeader(result: result),
-                  const SizedBox(height: 14),
-                  Text(
-                    result.statusLabel,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w900,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result.summaryTitle,
-                    style: textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w900,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result.lineLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    result.scoreLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
-                  if (!result.isBlocked &&
-                      result.recommendationReasons.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _RouteRecommendationReasons(
-                      reasons: result.recommendationReasons,
-                    ),
-                  ],
-                  if (arrivalStep != null) ...[
-                    const SizedBox(height: 16),
-                    _RouteArrivalGuidance(step: arrivalStep),
-                  ],
-                  const SizedBox(height: 16),
-                  const _RouteNotice(
-                    title: '안전 안내',
-                    text: _routeSafetyGuidanceNotice,
-                    icon: Icons.info_outline,
-                  ),
-                  if (result.blockedReasons.isNotEmpty) ...[
-                    for (final reason in result.blockedReasons)
-                      _RouteNotice(
-                        title: '안내 불가 이유',
-                        text: reason,
-                        icon: Icons.block,
+    return Semantics(
+      label: result.semanticLabel,
+      liveRegion: true,
+      explicitChildNodes: result.isBlocked,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Card(
+              color: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Color(0xFFD5E2E4)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _RouteResultStatusHeader(result: result),
+                    const SizedBox(height: 14),
+                    Text(
+                      result.statusLabel,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
                       ),
-                  ],
-                  if (result.warnings.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    for (final warning in result.warnings)
-                      _RouteNotice(
-                        title: '주의 확인',
-                        text: warning.message,
-                        icon: Icons.warning_amber,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      result.summaryTitle,
+                      style: textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      result.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF29484B),
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      result.scoreLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF29484B),
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (!result.isBlocked &&
+                        result.recommendationReasons.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _RouteRecommendationReasons(
+                        reasons: result.recommendationReasons,
+                      ),
+                    ],
+                    if (arrivalStep != null) ...[
+                      const SizedBox(height: 16),
+                      _RouteArrivalGuidance(step: arrivalStep),
+                    ],
+                    const SizedBox(height: 16),
+                    const _RouteNotice(
+                      title: '안전 안내',
+                      text: _routeSafetyGuidanceNotice,
+                      icon: Icons.info_outline,
+                    ),
+                    if (result.blockedReasons.isNotEmpty) ...[
+                      for (final reason in result.blockedReasons)
+                        _RouteNotice(
+                          title: '안내 불가 이유',
+                          text: reason,
+                          icon: Icons.block,
+                        ),
+                    ],
+                    if (result.isBlocked)
+                      const _RouteNotice(
+                        title: '다음 행동',
+                        text: _routeSearchFailureNextAction,
+                        icon: Icons.refresh,
+                      ),
+                    if (result.warnings.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      for (final warning in result.warnings)
+                        _RouteNotice(
+                          title: '주의 확인',
+                          text: warning.message,
+                          icon: Icons.warning_amber,
+                        ),
+                    ],
+                    if (result.movementSteps.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      _RouteStepSection(steps: result.movementSteps),
+                    ],
                   ],
-                  if (result.movementSteps.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    _RouteStepSection(steps: result.movementSteps),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          if (result.isBlocked)
+            Semantics(
+              container: true,
+              label: '다음 행동, $_routeSearchFailureNextAction',
+              child: const SizedBox.shrink(),
+            ),
+        ],
       ),
     );
   }
