@@ -336,6 +336,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
+  assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
   assert.doesNotMatch(envExample, /prod|production|secret|token/i);
 });
 
