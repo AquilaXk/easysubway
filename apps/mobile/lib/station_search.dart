@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
 import 'facility_report.dart';
+import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
 
@@ -1829,6 +1830,8 @@ class StationSearchScreen extends StatefulWidget {
     required this.locationProvider,
     this.favoriteRepository,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -1837,6 +1840,8 @@ class StationSearchScreen extends StatefulWidget {
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -2078,6 +2083,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           locationProvider: widget.locationProvider,
           stationId: result.id,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
         ),
       ),
     );
@@ -2546,6 +2553,8 @@ class FavoriteStationListScreen extends StatefulWidget {
     required this.reportRepository,
     this.locationProvider,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2554,6 +2563,8 @@ class FavoriteStationListScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<FavoriteStationListScreen> createState() =>
@@ -2571,6 +2582,8 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
         reportRepository: widget.reportRepository,
         locationProvider: widget.locationProvider,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+        internalRouteRepository: widget.internalRouteRepository,
+        internalRouteMobilityType: widget.internalRouteMobilityType,
       ),
     );
   }
@@ -2583,6 +2596,8 @@ class FavoriteStationListContent extends StatefulWidget {
     required this.reportRepository,
     this.locationProvider,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2591,6 +2606,8 @@ class FavoriteStationListContent extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
 
   @override
   State<FavoriteStationListContent> createState() =>
@@ -2640,6 +2657,8 @@ class _FavoriteStationListContentState
           locationProvider: widget.locationProvider,
           stationId: favorite.stationId,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
           // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
           initiallyFavorite: true,
         ),
@@ -2806,6 +2825,9 @@ class StationDetailScreen extends StatefulWidget {
     this.locationProvider,
     this.initiallyFavorite,
     this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteRequest,
+    this.internalRouteMobilityType = 'SENIOR',
     super.key,
   });
 
@@ -2816,6 +2838,9 @@ class StationDetailScreen extends StatefulWidget {
   final String stationId;
   final bool? initiallyFavorite;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final InternalRouteRequest? internalRouteRequest;
+  final String internalRouteMobilityType;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -2824,11 +2849,27 @@ class StationDetailScreen extends StatefulWidget {
 class _StationDetailScreenState extends State<StationDetailScreen> {
   late final StationDetailController _controller;
   StationFavoriteToggleController? _favoriteController;
+  InternalRouteController? _internalRouteController;
 
   @override
   void initState() {
     super.initState();
     _controller = StationDetailController(repository: widget.repository);
+    final internalRouteRepository = widget.internalRouteRepository;
+    final internalRouteRequest = widget.internalRouteRequest;
+    if (internalRouteRepository != null) {
+      _internalRouteController = InternalRouteController(
+        repository: internalRouteRepository,
+      );
+      if (internalRouteRequest != null) {
+        _internalRouteController!.load(internalRouteRequest);
+      } else {
+        _internalRouteController!.loadDefault(
+          stationId: widget.stationId,
+          mobilityType: widget.internalRouteMobilityType,
+        );
+      }
+    }
     final favoriteRepository = widget.favoriteRepository;
     if (favoriteRepository != null) {
       final initiallyFavorite = widget.initiallyFavorite;
@@ -2849,6 +2890,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
   void dispose() {
     _controller.dispose();
     _favoriteController?.dispose();
+    _internalRouteController?.dispose();
     super.dispose();
   }
 
@@ -2858,10 +2900,11 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
       appBar: AppBar(title: const Text('역 상세')),
       body: SafeArea(
         child: AnimatedBuilder(
-          animation: _controller,
+          animation: Listenable.merge([_controller, ?_internalRouteController]),
           builder: (context, _) {
             return _StationDetailBody(
               state: _controller.state,
+              internalRouteState: _internalRouteController?.state,
               reportRepository: widget.reportRepository,
               favoriteController: _favoriteController,
               locationProvider: widget.locationProvider,
@@ -2878,6 +2921,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
 class _StationDetailBody extends StatelessWidget {
   const _StationDetailBody({
     required this.state,
+    required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
     required this.locationProvider,
@@ -2885,6 +2929,7 @@ class _StationDetailBody extends StatelessWidget {
   });
 
   final StationDetailState state;
+  final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
   final CurrentLocationProvider? locationProvider;
@@ -2910,6 +2955,7 @@ class _StationDetailBody extends StatelessWidget {
         facilityAttentionSemanticLabel: state.facilityAttentionSemanticLabel,
         layoutSummaryItems: state.layoutSummaryItems,
         layoutSummarySemanticLabel: state.layoutSummarySemanticLabel,
+        internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
         locationProvider: locationProvider,
@@ -2928,6 +2974,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.facilityAttentionSemanticLabel,
     required this.layoutSummaryItems,
     required this.layoutSummarySemanticLabel,
+    required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
     required this.locationProvider,
@@ -2941,6 +2988,7 @@ class _StationDetailContent extends StatelessWidget {
   final String facilityAttentionSemanticLabel;
   final List<StationLayoutSummaryItem> layoutSummaryItems;
   final String layoutSummarySemanticLabel;
+  final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
   final CurrentLocationProvider? locationProvider;
@@ -2975,6 +3023,12 @@ class _StationDetailContent extends StatelessWidget {
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
+          const SizedBox(height: 24),
+        ],
+        if (internalRouteState != null) ...[
+          const _StationDetailSectionTitle(title: '내부 이동 안내'),
+          const SizedBox(height: 12),
+          _StationInternalRouteGuidance(state: internalRouteState!),
           const SizedBox(height: 24),
         ],
         if (mapMarkers.isNotEmpty) ...[
@@ -3401,6 +3455,150 @@ class _StationFavoriteControl extends StatelessWidget {
       StationFavoriteToggleStatus.failure =>
         state.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 저장',
     };
+  }
+}
+
+class _StationInternalRouteGuidance extends StatelessWidget {
+  const _StationInternalRouteGuidance({required this.state});
+
+  final InternalRouteState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state.status) {
+      InternalRouteViewStatus.loading => Semantics(
+        label: '내부 이동 안내 불러오는 중',
+        liveRegion: true,
+        child: const _StationDetailInfoRow(
+          icon: Icons.sync,
+          text: '내부 이동 안내를 불러오는 중입니다.',
+        ),
+      ),
+      InternalRouteViewStatus.failure => Semantics(
+        label: state.message,
+        liveRegion: true,
+        child: _StationDetailInfoRow(
+          icon: Icons.error_outline,
+          text: state.message,
+        ),
+      ),
+      InternalRouteViewStatus.success => _StationInternalRouteResultCard(
+        result: state.result!,
+      ),
+    };
+  }
+}
+
+class _StationInternalRouteResultCard extends StatelessWidget {
+  const _StationInternalRouteResultCard({required this.result});
+
+  final InternalRouteResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: result.semanticLabel,
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF8F6),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFB7D8D2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _StationDetailInfoRow(
+                icon: result.statusIcon,
+                text: result.statusLabel,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result.summaryLabel,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                result.totalBurdenLabel,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF2C5558),
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              if (result.warnings.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final warning in result.warnings)
+                  _StationDetailInfoRow(
+                    icon: Icons.warning_amber,
+                    text: warning.message,
+                  ),
+              ],
+              if (result.steps.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                for (final step in result.steps)
+                  _StationInternalRouteStepTile(step: step),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationInternalRouteStepTile extends StatelessWidget {
+  const _StationInternalRouteStepTile({required this.step});
+
+  final InternalRouteStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: step.semanticLabel,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                step.title,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                step.burdenLabel,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF2C5558),
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                step.guidance,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
