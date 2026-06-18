@@ -2099,8 +2099,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
+  assert.match(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
+  assert.match(stationSearch, /지도 위치 목록/);
+  assert.match(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
   assert.match(mapAdapterTest, /지도 제공자는 네이버를 기본값으로 두고 카카오를 대체 후보로 둔다/);
   assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
+  assert.match(widgetTest, /지도 대체 위치 목록/);
+  assert.match(widgetTest, /상록수역 상세 정보[\s\S]*지도 위치/);
+  assert.match(widgetTest, /1번 출구, 엘리베이터 연결, 계단 없는 이동 가능[\s\S]*지도 위치/);
   assert.match(facilityReport, /Future<FacilityReportResult> getReport\(String reportId\)/);
   assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
   assert.match(facilityReport, /refreshCurrentReport/);

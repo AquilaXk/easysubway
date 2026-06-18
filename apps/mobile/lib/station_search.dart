@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
 import 'facility_report.dart';
+import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
 
 const _stationSearchTimeout = Duration(seconds: 8);
@@ -2947,6 +2948,12 @@ class _StationDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mapMarkers = const EasySubwayMapAdapter().markersForStationDetail(
+      station: detail,
+      exits: exits,
+      facilities: facilities,
+    );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
@@ -2968,6 +2975,12 @@ class _StationDetailContent extends StatelessWidget {
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
+          const SizedBox(height: 24),
+        ],
+        if (mapMarkers.isNotEmpty) ...[
+          const _StationDetailSectionTitle(title: '지도 위치 목록'),
+          const SizedBox(height: 12),
+          _StationMapTextFallback(markers: mapMarkers),
           const SizedBox(height: 24),
         ],
         const _StationDetailSectionTitle(title: '출구'),
@@ -3054,6 +3067,88 @@ class _StationDetailContent extends StatelessWidget {
     }
     return provider.openLocationSettings;
   }
+}
+
+class _StationMapTextFallback extends StatelessWidget {
+  const _StationMapTextFallback({required this.markers});
+
+  final List<MapMarker> markers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          container: true,
+          label: '지도 대체 위치 목록',
+          child: const SizedBox.shrink(),
+        ),
+        Semantics(
+          container: true,
+          label: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
+          child: const ExcludeSemantics(
+            child: _StationDetailInfoRow(
+              icon: Icons.map_outlined,
+              text: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final marker in markers)
+          _StationMapTextFallbackItem(marker: marker),
+      ],
+    );
+  }
+}
+
+class _StationMapTextFallbackItem extends StatelessWidget {
+  const _StationMapTextFallbackItem({required this.marker});
+
+  final MapMarker marker;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: marker.semanticLabel,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                _mapMarkerIcon(marker.type),
+                size: 22,
+                color: const Color(0xFF006D77),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  marker.title,
+                  key: Key('stationMapTextFallbackItem-${marker.id}'),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _mapMarkerIcon(MapMarkerType type) {
+  return switch (type) {
+    MapMarkerType.station => Icons.train_outlined,
+    MapMarkerType.exit => Icons.exit_to_app,
+    MapMarkerType.facility => Icons.accessible_forward,
+  };
 }
 
 class _StationLayoutSummary extends StatelessWidget {

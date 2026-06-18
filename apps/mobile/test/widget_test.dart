@@ -2227,13 +2227,20 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        latitude: 37.302795,
+        longitude: 126.866489,
+      ),
       stationExits: const [
         StationExitInfo(
           id: 'exit-sangnoksu-1',
           stationId: 'station-sangnoksu',
           exitNumber: '1',
           name: '1번 출구',
+          latitude: 37.3021,
+          longitude: 126.8661,
           hasElevatorConnection: true,
           hasStairOnlyPath: false,
           dataConfidence: 'HIGH',
@@ -2249,6 +2256,8 @@ void main() {
           name: '1번 출구 엘리베이터',
           floorFrom: 'B1',
           floorTo: '1F',
+          latitude: 37.3022,
+          longitude: 126.8662,
           description: '1번 출구 앞',
           status: 'NORMAL',
           dataConfidence: 'HIGH',
@@ -2324,7 +2333,62 @@ void main() {
       expect(find.text('이동 구조'), findsOneWidget);
       expect(find.text('승강장'), findsOneWidget);
       expect(find.bySemanticsLabel('이동 구조, 1번 출구, 엘리베이터, 승강장'), findsOneWidget);
-      await tester.drag(find.byType(ListView), const Offset(0, -260));
+      await tester.scrollUntilVisible(
+        find.text('지도 위치 목록'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('지도 위치 목록'), findsOneWidget);
+      expect(find.text('지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.'), findsOneWidget);
+      expect(find.text('상록수역'), findsWidgets);
+      expect(find.text('1번 출구'), findsWidgets);
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+      expect(find.text('2번 출구'), findsNothing);
+      expect(find.bySemanticsLabel('지도 대체 위치 목록'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationMapTextFallbackItem-station-sangnoksu')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 출처 공식 파일, 마지막 확인 2026-06-13, 지도 위치',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationMapTextFallbackItem-exit-sangnoksu-1')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const Key('stationMapTextFallbackItem-facility-sangnoksu-elevator-1'),
+        ),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.text('출구'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
       await tester.pumpAndSettle();
       expect(find.text('출구'), findsOneWidget);
       expect(find.text('1번 출구'), findsWidgets);
@@ -2336,7 +2400,11 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.scrollUntilVisible(
+        find.text('시설'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
       expect(find.text('확인 필요 1개'), findsOneWidget);
@@ -5859,12 +5927,19 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
   }
 }
 
-StationDetail _stationDetail({required String id, required String name}) {
+StationDetail _stationDetail({
+  required String id,
+  required String name,
+  double? latitude,
+  double? longitude,
+}) {
   return StationDetail(
     id: id,
     nameKo: name,
     nameEn: id,
     region: '수도권',
+    latitude: latitude,
+    longitude: longitude,
     dataQualityLevel: 'LEVEL_1',
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
