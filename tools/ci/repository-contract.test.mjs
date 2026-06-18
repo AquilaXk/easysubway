@@ -611,7 +611,7 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   assert.match(compose, /image: grafana\/loki:3\.6\.0/);
   assert.match(compose, /--config\.file=\/etc\/loki\/loki\.yml/);
   assert.match(compose, /\.\/loki\/loki\.yml:\/etc\/loki\/loki\.yml:ro/);
-  assert.match(compose, /"\$\{EASYSUBWAY_LOKI_PORT:-3100\}:3100"/);
+  assert.match(compose, /"127\.0\.0\.1:\$\{EASYSUBWAY_LOKI_PORT:-3100\}:3100"/);
   assert.match(compose, /loki-data:\/loki/);
   assert.match(compose, /test: \["CMD", "loki", "-config\.file=\/etc\/loki\/loki\.yml", "-verify-config"\]/);
 

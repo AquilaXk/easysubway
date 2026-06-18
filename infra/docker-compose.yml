@@ -59,7 +59,7 @@ services:
     command:
       - "--config.file=/etc/loki/loki.yml"
     ports:
-      - "${EASYSUBWAY_LOKI_PORT:-3100}:3100"
+      - "127.0.0.1:${EASYSUBWAY_LOKI_PORT:-3100}:3100"
     volumes:
       - ./loki/loki.yml:/etc/loki/loki.yml:ro
       - loki-data:/loki
