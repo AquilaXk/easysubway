@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "store-accessibility-qa",
+  "checks": [
+    {
+      "id": "android_talkback_home_navigation",
+      "platform": "android",
+      "titleKo": "Android TalkBack 홈 주요 탐색",
+      "environmentKo": "Android 15 이상 에뮬레이터 또는 실제 기기에서 TalkBack 켜짐",
+      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 알림 설정, 도움말을 순서대로 탐색한다.",
+      "passCriteriaKo": "각 주요 이동 지점은 목적을 알 수 있는 한국어 label과 tap action을 읽고, 초점 순서가 화면 순서와 어긋나지 않는다.",
+      "automation": "manual-required",
+      "evidence": ["screen-recording", "accessibility-notes"]
+    },
+    {
+      "id": "android_font_scale_150",
+      "platform": "android",
+      "titleKo": "Android 글자 크기 150% 이상",
+      "environmentKo": "Android 디스플레이 글자 크기 150% 이상 또는 font scale 1.5",
+      "flowKo": "홈, 역 검색 결과, 경로 검색 결과, 시설 신고, 도움말 화면을 연다.",
+      "passCriteriaKo": "주요 버튼과 안내 문구가 잘리지 않고, 한 손 조작에 필요한 주요 CTA가 화면 안에 남는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "font-scale-value"]
+    },
+    {
+      "id": "android_high_contrast",
+      "platform": "android",
+      "titleKo": "Android 고대비 표시",
+      "environmentKo": "Android 고대비 텍스트 또는 앱 고대비 보기 설정 켜짐",
+      "flowKo": "온보딩 보기 설정에서 고대비를 켜고 홈, 검색, 경로, 신고 상태를 확인한다.",
+      "passCriteriaKo": "상태 배지, 오류 안내, 다음 행동, 안전 고지의 텍스트 대비가 낮아지지 않는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "contrast-notes"]
+    },
+    {
+      "id": "android_location_permission_denied",
+      "platform": "android",
+      "titleKo": "Android 위치 권한 거부 후 계속 사용",
+      "environmentKo": "Android 위치 권한을 거부한 새 설치 상태",
+      "flowKo": "위치 권한 요청을 거부한 뒤 역명 검색, 즐겨찾기, 접근성 정보 조회를 실행한다.",
+      "passCriteriaKo": "현재 위치 기능만 제한되고, 역명 검색과 접근성 정보 조회는 다음 행동 안내와 함께 계속 사용할 수 있다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "permission-state"]
+    },
+    {
+      "id": "android_network_error_recovery",
+      "platform": "android",
+      "titleKo": "Android 네트워크 오류 복구 안내",
+      "environmentKo": "Android 비행기 모드 또는 테스트 API 네트워크 차단",
+      "flowKo": "역 검색, 경로 검색, 신고 제출 중 네트워크 오류를 발생시킨 뒤 다시 시도 흐름을 확인한다.",
+      "passCriteriaKo": "오류 화면은 쉬운 한국어 이유와 다음 행동을 제공하고, 앱이 중단되지 않는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "logcat-summary"]
+    },
+    {
+      "id": "android_server_error_recovery",
+      "platform": "android",
+      "titleKo": "Android 서버 장애 응답 안내",
+      "environmentKo": "Android 테스트 빌드와 5xx 응답을 반환하는 테스트 API",
+      "flowKo": "경로 검색과 시설 신고 API가 서버 오류를 반환할 때 실패 상태와 재시도 안내를 확인한다.",
+      "passCriteriaKo": "사용자에게 내부 스택트레이스나 원시 오류가 보이지 않고, 다시 시도하거나 입력을 확인할 행동이 보인다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "api-response-summary"]
+    },
+    {
+      "id": "android_push_opt_in_out",
+      "platform": "android",
+      "titleKo": "Android 푸시 알림 opt-in/out",
+      "environmentKo": "Android 알림 권한을 허용하거나 거부할 수 있는 새 설치 상태",
+      "flowKo": "온보딩 알림 설명, OS 권한 요청, 알림 설정 변경, 권한 거부 후 안내를 확인한다.",
+      "passCriteriaKo": "권한 요청 전 목적 설명이 보이고, 거부해도 앱 주요 기능은 계속 사용 가능하며 설정 화면에서 다음 행동을 안내한다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "permission-state"]
+    },
+    {
+      "id": "android_reinstall_secure_storage_restore",
+      "platform": "android",
+      "titleKo": "Android 재설치와 secure storage 복원 실패",
+      "environmentKo": "Android 백업 비활성화 릴리즈 기준 설정과 재설치 테스트 환경",
+      "flowKo": "앱 삭제 후 재설치 또는 secure storage 복원 실패 상태에서 익명 인증과 온보딩 복구 흐름을 확인한다.",
+      "passCriteriaKo": "손상된 인증 정보는 정리되고, 사용자는 앱을 다시 시작하거나 이동 조건을 재설정할 수 있다.",
+      "automation": "manual-with-contract-baseline",
+      "evidence": ["adb-commands", "app-log-summary"]
+    },
+    {
+      "id": "ios_voiceover_home_navigation",
+      "platform": "ios",
+      "titleKo": "iOS VoiceOver 홈 주요 탐색",
+      "environmentKo": "iOS Simulator 또는 실제 iPhone에서 VoiceOver 켜짐",
+      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 알림 설정, 도움말을 순서대로 탐색한다.",
+      "passCriteriaKo": "각 주요 이동 지점은 목적을 알 수 있는 한국어 label과 button trait를 제공하고, 초점 순서가 예측 가능하다.",
+      "automation": "manual-required",
+      "evidence": ["screen-recording", "accessibility-notes"]
+    },
+    {
+      "id": "ios_dynamic_type_accessibility_size",
+      "platform": "ios",
+      "titleKo": "iOS Dynamic Type 접근성 크기",
+      "environmentKo": "iOS Dynamic Type 접근성 큰 글씨 크기",
+      "flowKo": "홈, 역 검색 결과, 경로 검색 결과, 시설 신고, 도움말 화면을 연다.",
+      "passCriteriaKo": "주요 제목, 오류 안내, 다음 행동, CTA가 잘리지 않고 스크롤로 접근 가능하다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "dynamic-type-size"]
+    },
+    {
+      "id": "ios_bold_text",
+      "platform": "ios",
+      "titleKo": "iOS Bold Text",
+      "environmentKo": "iOS Bold Text 켜짐",
+      "flowKo": "홈과 경로 검색 결과, 도움말 화면의 주요 안내를 확인한다.",
+      "passCriteriaKo": "굵은 글씨가 켜져도 버튼 텍스트와 안내 문구가 겹치거나 잘리지 않는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "accessibility-settings"]
+    },
+    {
+      "id": "ios_increase_contrast",
+      "platform": "ios",
+      "titleKo": "iOS Increase Contrast",
+      "environmentKo": "iOS Increase Contrast 켜짐",
+      "flowKo": "앱 고대비 보기 설정과 함께 홈, 검색, 경로, 신고 상태를 확인한다.",
+      "passCriteriaKo": "상태 배지, 오류 안내, 다음 행동, 안전 고지의 의미가 색상만으로 전달되지 않는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "contrast-notes"]
+    },
+    {
+      "id": "ios_reduce_motion",
+      "platform": "ios",
+      "titleKo": "iOS Reduce Motion",
+      "environmentKo": "iOS Reduce Motion 켜짐",
+      "flowKo": "홈에서 주요 화면 전환, 경로 검색 로딩, 신고 제출 상태를 확인한다.",
+      "passCriteriaKo": "움직임 감소 설정에서 핵심 상태 변화가 사라지지 않고 텍스트 또는 semantics로 확인된다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screen-recording", "accessibility-settings"]
+    },
+    {
+      "id": "ios_location_permission_denied",
+      "platform": "ios",
+      "titleKo": "iOS 위치 권한 거부 후 계속 사용",
+      "environmentKo": "iOS 위치 권한을 거부한 새 설치 상태",
+      "flowKo": "위치 권한 요청을 거부한 뒤 역명 검색, 즐겨찾기, 접근성 정보 조회를 실행한다.",
+      "passCriteriaKo": "현재 위치 기능만 제한되고, 역명 검색과 접근성 정보 조회는 다음 행동 안내와 함께 계속 사용할 수 있다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "permission-state"]
+    },
+    {
+      "id": "ios_network_error_recovery",
+      "platform": "ios",
+      "titleKo": "iOS 네트워크 오류 복구 안내",
+      "environmentKo": "iOS 네트워크 차단 또는 테스트 API 오류 환경",
+      "flowKo": "역 검색, 경로 검색, 신고 제출 중 네트워크 오류를 발생시킨 뒤 다시 시도 흐름을 확인한다.",
+      "passCriteriaKo": "오류 화면은 쉬운 한국어 이유와 다음 행동을 제공하고, 앱이 중단되지 않는다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "simulator-log-summary"]
+    },
+    {
+      "id": "ios_safe_area_small_screen_tap_targets",
+      "platform": "ios",
+      "titleKo": "iOS 작은 화면 safe area와 터치 영역",
+      "environmentKo": "작은 iPhone Simulator 또는 실제 iPhone, 세로 방향",
+      "flowKo": "홈, 역 검색, 경로 검색, 시설 신고, 도움말 화면 하단 CTA와 탭 영역을 확인한다.",
+      "passCriteriaKo": "safe area 안에서 주요 터치 영역이 가려지지 않고, 핵심 버튼은 터치 가능한 크기와 간격을 유지한다.",
+      "automation": "manual-with-widget-baseline",
+      "evidence": ["screenshots", "device-size"]
+    }
+  ]
+}
