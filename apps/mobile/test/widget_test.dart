@@ -2345,8 +2345,43 @@ void main() {
       expect(find.text('1번 출구'), findsWidgets);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('2번 출구'), findsNothing);
+      expect(find.bySemanticsLabel('지도 대체 위치 목록'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationMapTextFallbackItem-station-sangnoksu')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel('지도 대체 위치 목록, 상록수역, 1번 출구, 1번 출구 엘리베이터'),
+        find.bySemanticsLabel(
+          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 출처 공식 파일, 마지막 확인 2026-06-13, 지도 위치',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationMapTextFallbackItem-exit-sangnoksu-1')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const Key('stationMapTextFallbackItem-facility-sangnoksu-elevator-1'),
+        ),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+        ),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(

@@ -3076,26 +3076,28 @@ class _StationMapTextFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final semanticLabel =
-        '지도 대체 위치 목록, ${markers.map((marker) => marker.title).join(', ')}';
-
-    return Semantics(
-      container: true,
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _StationDetailInfoRow(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          container: true,
+          label: '지도 대체 위치 목록',
+          child: const SizedBox.shrink(),
+        ),
+        Semantics(
+          container: true,
+          label: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
+          child: const ExcludeSemantics(
+            child: _StationDetailInfoRow(
               icon: Icons.map_outlined,
               text: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
             ),
-            const SizedBox(height: 12),
-            for (final marker in markers)
-              _StationMapTextFallbackItem(marker: marker),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        for (final marker in markers)
+          _StationMapTextFallbackItem(marker: marker),
+      ],
     );
   }
 }
@@ -3107,29 +3109,35 @@ class _StationMapTextFallbackItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            _mapMarkerIcon(marker.type),
-            size: 22,
-            color: const Color(0xFF006D77),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              marker.title,
-              key: Key('stationMapTextFallbackItem-${marker.id}'),
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w800,
-                height: 1.3,
+    return Semantics(
+      container: true,
+      label: marker.semanticLabel,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                _mapMarkerIcon(marker.type),
+                size: 22,
+                color: const Color(0xFF006D77),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  marker.title,
+                  key: Key('stationMapTextFallbackItem-${marker.id}'),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
