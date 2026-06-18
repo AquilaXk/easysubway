@@ -2157,6 +2157,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /routeSearchFailureNextAction/);
   assert.match(routeSearch, /역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요\./);
   assert.match(routeSearch, /다음 행동 \$_routeSearchFailureNextAction/);
+  assert.match(routeSearch, /routeBlockedNextActionNotice/);
+  assert.doesNotMatch(
+    routeSearch,
+    /label: '다음 행동, \$_routeSearchFailureNextAction'[\s\S]{0,120}child: const SizedBox\.shrink\(\)/,
+  );
   assert.match(widgetTest, /경로 검색 실패는 다음 행동을 쉬운 문구로 안내한다/);
   assert.match(widgetTest, /안내 불가 이유[\s\S]*다음 행동/);
   assert.match(routeSearch, /routeFeedbackFailureNextAction/);
