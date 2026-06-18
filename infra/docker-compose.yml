@@ -53,6 +53,23 @@ services:
       retries: 5
       start_period: 20s
 
+  loki:
+    image: grafana/loki:3.6.0
+    container_name: easysubway-loki
+    command:
+      - "--config.file=/etc/loki/loki.yml"
+    ports:
+      - "${EASYSUBWAY_LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "loki", "-config.file=/etc/loki/loki.yml", "-verify-config"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   grafana:
     image: grafana/grafana:12.2.9
     container_name: easysubway-grafana
@@ -79,4 +96,5 @@ volumes:
   postgres-data:
   redis-data:
   prometheus-data:
+  loki-data:
   grafana-data:
