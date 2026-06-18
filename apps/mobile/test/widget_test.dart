@@ -692,6 +692,14 @@ void main() {
       expect(find.text('고객지원'), findsOneWidget);
       expect(find.text('support@easysubway.example'), findsOneWidget);
       await tester.scrollUntilVisible(
+        find.byKey(const Key('securityContactAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('보안 문의'), findsOneWidget);
+      expect(find.text('준비 중입니다.'), findsOneWidget);
+      await tester.scrollUntilVisible(
         find.byKey(const Key('dataDeletionAccessItem')),
         120,
         scrollable: find.byType(Scrollable).last,
@@ -825,6 +833,66 @@ void main() {
     }
   });
 
+  testWidgets('도움말은 보안 문의와 취약점 접수 경로를 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final launcher = RecordingSupportAccessLauncher();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          supportAccessLauncher: launcher,
+          supportAccessInfo: const SupportAccessInfo(
+            privacyPolicyUrl: 'https://easysubway.example/privacy',
+            supportEmail: 'support@easysubway.example',
+            dataDeletionEmail: 'privacy@easysubway.example',
+            securityEmail: 'security@easysubway.example',
+          ),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('homeHelpActionButton')));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('securityContactNotice')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('보안 문의 안내'), findsOneWidget);
+      expect(find.text('취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요.'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('securityContactAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('보안 문의'), findsOneWidget);
+      expect(find.text('security@easysubway.example'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.byKey(const Key('securityContactAccessItem')))
+            .getSemanticsData()
+            .label,
+        '보안 문의, security@easysubway.example',
+      );
+
+      await tester.tap(find.byKey(const Key('securityContactAccessItem')));
+      await tester.pumpAndSettle();
+
+      expect(launcher.openedUris.single.scheme, 'mailto');
+      expect(launcher.openedUris.single.path, 'security@easysubway.example');
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
     final launcher = RecordingSupportAccessLauncher();
 
@@ -926,6 +994,12 @@ void main() {
     await tester.tap(find.byKey(const Key('homeHelpActionButton')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('privacyPolicyAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(
       tester
           .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
@@ -949,6 +1023,20 @@ void main() {
       '고객지원, 준비 중입니다.',
     );
     await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('securityContactAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('securityContactAccessItem')))
+          .getSemanticsData()
+          .label,
+      '보안 문의, 준비 중입니다.',
+    );
+    await tester.tap(find.byKey(const Key('securityContactAccessItem')));
     await tester.scrollUntilVisible(
       find.byKey(const Key('dataDeletionAccessItem')),
       120,
