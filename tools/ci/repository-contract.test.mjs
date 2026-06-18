@@ -521,13 +521,13 @@ test("백엔드 런타임 의존성은 보안 패치 기준 버전을 사용한�
   const backendBuild = read("backend/build.gradle");
   const backendLockfile = read("backend/gradle.lockfile");
 
-  assert.match(backendBuild, /id 'org\.springframework\.boot' version '3\.5\.(?:1[5-9]|[2-9][0-9])'/);
-  assert.match(backendLockfile, /^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.(?:5[5-9]|[6-9][0-9])=/m);
-  assert.match(backendLockfile, /^org\.springframework\.security:spring-security-web:6\.5\.(?:1[1-9]|[2-9][0-9])=/m);
-  assert.match(backendLockfile, /^org\.thymeleaf:thymeleaf-spring6:3\.1\.(?:5|[6-9]|[1-9][0-9])\.RELEASE=/m);
-  assert.match(backendLockfile, /^org\.springframework:spring-webmvc:6\.2\.(?:19|[2-9][0-9])=/m);
-  assert.match(backendLockfile, /^org\.apache\.commons:commons-lang3:3\.18\.0=/m);
-  assert.match(backendLockfile, /^org\.apache\.logging\.log4j:log4j-core:2\.25\.3=/m);
+  assert.match(backendBuild, /id 'org\.springframework\.boot' version '3\.5\.(?:1[5-9]|[2-9][0-9]|[1-9][0-9]{2,})'/);
+  assert.match(backendLockfile, /^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.(?:5[5-9]|[6-9][0-9]|[1-9][0-9]{2,})=/m);
+  assert.match(backendLockfile, /^org\.springframework\.security:spring-security-web:6\.5\.(?:1[1-9]|[2-9][0-9]|[1-9][0-9]{2,})=/m);
+  assert.match(backendLockfile, /^org\.thymeleaf:thymeleaf-spring6:3\.1\.(?:5|[6-9]|[1-9][0-9]+)\.RELEASE=/m);
+  assert.match(backendLockfile, /^org\.springframework:spring-webmvc:6\.2\.(?:19|[2-9][0-9]|[1-9][0-9]{2,})=/m);
+  assert.match(backendLockfile, /^org\.apache\.commons:commons-lang3:3\.(?:18|19|[2-9][0-9]|[1-9][0-9]{2,})\.[0-9]+=/m);
+  assert.match(backendLockfile, /^org\.apache\.logging\.log4j:log4j-core:2\.(?:25\.(?:[3-9]|[1-9][0-9]+)|(?:2[6-9]|[3-9][0-9]|[1-9][0-9]{2,})\.[0-9]+)=/m);
   assert.doesNotMatch(backendLockfile, /^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.46=/m);
   assert.doesNotMatch(backendLockfile, /^org\.springframework\.security:spring-security-web:6\.5\.5=/m);
   assert.doesNotMatch(backendLockfile, /^org\.thymeleaf:thymeleaf-spring6:3\.1\.3\.RELEASE=/m);
@@ -580,7 +580,7 @@ test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 �
   assert.ok(existsSync(path.join(root, "backend/gradle/wrapper/gradle-wrapper.jar")));
   assert.match(wrapper, /gradle-8\.14\.5-bin\.zip/);
 
-  assert.match(build, /id 'org\.springframework\.boot' version '3\.5\.(?:1[5-9]|[2-9][0-9])'/);
+  assert.match(build, /id 'org\.springframework\.boot' version '3\.5\.(?:1[5-9]|[2-9][0-9]|[1-9][0-9]{2,})'/);
   assert.match(build, /languageVersion = JavaLanguageVersion\.of\(21\)/);
   assert.match(build, /https:\/\/maven\.egovframe\.go\.kr\/maven/);
   assert.match(build, /mavenBom 'org\.egovframe\.boot:egovframe-boot-starter-parent:5\.0\.0'/);
