@@ -556,6 +556,38 @@ test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () =
   assert.match(compose, /^volumes:\n  postgres-data:\n  redis-data:/m);
 });
 
+test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", () => {
+  const backupScript = read("tools/ops/postgres-backup.sh");
+  const restoreScript = read("tools/ops/postgres-restore-rehearsal.sh");
+
+  assert.match(backupScript, /set -euo pipefail/);
+  assert.match(backupScript, /EASYSUBWAY_ENV_FILE:-\$\{ROOT_DIR\}\/\.env\.example/);
+  assert.match(backupScript, /EASYSUBWAY_BACKUP_DIR:-\$\{ROOT_DIR\}\/\.codex\/backups/);
+  assert.match(backupScript, /umask 077/);
+  assert.match(backupScript, /chmod 700 "\$\{BACKUP_DIR\}"/);
+  assert.match(backupScript, /mktemp "\$\{BACKUP_DIR\}\/easysubway-postgres-\$\{timestamp\}\.XXXXXX"/);
+  assert.match(backupScript, /backup_file="\$\{temp_file\}\.dump"/);
+  assert.match(backupScript, /trap cleanup EXIT/);
+  assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres sh -lc/);
+  assert.match(backupScript, /pg_dump --format=custom --no-owner --no-privileges -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
+  assert.match(backupScript, /> "\$\{temp_file\}"/);
+  assert.match(backupScript, /test -s "\$\{temp_file\}"/);
+  assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
+  assert.match(backupScript, /trap - EXIT/);
+
+  assert.match(restoreScript, /set -euo pipefail/);
+  assert.match(restoreScript, /Usage: tools\/ops\/postgres-restore-rehearsal\.sh <backup-file>/);
+  assert.match(restoreScript, /EASYSUBWAY_RESTORE_DB:-easysubway_restore_rehearsal/);
+  assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T -e RESTORE_DB="\$\{RESTORE_DB\}" postgres sh -lc/);
+  assert.match(restoreScript, /sh -lc '\nset -eu\n/);
+  assert.match(restoreScript, /"\$POSTGRES_DB"\|postgres\|template0\|template1/);
+  assert.match(restoreScript, /Refusing to use protected restore database/);
+  assert.match(restoreScript, /dropdb --if-exists -U "\$POSTGRES_USER" "\$RESTORE_DB"/);
+  assert.match(restoreScript, /createdb -U "\$POSTGRES_USER" "\$RESTORE_DB"/);
+  assert.match(restoreScript, /pg_restore --clean --if-exists --no-owner --no-privileges -U "\$POSTGRES_USER" -d "\$RESTORE_DB"/);
+  assert.match(restoreScript, /trap cleanup EXIT/);
+});
+
 test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
