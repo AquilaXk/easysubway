@@ -754,6 +754,9 @@ test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 �
   const invalidFacility = read("backend/src/main/java/com/easysubway/transit/domain/InvalidAccessibilityFacilityException.java");
   const source = read("backend/src/main/java/com/easysubway/transit/domain/DataSourceType.java");
   const useCase = read("backend/src/main/java/com/easysubway/transit/application/port/in/TransitMasterQueryUseCase.java");
+  const stationMasterDataCounts = read(
+    "backend/src/main/java/com/easysubway/transit/application/port/in/StationMasterDataCounts.java",
+  );
   const adminUseCase = read("backend/src/main/java/com/easysubway/transit/application/port/in/TransitMasterAdminUseCase.java");
   const createFacilityCommand = read(
     "backend/src/main/java/com/easysubway/transit/application/port/in/CreateAccessibilityFacilityCommand.java",
@@ -788,8 +791,11 @@ test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 �
   assert.match(invalidFacility, /extends InvalidRequestException/);
   assert.match(source, /OFFICIAL_FILE/);
   assert.match(useCase, /interface TransitMasterQueryUseCase/);
+  assert.match(useCase, /countStationMasterDataByStationId/);
   assert.match(useCase, /listStationExits/);
   assert.match(useCase, /listStationFacilities/);
+  assert.match(stationMasterDataCounts, /record StationMasterDataCounts/);
+  assert.match(stationMasterDataCounts, /int routeEdgeCount/);
   assert.match(adminUseCase, /interface TransitMasterAdminUseCase/);
   assert.match(adminUseCase, /createAccessibilityFacility/);
   assert.match(adminUseCase, /updateAccessibilityFacility/);
@@ -811,6 +817,8 @@ test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 �
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
   assert.match(saveFacilityStatusPort, /saveAccessibilityFacility/);
   assert.match(service, /implements TransitMasterQueryUseCase, TransitMasterAdminUseCase/);
+  assert.match(service, /countStationMasterDataByStationId\(\)/);
+  assert.match(service, /countByStationId/);
   assert.match(service, /SaveAccessibilityFacilityStatusPort/);
   assert.match(service, /createAccessibilityFacility\(CreateAccessibilityFacilityCommand command\)/);
   assert.match(service, /updateAccessibilityFacility\(UpdateAccessibilityFacilityCommand command\)/);
@@ -826,6 +834,16 @@ test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 �
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/exits"\)/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/facilities"\)/);
+  assert.match(controller, /@GetMapping\("\/admin\/stations"\)/);
+  assert.match(controller, /@GetMapping\("\/admin\/stations\/\{stationId\}"\)/);
+  assert.match(controller, /record AdminStationSummaryResponse/);
+  assert.match(controller, /StationMasterDataCounts/);
+  assert.match(controller, /int exitCount/);
+  assert.match(controller, /int facilityCount/);
+  assert.match(controller, /int layoutSourceCount/);
+  assert.match(controller, /record AdminStationDetailResponse/);
+  assert.match(controller, /List<StationExitResponse> exits/);
+  assert.match(controller, /List<RouteEdgeResponse> routeEdges/);
   assert.match(controller, /@PostMapping\("\/admin\/facilities"\)/);
   assert.match(controller, /@PutMapping\("\/admin\/facilities\/\{facilityId\}"\)/);
   assert.match(controller, /@PatchMapping\("\/admin\/facilities\/\{facilityId\}\/status"\)/);
