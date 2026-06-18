@@ -191,7 +191,7 @@
         "optional": true
       },
       "appStorePrivacy": {
-        "dataType": "NSPrivacyCollectedDataTypeUserID",
+        "dataType": "NSPrivacyCollectedDataTypeDeviceID",
         "linkedToUser": true,
         "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
       }
@@ -218,12 +218,12 @@
       }
     },
     {
-      "id": "diagnostics_error_logs",
-      "displayNameKo": "오류 로그",
-      "purposeKo": "앱 오류와 서버 장애를 진단하고 접근성 흐름 회귀를 찾음",
+      "id": "diagnostics_crash_logs",
+      "displayNameKo": "앱 충돌 로그",
+      "purposeKo": "앱 충돌 원인을 분석하고 접근성 흐름 회귀를 찾음",
       "storageLocations": ["mobile-runtime", "backend-log"],
       "retentionKo": "운영 장애 분석에 필요한 최소 기간만 보관",
-      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 로그를 삭제 또는 익명화",
+      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 충돌 로그를 삭제 또는 익명화",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -234,6 +234,27 @@
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeCrashData",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "diagnostics_performance_logs",
+      "displayNameKo": "오류 및 성능 진단 로그",
+      "purposeKo": "앱 오류, 서버 장애, 응답 지연을 진단하고 운영 품질을 개선",
+      "storageLocations": ["mobile-runtime", "backend-log"],
+      "retentionKo": "운영 장애 분석에 필요한 최소 기간만 보관",
+      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 진단 로그를 삭제 또는 익명화",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "Diagnostics",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": false
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypePerformanceData",
         "linkedToUser": true,
         "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
       }
