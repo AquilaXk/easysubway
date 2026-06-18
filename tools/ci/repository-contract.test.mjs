@@ -1414,6 +1414,10 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.doesNotMatch(controller, /deviceToken/);
   assert.match(dashboardController, /@GetMapping\("\/admin\/notifications\/push\/page"\)/);
   assert.match(dashboardController, /PushNotificationDashboardUseCase/);
+  assert.match(dashboardController, /deliveryAttemptCount/);
+  assert.match(dashboardController, /successRateLabel/);
+  assert.match(dashboardController, /failureRateLabel/);
+  assert.match(dashboardController, /failureAlertLabel/);
   assert.match(operatorPushNotificationReportController, /@GetMapping\("\/operator\/api\/push-notification-report"\)/);
   assert.match(operatorPushNotificationReportController, /ApiResponse<OperatorPushNotificationReportView>/);
   assert.match(operatorPushNotificationReportController, /pushNotificationReportAssembler\.assemble\(\)/);
@@ -1432,6 +1436,10 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.doesNotMatch(operatorPushNotificationReportView, /notificationId|userId|deviceToken/);
   assert.match(dashboardTemplate, /푸시 알림 현황/);
   assert.match(dashboardTemplate, /전체 알림/);
+  assert.match(dashboardTemplate, /발송 시도/);
+  assert.match(dashboardTemplate, /발송 성공률/);
+  assert.match(dashboardTemplate, /발송 실패율/);
+  assert.match(dashboardTemplate, /점검 필요/);
   assert.match(dashboardTemplate, /상태별 알림/);
   assert.match(dashboardTemplate, /최근 실패/);
   assert.doesNotMatch(dashboardTemplate, /deviceToken/);
