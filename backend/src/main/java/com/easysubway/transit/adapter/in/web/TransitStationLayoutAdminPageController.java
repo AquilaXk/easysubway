@@ -1,25 +1,37 @@
 package com.easysubway.transit.adapter.in.web;
 
+import com.easysubway.transit.application.port.in.TransitMasterAdminUseCase;
 import com.easysubway.transit.application.port.in.TransitMasterQueryUseCase;
+import com.easysubway.transit.application.port.in.UpdateSimplifiedStationLayoutStatusCommand;
 import com.easysubway.transit.domain.RouteEdge;
 import com.easysubway.transit.domain.RouteNode;
 import com.easysubway.transit.domain.SimplifiedStationLayout;
+import com.easysubway.transit.domain.SimplifiedStationLayoutStatus;
 import com.easysubway.transit.domain.StationLayoutSource;
 import com.easysubway.transit.domain.StationLineSummary;
 import com.easysubway.transit.domain.StationWithLines;
+import java.security.Principal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 class TransitStationLayoutAdminPageController {
 
+	private final TransitMasterAdminUseCase transitMasterAdminUseCase;
 	private final TransitMasterQueryUseCase transitMasterQueryUseCase;
 
-	TransitStationLayoutAdminPageController(TransitMasterQueryUseCase transitMasterQueryUseCase) {
+	TransitStationLayoutAdminPageController(
+		TransitMasterAdminUseCase transitMasterAdminUseCase,
+		TransitMasterQueryUseCase transitMasterQueryUseCase
+	) {
+		this.transitMasterAdminUseCase = transitMasterAdminUseCase;
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 	}
 
@@ -29,9 +41,25 @@ class TransitStationLayoutAdminPageController {
 		model.addAttribute("station", StationLayoutPageStation.from(station));
 		model.addAttribute("layoutSources", layoutSourceRows(stationId));
 		model.addAttribute("layouts", layoutRows(stationId));
+		model.addAttribute("layoutStatusOptions", layoutStatusOptions());
 		model.addAttribute("routeNodes", routeNodeRows(stationId));
 		model.addAttribute("routeEdges", routeEdgeRows(stationId));
 		return "admin/stations/layouts";
+	}
+
+	@PostMapping("/admin/stations/{stationId}/layouts/{layoutId}/page/status")
+	String updateLayoutStatusFromPage(
+		@PathVariable String stationId,
+		@PathVariable String layoutId,
+		@RequestParam SimplifiedStationLayoutStatus status,
+		Principal principal
+	) {
+		transitMasterAdminUseCase.updateSimplifiedStationLayoutStatus(new UpdateSimplifiedStationLayoutStatusCommand(
+			layoutId,
+			status,
+			principal.getName()
+		));
+		return "redirect:/admin/stations/%s/layouts/page".formatted(stationId);
 	}
 
 	private List<StationLayoutSourceRow> layoutSourceRows(String stationId) {
@@ -59,6 +87,12 @@ class TransitStationLayoutAdminPageController {
 		return transitMasterQueryUseCase.listRouteEdges(stationId)
 			.stream()
 			.map(RouteEdgeRow::from)
+			.toList();
+	}
+
+	private static List<LayoutStatusOption> layoutStatusOptions() {
+		return Arrays.stream(SimplifiedStationLayoutStatus.values())
+			.map(status -> new LayoutStatusOption(status, status.name()))
 			.toList();
 	}
 
@@ -102,6 +136,7 @@ class TransitStationLayoutAdminPageController {
 	record SimplifiedStationLayoutRow(
 		String id,
 		int version,
+		SimplifiedStationLayoutStatus statusValue,
 		String status,
 		String confidenceLevel,
 		String baseFloor,
@@ -113,6 +148,7 @@ class TransitStationLayoutAdminPageController {
 			return new SimplifiedStationLayoutRow(
 				layout.id(),
 				layout.version(),
+				layout.status(),
 				layout.status().name(),
 				layout.confidenceLevel().name(),
 				layout.baseFloor(),
@@ -120,6 +156,9 @@ class TransitStationLayoutAdminPageController {
 				layout.lastVerifiedAt().toString()
 			);
 		}
+	}
+
+	record LayoutStatusOption(SimplifiedStationLayoutStatus value, String label) {
 	}
 
 	record RouteNodeRow(
