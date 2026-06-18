@@ -2527,19 +2527,27 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
 });
 
 test("iOS 푸시 알림은 APNs entitlement와 사전 설명 흐름을 가진다", () => {
-  const entitlementsPath = "apps/mobile/ios/Runner/Runner.entitlements";
-  assert.ok(existsSync(path.join(root, entitlementsPath)));
+  const debugEntitlementsPath =
+    "apps/mobile/ios/Runner/Runner-Debug.entitlements";
+  const releaseEntitlementsPath =
+    "apps/mobile/ios/Runner/Runner-Release.entitlements";
+  assert.ok(existsSync(path.join(root, debugEntitlementsPath)));
+  assert.ok(existsSync(path.join(root, releaseEntitlementsPath)));
 
-  const entitlements = read(entitlementsPath);
+  const debugEntitlements = read(debugEntitlementsPath);
+  const releaseEntitlements = read(releaseEntitlementsPath);
   const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
   const appDelegate = read("apps/mobile/ios/Runner/AppDelegate.swift");
   const main = read("apps/mobile/lib/main.dart");
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
 
-  assert.match(entitlements, /<key>aps-environment<\/key>\s*<string>development<\/string>/);
-  assert.match(project, /Runner\.entitlements \*\/ = \{isa = PBXFileReference;[\s\S]*?path = Runner\.entitlements;/);
-  assert.match(project, /CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/);
-  assert.equal([...project.matchAll(/CODE_SIGN_ENTITLEMENTS = Runner\/Runner\.entitlements;/g)].length, 3);
+  assert.match(debugEntitlements, /<key>aps-environment<\/key>\s*<string>development<\/string>/);
+  assert.match(releaseEntitlements, /<key>aps-environment<\/key>\s*<string>production<\/string>/);
+  assert.match(project, /Runner-Debug\.entitlements \*\/ = \{isa = PBXFileReference;[\s\S]*?path = "Runner-Debug\.entitlements";/);
+  assert.match(project, /Runner-Release\.entitlements \*\/ = \{isa = PBXFileReference;[\s\S]*?path = "Runner-Release\.entitlements";/);
+  assert.match(project, /CODE_SIGN_ENTITLEMENTS = "Runner\/Runner-Debug\.entitlements";/);
+  assert.equal([...project.matchAll(/CODE_SIGN_ENTITLEMENTS = "Runner\/Runner-Debug\.entitlements";/g)].length, 1);
+  assert.equal([...project.matchAll(/CODE_SIGN_ENTITLEMENTS = "Runner\/Runner-Release\.entitlements";/g)].length, 2);
   assert.match(
     appDelegate,
     /requestAuthorization\s*\(\s*options:\s*\[(?=[^\]]*\.alert)(?=[^\]]*\.sound)(?=[^\]]*\.badge)[^\]]*\]\s*\)/,
