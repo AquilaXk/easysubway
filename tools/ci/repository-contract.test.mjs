@@ -589,6 +589,7 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
   assert.match(compose, /grafana-data:\/var\/lib\/grafana/);
   assert.match(compose, /\.\/grafana\/provisioning:\/etc\/grafana\/provisioning:ro/);
+  assert.match(compose, /depends_on:\s*\n\s*prometheus:\s*\n\s*condition: service_healthy[\s\S]*loki:\s*\n\s*condition: service_healthy/);
 
   assert.match(prometheusConfig, /job_name: "easysubway-backend"/);
   assert.match(prometheusConfig, /metrics_path: "\/actuator\/prometheus"/);
@@ -598,6 +599,35 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(grafanaDatasource, /type: prometheus/);
   assert.match(grafanaDatasource, /url: http:\/\/prometheus:9090/);
   assert.match(grafanaDatasource, /isDefault: true/);
+});
+
+test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
+  const compose = read("infra/docker-compose.yml");
+  const lokiConfig = read("infra/loki/loki.yml");
+  const lokiDatasource = read("infra/grafana/provisioning/datasources/loki.yml");
+  const prometheusDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
+
+  assert.match(compose, /loki:\n/);
+  assert.match(compose, /image: grafana\/loki:3\.6\.0/);
+  assert.match(compose, /--config\.file=\/etc\/loki\/loki\.yml/);
+  assert.match(compose, /\.\/loki\/loki\.yml:\/etc\/loki\/loki\.yml:ro/);
+  assert.match(compose, /"127\.0\.0\.1:\$\{EASYSUBWAY_LOKI_PORT:-3100\}:3100"/);
+  assert.match(compose, /loki-data:\/loki/);
+  assert.match(compose, /test: \["CMD", "loki", "-config\.file=\/etc\/loki\/loki\.yml", "-verify-config"\]/);
+
+  assert.match(lokiConfig, /auth_enabled: false/);
+  assert.match(lokiConfig, /http_listen_port: 3100/);
+  assert.match(lokiConfig, /path_prefix: \/loki/);
+  assert.match(lokiConfig, /chunks_directory: \/loki\/chunks/);
+  assert.match(lokiConfig, /rules_directory: \/loki\/rules/);
+  assert.match(lokiConfig, /store: tsdb/);
+  assert.match(lokiConfig, /object_store: filesystem/);
+
+  assert.match(lokiDatasource, /name: easysubway-loki/);
+  assert.match(lokiDatasource, /type: loki/);
+  assert.match(lokiDatasource, /url: http:\/\/loki:3100/);
+  assert.match(lokiDatasource, /isDefault: false/);
+  assert.match(prometheusDatasource, /isDefault: true/);
 });
 
 test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 프로젝트다", () => {
