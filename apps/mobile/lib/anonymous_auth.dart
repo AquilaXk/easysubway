@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
+import 'secure_key_value_storage.dart';
 
 const _anonymousAuthTimeout = Duration(seconds: 8);
 const _anonymousAuthErrorMessage = '인증을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
@@ -29,19 +29,18 @@ abstract class AnonymousAuthCredentialStore {
 class SecureAnonymousAuthCredentialStore
     implements AnonymousAuthCredentialStore {
   const SecureAnonymousAuthCredentialStore({
-    this.storage = const FlutterSecureStorage(),
+    this.storage = const FlutterSecureKeyValueStorage(),
   });
 
-  final FlutterSecureStorage storage;
+  final SecureKeyValueStorage storage;
 
   @override
   Future<AnonymousAuthCredentials?> readCredentials() async {
-    final value = await storage.read(key: _anonymousAuthCredentialsKey);
-    if (value == null) {
-      return null;
-    }
-
     try {
+      final value = await storage.read(key: _anonymousAuthCredentialsKey);
+      if (value == null) {
+        return null;
+      }
       final decoded = jsonDecode(value);
       if (decoded is! Map<String, Object?>) {
         throw const FormatException('Invalid anonymous auth storage payload');
@@ -53,7 +52,7 @@ class SecureAnonymousAuthCredentialStore
         stackTrace,
         context: '저장된 익명 인증 정보를 읽는 중 예외가 발생했습니다.',
       );
-      await clearCredentials();
+      await _clearCredentialsAfterReadFailure();
       return null;
     }
   }
@@ -72,6 +71,18 @@ class SecureAnonymousAuthCredentialStore
   @override
   Future<void> clearCredentials() async {
     await storage.delete(key: _anonymousAuthCredentialsKey);
+  }
+
+  Future<void> _clearCredentialsAfterReadFailure() async {
+    try {
+      await clearCredentials();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '손상된 익명 인증 정보를 지우는 중 예외가 발생했습니다.',
+      );
+    }
   }
 }
 
