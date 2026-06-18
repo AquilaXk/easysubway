@@ -15,6 +15,10 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+function readJson(relativePath) {
+  return JSON.parse(read(relativePath));
+}
+
 function privacyCollectedDataTypeEntry(privacyManifest, dataType) {
   const dataTypesStart = privacyManifest.indexOf("<key>NSPrivacyCollectedDataTypes</key>");
   assert.notEqual(dataTypesStart, -1, "PrivacyInfo.xcprivacy must declare collected data types");
@@ -415,7 +419,7 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
     mobileJob,
-    /node --test --test-name-pattern "모바일 generic catch\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
+    /node --test --test-name-pattern "모바일 generic catch\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
 });
 
@@ -2541,8 +2545,106 @@ test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한�
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypePhotosorVideos");
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeOtherUserContent");
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeUserID");
+  assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeDeviceID");
   assert.match(project, /PrivacyInfo\.xcprivacy \*\/ = \{isa = PBXFileReference;[\s\S]*?path = PrivacyInfo\.xcprivacy;/);
   assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+});
+
+test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분류를 고정한다", () => {
+  const inventoryPath = "apps/mobile/release/store-privacy-inventory.json";
+  assert.ok(existsSync(path.join(root, inventoryPath)));
+
+  const inventory = readJson(inventoryPath);
+  const privacyManifest = read("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy");
+  const main = read("apps/mobile/lib/main.dart");
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const facilityReport = read("apps/mobile/lib/facility_report.dart");
+  const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
+  const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
+
+  assert.equal(inventory.schemaVersion, 1);
+  assert.equal(inventory.applicationId, "easysubway");
+  assert.equal(inventory.tracking, false);
+  assert.equal(inventory.sharesDataWithThirdParties, false);
+  assert.equal(inventory.encryptionInTransitRequired, true);
+  assert.equal(inventory.userDataDeletionSupported, true);
+  assert.match(inventory.privacyPolicyUrlSource, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(main, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(main, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+
+  const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
+  const requiredIds = [
+    "precise_location",
+    "search_queries",
+    "favorite_stations_routes_facilities",
+    "mobility_profile",
+    "facility_report_content",
+    "facility_report_photo",
+    "facility_report_location",
+    "notification_settings",
+    "push_token",
+    "anonymous_user_id",
+    "diagnostics_crash_logs",
+    "diagnostics_performance_logs",
+  ];
+  assert.deepEqual([...items.keys()].sort(), requiredIds.toSorted());
+
+  for (const id of requiredIds) {
+    const item = items.get(id);
+    assert.equal(typeof item.displayNameKo, "string", `${id} must have Korean display name`);
+    assert.ok(item.displayNameKo.length > 0, `${id} display name must not be empty`);
+    assert.equal(typeof item.purposeKo, "string", `${id} must have purpose`);
+    assert.ok(item.purposeKo.length > 0, `${id} purpose must not be empty`);
+    assert.ok(Array.isArray(item.storageLocations), `${id} must list storage locations`);
+    assert.ok(item.storageLocations.length > 0, `${id} must have at least one storage location`);
+    assert.equal(typeof item.retentionKo, "string", `${id} must have retention`);
+    assert.equal(typeof item.deletionKo, "string", `${id} must have deletion path`);
+    assert.equal(item.sharedWithThirdParties, false, `${id} must not be shared with third parties`);
+    assert.equal(item.usedForTracking, false, `${id} must not be used for tracking`);
+    assert.ok(item.googlePlayDataSafety?.dataType, `${id} must map to Play Data safety`);
+    assert.equal(
+      item.googlePlayDataSafety.encryptedInTransit,
+      true,
+      `${id} must require encrypted transport`,
+    );
+  }
+
+  const appStoreTypes = [...new Set(
+    inventory.dataTypes
+      .map((item) => item.appStorePrivacy?.dataType)
+      .filter(Boolean),
+  )].sort();
+  assert.deepEqual(appStoreTypes, [
+    "NSPrivacyCollectedDataTypeCrashData",
+    "NSPrivacyCollectedDataTypeDeviceID",
+    "NSPrivacyCollectedDataTypeOtherUserContent",
+    "NSPrivacyCollectedDataTypePerformanceData",
+    "NSPrivacyCollectedDataTypePhotosorVideos",
+    "NSPrivacyCollectedDataTypePreciseLocation",
+    "NSPrivacyCollectedDataTypeSearchHistory",
+    "NSPrivacyCollectedDataTypeSensitiveInfo",
+    "NSPrivacyCollectedDataTypeUserID",
+  ]);
+  for (const dataType of appStoreTypes) {
+    assertPrivacyCollectedDataType(privacyManifest, dataType);
+  }
+
+  assert.equal(items.get("precise_location").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePreciseLocation");
+  assert.equal(items.get("search_queries").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeSearchHistory");
+  assert.equal(items.get("mobility_profile").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeSensitiveInfo");
+  assert.equal(items.get("facility_report_photo").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePhotosorVideos");
+  assert.equal(items.get("facility_report_content").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeOtherUserContent");
+  assert.equal(items.get("facility_report_location").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePreciseLocation");
+  assert.equal(items.get("push_token").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeDeviceID");
+  assert.equal(items.get("anonymous_user_id").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeUserID");
+  assert.equal(items.get("diagnostics_crash_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeCrashData");
+  assert.equal(items.get("diagnostics_performance_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePerformanceData");
+
+  assert.match(stationSearch, /currentLocation\(\)/);
+  assert.match(facilityReport, /photoDataBase64/);
+  assert.match(facilityReport, /latitude/);
+  assert.match(notificationSettings, /deviceToken/);
+  assert.match(anonymousAuth, /anonymousAuth\.credentials/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
