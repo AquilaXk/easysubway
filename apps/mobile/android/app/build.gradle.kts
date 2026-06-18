@@ -45,7 +45,7 @@ android {
     defaultConfig {
         applicationId = "com.easysubway.easysubway_mobile"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = maxOf(35, flutter.targetSdkVersion)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
