@@ -1372,10 +1372,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionUseCase/);
   assert.match(operatorDataCollectionFailuresAssembler, /listRecentRuns/);
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionStatus\.FAILED/);
+  assert.match(operatorDataCollectionFailuresAssembler, /Duration\.ofHours\(24\)/);
   assert.match(operatorDataCollectionFailuresView, /record OperatorDataCollectionFailuresView/);
   assert.match(operatorDataCollectionFailuresView, /int totalRunCount/);
   assert.match(operatorDataCollectionFailuresView, /long failedRunCount/);
   assert.match(operatorDataCollectionFailuresView, /long retryableRunCount/);
+  assert.match(operatorDataCollectionFailuresView, /String latestCompletedAtLabel/);
+  assert.match(operatorDataCollectionFailuresView, /String freshnessAlertLabel/);
+  assert.match(operatorDataCollectionFailuresView, /String freshnessAlertDescription/);
+  assert.match(operatorDataCollectionFailuresView, /String freshnessAlertClass/);
   assert.match(operatorDataCollectionFailuresView, /record DataCollectionRunRow/);
   assert.doesNotMatch(operatorDataCollectionFailuresView, /runId|requestedBy/);
   assert.match(operatorReportTemplate, /운영기관 접근성 시설 현황/);
@@ -1394,6 +1399,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorDataCollectionFailuresTemplate, /운영기관 데이터 수집 실패 현황/);
   assert.match(operatorDataCollectionFailuresTemplate, /읽기 전용 리포트/);
   assert.match(operatorDataCollectionFailuresTemplate, /전체 수집 실행/);
+  assert.match(operatorDataCollectionFailuresTemplate, /데이터 갱신 상태/);
+  assert.match(operatorDataCollectionFailuresTemplate, /최신 완료 수집/);
+  assert.match(operatorDataCollectionFailuresTemplate, /report\.freshnessAlertLabel/);
+  assert.match(operatorDataCollectionFailuresTemplate, /report\.freshnessAlertDescription/);
+  assert.match(operatorDataCollectionFailuresTemplate, /report\.freshnessAlertClass/);
+  assert.match(operatorDataCollectionFailuresTemplate, /report\.latestCompletedAtLabel/);
   assert.match(operatorDataCollectionFailuresTemplate, /최근 수집 실행/);
   assert.doesNotMatch(
     operatorDataCollectionFailuresTemplate,
