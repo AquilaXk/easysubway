@@ -1,6 +1,11 @@
 package com.easysubway.notification.adapter.in.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.easysubway.notification.application.port.in.DeliverPushNotificationsCommand;
 import com.easysubway.notification.application.port.in.PushNotificationDeliveryUseCase;
@@ -13,19 +18,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 
 @DisplayName("푸시 알림 자동 발송 스케줄러")
 class PushNotificationDeliverySchedulerTest {
 
 	private PendingUserOutbox pendingUserOutbox;
 	private RecordingDeliveryUseCase deliveryUseCase;
+	private StringRedisTemplate redisTemplate;
 	private PushNotificationDeliveryScheduler scheduler;
 
 	@BeforeEach
+	@SuppressWarnings("unchecked")
 	void setUp() {
 		pendingUserOutbox = new PendingUserOutbox();
 		deliveryUseCase = new RecordingDeliveryUseCase();
-		scheduler = new PushNotificationDeliveryScheduler(pendingUserOutbox, deliveryUseCase);
+		redisTemplate = org.mockito.Mockito.mock(StringRedisTemplate.class);
+		when(redisTemplate.execute(
+			any(RedisScript.class),
+			eq(List.of("easysubway:notifications:push:delivery:scheduler-lock")),
+			anyString(),
+			eq("300000")
+		)).thenReturn(1L);
+		when(redisTemplate.execute(
+			any(RedisScript.class),
+			eq(List.of("easysubway:notifications:push:delivery:scheduler-lock")),
+			anyString()
+		)).thenReturn(1L);
+		scheduler = new PushNotificationDeliveryScheduler(pendingUserOutbox, deliveryUseCase, redisTemplate, 300000L);
 	}
 
 	@Test
@@ -37,6 +58,38 @@ class PushNotificationDeliverySchedulerTest {
 
 		assertThat(deliveryUseCase.deliveredUserIds)
 			.containsExactly("anonymous-user-1", "anonymous-user-2");
+	}
+
+	@Test
+	@DisplayName("다른 인스턴스가 lock을 보유하면 발송 유스케이스를 호출하지 않는다")
+	@SuppressWarnings("unchecked")
+	void deliverPendingNotificationsSkipsWhenLockIsAlreadyHeld() {
+		when(redisTemplate.execute(
+			any(RedisScript.class),
+			eq(List.of("easysubway:notifications:push:delivery:scheduler-lock")),
+			anyString(),
+			eq("300000")
+		)).thenReturn(0L);
+		pendingUserOutbox.userIds = List.of("anonymous-user-1");
+
+		scheduler.deliverPendingNotifications();
+
+		assertThat(deliveryUseCase.deliveredUserIds).isEmpty();
+	}
+
+	@Test
+	@DisplayName("lock을 획득한 실행은 완료 후 같은 token으로 lock을 해제한다")
+	@SuppressWarnings("unchecked")
+	void deliverPendingNotificationsReleasesAcquiredLock() {
+		pendingUserOutbox.userIds = List.of("anonymous-user-1");
+
+		scheduler.deliverPendingNotifications();
+
+		verify(redisTemplate).execute(
+			any(RedisScript.class),
+			eq(List.of("easysubway:notifications:push:delivery:scheduler-lock")),
+			anyString()
+		);
 	}
 
 	@Test
@@ -72,6 +125,7 @@ class PushNotificationDeliverySchedulerTest {
 		return new ApplicationContextRunner()
 			.withBean(LoadPendingPushNotificationOutboxPort.class, PendingUserOutbox::new)
 			.withBean(PushNotificationDeliveryUseCase.class, RecordingDeliveryUseCase::new)
+			.withBean(StringRedisTemplate.class, () -> org.mockito.Mockito.mock(StringRedisTemplate.class))
 			.withUserConfiguration(PushNotificationDeliveryScheduler.class);
 	}
 
