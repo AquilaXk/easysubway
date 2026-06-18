@@ -119,6 +119,8 @@ void main() {
     expect(result.summaryLabel, '1번 출구 엘리베이터에서 개찰구까지');
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
     expect(result.steps.single.burdenLabel, '약 1분 15초 · 28m · 엘리베이터 필요');
+    expect(result.semanticLabel, contains('1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지'));
+    expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
   });
 
   test('경로 API 저장소는 백엔드 경로 검색을 요청하고 결과를 파싱한다', () async {

@@ -330,6 +330,9 @@ class InternalRouteResult {
     if (warnings.isNotEmpty) {
       parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
     }
+    if (steps.isNotEmpty) {
+      parts.add('이동 단계 ${steps.map((step) => step.semanticLabel).join(', ')}');
+    }
     return parts.join(', ');
   }
 
