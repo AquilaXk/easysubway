@@ -2611,6 +2611,8 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     assert.equal(typeof item.readyWhenKo, "string", `${id} must define ready state`);
     assert.ok(Array.isArray(item.evidence), `${id} must list evidence`);
     assert.ok(item.evidence.length > 0, `${id} must require evidence`);
+    assert.ok(Array.isArray(item.configurationSources), `${id} must list configuration sources`);
+    assert.ok(item.configurationSources.length > 0, `${id} must require configuration sources`);
     assert.ok(Array.isArray(item.linkedArtifacts), `${id} must list linked artifacts`);
     for (const artifact of item.linkedArtifacts) {
       assert.ok(existsSync(path.join(root, artifact)), `${id} linked artifact must exist: ${artifact}`);
