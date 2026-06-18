@@ -441,6 +441,20 @@ test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한�
   );
 });
 
+test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 추적한다", () => {
+  const backendBuild = read("backend/build.gradle");
+  const androidBuild = read("apps/mobile/android/build.gradle.kts");
+  const backendLockfile = read("backend/gradle.lockfile");
+  const androidLockfile = read("apps/mobile/android/app/gradle.lockfile");
+
+  assert.match(backendBuild, /dependencyLocking\s*\{\s*lockAllConfigurations\(\)\s*\}/);
+  assert.match(androidBuild, /dependencyLocking\s*\{\s*lockAllConfigurations\(\)\s*\}/);
+  assert.match(backendLockfile, /This is a Gradle generated file for dependency locking/);
+  assert.match(androidLockfile, /This is a Gradle generated file for dependency locking/);
+  assert.match(backendLockfile, /\n[^#\n][^=\n]+=/);
+  assert.match(androidLockfile, /\n[^#\n][^=\n]+=/);
+});
+
 test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
   const compose = read("infra/docker-compose.yml");
 
