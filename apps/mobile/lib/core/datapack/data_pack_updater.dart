@@ -97,7 +97,8 @@ class DataPackUpdater {
       for (final result in results) {
         final pointer = result.pointer;
         if (pointer?.id == activePack.id &&
-            pointer?.version == activePack.version) {
+            _versionNumber(pointer?.version ?? '') ==
+                _versionNumber(activePack.version)) {
           return pointer;
         }
       }
