@@ -31,26 +31,42 @@ decode_base64_to_file() {
 	printf '%s' "${encoded}" | base64 -D > "${object_file}"
 }
 
+decode_manifest_field() {
+	local encoded="$1"
+	if [[ -z "${encoded}" ]]; then
+		return
+	fi
+	if printf '%s' "${encoded}" | base64 --decode 2>/dev/null; then
+		return
+	fi
+	printf '%s' "${encoded}" | base64 -D
+}
+
+manifest_field() {
+	local encoded="$1"
+	decode_manifest_field "${encoded}" | tr '\t\r\n' ' '
+}
+
 mkdir -p "${objects_dir}"
 chmod 700 "${run_dir}" "${objects_dir}"
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres sh -lc \
-	'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' <<'SQL' > "${rows_file}"
+	'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" "$POSTGRES_DB"' <<'SQL' > "${rows_file}"
 COPY (
 SELECT report_id,
-	COALESCE(photo_file_name, '') AS photo_file_name,
-	COALESCE(photo_content_type, '') AS photo_content_type,
+	ENCODE(CONVERT_TO(COALESCE(photo_file_name, ''), 'UTF8'), 'base64') AS photo_file_name_base64,
+	ENCODE(CONVERT_TO(COALESCE(photo_content_type, ''), 'UTF8'), 'base64') AS photo_content_type_base64,
 	photo_data_base64
 FROM facility_reports
 WHERE photo_data_base64 IS NOT NULL
 	AND photo_data_base64 <> ''
 ORDER BY report_id ASC
-) TO STDOUT WITH (FORMAT csv, DELIMITER E'\t');
+) TO STDOUT WITH (FORMAT text, DELIMITER E'\t');
 SQL
 
 printf 'report_id\tfile_name\tcontent_type\tobject_path\n' > "${manifest_file}"
 
-while IFS=$'\t' read -r report_id file_name content_type photo_data_base64; do
+while IFS=$'\t' read -r report_id file_name_base64 content_type_base64 photo_data_base64; do
 	if [[ -z "${report_id}" || -z "${photo_data_base64}" ]]; then
 		continue
 	fi
@@ -58,6 +74,8 @@ while IFS=$'\t' read -r report_id file_name content_type photo_data_base64; do
 	object_path="objects/${safe_report_id}.bin"
 	object_file="${run_dir}/${object_path}"
 	decode_base64_to_file "${photo_data_base64}" "${object_file}"
+	file_name="$(manifest_field "${file_name_base64}")"
+	content_type="$(manifest_field "${content_type_base64}")"
 	printf '%s\t%s\t%s\t%s\n' "${report_id}" "${file_name}" "${content_type}" "${object_path}" >> "${manifest_file}"
 done < "${rows_file}"
 
