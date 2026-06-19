@@ -219,6 +219,88 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
     }
   }
 
+  Future<bool> refreshExistingAuthorization(
+    String failedAuthorizationHeader,
+  ) async {
+    final issuingCredentials = _issuingCredentials;
+    if (issuingCredentials != null) {
+      try {
+        await issuingCredentials;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '기존 익명 인증 갱신 전 진행 중인 발급을 기다리는 중 예외가 발생했습니다.',
+        );
+        return false;
+      }
+    }
+
+    final credentials = _credentials ?? await credentialStore.readCredentials();
+    if (credentials == null) {
+      return false;
+    }
+    if (credentials.authorizationHeader != failedAuthorizationHeader) {
+      return false;
+    }
+
+    _credentials = null;
+    final nextIssuingCredentials = _refreshExistingCredentials(credentials);
+    _issuingCredentials = nextIssuingCredentials;
+    try {
+      await nextIssuingCredentials;
+      return true;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기존 익명 인증 갱신 결과를 처리하는 중 예외가 발생했습니다.',
+      );
+      return false;
+    } finally {
+      if (identical(_issuingCredentials, nextIssuingCredentials)) {
+        _issuingCredentials = null;
+      }
+    }
+  }
+
+  Future<void> clearCredentials() async {
+    final issuingCredentials = _issuingCredentials;
+    if (issuingCredentials != null) {
+      try {
+        await issuingCredentials;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '데이터 삭제 전 익명 인증 발급을 기다리는 중 예외가 발생했습니다.',
+        );
+        // 삭제 흐름에서는 진행 중인 발급 실패와 무관하게 로컬 인증 상태를 비운다.
+      }
+    }
+    _issuingCredentials = null;
+    _credentials = null;
+    await credentialStore.clearCredentials();
+  }
+
+  Future<AnonymousAuthCredentials> _refreshExistingCredentials(
+    AnonymousAuthCredentials credentials,
+  ) async {
+    try {
+      final refreshedCredentials = await repository.refreshAnonymousUser(
+        credentials.refreshToken,
+      );
+      return await _saveCurrentCredentials(refreshedCredentials);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기존 익명 인증 refresh token 갱신 중 예외가 발생했습니다.',
+      );
+      rethrow;
+    }
+  }
+
   Future<AnonymousAuthCredentials> _refreshOrIssueCredentials(
     AnonymousAuthCredentials credentials,
   ) async {
