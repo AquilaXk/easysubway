@@ -314,11 +314,14 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     String routeSearchId, {
     RouteSearchResult? result,
   }) async {
-    final routeId = routeSearchId.trim();
     final routeResult = result;
     if (routeResult == null) {
       throw const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했습니다.');
     }
+    final routeId = _favoriteRouteStorageId(
+      routeSearchId: routeSearchId,
+      result: routeResult,
+    );
 
     final addedAt = DateTime.now().toUtc();
     await userDatabase
@@ -335,6 +338,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     await _writeRouteSnapshot(routeId, routeResult);
     return _favoriteRouteFromResult(
       result: routeResult,
+      favoriteRouteId: routeId,
       addedAt: _isoFromSql(addedAt),
     );
   }
@@ -393,10 +397,14 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     required Map<String, Object?> snapshot,
     required String addedAt,
   }) {
+    final originalRouteSearchId = _string(
+      snapshot['routeSearchId'],
+      fallback: routeId,
+    );
     return FavoriteRoute(
       userId: _localUserId,
       favoriteRouteId: routeId,
-      routeSearchId: routeId,
+      routeSearchId: originalRouteSearchId,
       originStationId: _string(snapshot['originStationId']),
       originStationName: _string(snapshot['originStationName']),
       destinationStationId: _string(snapshot['destinationStationId']),
@@ -500,11 +508,12 @@ class FavoriteStationBuilder {
 
 FavoriteRoute _favoriteRouteFromResult({
   required RouteSearchResult result,
+  required String favoriteRouteId,
   required String addedAt,
 }) {
   return FavoriteRoute(
     userId: _localUserId,
-    favoriteRouteId: result.routeSearchId,
+    favoriteRouteId: favoriteRouteId,
     routeSearchId: result.routeSearchId,
     originStationId: result.originStationId,
     originStationName: result.originStationName,
@@ -518,6 +527,20 @@ FavoriteRoute _favoriteRouteFromResult({
     routeCreatedAt: result.createdAt,
     addedAt: addedAt,
   );
+}
+
+String _favoriteRouteStorageId({
+  required String routeSearchId,
+  required RouteSearchResult result,
+}) {
+  final baseId = routeSearchId.trim().isNotEmpty
+      ? routeSearchId.trim()
+      : result.routeSearchId.trim();
+  final mobilityType = result.mobilityType.trim();
+  if (baseId.isEmpty || mobilityType.isEmpty) {
+    return baseId;
+  }
+  return '$baseId::$mobilityType';
 }
 
 Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
