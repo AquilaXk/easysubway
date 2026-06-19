@@ -28,7 +28,9 @@ class DataPackUpdater {
     }
 
     final override = manifest.emergencyOverride;
+    final protectedVersions = <String>{};
     if (override != null) {
+      protectedVersions.add(override.version);
       await emergencyOverrideRepository?.saveOverride(
         EmergencyDataPackOverride(
           id: override.id,
@@ -36,6 +38,8 @@ class DataPackUpdater {
           reason: override.reason,
         ),
       );
+    } else {
+      await emergencyOverrideRepository?.clearOverride();
     }
 
     final results = <DataPackInstallResult>[];
@@ -43,7 +47,11 @@ class DataPackUpdater {
       final uri = client.manifestUri.resolve(pack.url.toString());
       final compressedBytes = await _download(uri);
       results.add(
-        await installer.install(pack: pack, compressedBytes: compressedBytes),
+        await installer.install(
+          pack: pack,
+          compressedBytes: compressedBytes,
+          protectedVersions: protectedVersions,
+        ),
       );
     }
     return results;

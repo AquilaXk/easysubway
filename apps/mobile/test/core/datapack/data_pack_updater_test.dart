@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_updater.dart';
+import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -84,8 +85,56 @@ void main() {
     final pointer = await installer.readCurrentPointer();
 
     expect(results.single.status, DataPackInstallStatus.rejected);
-    expect(results.single.reason, DataPackInstallRejectionReason.invalidArchive);
+    expect(
+      results.single.reason,
+      DataPackInstallRejectionReason.invalidArchive,
+    );
     expect(pointer?.version, '17');
     expect(await oldPack.exists(), isTrue);
+  });
+
+  test('updater는 manifest에서 emergency override가 해제되면 저장값을 지운다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    await overrideRepository.saveOverride(
+      const EmergencyDataPackOverride(
+        id: 'capital',
+        version: '17',
+        reason: '시설 상태 긴급 정정',
+      ),
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'ttlSeconds': 60, 'packs': []}))
+        ..close();
+    });
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 19, 15),
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/manifest.json',
+        ),
+        stateRepository: stateRepository,
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: Directory.systemTemp,
+        userDatabase: userDatabase,
+      ),
+      emergencyOverrideRepository: overrideRepository,
+    );
+
+    await updater.checkForUpdates();
+
+    expect(await overrideRepository.readOverride(), isNull);
   });
 }
