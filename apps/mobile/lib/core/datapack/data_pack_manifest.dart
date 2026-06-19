@@ -2,6 +2,7 @@ class DataPackManifest {
   const DataPackManifest({
     required this.ttl,
     required this.packs,
+    this.activePack,
     this.emergencyOverride,
   });
 
@@ -22,12 +23,14 @@ class DataPackManifest {
             return DataPackManifestEntry.fromJson(rawPack);
           })
           .toList(growable: false),
+      activePack: _parseActivePack(json['activePack']),
       emergencyOverride: _parseOverride(json['emergencyOverride']),
     );
   }
 
   final Duration ttl;
   final List<DataPackManifestEntry> packs;
+  final ActiveDataPackManifest? activePack;
   final EmergencyOverrideManifest? emergencyOverride;
 }
 
@@ -89,6 +92,26 @@ class EmergencyOverrideManifest {
   final String id;
   final String version;
   final String reason;
+}
+
+class ActiveDataPackManifest {
+  const ActiveDataPackManifest({required this.id, required this.version});
+
+  final String id;
+  final String version;
+}
+
+ActiveDataPackManifest? _parseActivePack(Object? rawActivePack) {
+  if (rawActivePack == null) {
+    return null;
+  }
+  if (rawActivePack is! Map<String, Object?>) {
+    throw const FormatException('Invalid active data pack.');
+  }
+  return ActiveDataPackManifest(
+    id: _readPackId(rawActivePack['id']),
+    version: _readPackVersion(rawActivePack['version']),
+  );
 }
 
 EmergencyOverrideManifest? _parseOverride(Object? rawOverride) {

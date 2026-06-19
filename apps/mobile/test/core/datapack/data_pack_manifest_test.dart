@@ -5,6 +5,7 @@ void main() {
   test('데이터팩 manifest는 TTL과 pack 검증 조건을 파싱한다', () {
     final manifest = DataPackManifest.fromJson({
       'ttlSeconds': 3600,
+      'activePack': {'id': 'capital', 'version': '18'},
       'packs': [
         {
           'id': 'capital',
@@ -25,6 +26,8 @@ void main() {
     });
 
     expect(manifest.ttl, const Duration(hours: 1));
+    expect(manifest.activePack?.id, 'capital');
+    expect(manifest.activePack?.version, '18');
     expect(manifest.packs.single.id, 'capital');
     expect(manifest.packs.single.version, '18');
     expect(
