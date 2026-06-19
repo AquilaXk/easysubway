@@ -252,11 +252,13 @@ void main() {
   });
 
   test('시설 신고 API 저장소는 receipt 저장 실패에도 접수 결과를 유지한다', () async {
+    late Map<String, Object?> requestBody;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) async {
-      await utf8.decodeStream(request);
+      requestBody =
+          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
       request.response
         ..statusCode = HttpStatus.created
         ..headers.contentType = ContentType.json
@@ -295,6 +297,62 @@ void main() {
 
     expect(result.id, 'report-1');
     expect(result.receiptToken, 'receipt-token-1');
+    expect(requestBody['clientSubmissionId'], isA<String>());
+  });
+
+  test('시설 신고 API 저장소는 사진 없는 신고에도 제출 식별자를 전송한다', () async {
+    late Map<String, Object?> requestBody;
+    final receiptStore = FakeFacilityReportReceiptStore();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestBody =
+          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'id': 'report-1',
+              'stationId': 'station-sangnoksu',
+              'facilityId': 'facility-sangnoksu-elevator-1',
+              'reportType': 'BROKEN',
+              'description': '문이 열리지 않습니다.',
+              'status': 'SUBMITTED',
+              'createdAt': '2026-06-13T10:00:00',
+              'receiptToken': 'receipt-token-1',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      receiptStore: receiptStore,
+    );
+
+    final result = await repository.createReport(
+      const FacilityReportRequest(
+        userId: 'anonymous-mobile-user',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+      ),
+    );
+
+    expect(requestBody['clientSubmissionId'], isA<String>());
+    expect(requestBody['clientSubmissionId'], isNot(isEmpty));
+    expect(requestBody, isNot(contains('photoObjectKey')));
+    expect(result.receiptToken, 'receipt-token-1');
+    expect(
+      await receiptStore.receiptTokenForReport('report-1'),
+      'receipt-token-1',
+    );
   });
 
   test('시설 신고 API 저장소는 upload intent method 불일치를 실패로 처리한다', () async {

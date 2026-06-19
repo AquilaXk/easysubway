@@ -128,12 +128,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     FacilityReportRequest reportRequest,
   ) async {
     final request = reportRequest.trimmed();
-    if (request.photoDataBase64 == null || request.photoDataBase64!.isEmpty) {
-      return request;
-    }
     final clientSubmissionId = request.clientSubmissionId?.isNotEmpty == true
         ? request.clientSubmissionId!
         : _newClientSubmissionId();
+    if (request.photoDataBase64 == null || request.photoDataBase64!.isEmpty) {
+      return request.withClientSubmissionId(clientSubmissionId);
+    }
     final photoBytes = base64Decode(request.photoDataBase64!);
     final photoSha256 = sha256.convert(photoBytes).toString();
     final uploadIntent = await _createPhotoUploadIntent(
@@ -496,6 +496,21 @@ class FacilityReportRequest {
     required String photoObjectKey,
     required String photoSha256,
     required int photoSizeBytes,
+  }) {
+    final request = trimmed();
+    return request.withClientSubmissionId(
+      clientSubmissionId,
+      photoObjectKey: photoObjectKey,
+      photoSha256: photoSha256,
+      photoSizeBytes: photoSizeBytes,
+    );
+  }
+
+  FacilityReportRequest withClientSubmissionId(
+    String clientSubmissionId, {
+    String? photoObjectKey,
+    String? photoSha256,
+    int? photoSizeBytes,
   }) {
     final request = trimmed();
     return FacilityReportRequest(
