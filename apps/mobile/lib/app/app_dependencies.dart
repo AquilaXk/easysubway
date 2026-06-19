@@ -7,6 +7,9 @@ import '../notification_settings.dart';
 import '../route_search.dart';
 import '../station_search.dart';
 import '../user_data_deletion.dart';
+import '../core/database/catalog/catalog_database.dart';
+import '../features/internal_route/data/local_internal_route_repository.dart';
+import '../features/routes/data/local_route_repository.dart';
 
 class AppDependencies {
   const AppDependencies({
@@ -40,6 +43,7 @@ class AppDependencies {
     AnonymousAuthRepository? anonymousAuthRepository,
     AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
+    CatalogDatabase? catalogDatabase,
     required bool enableAnonymousAuth,
     required bool enablePushNotifications,
   }) {
@@ -75,7 +79,10 @@ class AppDependencies {
             authProvider: sharedAuthProvider,
           ),
       routeRepository:
-          routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
+          routeRepository ??
+          (catalogDatabase == null
+              ? RouteSearchApiRepository(baseUri: baseUri)
+              : LocalRouteRepository(catalogDatabase: catalogDatabase)),
       routeFeedbackRepository:
           routeFeedbackRepository ??
           _defaultRouteFeedbackRepository(
@@ -102,7 +109,9 @@ class AppDependencies {
           ),
       internalRouteRepository:
           internalRouteRepository ??
-          InternalRouteApiRepository(baseUri: baseUri),
+          (catalogDatabase == null
+              ? InternalRouteApiRepository(baseUri: baseUri)
+              : LocalInternalRouteRepository(catalogDatabase: catalogDatabase)),
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
