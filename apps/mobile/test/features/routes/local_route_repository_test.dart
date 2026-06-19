@@ -17,10 +17,10 @@ void main() {
       enablePushNotifications: false,
     );
 
-    expect(dependencies.routeRepository, isA<LocalRouteRepository>());
+    expect(dependencies.routeRepository, isA<FallbackRouteSearchRepository>());
     expect(
       dependencies.internalRouteRepository,
-      isA<LocalInternalRouteRepository>(),
+      isA<FallbackInternalRouteRepository>(),
     );
   });
 
@@ -44,10 +44,63 @@ void main() {
     expect(result.destinationStationName, '사당');
     expect(result.lineId, 'seoul-4');
     expect(result.lineName, '수도권 4호선');
+    expect(result.isLocalResult, isTrue);
     expect(
       result.steps.map((step) => step.lineId).where((id) => id.isNotEmpty),
       ['seoul-4'],
     );
     expect(result.blockedReasons, isEmpty);
   });
+
+  test('로컬 catalog가 모르는 역 경로는 API repository로 fallback한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final apiRepository = _RecordingRouteSearchRepository();
+    final repository = FallbackRouteSearchRepository(
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+      apiRepository: apiRepository,
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-outside-pack',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(apiRepository.requests, hasLength(1));
+    expect(
+      apiRepository.requests.single.destinationStationId,
+      'station-outside-pack',
+    );
+    expect(result.routeSearchId, 'api-route-1');
+    expect(result.isLocalResult, isFalse);
+  });
+}
+
+class _RecordingRouteSearchRepository implements RouteSearchRepository {
+  final requests = <RouteSearchRequest>[];
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
+    requests.add(request);
+    return RouteSearchResult(
+      routeSearchId: 'api-route-1',
+      originStationId: request.originStationId,
+      originStationName: '상록수',
+      destinationStationId: request.destinationStationId,
+      destinationStationName: '외부역',
+      mobilityType: request.mobilityType,
+      status: 'FOUND',
+      lineId: 'api-line',
+      lineName: 'API 노선',
+      score: 80,
+      steps: const [],
+      warnings: const [],
+      blockedReasons: const [],
+      createdAt: '2026-06-19T00:00:00',
+    );
+  }
 }

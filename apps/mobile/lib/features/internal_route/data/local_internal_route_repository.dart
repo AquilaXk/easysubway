@@ -12,19 +12,14 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
 
   final CatalogDatabase catalogDatabase;
 
+  Future<bool> hasRouteNodes(String stationId) async {
+    final rows = await _routeNodeRows(stationId);
+    return rows.isNotEmpty;
+  }
+
   @override
   Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
-    final rows = await catalogDatabase
-        .customSelect(
-          '''
-      SELECT id, station_id, label, node_type
-      FROM internal_route_nodes
-      WHERE station_id = ?
-      ORDER BY id
-      ''',
-          variables: [Variable.withString(stationId.trim())],
-        )
-        .get();
+    final rows = await _routeNodeRows(stationId);
 
     return rows
         .map(
@@ -38,6 +33,20 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
           ),
         )
         .toList(growable: false);
+  }
+
+  Future<List<QueryRow>> _routeNodeRows(String stationId) {
+    return catalogDatabase
+        .customSelect(
+          '''
+      SELECT id, station_id, label, node_type
+      FROM internal_route_nodes
+      WHERE station_id = ?
+      ORDER BY id
+      ''',
+          variables: [Variable.withString(stationId.trim())],
+        )
+        .get();
   }
 
   @override
@@ -152,6 +161,40 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
       'LUGGAGE' => local.MobilityType.luggage,
       _ => local.MobilityType.senior,
     };
+  }
+}
+
+class FallbackInternalRouteRepository implements InternalRouteRepository {
+  const FallbackInternalRouteRepository({
+    required this.localRepository,
+    required this.apiRepository,
+  });
+
+  final LocalInternalRouteRepository localRepository;
+  final InternalRouteRepository apiRepository;
+
+  @override
+  Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
+    final localNodes = await localRepository.listRouteNodes(stationId);
+    if (localNodes.isEmpty) {
+      return apiRepository.listRouteNodes(stationId);
+    }
+    return localNodes;
+  }
+
+  @override
+  Future<InternalRouteResult> searchInternalRoute(
+    InternalRouteRequest request,
+  ) async {
+    if (!await localRepository.hasRouteNodes(request.stationId)) {
+      return apiRepository.searchInternalRoute(request);
+    }
+
+    final localResult = await localRepository.searchInternalRoute(request);
+    if (localResult.isBlocked) {
+      return apiRepository.searchInternalRoute(request);
+    }
+    return localResult;
   }
 }
 

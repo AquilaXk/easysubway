@@ -616,6 +616,8 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
 
+  bool get isLocalResult => routeSearchId.startsWith('local-');
+
   RouteSearchStep? get arrivalGuidanceStep {
     for (final step in steps.reversed) {
       final isDestinationAccessStep =
@@ -1722,13 +1724,17 @@ class _RouteSearchResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canSaveRoute = favoriteRouteRepository != null && !result.isBlocked;
+    final canUseApiActions = !result.isLocalResult;
+    final canSaveRoute =
+        canUseApiActions &&
+        favoriteRouteRepository != null &&
+        !result.isBlocked;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _RouteSearchResultSummaryCard(result: result),
-        if (routeFeedbackRepository != null) ...[
+        if (canUseApiActions && routeFeedbackRepository != null) ...[
           const SizedBox(height: 12),
           _RouteFeedbackButtons(
             result: result,

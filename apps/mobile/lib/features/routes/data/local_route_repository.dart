@@ -10,6 +10,12 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   final CatalogDatabase catalogDatabase;
 
+  Future<bool> canSearchRoute(RouteSearchRequest request) async {
+    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    return catalog.hasStation(request.originStationId) &&
+        catalog.hasStation(request.destinationStationId);
+  }
+
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
@@ -162,6 +168,29 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 }
 
+class FallbackRouteSearchRepository implements RouteSearchRepository {
+  const FallbackRouteSearchRepository({
+    required this.localRepository,
+    required this.apiRepository,
+  });
+
+  final LocalRouteRepository localRepository;
+  final RouteSearchRepository apiRepository;
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
+    if (!await localRepository.canSearchRoute(request)) {
+      return apiRepository.searchRoute(request);
+    }
+
+    final localResult = await localRepository.searchRoute(request);
+    if (localResult.isBlocked) {
+      return apiRepository.searchRoute(request);
+    }
+    return localResult;
+  }
+}
+
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,
@@ -288,6 +317,10 @@ class _RouteCatalogSnapshot {
 
   String stationName(String stationId) {
     return stationsById[stationId] ?? stationId;
+  }
+
+  bool hasStation(String stationId) {
+    return stationsById.containsKey(stationId);
   }
 
   String lineName(String lineId) {
