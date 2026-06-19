@@ -272,6 +272,24 @@ class FieldVerificationAdminControllerTest {
 	}
 
 	@Test
+	@DisplayName("현장 검증 항목 상태 변경 요청은 완료 또는 재확인 필요 상태만 허용한다")
+	void updateFieldVerificationItemStatusRejectsWorkflowStatus() throws Exception {
+		mockMvc.perform(patch("/admin/field-verifications/stations/station-sadang/items/field-verification-sadang-elevator/status")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "PLANNED"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.data").doesNotExist())
+			.andExpect(jsonPath("$.message").value("현장 검증 상태는 VERIFIED 또는 NEEDS_RECHECK만 허용됩니다."));
+	}
+
+	@Test
 	@DisplayName("현장 검증 CSV export는 관리자 인증을 요구한다")
 	void fieldVerificationCsvRequiresAdminAuthentication() throws Exception {
 		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu/export.csv"))

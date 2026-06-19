@@ -179,6 +179,10 @@ class FieldVerificationAdminController {
 			if (status == null) {
 				throw new InvalidRequestException("현장 검증 상태를 선택해야 합니다.");
 			}
+			if (status != FieldVerificationStatus.VERIFIED
+				&& status != FieldVerificationStatus.NEEDS_RECHECK) {
+				throw new InvalidRequestException("현장 검증 상태는 VERIFIED 또는 NEEDS_RECHECK만 허용됩니다.");
+			}
 			return new UpdateFieldVerificationItemStatusCommand(stationId, itemId, status, note);
 		}
 	}
