@@ -233,6 +233,8 @@ void main() {
     );
     final validSqliteBytes = await _validCatalogSqliteBytes(directory);
     final validCompressedBytes = gzip.encode(validSqliteBytes);
+    final secondSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final secondCompressedBytes = gzip.encode(secondSqliteBytes);
     final corruptBytes = gzip.encode(<int>[]);
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
@@ -255,6 +257,12 @@ void main() {
                   _packJson(
                     version: '19',
                     url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: secondCompressedBytes,
+                    sqliteBytes: secondSqliteBytes,
+                  ),
+                  _packJson(
+                    version: '20',
+                    url: 'catalog/capital-v20.sqlite.gz',
                     compressedBytes: corruptBytes,
                     sqliteBytes: const <int>[],
                   ),
@@ -268,6 +276,11 @@ void main() {
             ..add(validCompressedBytes)
             ..close();
         case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(secondCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/capital-v20.sqlite.gz':
           request.response
             ..statusCode = HttpStatus.ok
             ..add(corruptBytes)
@@ -301,14 +314,95 @@ void main() {
 
     expect(results.map((result) => result.status), [
       DataPackInstallStatus.installed,
+      DataPackInstallStatus.installed,
       DataPackInstallStatus.rejected,
     ]);
     expect(pointer?.version, '17');
+    expect(await oldPack.exists(), isTrue);
     expect(
       await File('${catalogDirectory.path}/capital-v18.sqlite').exists(),
       isTrue,
     );
     expect(await stateRepository.readManifestCache(), isNull);
+  });
+
+  test('updater는 pack 검증 실패 시 기존 emergency override를 유지한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-override-fail-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    await overrideRepository.saveOverride(
+      const EmergencyDataPackOverride(
+        id: 'capital',
+        version: '17',
+        reason: '시설 상태 긴급 정정',
+      ),
+    );
+    final corruptBytes = [1, 2, 3, 4];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'packs': [
+                  {
+                    'id': 'capital',
+                    'version': '18',
+                    'url': 'catalog/capital-v18.sqlite.gz',
+                    'sha256': sha256.convert(corruptBytes).toString(),
+                    'sqliteSha256': '1' * 64,
+                    'schemaVersion': '1',
+                    'requiredTables': ['catalog_metadata'],
+                  },
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v18.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(corruptBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 19, 18),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: Directory('${directory.path}/catalog'),
+        userDatabase: userDatabase,
+      ),
+      emergencyOverrideRepository: overrideRepository,
+    );
+
+    final results = await updater.checkForUpdates();
+    final override = await overrideRepository.readOverride();
+
+    expect(results.single.status, DataPackInstallStatus.rejected);
+    expect(override?.version, '17');
+    expect(override?.reason, '시설 상태 긴급 정정');
   });
 }
 

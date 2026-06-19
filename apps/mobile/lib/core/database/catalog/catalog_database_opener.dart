@@ -64,16 +64,10 @@ class CatalogDatabaseOpener {
       if (!await file.exists()) {
         return null;
       }
-      final database = CatalogDatabase.file(file);
-      final usable = await _isUsableCatalogDatabase(database);
-      if (usable) {
-        return database;
-      }
-      await database.close();
+      return await _openUsableCatalogDatabase(file);
     } on Object {
       return null;
     }
-    return null;
   }
 
   File? _currentDataPackFile(Map<String, Object?> pointer) {
@@ -119,16 +113,26 @@ class CatalogDatabaseOpener {
       if (!await file.exists()) {
         return null;
       }
-      final database = CatalogDatabase.file(file);
-      final usable = await _isUsableCatalogDatabase(database);
-      if (usable) {
-        return database;
-      }
-      await database.close();
+      return await _openUsableCatalogDatabase(file);
     } on Object {
       return null;
     }
-    return null;
+  }
+
+  Future<CatalogDatabase?> _openUsableCatalogDatabase(File file) async {
+    final database = CatalogDatabase.file(file);
+    var returned = false;
+    try {
+      if (await _isUsableCatalogDatabase(database)) {
+        returned = true;
+        return database;
+      }
+      return null;
+    } finally {
+      if (!returned) {
+        await database.close();
+      }
+    }
   }
 
   Future<bool> _isUsableCatalogDatabase(CatalogDatabase database) async {

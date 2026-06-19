@@ -195,6 +195,53 @@ void main() {
       isTrue,
     );
   });
+
+  test('installer는 staged install 중 기존 current pack을 정리하지 않는다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-stage-prune-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final currentPack = File('${catalogDirectory.path}/capital-v16.sqlite');
+    final previousPack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    await currentPack.writeAsString('current');
+    await previousPack.writeAsString('previous');
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '16',
+        'path': currentPack.path,
+        'sha256': 'current-sha',
+      }),
+    );
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+      ),
+      compressedBytes: compressedBytes,
+      activateCurrent: false,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(await currentPack.exists(), isTrue);
+    expect(await previousPack.exists(), isTrue);
+    expect(
+      await File('${catalogDirectory.path}/capital-v18.sqlite').exists(),
+      isTrue,
+    );
+  });
 }
 
 DataPackManifestEntry _pack({
