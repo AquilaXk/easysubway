@@ -34,6 +34,31 @@ void main() {
     }
   });
 
+  test('노선 필터 검색과 노선 목록은 로컬 라인 매핑을 사용한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = DriftStationRepository(database: database);
+
+    final lines = await repository.listLines();
+    final line4 = lines.singleWhere((line) => line.id == 'seoul-4');
+
+    expect(line4.name, '수도권 4호선');
+    expect(line4.lineCode, '4');
+    expect(line4.region, '수도권');
+    expect(line4.active, isTrue);
+
+    expect(
+      await repository.searchStationsOnLine('상록수', 'seoul-4'),
+      hasLength(1),
+    );
+    expect(await repository.searchStationsOnLine('', 'seoul-4'), isEmpty);
+    expect(
+      await repository.searchStationsOnLine('상록수', 'unknown-line'),
+      isEmpty,
+    );
+  });
+
   test('주변 역 검색은 로컬 좌표로 거리순 정렬과 limit을 적용한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

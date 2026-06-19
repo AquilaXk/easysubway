@@ -10,6 +10,11 @@ class DriftStationRepository
   DriftStationRepository({required this.database});
 
   final CatalogDatabase database;
+  Future<List<_LocalStationSummary>>? _stationSummaryCache;
+
+  void invalidateStationSummaryCache() {
+    _stationSummaryCache = null;
+  }
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -198,14 +203,14 @@ class DriftStationRepository
             id: row.read<String>('id'),
             stationId: row.read<String>('station_id'),
             exitId: row.read<String?>('exit_id') ?? '',
-            type: row.read<String>('type'),
-            name: row.read<String>('name'),
-            floorFrom: row.read<String>('floor_from'),
-            floorTo: row.read<String>('floor_to'),
-            description: row.read<String>('description'),
-            status: row.read<String>('status'),
+            type: row.read<String?>('type') ?? '',
+            name: row.read<String?>('name') ?? '',
+            floorFrom: row.read<String?>('floor_from') ?? '',
+            floorTo: row.read<String?>('floor_to') ?? '',
+            description: row.read<String?>('description') ?? '',
+            status: row.read<String?>('status') ?? '',
             dataConfidence: 'MEDIUM',
-            dataSourceType: row.read<String>('data_source_type'),
+            dataSourceType: row.read<String?>('data_source_type') ?? '',
             lastUpdatedAt: _dateLabelFromEpoch(
               row.read<int?>('last_verified_at_value'),
             ),
@@ -220,6 +225,23 @@ class DriftStationRepository
   }
 
   Future<List<_LocalStationSummary>> _listStationSummaries({
+    String? stationId,
+  }) async {
+    if (stationId == null) {
+      return _stationSummaryCache ??= _readStationSummaries();
+    }
+
+    final cached = _stationSummaryCache;
+    if (cached != null) {
+      return (await cached)
+          .where((summary) => summary.id == stationId)
+          .toList(growable: false);
+    }
+
+    return _readStationSummaries(stationId: stationId);
+  }
+
+  Future<List<_LocalStationSummary>> _readStationSummaries({
     String? stationId,
   }) async {
     final stationFilter = stationId == null ? '' : 'WHERE s.id = ?';
@@ -258,12 +280,12 @@ class DriftStationRepository
         () => _LocalStationSummary(
           id: stationId,
           nameKo: row.read<String>('name_ko'),
-          nameEn: row.read<String>('name_en'),
+          nameEn: row.read<String?>('name_en') ?? '',
           region: row.read<String>('region'),
           latitude: row.read<double?>('latitude'),
           longitude: row.read<double?>('longitude'),
           dataQualityLevel: row.read<String>('data_quality_level'),
-          dataSourceType: row.read<String>('data_source_type'),
+          dataSourceType: row.read<String?>('data_source_type') ?? '',
           lastVerifiedAt: _dateLabelFromEpoch(
             row.read<int?>('last_verified_at_value'),
           ),
