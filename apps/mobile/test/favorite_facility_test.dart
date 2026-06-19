@@ -116,6 +116,70 @@ void main() {
     expect(authProvider.invalidateCount, 1);
   });
 
+  test('즐겨찾기 시설 API 저장소는 시설 저장과 해제를 요청한다', () async {
+    final requestedMethods = <String>[];
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedMethods.add(request.method);
+      requestedPaths.add(request.uri.path);
+      request.response.headers.contentType = ContentType.json;
+      if (request.method == 'PUT') {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'userId': 'anonymous-user-1',
+                'facilityId': 'facility-sangnoksu-elevator-1',
+                'stationId': 'station-sangnoksu',
+                'stationNameKo': '상록수',
+                'stationNameEn': 'Sangnoksu',
+                'exitId': 'exit-sangnoksu-1',
+                'type': 'ELEVATOR',
+                'name': '1번 출구 엘리베이터',
+                'floorFrom': '1F',
+                'floorTo': 'B1',
+                'description': '1번 출구 앞',
+                'status': 'NORMAL',
+                'dataConfidence': 'HIGH',
+                'dataSourceType': 'OFFICIAL_FILE',
+                'lastUpdatedAt': '2026-06-12',
+                'addedAt': '2026-06-14T10:00:00',
+              },
+            }),
+          )
+          ..close();
+        return;
+      }
+
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..write(jsonEncode({'success': true, 'data': null}))
+        ..close();
+    });
+
+    final repository = FavoriteFacilityApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: const NoAuthorizationHeaderProvider(),
+    );
+
+    final saved = await repository.saveFavoriteFacility(
+      'facility-sangnoksu-elevator-1',
+    );
+    await repository.removeFavoriteFacility('facility-sangnoksu-elevator-1');
+
+    expect(saved.facilityId, 'facility-sangnoksu-elevator-1');
+    expect(requestedMethods, ['PUT', 'DELETE']);
+    expect(requestedPaths, [
+      '/api/v1/me/favorites/facilities/facility-sangnoksu-elevator-1',
+      '/api/v1/me/favorites/facilities/facility-sangnoksu-elevator-1',
+    ]);
+  });
+
   test('즐겨찾기 시설 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
     final repository = FakeFavoriteFacilityRepository();
     final controller = FavoriteFacilityListController(repository: repository);
@@ -170,6 +234,28 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
       throw currentError;
     }
     return favorites;
+  }
+
+  @override
+  Future<FavoriteFacility> saveFavoriteFacility(String facilityId) async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    final favorite = _favoriteFacility();
+    favorites = [favorite];
+    return favorite;
+  }
+
+  @override
+  Future<void> removeFavoriteFacility(String facilityId) async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    favorites = favorites
+        .where((favorite) => favorite.facilityId != facilityId)
+        .toList(growable: false);
   }
 }
 
