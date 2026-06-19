@@ -1,7 +1,9 @@
 import '../anonymous_auth.dart';
 import '../auth_headers.dart';
+import '../core/database/catalog/catalog_database.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
+import '../features/stations/data/drift_station_repository.dart';
 import '../internal_route.dart';
 import '../notification_settings.dart';
 import '../route_search.dart';
@@ -72,7 +74,11 @@ class AppDependencies {
         : null;
 
     return AppDependencies(
-      repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
+      repository:
+          repository ??
+          (catalogDatabase != null
+              ? DriftStationRepository(database: catalogDatabase)
+              : StationSearchApiRepository(baseUri: baseUri)),
       reportRepository:
           reportRepository ??
           FacilityReportApiRepository(
