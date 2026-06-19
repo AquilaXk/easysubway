@@ -9,9 +9,14 @@ import 'mobile_error_reporter.dart';
 
 const _favoriteFacilityTimeout = Duration(seconds: 8);
 const _favoriteFacilityLoadErrorMessage = '즐겨찾기 시설을 불러오지 못했습니다.';
+const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 처리하지 못했습니다.';
 
 abstract class FavoriteFacilityRepository {
   Future<List<FavoriteFacility>> listFavoriteFacilities();
+
+  Future<FavoriteFacility> saveFavoriteFacility(String facilityId);
+
+  Future<void> removeFavoriteFacility(String facilityId);
 }
 
 class FavoriteFacilityApiRepository implements FavoriteFacilityRepository {
@@ -53,6 +58,46 @@ class FavoriteFacilityApiRepository implements FavoriteFacilityRepository {
       );
       throw const FavoriteFacilityException(_favoriteFacilityLoadErrorMessage);
     }
+  }
+
+  @override
+  Future<FavoriteFacility> saveFavoriteFacility(String facilityId) async {
+    final data = await _requestData(
+      'PUT',
+      baseUri.resolve(
+        '/api/v1/me/favorites/facilities/${Uri.encodeComponent(facilityId)}',
+      ),
+      errorMessage: _favoriteFacilityChangeErrorMessage,
+    );
+    if (data is! Map<String, Object?>) {
+      throw const FavoriteFacilityException(
+        _favoriteFacilityChangeErrorMessage,
+      );
+    }
+
+    try {
+      return FavoriteFacility.fromJson(data);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 시설 저장 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const FavoriteFacilityException(
+        _favoriteFacilityChangeErrorMessage,
+      );
+    }
+  }
+
+  @override
+  Future<void> removeFavoriteFacility(String facilityId) async {
+    await _requestData(
+      'DELETE',
+      baseUri.resolve(
+        '/api/v1/me/favorites/facilities/${Uri.encodeComponent(facilityId)}',
+      ),
+      errorMessage: _favoriteFacilityChangeErrorMessage,
+    );
   }
 
   Future<Object?> _requestData(

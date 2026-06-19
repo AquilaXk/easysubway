@@ -43,6 +43,12 @@ abstract class StationSearchRepository {
   Future<List<StationFacilityInfo>> listStationFacilities(String stationId);
 }
 
+abstract class SearchHistoryRepository {
+  Future<void> recordSearch(String query);
+
+  Future<List<String>> listRecentQueries();
+}
+
 abstract class StationLineFilterRepository {
   Future<List<SubwayLineOption>> listLines();
 
@@ -1234,9 +1240,13 @@ class StationSearchState {
 }
 
 class StationSearchController extends ChangeNotifier {
-  StationSearchController({required this.repository});
+  StationSearchController({
+    required this.repository,
+    this.searchHistoryRepository,
+  });
 
   final StationSearchRepository repository;
+  final SearchHistoryRepository? searchHistoryRepository;
 
   StationSearchState _state = const StationSearchState.idle();
   int _searchRequestId = 0;
@@ -1268,6 +1278,7 @@ class StationSearchController extends ChangeNotifier {
           ? await (repository as StationLineFilterRepository)
                 .searchStationsOnLine(trimmedQuery, selectedLineId)
           : await repository.searchStations(trimmedQuery);
+      await _recordSearch(trimmedQuery);
       if (!_isActiveRequest(requestId)) {
         return;
       }
@@ -1304,6 +1315,18 @@ class StationSearchController extends ChangeNotifier {
       );
     }
     _notifyIfActive(requestId);
+  }
+
+  Future<void> _recordSearch(String query) async {
+    final repository = searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.recordSearch(query);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 저장 중 예외가 발생했습니다.');
+    }
   }
 
   Future<void> searchNearby(CurrentLocationProvider locationProvider) async {
@@ -1829,6 +1852,7 @@ class StationSearchScreen extends StatefulWidget {
     required this.reportRepository,
     required this.locationProvider,
     this.favoriteRepository,
+    this.searchHistoryRepository,
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
@@ -1839,6 +1863,7 @@ class StationSearchScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
@@ -1858,7 +1883,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = StationSearchController(repository: widget.repository);
+    _controller = StationSearchController(
+      repository: widget.repository,
+      searchHistoryRepository: widget.searchHistoryRepository,
+    );
     _queryController.addListener(_handleQueryChanged);
     final lineRepository = _lineFilterRepository;
     if (lineRepository != null) {

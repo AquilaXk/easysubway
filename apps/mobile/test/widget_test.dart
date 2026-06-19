@@ -6224,6 +6224,28 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
     }
     return favorites;
   }
+
+  @override
+  Future<FavoriteFacility> saveFavoriteFacility(String facilityId) async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    final favorite = _favoriteFacility();
+    favorites = [favorite];
+    return favorite;
+  }
+
+  @override
+  Future<void> removeFavoriteFacility(String facilityId) async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    favorites = favorites
+        .where((favorite) => favorite.facilityId != facilityId)
+        .toList(growable: false);
+  }
 }
 
 class FakeFavoriteRouteRepository implements FavoriteRouteRepository {
@@ -6248,7 +6270,10 @@ class FakeFavoriteRouteRepository implements FavoriteRouteRepository {
   }
 
   @override
-  Future<FavoriteRoute> saveFavoriteRoute(String routeSearchId) async {
+  Future<FavoriteRoute> saveFavoriteRoute(
+    String routeSearchId, {
+    RouteSearchResult? result,
+  }) async {
     savedRouteSearchIds.add(routeSearchId);
     final currentError = error;
     if (currentError != null) {
