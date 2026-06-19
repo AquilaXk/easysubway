@@ -70,6 +70,9 @@ class AppBootstrap {
     final userDatabase = await UserDatabaseOpener(
       databaseDirectory: Directory(p.join(supportDirectory.path, 'user')),
     ).open();
+    final emergencyOverrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
 
     try {
       await _runDataPackUpdateSafely(
@@ -80,6 +83,7 @@ class AppBootstrap {
       final catalogDatabase = await CatalogDatabaseOpener(
         databaseDirectory: supportDirectory,
         assetBundle: assetBundle ?? rootBundle,
+        emergencyOverrideRepository: emergencyOverrideRepository,
       ).open();
 
       final dependencies = AppDependencies.resolve(

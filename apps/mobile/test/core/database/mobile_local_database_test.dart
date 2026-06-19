@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
+import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:flutter/services.dart';
@@ -236,6 +237,69 @@ void main() {
           ''').getSingle();
 
     expect(metadata.read<String>('value'), 'capital-v18');
+  });
+
+  test('catalog opener는 emergency override가 있으면 current보다 우선한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-override-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    await overrideRepository.saveOverride(
+      const EmergencyDataPackOverride(
+        id: 'capital',
+        version: '17',
+        reason: '시설 상태 긴급 정정',
+      ),
+    );
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final overridePack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    final currentPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    for (final entry in [
+      (file: overridePack, activePack: 'capital-v17'),
+      (file: currentPack, activePack: 'capital-v18'),
+    ]) {
+      final database = CatalogDatabase.file(entry.file);
+      await database.seedBaselineIfEmpty();
+      await database
+          .into(database.catalogMetadata)
+          .insertOnConflictUpdate(
+            CatalogMetadataCompanion.insert(
+              key: 'activePack',
+              value: entry.activePack,
+              updatedAt: Value(DateTime.utc(2026, 6, 19, 14)),
+            ),
+          );
+      await database.close();
+    }
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': currentPack.path,
+        'sha256': 'current-fixture',
+      }),
+    );
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      emergencyOverrideRepository: overrideRepository,
+    ).open();
+    addTearDown(database.close);
+
+    final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), 'capital-v17');
   });
 
   test('앱 부트스트랩은 데이터팩 업데이트 후 current pointer로 catalog를 연다', () async {

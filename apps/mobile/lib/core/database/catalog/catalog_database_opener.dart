@@ -5,18 +5,21 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../datapack/emergency_override_repository.dart';
 import 'catalog_database.dart';
 
 class CatalogDatabaseOpener {
   CatalogDatabaseOpener({
     required this.databaseDirectory,
     required this.assetBundle,
+    this.emergencyOverrideRepository,
   });
 
   static const indexAssetPath = 'assets/datapacks/index.json';
 
   final Directory databaseDirectory;
   final AssetBundle assetBundle;
+  final EmergencyOverrideRepository? emergencyOverrideRepository;
 
   Future<CatalogDatabase> open() async {
     final installedDatabase = await _openInstalledCurrentDataPack();
@@ -53,7 +56,43 @@ class CatalogDatabaseOpener {
       if (path is! String || path.trim().isEmpty) {
         return null;
       }
+      final overrideDatabase = await _openEmergencyOverrideDataPack();
+      if (overrideDatabase != null) {
+        return overrideDatabase;
+      }
       final file = File(path);
+      if (!await file.exists()) {
+        return null;
+      }
+      final database = CatalogDatabase.file(file);
+      final usable = await _isUsableCatalogDatabase(database);
+      if (usable) {
+        return database;
+      }
+      await database.close();
+    } on Object {
+      return null;
+    }
+    return null;
+  }
+
+  Future<CatalogDatabase?> _openEmergencyOverrideDataPack() async {
+    final repository = emergencyOverrideRepository;
+    if (repository == null) {
+      return null;
+    }
+    try {
+      final override = await repository.readOverride();
+      if (override == null) {
+        return null;
+      }
+      final file = File(
+        p.join(
+          databaseDirectory.path,
+          'catalog',
+          '${override.id}-v${override.version}.sqlite',
+        ),
+      );
       if (!await file.exists()) {
         return null;
       }
