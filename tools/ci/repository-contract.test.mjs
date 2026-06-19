@@ -1317,8 +1317,13 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminPageController, /reportSurgeAlert/);
   assert.match(adminPageController, /점검 필요/);
   assert.doesNotMatch(adminPageController, /listReports\(status\)/);
+  assert.match(adminPageController, /ReportProcessingTimeView/);
+  assert.match(adminPageController, /processingTime/);
+  assert.match(adminPageController, /Duration\.between\(report\.createdAt\(\), report\.reviewedAt\(\)\)/);
   assert.match(adminReportListTemplate, /신고 급증/);
   assert.match(adminReportListTemplate, /최근 24시간 신고/);
+  assert.match(adminReportListTemplate, /신고 처리 시간/);
+  assert.match(adminReportListTemplate, /처리 완료 신고 없음/);
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
