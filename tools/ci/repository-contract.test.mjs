@@ -508,6 +508,83 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
+test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 backend image 검증을 생성한다", () => {
+  assert.equal(
+    existsSync(path.join(root, ".github/workflows/release-artifacts.yml")),
+    true,
+    "release artifact workflow must exist",
+  );
+
+  const workflow = read(".github/workflows/release-artifacts.yml");
+
+  assert.match(workflow, /^name: Release Artifacts$/m);
+  assert.match(workflow, /pull_request:[\s\S]*branches:[\s\S]*- main/);
+  assert.match(workflow, /push:[\s\S]*branches:[\s\S]*- main/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /permissions:\s*\n\s*contents: read/);
+  assert.match(workflow, /group: release-artifacts-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/);
+
+  assertActionsEnvSecretPolicy(".github/workflows/release-artifacts.yml", workflow);
+
+  assert.match(workflow, /android-release:/);
+  assert.match(workflow, /name: Android Release Artifact/);
+  assert.match(workflow, /keytool -genkeypair/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
+  assert.match(workflow, /flutter build appbundle --release/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway\.local\/privacy/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL=support@easysubway\.local/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway\.local/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL=security@easysubway\.local/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+  assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
+  assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
+  assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
+
+  assert.match(workflow, /ios-release:/);
+  assert.match(workflow, /name: iOS Release Artifact/);
+  assert.match(workflow, /runs-on: macos-latest/);
+  assert.match(workflow, /flutter build ios --release --no-codesign/);
+  assert.match(workflow, /build\/ios\/iphoneos\/Runner\.app/);
+  assert.match(workflow, /find build\/ios -name "\*\.dSYM" -print0/);
+  assert.match(workflow, /release-artifacts\/ios\/dSYMs\/\$\{dsym_path#build\/ios\/\}/);
+  assert.match(workflow, /ditto -c -k release-artifacts\/ios\/dSYMs release-artifacts\/ios\/dsym\.zip/);
+  assert.match(workflow, /dsym_count=\$\{dsym_count\}/);
+  assert.match(workflow, /name: easysubway-ios-release-\$\{\{ github\.sha \}\}/);
+
+  assert.match(workflow, /backend-release:/);
+  assert.match(workflow, /name: Backend Release Image/);
+  assert.match(workflow, /working-directory: backend[\s\S]*?\.\/gradlew bootJar --no-daemon/);
+  assert.match(workflow, /docker build -f backend\/Dockerfile -t easysubway-backend:\$\{\{ github\.sha \}\} backend/);
+  assert.match(workflow, /docker image inspect easysubway-backend:\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
+  assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+});
+
+test("backend release image는 bootJar 산출물만 포함하는 runtime image로 패키징된다", () => {
+  assert.equal(existsSync(path.join(root, "backend/Dockerfile")), true, "backend Dockerfile must exist");
+  assert.equal(existsSync(path.join(root, "backend/.dockerignore")), true, "backend .dockerignore must exist");
+
+  const dockerfile = read("backend/Dockerfile");
+  const dockerignore = read("backend/.dockerignore");
+
+  assert.match(dockerfile, /^FROM eclipse-temurin:21-jre$/m);
+  assert.match(dockerfile, /^WORKDIR \/app$/m);
+  assert.match(dockerfile, /^COPY build\/libs\/\*\.jar app\.jar$/m);
+  assert.match(dockerfile, /^EXPOSE 8080$/m);
+  assert.match(dockerfile, /^ENV SPRING_PROFILES_ACTIVE=prod$/m);
+  assert.match(dockerfile, /^ENTRYPOINT \["java", "-jar", "\/app\/app\.jar"\]$/m);
+  assert.doesNotMatch(dockerfile, /EASYSUBWAY_/);
+  assert.doesNotMatch(dockerfile, /COPY \. \./);
+  assert.match(dockerignore, /^\*$/m);
+  assert.match(dockerignore, /^!build$/m);
+  assert.match(dockerignore, /^!build\/libs$/m);
+  assert.match(dockerignore, /^!build\/libs\/\*\.jar$/m);
+  assert.doesNotMatch(dockerignore, /^!\.env/m);
+});
+
 test("OSV baseline은 기존 취약점 ID를 lockfile 위치별로 좁게 예외 처리한다", () => {
   assert.equal(existsSync(path.join(root, ".github/osv-scanner-release-baseline.toml")), false);
 
