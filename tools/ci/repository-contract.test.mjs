@@ -1358,6 +1358,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
   assert.match(security, /@Order\(3\)[\s\S]*?securityMatcher\([\s\S]*?"\/api\/v1\/me"/);
+  assert.match(security, /"\/api\/v1\/reports\/\*"/);
   assert.match(security, /"\/api\/v1\/reports\/\*\/confirm"/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
@@ -1455,6 +1456,33 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     operatorDataCollectionFailuresTemplate,
     /<form|_csrf|runId|requestedBy|\/admin\/collections/,
   );
+});
+
+test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준이다", () => {
+  const reportUseCase = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java");
+  const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
+  const reportController = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(security, /"\/api\/v1\/reports\/\*"/);
+  assert.match(security, /"\/api\/v1\/routes\/\*\/feedback"/);
+  assert.match(reportUseCase, /getUserReport\(String reportId, String userId\)/);
+  assert.match(reportService, /getUserReport\(String reportId, String userId\)/);
+  assert.match(reportService, /requireReportOwner\(report, userId\)/);
+  assert.match(reportController, /report\(\s*@PathVariable String reportId,\s*Principal principal\s*\)/);
+  assert.match(reportController, /facilityReportUseCase\.getUserReport\(reportId, principal\.getName\(\)\)/);
+  assert.match(reportController, /ApiResponse<List<FacilityReportStatusResponse>> myReports\(Principal principal\)/);
+  assert.match(reportController, /map\(FacilityReportStatusResponse::from\)/);
+  assert.match(reportController, /record FacilityReportStatusResponse\([^)]*String id,[^)]*String stationId,[^)]*String facilityId,[^)]*FacilityReportType reportType,[^)]*FacilityReportStatus status,[^)]*LocalDateTime createdAt,[^)]*LocalDateTime reviewedAt/);
+  assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*String userId/);
+  assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*photoFileName/);
+  assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*BigDecimal latitude/);
+  assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*String reviewedBy/);
+  assert.match(routeController, /submitRouteFeedback\([\s\S]*Principal principal[\s\S]*\)/);
+  assert.match(routeController, /request\.toCommand\(routeSearchId, principal\.getName\(\)\)/);
+  assert.match(routeController, /record SubmitRouteFeedbackRequest\(\s*RouteFeedbackRating rating,\s*String comment\s*\)/);
+  assert.doesNotMatch(routeController, /record SubmitRouteFeedbackRequest\([\s\S]*String userId/);
 });
 
 test("운영기관 제휴 제안 export는 접근성 리포트 CSV를 제공한다", () => {
