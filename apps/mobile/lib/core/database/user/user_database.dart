@@ -1,0 +1,45 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+
+import 'user_tables.dart';
+
+part 'user_database.g.dart';
+
+@DriftDatabase(
+  tables: [
+    FavoriteStations,
+    FavoriteFacilities,
+    FavoriteRoutes,
+    SearchHistory,
+    AppPreferences,
+    InstalledDataPacks,
+    DataPackUpdateState,
+    ReportReceipts,
+    ReportDrafts,
+  ],
+)
+class UserDatabase extends _$UserDatabase {
+  UserDatabase(super.executor);
+
+  factory UserDatabase.file(File file) {
+    return UserDatabase(NativeDatabase.createInBackground(file));
+  }
+
+  factory UserDatabase.memory() {
+    return UserDatabase(NativeDatabase.memory());
+  }
+
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (migrator) async {
+        await migrator.createAll();
+      },
+    );
+  }
+}

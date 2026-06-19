@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "id": "core",
+      "asset": "assets/datapacks/core.sqlite.gz",
+      "sha256": "44a49dfd224c47cac24a66445a474c438455375742764141d9781a42dae07aff",
+      "sqliteSha256": "7557d6cc42348e6950021ab08b43a34a461edde310f28324476ba9ca2c17b12c"
+    },
+    {
+      "id": "capital",
+      "asset": "assets/datapacks/capital.sqlite.gz",
+      "sha256": "44a49dfd224c47cac24a66445a474c438455375742764141d9781a42dae07aff",
+      "sqliteSha256": "7557d6cc42348e6950021ab08b43a34a461edde310f28324476ba9ca2c17b12c"
+    }
+  ]
+}
