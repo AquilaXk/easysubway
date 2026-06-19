@@ -33,7 +33,7 @@ class DataPackUpdater {
     final override = manifest.emergencyOverride;
     final protectedVersions = <String>{};
     if (override != null) {
-      protectedVersions.add(override.version);
+      protectedVersions.add(_normalizedVersion(override.version));
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
@@ -59,7 +59,7 @@ class DataPackUpdater {
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
-        protectedVersions.add(currentPointer.version);
+        protectedVersions.add(_normalizedVersion(currentPointer.version));
       }
       for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
@@ -150,4 +150,8 @@ class DataPackUpdater {
 
 int _versionNumber(String version) {
   return int.tryParse(version) ?? 0;
+}
+
+String _normalizedVersion(String version) {
+  return _versionNumber(version).toString();
 }
