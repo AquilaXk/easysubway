@@ -11,7 +11,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -116,22 +115,6 @@ class JdbcFieldVerificationSessionRepositoryTest {
 				assertThat(item.status()).isEqualTo(FieldVerificationStatus.NEEDS_RECHECK);
 				assertThat(item.note()).isEqualTo("엘리베이터 운행 중지 안내문 확인 필요");
 			});
-	}
-
-	@Test
-	@DisplayName("동시 생성 중복 키 충돌은 최신 세션과 항목 값으로 갱신한다")
-	void saveRetriesUpdateWhenConcurrentInsertCreatesRows() {
-		var jdbcTemplate = new DuplicateInsertOnceJdbcTemplate(repositoryJdbcTemplate("field-verification-session-retry"));
-		var retryRepository = new JdbcFieldVerificationSessionRepository(jdbcTemplate);
-		var session = session(
-			"field-verification-sadang-2026-06",
-			"station-sadang",
-			FieldVerificationStatus.NEEDS_RECHECK
-		);
-
-		retryRepository.save(session);
-
-		assertThat(retryRepository.findByStationId("station-sadang")).contains(session);
 	}
 
 	@Test
@@ -264,65 +247,5 @@ class JdbcFieldVerificationSessionRepositoryTest {
 			FieldVerificationStatus.PLANNED,
 			null
 		);
-	}
-
-	private JdbcTemplate repositoryJdbcTemplate(String databaseName) {
-		var dataSource = new DriverManagerDataSource(
-			"jdbc:h2:mem:" + databaseName + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-			"sa",
-			""
-		);
-		var jdbcTemplate = new JdbcTemplate(dataSource);
-		jdbcTemplate.execute("DROP TABLE IF EXISTS field_verification_items");
-		jdbcTemplate.execute("DROP TABLE IF EXISTS field_verification_sessions");
-		jdbcTemplate.execute("""
-			CREATE TABLE field_verification_sessions (
-				session_id VARCHAR(120) PRIMARY KEY,
-				station_id VARCHAR(120) NOT NULL,
-				station_name VARCHAR(120) NOT NULL,
-				verified_at DATE NOT NULL,
-				verified_by VARCHAR(120) NOT NULL,
-				status VARCHAR(40) NOT NULL,
-				note VARCHAR(1000)
-			)
-			""");
-		jdbcTemplate.execute("""
-			CREATE TABLE field_verification_items (
-				item_id VARCHAR(120) PRIMARY KEY,
-				session_id VARCHAR(120) NOT NULL,
-				item_type VARCHAR(40) NOT NULL,
-				target_name VARCHAR(200) NOT NULL,
-				status VARCHAR(40) NOT NULL,
-				note VARCHAR(1000),
-				CONSTRAINT fk_field_verification_items_session
-					FOREIGN KEY (session_id)
-					REFERENCES field_verification_sessions(session_id)
-			)
-			""");
-		return jdbcTemplate;
-	}
-
-	private static final class DuplicateInsertOnceJdbcTemplate extends JdbcTemplate {
-
-		private boolean sessionDuplicateRaised;
-		private boolean itemDuplicateRaised;
-
-		private DuplicateInsertOnceJdbcTemplate(JdbcTemplate delegate) {
-			super(delegate.getDataSource());
-		}
-
-		@Override
-		public int update(String sql, Object... args) {
-			int updated = super.update(sql, args);
-			if (!sessionDuplicateRaised && sql.contains("INSERT INTO field_verification_sessions")) {
-				sessionDuplicateRaised = true;
-				throw new DuplicateKeyException("concurrent session insert");
-			}
-			if (!itemDuplicateRaised && sql.contains("INSERT INTO field_verification_items")) {
-				itemDuplicateRaised = true;
-				throw new DuplicateKeyException("concurrent item insert");
-			}
-			return updated;
-		}
 	}
 }

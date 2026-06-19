@@ -2319,13 +2319,13 @@ test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분
   assert.match(jdbcSessionRepository, /@Repository\s+@Profile\("prod"\)/);
   assert.match(jdbcSessionRepository, /ROW_NUMBER\(\) OVER/);
   assert.match(jdbcSessionRepository, /PARTITION BY station_id/);
-  assert.match(jdbcSessionRepository, /UPDATE field_verification_sessions/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_sessions/);
-  assert.match(jdbcSessionRepository, /UPDATE field_verification_items/);
+  assert.match(jdbcSessionRepository, /ON CONFLICT \(session_id\) DO UPDATE/);
+  assert.match(jdbcSessionRepository, /station_id = EXCLUDED\.station_id/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_items/);
-  assert.match(jdbcSessionRepository, /DuplicateKeyException/);
-  assert.match(jdbcSessionRepository, /updateSession\(session\)/);
-  assert.match(jdbcSessionRepository, /updateItem\(session, item\)/);
+  assert.match(jdbcSessionRepository, /ON CONFLICT \(item_id\) DO UPDATE/);
+  assert.match(jdbcSessionRepository, /session_id = EXCLUDED\.session_id/);
+  assert.doesNotMatch(jdbcSessionRepository, /DuplicateKeyException/);
   assert.match(jdbcSessionRepository, /@Transactional\s+public void save\(FieldVerificationSession session\)/);
   assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, station_id DESC, session_id ASC/);
   assert.match(jdbcSessionRepository, /WHEN 'EXIT' THEN 1/);

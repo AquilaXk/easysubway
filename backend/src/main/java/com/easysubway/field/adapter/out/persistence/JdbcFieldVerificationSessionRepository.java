@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcFieldVerificationSessionRepository implements FieldVerificationSessionRepository {
 
 	private final JdbcTemplate jdbcTemplate;
+	private final DatabaseDialect databaseDialect;
 
 	public JdbcFieldVerificationSessionRepository(DataSource dataSource) {
 		this(new JdbcTemplate(dataSource));
@@ -28,6 +29,7 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 
 	JdbcFieldVerificationSessionRepository(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
+		this.databaseDialect = detectDatabaseDialect(jdbcTemplate);
 	}
 
 	@Override
@@ -87,15 +89,55 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 	@Override
 	@Transactional
 	public void save(FieldVerificationSession session) {
-		if (updateSession(session) == 0) {
-			try {
-				insertSession(session);
-			} catch (DuplicateKeyException exception) {
-				// 운영 다중 인스턴스가 같은 세션을 동시에 만들면 삽입 충돌 후 최신 값으로 수렴시킨다.
-				updateSession(session);
-			}
+		if (databaseDialect == DatabaseDialect.H2) {
+			saveWithUpdateInsert(session);
+			return;
 		}
-		session.items().forEach(item -> saveItem(session, item));
+		upsertSession(session);
+		session.items().forEach(item -> upsertItem(session, item));
+	}
+
+	private void saveWithUpdateInsert(FieldVerificationSession session) {
+		if (updateSession(session) == 0) {
+			insertSession(session);
+		}
+		session.items().forEach(item -> {
+			if (updateItem(session, item) == 0) {
+				insertItem(session, item);
+			}
+		});
+	}
+
+	private void upsertSession(FieldVerificationSession session) {
+		// PostgreSQL upsert로 다중 인스턴스 기준선 부트스트랩 충돌을 원자적으로 수렴시킨다.
+		jdbcTemplate.update(
+			"""
+				INSERT INTO field_verification_sessions (
+					session_id,
+					station_id,
+					station_name,
+					verified_at,
+					verified_by,
+					status,
+					note
+				)
+				VALUES (?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT (session_id) DO UPDATE
+				SET station_id = EXCLUDED.station_id,
+					station_name = EXCLUDED.station_name,
+					verified_at = EXCLUDED.verified_at,
+					verified_by = EXCLUDED.verified_by,
+					status = EXCLUDED.status,
+					note = EXCLUDED.note
+				""",
+			session.id(),
+			session.stationId(),
+			session.stationName(),
+			session.verifiedAt(),
+			session.verifiedBy(),
+			session.status().name(),
+			session.note()
+		);
 	}
 
 	private int updateSession(FieldVerificationSession session) {
@@ -144,15 +186,32 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 		);
 	}
 
-	private void saveItem(FieldVerificationSession session, FieldVerificationItem item) {
-		if (updateItem(session, item) == 0) {
-			try {
-				insertItem(session, item);
-			} catch (DuplicateKeyException exception) {
-				// 세션 항목도 같은 부트스트랩 race에서 삽입 충돌 후 최신 값으로 맞춘다.
-				updateItem(session, item);
-			}
-		}
+	private void upsertItem(FieldVerificationSession session, FieldVerificationItem item) {
+		jdbcTemplate.update(
+			"""
+				INSERT INTO field_verification_items (
+					item_id,
+					session_id,
+					item_type,
+					target_name,
+					status,
+					note
+				)
+				VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT (item_id) DO UPDATE
+				SET session_id = EXCLUDED.session_id,
+					item_type = EXCLUDED.item_type,
+					target_name = EXCLUDED.target_name,
+					status = EXCLUDED.status,
+					note = EXCLUDED.note
+				""",
+			item.id(),
+			session.id(),
+			item.type().name(),
+			item.targetName(),
+			item.status().name(),
+			item.note()
+		);
 	}
 
 	private int updateItem(FieldVerificationSession session, FieldVerificationItem item) {
@@ -243,5 +302,18 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 			FieldVerificationStatus.valueOf(resultSet.getString("status")),
 			resultSet.getString("note")
 		);
+	}
+
+	private DatabaseDialect detectDatabaseDialect(JdbcTemplate jdbcTemplate) {
+		DatabaseDialect dialect = jdbcTemplate.execute((ConnectionCallback<DatabaseDialect>) connection -> {
+			String productName = connection.getMetaData().getDatabaseProductName();
+			return "H2".equalsIgnoreCase(productName) ? DatabaseDialect.H2 : DatabaseDialect.POSTGRESQL;
+		});
+		return dialect == null ? DatabaseDialect.POSTGRESQL : dialect;
+	}
+
+	private enum DatabaseDialect {
+		POSTGRESQL,
+		H2
 	}
 }
