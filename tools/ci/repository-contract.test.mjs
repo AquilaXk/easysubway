@@ -2317,10 +2317,13 @@ test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분
   assert.match(inMemorySessionRepository, /implements FieldVerificationSessionRepository/);
   assert.match(inMemorySessionRepository, /LinkedHashMap/);
   assert.match(jdbcSessionRepository, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcSessionRepository, /ROW_NUMBER\(\) OVER/);
+  assert.match(jdbcSessionRepository, /PARTITION BY station_id/);
   assert.match(jdbcSessionRepository, /UPDATE field_verification_sessions/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_sessions/);
   assert.match(jdbcSessionRepository, /UPDATE field_verification_items/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_items/);
+  assert.match(jdbcSessionRepository, /@Transactional\s+public void save\(FieldVerificationSession session\)/);
   assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, session_id ASC/);
   assert.match(jdbcSessionRepository, /ORDER BY item_type ASC, item_id ASC/);
   assert.match(service, /FieldVerificationSessionRepository/);

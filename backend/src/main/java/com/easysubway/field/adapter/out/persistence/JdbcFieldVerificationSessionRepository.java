@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod")
@@ -39,7 +40,21 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 					verified_by,
 					status,
 					note
-				FROM field_verification_sessions
+				FROM (
+					SELECT session_id,
+						station_id,
+						station_name,
+						verified_at,
+						verified_by,
+						status,
+						note,
+						ROW_NUMBER() OVER (
+							PARTITION BY station_id
+							ORDER BY verified_at DESC, session_id ASC
+						) AS row_number
+					FROM field_verification_sessions
+				) ranked_sessions
+				WHERE row_number = 1
 				ORDER BY verified_at DESC, session_id ASC
 				""",
 			this::mapSession
@@ -69,6 +84,7 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 	}
 
 	@Override
+	@Transactional
 	public void save(FieldVerificationSession session) {
 		int updated = jdbcTemplate.update(
 			"""

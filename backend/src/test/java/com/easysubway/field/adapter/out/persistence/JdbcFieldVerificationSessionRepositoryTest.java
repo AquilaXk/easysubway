@@ -47,7 +47,10 @@ class JdbcFieldVerificationSessionRepositoryTest {
 				item_type VARCHAR(40) NOT NULL,
 				target_name VARCHAR(200) NOT NULL,
 				status VARCHAR(40) NOT NULL,
-				note VARCHAR(1000)
+				note VARCHAR(1000),
+				CONSTRAINT fk_field_verification_items_session
+					FOREIGN KEY (session_id)
+					REFERENCES field_verification_sessions(session_id)
 			)
 			""");
 		repository = new JdbcFieldVerificationSessionRepository(jdbcTemplate);
@@ -115,24 +118,49 @@ class JdbcFieldVerificationSessionRepositoryTest {
 	}
 
 	@Test
-	@DisplayName("세션 목록은 검증일 최신순과 세션 식별자순으로 조회한다")
-	void listAllOrdersByVerificationDateAndSessionId() {
-		repository.save(session("field-verification-sadang-2026-06", "station-sadang", FieldVerificationStatus.PLANNED));
-		repository.save(session("field-verification-sangnoksu-2026-06", "station-sangnoksu", FieldVerificationStatus.IN_PROGRESS));
+	@DisplayName("세션 목록은 역별 최신 세션만 검증일 최신순과 세션 식별자순으로 조회한다")
+	void listAllReturnsLatestSessionByStationAndOrdersByVerificationDate() {
+		repository.save(session(
+			"field-verification-sadang-2026-05",
+			"station-sadang",
+			FieldVerificationStatus.PLANNED,
+			LocalDate.of(2026, 5, 19)
+		));
+		repository.save(session(
+			"field-verification-sangnoksu-2026-06",
+			"station-sangnoksu",
+			FieldVerificationStatus.IN_PROGRESS,
+			LocalDate.of(2026, 6, 19)
+		));
+		repository.save(session(
+			"field-verification-sadang-2026-07",
+			"station-sadang",
+			FieldVerificationStatus.NEEDS_RECHECK,
+			LocalDate.of(2026, 7, 19)
+		));
 
 		var sessions = repository.listAll();
 
 		assertThat(sessions)
-			.extracting(FieldVerificationSession::stationId)
-			.containsExactly("station-sadang", "station-sangnoksu");
+			.extracting(FieldVerificationSession::id)
+			.containsExactly("field-verification-sadang-2026-07", "field-verification-sangnoksu-2026-06");
 	}
 
 	private FieldVerificationSession session(String sessionId, String stationId, FieldVerificationStatus status) {
+		return session(sessionId, stationId, status, LocalDate.of(2026, 6, 19));
+	}
+
+	private FieldVerificationSession session(
+		String sessionId,
+		String stationId,
+		FieldVerificationStatus status,
+		LocalDate verifiedAt
+	) {
 		return new FieldVerificationSession(
 			sessionId,
 			stationId,
 			stationId.equals("station-sadang") ? "사당역" : "상록수역",
-			LocalDate.of(2026, 6, 19),
+			verifiedAt,
 			"field-team",
 			status,
 			stationId.equals("station-sadang") ? "주요 환승역 현장 검증 확대 기준선" : "첫 현장 검증 지역 기준선",
