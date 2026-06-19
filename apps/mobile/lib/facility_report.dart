@@ -244,6 +244,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       final request = await _httpClient
           .getUrl(uri)
           .timeout(_facilityReportTimeout);
+      final receiptToken = await receiptStore
+          ?.receiptTokenForReport(trimmedReportId)
+          .timeout(_facilityReportTimeout);
+      if (receiptToken != null && receiptToken.isNotEmpty) {
+        request.headers.set('X-Easysubway-Report-Receipt-Token', receiptToken);
+      }
       final response = await request.close().timeout(_facilityReportTimeout);
 
       if (response.statusCode != HttpStatus.ok) {
@@ -554,6 +560,8 @@ class FacilityReportReceipt {
 
 abstract interface class FacilityReportReceiptStore {
   Future<void> saveReceipt(FacilityReportReceipt receipt);
+
+  Future<String?> receiptTokenForReport(String reportId);
 }
 
 class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
@@ -579,6 +587,29 @@ class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
             createdAt: receipt.createdAt,
           ),
         );
+  }
+
+  @override
+  Future<String?> receiptTokenForReport(String reportId) async {
+    final trimmedReportId = reportId.trim();
+    if (trimmedReportId.isEmpty) {
+      return null;
+    }
+    final directToken = await storage.read(
+      key: 'easysubway.facilityReport.receipt.$trimmedReportId',
+    );
+    if (directToken != null && directToken.isNotEmpty) {
+      return directToken;
+    }
+    final receipt = await (userDatabase.select(
+      userDatabase.reportReceipts,
+    )..where((row) => row.reportId.equals(trimmedReportId))).getSingleOrNull();
+    if (receipt == null) {
+      return null;
+    }
+    return storage.read(
+      key: 'easysubway.facilityReport.receipt.${receipt.receiptId}',
+    );
   }
 }
 
