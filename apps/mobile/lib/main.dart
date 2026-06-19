@@ -818,6 +818,9 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
   return UserDataDeletionApiRepository(
     baseUri: baseUri,
     authProvider: authProvider,
+    refreshExistingAuthorization: authProvider is AnonymousAuthSession
+        ? authProvider.refreshExistingAuthorization
+        : null,
   );
 }
 

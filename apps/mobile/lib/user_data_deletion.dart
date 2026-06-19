@@ -16,11 +16,13 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
   UserDataDeletionApiRepository({
     required this.baseUri,
     required this.authProvider,
+    this.refreshExistingAuthorization,
     HttpClient? httpClient,
   }) : _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
   final AuthorizationHeaderProvider authProvider;
+  final Future<bool> Function()? refreshExistingAuthorization;
   final HttpClient _httpClient;
 
   @override
@@ -63,9 +65,11 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
       if (response.statusCode == HttpStatus.unauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
-        await authProvider.invalidateAuthorization().timeout(
-          _userDataDeletionTimeout,
-        );
+        final refreshedAuthorization = await _refreshExistingAuthorization()
+            .timeout(_userDataDeletionTimeout);
+        if (!refreshedAuthorization) {
+          throw const UserDataDeletionException(userDataDeletionErrorMessage);
+        }
         continue;
       }
 
@@ -76,6 +80,14 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
       return UserDataDeletionResult.fromResponseBody(body);
     }
     throw const UserDataDeletionException(userDataDeletionErrorMessage);
+  }
+
+  Future<bool> _refreshExistingAuthorization() async {
+    final refresh = refreshExistingAuthorization;
+    if (refresh == null) {
+      return false;
+    }
+    return refresh();
   }
 }
 

@@ -68,6 +68,87 @@ void main() {
     expect(result.anonymousCredentialsDeleted, isTrue);
   });
 
+  test('사용자 데이터 삭제 API 저장소는 기존 인증 갱신 성공 시 삭제를 한 번 재시도한다', () async {
+    var requestCount = 0;
+    final authorizationHeaders = <String?>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestCount++;
+      authorizationHeaders.add(
+        request.headers.value(HttpHeaders.authorizationHeader),
+      );
+      if (requestCount == 1) {
+        request.response
+          ..statusCode = HttpStatus.unauthorized
+          ..write('expired')
+          ..close();
+        return;
+      }
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(_successfulDeletionBody())
+        ..close();
+    });
+
+    final authProvider = RefreshingAuthorizationHeaderProvider(
+      header: 'Bearer stale-access-token',
+      refreshedHeader: 'Bearer fresh-access-token',
+      refreshResult: true,
+    );
+    final repository = UserDataDeletionApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: authProvider,
+      refreshExistingAuthorization: authProvider.refreshExistingAuthorization,
+    );
+
+    final result = await repository.deleteCurrentUserData();
+
+    expect(result.userId, 'anonymous-user-1');
+    expect(requestCount, 2);
+    expect(authorizationHeaders, [
+      'Bearer stale-access-token',
+      'Bearer fresh-access-token',
+    ]);
+    expect(authProvider.refreshCount, 1);
+    expect(authProvider.invalidateCount, 0);
+  });
+
+  test('사용자 데이터 삭제 API 저장소는 기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다', () async {
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestCount++;
+      request.response
+        ..statusCode = HttpStatus.unauthorized
+        ..write('expired')
+        ..close();
+    });
+
+    final authProvider = RefreshingAuthorizationHeaderProvider(
+      header: 'Bearer stale-access-token',
+      refreshedHeader: 'Bearer new-user-access-token',
+      refreshResult: false,
+    );
+    final repository = UserDataDeletionApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      authProvider: authProvider,
+      refreshExistingAuthorization: authProvider.refreshExistingAuthorization,
+    );
+
+    await expectLater(
+      repository.deleteCurrentUserData(),
+      throwsA(isA<UserDataDeletionException>()),
+    );
+    expect(requestCount, 1);
+    expect(authProvider.refreshCount, 1);
+    expect(authProvider.invalidateCount, 0);
+  });
+
   test('사용자 데이터 삭제 API 저장소는 실패 응답에서 쉬운 오류를 던진다', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
@@ -99,6 +180,25 @@ void main() {
   });
 }
 
+String _successfulDeletionBody() {
+  return jsonEncode({
+    'success': true,
+    'data': {
+      'userId': 'anonymous-user-1',
+      'deletedFavoriteStationCount': 1,
+      'deletedFavoriteFacilityCount': 2,
+      'deletedFavoriteRouteCount': 3,
+      'anonymizedRouteFeedbackCount': 4,
+      'notificationSettingsDeleted': true,
+      'deletedRegisteredDeviceCount': 5,
+      'deletedPushNotificationCount': 6,
+      'mobilityProfileDeleted': true,
+      'anonymizedReportCount': 7,
+      'anonymousCredentialsDeleted': true,
+    },
+  });
+}
+
 class FixedAuthorizationHeaderProvider implements AuthorizationHeaderProvider {
   const FixedAuthorizationHeaderProvider(this.header);
 
@@ -109,4 +209,36 @@ class FixedAuthorizationHeaderProvider implements AuthorizationHeaderProvider {
 
   @override
   Future<void> invalidateAuthorization() async {}
+}
+
+class RefreshingAuthorizationHeaderProvider
+    implements AuthorizationHeaderProvider {
+  RefreshingAuthorizationHeaderProvider({
+    required this.header,
+    required this.refreshedHeader,
+    required this.refreshResult,
+  });
+
+  String header;
+  final String refreshedHeader;
+  final bool refreshResult;
+  int refreshCount = 0;
+  int invalidateCount = 0;
+
+  @override
+  Future<String?> authorizationHeader() async => header;
+
+  @override
+  Future<void> invalidateAuthorization() async {
+    invalidateCount++;
+  }
+
+  Future<bool> refreshExistingAuthorization() async {
+    refreshCount++;
+    if (!refreshResult) {
+      return false;
+    }
+    header = refreshedHeader;
+    return true;
+  }
 }
