@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'auth_headers.dart';
+import 'core/database/user/user_database.dart' as user_db;
 import 'mobile_error_reporter.dart';
 import 'secure_key_value_storage.dart';
 
@@ -43,11 +47,13 @@ class FacilityReportApiRepository implements FacilityReportRepository {
   FacilityReportApiRepository({
     required this.baseUri,
     this.authProvider,
+    this.receiptStore,
     HttpClient? httpClient,
   }) : _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
   final AuthorizationHeaderProvider? authProvider;
+  final FacilityReportReceiptStore? receiptStore;
   final HttpClient _httpClient;
 
   @override
@@ -71,6 +77,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
   Future<FacilityReportResult> _postReportWithAuthorizationRetry(
     FacilityReportRequest reportRequest,
   ) async {
+    final preparedRequest = await _prepareReportRequest(reportRequest);
     for (var attempt = 0; attempt < 2; attempt++) {
       final request = await _httpClient
           .postUrl(baseUri.resolve('/api/v1/reports'))
@@ -85,7 +92,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         );
       }
       request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(reportRequest.toJson()));
+      request.write(jsonEncode(preparedRequest.toJson()));
 
       final response = await request.close().timeout(_facilityReportTimeout);
       final body = await utf8
@@ -107,12 +114,132 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         throw const FacilityReportException(_facilityReportErrorMessage);
       }
 
-      return _reportResultFromBody(
+      final result = _reportResultFromBody(
         body,
         errorMessage: _facilityReportErrorMessage,
       );
+      await _saveReceiptIfPresentSafely(result);
+      return result;
     }
     throw const FacilityReportException(_facilityReportErrorMessage);
+  }
+
+  Future<FacilityReportRequest> _prepareReportRequest(
+    FacilityReportRequest reportRequest,
+  ) async {
+    final request = reportRequest.trimmed();
+    final clientSubmissionId = request.clientSubmissionId?.isNotEmpty == true
+        ? request.clientSubmissionId!
+        : _newClientSubmissionId();
+    if (request.photoDataBase64 == null || request.photoDataBase64!.isEmpty) {
+      return request.withClientSubmissionId(clientSubmissionId);
+    }
+    final photoBytes = base64Decode(request.photoDataBase64!);
+    final photoSha256 = sha256.convert(photoBytes).toString();
+    final uploadIntent = await _createPhotoUploadIntent(
+      clientSubmissionId: clientSubmissionId,
+      request: request,
+      photoSha256: photoSha256,
+      photoSizeBytes: photoBytes.length,
+    );
+    await _uploadPhoto(uploadIntent, request.photoContentType!, photoBytes);
+    return request.withUploadedPhoto(
+      clientSubmissionId: clientSubmissionId,
+      photoObjectKey: uploadIntent.objectKey,
+      photoSha256: photoSha256,
+      photoSizeBytes: photoBytes.length,
+    );
+  }
+
+  Future<FacilityReportPhotoUploadIntent> _createPhotoUploadIntent({
+    required String clientSubmissionId,
+    required FacilityReportRequest request,
+    required String photoSha256,
+    required int photoSizeBytes,
+  }) async {
+    final uploadRequest = await _httpClient
+        .postUrl(baseUri.resolve('/api/v1/report-uploads'))
+        .timeout(_facilityReportTimeout);
+    uploadRequest.headers.contentType = ContentType.json;
+    uploadRequest.write(
+      jsonEncode({
+        'clientSubmissionId': clientSubmissionId,
+        'photoFileName': request.photoFileName,
+        'photoContentType': request.photoContentType,
+        'photoSha256': photoSha256,
+        'photoSizeBytes': photoSizeBytes,
+      }),
+    );
+    final uploadResponse = await uploadRequest.close().timeout(
+      _facilityReportTimeout,
+    );
+    final body = await utf8
+        .decodeStream(uploadResponse)
+        .timeout(_facilityReportTimeout);
+    if (uploadResponse.statusCode != HttpStatus.created &&
+        uploadResponse.statusCode != HttpStatus.ok) {
+      throw const FacilityReportException(_facilityReportErrorMessage);
+    }
+    return FacilityReportPhotoUploadIntent.fromBody(
+      body,
+      errorMessage: _facilityReportErrorMessage,
+    );
+  }
+
+  Future<void> _uploadPhoto(
+    FacilityReportPhotoUploadIntent uploadIntent,
+    String contentType,
+    List<int> photoBytes,
+  ) async {
+    if (uploadIntent.uploadMethod.trim().toUpperCase() != 'PUT') {
+      throw const FacilityReportException(_facilityReportErrorMessage);
+    }
+    final uploadRequest = await _httpClient
+        .putUrl(uploadIntent.uploadUri(baseUri))
+        .timeout(_facilityReportTimeout);
+    uploadRequest.headers.contentType = ContentType.parse(contentType);
+    uploadRequest.add(photoBytes);
+    final uploadResponse = await uploadRequest.close().timeout(
+      _facilityReportTimeout,
+    );
+    await uploadResponse.drain<void>();
+    if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
+      throw const FacilityReportException(_facilityReportErrorMessage);
+    }
+  }
+
+  Future<void> _saveReceiptIfPresentSafely(FacilityReportResult result) async {
+    try {
+      await _saveReceiptIfPresent(result).timeout(_facilityReportTimeout);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 receipt token 저장 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _saveReceiptIfPresent(FacilityReportResult result) async {
+    final receiptToken = result.receiptToken;
+    if (receiptToken == null || receiptToken.isEmpty || receiptStore == null) {
+      return;
+    }
+    await receiptStore!.saveReceipt(
+      FacilityReportReceipt(
+        receiptId: result.id,
+        reportId: result.id,
+        status: result.status,
+        receiptToken: receiptToken,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  String _newClientSubmissionId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
   }
 
   @override
@@ -130,6 +257,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       final request = await _httpClient
           .getUrl(uri)
           .timeout(_facilityReportTimeout);
+      final receiptToken = await receiptStore
+          ?.receiptTokenForReport(trimmedReportId)
+          .timeout(_facilityReportTimeout);
+      if (receiptToken != null && receiptToken.isNotEmpty) {
+        request.headers.set('X-Easysubway-Report-Receipt-Token', receiptToken);
+      }
       final response = await request.close().timeout(_facilityReportTimeout);
 
       if (response.statusCode != HttpStatus.ok) {
@@ -273,6 +406,7 @@ class FacilityReportException implements Exception {
 class FacilityReportRequest {
   const FacilityReportRequest({
     required this.userId,
+    this.clientSubmissionId,
     required this.stationId,
     required this.facilityId,
     required this.reportType,
@@ -280,11 +414,15 @@ class FacilityReportRequest {
     this.photoFileName,
     this.photoContentType,
     this.photoDataBase64,
+    this.photoObjectKey,
+    this.photoSha256,
+    this.photoSizeBytes,
     this.latitude,
     this.longitude,
   });
 
   final String userId;
+  final String? clientSubmissionId;
   final String stationId;
   final String facilityId;
   final String reportType;
@@ -292,12 +430,16 @@ class FacilityReportRequest {
   final String? photoFileName;
   final String? photoContentType;
   final String? photoDataBase64;
+  final String? photoObjectKey;
+  final String? photoSha256;
+  final int? photoSizeBytes;
   final double? latitude;
   final double? longitude;
 
   FacilityReportRequest trimmed() {
     return FacilityReportRequest(
       userId: userId.trim(),
+      clientSubmissionId: clientSubmissionId?.trim(),
       stationId: stationId.trim(),
       facilityId: facilityId.trim(),
       reportType: reportType.trim(),
@@ -305,6 +447,9 @@ class FacilityReportRequest {
       photoFileName: photoFileName?.trim(),
       photoContentType: photoContentType?.trim(),
       photoDataBase64: photoDataBase64?.trim(),
+      photoObjectKey: photoObjectKey?.trim(),
+      photoSha256: photoSha256?.trim(),
+      photoSizeBytes: photoSizeBytes,
       latitude: latitude,
       longitude: longitude,
     );
@@ -319,15 +464,24 @@ class FacilityReportRequest {
       'reportType': request.reportType,
       'description': request.description,
     };
+    if (request.clientSubmissionId != null &&
+        request.clientSubmissionId!.isNotEmpty) {
+      json['clientSubmissionId'] = request.clientSubmissionId;
+    }
     if (request.photoFileName != null &&
         request.photoFileName!.isNotEmpty &&
         request.photoContentType != null &&
         request.photoContentType!.isNotEmpty &&
-        request.photoDataBase64 != null &&
-        request.photoDataBase64!.isNotEmpty) {
+        request.photoObjectKey != null &&
+        request.photoObjectKey!.isNotEmpty &&
+        request.photoSha256 != null &&
+        request.photoSha256!.isNotEmpty &&
+        request.photoSizeBytes != null) {
       json['photoFileName'] = request.photoFileName;
       json['photoContentType'] = request.photoContentType;
-      json['photoDataBase64'] = request.photoDataBase64;
+      json['photoObjectKey'] = request.photoObjectKey;
+      json['photoSha256'] = request.photoSha256;
+      json['photoSizeBytes'] = request.photoSizeBytes;
     }
     // 좌표 한쪽만 저장되면 현장 위치를 잘못 해석할 수 있어 한 쌍일 때만 보낸다.
     if (request.latitude != null && request.longitude != null) {
@@ -335,6 +489,155 @@ class FacilityReportRequest {
       json['longitude'] = request.longitude;
     }
     return json;
+  }
+
+  FacilityReportRequest withUploadedPhoto({
+    required String clientSubmissionId,
+    required String photoObjectKey,
+    required String photoSha256,
+    required int photoSizeBytes,
+  }) {
+    final request = trimmed();
+    return request.withClientSubmissionId(
+      clientSubmissionId,
+      photoObjectKey: photoObjectKey,
+      photoSha256: photoSha256,
+      photoSizeBytes: photoSizeBytes,
+    );
+  }
+
+  FacilityReportRequest withClientSubmissionId(
+    String clientSubmissionId, {
+    String? photoObjectKey,
+    String? photoSha256,
+    int? photoSizeBytes,
+  }) {
+    final request = trimmed();
+    return FacilityReportRequest(
+      userId: request.userId,
+      clientSubmissionId: clientSubmissionId,
+      stationId: request.stationId,
+      facilityId: request.facilityId,
+      reportType: request.reportType,
+      description: request.description,
+      photoFileName: request.photoFileName,
+      photoContentType: request.photoContentType,
+      photoObjectKey: photoObjectKey,
+      photoSha256: photoSha256,
+      photoSizeBytes: photoSizeBytes,
+      latitude: request.latitude,
+      longitude: request.longitude,
+    );
+  }
+}
+
+class FacilityReportPhotoUploadIntent {
+  const FacilityReportPhotoUploadIntent({
+    required this.objectKey,
+    required this.uploadUrl,
+    required this.uploadMethod,
+  });
+
+  factory FacilityReportPhotoUploadIntent.fromBody(
+    String body, {
+    required String errorMessage,
+  }) {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+      throw FacilityReportException(errorMessage);
+    }
+    final data = decoded['data'];
+    if (data is! Map<String, Object?>) {
+      throw FacilityReportException(errorMessage);
+    }
+    return FacilityReportPhotoUploadIntent(
+      objectKey: _requiredReportString(data, 'objectKey'),
+      uploadUrl: _requiredReportString(data, 'uploadUrl'),
+      uploadMethod: _requiredReportString(data, 'uploadMethod'),
+    );
+  }
+
+  final String objectKey;
+  final String uploadUrl;
+  final String uploadMethod;
+
+  Uri uploadUri(Uri baseUri) {
+    final parsed = Uri.parse(uploadUrl);
+    if (parsed.hasScheme) {
+      return parsed;
+    }
+    return baseUri.resolve(uploadUrl);
+  }
+}
+
+class FacilityReportReceipt {
+  const FacilityReportReceipt({
+    required this.receiptId,
+    required this.reportId,
+    required this.status,
+    required this.receiptToken,
+    required this.createdAt,
+  });
+
+  final String receiptId;
+  final String reportId;
+  final String status;
+  final String receiptToken;
+  final DateTime createdAt;
+}
+
+abstract interface class FacilityReportReceiptStore {
+  Future<void> saveReceipt(FacilityReportReceipt receipt);
+
+  Future<String?> receiptTokenForReport(String reportId);
+}
+
+class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
+  const DriftFacilityReportReceiptStore({
+    required this.userDatabase,
+    this.storage = const FlutterSecureKeyValueStorage(),
+  });
+
+  final user_db.UserDatabase userDatabase;
+  final SecureKeyValueStorage storage;
+
+  @override
+  Future<void> saveReceipt(FacilityReportReceipt receipt) async {
+    final secureKey = 'easysubway.facilityReport.receipt.${receipt.receiptId}';
+    await storage.write(key: secureKey, value: receipt.receiptToken);
+    await userDatabase
+        .into(userDatabase.reportReceipts)
+        .insertOnConflictUpdate(
+          user_db.ReportReceiptsCompanion.insert(
+            receiptId: receipt.receiptId,
+            reportId: Value(receipt.reportId),
+            status: receipt.status,
+            createdAt: receipt.createdAt,
+          ),
+        );
+  }
+
+  @override
+  Future<String?> receiptTokenForReport(String reportId) async {
+    final trimmedReportId = reportId.trim();
+    if (trimmedReportId.isEmpty) {
+      return null;
+    }
+    final directToken = await storage.read(
+      key: 'easysubway.facilityReport.receipt.$trimmedReportId',
+    );
+    if (directToken != null && directToken.isNotEmpty) {
+      return directToken;
+    }
+    final receipt = await (userDatabase.select(
+      userDatabase.reportReceipts,
+    )..where((row) => row.reportId.equals(trimmedReportId))).getSingleOrNull();
+    if (receipt == null) {
+      return null;
+    }
+    return storage.read(
+      key: 'easysubway.facilityReport.receipt.${receipt.receiptId}',
+    );
   }
 }
 
@@ -472,6 +775,7 @@ class FacilityReportResult {
     required this.description,
     required this.status,
     required this.createdAt,
+    this.receiptToken,
   });
 
   factory FacilityReportResult.fromJson(Map<String, Object?> json) {
@@ -483,6 +787,7 @@ class FacilityReportResult {
       description: _optionalReportString(json, 'description'),
       status: _requiredReportString(json, 'status'),
       createdAt: _requiredReportString(json, 'createdAt'),
+      receiptToken: _optionalReportString(json, 'receiptToken'),
     );
   }
 
@@ -493,6 +798,7 @@ class FacilityReportResult {
   final String description;
   final String status;
   final String createdAt;
+  final String? receiptToken;
 
   String get statusLabel {
     return switch (status) {
