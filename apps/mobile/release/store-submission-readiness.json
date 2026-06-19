@@ -46,8 +46,8 @@
       "decisionOwnerKo": "모바일/운영 담당",
       "readyWhenKo": "로그인 없음 기준이면 제한 접근 없음으로 제출하고, 제한 접근 기능이 추가되면 심사 계정과 접근 절차를 Play Console에 입력한다.",
       "evidence": ["app-access-declaration", "reviewer-access-notes"],
-      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/anonymous_auth.dart"],
-      "configurationSources": ["anonymous auth without user login"]
+      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/app/app_dependencies.dart"],
+      "configurationSources": ["no login or anonymous auth in MVP release path"]
     },
     {
       "id": "play_content_rating",
@@ -211,7 +211,7 @@
       "decisionOwnerKo": "모바일/운영 담당",
       "readyWhenKo": "로그인 없음 기준이면 심사 메모에 핵심 흐름과 위치 권한 목적을 설명하고, 제한 접근 기능이 생기면 데모 계정과 재현 절차를 제공한다.",
       "evidence": ["review-notes", "demo-access-check"],
-      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/anonymous_auth.dart", "apps/mobile/lib/station_search.dart"],
+      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/app/app_dependencies.dart", "apps/mobile/lib/station_search.dart"],
       "configurationSources": ["review notes", "demo account only when restricted access exists"]
     },
     {

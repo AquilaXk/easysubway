@@ -130,7 +130,7 @@ class FavoriteFacilityApiRepository implements FavoriteFacilityRepository {
         if (response.statusCode == HttpStatus.unauthorized &&
             authorizationHeader != null &&
             attempt == 0) {
-          // 저장된 익명 인증이 만료된 경우 비우고 새 인증으로 한 번만 다시 시도한다.
+          // 저장된 인증이 만료된 경우 비우고 한 번만 다시 시도한다.
           await authProvider.invalidateAuthorization().timeout(
             _favoriteFacilityTimeout,
           );

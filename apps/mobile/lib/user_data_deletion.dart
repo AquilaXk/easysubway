@@ -142,7 +142,6 @@ class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
         mobilityProfileDeleted: false,
         anonymizedReportCount:
             deletedReportReceiptCount + deletedReportDraftCount,
-        anonymousCredentialsDeleted: false,
       );
     } catch (error, stackTrace) {
       reportMobileError(
@@ -198,9 +197,6 @@ class UserDataDeletionCompositeRepository
       anonymizedReportCount:
           remoteResult.anonymizedReportCount +
           localResult.anonymizedReportCount,
-      anonymousCredentialsDeleted:
-          remoteResult.anonymousCredentialsDeleted ||
-          localResult.anonymousCredentialsDeleted,
     );
   }
 }
@@ -217,7 +213,6 @@ class UserDataDeletionResult {
     required this.deletedPushNotificationCount,
     required this.mobilityProfileDeleted,
     required this.anonymizedReportCount,
-    required this.anonymousCredentialsDeleted,
   });
 
   factory UserDataDeletionResult.fromResponseBody(String body) {
@@ -271,10 +266,6 @@ class UserDataDeletionResult {
         json,
         'anonymizedReportCount',
       ),
-      anonymousCredentialsDeleted: _requiredDeletionBool(
-        json,
-        'anonymousCredentialsDeleted',
-      ),
     );
   }
 
@@ -288,7 +279,6 @@ class UserDataDeletionResult {
   final int deletedPushNotificationCount;
   final bool mobilityProfileDeleted;
   final int anonymizedReportCount;
-  final bool anonymousCredentialsDeleted;
 }
 
 class UserDataDeletionException implements Exception {

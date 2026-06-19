@@ -155,7 +155,7 @@ class RouteFeedbackApiRepository implements RouteFeedbackRepository {
         final authorizationHeader = await authProvider
             .authorizationHeader()
             .timeout(_routeSearchTimeout);
-        // 익명 인증 API는 Basic 인증의 username을 사용자 식별자로 사용한다.
+        // Basic 인증의 username을 사용자 식별자로 사용한다.
         final userId = _userIdFromAuthorizationHeader(authorizationHeader);
         if (userId == null) {
           throw const RouteFeedbackException(_routeFeedbackErrorMessage);
@@ -176,7 +176,7 @@ class RouteFeedbackApiRepository implements RouteFeedbackRepository {
             .decodeStream(response)
             .timeout(_routeSearchTimeout);
 
-        // 저장된 익명 인증이 만료된 경우 새 인증을 발급받아 한 번만 재시도한다.
+        // 저장된 인증이 만료된 경우 한 번만 재시도한다.
         if (response.statusCode == HttpStatus.unauthorized && attempt == 0) {
           await authProvider.invalidateAuthorization().timeout(
             _routeSearchTimeout,
@@ -365,7 +365,7 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
         if (response.statusCode == HttpStatus.unauthorized &&
             authorizationHeader != null &&
             attempt == 0) {
-          // 만료된 익명 인증은 비우고 새 인증으로 한 번만 다시 시도한다.
+          // 만료된 인증은 비우고 한 번만 다시 시도한다.
           await authProvider.invalidateAuthorization().timeout(
             _routeSearchTimeout,
           );

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:easysubway_mobile/anonymous_auth.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
@@ -303,7 +302,6 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         onboardingStore: MemoryOnboardingResultStore(),
-        enableAnonymousAuth: false,
       ),
     );
     await tester.pumpAndSettle();
@@ -327,7 +325,6 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         notificationPermissionProvider: notificationPermissionProvider,
         onboardingStore: MemoryOnboardingResultStore(),
-        enableAnonymousAuth: false,
       ),
     );
     await tester.pumpAndSettle();
@@ -824,7 +821,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('데이터 삭제 요청'), findsOneWidget);
-      expect(find.text('앱 안에서 삭제 대상을 확인하고 직접 요청합니다.'), findsOneWidget);
 
       final privacyButtonSize = tester.getSize(
         find.byKey(const Key('privacyPolicyAccessItem')),
@@ -846,7 +842,7 @@ void main() {
       final deletionSemantics = tester
           .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
           .getSemanticsData();
-      expect(deletionSemantics.label, '데이터 삭제 요청, 앱 안에서 삭제를 진행합니다.');
+      expect(deletionSemantics.label, '데이터 삭제 요청, privacy@easysubway.example');
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
     } finally {
       semanticsHandle.dispose();
@@ -886,7 +882,7 @@ void main() {
       );
       expect(
         find.text(
-          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         ),
         findsOneWidget,
       );
@@ -1032,7 +1028,6 @@ void main() {
           supportEmail: 'support@easysubway.example',
           dataDeletionEmail: 'privacy@easysubway.example',
         ),
-        enableAnonymousAuth: false,
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -1086,13 +1081,6 @@ void main() {
 
   testWidgets('도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다', (tester) async {
     final deletionRepository = FakeUserDataDeletionRepository();
-    final anonymousStore = MemoryAnonymousAuthCredentialStore(
-      const AnonymousAuthCredentials(
-        userId: 'anonymous-user-1',
-        accessToken: 'access-token-1',
-        refreshToken: 'refresh-token-1',
-      ),
-    );
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: _completedOnboardingState().result,
     );
@@ -1115,7 +1103,6 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
         userDataDeletionRepository: deletionRepository,
-        anonymousAuthCredentialStore: anonymousStore,
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: draftTargetStore,
         initialOnboardingState: _completedOnboardingState(),
@@ -1133,7 +1120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dataDeletionStartButton')), findsOneWidget);
-    expect(find.textContaining('즐겨찾기, 이동 조건, 익명 인증'), findsOneWidget);
+    expect(find.textContaining('즐겨찾기, 이동 조건, 신고 접수 기록'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
     await tester.pumpAndSettle();
@@ -1144,8 +1131,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(deletionRepository.deleteCount, 1);
-    expect(anonymousStore.clearCount, 1);
-    expect(anonymousStore.credentials, isNull);
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
@@ -1155,13 +1140,6 @@ void main() {
     final deletionRepository = FakeUserDataDeletionRepository(
       error: const UserDataDeletionException(
         '데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      ),
-    );
-    final anonymousStore = MemoryAnonymousAuthCredentialStore(
-      const AnonymousAuthCredentials(
-        userId: 'anonymous-user-1',
-        accessToken: 'access-token-1',
-        refreshToken: 'refresh-token-1',
       ),
     );
     final onboardingStore = MemoryOnboardingResultStore(
@@ -1186,7 +1164,6 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
         userDataDeletionRepository: deletionRepository,
-        anonymousAuthCredentialStore: anonymousStore,
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: draftTargetStore,
         initialOnboardingState: _completedOnboardingState(),
@@ -1208,8 +1185,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(deletionRepository.deleteCount, 1);
-    expect(anonymousStore.clearCount, 0);
-    expect(anonymousStore.credentials, isNotNull);
     expect(onboardingStore.savedResult, isNotNull);
     expect(draftTargetStore.target, isNotNull);
     expect(find.text('데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
@@ -1231,7 +1206,6 @@ void main() {
           supportEmail: '',
           dataDeletionEmail: '',
         ),
-        enableAnonymousAuth: false,
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -1335,7 +1309,6 @@ void main() {
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
-        enableAnonymousAuth: false,
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -1346,80 +1319,33 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
   });
 
-  testWidgets('기본 홈 화면은 익명 인증으로 즐겨찾기를 노출한다', (tester) async {
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        anonymousAuthRepository: FakeAnonymousAuthRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    expect(find.byKey(const Key('favoritesButton')), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsOneWidget);
-    expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
-  });
-
-  test('기본 앱은 출시 범위에서 알림 설정 저장소를 만들지 않는다', () {
+  test('기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다', () {
     final app = EasySubwayApp(
       repository: FakeStationSearchRepository(),
       reportRepository: FakeFacilityReportRepository(),
       routeRepository: FakeRouteSearchRepository(),
-      anonymousAuthRepository: FakeAnonymousAuthRepository(),
       initialOnboardingState: _completedOnboardingState(),
     );
 
-    final favoriteRepository =
-        app.favoriteRepository as FavoriteStationApiRepository;
-    final favoriteFacilityRepository =
-        app.favoriteFacilityRepository as FavoriteFacilityApiRepository;
-    final favoriteRouteRepository =
-        app.favoriteRouteRepository as FavoriteRouteApiRepository;
-
-    expect(
-      identical(
-        favoriteRepository.authProvider,
-        favoriteFacilityRepository.authProvider,
-      ),
-      isTrue,
-    );
-    expect(
-      identical(
-        favoriteFacilityRepository.authProvider,
-        favoriteRouteRepository.authProvider,
-      ),
-      isTrue,
-    );
+    expect(app.favoriteRepository, isNull);
+    expect(app.favoriteFacilityRepository, isNull);
+    expect(app.favoriteRouteRepository, isNull);
     expect(app.notificationRepository, isNull);
     expect(app.notificationPermissionProvider, isNull);
   });
 
-  test('푸시 알림을 명시적으로 켜면 알림 저장소만 기본 생성한다', () {
+  test('푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다', () {
     final app = EasySubwayApp(
       repository: FakeStationSearchRepository(),
       reportRepository: FakeFacilityReportRepository(),
       routeRepository: FakeRouteSearchRepository(),
-      anonymousAuthRepository: FakeAnonymousAuthRepository(),
       initialOnboardingState: _completedOnboardingState(),
       enablePushNotifications: true,
     );
 
-    final favoriteRouteRepository =
-        app.favoriteRouteRepository as FavoriteRouteApiRepository;
-    final notificationRepository =
-        app.notificationRepository as NotificationSettingsApiRepository;
-
+    expect(app.favoriteRouteRepository, isNull);
+    expect(app.notificationRepository, isNull);
     expect(app.notificationPermissionProvider, isNull);
-    expect(
-      identical(
-        favoriteRouteRepository.authProvider,
-        notificationRepository.authProvider,
-      ),
-      isTrue,
-    );
   });
 
   testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
@@ -6324,36 +6250,6 @@ class ControlledFavoriteStationRepository implements FavoriteStationRepository {
   }
 }
 
-class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
-  int issueCount = 0;
-  int refreshCount = 0;
-
-  @override
-  bool get canReuseStoredCredentials => true;
-
-  @override
-  Future<AnonymousAuthCredentials> issueAnonymousUser() async {
-    issueCount++;
-    return const AnonymousAuthCredentials(
-      userId: 'anonymous-user-1',
-      accessToken: 'access-token-1',
-      refreshToken: 'refresh-token-1',
-    );
-  }
-
-  @override
-  Future<AnonymousAuthCredentials> refreshAnonymousUser(
-    String refreshToken,
-  ) async {
-    refreshCount++;
-    return const AnonymousAuthCredentials(
-      userId: 'anonymous-user-1',
-      accessToken: 'access-token-2',
-      refreshToken: 'refresh-token-2',
-    );
-  }
-}
-
 class FakeUserDataDeletionRepository implements UserDataDeletionRepository {
   FakeUserDataDeletionRepository({this.error});
 
@@ -6378,36 +6274,7 @@ class FakeUserDataDeletionRepository implements UserDataDeletionRepository {
       deletedPushNotificationCount: 1,
       mobilityProfileDeleted: true,
       anonymizedReportCount: 1,
-      anonymousCredentialsDeleted: true,
     );
-  }
-}
-
-class MemoryAnonymousAuthCredentialStore
-    implements AnonymousAuthCredentialStore {
-  MemoryAnonymousAuthCredentialStore([this.credentials]);
-
-  AnonymousAuthCredentials? credentials;
-  int readCount = 0;
-  int saveCount = 0;
-  int clearCount = 0;
-
-  @override
-  Future<AnonymousAuthCredentials?> readCredentials() async {
-    readCount++;
-    return credentials;
-  }
-
-  @override
-  Future<void> saveCredentials(AnonymousAuthCredentials credentials) async {
-    saveCount++;
-    this.credentials = credentials;
-  }
-
-  @override
-  Future<void> clearCredentials() async {
-    clearCount++;
-    credentials = null;
   }
 }
 

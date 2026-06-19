@@ -13,7 +13,7 @@
       "ownerKo": "모바일 담당",
       "readyWhenKo": "Android release manifest는 cleartext traffic을 허용하지 않고, iOS와 Flutter 네트워크 호출은 운영 환경에서 HTTPS API만 사용한다.",
       "evidence": ["release-merged-manifest", "mobile-network-endpoint-review"],
-      "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/auth_headers.dart", "apps/mobile/lib/anonymous_auth.dart"]
+      "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/app/app_endpoints.dart", "apps/mobile/lib/station_search.dart"]
     },
     {
       "id": "mobile_debug_network_overrides_limited",
@@ -96,14 +96,14 @@
       "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java", "backend/src/main/java/com/easysubway/common/web/ApiResponse.java"]
     },
     {
-      "id": "backend_rate_limiting",
+      "id": "backend_api_traffic_monitoring",
       "area": "backend",
       "severity": "release-blocker",
-      "titleKo": "백엔드 남용 방지 속도 제한",
+      "titleKo": "백엔드 API 오류율 관측",
       "ownerKo": "백엔드 담당",
-      "readyWhenKo": "익명 인증 발급은 rate limit을 적용하고, Redis 기반 어댑터와 신뢰 프록시 IP 해석 기준을 운영 설정에 맞춘다.",
-      "evidence": ["anonymous-auth-rate-limit-tests", "redis-rate-limit-adapter-review"],
-      "linkedArtifacts": ["backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitService.java", "backend/src/main/java/com/easysubway/auth/adapter/out/redis/RedisAnonymousAuthRateLimitAdapter.java", "backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthClientIpResolver.java"]
+      "readyWhenKo": "사용자 활동과 API 오류율을 분리해 기록하고, 관리자 대시보드에서 실패율 급증을 확인할 수 있다.",
+      "evidence": ["api-traffic-tests", "usage-dashboard-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java", "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java", "backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityAdminPageController.java"]
     },
     {
       "id": "backend_sensitive_log_minimization",
@@ -113,7 +113,7 @@
       "ownerKo": "백엔드/운영 담당",
       "readyWhenKo": "위치, 사용자 식별자, 신고 사진, 인증 비밀번호가 운영 로그에 불필요하게 남지 않도록 오류 로그와 감사 로그의 목적을 분리한다.",
       "evidence": ["log-field-review", "audit-log-review"],
-      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/main/java/com/easysubway/report/domain/FacilityReportReviewAudit.java", "backend/src/main/java/com/easysubway/auth/adapter/out/security/SpringSecurityAnonymousUserRegistry.java"]
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/main/java/com/easysubway/report/domain/FacilityReportReviewAudit.java", "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"]
     },
     {
       "id": "repository_secrets_not_tracked",

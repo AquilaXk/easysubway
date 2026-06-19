@@ -120,12 +120,9 @@ test("backend production schema is managed by Flyway versioned migrations", () =
     "legacy one-shot schema-postgresql.sql must be replaced by versioned migrations",
   );
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE/);
-  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS facility_reports/);
-  assert.match(baselineMigration, /CONSTRAINT fk_anonymous_auth_tokens_user/);
   assert.match(baselineMigration, /CONSTRAINT fk_facility_report_review_audits_report/);
-  assert.match(h2BaselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
-  assert.match(h2BaselineMigration, /CHECK \(char_length\(token_hash\) = 64\)/);
+  assert.doesNotMatch(`${baselineMigration}\n${h2BaselineMigration}`, /guest_accounts|anonymous_auth_tokens/);
   assert.doesNotMatch(h2BaselineMigration, /WHERE revoked_at IS NULL/);
 });
 
@@ -865,179 +862,36 @@ test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 �
   assert.doesNotMatch(applicationProdYml, /spring\.profiles\.active|on-profile/);
 });
 
-test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다", () => {
-  const credentials = read("backend/src/main/java/com/easysubway/auth/domain/AnonymousUserCredentials.java");
-  const tokenSession = read("backend/src/main/java/com/easysubway/auth/domain/AnonymousAuthTokenSession.java");
-  const authenticatedUser = read("backend/src/main/java/com/easysubway/auth/domain/AuthenticatedUser.java");
-  const invalidAuth = read("backend/src/main/java/com/easysubway/auth/domain/InvalidAnonymousAuthException.java");
-  const rateLimitExceeded = read("backend/src/main/java/com/easysubway/auth/domain/AnonymousAuthRateLimitExceededException.java");
-  const useCase = read("backend/src/main/java/com/easysubway/auth/application/port/in/AnonymousAuthUseCase.java");
-  const rateLimitUseCase = read("backend/src/main/java/com/easysubway/auth/application/port/in/AnonymousAuthRateLimitUseCase.java");
-  const registerPort = read("backend/src/main/java/com/easysubway/auth/application/port/out/RegisterAnonymousUserPort.java");
-  const tokenPort = read("backend/src/main/java/com/easysubway/auth/application/port/out/AnonymousAuthTokenPort.java");
-  const consumeRateLimitPort = read(
-    "backend/src/main/java/com/easysubway/auth/application/port/out/ConsumeAnonymousAuthRateLimitPort.java",
-  );
-  const service = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthService.java");
-  const rateLimitProperties = read(
-    "backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitProperties.java",
-  );
-  const rateLimitService = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitService.java");
-  const jdbcAuthRepository = read("backend/src/main/java/com/easysubway/auth/adapter/out/persistence/JdbcAnonymousAuthRepository.java");
-  const bearerFilter = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerAuthenticationFilter.java");
-  const bearerPrincipal = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerPrincipal.java");
-  const inMemoryTokenStore = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/InMemoryAnonymousAuthTokenStore.java");
-  const controllerTest = read("backend/src/test/java/com/easysubway/auth/adapter/in/web/AnonymousAuthControllerTest.java");
-  const infrastructureContainerTest = read(
-    "backend/src/test/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthInfrastructureContainerTest.java",
-  );
-  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const redisRateLimitAdapter = read(
-    "backend/src/main/java/com/easysubway/auth/adapter/out/redis/RedisAnonymousAuthRateLimitAdapter.java",
-  );
-  const clientIpProperties = read(
-    "backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthClientIpProperties.java",
-  );
-  const clientIpResolver = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthClientIpResolver.java");
-  const controller = read("backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java");
-  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
-  const userDetailsManager = read("backend/src/main/java/com/easysubway/common/security/ConcurrentUserDetailsManager.java");
-  const build = read("backend/build.gradle");
-  const applicationDev = read("backend/src/main/resources/application-dev.yml");
-  const applicationProd = read("backend/src/main/resources/application-prod.yml");
+test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 않는다", () => {
+  const removedPaths = [
+    "apps/mobile/lib/anonymous_auth.dart",
+    "apps/mobile/test/anonymous_auth_test.dart",
+    "backend/src/main/java/com/easysubway/auth/adapter/in/web/AnonymousAuthController.java",
+    "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/JdbcAnonymousAuthRepository.java",
+    "backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerAuthenticationFilter.java",
+    "backend/src/main/java/com/easysubway/auth/domain/AnonymousAuthTokenSession.java",
+  ];
 
-  assert.match(credentials, /record AnonymousUserCredentials/);
-  assert.match(credentials, /userId/);
-  assert.match(credentials, /password/);
-  assert.match(credentials, /createdAt/);
-  assert.match(tokenSession, /record AnonymousAuthTokenSession/);
-  assert.match(tokenSession, /accessToken/);
-  assert.match(tokenSession, /refreshToken/);
-  assert.match(authenticatedUser, /record AuthenticatedUser/);
-  assert.match(authenticatedUser, /authType/);
-  assert.match(authenticatedUser, /anonymous/);
-  assert.match(invalidAuth, /extends InvalidRequestException/);
-  assert.match(rateLimitExceeded, /extends RuntimeException/);
-  assert.match(useCase, /interface AnonymousAuthUseCase/);
-  assert.match(useCase, /issueAnonymousUser/);
-  assert.match(useCase, /refreshAnonymousUser/);
-  assert.match(useCase, /currentUser/);
-  assert.match(rateLimitUseCase, /interface AnonymousAuthRateLimitUseCase/);
-  assert.match(rateLimitUseCase, /check\(String clientKey\)/);
-  assert.match(registerPort, /interface RegisterAnonymousUserPort/);
-  assert.match(registerPort, /existsByUserId/);
-  assert.match(registerPort, /isAnonymousUser/);
-  assert.match(registerPort, /registerAnonymousUser/);
-  assert.match(tokenPort, /interface AnonymousAuthTokenPort/);
-  assert.match(tokenPort, /saveIssuedTokenHashes/);
-  assert.match(tokenPort, /findUserIdByAccessTokenHash/);
-  assert.match(tokenPort, /consumeRefreshTokenHash/);
-  assert.match(tokenPort, /saveAuditEvent/);
-  assert.match(consumeRateLimitPort, /interface ConsumeAnonymousAuthRateLimitPort/);
-  assert.match(consumeRateLimitPort, /consume\(String clientKey, Duration window\)/);
-  assert.match(service, /implements AnonymousAuthUseCase/);
-  assert.match(service, /RegisterAnonymousUserPort/);
-  assert.match(service, /AnonymousAuthTokenPort/);
-  assert.match(service, /AnonymousAuthTokenHasher\.sha256/);
-  assert.match(service, /REFRESH_TOKEN_REUSED_OR_INVALID/);
-  assert.match(service, /@Transactional\s+public AnonymousAuthTokenSession issueAnonymousUser\(\)/);
-  assert.match(service, /@Transactional\(noRollbackFor = InvalidAnonymousAuthException\.class\)\s+public AnonymousAuthTokenSession refreshAnonymousUser\(String refreshToken\)/);
-  assert.match(rateLimitProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.rate-limit\.anonymous"\)/);
-  assert.match(rateLimitProperties, /maxRequests = 20/);
-  assert.match(rateLimitProperties, /Duration\.ofMinutes\(10\)/);
-  assert.match(rateLimitService, /implements AnonymousAuthRateLimitUseCase/);
-  assert.match(rateLimitService, /ConsumeAnonymousAuthRateLimitPort/);
-  assert.match(rateLimitService, /AnonymousAuthRateLimitExceededException/);
-  assert.match(jdbcAuthRepository, /implements RegisterAnonymousUserPort, AnonymousAuthTokenPort/);
-  assert.match(jdbcAuthRepository, /guest_accounts/);
-  assert.match(jdbcAuthRepository, /anonymous_auth_tokens/);
-  assert.match(jdbcAuthRepository, /anonymous_auth_audit_events/);
-  assert.match(jdbcAuthRepository, /token_hash/);
-  assert.match(jdbcAuthRepository, /revoked_at IS NULL/);
-  assert.match(jdbcAuthRepository, /int updated = jdbcTemplate\.update/);
-  assert.match(jdbcAuthRepository, /return updated > 0 \? userId : Optional\.empty\(\);/);
-  assert.match(bearerFilter, /Bearer /);
-  assert.match(bearerFilter, /AnonymousAuthTokenHasher\.sha256/);
-  assert.match(bearerFilter, /new AnonymousBearerPrincipal\(userId\.get\(\)\)/);
-  assert.match(bearerFilter, /UsernamePasswordAuthenticationToken\([\s\S]*null,[\s\S]*List\.of/);
-  assert.match(bearerFilter, /ROLE_USER/);
-  assert.doesNotMatch(bearerFilter, /@Component/);
-  assert.match(bearerPrincipal, /record AnonymousBearerPrincipal\(String userId\) implements Principal/);
-  assert.match(bearerPrincipal, /public String getName\(\)/);
-  assert.match(inMemoryTokenStore, /CopyOnWriteArrayList/);
-  assert.doesNotMatch(inMemoryTokenStore, /new ArrayList/);
-  assert.equal(
-    existsSync(path.join(root, "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthSchemaInitializer.java")),
-    false,
-    "anonymous auth schema must be created by Flyway migrations, not a PostConstruct initializer",
-  );
-  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS guest_accounts/);
-  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
-  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_audit_events/);
-  assert.match(userDetailsManager, /implements UserDetailsManager, UserDetailsPasswordService/);
-  assert.match(userDetailsManager, /ConcurrentHashMap/);
-  assert.doesNotMatch(security, /InMemoryUserDetailsManager/);
-  assert.match(build, /spring-boot-starter-data-redis/);
-  assert.match(build, /org\.flywaydb:flyway-core/);
-  assert.match(build, /testImplementation 'org\.testcontainers:junit-jupiter:/);
-  assert.match(build, /testImplementation 'org\.testcontainers:postgresql:/);
-  assert.match(infrastructureContainerTest, /@Testcontainers/);
-  assert.match(infrastructureContainerTest, /PostgreSQLContainer/);
-  assert.match(infrastructureContainerTest, /GenericContainer/);
-  assert.match(infrastructureContainerTest, /Flyway\.configure\(\)/);
-  assert.match(infrastructureContainerTest, /classpath:db\/migration\/postgresql/);
-  assert.match(infrastructureContainerTest, /postgres:16-alpine/);
-  assert.match(infrastructureContainerTest, /redis:7-alpine/);
-  assert.match(infrastructureContainerTest, /JdbcAnonymousAuthRepository/);
-  assert.match(infrastructureContainerTest, /RedisAnonymousAuthRateLimitAdapter/);
-  assert.match(redisRateLimitAdapter, /implements ConsumeAnonymousAuthRateLimitPort/);
-  assert.match(redisRateLimitAdapter, /StringRedisTemplate/);
-  assert.match(redisRateLimitAdapter, /RedisScript\.of/);
-  assert.match(redisRateLimitAdapter, /redis\.call\('INCR'/);
-  assert.match(redisRateLimitAdapter, /redis\.call\('PEXPIRE'/);
-  assert.match(redisRateLimitAdapter, /easysubway:auth:anonymous:rate-limit:/);
-  assert.doesNotMatch(redisRateLimitAdapter, /synchronized/);
-  assert.match(clientIpProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.client-ip"\)/);
-  assert.match(clientIpProperties, /trustedProxies/);
-  assert.match(clientIpResolver, /X-Forwarded-For/);
-  assert.match(clientIpResolver, /firstUntrustedForwardedClientIp/);
-  assert.match(clientIpResolver, /isTrustedProxy/);
-  assert.match(clientIpResolver, /matchesCidr/);
-  assert.match(clientIpResolver, /parseIpAddress/);
-  assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);
-  assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous\/refresh"\)/);
-  assert.match(controller, /@Valid @RequestBody AnonymousAuthRefreshRequest request/);
-  assert.match(controller, /record AnonymousAuthRefreshRequest\(@NotBlank String refreshToken\)/);
-  assert.match(controller, /accessToken/);
-  assert.match(controller, /refreshToken/);
-  assert.match(controller, /HttpStatus\.UNAUTHORIZED/);
-  assert.match(controller, /AnonymousAuthRateLimitUseCase/);
-  assert.match(controller, /AnonymousAuthClientIpResolver/);
-  assert.doesNotMatch(controller, /request\.getRemoteAddr\(\)/);
-  assert.match(controller, /HttpStatus\.TOO_MANY_REQUESTS/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
-  assert.match(controller, /Authentication authentication/);
-  assert.match(controller, /AnonymousBearerPrincipal/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
-  assert.match(security, /AnonymousBearerAuthenticationFilter/);
-  assert.match(security, /AnonymousBearerAuthenticationFilter anonymousBearerAuthenticationFilter\(AnonymousAuthTokenPort anonymousAuthTokenPort\)/);
-  assert.match(security, /addFilterBefore\(anonymousBearerAuthenticationFilter, BasicAuthenticationFilter\.class\)/);
-  assert.match(security, /Environment environment/);
-  assert.match(security, /validateProdAdminCredentials/);
-  assert.match(security, /getActiveProfiles\(\)/);
-  assert.match(security, /운영 관리자 계정 설정이 필요합니다\./);
-  assert.match(applicationDev, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST:localhost\}/);
-  assert.match(applicationDev, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
-  assert.match(applicationDev, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS:\}/);
-  assert.match(applicationProd, /admin:[\s\S]*username: \$\{EASYSUBWAY_ADMIN_USERNAME\}/);
-  assert.match(applicationProd, /admin:[\s\S]*password: \$\{EASYSUBWAY_ADMIN_PASSWORD\}/);
-  assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
-  assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
-  assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
-  assert.match(controllerTest, /rotatedRefreshToken/);
-  assert.match(controllerTest, /assertThat\(rotatedRefreshToken\)\.isNotEqualTo\(refreshToken\)/);
-  assert.match(controllerTest, /refreshAnonymousUserRejectsBlankToken/);
-  assert.match(controllerTest, /status\(\)\.isBadRequest\(\)/);
+  for (const removedPath of removedPaths) {
+    assert.equal(
+      existsSync(path.join(root, removedPath)),
+      false,
+      `${removedPath} must be removed from the MVP release path`,
+    );
+  }
+
+  const main = read("apps/mobile/lib/main.dart");
+  const appBootstrap = read("apps/mobile/lib/app/app_bootstrap.dart");
+  const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
+  const facilityReport = read("apps/mobile/lib/facility_report.dart");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const postgresBaseline = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
+  const h2Baseline = read("backend/src/main/resources/db/migration/h2/V1__baseline_schema.sql");
+
+  assert.doesNotMatch(`${main}\n${appBootstrap}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
+  assert.doesNotMatch(facilityReport, /anonymous-mobile-user|anonymousReportUserId/);
+  assert.doesNotMatch(security, /AnonymousBearerAuthenticationFilter/);
+  assert.doesNotMatch(`${postgresBaseline}\n${h2Baseline}`, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
 });
 
 test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {
@@ -1122,9 +976,6 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   );
   const service = read("backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java");
   const controller = read("backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java");
-  const anonymousAuthRepository = read(
-    "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/JdbcAnonymousAuthRepository.java",
-  );
   const favoriteStationRepository = read(
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteStationRepository.java",
   );
@@ -1166,7 +1017,7 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   assert.match(result, /deletedPushNotificationCount/);
   assert.match(result, /mobilityProfileDeleted/);
   assert.match(result, /anonymizedReportCount/);
-  assert.match(result, /anonymousCredentialsDeleted/);
+  assert.doesNotMatch(result, /anonymousCredentialsDeleted/);
   assert.match(invalidDeletion, /extends RuntimeException/);
   assert.match(useCase, /interface UserDataDeletionUseCase/);
   assert.match(useCase, /deleteUserData\(String userId\)/);
@@ -1180,7 +1031,7 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   assert.match(mobilityProfilePort, /deleteMobilityProfile/);
   assert.match(reportPort, /anonymizeFacilityReportsByUserId/);
   assert.match(service, /implements UserDataDeletionUseCase/);
-  assert.match(service, /RegisterAnonymousUserPort/);
+  assert.doesNotMatch(service, /RegisterAnonymousUserPort|deleteAnonymousUser/);
   assert.match(service, /DeleteUserFavoriteStationPort/);
   assert.match(service, /DeleteUserFavoriteFacilityPort/);
   assert.match(service, /DeleteUserFavoriteRoutePort/);
@@ -1189,13 +1040,10 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   assert.match(service, /DeleteUserPushNotificationPort/);
   assert.match(service, /DeleteUserMobilityProfilePort/);
   assert.match(service, /AnonymizeUserFacilityReportPort/);
-  assert.match(service, /deleteAnonymousUser\(normalizedUserId\)/);
   assert.match(controller, /@DeleteMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Principal principal/);
   assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /UserDataDeletionUseCase/);
-  assert.match(anonymousAuthRepository, /boolean deleteAnonymousUser\(String userId\)/);
-  assert.match(anonymousAuthRepository, /DELETE FROM anonymous_auth_tokens WHERE user_id = \?/);
   assert.match(favoriteStationRepository, /DeleteUserFavoriteStationPort/);
   assert.match(favoriteFacilityRepository, /DeleteUserFavoriteFacilityPort/);
   assert.match(favoriteRouteRepository, /DeleteUserFavoriteRoutePort/);
@@ -2775,7 +2623,6 @@ test("백엔드 사용자 활동 현황은 관리자 대시보드와 헥사고�
   assert.match(repository, /Map<LocalDate, Set<String>>/);
   assert.match(filter, /extends OncePerRequestFilter/);
   assert.match(filter, /"\/api\/v1\/"/);
-  assert.match(filter, /"\/api\/v1\/auth\/anonymous"/);
   assert.match(filter, /response\.getStatus\(\) < 400/);
   assert.match(controller, /@GetMapping\("\/admin\/usage\/activity\/page"\)/);
   assert.match(controller, /UserActivityDashboardUseCase/);
@@ -3100,8 +2947,6 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
-  const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
-  const anonymousAuthTest = read("apps/mobile/test/anonymous_auth_test.dart");
   const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
   const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
@@ -3160,7 +3005,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
-  assert.match(main, /AnonymousAuthSession/);
+  assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
   assert.match(`${main}\n${appDependencies}`, /FavoriteStationApiRepository/);
   assert.match(`${main}\n${appDependencies}`, /NotificationSettingsApiRepository/);
   assert.match(main, /OnboardingScreen/);
@@ -3224,39 +3069,6 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(secureKeyValueStorage, /abstract interface class SecureKeyValueStorage/);
   assert.match(secureKeyValueStorage, /class FlutterSecureKeyValueStorage implements SecureKeyValueStorage/);
   assert.match(secureKeyValueStorage, /FlutterSecureStorage/);
-  assert.match(anonymousAuth, /class AnonymousAuthApiRepository implements AnonymousAuthRepository/);
-  assert.match(anonymousAuth, /class SecureAnonymousAuthCredentialStore/);
-  assert.match(anonymousAuth, /SecureKeyValueStorage/);
-  assert.match(anonymousAuth, /_clearCredentialsAfterReadFailure/);
-  assert.match(anonymousAuth, /readCredentials/);
-  assert.match(anonymousAuth, /saveCredentials/);
-  assert.match(anonymousAuth, /clearCredentials/);
-  assert.match(anonymousAuth, /canReuseStoredCredentials/);
-  assert.match(anonymousAuth, /refreshAnonymousUser/);
-  assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous\/refresh/);
-  assert.match(anonymousAuth, /accessToken/);
-  assert.match(anonymousAuth, /refreshToken/);
-  assert.match(anonymousAuth, /Bearer \$accessToken/);
-  assert.match(anonymousAuth, /POST|postUrl/);
-  assert.match(anonymousAuth, /\/api\/v1\/auth\/anonymous/);
-  assert.match(anonymousAuth, /class AnonymousAuthSession implements AuthorizationHeaderProvider/);
-  assert.match(anonymousAuth, /_credentials/);
-  assert.match(anonymousAuth, /_loadOrIssueCredentials/);
-  assert.match(anonymousAuth, /_refreshOrIssueCredentials/);
-  assert.match(anonymousAuth, /invalidateAuthorization/);
-  assert.match(anonymousAuth, /_issuingCredentials\s*=\s*nextIssuingCredentials/);
-  assert.match(anonymousAuth, /_isAllowedAnonymousAuthBaseUri/);
-  assert.match(anonymousAuth, /_isIpv4LoopbackLiteral/);
-  assert.match(anonymousAuth, /allowAndroidEmulatorHttp = kDebugMode/);
-  assert.match(anonymousAuth, /allowAndroidEmulatorHttp && host == '10\.0\.2\.2'/);
-  assert.match(anonymousAuth, /10\.0\.2\.2/);
-  assert.match(anonymousAuthTest, /저장된 인증 정보를 먼저 사용한다/);
-  assert.match(anonymousAuthTest, /재시작 후 재사용한다/);
-  assert.match(anonymousAuthTest, /인증 실패 후 refresh token으로 새 access token을 발급한다/);
-  assert.match(anonymousAuthTest, /동시 인증 무효화 후 하나의 새 인증 정보를 공유한다/);
-  assert.match(anonymousAuthTest, /원격 HTTP 주소에서 저장된 인증 정보를 재사용하지 않는다/);
-  assert.match(anonymousAuthTest, /secure storage 복원 실패 시 저장값을 지운다/);
-  assert.match(anonymousAuthTest, /secure storage 삭제 실패에도 null로 복구한다/);
   assert.match(onboarding, /SecureKeyValueStorage/);
   assert.match(onboarding, /_clearResultAfterReadFailure/);
   assert.match(onboardingTest, /온보딩 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
@@ -3399,19 +3211,17 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
-  assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
+  assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
   assert.match(userDataDeletion, /class UserDataDeletionApiRepository implements UserDataDeletionRepository/);
   assert.match(userDataDeletion, /deleteUrl\(baseUri\.resolve\('\/api\/v1\/me'\)\)/);
   assert.match(userDataDeletion, /HttpHeaders\.authorizationHeader/);
   assert.match(userDataDeletion, /refreshExistingAuthorization/);
-  assert.match(anonymousAuth, /refreshExistingAuthorization\(/);
   assert.match(
     userDataDeletion,
     /userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했습니다\. 잠시 후 다시 시도해 주세요\.'/,
   );
   assert.match(userDataDeletionTest, /인증 헤더로 DELETE \/api\/v1\/me를 호출한다/);
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
-  assert.match(anonymousAuthTest, /삭제 요청에 사용한 인증 정보가 바뀌면 기존 인증 갱신을 실패 처리한다/);
   assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
   assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
   assert.match(main, /UserDataDeletionScreen/);
@@ -3588,7 +3398,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "backend_role_authorization",
     "backend_report_photo_upload_limits",
     "backend_error_response_sanitized",
-    "backend_rate_limiting",
+    "backend_api_traffic_monitoring",
     "backend_sensitive_log_minimization",
     "repository_secrets_not_tracked",
     "repository_dependency_review",
@@ -3698,7 +3508,6 @@ test("iOS 앱은 개인정보 매니페스트를 번들 리소스로 포함한�
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypePreciseLocation");
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypePhotosorVideos");
   assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeOtherUserContent");
-  assertPrivacyCollectedDataType(privacyManifest, "NSPrivacyCollectedDataTypeUserID");
   assert.doesNotMatch(privacyManifest, /NSPrivacyCollectedDataTypeDeviceID/);
   assert.match(project, /PrivacyInfo\.xcprivacy \*\/ = \{isa = PBXFileReference;[\s\S]*?path = PrivacyInfo\.xcprivacy;/);
   assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
@@ -3713,7 +3522,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const main = read("apps/mobile/lib/main.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
-  const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.applicationId, "easysubway");
@@ -3734,7 +3542,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "facility_report_content",
     "facility_report_photo",
     "facility_report_location",
-    "anonymous_user_id",
     "diagnostics_crash_logs",
     "diagnostics_performance_logs",
   ];
@@ -3802,7 +3609,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "NSPrivacyCollectedDataTypePreciseLocation",
     "NSPrivacyCollectedDataTypeSearchHistory",
     "NSPrivacyCollectedDataTypeSensitiveInfo",
-    "NSPrivacyCollectedDataTypeUserID",
   ]);
   for (const dataType of appStoreTypes) {
     assertPrivacyCollectedDataType(privacyManifest, dataType);
@@ -3814,7 +3620,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(items.get("facility_report_photo").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePhotosorVideos");
   assert.equal(items.get("facility_report_content").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeOtherUserContent");
   assert.equal(items.get("facility_report_location").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePreciseLocation");
-  assert.equal(items.get("anonymous_user_id").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeUserID");
   assert.equal(items.get("diagnostics_crash_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeCrashData");
   assert.equal(items.get("diagnostics_performance_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePerformanceData");
   assert.ok(
@@ -3859,7 +3664,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   assert.match(`${main}\n${appDependencies}`, /pushNotificationsEnabled/);
-  assert.match(anonymousAuth, /anonymousAuth\.credentials/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {

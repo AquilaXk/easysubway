@@ -68,7 +68,7 @@
       "platform": "android",
       "titleKo": "Android 재설치와 secure storage 복원 실패",
       "environmentKo": "Android 백업 비활성화 릴리즈 기준 설정과 재설치 테스트 환경",
-      "flowKo": "앱 삭제 후 재설치 또는 secure storage 복원 실패 상태에서 익명 인증과 온보딩 복구 흐름을 확인한다.",
+      "flowKo": "앱 삭제 후 재설치 또는 secure storage 복원 실패 상태에서 온보딩과 로컬 상태 복구 흐름을 확인한다.",
       "passCriteriaKo": "손상된 인증 정보는 정리되고, 사용자는 앱을 다시 시작하거나 이동 조건을 재설정할 수 있다.",
       "automation": "manual-with-contract-baseline",
       "evidence": ["adb-commands", "app-log-summary"]
