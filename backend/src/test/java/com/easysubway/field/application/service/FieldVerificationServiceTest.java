@@ -91,7 +91,7 @@ class FieldVerificationServiceTest {
 		));
 
 		assertThat(session.stationId()).isEqualTo("station-sadang");
-		assertThat(session.status()).isEqualTo(FieldVerificationStatus.IN_PROGRESS);
+		assertThat(session.status()).isEqualTo(FieldVerificationStatus.NEEDS_RECHECK);
 		assertThat(session.items())
 			.filteredOn(item -> item.id().equals("field-verification-sadang-elevator"))
 			.singleElement()

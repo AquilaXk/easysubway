@@ -208,7 +208,7 @@ class FieldVerificationAdminControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.stationId").value("station-sadang"))
-			.andExpect(jsonPath("$.data.status").value("IN_PROGRESS"))
+			.andExpect(jsonPath("$.data.status").value("NEEDS_RECHECK"))
 			.andExpect(jsonPath("$.data.items[1].itemId").value("field-verification-sadang-elevator"))
 			.andExpect(jsonPath("$.data.items[1].status").value("NEEDS_RECHECK"))
 			.andExpect(jsonPath("$.data.items[1].note").value("엘리베이터 운행 중지 안내문 확인 필요"));

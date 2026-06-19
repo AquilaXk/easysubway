@@ -118,6 +118,9 @@ public class FieldVerificationService implements FieldVerificationUseCase {
 		if (items.stream().allMatch(item -> item.status() == FieldVerificationStatus.VERIFIED)) {
 			return FieldVerificationStatus.VERIFIED;
 		}
+		if (items.stream().anyMatch(item -> item.status() == FieldVerificationStatus.NEEDS_RECHECK)) {
+			return FieldVerificationStatus.NEEDS_RECHECK;
+		}
 		if (items.stream().allMatch(item -> item.status() == FieldVerificationStatus.PLANNED)) {
 			return FieldVerificationStatus.PLANNED;
 		}
