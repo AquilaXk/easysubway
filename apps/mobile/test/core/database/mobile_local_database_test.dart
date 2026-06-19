@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart';
 import 'package:easysubway_mobile/app/app_bootstrap.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -188,6 +191,141 @@ void main() {
     expect(
       await installedCapitalPack.openRead(0, 16).first,
       'SQLite format 3'.codeUnits.followedBy([0]).toList(),
+    );
+  });
+
+  test('catalog opener는 업데이트된 current pointer가 있으면 해당 데이터팩을 연다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-current-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final updatedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    final updatedDatabase = CatalogDatabase.file(updatedPack);
+    await updatedDatabase.seedBaselineIfEmpty();
+    await updatedDatabase
+        .into(updatedDatabase.catalogMetadata)
+        .insertOnConflictUpdate(
+          CatalogMetadataCompanion.insert(
+            key: 'activePack',
+            value: 'capital-v18',
+            updatedAt: Value(DateTime.utc(2026, 6, 19, 12)),
+          ),
+        );
+    await updatedDatabase.close();
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': updatedPack.path,
+        'sha256': 'local-fixture',
+      }),
+    );
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    ).open();
+    addTearDown(database.close);
+
+    final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), 'capital-v18');
+  });
+
+  test('앱 부트스트랩은 데이터팩 업데이트 후 current pointer로 catalog를 연다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-bootstrap-current-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    AppBootstrap? bootstrap;
+    addTearDown(() => bootstrap?.close());
+    bootstrap = await AppBootstrap.initialize(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      dataPackUpdateRunner:
+          ({required supportDirectory, required userDatabase}) async {
+            final catalogDirectory = Directory(
+              '${supportDirectory.path}/catalog',
+            );
+            await catalogDirectory.create(recursive: true);
+            final updatedPack = File(
+              '${catalogDirectory.path}/capital-v19.sqlite',
+            );
+            final updatedDatabase = CatalogDatabase.file(updatedPack);
+            await updatedDatabase.seedBaselineIfEmpty();
+            await updatedDatabase
+                .into(updatedDatabase.catalogMetadata)
+                .insertOnConflictUpdate(
+                  CatalogMetadataCompanion.insert(
+                    key: 'activePack',
+                    value: 'capital-v19',
+                    updatedAt: Value(DateTime.utc(2026, 6, 19, 13)),
+                  ),
+                );
+            await updatedDatabase.close();
+            await File('${catalogDirectory.path}/current.json').writeAsString(
+              jsonEncode({
+                'id': 'capital',
+                'version': '19',
+                'path': updatedPack.path,
+                'sha256': 'bootstrap-fixture',
+              }),
+            );
+          },
+      enableAnonymousAuth: false,
+      enablePushNotifications: false,
+    );
+
+    final metadata = await bootstrap.catalogDatabase.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), 'capital-v19');
+  });
+
+  test('앱 부트스트랩은 데이터팩 업데이트 실패 시 내장 catalog로 계속 시작한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-bootstrap-update-failure-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final reports = <FlutterErrorDetails>[];
+
+    AppBootstrap? bootstrap;
+    addTearDown(() => bootstrap?.close());
+    bootstrap = await runWithMobileErrorReporter(
+      reports.add,
+      () => AppBootstrap.initialize(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+        dataPackUpdateRunner:
+            ({required supportDirectory, required userDatabase}) async {
+              throw const SocketException('manifest unavailable');
+            },
+        enableAnonymousAuth: false,
+        enablePushNotifications: false,
+      ),
+    );
+
+    final metadata = await bootstrap!.catalogDatabase.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'schemaVersion'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), '1');
+    expect(reports, hasLength(1));
+    expect(
+      reports.single.context.toString(),
+      contains('데이터팩 업데이트 확인 중 예외가 발생했습니다.'),
     );
   });
 
