@@ -12,10 +12,8 @@ import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
 public class AnonymousBearerAuthenticationFilter extends OncePerRequestFilter {
 
 	private static final String BEARER_PREFIX = "Bearer ";
@@ -42,8 +40,8 @@ public class AnonymousBearerAuthenticationFilter extends OncePerRequestFilter {
 		var userId = anonymousAuthTokenPort.findUserIdByAccessTokenHash(AnonymousAuthTokenHasher.sha256(token));
 		if (userId.isPresent()) {
 			var authentication = new UsernamePasswordAuthenticationToken(
-				userId.get(),
-				"BEARER",
+				new AnonymousBearerPrincipal(userId.get()),
+				null,
 				List.of(new SimpleGrantedAuthority("ROLE_USER"))
 			);
 			SecurityContextHolder.getContext().setAuthentication(authentication);

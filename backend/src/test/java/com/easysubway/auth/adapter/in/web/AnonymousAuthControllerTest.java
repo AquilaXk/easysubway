@@ -48,7 +48,7 @@ class AnonymousAuthControllerTest {
 	}
 
 	@Test
-	@DisplayName("익명 사용자를 발급하고 같은 Basic 인증 정보로 현재 사용자를 조회한다")
+	@DisplayName("익명 사용자를 발급하고 Bearer token으로 현재 사용자를 조회한다")
 	void issueAnonymousUserAndReadCurrentUser() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/auth/anonymous"))
 			.andExpect(status().isOk())
@@ -118,8 +118,10 @@ class AnonymousAuthControllerTest {
 			.andReturn();
 		String refreshBody = refreshResult.getResponse().getContentAsString();
 		String rotatedAccessToken = JsonPath.read(refreshBody, "$.data.accessToken");
+		String rotatedRefreshToken = JsonPath.read(refreshBody, "$.data.refreshToken");
 
 		assertThat(rotatedAccessToken).isNotEqualTo(accessToken);
+		assertThat(rotatedRefreshToken).isNotEqualTo(refreshToken);
 
 		mockMvc.perform(get("/api/v1/me")
 				.header("Authorization", "Bearer " + rotatedAccessToken))
@@ -135,6 +137,17 @@ class AnonymousAuthControllerTest {
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.message").value("익명 인증 세션을 갱신할 수 없습니다."));
+	}
+
+	@Test
+	@DisplayName("refresh token 갱신은 빈 토큰 요청을 거부한다")
+	void refreshAnonymousUserRejectsBlankToken() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/anonymous/refresh")
+				.contentType("application/json")
+				.content("""
+					{"refreshToken":" "}
+					"""))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test

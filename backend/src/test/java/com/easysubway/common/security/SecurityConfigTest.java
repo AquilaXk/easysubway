@@ -2,7 +2,6 @@ package com.easysubway.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.easysubway.auth.adapter.out.security.AnonymousBearerAuthenticationFilter;
 import com.easysubway.auth.adapter.out.security.InMemoryAnonymousAuthTokenStore;
 import com.easysubway.auth.application.port.out.AnonymousAuthTokenPort;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +25,6 @@ class SecurityConfigTest {
 		))
 		.withUserConfiguration(
 			SecurityConfig.class,
-			AnonymousBearerAuthenticationFilter.class,
 			AnonymousAuthTokenTestConfiguration.class
 		);
 

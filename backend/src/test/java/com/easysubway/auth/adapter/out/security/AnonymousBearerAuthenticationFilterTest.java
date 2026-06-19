@@ -37,7 +37,10 @@ class AnonymousBearerAuthenticationFilterTest {
 
 		var authentication = SecurityContextHolder.getContext().getAuthentication();
 		assertThat(authentication.getName()).isEqualTo("anonymous-user-1");
-		assertThat(authentication.getCredentials()).isEqualTo("BEARER");
+		assertThat(authentication.getPrincipal())
+			.isInstanceOfSatisfying(AnonymousBearerPrincipal.class, principal ->
+				assertThat(principal.getName()).isEqualTo("anonymous-user-1"));
+		assertThat(authentication.getCredentials()).isNull();
 		assertThat(tokenPort.requestedAccessTokenHashes)
 			.containsExactly(AnonymousAuthTokenHasher.sha256("valid-access-token"));
 	}

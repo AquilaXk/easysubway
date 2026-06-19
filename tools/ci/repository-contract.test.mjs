@@ -529,6 +529,11 @@ test("백엔드 런타임 의존성은 보안 패치 기준 버전을 사용한�
   assert.match(backendLockfile, /^org\.apache\.commons:commons-lang3:3\.(?:18|19|[2-9][0-9]|[1-9][0-9]{2,})\.[0-9]+=/m);
   assert.match(backendLockfile, /^org\.apache\.commons:commons-compress:1\.(?:26\.[2-9]|2[7-9]\.[0-9]+|[3-9][0-9]\.[0-9]+)=/m);
   assert.match(backendLockfile, /^org\.apache\.logging\.log4j:log4j-core:2\.(?:25\.(?:[3-9]|[1-9][0-9]+)|(?:2[6-9]|[3-9][0-9]|[1-9][0-9]{2,})\.[0-9]+)=/m);
+  assert.match(backendLockfile, /^org\.testcontainers:database-commons:1\.21\.4=/m);
+  assert.match(backendLockfile, /^org\.testcontainers:jdbc:1\.21\.4=/m);
+  assert.match(backendLockfile, /^org\.testcontainers:junit-jupiter:1\.21\.4=/m);
+  assert.match(backendLockfile, /^org\.testcontainers:postgresql:1\.21\.4=/m);
+  assert.match(backendLockfile, /^org\.testcontainers:testcontainers:1\.21\.4=/m);
   assert.doesNotMatch(backendLockfile, /^org\.apache\.tomcat\.embed:tomcat-embed-core:10\.1\.46=/m);
   assert.doesNotMatch(backendLockfile, /^org\.springframework\.security:spring-security-web:6\.5\.5=/m);
   assert.doesNotMatch(backendLockfile, /^org\.thymeleaf:thymeleaf-spring6:3\.1\.3\.RELEASE=/m);
@@ -759,9 +764,12 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const rateLimitService = read("backend/src/main/java/com/easysubway/auth/application/service/AnonymousAuthRateLimitService.java");
   const jdbcAuthRepository = read("backend/src/main/java/com/easysubway/auth/adapter/out/persistence/JdbcAnonymousAuthRepository.java");
   const bearerFilter = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerAuthenticationFilter.java");
+  const bearerPrincipal = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerPrincipal.java");
+  const inMemoryTokenStore = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/InMemoryAnonymousAuthTokenStore.java");
   const authSchemaInitializer = read(
     "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthSchemaInitializer.java",
   );
+  const controllerTest = read("backend/src/test/java/com/easysubway/auth/adapter/in/web/AnonymousAuthControllerTest.java");
   const infrastructureContainerTest = read(
     "backend/src/test/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthInfrastructureContainerTest.java",
   );
@@ -814,6 +822,8 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(service, /AnonymousAuthTokenPort/);
   assert.match(service, /AnonymousAuthTokenHasher\.sha256/);
   assert.match(service, /REFRESH_TOKEN_REUSED_OR_INVALID/);
+  assert.match(service, /@Transactional\s+public AnonymousAuthTokenSession issueAnonymousUser\(\)/);
+  assert.match(service, /@Transactional\(noRollbackFor = InvalidAnonymousAuthException\.class\)\s+public AnonymousAuthTokenSession refreshAnonymousUser\(String refreshToken\)/);
   assert.match(rateLimitProperties, /@ConfigurationProperties\(prefix = "easysubway\.auth\.rate-limit\.anonymous"\)/);
   assert.match(rateLimitProperties, /maxRequests = 20/);
   assert.match(rateLimitProperties, /Duration\.ofMinutes\(10\)/);
@@ -826,11 +836,26 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(jdbcAuthRepository, /anonymous_auth_audit_events/);
   assert.match(jdbcAuthRepository, /token_hash/);
   assert.match(jdbcAuthRepository, /revoked_at IS NULL/);
+  assert.match(jdbcAuthRepository, /int updated = jdbcTemplate\.update/);
+  assert.match(jdbcAuthRepository, /return updated > 0 \? userId : Optional\.empty\(\);/);
   assert.match(bearerFilter, /Bearer /);
   assert.match(bearerFilter, /AnonymousAuthTokenHasher\.sha256/);
+  assert.match(bearerFilter, /new AnonymousBearerPrincipal\(userId\.get\(\)\)/);
+  assert.match(bearerFilter, /UsernamePasswordAuthenticationToken\([\s\S]*null,[\s\S]*List\.of/);
   assert.match(bearerFilter, /ROLE_USER/);
+  assert.doesNotMatch(bearerFilter, /@Component/);
+  assert.match(bearerPrincipal, /record AnonymousBearerPrincipal\(String userId\) implements Principal/);
+  assert.match(bearerPrincipal, /public String getName\(\)/);
+  assert.match(inMemoryTokenStore, /CopyOnWriteArrayList/);
+  assert.doesNotMatch(inMemoryTokenStore, /new ArrayList/);
   assert.match(authSchemaInitializer, /CREATE TABLE IF NOT EXISTS guest_accounts/);
   assert.match(authSchemaInitializer, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
+  assert.match(authSchemaInitializer, /chk_guest_accounts_user_id/);
+  assert.match(authSchemaInitializer, /idx_guest_accounts_created/);
+  assert.match(authSchemaInitializer, /ON DELETE CASCADE ON UPDATE CASCADE/);
+  assert.match(authSchemaInitializer, /chk_anonymous_auth_tokens_hash/);
+  assert.match(authSchemaInitializer, /idx_anonymous_auth_tokens_user_type/);
+  assert.match(authSchemaInitializer, /idx_anonymous_auth_audit_events_occurred/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS guest_accounts/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_audit_events/);
@@ -863,6 +888,8 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(clientIpResolver, /parseIpAddress/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous"\)/);
   assert.match(controller, /@PostMapping\("\/api\/v1\/auth\/anonymous\/refresh"\)/);
+  assert.match(controller, /@Valid @RequestBody AnonymousAuthRefreshRequest request/);
+  assert.match(controller, /record AnonymousAuthRefreshRequest\(@NotBlank String refreshToken\)/);
   assert.match(controller, /accessToken/);
   assert.match(controller, /refreshToken/);
   assert.match(controller, /HttpStatus\.UNAUTHORIZED/);
@@ -872,8 +899,10 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(controller, /HttpStatus\.TOO_MANY_REQUESTS/);
   assert.match(controller, /@GetMapping\("\/api\/v1\/me"\)/);
   assert.match(controller, /Authentication authentication/);
+  assert.match(controller, /AnonymousBearerPrincipal/);
   assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
   assert.match(security, /AnonymousBearerAuthenticationFilter/);
+  assert.match(security, /AnonymousBearerAuthenticationFilter anonymousBearerAuthenticationFilter\(AnonymousAuthTokenPort anonymousAuthTokenPort\)/);
   assert.match(security, /addFilterBefore\(anonymousBearerAuthenticationFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /Environment environment/);
   assert.match(security, /validateProdAdminCredentials/);
@@ -887,6 +916,10 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(applicationProd, /redis:[\s\S]*host: \$\{EASYSUBWAY_REDIS_HOST\}/);
   assert.match(applicationProd, /redis:[\s\S]*port: \$\{EASYSUBWAY_REDIS_PORT:6379\}/);
   assert.match(applicationProd, /trusted-proxies: \$\{EASYSUBWAY_TRUSTED_PROXY_CIDRS\}/);
+  assert.match(controllerTest, /rotatedRefreshToken/);
+  assert.match(controllerTest, /assertThat\(rotatedRefreshToken\)\.isNotEqualTo\(refreshToken\)/);
+  assert.match(controllerTest, /refreshAnonymousUserRejectsBlankToken/);
+  assert.match(controllerTest, /status\(\)\.isBadRequest\(\)/);
 });
 
 test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {

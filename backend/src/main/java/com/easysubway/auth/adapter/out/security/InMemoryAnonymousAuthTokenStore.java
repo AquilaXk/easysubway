@@ -2,17 +2,17 @@ package com.easysubway.auth.adapter.out.security;
 
 import com.easysubway.auth.application.port.out.AnonymousAuthTokenPort;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class InMemoryAnonymousAuthTokenStore implements AnonymousAuthTokenPort {
 
 	private final Map<String, String> userIdsByAccessTokenHash = new ConcurrentHashMap<>();
 	private final Map<String, String> accessTokenHashesByRefreshTokenHash = new ConcurrentHashMap<>();
-	private final List<String> auditEvents = new ArrayList<>();
+	private final List<String> auditEvents = new CopyOnWriteArrayList<>();
 
 	@Override
 	public void saveIssuedTokenHashes(

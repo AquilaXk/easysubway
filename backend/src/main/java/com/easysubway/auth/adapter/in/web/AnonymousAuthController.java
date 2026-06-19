@@ -2,11 +2,14 @@ package com.easysubway.auth.adapter.in.web;
 
 import com.easysubway.auth.application.port.in.AnonymousAuthRateLimitUseCase;
 import com.easysubway.auth.application.port.in.AnonymousAuthUseCase;
+import com.easysubway.auth.adapter.out.security.AnonymousBearerPrincipal;
 import com.easysubway.auth.domain.AnonymousAuthTokenSession;
 import com.easysubway.auth.domain.AnonymousAuthRateLimitExceededException;
 import com.easysubway.auth.domain.AuthenticatedUser;
 import com.easysubway.auth.domain.InvalidAnonymousAuthException;
 import com.easysubway.common.web.ApiResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
@@ -42,14 +45,14 @@ class AnonymousAuthController {
 	}
 
 	@PostMapping("/api/v1/auth/anonymous/refresh")
-	ApiResponse<AnonymousAuthResponse> refreshAnonymousUser(@RequestBody AnonymousAuthRefreshRequest request) {
+	ApiResponse<AnonymousAuthResponse> refreshAnonymousUser(@Valid @RequestBody AnonymousAuthRefreshRequest request) {
 		return ApiResponse.ok(AnonymousAuthResponse.from(anonymousAuthUseCase.refreshAnonymousUser(request.refreshToken())));
 	}
 
 	@GetMapping("/api/v1/me")
 	ApiResponse<AuthenticatedUserResponse> currentUser(Authentication authentication) {
 		return ApiResponse.ok(AuthenticatedUserResponse.from(anonymousAuthUseCase.currentUser(
-			authentication.getName(),
+			userIdFrom(authentication),
 			authTypeFrom(authentication)
 		)));
 	}
@@ -70,8 +73,15 @@ class AnonymousAuthController {
 		return anonymousAuthClientIpResolver.resolve(request);
 	}
 
+	private String userIdFrom(Authentication authentication) {
+		if (authentication.getPrincipal() instanceof AnonymousBearerPrincipal principal) {
+			return principal.getName();
+		}
+		return authentication.getName();
+	}
+
 	private String authTypeFrom(Authentication authentication) {
-		return "BEARER".equals(authentication.getCredentials()) ? "BEARER" : "BASIC";
+		return authentication.getPrincipal() instanceof AnonymousBearerPrincipal ? "BEARER" : "BASIC";
 	}
 
 	record AnonymousAuthResponse(
@@ -95,7 +105,7 @@ class AnonymousAuthController {
 		}
 	}
 
-	record AnonymousAuthRefreshRequest(String refreshToken) {
+	record AnonymousAuthRefreshRequest(@NotBlank String refreshToken) {
 	}
 
 	record AuthenticatedUserResponse(

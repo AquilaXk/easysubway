@@ -1,6 +1,7 @@
 package com.easysubway.common.security;
 
 import com.easysubway.auth.adapter.out.security.AnonymousBearerAuthenticationFilter;
+import com.easysubway.auth.application.port.out.AnonymousAuthTokenPort;
 import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -45,6 +46,11 @@ public class SecurityConfig {
 			)
 			.httpBasic(Customizer.withDefaults())
 			.build();
+	}
+
+	@Bean
+	AnonymousBearerAuthenticationFilter anonymousBearerAuthenticationFilter(AnonymousAuthTokenPort anonymousAuthTokenPort) {
+		return new AnonymousBearerAuthenticationFilter(anonymousAuthTokenPort);
 	}
 
 	@Bean

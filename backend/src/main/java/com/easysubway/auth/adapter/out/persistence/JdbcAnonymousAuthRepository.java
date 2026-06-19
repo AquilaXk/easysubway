@@ -129,7 +129,11 @@ public class JdbcAnonymousAuthRepository implements RegisterAnonymousUserPort, A
 			refreshTokenHash
 		);
 		Optional<String> userId = userIds.stream().findFirst();
-		userId.ifPresent(ignored -> jdbcTemplate.update(
+		if (userId.isEmpty()) {
+			return Optional.empty();
+		}
+
+		int updated = jdbcTemplate.update(
 			"""
 			UPDATE anonymous_auth_tokens
 			SET revoked_at = ?
@@ -139,8 +143,8 @@ public class JdbcAnonymousAuthRepository implements RegisterAnonymousUserPort, A
 			""",
 			Timestamp.valueOf(consumedAt),
 			refreshTokenHash
-		));
-		return userId;
+		);
+		return updated > 0 ? userId : Optional.empty();
 	}
 
 	@Override

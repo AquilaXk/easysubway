@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AnonymousAuthService implements AnonymousAuthUseCase {
@@ -65,6 +66,7 @@ public class AnonymousAuthService implements AnonymousAuthUseCase {
 	}
 
 	@Override
+	@Transactional
 	public AnonymousAuthTokenSession issueAnonymousUser() {
 		for (int attempt = 0; attempt < MAX_USER_ID_GENERATION_ATTEMPTS; attempt++) {
 			String userId = userIdGenerator.get();
@@ -93,6 +95,7 @@ public class AnonymousAuthService implements AnonymousAuthUseCase {
 	}
 
 	@Override
+	@Transactional(noRollbackFor = InvalidAnonymousAuthException.class)
 	public AnonymousAuthTokenSession refreshAnonymousUser(String refreshToken) {
 		if (refreshToken == null || refreshToken.isBlank()) {
 			throw new InvalidAnonymousAuthException("익명 인증 세션을 갱신할 수 없습니다.");
