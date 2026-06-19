@@ -3623,10 +3623,39 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.ok(item.displayNameKo.length > 0, `${id} display name must not be empty`);
     assert.equal(typeof item.purposeKo, "string", `${id} must have purpose`);
     assert.ok(item.purposeKo.length > 0, `${id} purpose must not be empty`);
+    assert.match(
+      item.implementationStatus,
+      /^(collected|local-only|backend-collected)$/,
+      `${id} must declare implementation status`,
+    );
+    assert.match(item.introducedInVersion, /^\d+\.\d+\.\d+$/, `${id} must declare introduced version`);
+    assert.equal(typeof item.codeOwner, "string", `${id} must declare code owner`);
+    assert.ok(item.codeOwner.length > 0, `${id} code owner must not be empty`);
+    assert.equal(typeof item.collectionTrigger, "string", `${id} must declare collection trigger`);
+    assert.ok(item.collectionTrigger.length > 0, `${id} collection trigger must not be empty`);
+    assert.ok(
+      Array.isArray(item.backendTableOrService),
+      `${id} must list backend tables or services`,
+    );
+    assert.ok(
+      item.backendTableOrService.length > 0,
+      `${id} must have at least one backend table or service`,
+    );
     assert.ok(Array.isArray(item.storageLocations), `${id} must list storage locations`);
     assert.ok(item.storageLocations.length > 0, `${id} must have at least one storage location`);
     assert.equal(typeof item.retentionKo, "string", `${id} must have retention`);
     assert.equal(typeof item.deletionKo, "string", `${id} must have deletion path`);
+    assert.equal(typeof item.deletionImplementation, "string", `${id} must have deletion implementation`);
+    assert.ok(item.deletionImplementation.length > 0, `${id} deletion implementation must not be empty`);
+    assert.ok(Array.isArray(item.evidence), `${id} must list evidence artifacts`);
+    assert.ok(item.evidence.length > 0, `${id} must have at least one evidence artifact`);
+    for (const evidencePath of item.evidence) {
+      assert.ok(
+        existsSync(path.join(root, evidencePath)),
+        `${id} evidence artifact must exist: ${evidencePath}`,
+      );
+    }
+    assert.equal(item.lastVerifiedAt, "2026-06-19", `${id} verification date must be current`);
     assert.equal(item.sharedWithThirdParties, false, `${id} must not be shared with third parties`);
     assert.equal(item.usedForTracking, false, `${id} must not be used for tracking`);
     assert.ok(item.googlePlayDataSafety?.dataType, `${id} must map to Play Data safety`);
@@ -3665,6 +3694,42 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(items.get("anonymous_user_id").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeUserID");
   assert.equal(items.get("diagnostics_crash_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypeCrashData");
   assert.equal(items.get("diagnostics_performance_logs").appStorePrivacy.dataType, "NSPrivacyCollectedDataTypePerformanceData");
+  assert.ok(
+    items.get("favorite_stations_routes_facilities").evidence.includes("apps/mobile/lib/station_search.dart"),
+    "favorite station evidence must include the station search implementation",
+  );
+  assert.deepEqual(items.get("facility_report_photo").storageLocations.toSorted(), [
+    "backend-database-legacy-column",
+    "backend-database-metadata",
+    "backend-object-storage",
+    "mobile-memory",
+  ]);
+  assert.match(
+    items.get("facility_report_photo").backendTableOrService.join("\n"),
+    /facility_reports\.photo_object_key[\s\S]*facility_reports\.photo_thumbnail_object_key[\s\S]*facility_reports\.photo_data_base64/,
+  );
+  assert.match(
+    items.get("facility_report_photo").deletionImplementation,
+    /deleteFacilityReportPhoto[\s\S]*photo_data_base64 = NULL/,
+  );
+
+  const excludedItems = new Map((inventory.excludedDataTypes ?? []).map((item) => [item.id, item]));
+  assert.deepEqual([...excludedItems.keys()].sort(), ["push_notification_token"]);
+  const pushToken = excludedItems.get("push_notification_token");
+  assert.equal(pushToken.implementationStatus, "excluded-from-release");
+  assert.match(pushToken.collectionTrigger, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=true/);
+  assert.equal(pushToken.sharedWithThirdParties, false);
+  assert.equal(pushToken.usedForTracking, false);
+  assert.equal(pushToken.googlePlayDataSafety.includedInRelease, false);
+  assert.equal(pushToken.appStorePrivacy.includedInRelease, false);
+  assert.equal(pushToken.lastVerifiedAt, "2026-06-19");
+  for (const evidencePath of pushToken.evidence) {
+    assert.ok(
+      existsSync(path.join(root, evidencePath)),
+      `push token evidence artifact must exist: ${evidencePath}`,
+    );
+  }
+  assert.doesNotMatch(privacyManifest, /NSPrivacyCollectedDataTypeDeviceID/);
 
   assert.match(stationSearch, /currentLocation\(\)/);
   assert.match(facilityReport, /photoDataBase64/);
