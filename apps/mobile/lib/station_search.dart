@@ -1278,10 +1278,10 @@ class StationSearchController extends ChangeNotifier {
           ? await (repository as StationLineFilterRepository)
                 .searchStationsOnLine(trimmedQuery, selectedLineId)
           : await repository.searchStations(trimmedQuery);
-      await _recordSearch(trimmedQuery);
       if (!_isActiveRequest(requestId)) {
         return;
       }
+      await _recordSearch(trimmedQuery);
       if (results.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,

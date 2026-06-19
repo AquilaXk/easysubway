@@ -896,6 +896,29 @@ void main() {
     expect(controller.state.results.single.nameKo, '강남');
   });
 
+  test('역 검색 컨트롤러는 늦게 도착한 이전 검색어를 최근 검색에 기록하지 않는다', () async {
+    final repository = ControlledStationSearchRepository();
+    final historyRepository = FakeSearchHistoryRepository();
+    final controller = StationSearchController(
+      repository: repository,
+      searchHistoryRepository: historyRepository,
+    );
+
+    final firstSearch = controller.search('상록수');
+    final secondSearch = controller.search('강남');
+
+    repository.complete('강남', [
+      _stationResult(id: 'station-gangnam', name: '강남'),
+    ]);
+    await secondSearch;
+    repository.complete('상록수', [
+      _stationResult(id: 'station-sangnoksu', name: '상록수'),
+    ]);
+    await firstSearch;
+
+    expect(historyRepository.recordedQueries, ['강남']);
+  });
+
   test('역 검색 컨트롤러는 빈 결과와 실패 상태를 표시한다', () async {
     final repository = FakeStationSearchRepository();
     final controller = StationSearchController(repository: repository);

@@ -119,12 +119,77 @@ void main() {
     final favorites = await repository.listFavoriteRoutes();
 
     expect(saved.summaryTitle, '상록수에서 사당까지');
+    expect(saved.routeSearchId, result.routeSearchId);
     expect(favorites.single.lineName, '수도권 4호선');
     expect(favorites.single.score, 92);
 
-    await repository.removeFavoriteRoute(result.routeSearchId);
+    await repository.removeFavoriteRoute(saved.favoriteRouteId);
 
     expect(await repository.listFavoriteRoutes(), isEmpty);
+  });
+
+  test('로컬 경로 즐겨찾기는 같은 구간도 이동 조건별로 분리해 저장한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    final seniorResult = RouteSearchResult(
+      routeSearchId: 'local-station-sangnoksu-station-sadang',
+      originStationId: 'station-sangnoksu',
+      originStationName: '상록수',
+      destinationStationId: 'station-sadang',
+      destinationStationName: '사당',
+      mobilityType: 'SENIOR',
+      status: 'FOUND',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      score: 92,
+      steps: const [],
+      warnings: const [],
+      blockedReasons: const [],
+      createdAt: '2026-06-19T09:00:00.000Z',
+    );
+    final wheelchairResult = RouteSearchResult(
+      routeSearchId: 'local-station-sangnoksu-station-sadang',
+      originStationId: 'station-sangnoksu',
+      originStationName: '상록수',
+      destinationStationId: 'station-sadang',
+      destinationStationName: '사당',
+      mobilityType: 'WHEELCHAIR',
+      status: 'FOUND',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      score: 88,
+      steps: const [],
+      warnings: const [],
+      blockedReasons: const [],
+      createdAt: '2026-06-19T09:01:00.000Z',
+    );
+
+    await repository.saveFavoriteRoute(
+      seniorResult.routeSearchId,
+      result: seniorResult,
+    );
+    await repository.saveFavoriteRoute(
+      wheelchairResult.routeSearchId,
+      result: wheelchairResult,
+    );
+    final favorites = await repository.listFavoriteRoutes();
+
+    expect(favorites, hasLength(2));
+    expect(favorites.map((favorite) => favorite.mobilityType).toSet(), {
+      'SENIOR',
+      'WHEELCHAIR',
+    });
+    expect(
+      favorites.map((favorite) => favorite.favoriteRouteId).toSet(),
+      hasLength(2),
+    );
   });
 
   test('로컬 알림 설정과 최근 검색은 app_preferences와 search_history에 보관한다', () async {
