@@ -39,7 +39,10 @@ class JdbcFacilityReportRepositoryTest {
 				description VARCHAR(1000),
 				photo_file_name VARCHAR(255),
 				photo_content_type VARCHAR(80),
-				photo_data_base64 TEXT,
+				photo_object_key VARCHAR(255),
+				photo_thumbnail_object_key VARCHAR(255),
+				photo_sha256 CHAR(64),
+				photo_size_bytes BIGINT,
 				latitude DECIMAL(10, 7),
 				longitude DECIMAL(10, 7),
 				duplicate_of_report_id VARCHAR(120),
@@ -247,7 +250,10 @@ class JdbcFacilityReportRepositoryTest {
 		FacilityReport anonymizedReport = repository.loadReport("report-1").orElseThrow();
 		assertThat(anonymizedReport.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
 		assertThat(anonymizedReport.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
-		assertThat(anonymizedReport.photoDataBase64()).isNull();
+		assertThat(anonymizedReport.photoObjectKey()).isNull();
+		assertThat(anonymizedReport.photoThumbnailObjectKey()).isNull();
+		assertThat(anonymizedReport.photoSha256()).isNull();
+		assertThat(anonymizedReport.photoSizeBytes()).isNull();
 		assertThat(anonymizedReport.latitude()).isNull();
 		assertThat(anonymizedReport.longitude()).isNull();
 		assertThat(anonymizedReport.duplicateOfReportId()).isEqualTo(targetReport.duplicateOfReportId());
