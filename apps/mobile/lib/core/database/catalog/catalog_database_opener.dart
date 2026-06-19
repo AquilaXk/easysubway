@@ -19,6 +19,11 @@ class CatalogDatabaseOpener {
   final AssetBundle assetBundle;
 
   Future<CatalogDatabase> open() async {
+    final installedDatabase = await _openInstalledCurrentDataPack();
+    if (installedDatabase != null) {
+      return installedDatabase;
+    }
+
     final datapackDirectory = Directory(
       p.join(databaseDirectory.path, 'datapacks'),
     );
@@ -30,6 +35,51 @@ class CatalogDatabaseOpener {
     );
     await database.seedBaselineIfEmpty();
     return database;
+  }
+
+  Future<CatalogDatabase?> _openInstalledCurrentDataPack() async {
+    final pointer = File(
+      p.join(databaseDirectory.path, 'catalog', 'current.json'),
+    );
+    if (!await pointer.exists()) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(await pointer.readAsString());
+      if (decoded is! Map<String, Object?>) {
+        return null;
+      }
+      final path = decoded['path'];
+      if (path is! String || path.trim().isEmpty) {
+        return null;
+      }
+      final file = File(path);
+      if (!await file.exists()) {
+        return null;
+      }
+      final database = CatalogDatabase.file(file);
+      final usable = await _isUsableCatalogDatabase(database);
+      if (usable) {
+        return database;
+      }
+      await database.close();
+    } on Object {
+      return null;
+    }
+    return null;
+  }
+
+  Future<bool> _isUsableCatalogDatabase(CatalogDatabase database) async {
+    final quickCheck = await database.customSelect('PRAGMA quick_check').get();
+    if (quickCheck.any((row) => row.data.values.first != 'ok')) {
+      return false;
+    }
+    final schemaVersion = await database
+        .customSelect(
+          "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
+        )
+        .getSingleOrNull();
+    return schemaVersion != null;
   }
 
   Future<void> _installBundledDataPacks(Directory datapackDirectory) async {

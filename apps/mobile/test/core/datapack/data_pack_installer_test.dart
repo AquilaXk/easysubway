@@ -1,0 +1,150 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
+import 'package:easysubway_mobile/core/database/user/user_database.dart'
+    as user_db;
+import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
+import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('installer는 손상 gzip이면 기존 current pointer를 유지한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-corrupt-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final oldPack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    await oldPack.writeAsString('old pack');
+    final current = File('${catalogDirectory.path}/current.json');
+    await current.writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '17',
+        'path': oldPack.path,
+        'sha256': 'old-sha',
+      }),
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+
+    final corruptBytes = [1, 2, 3, 4];
+    final result = await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(corruptBytes).toString(),
+        sqliteSha256: '1' * 64,
+      ),
+      compressedBytes: corruptBytes,
+    );
+    final pointer = await installer.readCurrentPointer();
+
+    expect(result.status, DataPackInstallStatus.rejected);
+    expect(result.reason, DataPackInstallRejectionReason.invalidArchive);
+    expect(pointer?.version, '17');
+    expect(await oldPack.exists(), isTrue);
+  });
+
+  test('installer는 검증된 sqlite pack을 버전별 파일로 설치하고 current를 전환한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-install-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+      ),
+      compressedBytes: compressedBytes,
+    );
+    final pointer = await installer.readCurrentPointer();
+    final installedRows = await userDatabase
+        .select(userDatabase.installedDataPacks)
+        .get();
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(pointer?.path.endsWith('catalog/capital-v18.sqlite'), isTrue);
+    expect(File(pointer!.path).existsSync(), isTrue);
+    expect(installedRows.single.packId, 'capital');
+    expect(installedRows.single.version, '18');
+  });
+
+  test('installer는 새 pack 설치 후 같은 pack의 오래된 버전을 정리한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-prune-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final oldest = File('${catalogDirectory.path}/capital-v16.sqlite');
+    final previous = File('${catalogDirectory.path}/capital-v17.sqlite');
+    await oldest.writeAsString('oldest');
+    await previous.writeAsString('previous');
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+
+    await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(await oldest.exists(), isFalse);
+    expect(await previous.exists(), isTrue);
+    expect(
+      await File('${catalogDirectory.path}/capital-v18.sqlite').exists(),
+      isTrue,
+    );
+  });
+}
+
+DataPackManifestEntry _pack({
+  required String version,
+  required String sha256,
+  required String sqliteSha256,
+}) {
+  return DataPackManifestEntry(
+    id: 'capital',
+    version: version,
+    url: Uri.parse('capital-v$version.sqlite.gz'),
+    compressedSha256: sha256,
+    sqliteSha256: sqliteSha256,
+    schemaVersion: '1',
+    requiredTables: const ['catalog_metadata', 'stations', 'station_lines'],
+    minimumTableRows: const {'stations': 2},
+  );
+}
+
+Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
+  final file = File('${directory.path}/fixture.sqlite');
+  final database = CatalogDatabase.file(file);
+  await database.seedBaselineIfEmpty();
+  await database.close();
+  return file.readAsBytes();
+}
