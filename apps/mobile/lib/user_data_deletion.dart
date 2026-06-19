@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'auth_headers.dart';
+import 'core/database/user/user_database.dart';
 import 'mobile_error_reporter.dart';
 
 const userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
@@ -90,6 +91,117 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
       return false;
     }
     return refresh(authorizationHeader);
+  }
+}
+
+class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
+  UserDataDeletionLocalRepository({required this.userDatabase});
+
+  final UserDatabase userDatabase;
+
+  @override
+  Future<UserDataDeletionResult> deleteCurrentUserData() async {
+    try {
+      late final int deletedFavoriteStationCount;
+      late final int deletedFavoriteFacilityCount;
+      late final int deletedFavoriteRouteCount;
+      late final int deletedAppPreferenceCount;
+      late final int deletedReportReceiptCount;
+      late final int deletedReportDraftCount;
+      await userDatabase.transaction(() async {
+        deletedFavoriteStationCount = await userDatabase
+            .delete(userDatabase.favoriteStations)
+            .go();
+        deletedFavoriteFacilityCount = await userDatabase
+            .delete(userDatabase.favoriteFacilities)
+            .go();
+        deletedFavoriteRouteCount = await userDatabase
+            .delete(userDatabase.favoriteRoutes)
+            .go();
+        await userDatabase.delete(userDatabase.searchHistory).go();
+        deletedAppPreferenceCount = await userDatabase
+            .delete(userDatabase.appPreferences)
+            .go();
+        deletedReportReceiptCount = await userDatabase
+            .delete(userDatabase.reportReceipts)
+            .go();
+        deletedReportDraftCount = await userDatabase
+            .delete(userDatabase.reportDrafts)
+            .go();
+      });
+
+      return UserDataDeletionResult(
+        userId: 'local-user',
+        deletedFavoriteStationCount: deletedFavoriteStationCount,
+        deletedFavoriteFacilityCount: deletedFavoriteFacilityCount,
+        deletedFavoriteRouteCount: deletedFavoriteRouteCount,
+        anonymizedRouteFeedbackCount: 0,
+        notificationSettingsDeleted: deletedAppPreferenceCount > 0,
+        deletedRegisteredDeviceCount: 0,
+        deletedPushNotificationCount: 0,
+        mobilityProfileDeleted: false,
+        anonymizedReportCount:
+            deletedReportReceiptCount + deletedReportDraftCount,
+        anonymousCredentialsDeleted: false,
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '로컬 사용자 데이터 삭제 처리 중 예외가 발생했습니다.',
+      );
+      throw const UserDataDeletionException(userDataDeletionErrorMessage);
+    }
+  }
+}
+
+class UserDataDeletionCompositeRepository
+    implements UserDataDeletionRepository {
+  UserDataDeletionCompositeRepository({
+    required this.remoteRepository,
+    required this.localRepository,
+  });
+
+  final UserDataDeletionRepository remoteRepository;
+  final UserDataDeletionRepository localRepository;
+
+  @override
+  Future<UserDataDeletionResult> deleteCurrentUserData() async {
+    final remoteResult = await remoteRepository.deleteCurrentUserData();
+    final localResult = await localRepository.deleteCurrentUserData();
+    return UserDataDeletionResult(
+      userId: remoteResult.userId,
+      deletedFavoriteStationCount:
+          remoteResult.deletedFavoriteStationCount +
+          localResult.deletedFavoriteStationCount,
+      deletedFavoriteFacilityCount:
+          remoteResult.deletedFavoriteFacilityCount +
+          localResult.deletedFavoriteFacilityCount,
+      deletedFavoriteRouteCount:
+          remoteResult.deletedFavoriteRouteCount +
+          localResult.deletedFavoriteRouteCount,
+      anonymizedRouteFeedbackCount:
+          remoteResult.anonymizedRouteFeedbackCount +
+          localResult.anonymizedRouteFeedbackCount,
+      notificationSettingsDeleted:
+          remoteResult.notificationSettingsDeleted ||
+          localResult.notificationSettingsDeleted,
+      deletedRegisteredDeviceCount:
+          remoteResult.deletedRegisteredDeviceCount +
+          localResult.deletedRegisteredDeviceCount,
+      deletedPushNotificationCount:
+          remoteResult.deletedPushNotificationCount +
+          localResult.deletedPushNotificationCount,
+      mobilityProfileDeleted:
+          remoteResult.mobilityProfileDeleted ||
+          localResult.mobilityProfileDeleted,
+      anonymizedReportCount:
+          remoteResult.anonymizedReportCount +
+          localResult.anonymizedReportCount,
+      anonymousCredentialsDeleted:
+          remoteResult.anonymousCredentialsDeleted ||
+          localResult.anonymousCredentialsDeleted,
+    );
   }
 }
 
