@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:path/path.dart' as p;
 
 import '../database/user/user_database.dart' as user_db;
 import 'data_pack_installer.dart';
@@ -91,7 +92,10 @@ class DataPackSelectionPolicy {
     return InstalledDataPackPointer(
       id: override.id,
       version: override.version,
-      path: installed.path,
+      path: p.join(
+        p.dirname(installed.path),
+        '${override.id}-v${override.version}.sqlite',
+      ),
       reason: override.reason,
     );
   }

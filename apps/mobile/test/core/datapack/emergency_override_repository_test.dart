@@ -29,6 +29,7 @@ void main() {
 
     expect(selected.id, 'capital');
     expect(selected.version, '17');
+    expect(selected.path, '/catalog/capital-v17.sqlite');
     expect(selected.reason, '시설 상태 긴급 정정');
   });
 }
