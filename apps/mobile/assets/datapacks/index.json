@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "id": "core",
+      "asset": "assets/datapacks/core.sqlite.gz",
+      "sha256": "44a49dfd224c47cac24a66445a474c438455375742764141d9781a42dae07aff"
+    },
+    {
+      "id": "capital",
+      "asset": "assets/datapacks/capital.sqlite.gz",
+      "sha256": "44a49dfd224c47cac24a66445a474c438455375742764141d9781a42dae07aff"
+    }
+  ]
+}
