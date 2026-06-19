@@ -6155,6 +6155,7 @@ class ControlledFavoriteStationRepository implements FavoriteStationRepository {
 
 class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   int issueCount = 0;
+  int refreshCount = 0;
 
   @override
   bool get canReuseStoredCredentials => true;
@@ -6164,7 +6165,20 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
     issueCount++;
     return const AnonymousAuthCredentials(
       userId: 'anonymous-user-1',
-      password: 'user-test-password',
+      accessToken: 'access-token-1',
+      refreshToken: 'refresh-token-1',
+    );
+  }
+
+  @override
+  Future<AnonymousAuthCredentials> refreshAnonymousUser(
+    String refreshToken,
+  ) async {
+    refreshCount++;
+    return const AnonymousAuthCredentials(
+      userId: 'anonymous-user-1',
+      accessToken: 'access-token-2',
+      refreshToken: 'refresh-token-2',
     );
   }
 }
