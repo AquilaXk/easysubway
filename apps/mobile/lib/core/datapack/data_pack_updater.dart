@@ -42,24 +42,41 @@ class DataPackUpdater {
       await emergencyOverrideRepository?.clearOverride();
     }
 
+    final packBaseUri = _packBaseUriForManifest(client.manifestUri);
     final results = <DataPackInstallResult>[];
     for (final pack in manifest.packs) {
-      final uri = client.manifestUri.resolve(pack.url.toString());
+      final uri = packBaseUri.resolve(pack.url.toString());
       final compressedBytes = await _download(uri);
       results.add(
         await installer.install(
           pack: pack,
           compressedBytes: compressedBytes,
           protectedVersions: protectedVersions,
+          activateCurrent: false,
         ),
       );
     }
     if (results.every(
       (result) => result.status == DataPackInstallStatus.installed,
     )) {
+      final currentPointer = results.lastOrNull?.pointer;
+      if (currentPointer != null) {
+        await installer.activateCurrentPointer(currentPointer);
+      }
       await client.saveManifestCache(manifestResult);
     }
     return results;
+  }
+
+  Uri _packBaseUriForManifest(Uri manifestUri) {
+    final manifestDirectory = manifestUri.resolve('./');
+    final pathSegments = manifestUri.pathSegments;
+    if (pathSegments.length >= 2 &&
+        pathSegments[pathSegments.length - 2] == 'catalog' &&
+        pathSegments.last == 'current.json') {
+      return manifestDirectory.resolve('../');
+    }
+    return manifestDirectory;
   }
 
   Future<List<int>> _download(Uri uri) async {

@@ -24,6 +24,7 @@ class DataPackInstaller {
     required DataPackManifestEntry pack,
     required List<int> compressedBytes,
     Set<String> protectedVersions = const {},
+    bool activateCurrent = true,
   }) async {
     await catalogDirectory.create(recursive: true);
     final compressedHash = sha256.convert(compressedBytes).toString();
@@ -75,7 +76,9 @@ class DataPackInstaller {
       sha256: pack.sqliteSha256,
       installedAt: _now().toUtc(),
     );
-    await _writeCurrentPointer(pointer);
+    if (activateCurrent) {
+      await activateCurrentPointer(pointer);
+    }
     await _pruneObsoletePacks(
       pack.id,
       keepVersionCount: 2,
@@ -108,6 +111,10 @@ class DataPackInstaller {
       return null;
     }
     return InstalledDataPackPointer.fromJson(decoded);
+  }
+
+  Future<void> activateCurrentPointer(InstalledDataPackPointer pointer) async {
+    await _writeCurrentPointer(pointer);
   }
 
   Future<DataPackInstallRejectionReason?> _validateSqlite(
