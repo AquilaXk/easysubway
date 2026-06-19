@@ -281,6 +281,10 @@ void main() {
     );
     await dependencies.favoriteRepository!.listFavoriteStations();
 
+    expect(
+      dependencies.userDataDeletionRepository,
+      isA<UserDataDeletionCompositeRepository>(),
+    );
     expect(anonymousAuthRepository.issueCount, 0);
     expect(anonymousAuthRepository.refreshCount, 0);
     expect(anonymousAuthStore.readCount, 0);

@@ -165,12 +165,11 @@ class AppDependencies {
           locationProvider ?? MethodChannelCurrentLocationProvider(),
       userDataDeletionRepository:
           userDataDeletionRepository ??
-          (userDatabase != null
-              ? UserDataDeletionLocalRepository(userDatabase: userDatabase)
-              : _defaultUserDataDeletionRepository(
-                  baseUri: baseUri,
-                  authProvider: sharedAuthProvider,
-                )),
+          _defaultUserDataDeletionRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+            userDatabase: userDatabase,
+          ),
       anonymousAuthSession: anonymousAuthSession,
     );
   }
@@ -210,17 +209,27 @@ AnonymousAuthSession? _defaultAnonymousAuthSession({
 UserDataDeletionRepository? _defaultUserDataDeletionRepository({
   required Uri baseUri,
   required AuthorizationHeaderProvider? authProvider,
+  required UserDatabase? userDatabase,
 }) {
-  if (authProvider == null) {
-    return null;
+  final localRepository = userDatabase == null
+      ? null
+      : UserDataDeletionLocalRepository(userDatabase: userDatabase);
+  final remoteRepository = authProvider == null
+      ? null
+      : UserDataDeletionApiRepository(
+          baseUri: baseUri,
+          authProvider: authProvider,
+          refreshExistingAuthorization: authProvider is AnonymousAuthSession
+              ? authProvider.refreshExistingAuthorization
+              : null,
+        );
+  if (remoteRepository != null && localRepository != null) {
+    return UserDataDeletionCompositeRepository(
+      remoteRepository: remoteRepository,
+      localRepository: localRepository,
+    );
   }
-  return UserDataDeletionApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-    refreshExistingAuthorization: authProvider is AnonymousAuthSession
-        ? authProvider.refreshExistingAuthorization
-        : null,
-  );
+  return remoteRepository ?? localRepository;
 }
 
 FavoriteStationRepository? _defaultFavoriteStationRepository({

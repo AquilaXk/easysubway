@@ -289,6 +289,100 @@ void main() {
     );
     expect(await userDatabase.select(userDatabase.reportDrafts).get(), isEmpty);
   });
+
+  test('합성 사용자 데이터 삭제 저장소는 서버 삭제 성공 후 로컬 삭제를 실행한다', () async {
+    final calls = <String>[];
+    final remoteRepository = RecordingUserDataDeletionRepository(
+      label: 'remote',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'anonymous-user-1',
+        deletedFavoriteStationCount: 1,
+        deletedFavoriteFacilityCount: 1,
+        deletedFavoriteRouteCount: 1,
+        anonymizedRouteFeedbackCount: 2,
+        notificationSettingsDeleted: false,
+        deletedRegisteredDeviceCount: 1,
+        deletedPushNotificationCount: 1,
+        mobilityProfileDeleted: true,
+        anonymizedReportCount: 3,
+        anonymousCredentialsDeleted: true,
+      ),
+    );
+    final localRepository = RecordingUserDataDeletionRepository(
+      label: 'local',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'local-user',
+        deletedFavoriteStationCount: 4,
+        deletedFavoriteFacilityCount: 5,
+        deletedFavoriteRouteCount: 6,
+        anonymizedRouteFeedbackCount: 0,
+        notificationSettingsDeleted: true,
+        deletedRegisteredDeviceCount: 0,
+        deletedPushNotificationCount: 0,
+        mobilityProfileDeleted: false,
+        anonymizedReportCount: 1,
+        anonymousCredentialsDeleted: false,
+      ),
+    );
+    final repository = UserDataDeletionCompositeRepository(
+      remoteRepository: remoteRepository,
+      localRepository: localRepository,
+    );
+
+    final result = await repository.deleteCurrentUserData();
+
+    expect(calls, ['remote', 'local']);
+    expect(result.userId, 'anonymous-user-1');
+    expect(result.deletedFavoriteStationCount, 5);
+    expect(result.deletedFavoriteFacilityCount, 6);
+    expect(result.deletedFavoriteRouteCount, 7);
+    expect(result.anonymizedRouteFeedbackCount, 2);
+    expect(result.notificationSettingsDeleted, isTrue);
+    expect(result.deletedRegisteredDeviceCount, 1);
+    expect(result.deletedPushNotificationCount, 1);
+    expect(result.mobilityProfileDeleted, isTrue);
+    expect(result.anonymizedReportCount, 4);
+    expect(result.anonymousCredentialsDeleted, isTrue);
+  });
+
+  test('합성 사용자 데이터 삭제 저장소는 서버 삭제 실패 시 로컬 데이터를 유지한다', () async {
+    final calls = <String>[];
+    final remoteRepository = RecordingUserDataDeletionRepository(
+      label: 'remote',
+      calls: calls,
+      error: const UserDataDeletionException(userDataDeletionErrorMessage),
+    );
+    final localRepository = RecordingUserDataDeletionRepository(
+      label: 'local',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'local-user',
+        deletedFavoriteStationCount: 1,
+        deletedFavoriteFacilityCount: 1,
+        deletedFavoriteRouteCount: 1,
+        anonymizedRouteFeedbackCount: 0,
+        notificationSettingsDeleted: true,
+        deletedRegisteredDeviceCount: 0,
+        deletedPushNotificationCount: 0,
+        mobilityProfileDeleted: false,
+        anonymizedReportCount: 0,
+        anonymousCredentialsDeleted: false,
+      ),
+    );
+    final repository = UserDataDeletionCompositeRepository(
+      remoteRepository: remoteRepository,
+      localRepository: localRepository,
+    );
+
+    await expectLater(
+      repository.deleteCurrentUserData(),
+      throwsA(isA<UserDataDeletionException>()),
+    );
+
+    expect(calls, ['remote']);
+  });
 }
 
 String _successfulDeletionBody() {
@@ -353,5 +447,30 @@ class RefreshingAuthorizationHeaderProvider
     }
     header = refreshedHeader;
     return true;
+  }
+}
+
+class RecordingUserDataDeletionRepository
+    implements UserDataDeletionRepository {
+  RecordingUserDataDeletionRepository({
+    required this.label,
+    required this.calls,
+    this.result,
+    this.error,
+  });
+
+  final String label;
+  final List<String> calls;
+  final UserDataDeletionResult? result;
+  final UserDataDeletionException? error;
+
+  @override
+  Future<UserDataDeletionResult> deleteCurrentUserData() async {
+    calls.add(label);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return result!;
   }
 }

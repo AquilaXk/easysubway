@@ -155,6 +155,56 @@ class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
   }
 }
 
+class UserDataDeletionCompositeRepository
+    implements UserDataDeletionRepository {
+  UserDataDeletionCompositeRepository({
+    required this.remoteRepository,
+    required this.localRepository,
+  });
+
+  final UserDataDeletionRepository remoteRepository;
+  final UserDataDeletionRepository localRepository;
+
+  @override
+  Future<UserDataDeletionResult> deleteCurrentUserData() async {
+    final remoteResult = await remoteRepository.deleteCurrentUserData();
+    final localResult = await localRepository.deleteCurrentUserData();
+    return UserDataDeletionResult(
+      userId: remoteResult.userId,
+      deletedFavoriteStationCount:
+          remoteResult.deletedFavoriteStationCount +
+          localResult.deletedFavoriteStationCount,
+      deletedFavoriteFacilityCount:
+          remoteResult.deletedFavoriteFacilityCount +
+          localResult.deletedFavoriteFacilityCount,
+      deletedFavoriteRouteCount:
+          remoteResult.deletedFavoriteRouteCount +
+          localResult.deletedFavoriteRouteCount,
+      anonymizedRouteFeedbackCount:
+          remoteResult.anonymizedRouteFeedbackCount +
+          localResult.anonymizedRouteFeedbackCount,
+      notificationSettingsDeleted:
+          remoteResult.notificationSettingsDeleted ||
+          localResult.notificationSettingsDeleted,
+      deletedRegisteredDeviceCount:
+          remoteResult.deletedRegisteredDeviceCount +
+          localResult.deletedRegisteredDeviceCount,
+      deletedPushNotificationCount:
+          remoteResult.deletedPushNotificationCount +
+          localResult.deletedPushNotificationCount,
+      mobilityProfileDeleted:
+          remoteResult.mobilityProfileDeleted ||
+          localResult.mobilityProfileDeleted,
+      anonymizedReportCount:
+          remoteResult.anonymizedReportCount +
+          localResult.anonymizedReportCount,
+      anonymousCredentialsDeleted:
+          remoteResult.anonymousCredentialsDeleted ||
+          localResult.anonymousCredentialsDeleted,
+    );
+  }
+}
+
 class UserDataDeletionResult {
   const UserDataDeletionResult({
     required this.userId,
