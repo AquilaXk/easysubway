@@ -10,6 +10,7 @@ import 'app/app_dependencies.dart';
 import 'facility_report.dart';
 import 'favorite_facility.dart';
 import 'internal_route.dart';
+import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
@@ -59,6 +60,8 @@ class EasySubwayApp extends StatelessWidget {
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     UserDataDeletionRepository? userDataDeletionRepository,
+    LegacyCredentialCleaner legacyCredentialCleaner =
+        const SecureLegacyCredentialCleaner(),
     OnboardingResultStore? onboardingStore,
     FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
@@ -92,6 +95,7 @@ class EasySubwayApp extends StatelessWidget {
          onboardingStore: onboardingStore,
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+         legacyCredentialCleaner: legacyCredentialCleaner,
          supportAccessInfo: supportAccessInfo.validatedForBuild(
            isReleaseMode: kReleaseMode,
          ),
@@ -105,6 +109,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     super.key,
@@ -140,6 +145,7 @@ class EasySubwayApp extends StatelessWidget {
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
 
@@ -204,6 +210,7 @@ class EasySubwayApp extends StatelessWidget {
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+        legacyCredentialCleaner: legacyCredentialCleaner,
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
@@ -306,6 +313,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
@@ -327,6 +335,7 @@ class _EasySubwayHome extends StatefulWidget {
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
@@ -406,6 +415,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   }
 
   Future<void> _handleUserDataDeleted() async {
+    await widget.legacyCredentialCleaner.clear();
     await widget.onboardingStore?.clearResult();
     await widget.facilityReportDraftTargetStore?.clearTarget();
     if (!mounted) {

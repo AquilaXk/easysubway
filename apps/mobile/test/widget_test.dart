@@ -5,6 +5,7 @@ import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/internal_route.dart';
+import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
@@ -14,6 +15,8 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fake_secure_key_value_storage.dart';
 
 OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
   return OnboardingState.completed(
@@ -1094,6 +1097,9 @@ void main() {
         facilityStatusLabel: '정상',
       ),
     );
+    final legacyCredentialStorage = FakeSecureKeyValueStorage()
+      ..values[SecureLegacyCredentialCleaner.legacyAuthCredentialsKey] =
+          'legacy-token-payload';
 
     await tester.pumpWidget(
       EasySubwayApp(
@@ -1103,6 +1109,9 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
         userDataDeletionRepository: deletionRepository,
+        legacyCredentialCleaner: SecureLegacyCredentialCleaner(
+          storage: legacyCredentialStorage,
+        ),
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: draftTargetStore,
         initialOnboardingState: _completedOnboardingState(),
@@ -1131,6 +1140,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(deletionRepository.deleteCount, 1);
+    expect(
+      legacyCredentialStorage.deletedKeys,
+      contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey),
+    );
+    expect(
+      legacyCredentialStorage.values,
+      isNot(contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey)),
+    );
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);

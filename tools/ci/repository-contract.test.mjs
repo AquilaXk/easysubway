@@ -104,6 +104,12 @@ test("backend production schema is managed by Flyway versioned migrations", () =
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
   const baselineMigration = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const h2BaselineMigration = read("backend/src/main/resources/db/migration/h2/V1__baseline_schema.sql");
+  const anonymousAuthDropMigration = read(
+    "backend/src/main/resources/db/migration/postgresql/V5__drop_anonymous_auth_tables.sql",
+  );
+  const h2AnonymousAuthDropMigration = read(
+    "backend/src/main/resources/db/migration/h2/V5__drop_anonymous_auth_tables.sql",
+  );
 
   assert.match(build, /implementation 'org\.flywaydb:flyway-core'/);
   assert.match(build, /runtimeOnly 'org\.flywaydb:flyway-database-postgresql'/);
@@ -122,7 +128,12 @@ test("backend production schema is managed by Flyway versioned migrations", () =
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE/);
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS facility_reports/);
   assert.match(baselineMigration, /CONSTRAINT fk_facility_report_review_audits_report/);
-  assert.doesNotMatch(`${baselineMigration}\n${h2BaselineMigration}`, /guest_accounts|anonymous_auth_tokens/);
+  assert.match(`${baselineMigration}\n${h2BaselineMigration}`, /CREATE TABLE IF NOT EXISTS guest_accounts/);
+  assert.match(`${baselineMigration}\n${h2BaselineMigration}`, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
+  assert.match(
+    `${anonymousAuthDropMigration}\n${h2AnonymousAuthDropMigration}`,
+    /DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
+  );
   assert.doesNotMatch(h2BaselineMigration, /WHERE revoked_at IS NULL/);
 });
 
@@ -884,14 +895,26 @@ test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 
   const appBootstrap = read("apps/mobile/lib/app/app_bootstrap.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
+  const legacyCredentialCleanup = read("apps/mobile/lib/legacy_credential_cleanup.dart");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const postgresBaseline = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const h2Baseline = read("backend/src/main/resources/db/migration/h2/V1__baseline_schema.sql");
+  const postgresAnonymousAuthDrop = read(
+    "backend/src/main/resources/db/migration/postgresql/V5__drop_anonymous_auth_tables.sql",
+  );
+  const h2AnonymousAuthDrop = read(
+    "backend/src/main/resources/db/migration/h2/V5__drop_anonymous_auth_tables.sql",
+  );
 
   assert.doesNotMatch(`${main}\n${appBootstrap}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
   assert.doesNotMatch(facilityReport, /anonymous-mobile-user|anonymousReportUserId/);
   assert.doesNotMatch(security, /AnonymousBearerAuthenticationFilter/);
-  assert.doesNotMatch(`${postgresBaseline}\n${h2Baseline}`, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
+  assert.match(`${postgresBaseline}\n${h2Baseline}`, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
+  assert.match(
+    `${postgresAnonymousAuthDrop}\n${h2AnonymousAuthDrop}`,
+    /DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
+  );
+  assert.match(legacyCredentialCleanup, /easysubway\.anonymousAuth\.credentials/);
 });
 
 test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {
