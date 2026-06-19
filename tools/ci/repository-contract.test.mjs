@@ -2488,6 +2488,35 @@ test("사용자 활동 JDBC 저장소는 운영 프로필에서 활동 지표를
   assert.match(repositoryTest, /summarizeUserActivityAfterRepositoryRecreation/);
 });
 
+test("신고 검수 감사 로그 JDBC 저장소는 운영 프로필에서 검수 이력을 영속화한다", () => {
+  const schema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const repository = read(
+    "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportReviewAuditRepository.java",
+  );
+  const repositoryTest = read(
+    "backend/src/test/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportReviewAuditRepositoryTest.java",
+  );
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS facility_report_review_audits/);
+  assert.match(schema, /audit_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
+  assert.match(schema, /report_id VARCHAR\(120\) NOT NULL/);
+  assert.match(schema, /reviewer_id VARCHAR\(120\) NOT NULL/);
+  assert.match(schema, /CONSTRAINT chk_facility_report_review_audits_decision/);
+  assert.match(schema, /CHECK \(decision IN \('ACCEPT', 'REJECT', 'MARK_DUPLICATE'\)\)/);
+  assert.match(schema, /CONSTRAINT chk_facility_report_review_audits_previous_status/);
+  assert.match(schema, /CONSTRAINT chk_facility_report_review_audits_next_status/);
+  assert.match(
+    schema,
+    /CREATE INDEX IF NOT EXISTS idx_facility_report_review_audits_report[\s\S]*ON facility_report_review_audits \(report_id, created_at ASC, audit_id ASC\)/,
+  );
+  assert.match(repository, /@Profile\("prod"\)/);
+  assert.match(repository, /implements[\s\S]*LoadFacilityReportReviewAuditPort[\s\S]*SaveFacilityReportReviewAuditPort/);
+  assert.match(repository, /INSERT INTO facility_report_review_audits/);
+  assert.match(repository, /WHERE report_id = \?/);
+  assert.match(repository, /ORDER BY created_at ASC, audit_id ASC/);
+  assert.match(repositoryTest, /loadAuditsByReportIdAfterRepositoryRecreation/);
+});
+
 test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const result = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchResult.java");
   const searchSummary = read("backend/src/main/java/com/easysubway/route/domain/RouteSearchDashboardSummary.java");
