@@ -9,6 +9,9 @@ import '../notification_settings.dart';
 import '../route_search.dart';
 import '../station_search.dart';
 import '../user_data_deletion.dart';
+import '../features/internal_route/data/local_internal_route_repository.dart';
+import '../features/routes/data/local_route_repository.dart'
+    show FallbackRouteSearchRepository, LocalRouteRepository;
 
 class AppDependencies {
   const AppDependencies({
@@ -82,7 +85,15 @@ class AppDependencies {
             authProvider: sharedAuthProvider,
           ),
       routeRepository:
-          routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
+          routeRepository ??
+          (catalogDatabase == null
+              ? RouteSearchApiRepository(baseUri: baseUri)
+              : FallbackRouteSearchRepository(
+                  localRepository: LocalRouteRepository(
+                    catalogDatabase: catalogDatabase,
+                  ),
+                  apiRepository: RouteSearchApiRepository(baseUri: baseUri),
+                )),
       routeFeedbackRepository:
           routeFeedbackRepository ??
           _defaultRouteFeedbackRepository(
@@ -109,7 +120,14 @@ class AppDependencies {
           ),
       internalRouteRepository:
           internalRouteRepository ??
-          InternalRouteApiRepository(baseUri: baseUri),
+          (catalogDatabase == null
+              ? InternalRouteApiRepository(baseUri: baseUri)
+              : FallbackInternalRouteRepository(
+                  localRepository: LocalInternalRouteRepository(
+                    catalogDatabase: catalogDatabase,
+                  ),
+                  apiRepository: InternalRouteApiRepository(baseUri: baseUri),
+                )),
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
