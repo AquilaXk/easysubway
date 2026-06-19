@@ -25,7 +25,7 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
     final favoriteRows = await userDatabase
         .customSelect(
           '''
-          SELECT station_id, added_at
+          SELECT station_id, CAST(added_at AS INTEGER) AS added_at_value
           FROM favorite_stations
           ORDER BY added_at DESC
           ''',
@@ -79,7 +79,7 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         lastVerifiedAt: _dateLabelFromEpoch(
           firstRow.read<int?>('last_verified_at_value'),
         ),
-        addedAt: _isoFromSql(favoriteRow.read<DateTime>('added_at')),
+        addedAt: _isoFromEpoch(favoriteRow.read<int?>('added_at_value')),
       );
       for (final row in stationRows) {
         final lineId = row.read<String?>('line_id');
@@ -153,7 +153,7 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
     final favoriteRows = await userDatabase
         .customSelect(
           '''
-          SELECT facility_id, station_id, added_at
+          SELECT facility_id, station_id, CAST(added_at AS INTEGER) AS added_at_value
           FROM favorite_facilities
           ORDER BY added_at DESC
           ''',
@@ -211,7 +211,7 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
           lastUpdatedAt: _dateLabelFromEpoch(
             row.read<int?>('last_verified_at_value'),
           ),
-          addedAt: _isoFromSql(favoriteRow.read<DateTime>('added_at')),
+          addedAt: _isoFromEpoch(favoriteRow.read<int?>('added_at_value')),
         ),
       );
     }
@@ -273,7 +273,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         .customSelect(
           '''
           SELECT route_id, origin_station_id, destination_station_id,
-                 mobility_profile, added_at
+                 mobility_profile, CAST(added_at AS INTEGER) AS added_at_value
           FROM favorite_routes
           ORDER BY added_at DESC
           ''',
@@ -290,7 +290,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           _favoriteRouteFromSnapshot(
             routeId: routeId,
             snapshot: snapshot,
-            addedAt: _isoFromSql(row.read<DateTime>('added_at')),
+            addedAt: _isoFromEpoch(row.read<int?>('added_at_value')),
           ),
         );
         continue;
@@ -302,7 +302,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           originStationId: row.read<String>('origin_station_id'),
           destinationStationId: row.read<String>('destination_station_id'),
           mobilityType: row.read<String>('mobility_profile'),
-          addedAt: _isoFromSql(row.read<DateTime>('added_at')),
+          addedAt: _isoFromEpoch(row.read<int?>('added_at_value')),
         ),
       );
     }
@@ -564,11 +564,25 @@ Map<String, Object?> _routeWarningToJson(RouteSearchWarning warning) {
 
 String _isoFromSql(DateTime value) => value.toUtc().toIso8601String();
 
+String _isoFromEpoch(int? value) {
+  if (value == null) {
+    return '';
+  }
+  return _dateTimeFromEpoch(value).toIso8601String();
+}
+
 String _dateLabelFromEpoch(int? value) {
   if (value == null) {
     return '';
   }
-  final utc = switch (value.abs()) {
+  final utc = _dateTimeFromEpoch(value);
+  return '${utc.year.toString().padLeft(4, '0')}-'
+      '${utc.month.toString().padLeft(2, '0')}-'
+      '${utc.day.toString().padLeft(2, '0')}';
+}
+
+DateTime _dateTimeFromEpoch(int value) {
+  return switch (value.abs()) {
     < 10000000000 => DateTime.fromMillisecondsSinceEpoch(
       value * 1000,
       isUtc: true,
@@ -579,9 +593,6 @@ String _dateLabelFromEpoch(int? value) {
     ),
     _ => DateTime.fromMillisecondsSinceEpoch(value, isUtc: true),
   };
-  return '${utc.year.toString().padLeft(4, '0')}-'
-      '${utc.month.toString().padLeft(2, '0')}-'
-      '${utc.day.toString().padLeft(2, '0')}';
 }
 
 String _string(Object? value, {String fallback = ''}) {
