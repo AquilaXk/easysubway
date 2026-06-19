@@ -1457,6 +1457,38 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   );
 });
 
+test("운영기관 제휴 제안 export는 접근성 리포트 CSV를 제공한다", () => {
+  const operatorReportController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
+  );
+  const operatorReportView = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportView.java",
+  );
+  const controllerTest = read(
+    "backend/src/test/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportControllerTest.java",
+  );
+
+  assert.match(operatorReportController, /@GetMapping\("\/operator\/api\/accessibility-report\/proposal\.csv"\)/);
+  assert.match(operatorReportController, /TEXT_CSV_UTF8/);
+  assert.match(operatorReportController, /HttpHeaders\.CONTENT_DISPOSITION/);
+  assert.match(operatorReportController, /easysubway-operator-accessibility-proposal\.csv/);
+  assert.match(operatorReportController, /section,metric,value,detail\\n/);
+  assert.match(operatorReportController, /"summary", "totalStations"/);
+  assert.match(operatorReportController, /"summary", "totalFacilities"/);
+  assert.match(operatorReportController, /"summary", "needsVerificationFacilityCount"/);
+  assert.match(operatorReportController, /"summary", "delayedFacilityStatusCount"/);
+  assert.match(operatorReportController, /stationScore/);
+  assert.match(operatorReportController, /priority/);
+  assert.match(operatorReportController, /csvValue/);
+  assert.match(operatorReportView, /reasonText\(\)/);
+  assert.match(controllerTest, /proposal\.csv/);
+  assert.match(controllerTest, /text\/csv;charset=UTF-8/);
+  assert.match(controllerTest, /stationScore,상록수/);
+  assert.match(controllerTest, /priority,상록수,장애인 화장실,\\"60 - 확인 필요 상태/);
+  assert.match(controllerTest, /admin-user/);
+  assert.match(controllerTest, /isForbidden/);
+});
+
 test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () => {
   const profile = read("backend/src/main/java/com/easysubway/profile/domain/MobilityProfile.java");
   const mobilityType = read("backend/src/main/java/com/easysubway/profile/domain/MobilityType.java");
