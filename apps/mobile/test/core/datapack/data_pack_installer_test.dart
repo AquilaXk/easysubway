@@ -52,6 +52,42 @@ void main() {
     expect(await oldPack.exists(), isTrue);
   });
 
+  test('installer는 빈 sqlite payload를 rejected로 처리하고 임시 파일을 지운다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-empty-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final sqliteBytes = <int>[];
+    final compressedBytes = gzip.encode(sqliteBytes);
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.rejected);
+    expect(result.reason, DataPackInstallRejectionReason.invalidSqliteHeader);
+    expect(
+      await File('${catalogDirectory.path}/capital-v18.sqlite.tmp').exists(),
+      isFalse,
+    );
+    expect(
+      await File('${catalogDirectory.path}/current.json').exists(),
+      isFalse,
+    );
+  });
+
   test('installer는 검증된 sqlite pack을 버전별 파일로 설치하고 current를 전환한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-install-',

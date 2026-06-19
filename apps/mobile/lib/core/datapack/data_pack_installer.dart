@@ -114,7 +114,9 @@ class DataPackInstaller {
     File file,
     DataPackManifestEntry pack,
   ) async {
-    final header = await file.openRead(0, 16).first;
+    final header = await file
+        .openRead(0, 16)
+        .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
     if (!_hasSqliteHeader(header)) {
       return DataPackInstallRejectionReason.invalidSqliteHeader;
     }

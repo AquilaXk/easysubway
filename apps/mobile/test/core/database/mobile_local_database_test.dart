@@ -239,6 +239,53 @@ void main() {
     expect(metadata.read<String>('value'), 'capital-v18');
   });
 
+  test(
+    'catalog opener는 이전 컨테이너 경로의 current pointer도 현재 catalog에서 복원한다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-current-relocated-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      final updatedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+      final updatedDatabase = CatalogDatabase.file(updatedPack);
+      await updatedDatabase.seedBaselineIfEmpty();
+      await updatedDatabase
+          .into(updatedDatabase.catalogMetadata)
+          .insertOnConflictUpdate(
+            CatalogMetadataCompanion.insert(
+              key: 'activePack',
+              value: 'capital-v18-relocated',
+              updatedAt: Value(DateTime.utc(2026, 6, 19, 15)),
+            ),
+          );
+      await updatedDatabase.close();
+      await File('${catalogDirectory.path}/current.json').writeAsString(
+        jsonEncode({
+          'id': 'capital',
+          'version': '18',
+          'path': '/stale/mobile/container/catalog/capital-v18.sqlite',
+          'sha256': 'local-fixture',
+        }),
+      );
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+
+      final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+      expect(metadata.read<String>('value'), 'capital-v18-relocated');
+    },
+  );
+
   test('catalog opener는 emergency override가 있으면 current보다 우선한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-catalog-override-',
