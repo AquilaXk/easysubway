@@ -91,6 +91,13 @@ function inMemoryRepositoryFiles() {
   }).trim().split("\n").filter(Boolean);
 }
 
+function prodJdbcRepositoryFiles() {
+  return execFileSync("git", ["ls-files", "backend/src/main/java/**/Jdbc*Repository.java"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+}
+
 function readPngPixelBounds(relativePath) {
   const png = readFileSync(path.join(root, relativePath));
   const signature = png.subarray(0, 8);
@@ -342,6 +349,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
+  assert.match(envExample, /^EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
@@ -927,6 +935,11 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   const readinessConfiguration = read(
     "backend/src/main/java/com/easysubway/common/persistence/ProductionPersistenceReadinessConfiguration.java",
   );
+  const unavailableTransitMaster = read(
+    "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/UnavailableTransitMasterRepository.java",
+  );
+  const applicationYml = read("backend/src/main/resources/application.yml");
+  const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
 
   assert.ok(files.length >= 1, "InMemory repository files must be discovered");
   for (const file of files) {
@@ -935,8 +948,38 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
     assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
   }
   assert.match(readinessConfiguration, /@Profile\("prod"\)/);
-  assert.match(readinessConfiguration, /BeanFactoryPostProcessor/);
-  assert.match(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
+  assert.match(readinessConfiguration, /HealthIndicator/);
+  assert.match(readinessConfiguration, /Status\.DOWN/);
+  assert.match(readinessConfiguration, /productionReadinessHealthIndicator/);
+  assert.doesNotMatch(readinessConfiguration, /BeanFactoryPostProcessor/);
+  assert.doesNotMatch(readinessConfiguration, /BeanCreationException/);
+  assert.doesNotMatch(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
+  assert.match(unavailableTransitMaster, /@Profile\("prod"\)/);
+  assert.match(unavailableTransitMaster, /implements[\s\S]*LoadTransitMasterPort/);
+  assert.match(unavailableTransitMaster, /public List<Station> loadStations\(\) \{\s*return List\.of\(\);/);
+  assert.match(unavailableTransitMaster, /UnsupportedOperationException/);
+  assert.match(unavailableTransitMaster, /saveFacilityStatus[\s\S]*unsupportedWriteOperation\("saveFacilityStatus"\)/);
+  assert.match(
+    unavailableTransitMaster,
+    /saveAccessibilityFacility[\s\S]*unsupportedWriteOperation\("saveAccessibilityFacility"\)/,
+  );
+  assert.match(unavailableTransitMaster, /saveStationLayoutSource[\s\S]*unsupportedWriteOperation\("saveStationLayoutSource"\)/);
+  assert.match(
+    unavailableTransitMaster,
+    /saveSimplifiedStationLayoutStatus[\s\S]*unsupportedWriteOperation\("saveSimplifiedStationLayoutStatus"\)/,
+  );
+  assert.match(unavailableTransitMaster, /saveRouteNode[\s\S]*unsupportedWriteOperation\("saveRouteNode"\)/);
+  assert.match(unavailableTransitMaster, /saveRouteEdge[\s\S]*unsupportedWriteOperation\("saveRouteEdge"\)/);
+  for (const file of prodJdbcRepositoryFiles()) {
+    const source = read(file);
+    if (/JdbcTemplate jdbcTemplate/.test(source) && /public Jdbc[A-Za-z0-9]+Repository\(DataSource/.test(source)) {
+      assert.match(source, /@Autowired\s+public Jdbc[A-Za-z0-9]+Repository\(/, `${file} must mark its Spring constructor`);
+    }
+  }
+  assert.match(applicationYml, /management:[\s\S]*endpoint:\s*\n\s*health:\s*\n\s*probes:\s*\n\s*enabled:\s*true/);
+  assert.doesNotMatch(applicationYml, /productionReadiness/);
+  assert.match(applicationProdYml, /readiness:\s*\n\s*include:\s*["']?readinessState\s*,\s*db\s*,\s*redis\s*,\s*productionReadiness["']?/);
+  assert.match(applicationProdYml, /external-enabled: \$\{EASYSUBWAY_PUSH_EXTERNAL_ENABLED:false\}/);
 });
 
 test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
