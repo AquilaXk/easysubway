@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
+import 'package:easysubway_mobile/core/database/user/user_database.dart'
+    as user_db;
 import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -183,6 +185,109 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('로컬 사용자 데이터 삭제 저장소는 user DB 개인 데이터를 비운다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final now = DateTime.utc(2026, 6, 19, 9);
+    await userDatabase
+        .into(userDatabase.favoriteStations)
+        .insert(
+          user_db.FavoriteStationsCompanion.insert(
+            stationId: 'station-sangnoksu',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.favoriteFacilities)
+        .insert(
+          user_db.FavoriteFacilitiesCompanion.insert(
+            facilityId: 'facility-sangnoksu-elevator-1',
+            stationId: 'station-sangnoksu',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.favoriteRoutes)
+        .insert(
+          user_db.FavoriteRoutesCompanion.insert(
+            routeId: 'local-station-sangnoksu-station-sadang::SENIOR',
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityProfile: 'SENIOR',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.searchHistory)
+        .insert(
+          user_db.SearchHistoryCompanion.insert(query: '상록수', searchedAt: now),
+        );
+    await userDatabase
+        .into(userDatabase.appPreferences)
+        .insert(
+          user_db.AppPreferencesCompanion.insert(
+            key: 'notification_settings',
+            value: '{}',
+            updatedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.reportReceipts)
+        .insert(
+          user_db.ReportReceiptsCompanion.insert(
+            receiptId: 'receipt-1',
+            status: 'SUBMITTED',
+            createdAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.reportDrafts)
+        .insert(
+          user_db.ReportDraftsCompanion.insert(
+            draftId: 'draft-1',
+            payloadJson: '{}',
+            updatedAt: now,
+          ),
+        );
+    final repository = UserDataDeletionLocalRepository(
+      userDatabase: userDatabase,
+    );
+
+    final result = await repository.deleteCurrentUserData();
+
+    expect(result.userId, 'local-user');
+    expect(result.deletedFavoriteStationCount, 1);
+    expect(result.deletedFavoriteFacilityCount, 1);
+    expect(result.deletedFavoriteRouteCount, 1);
+    expect(result.notificationSettingsDeleted, isTrue);
+    expect(result.anonymizedReportCount, 2);
+    expect(
+      await userDatabase.select(userDatabase.favoriteStations).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.favoriteFacilities).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.favoriteRoutes).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.searchHistory).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.appPreferences).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.reportReceipts).get(),
+      isEmpty,
+    );
+    expect(await userDatabase.select(userDatabase.reportDrafts).get(), isEmpty);
   });
 }
 
