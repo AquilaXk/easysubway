@@ -44,6 +44,13 @@ while IFS= read -r file; do
       repository=true
       deploy=true
       ;;
+    tools/datapack/**)
+      repository=true
+      mobile=true
+      android=true
+      ios=true
+      deploy=true
+      ;;
     scripts/**)
       repository=true
       ;;
