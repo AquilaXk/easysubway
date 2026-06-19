@@ -76,6 +76,7 @@ class AppBootstrap {
       anonymousAuthRepository: anonymousAuthRepository,
       anonymousAuthCredentialStore: anonymousAuthCredentialStore,
       userDataDeletionRepository: userDataDeletionRepository,
+      catalogDatabase: catalogDatabase,
       enableAnonymousAuth: enableAnonymousAuth,
       enablePushNotifications: enablePushNotifications,
     );
