@@ -342,6 +342,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
   assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
+  assert.match(envExample, /^EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
@@ -927,6 +928,8 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   const readinessConfiguration = read(
     "backend/src/main/java/com/easysubway/common/persistence/ProductionPersistenceReadinessConfiguration.java",
   );
+  const applicationYml = read("backend/src/main/resources/application.yml");
+  const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
 
   assert.ok(files.length >= 1, "InMemory repository files must be discovered");
   for (const file of files) {
@@ -935,8 +938,16 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
     assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
   }
   assert.match(readinessConfiguration, /@Profile\("prod"\)/);
-  assert.match(readinessConfiguration, /BeanFactoryPostProcessor/);
-  assert.match(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
+  assert.match(readinessConfiguration, /HealthIndicator/);
+  assert.match(readinessConfiguration, /Status\.DOWN/);
+  assert.match(readinessConfiguration, /productionReadinessHealthIndicator/);
+  assert.doesNotMatch(readinessConfiguration, /BeanFactoryPostProcessor/);
+  assert.doesNotMatch(readinessConfiguration, /BeanCreationException/);
+  assert.doesNotMatch(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
+  assert.match(applicationYml, /management:[\s\S]*endpoint:\s*\n\s*health:\s*\n\s*probes:\s*\n\s*enabled:\s*true/);
+  assert.doesNotMatch(applicationYml, /productionReadiness/);
+  assert.match(applicationProdYml, /readiness:\s*\n\s*include:\s*["']?readinessState\s*,\s*db\s*,\s*redis\s*,\s*productionReadiness["']?/);
+  assert.match(applicationProdYml, /external-enabled: \$\{EASYSUBWAY_PUSH_EXTERNAL_ENABLED:false\}/);
 });
 
 test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
