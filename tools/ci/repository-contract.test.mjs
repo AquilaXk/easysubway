@@ -111,6 +111,8 @@ test("backend production schema is managed by Flyway versioned migrations", () =
   assert.match(application, /locations: classpath:db\/migration\/\{vendor\}/);
   assert.match(applicationProd, /flyway:[\s\S]*enabled: true/);
   assert.match(applicationProd, /locations: classpath:db\/migration\/postgresql/);
+  assert.match(applicationProd, /baseline-on-migrate: true/);
+  assert.match(applicationProd, /baseline-version: 1/);
   assert.doesNotMatch(applicationProd, /schema-locations: classpath:db\/batch\/schema-postgresql\.sql/);
   assert.equal(
     existsSync(path.join(root, "backend/src/main/resources/db/batch/schema-postgresql.sql")),
