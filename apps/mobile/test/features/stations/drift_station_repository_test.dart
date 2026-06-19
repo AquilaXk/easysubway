@@ -21,6 +21,19 @@ void main() {
     }
   });
 
+  test('로컬 역 검색은 빈 값과 결과 없는 검색어를 빈 목록으로 반환한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = DriftStationRepository(database: database);
+
+    for (final query in ['', '   ', '없는역']) {
+      final results = await repository.searchStations(query);
+
+      expect(results, isEmpty, reason: query);
+    }
+  });
+
   test('주변 역 검색은 로컬 좌표로 거리순 정렬과 limit을 적용한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -59,6 +72,18 @@ void main() {
     expect(exits.single.hasElevatorConnection, isTrue);
     expect(facilities.single.type, 'ELEVATOR');
     expect(facilities.single.lastUpdatedAt, '2026-06-19');
+  });
+
+  test('존재하지 않는 역 상세 조회는 역 검색 예외를 던진다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = DriftStationRepository(database: database);
+
+    expect(
+      () => repository.getStationDetail('non-existent-station'),
+      throwsA(isA<StationSearchException>()),
+    );
   });
 
   test('앱 기본 의존성은 catalog DB가 있으면 로컬 역 repository를 사용한다', () async {
