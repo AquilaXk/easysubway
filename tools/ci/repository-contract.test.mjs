@@ -2132,6 +2132,39 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
 
+test("데이터 소스 원본 archive는 로컬 전용 산출물 기준선을 제공한다", () => {
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const archiveScript = read("tools/ops/data-source-raw-archive.sh");
+
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS data_source_raw_archives/);
+  assert.match(batchPostgresSchema, /archive_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
+  assert.match(batchPostgresSchema, /run_id VARCHAR\(80\) NOT NULL/);
+  assert.match(batchPostgresSchema, /source VARCHAR\(40\) NOT NULL/);
+  assert.match(batchPostgresSchema, /source_url VARCHAR\(1000\) NOT NULL/);
+  assert.match(batchPostgresSchema, /storage_uri VARCHAR\(1000\) NOT NULL/);
+  assert.match(batchPostgresSchema, /payload_sha256 VARCHAR\(64\) NOT NULL/);
+  assert.match(batchPostgresSchema, /captured_at TIMESTAMP NOT NULL/);
+  assert.match(batchPostgresSchema, /FOREIGN KEY \(run_id\) REFERENCES data_collection_runs\(run_id\)/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_source_raw_archives_run/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_source_raw_archives_source_captured/);
+
+  assert.match(archiveScript, /set -euo pipefail/);
+  assert.match(archiveScript, /EASYSUBWAY_ENV_FILE:-\$\{ROOT_DIR\}\/\.env\.example/);
+  assert.match(archiveScript, /EASYSUBWAY_DATA_SOURCE_ARCHIVE_DIR:-\$\{ROOT_DIR\}\/\.codex\/backups\/data-sources/);
+  assert.match(archiveScript, /umask 077/);
+  assert.match(archiveScript, /chmod 700 "\$\{BACKUP_DIR\}"/);
+  assert.match(archiveScript, /mktemp -d "\$\{BACKUP_DIR\}\/easysubway-data-sources-\$\{timestamp\}\.XXXXXX"/);
+  assert.match(archiveScript, /collection_runs_file="\$\{run_dir\}\/collection-runs\.csv"/);
+  assert.match(archiveScript, /raw_archives_file="\$\{run_dir\}\/raw-archives\.csv"/);
+  assert.match(archiveScript, /psql -v ON_ERROR_STOP=1 -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
+  assert.match(archiveScript, /FROM data_collection_runs/);
+  assert.match(archiveScript, /FROM data_source_raw_archives/);
+  assert.match(archiveScript, /TO STDOUT WITH \(FORMAT csv, HEADER true\)/);
+  assert.match(archiveScript, /ORDER BY started_at DESC, run_id ASC/);
+  assert.match(archiveScript, /ORDER BY captured_at DESC, archive_id ASC/);
+  assert.match(archiveScript, /printf 'data source archive written: %s\\n' "\$\{run_dir\}"/);
+});
+
 test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계를 따른다", () => {
   const summary = read("backend/src/main/java/com/easysubway/quality/domain/DataQualitySummary.java");
   const useCase = read("backend/src/main/java/com/easysubway/quality/application/port/in/DataQualityUseCase.java");
