@@ -15,6 +15,8 @@ const _anonymousAuthCredentialsKey = 'easysubway.anonymousAuth.credentials';
 abstract class AnonymousAuthRepository {
   Future<AnonymousAuthCredentials> issueAnonymousUser();
 
+  Future<AnonymousAuthCredentials> refreshAnonymousUser(String refreshToken);
+
   bool get canReuseStoredCredentials => true;
 }
 
@@ -63,7 +65,8 @@ class SecureAnonymousAuthCredentialStore
       key: _anonymousAuthCredentialsKey,
       value: jsonEncode({
         'userId': credentials.userId,
-        'password': credentials.password,
+        'accessToken': credentials.accessToken,
+        'refreshToken': credentials.refreshToken,
       }),
     );
   }
@@ -107,8 +110,23 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
 
   @override
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
-    final uri = baseUri.resolve('/api/v1/auth/anonymous');
+    return _postCredentials(baseUri.resolve('/api/v1/auth/anonymous'));
+  }
 
+  @override
+  Future<AnonymousAuthCredentials> refreshAnonymousUser(
+    String refreshToken,
+  ) async {
+    return _postCredentials(
+      baseUri.resolve('/api/v1/auth/anonymous/refresh'),
+      requestBody: jsonEncode({'refreshToken': refreshToken}),
+    );
+  }
+
+  Future<AnonymousAuthCredentials> _postCredentials(
+    Uri uri, {
+    String? requestBody,
+  }) async {
     try {
       if (!_isAllowedAnonymousAuthBaseUri(
         uri,
@@ -120,8 +138,12 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
       final request = await _httpClient
           .postUrl(uri)
           .timeout(_anonymousAuthTimeout);
+      if (requestBody != null) {
+        request.headers.contentType = ContentType.json;
+        request.write(requestBody);
+      }
       final response = await request.close().timeout(_anonymousAuthTimeout);
-      final body = await utf8
+      final responseBody = await utf8
           .decodeStream(response)
           .timeout(_anonymousAuthTimeout);
 
@@ -129,7 +151,7 @@ class AnonymousAuthApiRepository implements AnonymousAuthRepository {
         throw const AnonymousAuthException(_anonymousAuthErrorMessage);
       }
 
-      final decoded = jsonDecode(body);
+      final decoded = jsonDecode(responseBody);
       if (decoded is! Map<String, Object?> || decoded['success'] != true) {
         throw const AnonymousAuthException(_anonymousAuthErrorMessage);
       }
@@ -173,9 +195,48 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
 
   @override
   Future<void> invalidateAuthorization() async {
+    final issuingCredentials = _issuingCredentials;
+    if (issuingCredentials != null) {
+      await issuingCredentials;
+      return;
+    }
+
+    final credentials = _credentials ?? await credentialStore.readCredentials();
     _credentials = null;
-    // 401 복구 중 이미 새 인증을 발급 중이면 같은 Future를 공유해야 요청별 익명 계정이 갈라지지 않는다.
-    await credentialStore.clearCredentials();
+    if (credentials == null) {
+      await credentialStore.clearCredentials();
+      return;
+    }
+
+    final nextIssuingCredentials = _refreshOrIssueCredentials(credentials);
+    _issuingCredentials = nextIssuingCredentials;
+    try {
+      await nextIssuingCredentials;
+    } finally {
+      if (identical(_issuingCredentials, nextIssuingCredentials)) {
+        _issuingCredentials = null;
+      }
+    }
+  }
+
+  Future<AnonymousAuthCredentials> _refreshOrIssueCredentials(
+    AnonymousAuthCredentials credentials,
+  ) async {
+    try {
+      final refreshedCredentials = await repository.refreshAnonymousUser(
+        credentials.refreshToken,
+      );
+      return await _saveCurrentCredentials(refreshedCredentials);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '익명 인증 refresh token 갱신 중 예외가 발생했습니다.',
+      );
+      await credentialStore.clearCredentials();
+      final issuedCredentials = await repository.issueAnonymousUser();
+      return _saveCurrentCredentials(issuedCredentials);
+    }
   }
 
   Future<AnonymousAuthCredentials> _currentCredentials() async {
@@ -213,32 +274,38 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
     }
 
     final issuedCredentials = await repository.issueAnonymousUser();
-    await credentialStore.saveCredentials(issuedCredentials);
-    _credentials = issuedCredentials;
-    return issuedCredentials;
+    return _saveCurrentCredentials(issuedCredentials);
+  }
+
+  Future<AnonymousAuthCredentials> _saveCurrentCredentials(
+    AnonymousAuthCredentials credentials,
+  ) async {
+    await credentialStore.saveCredentials(credentials);
+    _credentials = credentials;
+    return credentials;
   }
 }
 
 class AnonymousAuthCredentials {
   const AnonymousAuthCredentials({
     required this.userId,
-    required this.password,
+    required this.accessToken,
+    required this.refreshToken,
   });
 
   factory AnonymousAuthCredentials.fromJson(Map<String, Object?> json) {
     return AnonymousAuthCredentials(
       userId: _requiredAuthString(json, 'userId'),
-      password: _requiredAuthString(json, 'password'),
+      accessToken: _requiredAuthString(json, 'accessToken'),
+      refreshToken: _requiredAuthString(json, 'refreshToken'),
     );
   }
 
   final String userId;
-  final String password;
+  final String accessToken;
+  final String refreshToken;
 
-  String get authorizationHeader {
-    final token = base64Encode(utf8.encode('$userId:$password'));
-    return 'Basic $token';
-  }
+  String get authorizationHeader => 'Bearer $accessToken';
 }
 
 class AnonymousAuthException implements Exception {
@@ -266,7 +333,7 @@ bool _isAllowedAnonymousAuthBaseUri(
     return true;
   }
 
-  // Basic 인증은 개발용 로컬 주소와 debug 에뮬레이터 별칭 외에는 평문 HTTP로 보내지 않는다.
+  // 인증 token은 개발용 로컬 주소와 debug 에뮬레이터 별칭 외에는 평문 HTTP로 보내지 않는다.
   if (uri.scheme != 'http') {
     return false;
   }

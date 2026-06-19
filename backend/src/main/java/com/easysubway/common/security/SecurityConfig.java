@@ -1,5 +1,6 @@
 package com.easysubway.common.security;
 
+import com.easysubway.auth.adapter.out.security.AnonymousBearerAuthenticationFilter;
 import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -13,6 +14,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -47,7 +49,10 @@ public class SecurityConfig {
 
 	@Bean
 	@Order(3)
-	SecurityFilterChain userSecurityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain userSecurityFilterChain(
+		HttpSecurity http,
+		AnonymousBearerAuthenticationFilter anonymousBearerAuthenticationFilter
+	) throws Exception {
 		// 사용자별 데이터는 URL이나 본문 userId가 아니라 인증 계정을 기준으로 다룬다.
 		return http
 			.securityMatcher(
@@ -65,6 +70,7 @@ public class SecurityConfig {
 			.authorizeHttpRequests(authorize -> authorize
 				.anyRequest().authenticated()
 			)
+			.addFilterBefore(anonymousBearerAuthenticationFilter, BasicAuthenticationFilter.class)
 			.httpBasic(Customizer.withDefaults())
 			.build();
 	}
