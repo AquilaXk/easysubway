@@ -2174,6 +2174,54 @@ test("데이터 소스 원본 archive는 로컬 전용 산출물 기준선을 �
   assert.match(archiveScript, /printf 'data source archive written: %s\\n' "\$\{run_dir\}"/);
 });
 
+test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한다", () => {
+  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const session = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationSession.java");
+  const item = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationItem.java");
+  const itemType = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationItemType.java");
+  const status = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationStatus.java");
+  const useCase = read("backend/src/main/java/com/easysubway/field/application/port/in/FieldVerificationUseCase.java");
+  const service = read("backend/src/main/java/com/easysubway/field/application/service/FieldVerificationService.java");
+  const controller = read("backend/src/main/java/com/easysubway/field/adapter/in/web/FieldVerificationAdminController.java");
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS field_verification_sessions/);
+  assert.match(batchPostgresSchema, /session_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
+  assert.match(batchPostgresSchema, /station_id VARCHAR\(120\) NOT NULL/);
+  assert.match(batchPostgresSchema, /verified_at DATE NOT NULL/);
+  assert.match(batchPostgresSchema, /verified_by VARCHAR\(120\) NOT NULL/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_field_verification_sessions_status/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_field_verification_sessions_station/);
+  assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS field_verification_items/);
+  assert.match(batchPostgresSchema, /item_type VARCHAR\(40\) NOT NULL/);
+  assert.match(batchPostgresSchema, /FOREIGN KEY \(session_id\) REFERENCES field_verification_sessions\(session_id\)/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_field_verification_items_type/);
+  assert.match(batchPostgresSchema, /CONSTRAINT chk_field_verification_items_status/);
+  assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_field_verification_items_session/);
+
+  assert.match(session, /record FieldVerificationSession/);
+  assert.match(session, /List<FieldVerificationItem> items/);
+  assert.match(item, /record FieldVerificationItem/);
+  assert.match(itemType, /EXIT\("출구"\)/);
+  assert.match(itemType, /PLATFORM_TRANSFER\("승강장\/환승 동선"\)/);
+  assert.match(status, /PLANNED/);
+  assert.match(status, /IN_PROGRESS/);
+  assert.match(status, /VERIFIED/);
+  assert.match(status, /NEEDS_RECHECK/);
+  assert.match(useCase, /FieldVerificationSession getStationVerification\(String stationId\)/);
+  assert.match(service, /SANGNOKSU_STATION_ID = "station-sangnoksu"/);
+  assert.match(service, /field-verification-sangnoksu-2026-06/);
+  assert.match(service, /FieldVerificationItemType\.EXIT/);
+  assert.match(service, /FieldVerificationItemType\.ELEVATOR/);
+  assert.match(service, /FieldVerificationItemType\.ESCALATOR/);
+  assert.match(service, /FieldVerificationItemType\.RESTROOM/);
+  assert.match(service, /FieldVerificationItemType\.PLATFORM_TRANSFER/);
+  assert.match(controller, /@GetMapping\("\/admin\/field-verifications\/stations\/\{stationId\}"\)/);
+  assert.match(controller, /ApiResponse<FieldVerificationView>/);
+  assert.match(controller, /record FieldVerificationItemView/);
+  assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
+});
+
 test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계를 따른다", () => {
   const summary = read("backend/src/main/java/com/easysubway/quality/domain/DataQualitySummary.java");
   const useCase = read("backend/src/main/java/com/easysubway/quality/application/port/in/DataQualityUseCase.java");
