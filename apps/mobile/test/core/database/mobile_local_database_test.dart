@@ -6,6 +6,7 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
+import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,10 +89,26 @@ void main() {
           WHERE key = 'schemaVersion'
           ''').getSingle();
     final stations = await database.customSelect('''
-          SELECT name_ko
+          SELECT id, name_ko, latitude, longitude
           FROM stations
           WHERE id IN ('station-sangnoksu', 'station-sadang')
           ORDER BY name_ko
+          ''').get();
+    final aliases = await database.customSelect('''
+          SELECT alias
+          FROM station_aliases
+          WHERE station_id = 'station-sangnoksu'
+          ORDER BY alias
+          ''').get();
+    final exits = await database.customSelect('''
+          SELECT exit_number
+          FROM station_exits
+          WHERE station_id = 'station-sangnoksu'
+          ''').get();
+    final facilities = await database.customSelect('''
+          SELECT type, name
+          FROM facilities
+          WHERE station_id = 'station-sangnoksu'
           ''').get();
 
     expect(metadata.read<String>('value'), '1');
@@ -99,6 +116,20 @@ void main() {
       '사당',
       '상록수',
     ]);
+    final sangnoksu = stations.firstWhere(
+      (row) => row.read<String>('id') == 'station-sangnoksu',
+    );
+    expect(sangnoksu.read<double>('latitude'), closeTo(37.3028, 0.001));
+    expect(sangnoksu.read<double>('longitude'), closeTo(126.8666, 0.001));
+    expect(aliases.map((row) => row.read<String>('alias')), [
+      '448',
+      '4호선 상록수',
+      'Sangnoksu',
+      '상록수역',
+    ]);
+    expect(exits.single.read<String>('exit_number'), '1');
+    expect(facilities.single.read<String>('type'), 'ELEVATOR');
+    expect(facilities.single.read<String>('name'), '1번 출구 엘리베이터');
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
       isTrue,
@@ -107,6 +138,25 @@ void main() {
       File('${directory.path}/datapacks/capital.sqlite').existsSync(),
       isTrue,
     );
+  });
+
+  test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-search-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    ).open();
+    addTearDown(database.close);
+    final repository = DriftStationRepository(database: database);
+
+    final results = await repository.searchStations('448');
+
+    expect(results, hasLength(1));
+    expect(results.single.id, 'station-sangnoksu');
   });
 
   test('내장 데이터팩은 설치된 파일이 손상되어 있으면 번들 asset으로 교체한다', () async {
