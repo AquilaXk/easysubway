@@ -18,6 +18,11 @@ import 'station_search.dart';
 import 'mobile_error_reporter.dart';
 import 'user_data_deletion.dart';
 
+const defaultPushNotificationsEnabled = bool.fromEnvironment(
+  'EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS',
+  defaultValue: false,
+);
+
 void main() {
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
@@ -55,6 +60,7 @@ class EasySubwayApp extends StatelessWidget {
         const UrlLauncherSupportAccessLauncher(),
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enableAnonymousAuth = true,
+    bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
   }) : this._(
          dependencies: _EasySubwayAppDependencies.resolve(
@@ -73,6 +79,7 @@ class EasySubwayApp extends StatelessWidget {
            anonymousAuthCredentialStore: anonymousAuthCredentialStore,
            userDataDeletionRepository: userDataDeletionRepository,
            enableAnonymousAuth: enableAnonymousAuth,
+           enablePushNotifications: enablePushNotifications,
          ),
          initialOnboardingState: initialOnboardingState,
          onboardingStore: onboardingStore,
@@ -705,6 +712,7 @@ class _EasySubwayAppDependencies {
     AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
     required bool enableAnonymousAuth,
+    required bool enablePushNotifications,
   }) {
     final baseUri = defaultStationApiBaseUri();
     final anonymousAuthSession = _defaultAnonymousAuthSession(
@@ -714,17 +722,23 @@ class _EasySubwayAppDependencies {
       enableAnonymousAuth: enableAnonymousAuth,
     );
     final sharedAuthProvider = anonymousAuthSession;
-    final resolvedNotificationRepository =
-        notificationRepository ??
-        _defaultNotificationSettingsRepository(
-          baseUri: baseUri,
-          authProvider: sharedAuthProvider,
-        );
-    final resolvedNotificationPermissionProvider =
-        notificationPermissionProvider ??
-        (resolvedNotificationRepository == null
-            ? null
-            : MethodChannelNotificationPermissionProvider());
+    final pushNotificationsEnabled =
+        enablePushNotifications ||
+        notificationRepository != null ||
+        notificationPermissionProvider != null;
+    final resolvedNotificationRepository = pushNotificationsEnabled
+        ? notificationRepository ??
+              _defaultNotificationSettingsRepository(
+                baseUri: baseUri,
+                authProvider: sharedAuthProvider,
+              )
+        : null;
+    final resolvedNotificationPermissionProvider = pushNotificationsEnabled
+        ? notificationPermissionProvider ??
+              (resolvedNotificationRepository == null
+                  ? null
+                  : MethodChannelNotificationPermissionProvider())
+        : null;
 
     return _EasySubwayAppDependencies(
       repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
@@ -1554,7 +1568,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              '즐겨찾기, 이동 조건, 알림 설정, 익명 인증, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+              '즐겨찾기, 이동 조건, 익명 인증, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF102A2C),
                 height: 1.4,
@@ -1863,10 +1877,9 @@ class _PrivacyDataUseSummary extends StatelessWidget {
 
   static const _title = '개인정보 사용 안내';
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
-  static const _appDataPurpose =
-      '즐겨찾기, 이동 조건, 신고 내용과 사진, 알림 설정은 앱 기능 제공에 사용됩니다.';
+  static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _deletionScope =
-      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
+      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
 
   @override

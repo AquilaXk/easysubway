@@ -881,12 +881,12 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('즐겨찾기, 이동 조건, 신고 내용과 사진, 알림 설정은 앱 기능 제공에 사용됩니다.'),
+        find.text('즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.'),
         findsOneWidget,
       );
       expect(
         find.text(
-          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         ),
         findsOneWidget,
       );
@@ -1133,7 +1133,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dataDeletionStartButton')), findsOneWidget);
-    expect(find.textContaining('즐겨찾기, 이동 조건, 알림 설정'), findsOneWidget);
+    expect(find.textContaining('즐겨찾기, 이동 조건, 익명 인증'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
     await tester.pumpAndSettle();
@@ -1359,11 +1359,11 @@ void main() {
 
     expect(find.byKey(const Key('favoritesButton')), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsOneWidget);
-    expect(find.byKey(const Key('notificationSettingsButton')), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsOneWidget);
+    expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
   });
 
-  test('기본 앱은 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
+  test('기본 앱은 출시 범위에서 알림 설정 저장소를 만들지 않는다', () {
     final app = EasySubwayApp(
       repository: FakeStationSearchRepository(),
       reportRepository: FakeFacilityReportRepository(),
@@ -1378,8 +1378,6 @@ void main() {
         app.favoriteFacilityRepository as FavoriteFacilityApiRepository;
     final favoriteRouteRepository =
         app.favoriteRouteRepository as FavoriteRouteApiRepository;
-    final notificationRepository =
-        app.notificationRepository as NotificationSettingsApiRepository;
 
     expect(
       identical(
@@ -1395,6 +1393,25 @@ void main() {
       ),
       isTrue,
     );
+    expect(app.notificationRepository, isNull);
+    expect(app.notificationPermissionProvider, isNull);
+  });
+
+  test('푸시 알림을 명시적으로 켜면 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
+    final app = EasySubwayApp(
+      repository: FakeStationSearchRepository(),
+      reportRepository: FakeFacilityReportRepository(),
+      routeRepository: FakeRouteSearchRepository(),
+      anonymousAuthRepository: FakeAnonymousAuthRepository(),
+      initialOnboardingState: _completedOnboardingState(),
+      enablePushNotifications: true,
+    );
+
+    final favoriteRouteRepository =
+        app.favoriteRouteRepository as FavoriteRouteApiRepository;
+    final notificationRepository =
+        app.notificationRepository as NotificationSettingsApiRepository;
+
     expect(
       identical(
         favoriteRouteRepository.authProvider,
