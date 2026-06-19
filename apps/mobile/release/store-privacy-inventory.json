@@ -11,9 +11,21 @@
       "id": "precise_location",
       "displayNameKo": "현재 위치",
       "purposeKo": "가까운 역 검색과 시설 신고 위치 확인",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 가까운 역 검색을 실행하거나 시설 신고 위치를 첨부할 때만 사용",
+      "backendTableOrService": ["stationSearch.currentLocation", "facility_reports.latitude", "facility_reports.longitude"],
       "storageLocations": ["mobile-memory", "backend-report"],
       "retentionKo": "주변 역 검색은 저장하지 않고, 시설 신고 위치는 신고 처리와 운영 검수 기간 동안 보관",
       "deletionKo": "데이터 삭제 요청 시 신고자 연결을 제거하고 위치를 익명화 또는 삭제",
+      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 사용자의 신고 위치 연결을 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/station_search.dart",
+        "apps/mobile/lib/facility_report.dart",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -32,9 +44,20 @@
       "id": "search_queries",
       "displayNameKo": "역 검색어",
       "purposeKo": "역명, 초성, 노선별 검색 결과 제공",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 역명, 초성, 노선 검색어를 입력할 때 요청 본문과 서버 요청 로그에 포함",
+      "backendTableOrService": ["apps/mobile/lib/station_search.dart", "TransitMasterController station search request"],
       "storageLocations": ["backend-request"],
       "retentionKo": "요청 처리와 운영 오류 분석에 필요한 최소 기간만 보관",
       "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 검색 기록을 삭제 또는 익명화",
+      "deletionImplementation": "사용자 식별자와 연결된 서버 요청 기록은 데이터 삭제 요청 처리 기준에 따라 삭제 또는 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/station_search.dart",
+        "backend/src/main/java/com/easysubway/transit/adapter/in/web/TransitMasterController.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -53,9 +76,21 @@
       "id": "favorite_stations_routes_facilities",
       "displayNameKo": "즐겨찾기 역, 경로, 시설",
       "purposeKo": "사용자가 자주 확인하는 이동 정보와 시설 상태를 빠르게 제공",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 역, 경로, 시설 즐겨찾기를 저장할 때 인증 사용자 식별자와 함께 저장",
+      "backendTableOrService": ["favorite_stations", "favorite_routes", "favorite_facilities"],
       "storageLocations": ["backend-database"],
       "retentionKo": "사용자가 삭제하거나 데이터 삭제를 요청할 때까지 보관",
       "deletionKo": "앱 기능 또는 데이터 삭제 요청으로 삭제",
+      "deletionImplementation": "UserDataDeletionService가 즐겨찾기 역, 경로, 시설 삭제 포트를 호출해 사용자 연결 데이터를 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/favorite_facility.dart",
+        "apps/mobile/lib/internal_route.dart",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -74,9 +109,21 @@
       "id": "mobility_profile",
       "displayNameKo": "이동 조건",
       "purposeKo": "계단 회피, 엘리베이터 우선 등 사용자 상황에 맞는 경로 안내",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "온보딩 또는 설정에서 이동 조건을 선택하고 저장할 때",
+      "backendTableOrService": ["mobile secure storage", "mobility_profiles"],
       "storageLocations": ["mobile-secure-storage", "backend-database"],
       "retentionKo": "사용자가 변경하거나 데이터 삭제를 요청할 때까지 보관",
       "deletionKo": "온보딩 재설정 또는 데이터 삭제 요청으로 삭제",
+      "deletionImplementation": "SecureOnboardingResultStore와 DeleteUserMobilityProfilePort가 로컬 및 서버 이동 조건을 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/mobility_profile.dart",
+        "apps/mobile/lib/onboarding.dart",
+        "backend/src/main/java/com/easysubway/user/application/port/out/DeleteUserMobilityProfilePort.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -95,9 +142,21 @@
       "id": "facility_report_content",
       "displayNameKo": "시설 신고 내용",
       "purposeKo": "엘리베이터 고장, 공사, 위치 오류 같은 시설 상태 검수",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 시설 신고를 제출할 때 선택 항목과 자유 입력 내용이 저장",
+      "backendTableOrService": ["facility_reports.description", "facility_reports.report_type", "facility_reports.status"],
       "storageLocations": ["backend-database"],
       "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
       "deletionKo": "데이터 삭제 요청 시 신고자 연결과 자유 입력 내용을 삭제 또는 익명화",
+      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 신고자와 자유 입력 내용을 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/facility_report.dart",
+        "backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -116,9 +175,33 @@
       "id": "facility_report_photo",
       "displayNameKo": "시설 신고 사진",
       "purposeKo": "시설 고장과 위치 오류를 운영자가 확인",
-      "storageLocations": ["mobile-memory", "backend-database"],
-      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
-      "deletionKo": "데이터 삭제 요청 시 사진을 삭제 또는 신고자 연결에서 분리",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 시설 신고 제출 전에 사진을 첨부하고 전송할 때",
+      "backendTableOrService": [
+        "facility_reports.photo_object_key",
+        "facility_reports.photo_thumbnail_object_key",
+        "facility_reports.photo_data_base64 legacy"
+      ],
+      "storageLocations": [
+        "mobile-memory",
+        "backend-object-storage",
+        "backend-database-metadata",
+        "backend-database-legacy-column"
+      ],
+      "retentionKo": "원본과 썸네일 object는 신고 처리와 운영 검수 기간 동안 보관하고, photo_data_base64 legacy 컬럼은 object backfill/export 완료 전까지만 호환용으로 유지",
+      "deletionKo": "데이터 삭제 요청 시 object storage의 원본과 썸네일을 삭제하고 legacy Base64 컬럼은 NULL 처리",
+      "deletionImplementation": "deleteFacilityReportPhoto로 원본과 썸네일 object를 삭제하고 JdbcFacilityReportRepository가 photo_data_base64 = NULL로 legacy 값을 제거한다.",
+      "evidence": [
+        "apps/mobile/lib/facility_report.dart",
+        "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
+        "backend/src/main/java/com/easysubway/report/adapter/out/storage/LocalFacilityReportPhotoStorage.java",
+        "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepository.java",
+        "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
+        "tools/ops/facility-report-photo-backup.sh"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -137,9 +220,21 @@
       "id": "facility_report_location",
       "displayNameKo": "시설 신고 위치",
       "purposeKo": "신고 대상 시설 주변의 실제 위치를 운영 검수에 참고",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 시설 신고 대상 위치를 확인하고 신고를 제출할 때",
+      "backendTableOrService": ["facility_reports.latitude", "facility_reports.longitude"],
       "storageLocations": ["backend-database"],
       "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
       "deletionKo": "데이터 삭제 요청 시 위치를 삭제 또는 익명화",
+      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 신고 위치를 사용자 식별자와 분리한다.",
+      "evidence": [
+        "apps/mobile/lib/facility_report.dart",
+        "backend/src/main/java/com/easysubway/report/domain/FacilityReport.java",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -158,9 +253,22 @@
       "id": "anonymous_user_id",
       "displayNameKo": "익명 사용자 식별자",
       "purposeKo": "즐겨찾기와 신고 이력을 계정 없이 연결",
+      "implementationStatus": "collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "앱 시작 또는 인증 만료 후 익명 인증 세션을 발급하거나 갱신할 때",
+      "backendTableOrService": ["anonymous auth credentials", "user-linked feature tables"],
       "storageLocations": ["mobile-secure-storage", "backend-database"],
       "retentionKo": "앱 사용 기간 동안 보관하고 데이터 삭제 요청 시 삭제",
       "deletionKo": "데이터 삭제 요청 시 삭제",
+      "deletionImplementation": "AnonymousAuthCredentialStore가 로컬 자격 증명을 지우고 UserDataDeletionService가 연결된 서버 데이터를 삭제 또는 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/anonymous_auth.dart",
+        "apps/mobile/lib/user_data_deletion.dart",
+        "backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -179,9 +287,21 @@
       "id": "diagnostics_crash_logs",
       "displayNameKo": "앱 충돌 로그",
       "purposeKo": "앱 충돌 원인을 분석하고 접근성 흐름 회귀를 찾음",
+      "implementationStatus": "local-only",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "앱 오류 처리 경로가 사용자 메시지와 내부 리포터를 분리할 때",
+      "backendTableOrService": ["mobile runtime error reporter", "backend sanitized error response"],
       "storageLocations": ["mobile-runtime", "backend-log"],
       "retentionKo": "운영 장애 분석에 필요한 최소 기간만 보관",
       "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 충돌 로그를 삭제 또는 익명화",
+      "deletionImplementation": "모바일 오류 리포터와 백엔드 공통 예외 응답은 사용자 화면과 내부 진단 정보를 분리하고, 사용자 연결 로그는 운영 보관 정책에 따라 삭제 또는 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/mobile_error_reporter.dart",
+        "apps/mobile/release/release-security-gate.json",
+        "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -200,9 +320,21 @@
       "id": "diagnostics_performance_logs",
       "displayNameKo": "오류 및 성능 진단 로그",
       "purposeKo": "앱 오류, 서버 장애, 응답 지연을 진단하고 운영 품질을 개선",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "앱 오류 처리, API 오류 응답, 운영 지표 집계가 발생할 때",
+      "backendTableOrService": ["mobile runtime error reporter", "user activity metrics", "backend logs"],
       "storageLocations": ["mobile-runtime", "backend-log"],
       "retentionKo": "운영 장애 분석에 필요한 최소 기간만 보관",
       "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 연결된 진단 로그를 삭제 또는 익명화",
+      "deletionImplementation": "운영 지표와 로그는 사용자 식별자 연결을 최소화하고, 삭제 요청 시 사용자 연결 값을 삭제 또는 익명화한다.",
+      "evidence": [
+        "apps/mobile/lib/mobile_error_reporter.dart",
+        "apps/mobile/release/release-security-gate.json",
+        "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -213,6 +345,45 @@
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypePerformanceData",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    }
+  ],
+  "excludedDataTypes": [
+    {
+      "id": "push_notification_token",
+      "displayNameKo": "푸시 알림 기기 토큰",
+      "purposeKo": "즐겨찾기 시설과 신고 처리 상태 알림 발송",
+      "implementationStatus": "excluded-from-release",
+      "introducedInVersion": "0.1.0",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "기본 릴리즈에서는 수집하지 않으며 EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=true 빌드에서만 알림 권한 허용 후 등록",
+      "backendTableOrService": ["registered_devices.device_token", "push_notification_outbox.device_token"],
+      "storageLocations": ["excluded-from-default-release"],
+      "retentionKo": "기본 릴리즈 범위에서는 보관하지 않음",
+      "deletionKo": "기능 활성화 빌드에서는 데이터 삭제 요청 시 등록 기기와 푸시 outbox 연결을 삭제",
+      "deletionImplementation": "UserDataDeletionService가 DeleteUserNotificationPreferencePort와 DeleteUserPushNotificationPort를 호출해 등록 기기와 푸시 outbox 연결을 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/main.dart",
+        "apps/mobile/lib/notification_settings.dart",
+        "apps/mobile/ios/Runner/Runner-Release.entitlements",
+        "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy",
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+      ],
+      "lastVerifiedAt": "2026-06-19",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "includedInRelease": false,
+        "dataType": "Device or other IDs",
+        "purpose": "App functionality",
+        "encryptedInTransit": true,
+        "optional": true
+      },
+      "appStorePrivacy": {
+        "includedInRelease": false,
+        "dataType": "NSPrivacyCollectedDataTypeDeviceID",
         "linkedToUser": true,
         "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
       }
