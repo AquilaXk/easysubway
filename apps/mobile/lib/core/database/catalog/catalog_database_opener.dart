@@ -5,20 +5,28 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../datapack/emergency_override_repository.dart';
 import 'catalog_database.dart';
 
 class CatalogDatabaseOpener {
   CatalogDatabaseOpener({
     required this.databaseDirectory,
     required this.assetBundle,
+    this.emergencyOverrideRepository,
   });
 
   static const indexAssetPath = 'assets/datapacks/index.json';
 
   final Directory databaseDirectory;
   final AssetBundle assetBundle;
+  final EmergencyOverrideRepository? emergencyOverrideRepository;
 
   Future<CatalogDatabase> open() async {
+    final installedDatabase = await _openInstalledCurrentDataPack();
+    if (installedDatabase != null) {
+      return installedDatabase;
+    }
+
     final datapackDirectory = Directory(
       p.join(databaseDirectory.path, 'datapacks'),
     );
@@ -30,6 +38,114 @@ class CatalogDatabaseOpener {
     );
     await database.seedBaselineIfEmpty();
     return database;
+  }
+
+  Future<CatalogDatabase?> _openInstalledCurrentDataPack() async {
+    final overrideDatabase = await _openEmergencyOverrideDataPack();
+    if (overrideDatabase != null) {
+      return overrideDatabase;
+    }
+
+    final pointer = File(
+      p.join(databaseDirectory.path, 'catalog', 'current.json'),
+    );
+    if (!await pointer.exists()) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(await pointer.readAsString());
+      if (decoded is! Map<String, Object?>) {
+        return null;
+      }
+      final file = _currentDataPackFile(decoded);
+      if (file == null) {
+        return null;
+      }
+      if (!await file.exists()) {
+        return null;
+      }
+      return await _openUsableCatalogDatabase(file);
+    } on Object {
+      return null;
+    }
+  }
+
+  File? _currentDataPackFile(Map<String, Object?> pointer) {
+    final id = pointer['id'];
+    final version = pointer['version'];
+    if (id is String &&
+        id.trim().isNotEmpty &&
+        version is String &&
+        version.trim().isNotEmpty) {
+      return File(
+        p.join(
+          databaseDirectory.path,
+          'catalog',
+          '${id.trim()}-v${version.trim()}.sqlite',
+        ),
+      );
+    }
+
+    final path = pointer['path'];
+    if (path is String && path.trim().isNotEmpty) {
+      return File(path.trim());
+    }
+    return null;
+  }
+
+  Future<CatalogDatabase?> _openEmergencyOverrideDataPack() async {
+    final repository = emergencyOverrideRepository;
+    if (repository == null) {
+      return null;
+    }
+    try {
+      final override = await repository.readOverride();
+      if (override == null) {
+        return null;
+      }
+      final file = File(
+        p.join(
+          databaseDirectory.path,
+          'catalog',
+          '${override.id}-v${override.version}.sqlite',
+        ),
+      );
+      if (!await file.exists()) {
+        return null;
+      }
+      return await _openUsableCatalogDatabase(file);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<CatalogDatabase?> _openUsableCatalogDatabase(File file) async {
+    final database = CatalogDatabase.file(file);
+    var returned = false;
+    try {
+      if (await _isUsableCatalogDatabase(database)) {
+        returned = true;
+        return database;
+      }
+      return null;
+    } finally {
+      if (!returned) {
+        await database.close();
+      }
+    }
+  }
+
+  Future<bool> _isUsableCatalogDatabase(CatalogDatabase database) async {
+    final quickCheck = await database.customSelect('PRAGMA quick_check').get();
+    if (quickCheck.any((row) => row.data.values.first != 'ok')) {
+      return false;
+    }
+    final schemaVersion = await database
+        .customSelect(
+          "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
+        )
+        .getSingleOrNull();
+    return schemaVersion != null;
   }
 
   Future<void> _installBundledDataPacks(Directory datapackDirectory) async {
