@@ -165,10 +165,12 @@ class AppDependencies {
           locationProvider ?? MethodChannelCurrentLocationProvider(),
       userDataDeletionRepository:
           userDataDeletionRepository ??
-          _defaultUserDataDeletionRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
+          (userDatabase != null
+              ? UserDataDeletionLocalRepository(userDatabase: userDatabase)
+              : _defaultUserDataDeletionRepository(
+                  baseUri: baseUri,
+                  authProvider: sharedAuthProvider,
+                )),
       anonymousAuthSession: anonymousAuthSession,
     );
   }
