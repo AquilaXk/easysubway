@@ -5,8 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'app/app_bootstrap.dart';
+import 'app/app_dependencies.dart';
 import 'anonymous_auth.dart';
-import 'auth_headers.dart';
 import 'facility_report.dart';
 import 'favorite_facility.dart';
 import 'internal_route.dart';
@@ -23,20 +24,30 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
   defaultValue: false,
 );
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final bootstrap = await AppBootstrap.initialize(
+    enableAnonymousAuth: true,
+    enablePushNotifications: defaultPushNotificationsEnabled,
+  );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
-    EasySubwayApp(
-      onboardingStore: const SecureOnboardingResultStore(),
-      facilityReportDraftTargetStore:
-          const SecureFacilityReportDraftTargetStore(),
-      facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+    AppBootstrapLifecycle(
+      close: bootstrap.close,
+      child: EasySubwayApp(
+        dependencies: bootstrap.dependencies,
+        onboardingStore: const SecureOnboardingResultStore(),
+        facilityReportDraftTargetStore:
+            const SecureFacilityReportDraftTargetStore(),
+        facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+      ),
     ),
   );
 }
 
 class EasySubwayApp extends StatelessWidget {
   EasySubwayApp({
+    AppDependencies? dependencies,
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
@@ -63,24 +74,26 @@ class EasySubwayApp extends StatelessWidget {
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
   }) : this._(
-         dependencies: _EasySubwayAppDependencies.resolve(
-           repository: repository,
-           reportRepository: reportRepository,
-           routeRepository: routeRepository,
-           routeFeedbackRepository: routeFeedbackRepository,
-           favoriteRepository: favoriteRepository,
-           favoriteFacilityRepository: favoriteFacilityRepository,
-           favoriteRouteRepository: favoriteRouteRepository,
-           internalRouteRepository: internalRouteRepository,
-           notificationRepository: notificationRepository,
-           notificationPermissionProvider: notificationPermissionProvider,
-           locationProvider: locationProvider,
-           anonymousAuthRepository: anonymousAuthRepository,
-           anonymousAuthCredentialStore: anonymousAuthCredentialStore,
-           userDataDeletionRepository: userDataDeletionRepository,
-           enableAnonymousAuth: enableAnonymousAuth,
-           enablePushNotifications: enablePushNotifications,
-         ),
+         dependencies:
+             dependencies ??
+             AppDependencies.resolve(
+               repository: repository,
+               reportRepository: reportRepository,
+               routeRepository: routeRepository,
+               routeFeedbackRepository: routeFeedbackRepository,
+               favoriteRepository: favoriteRepository,
+               favoriteFacilityRepository: favoriteFacilityRepository,
+               favoriteRouteRepository: favoriteRouteRepository,
+               internalRouteRepository: internalRouteRepository,
+               notificationRepository: notificationRepository,
+               notificationPermissionProvider: notificationPermissionProvider,
+               locationProvider: locationProvider,
+               anonymousAuthRepository: anonymousAuthRepository,
+               anonymousAuthCredentialStore: anonymousAuthCredentialStore,
+               userDataDeletionRepository: userDataDeletionRepository,
+               enableAnonymousAuth: enableAnonymousAuth,
+               enablePushNotifications: enablePushNotifications,
+             ),
          initialOnboardingState: initialOnboardingState,
          onboardingStore: onboardingStore,
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
@@ -93,7 +106,7 @@ class EasySubwayApp extends StatelessWidget {
        );
 
   EasySubwayApp._({
-    required _EasySubwayAppDependencies dependencies,
+    required AppDependencies dependencies,
     required this.initialOnboardingState,
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
@@ -676,227 +689,6 @@ TextStyle _boldTextStyle(TextStyle? style) {
   );
   return (style ?? const TextStyle()).copyWith(
     fontWeight: FontWeight.values[nextIndex],
-  );
-}
-
-class _EasySubwayAppDependencies {
-  const _EasySubwayAppDependencies({
-    required this.repository,
-    required this.reportRepository,
-    required this.routeRepository,
-    required this.routeFeedbackRepository,
-    required this.favoriteRepository,
-    required this.favoriteFacilityRepository,
-    required this.favoriteRouteRepository,
-    required this.internalRouteRepository,
-    required this.notificationRepository,
-    required this.notificationPermissionProvider,
-    required this.locationProvider,
-    required this.userDataDeletionRepository,
-    required this.anonymousAuthSession,
-  });
-
-  factory _EasySubwayAppDependencies.resolve({
-    StationSearchRepository? repository,
-    FacilityReportRepository? reportRepository,
-    RouteSearchRepository? routeRepository,
-    RouteFeedbackRepository? routeFeedbackRepository,
-    FavoriteStationRepository? favoriteRepository,
-    FavoriteFacilityRepository? favoriteFacilityRepository,
-    FavoriteRouteRepository? favoriteRouteRepository,
-    InternalRouteRepository? internalRouteRepository,
-    NotificationSettingsRepository? notificationRepository,
-    NotificationPermissionProvider? notificationPermissionProvider,
-    CurrentLocationProvider? locationProvider,
-    AnonymousAuthRepository? anonymousAuthRepository,
-    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
-    UserDataDeletionRepository? userDataDeletionRepository,
-    required bool enableAnonymousAuth,
-    required bool enablePushNotifications,
-  }) {
-    final baseUri = defaultStationApiBaseUri();
-    final anonymousAuthSession = _defaultAnonymousAuthSession(
-      baseUri: baseUri,
-      anonymousAuthRepository: anonymousAuthRepository,
-      credentialStore: anonymousAuthCredentialStore,
-      enableAnonymousAuth: enableAnonymousAuth,
-    );
-    final sharedAuthProvider = anonymousAuthSession;
-    final pushNotificationsEnabled =
-        enablePushNotifications ||
-        notificationRepository != null ||
-        notificationPermissionProvider != null;
-    final resolvedNotificationRepository = pushNotificationsEnabled
-        ? notificationRepository ??
-              _defaultNotificationSettingsRepository(
-                baseUri: baseUri,
-                authProvider: sharedAuthProvider,
-              )
-        : null;
-    final resolvedNotificationPermissionProvider = pushNotificationsEnabled
-        ? notificationPermissionProvider
-        : null;
-
-    return _EasySubwayAppDependencies(
-      repository: repository ?? StationSearchApiRepository(baseUri: baseUri),
-      reportRepository:
-          reportRepository ??
-          FacilityReportApiRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      routeRepository:
-          routeRepository ?? RouteSearchApiRepository(baseUri: baseUri),
-      routeFeedbackRepository:
-          routeFeedbackRepository ??
-          _defaultRouteFeedbackRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      favoriteRepository:
-          favoriteRepository ??
-          _defaultFavoriteStationRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      favoriteFacilityRepository:
-          favoriteFacilityRepository ??
-          _defaultFavoriteFacilityRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      favoriteRouteRepository:
-          favoriteRouteRepository ??
-          _defaultFavoriteRouteRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      internalRouteRepository:
-          internalRouteRepository ??
-          InternalRouteApiRepository(baseUri: baseUri),
-      notificationRepository: resolvedNotificationRepository,
-      notificationPermissionProvider: resolvedNotificationPermissionProvider,
-      locationProvider:
-          locationProvider ?? MethodChannelCurrentLocationProvider(),
-      userDataDeletionRepository:
-          userDataDeletionRepository ??
-          _defaultUserDataDeletionRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
-      anonymousAuthSession: anonymousAuthSession,
-    );
-  }
-
-  final StationSearchRepository repository;
-  final FacilityReportRepository reportRepository;
-  final RouteSearchRepository routeRepository;
-  final RouteFeedbackRepository? routeFeedbackRepository;
-  final FavoriteStationRepository? favoriteRepository;
-  final FavoriteFacilityRepository? favoriteFacilityRepository;
-  final FavoriteRouteRepository? favoriteRouteRepository;
-  final InternalRouteRepository internalRouteRepository;
-  final NotificationSettingsRepository? notificationRepository;
-  final NotificationPermissionProvider? notificationPermissionProvider;
-  final CurrentLocationProvider locationProvider;
-  final UserDataDeletionRepository? userDataDeletionRepository;
-  final AnonymousAuthSession? anonymousAuthSession;
-}
-
-AnonymousAuthSession? _defaultAnonymousAuthSession({
-  required Uri baseUri,
-  required bool enableAnonymousAuth,
-  AnonymousAuthRepository? anonymousAuthRepository,
-  AnonymousAuthCredentialStore? credentialStore,
-}) {
-  if (!enableAnonymousAuth) {
-    return null;
-  }
-  return AnonymousAuthSession(
-    repository:
-        anonymousAuthRepository ?? AnonymousAuthApiRepository(baseUri: baseUri),
-    credentialStore: credentialStore,
-  );
-}
-
-UserDataDeletionRepository? _defaultUserDataDeletionRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return UserDataDeletionApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-    refreshExistingAuthorization: authProvider is AnonymousAuthSession
-        ? authProvider.refreshExistingAuthorization
-        : null,
-  );
-}
-
-FavoriteStationRepository? _defaultFavoriteStationRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return FavoriteStationApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-  );
-}
-
-FavoriteFacilityRepository? _defaultFavoriteFacilityRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return FavoriteFacilityApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-  );
-}
-
-FavoriteRouteRepository? _defaultFavoriteRouteRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return FavoriteRouteApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-  );
-}
-
-RouteFeedbackRepository? _defaultRouteFeedbackRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return RouteFeedbackApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
-  );
-}
-
-NotificationSettingsRepository? _defaultNotificationSettingsRepository({
-  required Uri baseUri,
-  required AuthorizationHeaderProvider? authProvider,
-}) {
-  if (authProvider == null) {
-    return null;
-  }
-  return NotificationSettingsApiRepository(
-    baseUri: baseUri,
-    authProvider: authProvider,
   );
 }
 
