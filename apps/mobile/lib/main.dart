@@ -16,6 +16,7 @@ import 'onboarding.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 import 'mobile_error_reporter.dart';
+import 'user_data_deletion.dart';
 
 void main() {
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
@@ -43,6 +44,8 @@ class EasySubwayApp extends StatelessWidget {
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     AnonymousAuthRepository? anonymousAuthRepository,
+    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
+    UserDataDeletionRepository? userDataDeletionRepository,
     OnboardingResultStore? onboardingStore,
     FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
@@ -67,6 +70,8 @@ class EasySubwayApp extends StatelessWidget {
            notificationPermissionProvider: notificationPermissionProvider,
            locationProvider: locationProvider,
            anonymousAuthRepository: anonymousAuthRepository,
+           anonymousAuthCredentialStore: anonymousAuthCredentialStore,
+           userDataDeletionRepository: userDataDeletionRepository,
            enableAnonymousAuth: enableAnonymousAuth,
          ),
          initialOnboardingState: initialOnboardingState,
@@ -100,7 +105,9 @@ class EasySubwayApp extends StatelessWidget {
        notificationRepository = dependencies.notificationRepository,
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
-       locationProvider = dependencies.locationProvider;
+       locationProvider = dependencies.locationProvider,
+       userDataDeletionRepository = dependencies.userDataDeletionRepository,
+       anonymousAuthSession = dependencies.anonymousAuthSession;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -113,6 +120,8 @@ class EasySubwayApp extends StatelessWidget {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final UserDataDeletionRepository? userDataDeletionRepository;
+  final AnonymousAuthSession? anonymousAuthSession;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -182,6 +191,8 @@ class EasySubwayApp extends StatelessWidget {
         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
+        userDataDeletionRepository: userDataDeletionRepository,
+        anonymousAuthSession: anonymousAuthSession,
       ),
     );
   }
@@ -282,6 +293,8 @@ class _EasySubwayHome extends StatefulWidget {
     required this.facilityReportLostPhotoRestorer,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.userDataDeletionRepository,
+    required this.anonymousAuthSession,
   });
 
   final StationSearchRepository repository;
@@ -301,6 +314,8 @@ class _EasySubwayHome extends StatefulWidget {
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final UserDataDeletionRepository? userDataDeletionRepository;
+  final AnonymousAuthSession? anonymousAuthSession;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -369,8 +384,23 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         supportAccessInfo: widget.supportAccessInfo,
         supportAccessLauncher: widget.supportAccessLauncher,
+        userDataDeletionRepository: widget.userDataDeletionRepository,
+        onUserDataDeleted: _handleUserDataDeleted,
       ),
     );
+  }
+
+  Future<void> _handleUserDataDeleted() async {
+    await widget.anonymousAuthSession?.clearCredentials();
+    await widget.onboardingStore?.clearResult();
+    await widget.facilityReportDraftTargetStore?.clearTarget();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _onboardingState = const OnboardingState.initial();
+      _loadingOnboardingState = false;
+    });
   }
 
   Future<void> _restoreOnboardingState() async {
@@ -655,6 +685,8 @@ class _EasySubwayAppDependencies {
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
+    required this.userDataDeletionRepository,
+    required this.anonymousAuthSession,
   });
 
   factory _EasySubwayAppDependencies.resolve({
@@ -670,14 +702,18 @@ class _EasySubwayAppDependencies {
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     AnonymousAuthRepository? anonymousAuthRepository,
+    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
+    UserDataDeletionRepository? userDataDeletionRepository,
     required bool enableAnonymousAuth,
   }) {
     final baseUri = defaultStationApiBaseUri();
-    final sharedAuthProvider = _defaultAuthorizationHeaderProvider(
+    final anonymousAuthSession = _defaultAnonymousAuthSession(
       baseUri: baseUri,
       anonymousAuthRepository: anonymousAuthRepository,
+      credentialStore: anonymousAuthCredentialStore,
       enableAnonymousAuth: enableAnonymousAuth,
     );
+    final sharedAuthProvider = anonymousAuthSession;
     final resolvedNotificationRepository =
         notificationRepository ??
         _defaultNotificationSettingsRepository(
@@ -731,6 +767,13 @@ class _EasySubwayAppDependencies {
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
+      userDataDeletionRepository:
+          userDataDeletionRepository ??
+          _defaultUserDataDeletionRepository(
+            baseUri: baseUri,
+            authProvider: sharedAuthProvider,
+          ),
+      anonymousAuthSession: anonymousAuthSession,
     );
   }
 
@@ -745,12 +788,15 @@ class _EasySubwayAppDependencies {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final UserDataDeletionRepository? userDataDeletionRepository;
+  final AnonymousAuthSession? anonymousAuthSession;
 }
 
-AuthorizationHeaderProvider? _defaultAuthorizationHeaderProvider({
+AnonymousAuthSession? _defaultAnonymousAuthSession({
   required Uri baseUri,
   required bool enableAnonymousAuth,
   AnonymousAuthRepository? anonymousAuthRepository,
+  AnonymousAuthCredentialStore? credentialStore,
 }) {
   if (!enableAnonymousAuth) {
     return null;
@@ -758,6 +804,20 @@ AuthorizationHeaderProvider? _defaultAuthorizationHeaderProvider({
   return AnonymousAuthSession(
     repository:
         anonymousAuthRepository ?? AnonymousAuthApiRepository(baseUri: baseUri),
+    credentialStore: credentialStore,
+  );
+}
+
+UserDataDeletionRepository? _defaultUserDataDeletionRepository({
+  required Uri baseUri,
+  required AuthorizationHeaderProvider? authProvider,
+}) {
+  if (authProvider == null) {
+    return null;
+  }
+  return UserDataDeletionApiRepository(
+    baseUri: baseUri,
+    authProvider: authProvider,
   );
 }
 
@@ -841,6 +901,8 @@ class HomeScreen extends StatelessWidget {
     required this.locationProvider,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.userDataDeletionRepository,
+    required this.onUserDataDeleted,
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
     String? initialMobilityType,
@@ -861,6 +923,8 @@ class HomeScreen extends StatelessWidget {
   final CurrentLocationProvider locationProvider;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final UserDataDeletionRepository? userDataDeletionRepository;
+  final Future<void> Function()? onUserDataDeleted;
   final String initialMobilityType;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -884,6 +948,8 @@ class HomeScreen extends StatelessWidget {
           builder: (_) => SupportAccessScreen(
             accessInfo: supportAccessInfo,
             launcher: supportAccessLauncher,
+            userDataDeletionRepository: userDataDeletionRepository,
+            onUserDataDeleted: onUserDataDeleted,
           ),
         ),
       );
@@ -1266,11 +1332,15 @@ class SupportAccessScreen extends StatelessWidget {
   const SupportAccessScreen({
     required this.accessInfo,
     required this.launcher,
+    required this.userDataDeletionRepository,
+    required this.onUserDataDeleted,
     super.key,
   });
 
   final SupportAccessInfo accessInfo;
   final SupportAccessLauncher launcher;
+  final UserDataDeletionRepository? userDataDeletionRepository;
+  final Future<void> Function()? onUserDataDeleted;
 
   @override
   Widget build(BuildContext context) {
@@ -1313,16 +1383,289 @@ class SupportAccessScreen extends StatelessWidget {
               launcher: launcher,
             ),
             const SizedBox(height: 12),
-            _SupportAccessItem(
-              key: const Key('dataDeletionAccessItem'),
-              icon: Icons.delete_outline,
-              title: '데이터 삭제 요청',
-              value: accessInfo.dataDeletionEmail,
-              uri: _mailtoUri(accessInfo.dataDeletionEmail, '쉬운 지하철 데이터 삭제 요청'),
-              launcher: launcher,
+            if (userDataDeletionRepository == null)
+              _SupportAccessItem(
+                key: const Key('dataDeletionAccessItem'),
+                icon: Icons.delete_outline,
+                title: '데이터 삭제 요청',
+                value: accessInfo.dataDeletionEmail,
+                uri: _mailtoUri(
+                  accessInfo.dataDeletionEmail,
+                  '쉬운 지하철 데이터 삭제 요청',
+                ),
+                launcher: launcher,
+              )
+            else
+              _UserDataDeletionAccessItem(
+                repository: userDataDeletionRepository!,
+                onDeleted: onUserDataDeleted,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UserDataDeletionAccessItem extends StatelessWidget {
+  const _UserDataDeletionAccessItem({
+    required this.repository,
+    required this.onDeleted,
+  });
+
+  final UserDataDeletionRepository repository;
+  final Future<void> Function()? onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    void openDeletionScreen() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => UserDataDeletionScreen(
+            repository: repository,
+            onDeleted: onDeleted,
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      key: const Key('dataDeletionAccessItem'),
+      button: true,
+      label: '데이터 삭제 요청, 앱 안에서 삭제를 진행합니다.',
+      onTap: openDeletionScreen,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: openDeletionScreen,
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFF8B1E1E),
+                    size: 28,
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '데이터 삭제 요청',
+                          style: TextStyle(
+                            color: Color(0xFF102A2C),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '앱 안에서 삭제 대상을 확인하고 직접 요청합니다.',
+                          style: TextStyle(
+                            color: Color(0xFF466467),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: Color(0xFF466467)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class UserDataDeletionScreen extends StatefulWidget {
+  const UserDataDeletionScreen({
+    required this.repository,
+    required this.onDeleted,
+    super.key,
+  });
+
+  final UserDataDeletionRepository repository;
+  final Future<void> Function()? onDeleted;
+
+  @override
+  State<UserDataDeletionScreen> createState() => _UserDataDeletionScreenState();
+}
+
+class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 데이터 삭제')),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: FilledButton.icon(
+          key: const Key('dataDeletionStartButton'),
+          onPressed: _isDeleting ? null : _confirmAndDelete,
+          icon: _isDeleting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              : const Icon(Icons.delete_forever_outlined),
+          label: Text(_isDeleting ? '삭제 중' : '내 데이터 삭제'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF8B1E1E),
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                '삭제 전에 확인해 주세요',
+                style: textTheme.headlineSmall?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '즐겨찾기, 이동 조건, 알림 설정, 익명 인증, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+              style: textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF102A2C),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const _DataDeletionNoticeLine(
+              text: '삭제가 끝나면 현재 로그인 정보는 지워지고 처음 설정 화면으로 돌아갑니다.',
+            ),
+            const _DataDeletionNoticeLine(
+              text: '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+            ),
+            const _DataDeletionNoticeLine(
+              text: '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('정말 삭제할까요?'),
+        content: const Text('삭제 후에는 앱에 저장된 인증 정보와 설정이 지워지고 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            key: const Key('dataDeletionConfirmButton'),
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8B1E1E),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _deleteCurrentUserData();
+    }
+  }
+
+  Future<void> _deleteCurrentUserData() async {
+    setState(() {
+      _isDeleting = true;
+    });
+    try {
+      await widget.repository.deleteCurrentUserData();
+      await widget.onDeleted?.call();
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on UserDataDeletionException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '사용자 데이터 삭제 처리 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(userDataDeletionErrorMessage)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+}
+
+class _DataDeletionNoticeLine extends StatelessWidget {
+  const _DataDeletionNoticeLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 7, color: Color(0xFF8B1E1E)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: const Color(0xFF3B2020),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

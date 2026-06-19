@@ -219,6 +219,25 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
     }
   }
 
+  Future<void> clearCredentials() async {
+    final issuingCredentials = _issuingCredentials;
+    if (issuingCredentials != null) {
+      try {
+        await issuingCredentials;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '데이터 삭제 전 익명 인증 발급을 기다리는 중 예외가 발생했습니다.',
+        );
+        // 삭제 흐름에서는 진행 중인 발급 실패와 무관하게 로컬 인증 상태를 비운다.
+      }
+    }
+    _issuingCredentials = null;
+    _credentials = null;
+    await credentialStore.clearCredentials();
+  }
+
   Future<AnonymousAuthCredentials> _refreshOrIssueCredentials(
     AnonymousAuthCredentials credentials,
   ) async {
