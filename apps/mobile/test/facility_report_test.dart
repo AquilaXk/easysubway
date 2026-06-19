@@ -430,12 +430,16 @@ void main() {
   test('시설 신고 API 저장소는 접수번호로 처리 상태를 조회한다', () async {
     late String requestMethod;
     late String requestPath;
+    late String? receiptTokenHeader;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) {
       requestMethod = request.method;
       requestPath = request.uri.path;
+      receiptTokenHeader = request.headers.value(
+        'X-Easysubway-Report-Receipt-Token',
+      );
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
@@ -458,12 +462,16 @@ void main() {
 
     final repository = FacilityReportApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      receiptStore: FakeFacilityReportReceiptStore({
+        'report-1': 'receipt-token-1',
+      }),
     );
 
     final result = await repository.getReport('report-1');
 
     expect(requestMethod, 'GET');
     expect(requestPath, '/api/v1/reports/report-1');
+    expect(receiptTokenHeader, 'receipt-token-1');
     expect(result.id, 'report-1');
     expect(result.status, 'ACCEPTED');
     expect(result.statusLabel, '반영됨');
@@ -837,6 +845,23 @@ class FailingRefreshFacilityReportRepository
   @override
   Future<List<FacilityReportResult>> listMyReports() {
     throw UnimplementedError();
+  }
+}
+
+class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
+  FakeFacilityReportReceiptStore([Map<String, String>? receiptTokens])
+    : _receiptTokens = Map.of(receiptTokens ?? const {});
+
+  final Map<String, String> _receiptTokens;
+
+  @override
+  Future<void> saveReceipt(FacilityReportReceipt receipt) async {
+    _receiptTokens[receipt.reportId] = receipt.receiptToken;
+  }
+
+  @override
+  Future<String?> receiptTokenForReport(String reportId) async {
+    return _receiptTokens[reportId];
   }
 }
 

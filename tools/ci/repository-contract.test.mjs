@@ -1595,7 +1595,6 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(jdbcRepository, /resultSet\.getString\("photo_data_base64"\)/);
   assert.doesNotMatch(jdbcRepository, /report\.photoDataBase64/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS facility_reports/);
-  assert.doesNotMatch(batchPostgresSchema, /photo_data_base64 TEXT/);
   assert.equal(existsSync(path.join(root, photoObjectMigrationPath)), true);
   const photoObjectMigration = read(photoObjectMigrationPath);
   assert.doesNotMatch(photoObjectMigration, /DROP COLUMN IF EXISTS photo_data_base64/);
@@ -1603,6 +1602,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_thumbnail_object_key VARCHAR\(255\)/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_sha256 CHAR\(64\)/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_size_bytes BIGINT/);
+  assert.equal(existsSync(path.join(root, dropBase64MigrationPath)), true);
+  const dropBase64Migration = read(dropBase64MigrationPath);
+  assert.match(dropBase64Migration, /DROP COLUMN IF EXISTS photo_data_base64/);
   assert.equal(existsSync(path.join(root, receiptTokenMigrationPath)), true);
   const receiptTokenMigration = read(receiptTokenMigrationPath);
   assert.match(receiptTokenMigration, /ADD COLUMN IF NOT EXISTS client_submission_id VARCHAR\(120\)/);
