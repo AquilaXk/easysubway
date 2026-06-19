@@ -1,7 +1,9 @@
 package com.easysubway.usage.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.easysubway.usage.domain.InvalidUserActivityException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,5 +80,15 @@ class JdbcUserActivityRepositoryTest {
 		assertThat(summary.totalActiveUsers()).isEqualTo(1);
 		assertThat(summary.totalApiRequests()).isEqualTo(1);
 		assertThat(summary.totalApiErrors()).isZero();
+	}
+
+	@Test
+	@DisplayName("DB 컬럼 길이를 넘는 사용자 식별자는 활동 기록으로 저장하지 않는다")
+	void recordUserActivityRejectsUserIdOverColumnLimit() {
+		String tooLongUserId = "a".repeat(121);
+
+		assertThatThrownBy(() -> repository.recordUserActivity(tooLongUserId, LocalDateTime.of(2026, 6, 17, 9, 0)))
+			.isInstanceOf(InvalidUserActivityException.class)
+			.hasMessage("사용자 활동 식별자는 120자 이하여야 합니다.");
 	}
 }

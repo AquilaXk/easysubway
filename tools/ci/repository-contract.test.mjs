@@ -2470,12 +2470,17 @@ test("사용자 활동 JDBC 저장소는 운영 프로필에서 활동 지표를
 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS user_activity_events/);
   assert.match(schema, /user_id VARCHAR\(120\) NOT NULL/);
+  assert.match(schema, /chk_user_activity_events_user_id[\s\S]*CHECK \(char_length\(trim\(user_id\)\) > 0\)/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS api_traffic_events/);
   assert.match(schema, /duration_millis BIGINT NOT NULL/);
-  assert.match(schema, /idx_user_activity_events_occurred/);
-  assert.match(schema, /idx_api_traffic_events_occurred/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_user_activity_events_occurred[\s\S]*ON user_activity_events \(occurred_at DESC, user_id ASC\)/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_api_traffic_events_occurred[\s\S]*ON api_traffic_events \(occurred_at DESC, status_code ASC\)/);
+  assert.match(schema, /chk_api_traffic_events_status_code[\s\S]*CHECK \(status_code BETWEEN 100 AND 599\)/);
+  assert.match(schema, /chk_api_traffic_events_duration[\s\S]*CHECK \(duration_millis >= 0\)/);
   assert.match(repository, /@Profile\("prod"\)/);
   assert.match(repository, /implements[\s\S]*RecordUserActivityPort[\s\S]*RecordApiTrafficPort[\s\S]*SummarizeUserActivityPort/);
+  assert.match(repository, /USER_ID_MAX_LENGTH = 120/);
+  assert.match(repository, /사용자 활동 식별자는 120자 이하여야 합니다\./);
   assert.match(repository, /INSERT INTO user_activity_events/);
   assert.match(repository, /INSERT INTO api_traffic_events/);
   assert.match(repository, /COUNT\(DISTINCT user_id\)/);

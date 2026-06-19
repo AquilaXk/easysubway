@@ -203,7 +203,9 @@ CREATE INDEX IF NOT EXISTS idx_mobility_profiles_updated_at
 
 CREATE TABLE IF NOT EXISTS user_activity_events (
 	user_id VARCHAR(120) NOT NULL,
-	occurred_at TIMESTAMP NOT NULL
+	occurred_at TIMESTAMP NOT NULL,
+	CONSTRAINT chk_user_activity_events_user_id
+		CHECK (char_length(trim(user_id)) > 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_activity_events_occurred

@@ -20,6 +20,8 @@ import org.springframework.stereotype.Repository;
 @Profile("prod")
 public class JdbcUserActivityRepository implements RecordUserActivityPort, RecordApiTrafficPort, SummarizeUserActivityPort {
 
+	private static final int USER_ID_MAX_LENGTH = 120;
+
 	private final JdbcTemplate jdbcTemplate;
 
 	public JdbcUserActivityRepository(DataSource dataSource) {
@@ -35,6 +37,10 @@ public class JdbcUserActivityRepository implements RecordUserActivityPort, Recor
 		if (userId == null || userId.isBlank()) {
 			throw new InvalidUserActivityException("사용자 활동 식별자가 필요합니다.");
 		}
+		String normalizedUserId = userId.trim();
+		if (normalizedUserId.length() > USER_ID_MAX_LENGTH) {
+			throw new InvalidUserActivityException("사용자 활동 식별자는 120자 이하여야 합니다.");
+		}
 		if (occurredAt == null) {
 			throw new InvalidUserActivityException("사용자 활동 시간이 필요합니다.");
 		}
@@ -44,7 +50,7 @@ public class JdbcUserActivityRepository implements RecordUserActivityPort, Recor
 				INSERT INTO user_activity_events (user_id, occurred_at)
 				VALUES (?, ?)
 				""",
-			userId.trim(),
+			normalizedUserId,
 			occurredAt
 		);
 	}
