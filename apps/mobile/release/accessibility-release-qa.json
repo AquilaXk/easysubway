@@ -8,7 +8,7 @@
       "platform": "android",
       "titleKo": "Android TalkBack 홈 주요 탐색",
       "environmentKo": "Android 15 이상 에뮬레이터 또는 실제 기기에서 TalkBack 켜짐",
-      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 알림 설정, 도움말을 순서대로 탐색한다.",
+      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 도움말을 순서대로 탐색한다.",
       "passCriteriaKo": "각 주요 이동 지점은 목적을 알 수 있는 한국어 label과 tap action을 읽고, 초점 순서가 화면 순서와 어긋나지 않는다.",
       "automation": "manual-required",
       "evidence": ["screen-recording", "accessibility-notes"]
@@ -64,16 +64,6 @@
       "evidence": ["screenshots", "api-response-summary"]
     },
     {
-      "id": "android_push_opt_in_out",
-      "platform": "android",
-      "titleKo": "Android 푸시 알림 opt-in/out",
-      "environmentKo": "Android 알림 권한을 허용하거나 거부할 수 있는 새 설치 상태",
-      "flowKo": "온보딩 알림 설명, OS 권한 요청, 알림 설정 변경, 권한 거부 후 안내를 확인한다.",
-      "passCriteriaKo": "권한 요청 전 목적 설명이 보이고, 거부해도 앱 주요 기능은 계속 사용 가능하며 설정 화면에서 다음 행동을 안내한다.",
-      "automation": "manual-with-widget-baseline",
-      "evidence": ["screenshots", "permission-state"]
-    },
-    {
       "id": "android_reinstall_secure_storage_restore",
       "platform": "android",
       "titleKo": "Android 재설치와 secure storage 복원 실패",
@@ -88,7 +78,7 @@
       "platform": "ios",
       "titleKo": "iOS VoiceOver 홈 주요 탐색",
       "environmentKo": "iOS Simulator 또는 실제 iPhone에서 VoiceOver 켜짐",
-      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 알림 설정, 도움말을 순서대로 탐색한다.",
+      "flowKo": "앱 시작 후 홈의 역 검색, 길찾기, 이동 조건, 도움말을 순서대로 탐색한다.",
       "passCriteriaKo": "각 주요 이동 지점은 목적을 알 수 있는 한국어 label과 button trait를 제공하고, 초점 순서가 예측 가능하다.",
       "automation": "manual-required",
       "evidence": ["screen-recording", "accessibility-notes"]
