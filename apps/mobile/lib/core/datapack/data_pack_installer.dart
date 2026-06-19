@@ -78,12 +78,12 @@ class DataPackInstaller {
     );
     if (activateCurrent) {
       await activateCurrentPointer(pointer);
+      await pruneObsoletePacks(
+        pack.id,
+        keepVersionCount: 2,
+        protectedVersions: protectedVersions,
+      );
     }
-    await _pruneObsoletePacks(
-      pack.id,
-      keepVersionCount: 2,
-      protectedVersions: protectedVersions,
-    );
     await userDatabase
         .into(userDatabase.installedDataPacks)
         .insertOnConflictUpdate(
@@ -115,6 +115,18 @@ class DataPackInstaller {
 
   Future<void> activateCurrentPointer(InstalledDataPackPointer pointer) async {
     await _writeCurrentPointer(pointer);
+  }
+
+  Future<void> pruneObsoletePacks(
+    String packId, {
+    required int keepVersionCount,
+    required Set<String> protectedVersions,
+  }) async {
+    await _pruneObsoletePacks(
+      packId,
+      keepVersionCount: keepVersionCount,
+      protectedVersions: protectedVersions,
+    );
   }
 
   Future<DataPackInstallRejectionReason?> _validateSqlite(

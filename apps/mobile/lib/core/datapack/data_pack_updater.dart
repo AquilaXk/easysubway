@@ -31,15 +31,6 @@ class DataPackUpdater {
     final protectedVersions = <String>{};
     if (override != null) {
       protectedVersions.add(override.version);
-      await emergencyOverrideRepository?.saveOverride(
-        EmergencyDataPackOverride(
-          id: override.id,
-          version: override.version,
-          reason: override.reason,
-        ),
-      );
-    } else {
-      await emergencyOverrideRepository?.clearOverride();
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
@@ -62,6 +53,24 @@ class DataPackUpdater {
       final currentPointer = results.lastOrNull?.pointer;
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
+      }
+      for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
+        await installer.pruneObsoletePacks(
+          packId,
+          keepVersionCount: 2,
+          protectedVersions: protectedVersions,
+        );
+      }
+      if (override != null) {
+        await emergencyOverrideRepository?.saveOverride(
+          EmergencyDataPackOverride(
+            id: override.id,
+            version: override.version,
+            reason: override.reason,
+          ),
+        );
+      } else {
+        await emergencyOverrideRepository?.clearOverride();
       }
       await client.saveManifestCache(manifestResult);
     }
