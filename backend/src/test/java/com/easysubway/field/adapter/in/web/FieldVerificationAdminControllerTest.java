@@ -2,6 +2,7 @@ package com.easysubway.field.adapter.in.web;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -45,12 +47,44 @@ class FieldVerificationAdminControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자는 역별 현장 검증 결과를 CSV로 내려받는다")
+	void adminDownloadsStationFieldVerificationCsv() throws Exception {
+		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu/export.csv")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(header().string(
+				HttpHeaders.CONTENT_DISPOSITION,
+				"attachment; filename=\"easysubway-field-verification-station-sangnoksu.csv\""
+			))
+			.andExpect(header().string(HttpHeaders.CONTENT_TYPE, "text/csv;charset=UTF-8"))
+			.andExpect(result -> {
+				String csv = result.getResponse().getContentAsString();
+				org.assertj.core.api.Assertions.assertThat(csv)
+					.startsWith("sessionId,stationId,stationName,verifiedAt,verifiedBy,sessionStatus,itemType,itemLabel,targetName,itemStatus,note\n")
+					.contains("field-verification-sangnoksu-2026-06,station-sangnoksu,상록수역,")
+					.contains("EXIT,출구,주요 출구 연결,VERIFIED,")
+					.contains("PLATFORM_TRANSFER,승강장/환승 동선,승강장과 환승 접근 동선,PLANNED,");
+			});
+	}
+
+	@Test
 	@DisplayName("현장 검증 API는 관리자 인증을 요구한다")
 	void fieldVerificationRequiresAdminAuthentication() throws Exception {
 		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu"))
 			.andExpect(status().isUnauthorized());
 
 		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu")
+				.with(httpBasic("anonymous-user-1", "user-test-password")))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@DisplayName("현장 검증 CSV export는 관리자 인증을 요구한다")
+	void fieldVerificationCsvRequiresAdminAuthentication() throws Exception {
+		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu/export.csv"))
+			.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(get("/admin/field-verifications/stations/station-sangnoksu/export.csv")
 				.with(httpBasic("anonymous-user-1", "user-test-password")))
 			.andExpect(status().isForbidden());
 	}
