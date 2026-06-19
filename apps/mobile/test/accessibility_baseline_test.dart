@@ -26,7 +26,6 @@ void main() {
           reportRepository: _AccessibilityFacilityReportRepository(),
           routeRepository: _AccessibilityRouteSearchRepository(),
           locationProvider: _AccessibilityCurrentLocationProvider(),
-          enableAnonymousAuth: false,
           initialOnboardingState: _completedOnboardingState(
             preferences: const OnboardingViewPreferences(
               largeTextEnabled: true,

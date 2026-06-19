@@ -38,7 +38,6 @@ void main() {
               'deletedPushNotificationCount': 6,
               'mobilityProfileDeleted': true,
               'anonymizedReportCount': 7,
-              'anonymousCredentialsDeleted': true,
             },
           }),
         )
@@ -67,7 +66,6 @@ void main() {
     expect(result.deletedPushNotificationCount, 6);
     expect(result.mobilityProfileDeleted, isTrue);
     expect(result.anonymizedReportCount, 7);
-    expect(result.anonymousCredentialsDeleted, isTrue);
   });
 
   test('사용자 데이터 삭제 API 저장소는 기존 인증 갱신 성공 시 삭제를 한 번 재시도한다', () async {
@@ -306,7 +304,6 @@ void main() {
         deletedPushNotificationCount: 1,
         mobilityProfileDeleted: true,
         anonymizedReportCount: 3,
-        anonymousCredentialsDeleted: true,
       ),
     );
     final localRepository = RecordingUserDataDeletionRepository(
@@ -323,7 +320,6 @@ void main() {
         deletedPushNotificationCount: 0,
         mobilityProfileDeleted: false,
         anonymizedReportCount: 1,
-        anonymousCredentialsDeleted: false,
       ),
     );
     final repository = UserDataDeletionCompositeRepository(
@@ -344,7 +340,6 @@ void main() {
     expect(result.deletedPushNotificationCount, 1);
     expect(result.mobilityProfileDeleted, isTrue);
     expect(result.anonymizedReportCount, 4);
-    expect(result.anonymousCredentialsDeleted, isTrue);
   });
 
   test('합성 사용자 데이터 삭제 저장소는 서버 삭제 실패 시 로컬 데이터를 유지한다', () async {
@@ -368,7 +363,6 @@ void main() {
         deletedPushNotificationCount: 0,
         mobilityProfileDeleted: false,
         anonymizedReportCount: 0,
-        anonymousCredentialsDeleted: false,
       ),
     );
     final repository = UserDataDeletionCompositeRepository(
@@ -399,7 +393,6 @@ String _successfulDeletionBody() {
       'deletedPushNotificationCount': 6,
       'mobilityProfileDeleted': true,
       'anonymizedReportCount': 7,
-      'anonymousCredentialsDeleted': true,
     },
   });
 }

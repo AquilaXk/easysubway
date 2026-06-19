@@ -439,7 +439,6 @@ void main() {
               }),
             );
           },
-      enableAnonymousAuth: false,
       enablePushNotifications: false,
     );
 
@@ -470,7 +469,6 @@ void main() {
             ({required supportDirectory, required userDatabase}) async {
               throw const SocketException('manifest unavailable');
             },
-        enableAnonymousAuth: false,
         enablePushNotifications: false,
       ),
     );

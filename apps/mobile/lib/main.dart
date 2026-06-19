@@ -7,10 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
-import 'anonymous_auth.dart';
 import 'facility_report.dart';
 import 'favorite_facility.dart';
 import 'internal_route.dart';
+import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
@@ -27,7 +27,6 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final bootstrap = await AppBootstrap.initialize(
-    enableAnonymousAuth: true,
     enablePushNotifications: defaultPushNotificationsEnabled,
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
@@ -40,6 +39,7 @@ Future<void> main() async {
         facilityReportDraftTargetStore:
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+        legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
       ),
     ),
   );
@@ -60,9 +60,9 @@ class EasySubwayApp extends StatelessWidget {
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
-    AnonymousAuthRepository? anonymousAuthRepository,
-    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
+    LegacyCredentialCleaner legacyCredentialCleaner =
+        const NoLegacyCredentialCleaner(),
     OnboardingResultStore? onboardingStore,
     FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
@@ -71,7 +71,6 @@ class EasySubwayApp extends StatelessWidget {
     SupportAccessLauncher supportAccessLauncher =
         const UrlLauncherSupportAccessLauncher(),
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
-    bool enableAnonymousAuth = true,
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
   }) : this._(
@@ -90,16 +89,14 @@ class EasySubwayApp extends StatelessWidget {
                notificationRepository: notificationRepository,
                notificationPermissionProvider: notificationPermissionProvider,
                locationProvider: locationProvider,
-               anonymousAuthRepository: anonymousAuthRepository,
-               anonymousAuthCredentialStore: anonymousAuthCredentialStore,
                userDataDeletionRepository: userDataDeletionRepository,
-               enableAnonymousAuth: enableAnonymousAuth,
                enablePushNotifications: enablePushNotifications,
              ),
          initialOnboardingState: initialOnboardingState,
          onboardingStore: onboardingStore,
          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+         legacyCredentialCleaner: legacyCredentialCleaner,
          supportAccessInfo: supportAccessInfo.validatedForBuild(
            isReleaseMode: kReleaseMode,
          ),
@@ -113,6 +110,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     super.key,
@@ -129,8 +127,7 @@ class EasySubwayApp extends StatelessWidget {
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
        locationProvider = dependencies.locationProvider,
-       userDataDeletionRepository = dependencies.userDataDeletionRepository,
-       anonymousAuthSession = dependencies.anonymousAuthSession;
+       userDataDeletionRepository = dependencies.userDataDeletionRepository;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -145,11 +142,11 @@ class EasySubwayApp extends StatelessWidget {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final AnonymousAuthSession? anonymousAuthSession;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
 
@@ -214,10 +211,10 @@ class EasySubwayApp extends StatelessWidget {
         onboardingStore: onboardingStore,
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
         facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+        legacyCredentialCleaner: legacyCredentialCleaner,
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
-        anonymousAuthSession: anonymousAuthSession,
       ),
     );
   }
@@ -317,10 +314,10 @@ class _EasySubwayHome extends StatefulWidget {
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
     required this.facilityReportLostPhotoRestorer,
+    required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
-    required this.anonymousAuthSession,
   });
 
   final StationSearchRepository repository;
@@ -339,10 +336,10 @@ class _EasySubwayHome extends StatefulWidget {
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer;
+  final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final AnonymousAuthSession? anonymousAuthSession;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -359,6 +356,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   @override
   void initState() {
     super.initState();
+    unawaited(_clearLegacyCredentialsOnStartup());
     if (_loadingOnboardingState) {
       _restoreOnboardingState();
     }
@@ -419,7 +417,15 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   }
 
   Future<void> _handleUserDataDeleted() async {
-    await widget.anonymousAuthSession?.clearCredentials();
+    try {
+      await widget.legacyCredentialCleaner.clear();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '데이터 삭제 후 기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
+      );
+    }
     await widget.onboardingStore?.clearResult();
     await widget.facilityReportDraftTargetStore?.clearTarget();
     if (!mounted) {
@@ -429,6 +435,18 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _onboardingState = const OnboardingState.initial();
       _loadingOnboardingState = false;
     });
+  }
+
+  Future<void> _clearLegacyCredentialsOnStartup() async {
+    try {
+      await widget.legacyCredentialCleaner.clear();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
+      );
+    }
   }
 
   Future<void> _restoreOnboardingState() async {
@@ -1368,7 +1386,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              '즐겨찾기, 이동 조건, 익명 인증, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+              '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF102A2C),
                 height: 1.4,
@@ -1679,7 +1697,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _deletionScope =
-      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
+      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
 
   @override
