@@ -41,6 +41,11 @@ class CatalogDatabaseOpener {
   }
 
   Future<CatalogDatabase?> _openInstalledCurrentDataPack() async {
+    final overrideDatabase = await _openEmergencyOverrideDataPack();
+    if (overrideDatabase != null) {
+      return overrideDatabase;
+    }
+
     final pointer = File(
       p.join(databaseDirectory.path, 'catalog', 'current.json'),
     );
@@ -55,10 +60,6 @@ class CatalogDatabaseOpener {
       final path = decoded['path'];
       if (path is! String || path.trim().isEmpty) {
         return null;
-      }
-      final overrideDatabase = await _openEmergencyOverrideDataPack();
-      if (overrideDatabase != null) {
-        return overrideDatabase;
       }
       final file = File(path);
       if (!await file.exists()) {

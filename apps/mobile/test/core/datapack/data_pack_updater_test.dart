@@ -83,6 +83,7 @@ void main() {
 
     final results = await updater.checkForUpdates();
     final pointer = await installer.readCurrentPointer();
+    final manifestCache = await stateRepository.readManifestCache();
 
     expect(results.single.status, DataPackInstallStatus.rejected);
     expect(
@@ -91,6 +92,7 @@ void main() {
     );
     expect(pointer?.version, '17');
     expect(await oldPack.exists(), isTrue);
+    expect(manifestCache, isNull);
   });
 
   test('updater는 manifest에서 emergency override가 해제되면 저장값을 지운다', () async {
@@ -136,5 +138,6 @@ void main() {
     await updater.checkForUpdates();
 
     expect(await overrideRepository.readOverride(), isNull);
+    expect(await stateRepository.readManifestCache(), isNotNull);
   });
 }

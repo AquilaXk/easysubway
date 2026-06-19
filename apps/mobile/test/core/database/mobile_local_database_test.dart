@@ -302,6 +302,55 @@ void main() {
     expect(metadata.read<String>('value'), 'capital-v17');
   });
 
+  test('catalog opener는 current pointer가 없어도 emergency override를 연다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-override-no-current-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    await overrideRepository.saveOverride(
+      const EmergencyDataPackOverride(
+        id: 'capital',
+        version: '17',
+        reason: '시설 상태 긴급 정정',
+      ),
+    );
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final overridePack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    final overrideDatabase = CatalogDatabase.file(overridePack);
+    await overrideDatabase.seedBaselineIfEmpty();
+    await overrideDatabase
+        .into(overrideDatabase.catalogMetadata)
+        .insertOnConflictUpdate(
+          CatalogMetadataCompanion.insert(
+            key: 'activePack',
+            value: 'capital-v17',
+            updatedAt: Value(DateTime.utc(2026, 6, 19, 16)),
+          ),
+        );
+    await overrideDatabase.close();
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      emergencyOverrideRepository: overrideRepository,
+    ).open();
+    addTearDown(database.close);
+
+    final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), 'capital-v17');
+  });
+
   test('앱 부트스트랩은 데이터팩 업데이트 후 current pointer로 catalog를 연다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-bootstrap-current-',

@@ -44,8 +44,8 @@ class DataPackManifestEntry {
   });
 
   factory DataPackManifestEntry.fromJson(Map<String, Object?> json) {
-    final id = _requiredString(json, 'id');
-    final version = _requiredString(json, 'version');
+    final id = _readPackId(json['id']);
+    final version = _readPackVersion(json['version']);
     final url = _requiredString(json, 'url');
     final requiredTables = json['requiredTables'];
     final minimumTableRows = json['minimumTableRows'];
@@ -99,8 +99,8 @@ EmergencyOverrideManifest? _parseOverride(Object? rawOverride) {
     throw const FormatException('Invalid emergency override.');
   }
   return EmergencyOverrideManifest(
-    id: _requiredString(rawOverride, 'id'),
-    version: _requiredString(rawOverride, 'version'),
+    id: _readPackId(rawOverride['id']),
+    version: _readPackVersion(rawOverride['version']),
     reason: _requiredString(rawOverride, 'reason'),
   );
 }
@@ -139,4 +139,28 @@ String _readTableName(Object? value) {
     throw const FormatException('Invalid data pack table name.');
   }
   return tableName;
+}
+
+String _readPackId(Object? value) {
+  if (value is! String) {
+    throw const FormatException('Invalid data pack identity.');
+  }
+  final packId = value.trim();
+  final identifier = RegExp(r'^[A-Za-z][A-Za-z0-9_-]*$');
+  if (!identifier.hasMatch(packId)) {
+    throw const FormatException('Invalid data pack identity.');
+  }
+  return packId;
+}
+
+String _readPackVersion(Object? value) {
+  if (value is! String) {
+    throw const FormatException('Invalid data pack version.');
+  }
+  final version = value.trim();
+  final numericVersion = RegExp(r'^[0-9]+$');
+  if (!numericVersion.hasMatch(version)) {
+    throw const FormatException('Invalid data pack version.');
+  }
+  return version;
 }

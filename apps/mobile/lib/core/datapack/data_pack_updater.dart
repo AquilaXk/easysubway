@@ -54,6 +54,11 @@ class DataPackUpdater {
         ),
       );
     }
+    if (results.every(
+      (result) => result.status == DataPackInstallStatus.installed,
+    )) {
+      await client.saveManifestCache(manifestResult);
+    }
     return results;
   }
 

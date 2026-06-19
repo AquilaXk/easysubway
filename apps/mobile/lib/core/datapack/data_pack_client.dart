@@ -60,23 +60,40 @@ class DataPackClient {
       throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
     }
     final manifest = DataPackManifest.fromJson(decoded);
-    await stateRepository.saveManifestCache(
-      etag: response.headers.value(HttpHeaders.etagHeader),
-      checkedAt: _now().toUtc(),
-      ttl: manifest.ttl,
-    );
     return DataPackManifestFetchResult(
       status: DataPackManifestFetchStatus.updated,
       manifest: manifest,
+      etag: response.headers.value(HttpHeaders.etagHeader),
+      checkedAt: _now().toUtc(),
+    );
+  }
+
+  Future<void> saveManifestCache(DataPackManifestFetchResult result) async {
+    final manifest = result.manifest;
+    final checkedAt = result.checkedAt;
+    if (manifest == null || checkedAt == null) {
+      return;
+    }
+    await stateRepository.saveManifestCache(
+      etag: result.etag,
+      checkedAt: checkedAt,
+      ttl: manifest.ttl,
     );
   }
 }
 
 class DataPackManifestFetchResult {
-  const DataPackManifestFetchResult({required this.status, this.manifest});
+  const DataPackManifestFetchResult({
+    required this.status,
+    this.manifest,
+    this.etag,
+    this.checkedAt,
+  });
 
   final DataPackManifestFetchStatus status;
   final DataPackManifest? manifest;
+  final String? etag;
+  final DateTime? checkedAt;
 }
 
 enum DataPackManifestFetchStatus { freshCache, notModified, updated }
