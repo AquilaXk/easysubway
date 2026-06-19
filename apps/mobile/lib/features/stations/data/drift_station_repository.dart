@@ -215,16 +215,17 @@ class DriftStationRepository
   }
 
   Future<_LocalStationSummary?> _getStationSummary(String stationId) async {
-    for (final summary in await _listStationSummaries()) {
-      if (summary.id == stationId) {
-        return summary;
-      }
-    }
-    return null;
+    final summaries = await _listStationSummaries(stationId: stationId);
+    return summaries.isEmpty ? null : summaries.single;
   }
 
-  Future<List<_LocalStationSummary>> _listStationSummaries() async {
-    final rows = await database.customSelect('''
+  Future<List<_LocalStationSummary>> _listStationSummaries({
+    String? stationId,
+  }) async {
+    final stationFilter = stationId == null ? '' : 'WHERE s.id = ?';
+    final rows = await database
+        .customSelect(
+          '''
           SELECT
             s.id,
             s.name_ko,
@@ -242,8 +243,12 @@ class DriftStationRepository
           FROM stations s
           LEFT JOIN station_lines sl ON sl.station_id = s.id
           LEFT JOIN lines l ON l.id = sl.line_id
+          $stationFilter
           ORDER BY s.name_ko, sl.line_sequence
-          ''').get();
+          ''',
+          variables: [if (stationId != null) Variable.withString(stationId)],
+        )
+        .get();
 
     final summaries = <String, _LocalStationSummary>{};
     for (final row in rows) {
@@ -281,7 +286,14 @@ class DriftStationRepository
     }
 
     final aliasRows = await database
-        .customSelect('SELECT station_id, alias FROM station_aliases')
+        .customSelect(
+          '''
+          SELECT station_id, alias
+          FROM station_aliases
+          ${stationId == null ? '' : 'WHERE station_id = ?'}
+          ''',
+          variables: [if (stationId != null) Variable.withString(stationId)],
+        )
         .get();
     for (final row in aliasRows) {
       summaries[row.read<String>('station_id')]?.aliases.add(
