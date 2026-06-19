@@ -98,6 +98,37 @@ function prodJdbcRepositoryFiles() {
   }).trim().split("\n").filter(Boolean);
 }
 
+test("backend production schema is managed by Flyway versioned migrations", () => {
+  const build = read("backend/build.gradle");
+  const application = read("backend/src/main/resources/application.yml");
+  const applicationProd = read("backend/src/main/resources/application-prod.yml");
+  const baselineMigration = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
+  const h2BaselineMigration = read("backend/src/main/resources/db/migration/h2/V1__baseline_schema.sql");
+
+  assert.match(build, /implementation 'org\.flywaydb:flyway-core'/);
+  assert.match(build, /runtimeOnly 'org\.flywaydb:flyway-database-postgresql'/);
+  assert.match(application, /flyway:[\s\S]*enabled: true/);
+  assert.match(application, /locations: classpath:db\/migration\/\{vendor\}/);
+  assert.match(applicationProd, /flyway:[\s\S]*enabled: true/);
+  assert.match(applicationProd, /locations: classpath:db\/migration\/postgresql/);
+  assert.match(applicationProd, /baseline-on-migrate: true/);
+  assert.match(applicationProd, /baseline-version: 1/);
+  assert.doesNotMatch(applicationProd, /schema-locations: classpath:db\/batch\/schema-postgresql\.sql/);
+  assert.equal(
+    existsSync(path.join(root, "backend/src/main/resources/db/batch/schema-postgresql.sql")),
+    false,
+    "legacy one-shot schema-postgresql.sql must be replaced by versioned migrations",
+  );
+  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE/);
+  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
+  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS facility_reports/);
+  assert.match(baselineMigration, /CONSTRAINT fk_anonymous_auth_tokens_user/);
+  assert.match(baselineMigration, /CONSTRAINT fk_facility_report_review_audits_report/);
+  assert.match(h2BaselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
+  assert.match(h2BaselineMigration, /CHECK \(char_length\(token_hash\) = 64\)/);
+  assert.doesNotMatch(h2BaselineMigration, /WHERE revoked_at IS NULL/);
+});
+
 function readPngPixelBounds(relativePath) {
   const png = readFileSync(path.join(root, relativePath));
   const signature = png.subarray(0, 8);
@@ -774,14 +805,11 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   const bearerFilter = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerAuthenticationFilter.java");
   const bearerPrincipal = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/AnonymousBearerPrincipal.java");
   const inMemoryTokenStore = read("backend/src/main/java/com/easysubway/auth/adapter/out/security/InMemoryAnonymousAuthTokenStore.java");
-  const authSchemaInitializer = read(
-    "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthSchemaInitializer.java",
-  );
   const controllerTest = read("backend/src/test/java/com/easysubway/auth/adapter/in/web/AnonymousAuthControllerTest.java");
   const infrastructureContainerTest = read(
     "backend/src/test/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthInfrastructureContainerTest.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const redisRateLimitAdapter = read(
     "backend/src/main/java/com/easysubway/auth/adapter/out/redis/RedisAnonymousAuthRateLimitAdapter.java",
   );
@@ -856,14 +884,11 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(bearerPrincipal, /public String getName\(\)/);
   assert.match(inMemoryTokenStore, /CopyOnWriteArrayList/);
   assert.doesNotMatch(inMemoryTokenStore, /new ArrayList/);
-  assert.match(authSchemaInitializer, /CREATE TABLE IF NOT EXISTS guest_accounts/);
-  assert.match(authSchemaInitializer, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
-  assert.match(authSchemaInitializer, /chk_guest_accounts_user_id/);
-  assert.match(authSchemaInitializer, /idx_guest_accounts_created/);
-  assert.match(authSchemaInitializer, /ON DELETE CASCADE ON UPDATE CASCADE/);
-  assert.match(authSchemaInitializer, /chk_anonymous_auth_tokens_hash/);
-  assert.match(authSchemaInitializer, /idx_anonymous_auth_tokens_user_type/);
-  assert.match(authSchemaInitializer, /idx_anonymous_auth_audit_events_occurred/);
+  assert.equal(
+    existsSync(path.join(root, "backend/src/main/java/com/easysubway/auth/adapter/out/persistence/AnonymousAuthSchemaInitializer.java")),
+    false,
+    "anonymous auth schema must be created by Flyway migrations, not a PostConstruct initializer",
+  );
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS guest_accounts/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS anonymous_auth_audit_events/);
@@ -871,11 +896,14 @@ test("백엔드 익명 사용자 인증은 헥사고날 API 경계를 따른다"
   assert.match(userDetailsManager, /ConcurrentHashMap/);
   assert.doesNotMatch(security, /InMemoryUserDetailsManager/);
   assert.match(build, /spring-boot-starter-data-redis/);
+  assert.match(build, /org\.flywaydb:flyway-core/);
   assert.match(build, /testImplementation 'org\.testcontainers:junit-jupiter:/);
   assert.match(build, /testImplementation 'org\.testcontainers:postgresql:/);
   assert.match(infrastructureContainerTest, /@Testcontainers/);
   assert.match(infrastructureContainerTest, /PostgreSQLContainer/);
   assert.match(infrastructureContainerTest, /GenericContainer/);
+  assert.match(infrastructureContainerTest, /Flyway\.configure\(\)/);
+  assert.match(infrastructureContainerTest, /classpath:db\/migration\/postgresql/);
   assert.match(infrastructureContainerTest, /postgres:16-alpine/);
   assert.match(infrastructureContainerTest, /redis:7-alpine/);
   assert.match(infrastructureContainerTest, /JdbcAnonymousAuthRepository/);
@@ -1339,7 +1367,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const transitRepository = read(
     "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/InMemoryTransitMasterRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const adminPageController = read(
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
@@ -1657,7 +1685,7 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/profile/adapter/out/persistence/JdbcMobilityProfileRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java");
 
   assert.match(profile, /record MobilityProfile/);
@@ -1714,7 +1742,7 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteStationRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteStationController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1781,7 +1809,7 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteFacilityRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1852,7 +1880,7 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   const service = read("backend/src/main/java/com/easysubway/favorite/application/service/FavoriteRouteService.java");
   const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteRouteRepository.java");
   const jdbcRepository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteRouteRepository.java");
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1920,7 +1948,7 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcNotificationPreferenceRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -1994,7 +2022,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   const jdbcRepository = read(
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcPushNotificationOutboxRepository.java",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
   const dashboardController = read(
     "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
@@ -2205,7 +2233,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const application = read("backend/src/main/resources/application.yml");
   const applicationDev = read("backend/src/main/resources/application-dev.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
   const source = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionSource.java");
   const status = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStatus.java");
@@ -2237,7 +2265,8 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(applicationProd, /datasource:[\s\S]*url: \$\{EASYSUBWAY_DATASOURCE_URL\}/);
   assert.match(applicationProd, /driver-class-name: org\.postgresql\.Driver/);
   assert.match(applicationProd, /sql:[\s\S]*init:[\s\S]*mode: never/);
-  assert.match(applicationProd, /schema-locations: classpath:db\/batch\/schema-postgresql\.sql/);
+  assert.match(applicationProd, /flyway:[\s\S]*enabled: true/);
+  assert.match(applicationProd, /locations: classpath:db\/migration\/postgresql/);
   assert.match(applicationProd, /batch:[\s\S]*jdbc:[\s\S]*initialize-schema: never/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS BATCH_JOB_EXECUTION/);
@@ -2320,7 +2349,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
 });
 
 test("데이터 소스 원본 archive는 로컬 전용 산출물 기준선을 제공한다", () => {
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const archiveScript = read("tools/ops/data-source-raw-archive.sh");
 
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS data_source_raw_archives/);
@@ -2362,7 +2391,7 @@ test("데이터 소스 원본 archive는 로컬 전용 산출물 기준선을 �
 });
 
 test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한다", () => {
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const session = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationSession.java");
   const item = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationItem.java");
   const history = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationChangeHistory.java");
@@ -2615,7 +2644,7 @@ test("백엔드 사용자 활동 현황은 관리자 대시보드와 헥사고�
 });
 
 test("사용자 활동 JDBC 저장소는 운영 프로필에서 활동 지표를 영속화한다", () => {
-  const schema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const schema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const repository = read(
     "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java",
   );
@@ -2644,7 +2673,7 @@ test("사용자 활동 JDBC 저장소는 운영 프로필에서 활동 지표를
 });
 
 test("신고 검수 감사 로그 JDBC 저장소는 운영 프로필에서 검수 이력을 영속화한다", () => {
-  const schema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const schema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const repository = read(
     "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportReviewAuditRepository.java",
   );
@@ -2742,7 +2771,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   const operatorRouteFeedbackReportTemplate = read(
     "backend/src/main/resources/templates/operator/route-feedback-report.html",
   );
-  const batchPostgresSchema = read("backend/src/main/resources/db/batch/schema-postgresql.sql");
+  const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
 
   assert.match(result, /record RouteSearchResult/);
   assert.match(result, /mobilityType/);
