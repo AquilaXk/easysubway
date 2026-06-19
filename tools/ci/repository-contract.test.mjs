@@ -957,6 +957,19 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   assert.match(unavailableTransitMaster, /@Profile\("prod"\)/);
   assert.match(unavailableTransitMaster, /implements[\s\S]*LoadTransitMasterPort/);
   assert.match(unavailableTransitMaster, /public List<Station> loadStations\(\) \{\s*return List\.of\(\);/);
+  assert.match(unavailableTransitMaster, /UnsupportedOperationException/);
+  assert.match(unavailableTransitMaster, /saveFacilityStatus[\s\S]*unsupportedWriteOperation\("saveFacilityStatus"\)/);
+  assert.match(
+    unavailableTransitMaster,
+    /saveAccessibilityFacility[\s\S]*unsupportedWriteOperation\("saveAccessibilityFacility"\)/,
+  );
+  assert.match(unavailableTransitMaster, /saveStationLayoutSource[\s\S]*unsupportedWriteOperation\("saveStationLayoutSource"\)/);
+  assert.match(
+    unavailableTransitMaster,
+    /saveSimplifiedStationLayoutStatus[\s\S]*unsupportedWriteOperation\("saveSimplifiedStationLayoutStatus"\)/,
+  );
+  assert.match(unavailableTransitMaster, /saveRouteNode[\s\S]*unsupportedWriteOperation\("saveRouteNode"\)/);
+  assert.match(unavailableTransitMaster, /saveRouteEdge[\s\S]*unsupportedWriteOperation\("saveRouteEdge"\)/);
   for (const file of prodJdbcRepositoryFiles()) {
     const source = read(file);
     if (/JdbcTemplate jdbcTemplate/.test(source) && /public Jdbc[A-Za-z0-9]+Repository\(DataSource/.test(source)) {

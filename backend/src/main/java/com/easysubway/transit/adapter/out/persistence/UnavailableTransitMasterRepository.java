@@ -64,14 +64,17 @@ public class UnavailableTransitMasterRepository implements
 
 	@Override
 	public void saveFacilityStatus(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt) {
+		throw unsupportedWriteOperation("saveFacilityStatus");
 	}
 
 	@Override
 	public void saveAccessibilityFacility(AccessibilityFacility facility) {
+		throw unsupportedWriteOperation("saveAccessibilityFacility");
 	}
 
 	@Override
 	public void saveStationLayoutSource(StationLayoutSource source) {
+		throw unsupportedWriteOperation("saveStationLayoutSource");
 	}
 
 	@Override
@@ -81,13 +84,22 @@ public class UnavailableTransitMasterRepository implements
 		String reviewedBy,
 		LocalDate updatedAt
 	) {
+		throw unsupportedWriteOperation("saveSimplifiedStationLayoutStatus");
 	}
 
 	@Override
 	public void saveRouteNode(RouteNode routeNode) {
+		throw unsupportedWriteOperation("saveRouteNode");
 	}
 
 	@Override
 	public void saveRouteEdge(RouteEdge routeEdge) {
+		throw unsupportedWriteOperation("saveRouteEdge");
+	}
+
+	private UnsupportedOperationException unsupportedWriteOperation(String operation) {
+		return new UnsupportedOperationException(
+			"운영 프로필에서는 도시철도 마스터 데이터 쓰기를 지원하지 않습니다: " + operation
+		);
 	}
 }
