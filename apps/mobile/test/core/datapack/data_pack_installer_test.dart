@@ -122,6 +122,43 @@ void main() {
       isTrue,
     );
   });
+
+  test('installer는 emergency override 대상 버전을 정리하지 않는다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-prune-override-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final overridePack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    final previous = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await overridePack.writeAsString('override');
+    await previous.writeAsString('previous');
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+
+    await installer.install(
+      pack: _pack(
+        version: '19',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+      ),
+      compressedBytes: compressedBytes,
+      protectedVersions: const {'17'},
+    );
+
+    expect(await overridePack.exists(), isTrue);
+    expect(
+      await File('${catalogDirectory.path}/capital-v19.sqlite').exists(),
+      isTrue,
+    );
+  });
 }
 
 DataPackManifestEntry _pack({

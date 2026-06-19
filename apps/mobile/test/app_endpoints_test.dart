@@ -16,6 +16,20 @@ void main() {
     );
   });
 
+  test('앱 endpoint는 slash가 없는 데이터팩 base URL도 directory로 처리한다', () {
+    const endpoints = AppEndpoints(
+      dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks',
+      reportApiBaseUrl: 'https://api.easysubway.example',
+    );
+
+    expect(
+      endpoints.dataPackManifestUri,
+      Uri.parse(
+        'https://cdn.easysubway.example/datapacks/catalog/current.json',
+      ),
+    );
+  });
+
   test('앱 endpoint는 비어 있거나 host가 없는 데이터팩 URL을 사용하지 않는다', () {
     expect(
       const AppEndpoints(

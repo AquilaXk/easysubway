@@ -26,6 +26,13 @@ class EmergencyOverrideRepository {
         );
   }
 
+  Future<void> clearOverride() async {
+    await userDatabase.customStatement(
+      'DELETE FROM data_pack_update_state WHERE key = ?',
+      [_overrideKey],
+    );
+  }
+
   Future<EmergencyDataPackOverride?> readOverride() async {
     final row = await userDatabase
         .customSelect(

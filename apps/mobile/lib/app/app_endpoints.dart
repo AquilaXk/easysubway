@@ -25,7 +25,8 @@ class AppEndpoints {
     if (trimmed.isEmpty) {
       return null;
     }
-    final base = Uri.tryParse(trimmed);
+    final normalized = trimmed.endsWith('/') ? trimmed : '$trimmed/';
+    final base = Uri.tryParse(normalized);
     if (base == null || !base.hasScheme || base.host.isEmpty) {
       return null;
     }

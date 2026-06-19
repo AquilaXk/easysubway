@@ -23,6 +23,7 @@ class DataPackInstaller {
   Future<DataPackInstallResult> install({
     required DataPackManifestEntry pack,
     required List<int> compressedBytes,
+    Set<String> protectedVersions = const {},
   }) async {
     await catalogDirectory.create(recursive: true);
     final compressedHash = sha256.convert(compressedBytes).toString();
@@ -75,7 +76,11 @@ class DataPackInstaller {
       installedAt: _now().toUtc(),
     );
     await _writeCurrentPointer(pointer);
-    await _pruneObsoletePacks(pack.id, keepVersionCount: 2);
+    await _pruneObsoletePacks(
+      pack.id,
+      keepVersionCount: 2,
+      protectedVersions: protectedVersions,
+    );
     await userDatabase
         .into(userDatabase.installedDataPacks)
         .insertOnConflictUpdate(
@@ -168,6 +173,7 @@ class DataPackInstaller {
   Future<void> _pruneObsoletePacks(
     String packId, {
     required int keepVersionCount,
+    required Set<String> protectedVersions,
   }) async {
     final packFiles = await catalogDirectory
         .list()
@@ -179,7 +185,16 @@ class DataPackInstaller {
     packFiles.sort((left, right) {
       return _versionNumber(right.path).compareTo(_versionNumber(left.path));
     });
-    for (final file in packFiles.skip(keepVersionCount)) {
+    var keptUnprotectedCount = 0;
+    for (final file in packFiles) {
+      final version = _versionNumber(file.path).toString();
+      if (protectedVersions.contains(version)) {
+        continue;
+      }
+      keptUnprotectedCount++;
+      if (keptUnprotectedCount <= keepVersionCount) {
+        continue;
+      }
       await _deleteIfExists(file);
     }
   }
