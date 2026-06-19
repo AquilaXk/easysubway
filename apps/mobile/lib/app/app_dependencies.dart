@@ -9,7 +9,8 @@ import '../station_search.dart';
 import '../user_data_deletion.dart';
 import '../core/database/catalog/catalog_database.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
-import '../features/routes/data/local_route_repository.dart';
+import '../features/routes/data/local_route_repository.dart'
+    show FallbackRouteSearchRepository, LocalRouteRepository;
 
 class AppDependencies {
   const AppDependencies({
