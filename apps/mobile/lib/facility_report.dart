@@ -241,12 +241,18 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     }
 
     final data = decoded['data'];
-    if (data is! List<Object?>) {
-      throw FacilityReportException(errorMessage);
+    final items = switch (data) {
+      {'items': final List<Object?> pageItems} => pageItems,
+      final List<Object?> listItems => listItems,
+      _ => throw FacilityReportException(errorMessage),
+    };
+
+    if (items.isEmpty) {
+      return const [];
     }
 
     return [
-      for (final item in data)
+      for (final item in items)
         if (item is Map<String, Object?>)
           FacilityReportResult.fromJson(item)
         else
