@@ -59,4 +59,46 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('데이터팩 manifest는 파일 경로로 안전하지 않은 pack id와 version을 거부한다', () {
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          {
+            'id': '../capital',
+            'version': '18',
+            'url': 'catalog/capital-v18.sqlite.gz',
+            'sha256': 'a' * 64,
+            'sqliteSha256': 'b' * 64,
+            'schemaVersion': '1',
+            'requiredTables': ['catalog_metadata'],
+          },
+        ],
+      }),
+      throwsFormatException,
+    );
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          {
+            'id': 'capital',
+            'version': '../18',
+            'url': 'catalog/capital-v18.sqlite.gz',
+            'sha256': 'a' * 64,
+            'sqliteSha256': 'b' * 64,
+            'schemaVersion': '1',
+            'requiredTables': ['catalog_metadata'],
+          },
+        ],
+        'emergencyOverride': {
+          'id': 'capital',
+          'version': '../17',
+          'reason': '시설 상태 긴급 정정',
+        },
+      }),
+      throwsFormatException,
+    );
+  });
 }

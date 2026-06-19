@@ -45,7 +45,7 @@ void main() {
     expect(requestCount, 0);
   });
 
-  test('manifest client는 TTL 만료 후 ETag로 조건부 요청한다', () async {
+  test('manifest client는 TTL 만료 후 ETag 요청 결과를 성공 후 저장한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
     final stateRepository = DataPackUpdateStateRepository(
@@ -93,6 +93,7 @@ void main() {
     );
 
     final result = await client.fetchManifestIfNeeded();
+    await client.saveManifestCache(result);
     final cache = await stateRepository.readManifestCache();
 
     expect(ifNoneMatch, 'etag-v17');
