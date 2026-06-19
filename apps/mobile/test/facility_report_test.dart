@@ -408,26 +408,31 @@ void main() {
         ..write(
           jsonEncode({
             'success': true,
-            'data': [
-              {
-                'id': 'report-2',
-                'stationId': 'station-sangnoksu',
-                'facilityId': 'facility-sangnoksu-elevator-1',
-                'reportType': 'CLOSED',
-                'description': '출입문이 막혀 있습니다.',
-                'status': 'ACCEPTED',
-                'createdAt': '2026-06-15T09:00:00',
-              },
-              {
-                'id': 'report-1',
-                'stationId': 'station-sangnoksu',
-                'facilityId': 'facility-sangnoksu-elevator-2',
-                'reportType': 'BROKEN',
-                'description': '버튼이 눌리지 않습니다.',
-                'status': 'SUBMITTED',
-                'createdAt': '2026-06-14T09:00:00',
-              },
-            ],
+            'data': {
+              'items': [
+                {
+                  'id': 'report-2',
+                  'stationId': 'station-sangnoksu',
+                  'facilityId': 'facility-sangnoksu-elevator-1',
+                  'reportType': 'CLOSED',
+                  'description': '출입문이 막혀 있습니다.',
+                  'status': 'ACCEPTED',
+                  'createdAt': '2026-06-15T09:00:00',
+                },
+                {
+                  'id': 'report-1',
+                  'stationId': 'station-sangnoksu',
+                  'facilityId': 'facility-sangnoksu-elevator-2',
+                  'reportType': 'BROKEN',
+                  'description': '버튼이 눌리지 않습니다.',
+                  'status': 'SUBMITTED',
+                  'createdAt': '2026-06-14T09:00:00',
+                },
+              ],
+              'page': 0,
+              'size': 20,
+              'hasNext': false,
+            },
           }),
         )
         ..close();
