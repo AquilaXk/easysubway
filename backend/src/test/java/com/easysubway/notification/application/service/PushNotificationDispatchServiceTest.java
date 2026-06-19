@@ -106,6 +106,32 @@ class PushNotificationDispatchServiceTest {
 	}
 
 	@Test
+	@DisplayName("같은 idempotency key 발송은 outbox 후보를 중복 생성하지 않는다")
+	void dispatchWithSameIdempotencyKeyDoesNotDuplicateOutboxMessage() {
+		registerDevice("anonymous-user-idempotent", DevicePlatform.ANDROID, "android-token-idempotent");
+
+		dispatchService.dispatch(new DispatchPushNotificationCommand(
+			"anonymous-user-idempotent",
+			PushNotificationType.REPORT_STATUS,
+			"신고 처리 결과",
+			"제보해 주신 신고가 확인되어 시설 정보에 반영되었습니다.",
+			"report-status:report-1:ACCEPTED"
+		));
+		dispatchService.dispatch(new DispatchPushNotificationCommand(
+			"anonymous-user-idempotent",
+			PushNotificationType.REPORT_STATUS,
+			"신고 처리 결과",
+			"제보해 주신 신고가 확인되어 시설 정보에 반영되었습니다.",
+			"report-status:report-1:ACCEPTED"
+		));
+
+		assertThat(outboxRepository.loadPushNotifications("anonymous-user-idempotent"))
+			.hasSize(1)
+			.extracting("type")
+			.containsExactly(PushNotificationType.REPORT_STATUS);
+	}
+
+	@Test
 	@DisplayName("발송 명령은 사용자, 알림 종류, 제목, 본문을 요구한다")
 	void dispatchCommandRequiresUserTypeTitleAndBody() {
 		assertThatThrownBy(() -> new DispatchPushNotificationCommand(
