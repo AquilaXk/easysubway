@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -88,5 +90,32 @@ class AppBootstrap {
   Future<void> close() async {
     await catalogDatabase.close();
     await userDatabase.close();
+  }
+}
+
+class AppBootstrapLifecycle extends StatefulWidget {
+  const AppBootstrapLifecycle({
+    required this.close,
+    required this.child,
+    super.key,
+  });
+
+  final Future<void> Function() close;
+  final Widget child;
+
+  @override
+  State<AppBootstrapLifecycle> createState() => _AppBootstrapLifecycleState();
+}
+
+class _AppBootstrapLifecycleState extends State<AppBootstrapLifecycle> {
+  @override
+  void dispose() {
+    unawaited(widget.close());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

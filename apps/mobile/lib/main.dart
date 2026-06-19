@@ -32,12 +32,15 @@ Future<void> main() async {
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
-    EasySubwayApp(
-      dependencies: bootstrap.dependencies,
-      onboardingStore: const SecureOnboardingResultStore(),
-      facilityReportDraftTargetStore:
-          const SecureFacilityReportDraftTargetStore(),
-      facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+    AppBootstrapLifecycle(
+      close: bootstrap.close,
+      child: EasySubwayApp(
+        dependencies: bootstrap.dependencies,
+        onboardingStore: const SecureOnboardingResultStore(),
+        facilityReportDraftTargetStore:
+            const SecureFacilityReportDraftTargetStore(),
+        facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+      ),
     ),
   );
 }

@@ -1,14 +1,35 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:easysubway_mobile/app/app_bootstrap.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('앱 부트스트랩 owner는 제거될 때 열린 DB 자원을 닫는다', (tester) async {
+    final closeCalled = Completer<void>();
+
+    await tester.pumpWidget(
+      AppBootstrapLifecycle(
+        close: () {
+          closeCalled.complete();
+          return Future<void>.value();
+        },
+        child: const SizedBox.shrink(),
+      ),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    await closeCalled.future;
+    expect(closeCalled.isCompleted, isTrue);
+  });
 
   test('catalog DB는 앱 시작에 필요한 schema와 index를 만든다', () async {
     final database = CatalogDatabase.memory();
