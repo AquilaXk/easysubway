@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,7 +87,19 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 	@Override
 	@Transactional
 	public void save(FieldVerificationSession session) {
-		int updated = jdbcTemplate.update(
+		if (updateSession(session) == 0) {
+			try {
+				insertSession(session);
+			} catch (DuplicateKeyException exception) {
+				// 운영 다중 인스턴스가 같은 세션을 동시에 만들면 삽입 충돌 후 최신 값으로 수렴시킨다.
+				updateSession(session);
+			}
+		}
+		session.items().forEach(item -> saveItem(session, item));
+	}
+
+	private int updateSession(FieldVerificationSession session) {
+		return jdbcTemplate.update(
 			"""
 				UPDATE field_verification_sessions
 				SET station_id = ?,
@@ -105,34 +118,45 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 			session.note(),
 			session.id()
 		);
-		if (updated == 0) {
-			jdbcTemplate.update(
-				"""
-					INSERT INTO field_verification_sessions (
-						session_id,
-						station_id,
-						station_name,
-						verified_at,
-						verified_by,
-						status,
-						note
-					)
-					VALUES (?, ?, ?, ?, ?, ?, ?)
-					""",
-				session.id(),
-				session.stationId(),
-				session.stationName(),
-				session.verifiedAt(),
-				session.verifiedBy(),
-				session.status().name(),
-				session.note()
-			);
-		}
-		session.items().forEach(item -> saveItem(session, item));
+	}
+
+	private void insertSession(FieldVerificationSession session) {
+		jdbcTemplate.update(
+			"""
+				INSERT INTO field_verification_sessions (
+					session_id,
+					station_id,
+					station_name,
+					verified_at,
+					verified_by,
+					status,
+					note
+				)
+				VALUES (?, ?, ?, ?, ?, ?, ?)
+				""",
+			session.id(),
+			session.stationId(),
+			session.stationName(),
+			session.verifiedAt(),
+			session.verifiedBy(),
+			session.status().name(),
+			session.note()
+		);
 	}
 
 	private void saveItem(FieldVerificationSession session, FieldVerificationItem item) {
-		int updated = jdbcTemplate.update(
+		if (updateItem(session, item) == 0) {
+			try {
+				insertItem(session, item);
+			} catch (DuplicateKeyException exception) {
+				// 세션 항목도 같은 부트스트랩 race에서 삽입 충돌 후 최신 값으로 맞춘다.
+				updateItem(session, item);
+			}
+		}
+	}
+
+	private int updateItem(FieldVerificationSession session, FieldVerificationItem item) {
+		return jdbcTemplate.update(
 			"""
 				UPDATE field_verification_items
 				SET session_id = ?,
@@ -149,27 +173,28 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 			item.note(),
 			item.id()
 		);
-		if (updated == 0) {
-			jdbcTemplate.update(
-				"""
-					INSERT INTO field_verification_items (
-						item_id,
-						session_id,
-						item_type,
-						target_name,
-						status,
-						note
-					)
-					VALUES (?, ?, ?, ?, ?, ?)
-					""",
-				item.id(),
-				session.id(),
-				item.type().name(),
-				item.targetName(),
-				item.status().name(),
-				item.note()
-			);
-		}
+	}
+
+	private void insertItem(FieldVerificationSession session, FieldVerificationItem item) {
+		jdbcTemplate.update(
+			"""
+				INSERT INTO field_verification_items (
+					item_id,
+					session_id,
+					item_type,
+					target_name,
+					status,
+					note
+				)
+				VALUES (?, ?, ?, ?, ?, ?)
+				""",
+			item.id(),
+			session.id(),
+			item.type().name(),
+			item.targetName(),
+			item.status().name(),
+			item.note()
+		);
 	}
 
 	private FieldVerificationSession mapSession(ResultSet resultSet, int rowNumber) throws SQLException {

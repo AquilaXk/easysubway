@@ -2323,6 +2323,9 @@ test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_sessions/);
   assert.match(jdbcSessionRepository, /UPDATE field_verification_items/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_items/);
+  assert.match(jdbcSessionRepository, /DuplicateKeyException/);
+  assert.match(jdbcSessionRepository, /updateSession\(session\)/);
+  assert.match(jdbcSessionRepository, /updateItem\(session, item\)/);
   assert.match(jdbcSessionRepository, /@Transactional\s+public void save\(FieldVerificationSession session\)/);
   assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, session_id ASC/);
   assert.match(jdbcSessionRepository, /ORDER BY item_type ASC, item_id ASC/);
