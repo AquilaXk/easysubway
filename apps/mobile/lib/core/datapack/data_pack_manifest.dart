@@ -62,10 +62,7 @@ class DataPackManifestEntry {
       schemaVersion: _requiredString(json, 'schemaVersion'),
       requiredTables: requiredTables
           .map((table) {
-            if (table is! String || table.trim().isEmpty) {
-              throw const FormatException('Invalid required data pack table.');
-            }
-            return table.trim();
+            return _readTableName(table);
           })
           .toList(growable: false),
       minimumTableRows: _parseMinimumTableRows(minimumTableRows),
@@ -116,10 +113,11 @@ Map<String, int> _parseMinimumTableRows(Object? rawRows) {
     throw const FormatException('Invalid minimum table rows.');
   }
   return rawRows.map((key, value) {
-    if (key.trim().isEmpty || value is! int || value < 0) {
+    final tableName = _readTableName(key);
+    if (value is! int || value < 0) {
       throw const FormatException('Invalid minimum table row entry.');
     }
-    return MapEntry(key.trim(), value);
+    return MapEntry(tableName, value);
   });
 }
 
@@ -129,4 +127,16 @@ String _requiredString(Map<String, Object?> json, String key) {
     throw const FormatException('Invalid data pack manifest value.');
   }
   return value.trim();
+}
+
+String _readTableName(Object? value) {
+  if (value is! String) {
+    throw const FormatException('Invalid data pack table name.');
+  }
+  final tableName = value.trim();
+  final identifier = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
+  if (!identifier.hasMatch(tableName)) {
+    throw const FormatException('Invalid data pack table name.');
+  }
+  return tableName;
 }
