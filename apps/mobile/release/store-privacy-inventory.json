@@ -251,40 +251,6 @@
       }
     },
     {
-      "id": "anonymous_user_id",
-      "displayNameKo": "익명 사용자 식별자",
-      "purposeKo": "즐겨찾기와 신고 이력을 계정 없이 연결",
-      "implementationStatus": "collected",
-      "introducedInVersion": "0.1.0",
-      "codeOwner": "mobile/backend",
-      "collectionTrigger": "앱 시작 또는 인증 만료 후 익명 인증 세션을 발급하거나 갱신할 때",
-      "backendTableOrService": ["anonymous auth credentials", "user-linked feature tables"],
-      "storageLocations": ["mobile-secure-storage", "backend-database"],
-      "retentionKo": "앱 사용 기간 동안 보관하고 데이터 삭제 요청 시 삭제",
-      "deletionKo": "데이터 삭제 요청 시 삭제",
-      "deletionImplementation": "AnonymousAuthCredentialStore가 로컬 자격 증명을 지우고 UserDataDeletionService가 연결된 서버 데이터를 삭제 또는 익명화한다.",
-      "evidence": [
-        "apps/mobile/lib/anonymous_auth.dart",
-        "apps/mobile/lib/user_data_deletion.dart",
-        "backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java",
-        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
-      ],
-      "lastVerifiedAt": "2026-06-19",
-      "sharedWithThirdParties": false,
-      "usedForTracking": false,
-      "googlePlayDataSafety": {
-        "dataType": "User IDs",
-        "purpose": "App functionality",
-        "encryptedInTransit": true,
-        "optional": false
-      },
-      "appStorePrivacy": {
-        "dataType": "NSPrivacyCollectedDataTypeUserID",
-        "linkedToUser": true,
-        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-      }
-    },
-    {
       "id": "diagnostics_crash_logs",
       "displayNameKo": "앱 충돌 로그",
       "purposeKo": "앱 충돌 원인을 분석하고 접근성 흐름 회귀를 찾음",

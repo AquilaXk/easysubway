@@ -18,7 +18,6 @@ const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
 const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
 const _facilityReportFailureNextAction = '내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.';
-const _anonymousReportUserId = 'anonymous-mobile-user';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportLocationDisabledMessage =
     '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
@@ -102,7 +101,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       if (response.statusCode == HttpStatus.unauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
-        // 만료된 익명 인증은 비우고 새 인증으로 한 번만 다시 시도한다.
+        // 만료된 인증은 비우고 한 번만 다시 시도한다.
         await authProvider!.invalidateAuthorization().timeout(
           _facilityReportTimeout,
         );
@@ -328,7 +327,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       if (response.statusCode == HttpStatus.unauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
-        // 목록 조회도 접수와 같은 익명 인증을 쓰므로 만료 시 한 번만 갱신한다.
+        // 목록 조회 인증이 만료된 경우 한 번만 갱신한다.
         await authProvider!.invalidateAuthorization().timeout(
           _facilityReportTimeout,
         );
@@ -405,7 +404,7 @@ class FacilityReportException implements Exception {
 
 class FacilityReportRequest {
   const FacilityReportRequest({
-    required this.userId,
+    this.userId,
     this.clientSubmissionId,
     required this.stationId,
     required this.facilityId,
@@ -421,7 +420,7 @@ class FacilityReportRequest {
     this.longitude,
   });
 
-  final String userId;
+  final String? userId;
   final String? clientSubmissionId;
   final String stationId;
   final String facilityId;
@@ -438,7 +437,7 @@ class FacilityReportRequest {
 
   FacilityReportRequest trimmed() {
     return FacilityReportRequest(
-      userId: userId.trim(),
+      userId: userId?.trim(),
       clientSubmissionId: clientSubmissionId?.trim(),
       stationId: stationId.trim(),
       facilityId: facilityId.trim(),
@@ -458,7 +457,6 @@ class FacilityReportRequest {
   Map<String, Object?> toJson() {
     final request = trimmed();
     final json = <String, Object?>{
-      'userId': request.userId,
       'stationId': request.stationId,
       'facilityId': request.facilityId,
       'reportType': request.reportType,
@@ -1033,7 +1031,6 @@ class FacilityReportController extends ChangeNotifier {
     try {
       final result = await repository.createReport(
         FacilityReportRequest(
-          userId: _anonymousReportUserId,
           stationId: target.stationId,
           facilityId: target.facilityId,
           reportType: selectedType.reportType,

@@ -165,7 +165,7 @@ class NotificationSettingsApiRepository
         if (response.statusCode == HttpStatus.unauthorized &&
             authorizationHeader != null &&
             attempt == 0) {
-          // 익명 인증이 만료된 경우 저장소를 비우고 새 인증으로 한 번만 다시 시도한다.
+          // 인증이 만료된 경우 저장소를 비우고 한 번만 다시 시도한다.
           await authProvider.invalidateAuthorization().timeout(
             _notificationSettingsTimeout,
           );
@@ -257,7 +257,7 @@ class DeviceRegistrationApiRepository implements DeviceRegistrationRepository {
       if (response.statusCode == HttpStatus.unauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
-        // 기기 등록도 익명 인증 사용자에 묶이므로 만료 시 한 번만 새 인증으로 재시도한다.
+        // 기기 등록 인증이 만료된 경우 한 번만 다시 시도한다.
         await authProvider.invalidateAuthorization().timeout(
           _notificationSettingsTimeout,
         );

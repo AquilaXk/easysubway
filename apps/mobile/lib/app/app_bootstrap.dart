@@ -6,7 +6,6 @@ import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../anonymous_auth.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
 import '../internal_route.dart';
@@ -58,11 +57,8 @@ class AppBootstrap {
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
-    AnonymousAuthRepository? anonymousAuthRepository,
-    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
     DataPackUpdateRunner? dataPackUpdateRunner,
-    required bool enableAnonymousAuth,
     required bool enablePushNotifications,
   }) async {
     final supportDirectory =
@@ -98,12 +94,9 @@ class AppBootstrap {
         notificationRepository: notificationRepository,
         notificationPermissionProvider: notificationPermissionProvider,
         locationProvider: locationProvider,
-        anonymousAuthRepository: anonymousAuthRepository,
-        anonymousAuthCredentialStore: anonymousAuthCredentialStore,
         userDataDeletionRepository: userDataDeletionRepository,
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
-        enableAnonymousAuth: enableAnonymousAuth,
         enablePushNotifications: enablePushNotifications,
       );
 

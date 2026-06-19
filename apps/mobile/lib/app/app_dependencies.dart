@@ -1,4 +1,3 @@
-import '../anonymous_auth.dart';
 import '../auth_headers.dart';
 import '../core/database/catalog/catalog_database.dart';
 import '../core/database/user/user_database.dart';
@@ -32,7 +31,6 @@ class AppDependencies {
     required this.notificationPermissionProvider,
     required this.locationProvider,
     required this.userDataDeletionRepository,
-    required this.anonymousAuthSession,
   });
 
   factory AppDependencies.resolve({
@@ -48,22 +46,12 @@ class AppDependencies {
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
-    AnonymousAuthRepository? anonymousAuthRepository,
-    AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
-    required bool enableAnonymousAuth,
     required bool enablePushNotifications,
   }) {
     final baseUri = defaultStationApiBaseUri();
-    final anonymousAuthSession = _defaultAnonymousAuthSession(
-      baseUri: baseUri,
-      anonymousAuthRepository: anonymousAuthRepository,
-      credentialStore: anonymousAuthCredentialStore,
-      enableAnonymousAuth: enableAnonymousAuth,
-    );
-    final sharedAuthProvider = anonymousAuthSession;
     final pushNotificationsEnabled =
         enablePushNotifications ||
         notificationRepository != null ||
@@ -76,7 +64,7 @@ class AppDependencies {
                     )
                   : _defaultNotificationSettingsRepository(
                       baseUri: baseUri,
-                      authProvider: sharedAuthProvider,
+                      authProvider: null,
                     ))
         : null;
     final resolvedNotificationPermissionProvider = pushNotificationsEnabled
@@ -93,7 +81,7 @@ class AppDependencies {
           reportRepository ??
           FacilityReportApiRepository(
             baseUri: baseUri,
-            authProvider: sharedAuthProvider,
+            authProvider: null,
             receiptStore: userDatabase == null
                 ? null
                 : DriftFacilityReportReceiptStore(userDatabase: userDatabase),
@@ -110,10 +98,7 @@ class AppDependencies {
                 )),
       routeFeedbackRepository:
           routeFeedbackRepository ??
-          _defaultRouteFeedbackRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
+          _defaultRouteFeedbackRepository(baseUri: baseUri, authProvider: null),
       favoriteRepository:
           favoriteRepository ??
           (catalogDatabase != null && userDatabase != null
@@ -123,7 +108,7 @@ class AppDependencies {
                 )
               : _defaultFavoriteStationRepository(
                   baseUri: baseUri,
-                  authProvider: sharedAuthProvider,
+                  authProvider: null,
                 )),
       favoriteFacilityRepository:
           favoriteFacilityRepository ??
@@ -134,7 +119,7 @@ class AppDependencies {
                 )
               : _defaultFavoriteFacilityRepository(
                   baseUri: baseUri,
-                  authProvider: sharedAuthProvider,
+                  authProvider: null,
                 )),
       favoriteRouteRepository:
           favoriteRouteRepository ??
@@ -145,7 +130,7 @@ class AppDependencies {
                 )
               : _defaultFavoriteRouteRepository(
                   baseUri: baseUri,
-                  authProvider: sharedAuthProvider,
+                  authProvider: null,
                 )),
       searchHistoryRepository:
           searchHistoryRepository ??
@@ -170,10 +155,9 @@ class AppDependencies {
           userDataDeletionRepository ??
           _defaultUserDataDeletionRepository(
             baseUri: baseUri,
-            authProvider: sharedAuthProvider,
+            authProvider: null,
             userDatabase: userDatabase,
           ),
-      anonymousAuthSession: anonymousAuthSession,
     );
   }
 
@@ -190,23 +174,6 @@ class AppDependencies {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final AnonymousAuthSession? anonymousAuthSession;
-}
-
-AnonymousAuthSession? _defaultAnonymousAuthSession({
-  required Uri baseUri,
-  required bool enableAnonymousAuth,
-  AnonymousAuthRepository? anonymousAuthRepository,
-  AnonymousAuthCredentialStore? credentialStore,
-}) {
-  if (!enableAnonymousAuth) {
-    return null;
-  }
-  return AnonymousAuthSession(
-    repository:
-        anonymousAuthRepository ?? AnonymousAuthApiRepository(baseUri: baseUri),
-    credentialStore: credentialStore,
-  );
 }
 
 UserDataDeletionRepository? _defaultUserDataDeletionRepository({
@@ -222,9 +189,6 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
       : UserDataDeletionApiRepository(
           baseUri: baseUri,
           authProvider: authProvider,
-          refreshExistingAuthorization: authProvider is AnonymousAuthSession
-              ? authProvider.refreshExistingAuthorization
-              : null,
         );
   if (remoteRepository != null && localRepository != null) {
     return UserDataDeletionCompositeRepository(

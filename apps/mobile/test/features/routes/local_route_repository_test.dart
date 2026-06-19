@@ -13,7 +13,6 @@ void main() {
 
     final dependencies = AppDependencies.resolve(
       catalogDatabase: database,
-      enableAnonymousAuth: false,
       enablePushNotifications: false,
     );
 
