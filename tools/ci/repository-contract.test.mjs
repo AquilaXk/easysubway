@@ -2975,6 +2975,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
   const anonymousAuth = read("apps/mobile/lib/anonymous_auth.dart");
   const anonymousAuthTest = read("apps/mobile/test/anonymous_auth_test.dart");
+  const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
+  const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
@@ -3268,6 +3270,22 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 익명 인증, 기기 알림 정보, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
+  assert.match(userDataDeletion, /class UserDataDeletionApiRepository implements UserDataDeletionRepository/);
+  assert.match(userDataDeletion, /deleteUrl\(baseUri\.resolve\('\/api\/v1\/me'\)\)/);
+  assert.match(userDataDeletion, /HttpHeaders\.authorizationHeader/);
+  assert.match(userDataDeletion, /refreshExistingAuthorization/);
+  assert.match(anonymousAuth, /refreshExistingAuthorization\(/);
+  assert.match(
+    userDataDeletion,
+    /userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했습니다\. 잠시 후 다시 시도해 주세요\.'/,
+  );
+  assert.match(userDataDeletionTest, /인증 헤더로 DELETE \/api\/v1\/me를 호출한다/);
+  assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
+  assert.match(anonymousAuthTest, /삭제 요청에 사용한 인증 정보가 바뀌면 기존 인증 갱신을 실패 처리한다/);
+  assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
+  assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
+  assert.match(main, /UserDataDeletionScreen/);
+  assert.match(main, /dataDeletionConfirmButton/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
