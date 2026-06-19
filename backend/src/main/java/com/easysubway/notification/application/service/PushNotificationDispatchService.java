@@ -65,7 +65,7 @@ public class PushNotificationDispatchService implements PushNotificationDispatch
 				PushNotificationStatus.PENDING,
 				LocalDateTime.now(clock)
 			);
-			savedNotifications.add(savePushNotificationOutboxPort.savePushNotification(notification));
+			savedNotifications.add(savePushNotificationOutboxPort.savePendingPushNotificationIfAbsent(notification));
 		}
 
 		return new PushNotificationDispatchResult(

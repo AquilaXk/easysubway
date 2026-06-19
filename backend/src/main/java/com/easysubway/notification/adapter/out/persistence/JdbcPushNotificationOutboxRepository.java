@@ -116,6 +116,17 @@ public class JdbcPushNotificationOutboxRepository implements
 	}
 
 	@Override
+	public PushNotification savePendingPushNotificationIfAbsent(PushNotification notification) {
+		try {
+			insertPushNotification(notification);
+			return notification;
+		} catch (DuplicateKeyException exception) {
+			return loadPushNotification(notification.notificationId())
+				.orElse(notification);
+		}
+	}
+
+	@Override
 	public PushNotificationDashboardSummary summarizePushNotificationOutbox() {
 		List<StatusCountRow> statusCounts = jdbcTemplate.query(
 			"""
@@ -231,6 +242,29 @@ public class JdbcPushNotificationOutboxRepository implements
 			resultSet.getString("failure_reason"),
 			resultSet.getTimestamp("created_at").toLocalDateTime()
 		);
+	}
+
+	private java.util.Optional<PushNotification> loadPushNotification(String notificationId) {
+		return jdbcTemplate.query(
+				"""
+					SELECT notification_id,
+						user_id,
+						platform,
+						device_token,
+						notification_type,
+						title,
+						body,
+						status,
+						failure_reason,
+						created_at
+					FROM push_notification_outbox
+					WHERE notification_id = ?
+					""",
+				this::mapPushNotification,
+				notificationId
+			)
+			.stream()
+			.findFirst();
 	}
 
 	private String latestFailureReason() {

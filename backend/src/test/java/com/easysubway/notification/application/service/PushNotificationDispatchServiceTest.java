@@ -117,6 +117,9 @@ class PushNotificationDispatchServiceTest {
 			"제보해 주신 신고가 확인되어 시설 정보에 반영되었습니다.",
 			"report-status:report-1:ACCEPTED"
 		));
+		var sentNotification = outboxRepository.loadPushNotifications("anonymous-user-idempotent").getFirst()
+			.withStatus(PushNotificationStatus.SENT);
+		outboxRepository.savePushNotification(sentNotification);
 		dispatchService.dispatch(new DispatchPushNotificationCommand(
 			"anonymous-user-idempotent",
 			PushNotificationType.REPORT_STATUS,
@@ -127,8 +130,8 @@ class PushNotificationDispatchServiceTest {
 
 		assertThat(outboxRepository.loadPushNotifications("anonymous-user-idempotent"))
 			.hasSize(1)
-			.extracting("type")
-			.containsExactly(PushNotificationType.REPORT_STATUS);
+			.extracting("type", "status")
+			.containsExactly(tuple(PushNotificationType.REPORT_STATUS, PushNotificationStatus.SENT));
 	}
 
 	@Test
@@ -173,5 +176,9 @@ class PushNotificationDispatchServiceTest {
 
 	private void registerDevice(String userId, DevicePlatform platform, String deviceToken) {
 		preferenceService.registerDevice(new RegisterDeviceCommand(userId, platform, deviceToken));
+	}
+
+	private static org.assertj.core.groups.Tuple tuple(Object... values) {
+		return org.assertj.core.api.Assertions.tuple(values);
 	}
 }
