@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'data_pack_client.dart';
 import 'data_pack_installer.dart';
+import 'data_pack_manifest.dart';
 import 'emergency_override_repository.dart';
 
 const _dataPackDownloadTimeout = Duration(seconds: 20);
@@ -12,12 +13,14 @@ class DataPackUpdater {
     required this.client,
     required this.installer,
     this.emergencyOverrideRepository,
+    this.activePackId = 'capital',
     HttpClient? httpClient,
   }) : _httpClient = httpClient ?? HttpClient();
 
   final DataPackClient client;
   final DataPackInstaller installer;
   final EmergencyOverrideRepository? emergencyOverrideRepository;
+  final String activePackId;
   final HttpClient _httpClient;
 
   Future<List<DataPackInstallResult>> checkForUpdates() async {
@@ -30,7 +33,7 @@ class DataPackUpdater {
     final override = manifest.emergencyOverride;
     final protectedVersions = <String>{};
     if (override != null) {
-      protectedVersions.add(override.version);
+      protectedVersions.add(_normalizedVersion(override.version));
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
@@ -50,9 +53,13 @@ class DataPackUpdater {
     if (results.every(
       (result) => result.status == DataPackInstallStatus.installed,
     )) {
-      final currentPointer = results.lastOrNull?.pointer;
+      final currentPointer = _currentPointerForManifest(
+        manifest: manifest,
+        results: results,
+      );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
+        protectedVersions.add(_normalizedVersion(currentPointer.version));
       }
       for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
@@ -75,6 +82,44 @@ class DataPackUpdater {
       await client.saveManifestCache(manifestResult);
     }
     return results;
+  }
+
+  InstalledDataPackPointer? _currentPointerForManifest({
+    required DataPackManifest manifest,
+    required List<DataPackInstallResult> results,
+  }) {
+    if (results.isEmpty) {
+      return null;
+    }
+
+    final activePack = manifest.activePack;
+    if (activePack != null) {
+      for (final result in results) {
+        final pointer = result.pointer;
+        if (pointer?.id == activePack.id &&
+            _versionNumber(pointer?.version ?? '') ==
+                _versionNumber(activePack.version)) {
+          return pointer;
+        }
+      }
+      throw const DataPackClientException('활성 데이터팩을 선택하지 못했습니다.');
+    }
+
+    InstalledDataPackPointer? selected;
+    for (final result in results) {
+      final pointer = result.pointer;
+      if (pointer == null || pointer.id != activePackId) {
+        continue;
+      }
+      if (selected == null ||
+          _versionNumber(pointer.version) > _versionNumber(selected.version)) {
+        selected = pointer;
+      }
+    }
+    if (selected == null) {
+      throw const DataPackClientException('활성 데이터팩을 선택하지 못했습니다.');
+    }
+    return selected;
   }
 
   Uri _packBaseUriForManifest(Uri manifestUri) {
@@ -102,4 +147,12 @@ class DataPackUpdater {
     }
     return bytes;
   }
+}
+
+int _versionNumber(String version) {
+  return int.tryParse(version) ?? 0;
+}
+
+String _normalizedVersion(String version) {
+  return _versionNumber(version).toString();
 }

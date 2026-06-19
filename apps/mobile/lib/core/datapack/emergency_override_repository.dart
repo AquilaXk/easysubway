@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:path/path.dart' as p;
 
 import '../database/user/user_database.dart' as user_db;
 import 'data_pack_installer.dart';
@@ -61,8 +62,8 @@ class EmergencyDataPackOverride {
 
   factory EmergencyDataPackOverride.fromJson(Map<String, Object?> json) {
     return EmergencyDataPackOverride(
-      id: _readString(json, 'id'),
-      version: _readString(json, 'version'),
+      id: _readFilenamePart(json, 'id'),
+      version: _readFilenamePart(json, 'version'),
       reason: _readString(json, 'reason'),
     );
   }
@@ -91,7 +92,10 @@ class DataPackSelectionPolicy {
     return InstalledDataPackPointer(
       id: override.id,
       version: override.version,
-      path: installed.path,
+      path: p.join(
+        p.dirname(installed.path),
+        '${override.id}-v${override.version}.sqlite',
+      ),
       reason: override.reason,
     );
   }
@@ -103,4 +107,14 @@ String _readString(Map<String, Object?> json, String key) {
     throw const FormatException('Invalid emergency data pack override.');
   }
   return value.trim();
+}
+
+String _readFilenamePart(Map<String, Object?> json, String key) {
+  final value = _readString(json, key);
+  final hasUnsafePathPart =
+      value.contains('..') || value.contains('/') || value.contains('\\');
+  if (hasUnsafePathPart || !RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(value)) {
+    throw const FormatException('Invalid emergency data pack override.');
+  }
+  return value;
 }
