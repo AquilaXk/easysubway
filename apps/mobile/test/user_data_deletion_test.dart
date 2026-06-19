@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
+import 'package:easysubway_mobile/core/database/user/user_database.dart'
+    as user_db;
 import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -184,6 +186,203 @@ void main() {
       ),
     );
   });
+
+  test('로컬 사용자 데이터 삭제 저장소는 user DB 개인 데이터를 비운다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final now = DateTime.utc(2026, 6, 19, 9);
+    await userDatabase
+        .into(userDatabase.favoriteStations)
+        .insert(
+          user_db.FavoriteStationsCompanion.insert(
+            stationId: 'station-sangnoksu',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.favoriteFacilities)
+        .insert(
+          user_db.FavoriteFacilitiesCompanion.insert(
+            facilityId: 'facility-sangnoksu-elevator-1',
+            stationId: 'station-sangnoksu',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.favoriteRoutes)
+        .insert(
+          user_db.FavoriteRoutesCompanion.insert(
+            routeId: 'local-station-sangnoksu-station-sadang::SENIOR',
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityProfile: 'SENIOR',
+            addedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.searchHistory)
+        .insert(
+          user_db.SearchHistoryCompanion.insert(query: '상록수', searchedAt: now),
+        );
+    await userDatabase
+        .into(userDatabase.appPreferences)
+        .insert(
+          user_db.AppPreferencesCompanion.insert(
+            key: 'notification_settings',
+            value: '{}',
+            updatedAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.reportReceipts)
+        .insert(
+          user_db.ReportReceiptsCompanion.insert(
+            receiptId: 'receipt-1',
+            status: 'SUBMITTED',
+            createdAt: now,
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.reportDrafts)
+        .insert(
+          user_db.ReportDraftsCompanion.insert(
+            draftId: 'draft-1',
+            payloadJson: '{}',
+            updatedAt: now,
+          ),
+        );
+    final repository = UserDataDeletionLocalRepository(
+      userDatabase: userDatabase,
+    );
+
+    final result = await repository.deleteCurrentUserData();
+
+    expect(result.userId, 'local-user');
+    expect(result.deletedFavoriteStationCount, 1);
+    expect(result.deletedFavoriteFacilityCount, 1);
+    expect(result.deletedFavoriteRouteCount, 1);
+    expect(result.notificationSettingsDeleted, isTrue);
+    expect(result.anonymizedReportCount, 2);
+    expect(
+      await userDatabase.select(userDatabase.favoriteStations).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.favoriteFacilities).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.favoriteRoutes).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.searchHistory).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.appPreferences).get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase.select(userDatabase.reportReceipts).get(),
+      isEmpty,
+    );
+    expect(await userDatabase.select(userDatabase.reportDrafts).get(), isEmpty);
+  });
+
+  test('합성 사용자 데이터 삭제 저장소는 서버 삭제 성공 후 로컬 삭제를 실행한다', () async {
+    final calls = <String>[];
+    final remoteRepository = RecordingUserDataDeletionRepository(
+      label: 'remote',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'anonymous-user-1',
+        deletedFavoriteStationCount: 1,
+        deletedFavoriteFacilityCount: 1,
+        deletedFavoriteRouteCount: 1,
+        anonymizedRouteFeedbackCount: 2,
+        notificationSettingsDeleted: false,
+        deletedRegisteredDeviceCount: 1,
+        deletedPushNotificationCount: 1,
+        mobilityProfileDeleted: true,
+        anonymizedReportCount: 3,
+        anonymousCredentialsDeleted: true,
+      ),
+    );
+    final localRepository = RecordingUserDataDeletionRepository(
+      label: 'local',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'local-user',
+        deletedFavoriteStationCount: 4,
+        deletedFavoriteFacilityCount: 5,
+        deletedFavoriteRouteCount: 6,
+        anonymizedRouteFeedbackCount: 0,
+        notificationSettingsDeleted: true,
+        deletedRegisteredDeviceCount: 0,
+        deletedPushNotificationCount: 0,
+        mobilityProfileDeleted: false,
+        anonymizedReportCount: 1,
+        anonymousCredentialsDeleted: false,
+      ),
+    );
+    final repository = UserDataDeletionCompositeRepository(
+      remoteRepository: remoteRepository,
+      localRepository: localRepository,
+    );
+
+    final result = await repository.deleteCurrentUserData();
+
+    expect(calls, ['remote', 'local']);
+    expect(result.userId, 'anonymous-user-1');
+    expect(result.deletedFavoriteStationCount, 5);
+    expect(result.deletedFavoriteFacilityCount, 6);
+    expect(result.deletedFavoriteRouteCount, 7);
+    expect(result.anonymizedRouteFeedbackCount, 2);
+    expect(result.notificationSettingsDeleted, isTrue);
+    expect(result.deletedRegisteredDeviceCount, 1);
+    expect(result.deletedPushNotificationCount, 1);
+    expect(result.mobilityProfileDeleted, isTrue);
+    expect(result.anonymizedReportCount, 4);
+    expect(result.anonymousCredentialsDeleted, isTrue);
+  });
+
+  test('합성 사용자 데이터 삭제 저장소는 서버 삭제 실패 시 로컬 데이터를 유지한다', () async {
+    final calls = <String>[];
+    final remoteRepository = RecordingUserDataDeletionRepository(
+      label: 'remote',
+      calls: calls,
+      error: const UserDataDeletionException(userDataDeletionErrorMessage),
+    );
+    final localRepository = RecordingUserDataDeletionRepository(
+      label: 'local',
+      calls: calls,
+      result: const UserDataDeletionResult(
+        userId: 'local-user',
+        deletedFavoriteStationCount: 1,
+        deletedFavoriteFacilityCount: 1,
+        deletedFavoriteRouteCount: 1,
+        anonymizedRouteFeedbackCount: 0,
+        notificationSettingsDeleted: true,
+        deletedRegisteredDeviceCount: 0,
+        deletedPushNotificationCount: 0,
+        mobilityProfileDeleted: false,
+        anonymizedReportCount: 0,
+        anonymousCredentialsDeleted: false,
+      ),
+    );
+    final repository = UserDataDeletionCompositeRepository(
+      remoteRepository: remoteRepository,
+      localRepository: localRepository,
+    );
+
+    await expectLater(
+      repository.deleteCurrentUserData(),
+      throwsA(isA<UserDataDeletionException>()),
+    );
+
+    expect(calls, ['remote']);
+  });
 }
 
 String _successfulDeletionBody() {
@@ -248,5 +447,30 @@ class RefreshingAuthorizationHeaderProvider
     }
     header = refreshedHeader;
     return true;
+  }
+}
+
+class RecordingUserDataDeletionRepository
+    implements UserDataDeletionRepository {
+  RecordingUserDataDeletionRepository({
+    required this.label,
+    required this.calls,
+    this.result,
+    this.error,
+  });
+
+  final String label;
+  final List<String> calls;
+  final UserDataDeletionResult? result;
+  final UserDataDeletionException? error;
+
+  @override
+  Future<UserDataDeletionResult> deleteCurrentUserData() async {
+    calls.add(label);
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return result!;
   }
 }
