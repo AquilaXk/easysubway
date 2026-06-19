@@ -213,7 +213,7 @@ void main() {
     expect(requestBody, isNot(contains('photoUrl')));
     expect(requestBody['latitude'], 37.302421);
     expect(requestBody['longitude'], 126.866221);
-    expect(authorizationHeader, isNull);
+    expect(authorizationHeader, isNotNull);
     expect(result.id, 'report-1');
     expect(result.receiptToken, 'receipt-token-1');
     expect(result.statusLabel, '접수됨');

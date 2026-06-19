@@ -82,11 +82,9 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       final request = await _httpClient
           .postUrl(baseUri.resolve('/api/v1/reports'))
           .timeout(_facilityReportTimeout);
-      final authorizationHeader = preparedRequest.clientSubmissionId == null
-          ? await authProvider?.authorizationHeader().timeout(
-              _facilityReportTimeout,
-            )
-          : null;
+      final authorizationHeader = await authProvider
+          ?.authorizationHeader()
+          .timeout(_facilityReportTimeout);
       if (authorizationHeader != null) {
         request.headers.set(
           HttpHeaders.authorizationHeader,
