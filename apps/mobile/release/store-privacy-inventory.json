@@ -86,6 +86,7 @@
       "deletionKo": "앱 기능 또는 데이터 삭제 요청으로 삭제",
       "deletionImplementation": "UserDataDeletionService가 즐겨찾기 역, 경로, 시설 삭제 포트를 호출해 사용자 연결 데이터를 삭제한다.",
       "evidence": [
+        "apps/mobile/lib/station_search.dart",
         "apps/mobile/lib/favorite_facility.dart",
         "apps/mobile/lib/internal_route.dart",
         "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
