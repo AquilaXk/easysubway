@@ -855,6 +855,21 @@ void main() {
     expect(controller.state.status, StationSearchStatus.success);
   });
 
+  test('역 검색 컨트롤러는 검색어를 로컬 최근 검색 저장소에 기록한다', () async {
+    final repository = FakeStationSearchRepository()
+      ..nextResults = [_stationResult(id: 'station-sangnoksu', name: '상록수')];
+    final historyRepository = FakeSearchHistoryRepository();
+    final controller = StationSearchController(
+      repository: repository,
+      searchHistoryRepository: historyRepository,
+    );
+
+    await controller.search(' 상록수 ');
+
+    expect(repository.requestedQueries, ['상록수']);
+    expect(historyRepository.recordedQueries, ['상록수']);
+  });
+
   test('역 검색 컨트롤러는 늦게 도착한 이전 응답을 무시한다', () async {
     final repository = ControlledStationSearchRepository();
     final controller = StationSearchController(repository: repository);
@@ -1380,6 +1395,20 @@ class ControlledStationSearchRepository implements StationSearchRepository {
       throw StateError('Pending search not found: $query');
     }
     completer.complete(results);
+  }
+}
+
+class FakeSearchHistoryRepository implements SearchHistoryRepository {
+  final recordedQueries = <String>[];
+
+  @override
+  Future<void> recordSearch(String query) async {
+    recordedQueries.add(query);
+  }
+
+  @override
+  Future<List<String>> listRecentQueries() async {
+    return recordedQueries.reversed.toList(growable: false);
   }
 }
 
