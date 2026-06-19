@@ -25,8 +25,9 @@ void main() {
             'success': true,
             'data': {
               'userId': 'anonymous-user-1',
-              'password': 'user-test-password',
-              'authType': 'BASIC',
+              'accessToken': 'access-token-1',
+              'refreshToken': 'refresh-token-1',
+              'authType': 'BEARER',
               'anonymous': true,
               'createdAt': '2026-06-13T10:00:00',
             },
@@ -44,11 +45,12 @@ void main() {
     expect(requestedMethod, 'POST');
     expect(requestedUri.path, '/api/v1/auth/anonymous');
     expect(credentials.userId, 'anonymous-user-1');
-    expect(credentials.password, 'user-test-password');
-    expect(credentials.authorizationHeader, startsWith('Basic '));
+    expect(credentials.accessToken, 'access-token-1');
+    expect(credentials.refreshToken, 'refresh-token-1');
+    expect(credentials.authorizationHeader, 'Bearer access-token-1');
   });
 
-  test('익명 인증 세션은 한 번 발급한 Basic 헤더를 재사용한다', () async {
+  test('익명 인증 세션은 한 번 발급한 Bearer 헤더를 재사용한다', () async {
     final repository = FakeAnonymousAuthRepository();
     final credentialStore = MemoryAnonymousAuthCredentialStore();
     final session = AnonymousAuthSession(
@@ -62,10 +64,7 @@ void main() {
     expect(repository.issueCount, 1);
     expect(credentialStore.saveCount, 1);
     expect(firstHeader, secondHeader);
-    expect(
-      firstHeader,
-      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
-    );
+    expect(firstHeader, 'Bearer access-token-1');
   });
 
   test('익명 인증 저장소는 secure storage 복원 실패 시 저장값을 지운다', () async {
@@ -98,7 +97,8 @@ void main() {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(
         userId: 'stored-anonymous-user',
-        password: 'stored-password',
+        accessToken: 'stored-access-token',
+        refreshToken: 'stored-refresh-token',
       ),
     );
     final session = AnonymousAuthSession(
@@ -111,10 +111,7 @@ void main() {
     expect(repository.issueCount, 0);
     expect(credentialStore.readCount, 1);
     expect(credentialStore.saveCount, 0);
-    expect(
-      header,
-      'Basic ${base64Encode(utf8.encode('stored-anonymous-user:stored-password'))}',
-    );
+    expect(header, 'Bearer stored-access-token');
   });
 
   test('익명 인증 세션은 발급한 인증 정보를 저장해 재시작 후 재사용한다', () async {
@@ -128,7 +125,8 @@ void main() {
     final firstHeader = await firstSession.authorizationHeader();
     final secondRepository = FakeAnonymousAuthRepository(
       userId: 'new-anonymous-user',
-      password: 'new-password',
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
     );
     final secondSession = AnonymousAuthSession(
       repository: secondRepository,
@@ -142,16 +140,18 @@ void main() {
     expect(secondHeader, firstHeader);
   });
 
-  test('익명 인증 세션은 인증 실패 후 저장된 인증 정보를 지우고 다시 발급한다', () async {
+  test('익명 인증 세션은 인증 실패 후 refresh token으로 새 access token을 발급한다', () async {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(
         userId: 'stale-anonymous-user',
-        password: 'stale-password',
+        accessToken: 'stale-access-token',
+        refreshToken: 'stale-refresh-token',
       ),
     );
     final repository = FakeAnonymousAuthRepository(
       userId: 'fresh-anonymous-user',
-      password: 'fresh-password',
+      accessToken: 'fresh-access-token',
+      refreshToken: 'fresh-refresh-token',
     );
     final session = AnonymousAuthSession(
       repository: repository,
@@ -162,16 +162,12 @@ void main() {
     await session.invalidateAuthorization();
     final freshHeader = await session.authorizationHeader();
 
-    expect(
-      staleHeader,
-      'Basic ${base64Encode(utf8.encode('stale-anonymous-user:stale-password'))}',
-    );
-    expect(
-      freshHeader,
-      'Basic ${base64Encode(utf8.encode('fresh-anonymous-user:fresh-password'))}',
-    );
-    expect(repository.issueCount, 1);
-    expect(credentialStore.clearCount, 1);
+    expect(staleHeader, 'Bearer stale-access-token');
+    expect(freshHeader, 'Bearer fresh-access-token');
+    expect(repository.issueCount, 0);
+    expect(repository.refreshCount, 1);
+    expect(repository.refreshedTokens, ['stale-refresh-token']);
+    expect(credentialStore.clearCount, 0);
     expect(credentialStore.saveCount, 1);
     expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
   });
@@ -180,7 +176,8 @@ void main() {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(
         userId: 'stale-anonymous-user',
-        password: 'stale-password',
+        accessToken: 'stale-access-token',
+        refreshToken: 'stale-refresh-token',
       ),
     );
     final repository = ControlledAnonymousAuthRepository();
@@ -197,30 +194,27 @@ void main() {
     repository.completeIssue(
       const AnonymousAuthCredentials(
         userId: 'fresh-anonymous-user',
-        password: 'fresh-password',
+        accessToken: 'fresh-access-token',
+        refreshToken: 'fresh-refresh-token',
       ),
     );
     final refreshedHeaders = await Future.wait([firstRefresh, secondRefresh]);
 
-    expect(
-      staleHeader,
-      'Basic ${base64Encode(utf8.encode('stale-anonymous-user:stale-password'))}',
-    );
-    expect(repository.issueCount, 1);
+    expect(staleHeader, 'Bearer stale-access-token');
+    expect(repository.refreshCount, 1);
+    expect(repository.refreshedTokens, ['stale-refresh-token']);
     expect(refreshedHeaders.toSet(), hasLength(1));
-    expect(
-      refreshedHeaders.toSet().single,
-      'Basic ${base64Encode(utf8.encode('fresh-anonymous-user:fresh-password'))}',
-    );
+    expect(refreshedHeaders.toSet().single, 'Bearer fresh-access-token');
     expect(credentialStore.saveCount, 1);
     expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
   });
 
-  test('익명 인증 세션은 원격 HTTP 주소에서 저장된 Basic 인증 정보를 재사용하지 않는다', () async {
+  test('익명 인증 세션은 원격 HTTP 주소에서 저장된 인증 정보를 재사용하지 않는다', () async {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(
         userId: 'stored-anonymous-user',
-        password: 'stored-password',
+        accessToken: 'stored-access-token',
+        refreshToken: 'stored-refresh-token',
       ),
     );
     final httpClient = NetworkFailingHttpClient();
@@ -305,13 +299,17 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   FakeAnonymousAuthRepository({
     this.issueDelay = const Duration(milliseconds: 10),
     this.userId = 'anonymous-user-1',
-    this.password = 'user-test-password',
+    this.accessToken = 'access-token-1',
+    this.refreshToken = 'refresh-token-1',
   });
 
   final Duration issueDelay;
   final String userId;
-  final String password;
+  final String accessToken;
+  final String refreshToken;
   int issueCount = 0;
+  int refreshCount = 0;
+  final refreshedTokens = <String>[];
 
   @override
   bool get canReuseStoredCredentials => true;
@@ -320,14 +318,35 @@ class FakeAnonymousAuthRepository implements AnonymousAuthRepository {
   Future<AnonymousAuthCredentials> issueAnonymousUser() async {
     issueCount++;
     await Future<void>.delayed(issueDelay);
-    return AnonymousAuthCredentials(userId: userId, password: password);
+    return AnonymousAuthCredentials(
+      userId: userId,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+  }
+
+  @override
+  Future<AnonymousAuthCredentials> refreshAnonymousUser(
+    String refreshToken,
+  ) async {
+    refreshCount++;
+    refreshedTokens.add(refreshToken);
+    await Future<void>.delayed(issueDelay);
+    return AnonymousAuthCredentials(
+      userId: userId,
+      accessToken: accessToken,
+      refreshToken: this.refreshToken,
+    );
   }
 }
 
 class ControlledAnonymousAuthRepository implements AnonymousAuthRepository {
   final issueStarted = Completer<void>();
   final _issueCompleter = Completer<AnonymousAuthCredentials>();
+  final _refreshCompleter = Completer<AnonymousAuthCredentials>();
   var issueCount = 0;
+  var refreshCount = 0;
+  final refreshedTokens = <String>[];
 
   @override
   bool get canReuseStoredCredentials => true;
@@ -341,8 +360,23 @@ class ControlledAnonymousAuthRepository implements AnonymousAuthRepository {
     return _issueCompleter.future;
   }
 
+  @override
+  Future<AnonymousAuthCredentials> refreshAnonymousUser(String refreshToken) {
+    refreshCount++;
+    refreshedTokens.add(refreshToken);
+    if (!issueStarted.isCompleted) {
+      issueStarted.complete();
+    }
+    return _refreshCompleter.future;
+  }
+
   void completeIssue(AnonymousAuthCredentials credentials) {
-    _issueCompleter.complete(credentials);
+    if (!_issueCompleter.isCompleted) {
+      _issueCompleter.complete(credentials);
+    }
+    if (!_refreshCompleter.isCompleted) {
+      _refreshCompleter.complete(credentials);
+    }
   }
 }
 
