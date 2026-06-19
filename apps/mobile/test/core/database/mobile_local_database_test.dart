@@ -88,6 +88,38 @@ void main() {
     );
   });
 
+  test('내장 데이터팩은 설치된 파일이 손상되어 있으면 번들 asset으로 교체한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-corrupt-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final installedCapitalPack = File(
+      '${directory.path}/datapacks/capital.sqlite',
+    );
+    await installedCapitalPack.create(recursive: true);
+    await installedCapitalPack.writeAsString('broken sqlite file');
+
+    final opener = CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    );
+    final database = await opener.open();
+    addTearDown(database.close);
+
+    final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'schemaVersion'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), '1');
+    expect(
+      await installedCapitalPack.openRead(0, 16).first,
+      'SQLite format 3'.codeUnits.followedBy([0]).toList(),
+    );
+  });
+
   test('user DB는 catalog 데이터팩 교체와 독립적으로 즐겨찾기를 보존한다', () async {
     final directory = await Directory.systemTemp.createTemp('easysubway-user-');
     addTearDown(() => directory.delete(recursive: true));

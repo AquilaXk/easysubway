@@ -57,14 +57,22 @@ class CatalogDatabaseOpener {
   ) async {
     final id = pack['id'];
     final asset = pack['asset'];
-    final expectedSha256 = pack['sha256'];
+    final expectedCompressedSha256 = pack['sha256'];
+    final expectedSqliteSha256 = pack['sqliteSha256'];
     if (id is! String || asset is! String) {
       throw const FormatException('Invalid data pack identity.');
     }
 
     final target = File(p.join(datapackDirectory.path, '$id.sqlite'));
     if (await target.exists()) {
-      return;
+      if (expectedSqliteSha256 is! String || expectedSqliteSha256.isEmpty) {
+        return;
+      }
+
+      final installedBytes = await target.readAsBytes();
+      if (sha256.convert(installedBytes).toString() == expectedSqliteSha256) {
+        return;
+      }
     }
 
     final byteData = await assetBundle.load(asset);
@@ -72,13 +80,40 @@ class CatalogDatabaseOpener {
       byteData.offsetInBytes,
       byteData.lengthInBytes,
     );
-    if (expectedSha256 is String &&
-        expectedSha256.isNotEmpty &&
-        sha256.convert(compressedBytes).toString() != expectedSha256) {
+    if (expectedCompressedSha256 is String &&
+        expectedCompressedSha256.isNotEmpty &&
+        sha256.convert(compressedBytes).toString() !=
+            expectedCompressedSha256) {
       throw const FormatException('Data pack checksum mismatch.');
     }
 
     final databaseBytes = gzip.decode(compressedBytes);
-    await target.writeAsBytes(databaseBytes, flush: true);
+    if (expectedSqliteSha256 is String &&
+        expectedSqliteSha256.isNotEmpty &&
+        sha256.convert(databaseBytes).toString() != expectedSqliteSha256) {
+      throw const FormatException('Data pack sqlite checksum mismatch.');
+    }
+
+    await _replaceInstalledDataPack(target, databaseBytes);
+  }
+
+  Future<void> _replaceInstalledDataPack(
+    File target,
+    List<int> databaseBytes,
+  ) async {
+    final temporary = File('${target.path}.installing');
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+
+    await temporary.writeAsBytes(databaseBytes, flush: true);
+    try {
+      await temporary.rename(target.path);
+    } on FileSystemException {
+      if (await target.exists()) {
+        await target.delete();
+      }
+      await temporary.rename(target.path);
+    }
   }
 }
