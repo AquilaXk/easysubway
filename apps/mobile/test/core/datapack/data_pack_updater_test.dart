@@ -327,6 +327,7 @@ void main() {
   });
 
   test('updater는 manifest 순서와 무관하게 최신 capital pack을 current로 선택한다', () async {
+    // activePack이 없는 manifest에서는 기본 pack id의 최신 version을 current로 선택한다.
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-updater-active-',
     );
@@ -510,6 +511,14 @@ void main() {
     expect(pointer?.version, '017');
     expect(
       await File('${catalogDirectory.path}/capital-v017.sqlite').exists(),
+      isTrue,
+    );
+    expect(
+      await File('${catalogDirectory.path}/capital-v18.sqlite').exists(),
+      isTrue,
+    );
+    expect(
+      await File('${catalogDirectory.path}/capital-v19.sqlite').exists(),
       isTrue,
     );
   });

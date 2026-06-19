@@ -32,4 +32,19 @@ void main() {
     expect(selected.path, '/catalog/capital-v17.sqlite');
     expect(selected.reason, '시설 상태 긴급 정정');
   });
+
+  test('emergency override는 파일 경로 조작 문자를 거부한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final repository = EmergencyOverrideRepository(userDatabase: userDatabase);
+    await repository.saveOverride(
+      const EmergencyDataPackOverride(
+        id: '../capital',
+        version: '17',
+        reason: '시설 상태 긴급 정정',
+      ),
+    );
+
+    await expectLater(repository.readOverride(), throwsFormatException);
+  });
 }
