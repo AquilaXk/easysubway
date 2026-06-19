@@ -53,4 +53,23 @@ class LocalFacilityReportPhotoStorageTest {
 		assertThat(protectedFile).exists();
 		assertThat(Files.readString(protectedFile)).isEqualTo("keep");
 	}
+
+	@Test
+	void preservesWebpContentType() {
+		LocalFacilityReportPhotoStorage storage = new LocalFacilityReportPhotoStorage(tempDir);
+
+		var storedPhoto = storage.storeFacilityReportPhoto(new StoreFacilityReportPhotoCommand(
+			"report-webp",
+			"photo.webp",
+			"image/webp",
+			new byte[] {1},
+			new byte[] {1},
+			"1".repeat(64),
+			1
+		));
+
+		assertThat(storedPhoto.objectKey()).endsWith(".webp");
+		assertThat(storage.loadFacilityReportPhoto(storedPhoto.objectKey()))
+			.hasValueSatisfying(photo -> assertThat(photo.contentType()).isEqualTo("image/webp"));
+	}
 }

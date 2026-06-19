@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${EASYSUBWAY_ENV_FILE:-${ROOT_DIR}/.env.example}"
 COMPOSE_FILE="${EASYSUBWAY_COMPOSE_FILE:-${ROOT_DIR}/infra/docker-compose.yml}"
 BACKUP_DIR="${1:-${EASYSUBWAY_PHOTO_BACKUP_DIR:-${ROOT_DIR}/.codex/backups/facility-report-photos}}"
-PHOTO_STORAGE_DIR="${EASYSUBWAY_REPORT_PHOTO_STORAGE_DIR:-${ROOT_DIR}/.codex/report-photos}"
+PHOTO_STORAGE_DIR="${EASYSUBWAY_REPORTS_PHOTOS_STORAGE_DIR:-${TMPDIR:-/tmp}/easysubway-report-photos}"
 
 umask 077
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -42,12 +42,17 @@ manifest_field() {
 copy_object() {
 	local object_key="$1"
 	local target_path="$2"
-	if [[ -z "${object_key}" || "${object_key}" == *".."* ]]; then
+	if [[ -z "${object_key}" ]]; then
 		return
+	fi
+	if [[ "${object_key}" == /* || "${object_key}" == *".."* ]]; then
+		printf 'invalid facility report photo object key: %s\n' "${object_key}" >&2
+		return 1
 	fi
 	local source_file="${PHOTO_STORAGE_DIR}/${object_key}"
 	if [[ ! -f "${source_file}" ]]; then
-		return
+		printf 'facility report photo object not found: %s\n' "${source_file}" >&2
+		return 1
 	fi
 	mkdir -p "$(dirname "${target_path}")"
 	cp "${source_file}" "${target_path}"
@@ -79,7 +84,6 @@ while IFS=$'\t' read -r report_id file_name_base64 content_type_base64 object_ke
 	if [[ -z "${report_id}" || -z "${object_key}" ]]; then
 		continue
 	fi
-	safe_report_id="$(printf '%s' "${report_id}" | tr -c 'A-Za-z0-9._-' '_')"
 	object_path="objects/${object_key}"
 	thumbnail_path="objects/${thumbnail_object_key}"
 	object_file="${run_dir}/${object_path}"

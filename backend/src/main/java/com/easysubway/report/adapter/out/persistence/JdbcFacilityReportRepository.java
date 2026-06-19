@@ -186,6 +186,7 @@ public class JdbcFacilityReportRepository implements
 					photo_thumbnail_object_key = NULL,
 					photo_sha256 = NULL,
 					photo_size_bytes = NULL,
+					photo_data_base64 = NULL,
 					latitude = NULL,
 					longitude = NULL
 				WHERE user_id = ?

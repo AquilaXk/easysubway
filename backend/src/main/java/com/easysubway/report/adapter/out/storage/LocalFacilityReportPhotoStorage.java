@@ -86,10 +86,20 @@ public class LocalFacilityReportPhotoStorage implements
 	}
 
 	private String extensionFor(String contentType) {
-		return "image/png".equals(contentType) ? ".png" : ".jpg";
+		return switch (contentType) {
+			case "image/png" -> ".png";
+			case "image/webp" -> ".webp";
+			default -> ".jpg";
+		};
 	}
 
 	private String contentTypeFor(String objectKey) {
-		return objectKey.endsWith(".png") ? "image/png" : "image/jpeg";
+		if (objectKey.endsWith(".png")) {
+			return "image/png";
+		}
+		if (objectKey.endsWith(".webp")) {
+			return "image/webp";
+		}
+		return "image/jpeg";
 	}
 }

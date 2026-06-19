@@ -19,6 +19,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 class JdbcFacilityReportRepositoryTest {
 
 	private JdbcFacilityReportRepository repository;
+	private JdbcTemplate jdbcTemplate;
 
 	@BeforeEach
 	void setUp() {
@@ -27,7 +28,7 @@ class JdbcFacilityReportRepositoryTest {
 			"sa",
 			""
 		);
-		var jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS facility_reports");
 		jdbcTemplate.execute("""
 			CREATE TABLE facility_reports (
@@ -43,6 +44,7 @@ class JdbcFacilityReportRepositoryTest {
 				photo_thumbnail_object_key VARCHAR(255),
 				photo_sha256 CHAR(64),
 				photo_size_bytes BIGINT,
+				photo_data_base64 TEXT,
 				latitude DECIMAL(10, 7),
 				longitude DECIMAL(10, 7),
 				duplicate_of_report_id VARCHAR(120),
@@ -210,6 +212,11 @@ class JdbcFacilityReportRepositoryTest {
 		var otherUserReport = submittedReport("report-2", "anonymous-user-2", 10);
 		repository.saveReport(targetReport);
 		repository.saveReport(otherUserReport);
+		jdbcTemplate.update(
+			"UPDATE facility_reports SET photo_data_base64 = ? WHERE report_id = ?",
+			"legacy-base64",
+			"report-1"
+		);
 
 		int anonymizedCount = repository.anonymizeFacilityReportsByUserId("anonymous-user-1");
 		int anonymizedAgainCount = repository.anonymizeFacilityReportsByUserId("anonymous-user-1");
@@ -234,6 +241,11 @@ class JdbcFacilityReportRepositoryTest {
 			targetReport.reviewedAt(),
 			targetReport.reviewedBy()
 		));
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT photo_data_base64 FROM facility_reports WHERE report_id = ?",
+			String.class,
+			"report-1"
+		)).isNull();
 		assertThat(repository.loadReport("report-2")).contains(otherUserReport);
 	}
 
