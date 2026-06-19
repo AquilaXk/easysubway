@@ -37,7 +37,10 @@ class FieldVerificationAdminController {
 		FieldVerificationSession session = fieldVerificationUseCase.getStationVerification(stationId);
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.CONTENT_TYPE, TEXT_CSV_UTF8);
-		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"easysubway-field-verification-" + stationId + ".csv\"");
+		headers.add(
+			HttpHeaders.CONTENT_DISPOSITION,
+			"attachment; filename=\"easysubway-field-verification-" + safeFilenameStationId(stationId) + ".csv\""
+		);
 		return new ResponseEntity<>(toCsv(session), headers, HttpStatus.OK);
 	}
 
@@ -76,10 +79,26 @@ class FieldVerificationAdminController {
 		if (value == null) {
 			return "";
 		}
-		if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
-			return "\"" + value.replace("\"", "\"\"") + "\"";
+		String safe = escapeSpreadsheetFormula(value);
+		if (safe.contains(",") || safe.contains("\"") || safe.contains("\n") || safe.contains("\r")) {
+			return "\"" + safe.replace("\"", "\"\"") + "\"";
+		}
+		return safe;
+	}
+
+	private String escapeSpreadsheetFormula(String value) {
+		if (value.isEmpty()) {
+			return value;
+		}
+		char first = value.charAt(0);
+		if (first == '=' || first == '+' || first == '-' || first == '@') {
+			return "'" + value;
 		}
 		return value;
+	}
+
+	private String safeFilenameStationId(String stationId) {
+		return stationId.replaceAll("[^A-Za-z0-9_-]", "_");
 	}
 
 	record FieldVerificationView(
