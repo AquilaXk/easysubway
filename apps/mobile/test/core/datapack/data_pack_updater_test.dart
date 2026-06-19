@@ -411,7 +411,7 @@ void main() {
     expect(pointer?.version, '19');
   });
 
-  test('updater는 manifest activePack으로 선택한 이전 version을 prune하지 않는다', () async {
+  test('updater는 zero-padded activePack 이전 version을 prune하지 않는다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-updater-active-prune-',
     );
@@ -419,8 +419,8 @@ void main() {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
     final catalogDirectory = Directory('${directory.path}/catalog');
-    final v17SqliteBytes = await _validCatalogSqliteBytes(directory);
-    final v17CompressedBytes = gzip.encode(v17SqliteBytes);
+    final v017SqliteBytes = await _validCatalogSqliteBytes(directory);
+    final v017CompressedBytes = gzip.encode(v017SqliteBytes);
     final v18SqliteBytes = await _validCatalogSqliteBytes(directory);
     final v18CompressedBytes = gzip.encode(v18SqliteBytes);
     final v19SqliteBytes = await _validCatalogSqliteBytes(directory);
@@ -436,7 +436,7 @@ void main() {
             ..write(
               jsonEncode({
                 'ttlSeconds': 60,
-                'activePack': {'id': 'capital', 'version': '17'},
+                'activePack': {'id': 'capital', 'version': '017'},
                 'packs': [
                   _packJson(
                     version: '19',
@@ -451,19 +451,19 @@ void main() {
                     sqliteBytes: v18SqliteBytes,
                   ),
                   _packJson(
-                    version: '17',
-                    url: 'catalog/capital-v17.sqlite.gz',
-                    compressedBytes: v17CompressedBytes,
-                    sqliteBytes: v17SqliteBytes,
+                    version: '017',
+                    url: 'catalog/capital-v017.sqlite.gz',
+                    compressedBytes: v017CompressedBytes,
+                    sqliteBytes: v017SqliteBytes,
                   ),
                 ],
               }),
             )
             ..close();
-        case '/datapacks/catalog/capital-v17.sqlite.gz':
+        case '/datapacks/catalog/capital-v017.sqlite.gz':
           request.response
             ..statusCode = HttpStatus.ok
-            ..add(v17CompressedBytes)
+            ..add(v017CompressedBytes)
             ..close();
         case '/datapacks/catalog/capital-v18.sqlite.gz':
           request.response
@@ -507,9 +507,9 @@ void main() {
       ),
       isTrue,
     );
-    expect(pointer?.version, '17');
+    expect(pointer?.version, '017');
     expect(
-      await File('${catalogDirectory.path}/capital-v17.sqlite').exists(),
+      await File('${catalogDirectory.path}/capital-v017.sqlite').exists(),
       isTrue,
     );
   });
