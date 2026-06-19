@@ -155,51 +155,9 @@
       }
     },
     {
-      "id": "notification_settings",
-      "displayNameKo": "알림 설정",
-      "purposeKo": "즐겨찾는 역과 경로의 시설 상태 알림 수신 여부 저장",
-      "storageLocations": ["backend-database"],
-      "retentionKo": "사용자가 변경하거나 데이터 삭제를 요청할 때까지 보관",
-      "deletionKo": "알림 설정 화면 또는 데이터 삭제 요청으로 삭제",
-      "sharedWithThirdParties": false,
-      "usedForTracking": false,
-      "googlePlayDataSafety": {
-        "dataType": "App activity",
-        "purpose": "App functionality",
-        "encryptedInTransit": true,
-        "optional": true
-      },
-      "appStorePrivacy": {
-        "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
-        "linkedToUser": true,
-        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-      }
-    },
-    {
-      "id": "push_token",
-      "displayNameKo": "푸시 알림 토큰",
-      "purposeKo": "시설 상태와 신고 처리 결과 알림 발송",
-      "storageLocations": ["backend-database", "platform-push-service"],
-      "retentionKo": "알림 수신을 끄거나 데이터 삭제를 요청할 때까지 보관",
-      "deletionKo": "알림 설정 해제 또는 데이터 삭제 요청으로 삭제",
-      "sharedWithThirdParties": false,
-      "usedForTracking": false,
-      "googlePlayDataSafety": {
-        "dataType": "Device or other IDs",
-        "purpose": "App functionality",
-        "encryptedInTransit": true,
-        "optional": true
-      },
-      "appStorePrivacy": {
-        "dataType": "NSPrivacyCollectedDataTypeDeviceID",
-        "linkedToUser": true,
-        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-      }
-    },
-    {
       "id": "anonymous_user_id",
       "displayNameKo": "익명 사용자 식별자",
-      "purposeKo": "즐겨찾기, 알림 설정, 신고 이력을 계정 없이 연결",
+      "purposeKo": "즐겨찾기와 신고 이력을 계정 없이 연결",
       "storageLocations": ["mobile-secure-storage", "backend-database"],
       "retentionKo": "앱 사용 기간 동안 보관하고 데이터 삭제 요청 시 삭제",
       "deletionKo": "데이터 삭제 요청 시 삭제",
