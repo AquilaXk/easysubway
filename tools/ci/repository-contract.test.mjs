@@ -2214,6 +2214,9 @@ test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한�
   const itemType = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationItemType.java");
   const status = read("backend/src/main/java/com/easysubway/field/domain/FieldVerificationStatus.java");
   const useCase = read("backend/src/main/java/com/easysubway/field/application/port/in/FieldVerificationUseCase.java");
+  const historyRepositoryPort = read("backend/src/main/java/com/easysubway/field/application/port/out/FieldVerificationChangeHistoryRepository.java");
+  const inMemoryHistoryRepository = read("backend/src/main/java/com/easysubway/field/adapter/out/persistence/InMemoryFieldVerificationChangeHistoryRepository.java");
+  const jdbcHistoryRepository = read("backend/src/main/java/com/easysubway/field/adapter/out/persistence/JdbcFieldVerificationChangeHistoryRepository.java");
   const service = read("backend/src/main/java/com/easysubway/field/application/service/FieldVerificationService.java");
   const controller = read("backend/src/main/java/com/easysubway/field/adapter/in/web/FieldVerificationAdminController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
@@ -2256,7 +2259,17 @@ test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한�
   assert.match(useCase, /List<FieldVerificationSession> listStationVerifications\(\)/);
   assert.match(useCase, /FieldVerificationSession updateItemStatus\(UpdateFieldVerificationItemStatusCommand command\)/);
   assert.match(useCase, /List<FieldVerificationChangeHistory> listStationChangeHistory\(String stationId\)/);
+  assert.match(historyRepositoryPort, /void save\(FieldVerificationChangeHistory history\)/);
+  assert.match(historyRepositoryPort, /List<FieldVerificationChangeHistory> listByStationId\(String stationId\)/);
+  assert.match(inMemoryHistoryRepository, /@Repository\s+@Profile\("!prod"\)/);
+  assert.match(inMemoryHistoryRepository, /implements FieldVerificationChangeHistoryRepository/);
+  assert.match(jdbcHistoryRepository, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcHistoryRepository, /JdbcTemplate/);
+  assert.match(jdbcHistoryRepository, /INSERT INTO field_verification_change_history/);
+  assert.match(jdbcHistoryRepository, /ORDER BY changed_at DESC, history_id ASC/);
   assert.match(service, /SANGNOKSU_STATION_ID = "station-sangnoksu"/);
+  assert.doesNotMatch(service, /historiesByStationId/);
+  assert.match(service, /FieldVerificationChangeHistoryRepository/);
   assert.match(service, /field-verification-sangnoksu-2026-06/);
   assert.match(service, /SADANG_STATION_ID = "station-sadang"/);
   assert.match(service, /field-verification-sadang-2026-06/);
