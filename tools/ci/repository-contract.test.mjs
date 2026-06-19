@@ -91,6 +91,13 @@ function inMemoryRepositoryFiles() {
   }).trim().split("\n").filter(Boolean);
 }
 
+function prodJdbcRepositoryFiles() {
+  return execFileSync("git", ["ls-files", "backend/src/main/java/**/Jdbc*Repository.java"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+}
+
 function readPngPixelBounds(relativePath) {
   const png = readFileSync(path.join(root, relativePath));
   const signature = png.subarray(0, 8);
@@ -928,6 +935,9 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   const readinessConfiguration = read(
     "backend/src/main/java/com/easysubway/common/persistence/ProductionPersistenceReadinessConfiguration.java",
   );
+  const unavailableTransitMaster = read(
+    "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/UnavailableTransitMasterRepository.java",
+  );
   const applicationYml = read("backend/src/main/resources/application.yml");
   const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
 
@@ -944,6 +954,15 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   assert.doesNotMatch(readinessConfiguration, /BeanFactoryPostProcessor/);
   assert.doesNotMatch(readinessConfiguration, /BeanCreationException/);
   assert.doesNotMatch(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
+  assert.match(unavailableTransitMaster, /@Profile\("prod"\)/);
+  assert.match(unavailableTransitMaster, /implements[\s\S]*LoadTransitMasterPort/);
+  assert.match(unavailableTransitMaster, /public List<Station> loadStations\(\) \{\s*return List\.of\(\);/);
+  for (const file of prodJdbcRepositoryFiles()) {
+    const source = read(file);
+    if (/JdbcTemplate jdbcTemplate/.test(source) && /public Jdbc[A-Za-z0-9]+Repository\(DataSource/.test(source)) {
+      assert.match(source, /@Autowired\s+public Jdbc[A-Za-z0-9]+Repository\(/, `${file} must mark its Spring constructor`);
+    }
+  }
   assert.match(applicationYml, /management:[\s\S]*endpoint:\s*\n\s*health:\s*\n\s*probes:\s*\n\s*enabled:\s*true/);
   assert.doesNotMatch(applicationYml, /productionReadiness/);
   assert.match(applicationProdYml, /readiness:\s*\n\s*include:\s*["']?readinessState\s*,\s*db\s*,\s*redis\s*,\s*productionReadiness["']?/);
