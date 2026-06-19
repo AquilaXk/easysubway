@@ -59,6 +59,7 @@ class DataPackUpdater {
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
+        protectedVersions.add(currentPointer.version);
       }
       for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
