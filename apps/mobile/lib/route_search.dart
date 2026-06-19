@@ -247,7 +247,10 @@ class RouteFeedbackException implements Exception {
 abstract class FavoriteRouteRepository {
   Future<List<FavoriteRoute>> listFavoriteRoutes();
 
-  Future<FavoriteRoute> saveFavoriteRoute(String routeSearchId);
+  Future<FavoriteRoute> saveFavoriteRoute(
+    String routeSearchId, {
+    RouteSearchResult? result,
+  });
 
   Future<void> removeFavoriteRoute(String favoriteRouteId);
 }
@@ -294,7 +297,10 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
   }
 
   @override
-  Future<FavoriteRoute> saveFavoriteRoute(String routeSearchId) async {
+  Future<FavoriteRoute> saveFavoriteRoute(
+    String routeSearchId, {
+    RouteSearchResult? result,
+  }) async {
     final data = await _requestData(
       'POST',
       baseUri.resolve('/api/v1/me/favorites/routes'),
@@ -2469,7 +2475,10 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
     });
 
     try {
-      await widget.repository.saveFavoriteRoute(widget.result.routeSearchId);
+      await widget.repository.saveFavoriteRoute(
+        widget.result.routeSearchId,
+        result: widget.result,
+      );
       if (!mounted) {
         return;
       }

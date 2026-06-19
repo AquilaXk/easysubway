@@ -1,8 +1,12 @@
 import '../anonymous_auth.dart';
 import '../auth_headers.dart';
 import '../core/database/catalog/catalog_database.dart';
+import '../core/database/user/user_database.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
+import '../features/favorites/data/drift_favorite_repositories.dart';
+import '../features/preferences/data/drift_notification_settings_repository.dart';
+import '../features/search_history/data/drift_search_history_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
 import '../internal_route.dart';
 import '../notification_settings.dart';
@@ -22,6 +26,7 @@ class AppDependencies {
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
+    required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
@@ -38,6 +43,7 @@ class AppDependencies {
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
+    SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
@@ -46,6 +52,7 @@ class AppDependencies {
     AnonymousAuthCredentialStore? anonymousAuthCredentialStore,
     UserDataDeletionRepository? userDataDeletionRepository,
     CatalogDatabase? catalogDatabase,
+    UserDatabase? userDatabase,
     required bool enableAnonymousAuth,
     required bool enablePushNotifications,
   }) {
@@ -63,10 +70,14 @@ class AppDependencies {
         notificationPermissionProvider != null;
     final resolvedNotificationRepository = pushNotificationsEnabled
         ? notificationRepository ??
-              _defaultNotificationSettingsRepository(
-                baseUri: baseUri,
-                authProvider: sharedAuthProvider,
-              )
+              (userDatabase != null
+                  ? DriftNotificationSettingsRepository(
+                      userDatabase: userDatabase,
+                    )
+                  : _defaultNotificationSettingsRepository(
+                      baseUri: baseUri,
+                      authProvider: sharedAuthProvider,
+                    ))
         : null;
     final resolvedNotificationPermissionProvider = pushNotificationsEnabled
         ? notificationPermissionProvider
@@ -102,22 +113,42 @@ class AppDependencies {
           ),
       favoriteRepository:
           favoriteRepository ??
-          _defaultFavoriteStationRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
+          (catalogDatabase != null && userDatabase != null
+              ? DriftFavoriteStationRepository(
+                  catalogDatabase: catalogDatabase,
+                  userDatabase: userDatabase,
+                )
+              : _defaultFavoriteStationRepository(
+                  baseUri: baseUri,
+                  authProvider: sharedAuthProvider,
+                )),
       favoriteFacilityRepository:
           favoriteFacilityRepository ??
-          _defaultFavoriteFacilityRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
+          (catalogDatabase != null && userDatabase != null
+              ? DriftFavoriteFacilityRepository(
+                  catalogDatabase: catalogDatabase,
+                  userDatabase: userDatabase,
+                )
+              : _defaultFavoriteFacilityRepository(
+                  baseUri: baseUri,
+                  authProvider: sharedAuthProvider,
+                )),
       favoriteRouteRepository:
           favoriteRouteRepository ??
-          _defaultFavoriteRouteRepository(
-            baseUri: baseUri,
-            authProvider: sharedAuthProvider,
-          ),
+          (catalogDatabase != null && userDatabase != null
+              ? DriftFavoriteRouteRepository(
+                  catalogDatabase: catalogDatabase,
+                  userDatabase: userDatabase,
+                )
+              : _defaultFavoriteRouteRepository(
+                  baseUri: baseUri,
+                  authProvider: sharedAuthProvider,
+                )),
+      searchHistoryRepository:
+          searchHistoryRepository ??
+          (userDatabase == null
+              ? null
+              : DriftSearchHistoryRepository(userDatabase: userDatabase)),
       internalRouteRepository:
           internalRouteRepository ??
           (catalogDatabase == null
@@ -149,6 +180,7 @@ class AppDependencies {
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
