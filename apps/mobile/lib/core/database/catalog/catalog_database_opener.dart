@@ -57,11 +57,10 @@ class CatalogDatabaseOpener {
       if (decoded is! Map<String, Object?>) {
         return null;
       }
-      final path = decoded['path'];
-      if (path is! String || path.trim().isEmpty) {
+      final file = _currentDataPackFile(decoded);
+      if (file == null) {
         return null;
       }
-      final file = File(path);
       if (!await file.exists()) {
         return null;
       }
@@ -73,6 +72,29 @@ class CatalogDatabaseOpener {
       await database.close();
     } on Object {
       return null;
+    }
+    return null;
+  }
+
+  File? _currentDataPackFile(Map<String, Object?> pointer) {
+    final id = pointer['id'];
+    final version = pointer['version'];
+    if (id is String &&
+        id.trim().isNotEmpty &&
+        version is String &&
+        version.trim().isNotEmpty) {
+      return File(
+        p.join(
+          databaseDirectory.path,
+          'catalog',
+          '${id.trim()}-v${version.trim()}.sqlite',
+        ),
+      );
+    }
+
+    final path = pointer['path'];
+    if (path is String && path.trim().isNotEmpty) {
+      return File(path.trim());
     }
     return null;
   }
