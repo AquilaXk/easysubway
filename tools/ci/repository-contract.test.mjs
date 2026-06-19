@@ -2303,6 +2303,34 @@ test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한�
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
 });
 
+test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분리한다", () => {
+  const sessionRepositoryPort = read("backend/src/main/java/com/easysubway/field/application/port/out/FieldVerificationSessionRepository.java");
+  const inMemorySessionRepository = read("backend/src/main/java/com/easysubway/field/adapter/out/persistence/InMemoryFieldVerificationSessionRepository.java");
+  const jdbcSessionRepository = read("backend/src/main/java/com/easysubway/field/adapter/out/persistence/JdbcFieldVerificationSessionRepository.java");
+  const service = read("backend/src/main/java/com/easysubway/field/application/service/FieldVerificationService.java");
+  const profileTest = read("backend/src/test/java/com/easysubway/common/persistence/InMemoryRepositoryProfileTest.java");
+
+  assert.match(sessionRepositoryPort, /List<FieldVerificationSession> listAll\(\)/);
+  assert.match(sessionRepositoryPort, /Optional<FieldVerificationSession> findByStationId\(String stationId\)/);
+  assert.match(sessionRepositoryPort, /void save\(FieldVerificationSession session\)/);
+  assert.match(inMemorySessionRepository, /@Repository\s+@Profile\("!prod"\)/);
+  assert.match(inMemorySessionRepository, /implements FieldVerificationSessionRepository/);
+  assert.match(inMemorySessionRepository, /LinkedHashMap/);
+  assert.match(jdbcSessionRepository, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcSessionRepository, /UPDATE field_verification_sessions/);
+  assert.match(jdbcSessionRepository, /INSERT INTO field_verification_sessions/);
+  assert.match(jdbcSessionRepository, /UPDATE field_verification_items/);
+  assert.match(jdbcSessionRepository, /INSERT INTO field_verification_items/);
+  assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, session_id ASC/);
+  assert.match(jdbcSessionRepository, /ORDER BY item_type ASC, item_id ASC/);
+  assert.match(service, /FieldVerificationSessionRepository/);
+  assert.match(service, /sessionRepository\.save/);
+  assert.match(service, /sessionRepository\.findByStationId/);
+  assert.doesNotMatch(service, /Map<String, FieldVerificationSession>/);
+  assert.doesNotMatch(service, /sessionsByStationId/);
+  assert.match(profileTest, /InMemoryFieldVerificationSessionRepository/);
+});
+
 test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계를 따른다", () => {
   const summary = read("backend/src/main/java/com/easysubway/quality/domain/DataQualitySummary.java");
   const useCase = read("backend/src/main/java/com/easysubway/quality/application/port/in/DataQualityUseCase.java");
