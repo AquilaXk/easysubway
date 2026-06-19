@@ -141,11 +141,24 @@ jobs:
           mkdir -p release-artifacts/ios
           test -d build/ios/iphoneos/Runner.app
           ditto -c -k --keepParent build/ios/iphoneos/Runner.app release-artifacts/ios/Runner.app.zip
-          find build/ios -name "*.dSYM" -print -exec ditto -c -k --keepParent {} release-artifacts/ios/dsym.zip \; || true
+          dsym_count=0
+          mkdir -p release-artifacts/ios/dSYMs
+          while IFS= read -r -d '' dsym_path; do
+            target_path="release-artifacts/ios/dSYMs/${dsym_path#build/ios/}"
+            mkdir -p "$(dirname "${target_path}")"
+            cp -R "${dsym_path}" "${target_path}"
+            dsym_count=$((dsym_count + 1))
+          done < <(find build/ios -name "*.dSYM" -print0)
+          if (( dsym_count > 0 )); then
+            ditto -c -k release-artifacts/ios/dSYMs release-artifacts/ios/dsym.zip
+          else
+            printf 'dsym=not-generated\n' > release-artifacts/ios/dsym.txt
+          fi
           cp ios/Runner/PrivacyInfo.xcprivacy release-artifacts/ios/PrivacyInfo.xcprivacy
           {
             echo "commit=${GITHUB_SHA}"
             echo "artifact=Runner.app.zip"
+            echo "dsym_count=${dsym_count}"
             echo "privacy_manifest=ios/Runner/PrivacyInfo.xcprivacy"
           } > release-artifacts/ios/release-metadata.txt
 
