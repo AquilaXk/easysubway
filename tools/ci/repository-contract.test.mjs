@@ -588,6 +588,27 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(restoreScript, /trap cleanup EXIT/);
 });
 
+test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선을 제공한다", () => {
+  const backupScript = read("tools/ops/facility-report-photo-backup.sh");
+
+  assert.match(backupScript, /set -euo pipefail/);
+  assert.match(backupScript, /EASYSUBWAY_ENV_FILE:-\$\{ROOT_DIR\}\/\.env\.example/);
+  assert.match(backupScript, /EASYSUBWAY_PHOTO_BACKUP_DIR:-\$\{ROOT_DIR\}\/\.codex\/backups\/facility-report-photos/);
+  assert.match(backupScript, /umask 077/);
+  assert.match(backupScript, /chmod 700 "\$\{BACKUP_DIR\}"/);
+  assert.match(backupScript, /objects_dir="\$\{run_dir\}\/objects"/);
+  assert.match(backupScript, /manifest_file="\$\{run_dir\}\/manifest\.tsv"/);
+  assert.match(backupScript, /COPY \(\nSELECT report_id,/);
+  assert.match(backupScript, /photo_data_base64 IS NOT NULL/);
+  assert.match(backupScript, /photo_data_base64 <> ''/);
+  assert.match(backupScript, /ORDER BY report_id ASC/);
+  assert.match(backupScript, /base64 --decode > "\$\{object_file\}"/);
+  assert.match(backupScript, /printf 'report_id\\tfile_name\\tcontent_type\\tobject_path\\n'/);
+  assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\n'/);
+  assert.match(backupScript, /trap cleanup EXIT/);
+  assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
+});
+
 test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
