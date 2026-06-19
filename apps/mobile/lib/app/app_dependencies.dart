@@ -94,6 +94,9 @@ class AppDependencies {
           FacilityReportApiRepository(
             baseUri: baseUri,
             authProvider: sharedAuthProvider,
+            receiptStore: userDatabase == null
+                ? null
+                : DriftFacilityReportReceiptStore(userDatabase: userDatabase),
           ),
       routeRepository:
           routeRepository ??

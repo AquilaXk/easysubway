@@ -1441,6 +1441,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const loadPort = read("backend/src/main/java/com/easysubway/report/application/port/out/LoadFacilityReportPort.java");
   const savePort = read("backend/src/main/java/com/easysubway/report/application/port/out/SaveFacilityReportPort.java");
   const photoStoragePortPath = "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportPhotoPort.java";
+  const uploadedPhotoStoragePortPath =
+    "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportUploadedPhotoPort.java";
   const deletePhotoPortPath = "backend/src/main/java/com/easysubway/report/application/port/out/DeleteFacilityReportPhotoPort.java";
   const saveFacilityStatusPort = read(
     "backend/src/main/java/com/easysubway/transit/application/port/out/SaveAccessibilityFacilityStatusPort.java",
@@ -1454,6 +1456,10 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
   const photoObjectMigrationPath =
     "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql";
+  const receiptTokenMigrationPath =
+    "backend/src/main/resources/db/migration/postgresql/V3__facility_report_receipt_tokens.sql";
+  const dropBase64MigrationPath =
+    "backend/src/main/resources/db/migration/postgresql/V4__drop_facility_report_base64_payload.sql";
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const adminPageController = read(
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
@@ -1522,6 +1528,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(invalidReport, /extends InvalidRequestException/);
   assert.match(useCase, /interface FacilityReportUseCase/);
   assert.match(useCase, /createReport/);
+  assert.match(useCase, /createReportWithReceipt/);
+  assert.match(useCase, /getReportByReceiptToken/);
   assert.match(useCase, /getReport/);
   assert.match(useCase, /listReports/);
   assert.match(useCase, /listUserReportSummaries/);
@@ -1533,16 +1541,20 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(reviewCommand, /record ReviewFacilityReportCommand/);
   assert.match(loadPort, /interface LoadFacilityReportPort/);
   assert.match(loadPort, /loadReports/);
+  assert.match(loadPort, /loadReportByClientSubmissionId/);
   assert.match(loadPort, /loadUserReportSummaries/);
   assert.match(loadPort, /loadReportSummaries/);
   assert.match(loadPort, /countReportsCreatedSince/);
   assert.match(loadPort, /loadReportProcessingTimeSummary/);
   assert.match(savePort, /interface SaveFacilityReportPort/);
   assert.equal(existsSync(path.join(root, photoStoragePortPath)), true);
+  assert.equal(existsSync(path.join(root, uploadedPhotoStoragePortPath)), true);
   assert.equal(existsSync(path.join(root, deletePhotoPortPath)), true);
   assert.match(read(photoStoragePortPath), /interface StoreFacilityReportPhotoPort/);
   assert.match(read(photoStoragePortPath), /storeFacilityReportPhoto/);
   assert.match(read(photoStoragePortPath), /storedBytes/);
+  assert.match(read(uploadedPhotoStoragePortPath), /interface StoreFacilityReportUploadedPhotoPort/);
+  assert.match(read(uploadedPhotoStoragePortPath), /storeUploadedReportPhoto/);
   assert.match(read(deletePhotoPortPath), /interface DeleteFacilityReportPhotoPort/);
   assert.match(read(deletePhotoPortPath), /deleteFacilityReportPhoto/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
@@ -1572,25 +1584,32 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /Optional<FacilityReport> loadReport\(String reportId\)/);
   assert.match(jdbcRepository, /List<FacilityReport> loadReports\(\)/);
   assert.match(jdbcRepository, /PageResult<FacilityReportSummary> loadReportSummaries/);
+  assert.match(jdbcRepository, /Optional<FacilityReport> loadReportByClientSubmissionId/);
   assert.match(jdbcRepository, /LIMIT \?/);
   assert.match(jdbcRepository, /OFFSET \?/);
   assert.match(jdbcRepository, /FacilityReport saveReport\(FacilityReport report\)/);
   assert.match(jdbcRepository, /int anonymizeFacilityReportsByUserId\(String userId\)/);
   assert.match(jdbcRepository, /ON CONFLICT \(report_id\) DO UPDATE/);
   assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
-  assert.match(jdbcRepository, /photo_data_base64 = NULL/);
+  assert.doesNotMatch(jdbcRepository, /photo_data_base64 = NULL/);
   assert.doesNotMatch(jdbcRepository, /resultSet\.getString\("photo_data_base64"\)/);
   assert.doesNotMatch(jdbcRepository, /report\.photoDataBase64/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS facility_reports/);
-  assert.match(batchPostgresSchema, /photo_data_base64 TEXT/);
+  assert.doesNotMatch(batchPostgresSchema, /photo_data_base64 TEXT/);
   assert.equal(existsSync(path.join(root, photoObjectMigrationPath)), true);
   const photoObjectMigration = read(photoObjectMigrationPath);
   assert.doesNotMatch(photoObjectMigration, /DROP COLUMN IF EXISTS photo_data_base64/);
-  assert.match(photoObjectMigration, /Keep photo_data_base64 until object backfill\/export/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_object_key VARCHAR\(255\)/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_thumbnail_object_key VARCHAR\(255\)/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_sha256 CHAR\(64\)/);
   assert.match(photoObjectMigration, /ADD COLUMN IF NOT EXISTS photo_size_bytes BIGINT/);
+  assert.equal(existsSync(path.join(root, receiptTokenMigrationPath)), true);
+  const receiptTokenMigration = read(receiptTokenMigrationPath);
+  assert.match(receiptTokenMigration, /ADD COLUMN IF NOT EXISTS client_submission_id VARCHAR\(120\)/);
+  assert.match(receiptTokenMigration, /ADD COLUMN IF NOT EXISTS receipt_token_hash CHAR\(64\)/);
+  assert.match(receiptTokenMigration, /ux_facility_reports_client_submission/);
+  assert.equal(existsSync(path.join(root, dropBase64MigrationPath)), true);
+  assert.match(read(dropBase64MigrationPath), /DROP COLUMN IF EXISTS photo_data_base64/);
   assert.match(batchPostgresSchema, /CONSTRAINT fk_facility_reports_duplicate/);
   assert.match(batchPostgresSchema, /FOREIGN KEY \(duplicate_of_report_id\) REFERENCES facility_reports\(report_id\)/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_facility_reports_report_type/);
@@ -1749,11 +1768,16 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(security, /"\/api\/v1\/reports\/\*"/);
+  assert.match(security, /"\/api\/v1\/report-uploads"/);
+  assert.match(security, /"\/api\/v1\/report-uploads\/\*"/);
   assert.match(security, /"\/api\/v1\/routes\/\*\/feedback"/);
   assert.match(reportUseCase, /getUserReport\(String reportId, String userId\)/);
+  assert.match(reportUseCase, /getReportByReceiptToken\(String reportId, String receiptToken\)/);
   assert.match(reportService, /getUserReport\(String reportId, String userId\)/);
+  assert.match(reportService, /getReportByReceiptToken\(String reportId, String receiptToken\)/);
   assert.match(reportService, /requireReportOwner\(report, userId\)/);
-  assert.match(reportController, /report\(\s*@PathVariable String reportId,\s*Principal principal\s*\)/);
+  assert.match(reportController, /report\(\s*@PathVariable String reportId,\s*Principal principal,\s*@RequestHeader\(name = "X-Easysubway-Report-Receipt-Token"/);
+  assert.match(reportController, /facilityReportUseCase\.getReportByReceiptToken\(reportId, receiptToken\)/);
   assert.match(reportController, /facilityReportUseCase\.getUserReport\(reportId, principal\.getName\(\)\)/);
   assert.match(reportController, /ApiResponse<PageResponse<FacilityReportStatusResponse>> myReports/);
   assert.match(reportController, /FacilityReportPageRequest\.of\(page, size\)/);

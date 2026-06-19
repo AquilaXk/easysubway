@@ -97,34 +97,74 @@ void main() {
 
   test('시설 신고 API 저장소는 백엔드 계약에 맞춰 신고를 전송한다', () async {
     late String? authorizationHeader;
+    late Map<String, Object?> uploadIntentBody;
+    late List<int> uploadedPhotoBytes;
     late Map<String, Object?> requestBody;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) async {
-      authorizationHeader = request.headers.value(
-        HttpHeaders.authorizationHeader,
-      );
-      requestBody =
-          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
-      request.response
-        ..statusCode = HttpStatus.created
-        ..headers.contentType = ContentType.json
-        ..write(
-          jsonEncode({
-            'success': true,
-            'data': {
-              'id': 'report-1',
-              'stationId': 'station-sangnoksu',
-              'facilityId': 'facility-sangnoksu-elevator-1',
-              'reportType': 'BROKEN',
-              'description': '문이 열리지 않습니다.',
-              'status': 'SUBMITTED',
-              'createdAt': '2026-06-13T10:00:00',
-            },
-          }),
-        )
-        ..close();
+      switch ((request.method, request.uri.path)) {
+        case ('POST', '/api/v1/report-uploads'):
+          uploadIntentBody =
+              jsonDecode(await utf8.decodeStream(request))
+                  as Map<String, Object?>;
+          request.response
+            ..statusCode = HttpStatus.created
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'success': true,
+                'data': {
+                  'objectKey':
+                      'facility-reports/uploads/client-submission-1-photo.jpg',
+                  'uploadUrl':
+                      '/api/v1/report-uploads/client-submission-1-photo.jpg',
+                  'uploadMethod': 'PUT',
+                },
+              }),
+            )
+            ..close();
+        case ('PUT', '/api/v1/report-uploads/client-submission-1-photo.jpg'):
+          uploadedPhotoBytes = await request.fold<List<int>>(
+            <int>[],
+            (bytes, chunk) => bytes..addAll(chunk),
+          );
+          request.response
+            ..statusCode = HttpStatus.noContent
+            ..close();
+        case ('POST', '/api/v1/reports'):
+          authorizationHeader = request.headers.value(
+            HttpHeaders.authorizationHeader,
+          );
+          requestBody =
+              jsonDecode(await utf8.decodeStream(request))
+                  as Map<String, Object?>;
+          request.response
+            ..statusCode = HttpStatus.created
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'success': true,
+                'data': {
+                  'id': 'report-1',
+                  'stationId': 'station-sangnoksu',
+                  'facilityId': 'facility-sangnoksu-elevator-1',
+                  'reportType': 'BROKEN',
+                  'description': '문이 열리지 않습니다.',
+                  'status': 'SUBMITTED',
+                  'createdAt': '2026-06-13T10:00:00',
+                  'receiptToken': 'receipt-token-1',
+                },
+              }),
+            )
+            ..close();
+        default:
+          await utf8.decodeStream(request);
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
     });
 
     final repository = FacilityReportApiRepository(
@@ -138,6 +178,7 @@ void main() {
     final result = await repository.createReport(
       const FacilityReportRequest(
         userId: 'anonymous-mobile-user',
+        clientSubmissionId: 'client-submission-1',
         stationId: 'station-sangnoksu',
         facilityId: 'facility-sangnoksu-elevator-1',
         reportType: 'BROKEN',
@@ -150,22 +191,61 @@ void main() {
       ),
     );
 
+    expect(uploadIntentBody['clientSubmissionId'], 'client-submission-1');
+    expect(uploadIntentBody['photoFileName'], 'elevator-door.jpg');
+    expect(uploadIntentBody['photoContentType'], 'image/jpeg');
+    expect(uploadIntentBody['photoSizeBytes'], 11);
+    expect(uploadedPhotoBytes, utf8.encode('image-bytes'));
     expect(requestBody['stationId'], 'station-sangnoksu');
     expect(requestBody['facilityId'], 'facility-sangnoksu-elevator-1');
     expect(requestBody['reportType'], 'BROKEN');
     expect(requestBody['description'], '문이 열리지 않습니다.');
+    expect(requestBody['clientSubmissionId'], 'client-submission-1');
     expect(requestBody['photoFileName'], 'elevator-door.jpg');
     expect(requestBody['photoContentType'], 'image/jpeg');
-    expect(requestBody['photoDataBase64'], 'aW1hZ2UtYnl0ZXM=');
+    expect(
+      requestBody['photoObjectKey'],
+      'facility-reports/uploads/client-submission-1-photo.jpg',
+    );
+    expect(requestBody['photoSha256'], isA<String>());
+    expect(requestBody['photoSizeBytes'], 11);
+    expect(requestBody, isNot(contains('photoDataBase64')));
     expect(requestBody, isNot(contains('photoUrl')));
     expect(requestBody['latitude'], 37.302421);
     expect(requestBody['longitude'], 126.866221);
-    expect(
-      authorizationHeader,
-      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
-    );
+    expect(authorizationHeader, isNull);
     expect(result.id, 'report-1');
+    expect(result.receiptToken, 'receipt-token-1');
     expect(result.statusLabel, '접수됨');
+  });
+
+  test('시설 신고 요청은 사진 Base64 대신 object metadata를 전송한다', () {
+    final request = FacilityReportRequest(
+      userId: 'anonymous-mobile-user',
+      clientSubmissionId: 'client-submission-1',
+      stationId: 'station-sangnoksu',
+      facilityId: 'facility-sangnoksu-elevator-1',
+      reportType: 'BROKEN',
+      description: '문이 열리지 않습니다.',
+      photoFileName: 'elevator-door.jpg',
+      photoContentType: 'image/jpeg',
+      photoObjectKey: 'facility-reports/client-submission-1/photo.jpg',
+      photoSha256: 'a' * 64,
+      photoSizeBytes: 4096,
+    );
+
+    final json = request.toJson();
+
+    expect(json['clientSubmissionId'], 'client-submission-1');
+    expect(json['photoFileName'], 'elevator-door.jpg');
+    expect(json['photoContentType'], 'image/jpeg');
+    expect(
+      json['photoObjectKey'],
+      'facility-reports/client-submission-1/photo.jpg',
+    );
+    expect(json['photoSha256'], 'a' * 64);
+    expect(json['photoSizeBytes'], 4096);
+    expect(json, isNot(contains('photoDataBase64')));
   });
 
   test('시설 신고 요청은 사진이 없으면 사진 데이터를 전송하지 않는다', () {
