@@ -56,7 +56,7 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 					FROM field_verification_sessions
 				) ranked_sessions
 				WHERE row_number = 1
-				ORDER BY verified_at DESC, session_id ASC
+				ORDER BY verified_at DESC, station_id DESC, session_id ASC
 				""",
 			this::mapSession
 		);
@@ -221,7 +221,14 @@ public class JdbcFieldVerificationSessionRepository implements FieldVerification
 					note
 				FROM field_verification_items
 				WHERE session_id = ?
-				ORDER BY item_type ASC, item_id ASC
+				ORDER BY CASE item_type
+					WHEN 'EXIT' THEN 1
+					WHEN 'ELEVATOR' THEN 2
+					WHEN 'ESCALATOR' THEN 3
+					WHEN 'RESTROOM' THEN 4
+					WHEN 'PLATFORM_TRANSFER' THEN 5
+					ELSE 99
+				END ASC, item_id ASC
 				""",
 			this::mapItem,
 			sessionId

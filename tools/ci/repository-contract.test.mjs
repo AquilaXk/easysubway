@@ -2327,8 +2327,10 @@ test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분
   assert.match(jdbcSessionRepository, /updateSession\(session\)/);
   assert.match(jdbcSessionRepository, /updateItem\(session, item\)/);
   assert.match(jdbcSessionRepository, /@Transactional\s+public void save\(FieldVerificationSession session\)/);
-  assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, session_id ASC/);
-  assert.match(jdbcSessionRepository, /ORDER BY item_type ASC, item_id ASC/);
+  assert.match(jdbcSessionRepository, /ORDER BY verified_at DESC, station_id DESC, session_id ASC/);
+  assert.match(jdbcSessionRepository, /WHEN 'EXIT' THEN 1/);
+  assert.match(jdbcSessionRepository, /WHEN 'PLATFORM_TRANSFER' THEN 5/);
+  assert.match(jdbcSessionRepository, /END ASC, item_id ASC/);
   assert.match(service, /FieldVerificationSessionRepository/);
   assert.match(service, /sessionRepository\.save/);
   assert.match(service, /sessionRepository\.findByStationId/);

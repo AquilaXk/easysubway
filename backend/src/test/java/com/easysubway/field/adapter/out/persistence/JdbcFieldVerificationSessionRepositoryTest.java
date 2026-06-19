@@ -163,6 +163,62 @@ class JdbcFieldVerificationSessionRepositoryTest {
 			.containsExactly("field-verification-sadang-2026-07", "field-verification-sangnoksu-2026-06");
 	}
 
+	@Test
+	@DisplayName("같은 검증일의 세션 목록은 기존 기준선 노출 순서를 유지한다")
+	void listAllKeepsBaselineDisplayOrderWhenVerificationDatesAreSame() {
+		repository.save(session(
+			"field-verification-sadang-2026-06",
+			"station-sadang",
+			FieldVerificationStatus.PLANNED,
+			LocalDate.of(2026, 6, 19)
+		));
+		repository.save(session(
+			"field-verification-sangnoksu-2026-06",
+			"station-sangnoksu",
+			FieldVerificationStatus.IN_PROGRESS,
+			LocalDate.of(2026, 6, 19)
+		));
+
+		var sessions = repository.listAll();
+
+		assertThat(sessions)
+			.extracting(FieldVerificationSession::id)
+			.containsExactly("field-verification-sangnoksu-2026-06", "field-verification-sadang-2026-06");
+	}
+
+	@Test
+	@DisplayName("항목 목록은 관리자 API와 CSV 출력 순서를 유지한다")
+	void findByStationIdKeepsFieldVerificationItemDisplayOrder() {
+		repository.save(new FieldVerificationSession(
+			"field-verification-sadang-2026-06",
+			"station-sadang",
+			"사당역",
+			LocalDate.of(2026, 6, 19),
+			"field-team",
+			FieldVerificationStatus.IN_PROGRESS,
+			"주요 환승역 현장 검증 확대 기준선",
+			List.of(
+				item("field-verification-sadang-elevator", FieldVerificationItemType.ELEVATOR),
+				item("field-verification-sadang-platform-transfer", FieldVerificationItemType.PLATFORM_TRANSFER),
+				item("field-verification-sadang-exit", FieldVerificationItemType.EXIT),
+				item("field-verification-sadang-restroom", FieldVerificationItemType.RESTROOM),
+				item("field-verification-sadang-escalator", FieldVerificationItemType.ESCALATOR)
+			)
+		));
+
+		var found = repository.findByStationId("station-sadang").orElseThrow();
+
+		assertThat(found.items())
+			.extracting(FieldVerificationItem::type)
+			.containsExactly(
+				FieldVerificationItemType.EXIT,
+				FieldVerificationItemType.ELEVATOR,
+				FieldVerificationItemType.ESCALATOR,
+				FieldVerificationItemType.RESTROOM,
+				FieldVerificationItemType.PLATFORM_TRANSFER
+			);
+	}
+
 	private FieldVerificationSession session(String sessionId, String stationId, FieldVerificationStatus status) {
 		return session(sessionId, stationId, status, LocalDate.of(2026, 6, 19));
 	}
@@ -197,6 +253,16 @@ class JdbcFieldVerificationSessionRepositoryTest {
 					null
 				)
 			)
+		);
+	}
+
+	private FieldVerificationItem item(String itemId, FieldVerificationItemType type) {
+		return new FieldVerificationItem(
+			itemId,
+			type,
+			type.label(),
+			FieldVerificationStatus.PLANNED,
+			null
 		);
 	}
 
