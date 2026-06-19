@@ -128,10 +128,16 @@ test("backend production schema is managed by Flyway versioned migrations", () =
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE/);
   assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS facility_reports/);
   assert.match(baselineMigration, /CONSTRAINT fk_facility_report_review_audits_report/);
-  assert.match(`${baselineMigration}\n${h2BaselineMigration}`, /CREATE TABLE IF NOT EXISTS guest_accounts/);
-  assert.match(`${baselineMigration}\n${h2BaselineMigration}`, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
+  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
+  assert.match(h2BaselineMigration, /CREATE TABLE IF NOT EXISTS guest_accounts/);
+  assert.match(baselineMigration, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
+  assert.match(h2BaselineMigration, /CREATE TABLE IF NOT EXISTS anonymous_auth_tokens/);
   assert.match(
-    `${anonymousAuthDropMigration}\n${h2AnonymousAuthDropMigration}`,
+    anonymousAuthDropMigration,
+    /UPDATE route_feedbacks[\s\S]*UPDATE facility_reports[\s\S]*DELETE FROM user_activity_events[\s\S]*DELETE FROM push_notification_outbox[\s\S]*DELETE FROM registered_devices[\s\S]*DELETE FROM notification_settings[\s\S]*DELETE FROM mobility_profiles[\s\S]*DELETE FROM favorite_route_stations[\s\S]*DELETE FROM favorite_routes[\s\S]*DELETE FROM favorite_facilities[\s\S]*DELETE FROM favorite_stations[\s\S]*DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
+  );
+  assert.match(
+    h2AnonymousAuthDropMigration,
     /UPDATE route_feedbacks[\s\S]*UPDATE facility_reports[\s\S]*DELETE FROM user_activity_events[\s\S]*DELETE FROM push_notification_outbox[\s\S]*DELETE FROM registered_devices[\s\S]*DELETE FROM notification_settings[\s\S]*DELETE FROM mobility_profiles[\s\S]*DELETE FROM favorite_route_stations[\s\S]*DELETE FROM favorite_routes[\s\S]*DELETE FROM favorite_facilities[\s\S]*DELETE FROM favorite_stations[\s\S]*DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
   );
   assert.doesNotMatch(h2BaselineMigration, /WHERE revoked_at IS NULL/);
@@ -909,9 +915,14 @@ test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 
   assert.doesNotMatch(`${main}\n${appBootstrap}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
   assert.doesNotMatch(facilityReport, /anonymous-mobile-user|anonymousReportUserId/);
   assert.doesNotMatch(security, /AnonymousBearerAuthenticationFilter/);
-  assert.match(`${postgresBaseline}\n${h2Baseline}`, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
+  assert.match(postgresBaseline, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
+  assert.match(h2Baseline, /guest_accounts|anonymous_auth_tokens|anonymous_auth_audit_events/);
   assert.match(
-    `${postgresAnonymousAuthDrop}\n${h2AnonymousAuthDrop}`,
+    postgresAnonymousAuthDrop,
+    /UPDATE route_feedbacks[\s\S]*UPDATE facility_reports[\s\S]*DELETE FROM user_activity_events[\s\S]*DELETE FROM push_notification_outbox[\s\S]*DELETE FROM registered_devices[\s\S]*DELETE FROM notification_settings[\s\S]*DELETE FROM mobility_profiles[\s\S]*DELETE FROM favorite_route_stations[\s\S]*DELETE FROM favorite_routes[\s\S]*DELETE FROM favorite_facilities[\s\S]*DELETE FROM favorite_stations[\s\S]*DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
+  );
+  assert.match(
+    h2AnonymousAuthDrop,
     /UPDATE route_feedbacks[\s\S]*UPDATE facility_reports[\s\S]*DELETE FROM user_activity_events[\s\S]*DELETE FROM push_notification_outbox[\s\S]*DELETE FROM registered_devices[\s\S]*DELETE FROM notification_settings[\s\S]*DELETE FROM mobility_profiles[\s\S]*DELETE FROM favorite_route_stations[\s\S]*DELETE FROM favorite_routes[\s\S]*DELETE FROM favorite_facilities[\s\S]*DELETE FROM favorite_stations[\s\S]*DROP TABLE IF EXISTS anonymous_auth_audit_events;[\s\S]*DROP TABLE IF EXISTS anonymous_auth_tokens;[\s\S]*DROP TABLE IF EXISTS guest_accounts;/,
   );
   assert.match(legacyCredentialCleanup, /easysubway\.anonymousAuth\.credentials/);

@@ -417,7 +417,15 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   }
 
   Future<void> _handleUserDataDeleted() async {
-    await widget.legacyCredentialCleaner.clear();
+    try {
+      await widget.legacyCredentialCleaner.clear();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '데이터 삭제 후 기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
+      );
+    }
     await widget.onboardingStore?.clearResult();
     await widget.facilityReportDraftTargetStore?.clearTarget();
     if (!mounted) {
