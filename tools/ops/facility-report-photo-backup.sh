@@ -54,8 +54,8 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres sh
 	'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" "$POSTGRES_DB"' <<'SQL' > "${rows_file}"
 COPY (
 SELECT report_id,
-	ENCODE(CONVERT_TO(COALESCE(photo_file_name, ''), 'UTF8'), 'base64') AS photo_file_name_base64,
-	ENCODE(CONVERT_TO(COALESCE(photo_content_type, ''), 'UTF8'), 'base64') AS photo_content_type_base64,
+	REPLACE(REPLACE(ENCODE(CONVERT_TO(COALESCE(photo_file_name, ''), 'UTF8'), 'base64'), E'\n', ''), E'\r', '') AS photo_file_name_base64,
+	REPLACE(REPLACE(ENCODE(CONVERT_TO(COALESCE(photo_content_type, ''), 'UTF8'), 'base64'), E'\n', ''), E'\r', '') AS photo_content_type_base64,
 	photo_data_base64
 FROM facility_reports
 WHERE photo_data_base64 IS NOT NULL
