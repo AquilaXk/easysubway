@@ -1397,7 +1397,7 @@ void main() {
     expect(app.notificationPermissionProvider, isNull);
   });
 
-  test('푸시 알림을 명시적으로 켜면 즐겨찾기와 알림 설정에 같은 익명 인증 세션을 주입한다', () {
+  test('푸시 알림을 명시적으로 켜면 알림 저장소만 기본 생성한다', () {
     final app = EasySubwayApp(
       repository: FakeStationSearchRepository(),
       reportRepository: FakeFacilityReportRepository(),
@@ -1412,6 +1412,7 @@ void main() {
     final notificationRepository =
         app.notificationRepository as NotificationSettingsApiRepository;
 
+    expect(app.notificationPermissionProvider, isNull);
     expect(
       identical(
         favoriteRouteRepository.authProvider,

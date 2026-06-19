@@ -734,10 +734,7 @@ class _EasySubwayAppDependencies {
               )
         : null;
     final resolvedNotificationPermissionProvider = pushNotificationsEnabled
-        ? notificationPermissionProvider ??
-              (resolvedNotificationRepository == null
-                  ? null
-                  : MethodChannelNotificationPermissionProvider())
+        ? notificationPermissionProvider
         : null;
 
     return _EasySubwayAppDependencies(
