@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS data_source_raw_archives (
 	captured_at TIMESTAMP NOT NULL,
 	CONSTRAINT fk_data_source_raw_archives_run
 		FOREIGN KEY (run_id) REFERENCES data_collection_runs(run_id)
-		ON DELETE CASCADE ON UPDATE CASCADE,
+		ON DELETE RESTRICT ON UPDATE CASCADE,
 	CONSTRAINT chk_data_source_raw_archives_source
 		CHECK (source IN ('TRANSIT_MASTER')),
 	CONSTRAINT chk_data_source_raw_archives_sha256
