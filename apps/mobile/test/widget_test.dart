@@ -171,6 +171,9 @@ void main() {
 
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore();
+    final legacyCredentialStorage = FakeSecureKeyValueStorage()
+      ..values[SecureLegacyCredentialCleaner.legacyAuthCredentialsKey] =
+          'legacy-token-payload';
 
     await tester.pumpWidget(
       EasySubwayApp(
@@ -179,6 +182,9 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
+        legacyCredentialCleaner: SecureLegacyCredentialCleaner(
+          storage: legacyCredentialStorage,
+        ),
         onboardingStore: onboardingStore,
       ),
     );
@@ -196,6 +202,14 @@ void main() {
     expect(find.text('어디로 가시나요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+    expect(
+      legacyCredentialStorage.deletedKeys,
+      contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey),
+    );
+    expect(
+      legacyCredentialStorage.values,
+      isNot(contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey)),
+    );
     expect(onboardingStore.savedResult?.profile.id, 'elderly');
     expect(onboardingStore.saveCount, 1);
   });

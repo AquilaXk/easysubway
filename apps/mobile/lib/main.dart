@@ -39,6 +39,7 @@ Future<void> main() async {
         facilityReportDraftTargetStore:
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+        legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
       ),
     ),
   );
@@ -61,7 +62,7 @@ class EasySubwayApp extends StatelessWidget {
     CurrentLocationProvider? locationProvider,
     UserDataDeletionRepository? userDataDeletionRepository,
     LegacyCredentialCleaner legacyCredentialCleaner =
-        const SecureLegacyCredentialCleaner(),
+        const NoLegacyCredentialCleaner(),
     OnboardingResultStore? onboardingStore,
     FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
     FacilityReportLostPhotoRestorer? facilityReportLostPhotoRestorer,
@@ -355,6 +356,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   @override
   void initState() {
     super.initState();
+    unawaited(_clearLegacyCredentialsOnStartup());
     if (_loadingOnboardingState) {
       _restoreOnboardingState();
     }
@@ -425,6 +427,18 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _onboardingState = const OnboardingState.initial();
       _loadingOnboardingState = false;
     });
+  }
+
+  Future<void> _clearLegacyCredentialsOnStartup() async {
+    try {
+      await widget.legacyCredentialCleaner.clear();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
+      );
+    }
   }
 
   Future<void> _restoreOnboardingState() async {
