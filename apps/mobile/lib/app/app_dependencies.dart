@@ -82,7 +82,12 @@ class AppDependencies {
           routeRepository ??
           (catalogDatabase == null
               ? RouteSearchApiRepository(baseUri: baseUri)
-              : LocalRouteRepository(catalogDatabase: catalogDatabase)),
+              : FallbackRouteSearchRepository(
+                  localRepository: LocalRouteRepository(
+                    catalogDatabase: catalogDatabase,
+                  ),
+                  apiRepository: RouteSearchApiRepository(baseUri: baseUri),
+                )),
       routeFeedbackRepository:
           routeFeedbackRepository ??
           _defaultRouteFeedbackRepository(
@@ -111,7 +116,12 @@ class AppDependencies {
           internalRouteRepository ??
           (catalogDatabase == null
               ? InternalRouteApiRepository(baseUri: baseUri)
-              : LocalInternalRouteRepository(catalogDatabase: catalogDatabase)),
+              : FallbackInternalRouteRepository(
+                  localRepository: LocalInternalRouteRepository(
+                    catalogDatabase: catalogDatabase,
+                  ),
+                  apiRepository: InternalRouteApiRepository(baseUri: baseUri),
+                )),
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
