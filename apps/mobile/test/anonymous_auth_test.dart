@@ -172,6 +172,69 @@ void main() {
     expect(credentialStore.credentials?.userId, 'fresh-anonymous-user');
   });
 
+  test('익명 인증 세션은 삭제 요청에 사용한 인증 정보가 바뀌면 기존 인증 갱신을 실패 처리한다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stale-anonymous-user',
+        accessToken: 'stale-access-token',
+        refreshToken: 'stale-refresh-token',
+      ),
+    );
+    final repository = FakeAnonymousAuthRepository(
+      userId: 'fresh-anonymous-user',
+      accessToken: 'fresh-access-token',
+      refreshToken: 'fresh-refresh-token',
+    );
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
+
+    final staleHeader = await session.authorizationHeader();
+    await session.invalidateAuthorization();
+
+    final refreshed = await session.refreshExistingAuthorization(staleHeader!);
+
+    expect(refreshed, isFalse);
+    expect(repository.refreshCount, 1);
+    expect(
+      credentialStore.credentials?.authorizationHeader,
+      'Bearer fresh-access-token',
+    );
+  });
+
+  test('익명 인증 세션은 삭제 요청에 사용한 인증 정보만 기존 인증 갱신한다', () async {
+    final credentialStore = MemoryAnonymousAuthCredentialStore(
+      const AnonymousAuthCredentials(
+        userId: 'stale-anonymous-user',
+        accessToken: 'stale-access-token',
+        refreshToken: 'stale-refresh-token',
+      ),
+    );
+    final repository = FakeAnonymousAuthRepository(
+      userId: 'fresh-anonymous-user',
+      accessToken: 'fresh-access-token',
+      refreshToken: 'fresh-refresh-token',
+    );
+    final session = AnonymousAuthSession(
+      repository: repository,
+      credentialStore: credentialStore,
+    );
+
+    final staleHeader = await session.authorizationHeader();
+
+    final refreshed = await session.refreshExistingAuthorization(staleHeader!);
+
+    expect(refreshed, isTrue);
+    expect(repository.issueCount, 0);
+    expect(repository.refreshCount, 1);
+    expect(repository.refreshedTokens, ['stale-refresh-token']);
+    expect(
+      credentialStore.credentials?.authorizationHeader,
+      'Bearer fresh-access-token',
+    );
+  });
+
   test('익명 인증 세션은 동시 인증 무효화 후 하나의 새 인증 정보를 공유한다', () async {
     final credentialStore = MemoryAnonymousAuthCredentialStore(
       const AnonymousAuthCredentials(

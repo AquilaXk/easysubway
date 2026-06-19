@@ -113,6 +113,9 @@ void main() {
       'Bearer fresh-access-token',
     ]);
     expect(authProvider.refreshCount, 1);
+    expect(authProvider.refreshedAuthorizationHeaders, [
+      'Bearer stale-access-token',
+    ]);
     expect(authProvider.invalidateCount, 0);
   });
 
@@ -146,6 +149,9 @@ void main() {
     );
     expect(requestCount, 1);
     expect(authProvider.refreshCount, 1);
+    expect(authProvider.refreshedAuthorizationHeaders, [
+      'Bearer stale-access-token',
+    ]);
     expect(authProvider.invalidateCount, 0);
   });
 
@@ -224,6 +230,7 @@ class RefreshingAuthorizationHeaderProvider
   final bool refreshResult;
   int refreshCount = 0;
   int invalidateCount = 0;
+  final refreshedAuthorizationHeaders = <String>[];
 
   @override
   Future<String?> authorizationHeader() async => header;
@@ -233,8 +240,9 @@ class RefreshingAuthorizationHeaderProvider
     invalidateCount++;
   }
 
-  Future<bool> refreshExistingAuthorization() async {
+  Future<bool> refreshExistingAuthorization(String authorizationHeader) async {
     refreshCount++;
+    refreshedAuthorizationHeaders.add(authorizationHeader);
     if (!refreshResult) {
       return false;
     }

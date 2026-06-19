@@ -219,7 +219,9 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
     }
   }
 
-  Future<bool> refreshExistingAuthorization() async {
+  Future<bool> refreshExistingAuthorization(
+    String failedAuthorizationHeader,
+  ) async {
     final issuingCredentials = _issuingCredentials;
     if (issuingCredentials != null) {
       try {
@@ -236,6 +238,9 @@ class AnonymousAuthSession implements AuthorizationHeaderProvider {
 
     final credentials = _credentials ?? await credentialStore.readCredentials();
     if (credentials == null) {
+      return false;
+    }
+    if (credentials.authorizationHeader != failedAuthorizationHeader) {
       return false;
     }
 
