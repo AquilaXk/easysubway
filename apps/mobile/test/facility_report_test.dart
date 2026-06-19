@@ -207,7 +207,10 @@ void main() {
       requestBody['photoObjectKey'],
       'facility-reports/uploads/client-submission-1-photo.jpg',
     );
-    expect(requestBody['photoSha256'], isA<String>());
+    expect(
+      requestBody['photoSha256'],
+      '2c8648d103e3dd7ad87660da0f126a1443b6d21ac1bd3ec000c5e24e2373a90c',
+    );
     expect(requestBody['photoSizeBytes'], 11);
     expect(requestBody, isNot(contains('photoDataBase64')));
     expect(requestBody, isNot(contains('photoUrl')));
@@ -246,6 +249,96 @@ void main() {
     expect(json['photoSha256'], 'a' * 64);
     expect(json['photoSizeBytes'], 4096);
     expect(json, isNot(contains('photoDataBase64')));
+  });
+
+  test('시설 신고 API 저장소는 receipt 저장 실패에도 접수 결과를 유지한다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      await utf8.decodeStream(request);
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'id': 'report-1',
+              'stationId': 'station-sangnoksu',
+              'facilityId': 'facility-sangnoksu-elevator-1',
+              'reportType': 'BROKEN',
+              'description': '문이 열리지 않습니다.',
+              'status': 'SUBMITTED',
+              'createdAt': '2026-06-13T10:00:00',
+              'receiptToken': 'receipt-token-1',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      receiptStore: FakeFacilityReportReceiptStore(null, true),
+    );
+
+    final result = await repository.createReport(
+      const FacilityReportRequest(
+        userId: 'anonymous-mobile-user',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'BROKEN',
+        description: '문이 열리지 않습니다.',
+      ),
+    );
+
+    expect(result.id, 'report-1');
+    expect(result.receiptToken, 'receipt-token-1');
+  });
+
+  test('시설 신고 API 저장소는 upload intent method 불일치를 실패로 처리한다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      await utf8.decodeStream(request);
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'objectKey': 'facility-reports/uploads/client-submission-1.jpg',
+              'uploadUrl': '/api/v1/report-uploads/client-submission-1.jpg',
+              'uploadMethod': 'POST',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await expectLater(
+      repository.createReport(
+        const FacilityReportRequest(
+          userId: 'anonymous-mobile-user',
+          clientSubmissionId: 'client-submission-1',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'BROKEN',
+          description: '문이 열리지 않습니다.',
+          photoFileName: 'elevator-door.jpg',
+          photoContentType: 'image/jpeg',
+          photoDataBase64: 'aW1hZ2UtYnl0ZXM=',
+        ),
+      ),
+      throwsA(isA<FacilityReportException>()),
+    );
   });
 
   test('시설 신고 요청은 사진이 없으면 사진 데이터를 전송하지 않는다', () {
@@ -849,13 +942,19 @@ class FailingRefreshFacilityReportRepository
 }
 
 class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
-  FakeFacilityReportReceiptStore([Map<String, String>? receiptTokens])
-    : _receiptTokens = Map.of(receiptTokens ?? const {});
+  FakeFacilityReportReceiptStore([
+    Map<String, String>? receiptTokens,
+    this.throwOnSave = false,
+  ]) : _receiptTokens = Map.of(receiptTokens ?? const {});
 
   final Map<String, String> _receiptTokens;
+  final bool throwOnSave;
 
   @override
   Future<void> saveReceipt(FacilityReportReceipt receipt) async {
+    if (throwOnSave) {
+      throw StateError('receipt save failed');
+    }
     _receiptTokens[receipt.reportId] = receipt.receiptToken;
   }
 

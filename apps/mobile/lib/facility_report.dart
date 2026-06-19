@@ -118,7 +118,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         body,
         errorMessage: _facilityReportErrorMessage,
       );
-      await _saveReceiptIfPresent(result);
+      await _saveReceiptIfPresentSafely(result);
       return result;
     }
     throw const FacilityReportException(_facilityReportErrorMessage);
@@ -191,6 +191,9 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     String contentType,
     List<int> photoBytes,
   ) async {
+    if (uploadIntent.uploadMethod.trim().toUpperCase() != 'PUT') {
+      throw const FacilityReportException(_facilityReportErrorMessage);
+    }
     final uploadRequest = await _httpClient
         .putUrl(uploadIntent.uploadUri(baseUri))
         .timeout(_facilityReportTimeout);
@@ -202,6 +205,18 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     await uploadResponse.drain<void>();
     if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
       throw const FacilityReportException(_facilityReportErrorMessage);
+    }
+  }
+
+  Future<void> _saveReceiptIfPresentSafely(FacilityReportResult result) async {
+    try {
+      await _saveReceiptIfPresent(result).timeout(_facilityReportTimeout);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 신고 receipt token 저장 중 예외가 발생했습니다.',
+      );
     }
   }
 

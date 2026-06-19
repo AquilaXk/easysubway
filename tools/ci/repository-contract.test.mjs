@@ -1609,6 +1609,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const receiptTokenMigration = read(receiptTokenMigrationPath);
   assert.match(receiptTokenMigration, /ADD COLUMN IF NOT EXISTS client_submission_id VARCHAR\(120\)/);
   assert.match(receiptTokenMigration, /ADD COLUMN IF NOT EXISTS receipt_token_hash CHAR\(64\)/);
+  assert.match(receiptTokenMigration, /chk_facility_reports_receipt_hash_requires_submission/);
   assert.match(receiptTokenMigration, /ux_facility_reports_client_submission/);
   assert.equal(existsSync(path.join(root, dropBase64MigrationPath)), true);
   assert.match(read(dropBase64MigrationPath), /DROP COLUMN IF EXISTS photo_data_base64/);
