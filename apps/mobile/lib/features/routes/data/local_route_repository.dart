@@ -93,7 +93,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             fromStationId: fromStationId,
             toStationId: toStationId,
             estimatedMinutes: (step.durationSeconds / 60).ceil().clamp(1, 999),
-            distanceMeters: step.cost * 2,
+            distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
             requiresAccessibilityCheck:
                 step.type.name == 'entry' || step.type.name == 'exit',
@@ -236,8 +236,14 @@ class _RouteCatalogSnapshot {
       'last_verified_at',
       'NULL',
     );
+    final distanceMetersSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'distance_meters',
+      '0',
+    );
     final networkEdgeRows = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, duration_seconds, edge_type,
+                 $distanceMetersSql AS distance_meters,
                  $servicePatternSql AS service_pattern,
                  $includesStairsSql AS includes_stairs,
                  $accessibilityStatusSql AS accessibility_status,
@@ -272,6 +278,7 @@ class _RouteCatalogSnapshot {
               fromNodeId: row.read<String>('from_node_id'),
               toNodeId: row.read<String>('to_node_id'),
               durationSeconds: row.read<int>('duration_seconds'),
+              distanceMeters: row.read<int>('distance_meters'),
               edgeType: row.read<String>('edge_type'),
               servicePattern: row.read<String>('service_pattern'),
               includesStairs: row.read<int>('includes_stairs') != 0,
@@ -637,6 +644,7 @@ graph.RouteEdge _toGraphRouteEdge(
         ? 60
         : networkEdge.durationSeconds,
     lineId: _lineIdForNode(effectiveFromNodeId),
+    distanceMeters: networkEdge.distanceMeters,
     includesStairs: networkEdge.includesStairs,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
@@ -735,6 +743,7 @@ class _NetworkEdgeSnapshot {
     required this.fromNodeId,
     required this.toNodeId,
     required this.durationSeconds,
+    required this.distanceMeters,
     required this.edgeType,
     required this.servicePattern,
     required this.includesStairs,
@@ -747,6 +756,7 @@ class _NetworkEdgeSnapshot {
   final String fromNodeId;
   final String toNodeId;
   final int durationSeconds;
+  final int distanceMeters;
   final String edgeType;
   final String servicePattern;
   final bool includesStairs;

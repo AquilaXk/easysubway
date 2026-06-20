@@ -520,6 +520,90 @@ void main() {
     expect(rideStep.estimatedMinutes, 2);
   });
 
+  test('step 거리는 ranking cost에서 만들지 않고 측정값이 없으면 미확인으로 둔다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score,
+        last_verified_at
+      )
+      VALUES (
+        'edge-a-b-low-confidence-distance-unknown',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        120,
+        'RIDE',
+        'LOCAL',
+        'AVAILABLE',
+        50,
+        0
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.lineId == 'line-test',
+    );
+    expect(result.status, 'FOUND');
+    expect(rideStep.estimatedMinutes, 2);
+    expect(rideStep.distanceMeters, 0);
+  });
+
+  test('step 거리는 catalog 측정값이 있으면 ranking cost 대신 그 값을 사용한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement(
+      'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, accessibility_status, reliability_score,
+        last_verified_at
+      )
+      VALUES (
+        'edge-a-b-measured-distance',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        120,
+        850,
+        'RIDE',
+        'LOCAL',
+        'AVAILABLE',
+        50,
+        0
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.lineId == 'line-test',
+    );
+    expect(result.status, 'FOUND');
+    expect(rideStep.estimatedMinutes, 2);
+    expect(rideStep.distanceMeters, 850);
+  });
+
   test('사용 불가 explicit transfer edge는 자동 환승 edge로 우회하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
