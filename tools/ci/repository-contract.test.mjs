@@ -417,6 +417,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
+  const cdWorkflow = read(".github/workflows/cd.yml");
 
   assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
   assert.match(readme, /GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
@@ -427,11 +428,59 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
+  assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
     const source = read(file);
     assertActionsEnvSecretPolicy(file, source);
   }
+});
+
+test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-cd-env-"));
+  const envFile = path.join(dir, "deploy.env");
+  await writeFile(envFile, [
+    "EASYSUBWAY_POSTGRES_DB=easysubway",
+    "EASYSUBWAY_POSTGRES_USER=easysubway",
+    "EASYSUBWAY_POSTGRES_PASSWORD=secret",
+    "EASYSUBWAY_POSTGRES_PORT=5432",
+    "EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://db:5432/easysubway",
+    "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
+    "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
+    "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
+    "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
+    "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
+    "EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900",
+    "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
+    "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
+    "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
+    "EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY=datapack-signing-key",
+    "EASYSUBWAY_TRUSTED_PROXY_CIDRS=",
+    "EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false",
+    "EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
+    "EASYSUBWAY_ADMIN_USERNAME=admin",
+    "EASYSUBWAY_ADMIN_PASSWORD=secret",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
+    "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@example.com",
+    "EASYSUBWAY_ANDROID_KEYSTORE_PATH=",
+    "EASYSUBWAY_ANDROID_STORE_PASSWORD=",
+    "EASYSUBWAY_ANDROID_KEY_ALIAS=",
+    "EASYSUBWAY_ANDROID_KEY_PASSWORD=",
+    "",
+  ].join("\n"));
+
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
+
+  await writeFile(envFile, "EASYSUBWAY_POSTGRES_DB=easysubway\n");
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /Missing required deployment env names/
+  );
 });
 
 test("GitHub Actions 환경값 계약은 bracket notation 우회를 차단한다", () => {
