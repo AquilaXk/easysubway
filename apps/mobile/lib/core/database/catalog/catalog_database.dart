@@ -172,6 +172,22 @@ class CatalogDatabase extends _$CatalogDatabase {
             platformInfo: const Value('당고개 방면 / 오이도 방면'),
           ),
         ]);
+        batch.insertAllOnConflictUpdate(networkEdges, [
+          NetworkEdgesCompanion.insert(
+            id: 'edge-sangnoksu-sadang-seoul-4',
+            fromNodeId: 'station-sangnoksu:seoul-4',
+            toNodeId: 'station-sadang:seoul-4',
+            durationSeconds: const Value(420),
+            edgeType: const Value('RIDE'),
+          ),
+          NetworkEdgesCompanion.insert(
+            id: 'edge-sadang-sangnoksu-seoul-4',
+            fromNodeId: 'station-sadang:seoul-4',
+            toNodeId: 'station-sangnoksu:seoul-4',
+            durationSeconds: const Value(420),
+            edgeType: const Value('RIDE'),
+          ),
+        ]);
         batch.insertAllOnConflictUpdate(stationExits, [
           StationExitsCompanion.insert(
             id: 'exit-sangnoksu-1',
