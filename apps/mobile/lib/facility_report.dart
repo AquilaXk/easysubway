@@ -297,20 +297,20 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         return const [];
       }
 
-      final reports = <FacilityReportResult>[];
-      for (final receipt in receipts) {
-        try {
-          reports.add(await getReport(receipt.reportId));
-        } catch (error, stackTrace) {
-          reportMobileError(
-            error,
-            stackTrace,
-            context: '시설 신고 receipt 기반 상태 조회 중 예외가 발생했습니다.',
-          );
-          reports.add(_reportResultFromReceipt(receipt));
-        }
-      }
-      return reports;
+      return Future.wait(
+        receipts.map((receipt) async {
+          try {
+            return await getReport(receipt.reportId);
+          } catch (error, stackTrace) {
+            reportMobileError(
+              error,
+              stackTrace,
+              context: '시설 신고 receipt 기반 상태 조회 중 예외가 발생했습니다.',
+            );
+            return _reportResultFromReceipt(receipt);
+          }
+        }),
+      );
     } on FacilityReportException {
       rethrow;
     } catch (error, stackTrace) {

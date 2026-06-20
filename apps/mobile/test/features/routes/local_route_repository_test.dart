@@ -68,7 +68,7 @@ void main() {
     );
 
     expect(result.status, 'BLOCKED');
-    expect(result.destinationStationName, 'station-outside-pack');
+    expect(result.destinationStationName, '확인 필요 역');
     expect(result.isLocalResult, isTrue);
   });
 }

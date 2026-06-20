@@ -958,9 +958,23 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
   FakeFacilityReportReceiptStore([
     Map<String, String>? receiptTokens,
     this.throwOnSave = false,
-  ]) : _receiptTokens = Map.of(receiptTokens ?? const {});
+  ]) : _receiptTokens = Map.of(receiptTokens ?? const {}),
+       _createdAtByReportId = {
+         for (final entry
+             in (receiptTokens ?? const <String, String>{}).keys
+                 .toList()
+                 .asMap()
+                 .entries)
+           entry.value: DateTime(
+             2026,
+             6,
+             13,
+             10,
+           ).subtract(Duration(minutes: entry.key)),
+       };
 
   final Map<String, String> _receiptTokens;
+  final Map<String, DateTime> _createdAtByReportId;
   final bool throwOnSave;
 
   @override
@@ -969,6 +983,7 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
       throw StateError('receipt save failed');
     }
     _receiptTokens[receipt.reportId] = receipt.receiptToken;
+    _createdAtByReportId[receipt.reportId] = receipt.createdAt;
   }
 
   @override
@@ -978,16 +993,17 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
 
   @override
   Future<List<FacilityReportReceipt>> listReceipts() async {
-    return [
+    return ([
       for (final entry in _receiptTokens.entries)
         FacilityReportReceipt(
           receiptId: entry.key,
           reportId: entry.key,
           status: 'SUBMITTED',
           receiptToken: entry.value,
-          createdAt: DateTime(2026, 6, 13, 10),
+          createdAt:
+              _createdAtByReportId[entry.key] ?? DateTime(2026, 6, 13, 10),
         ),
-    ];
+    ]..sort((left, right) => right.createdAt.compareTo(left.createdAt)));
   }
 }
 
