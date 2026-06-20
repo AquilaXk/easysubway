@@ -4442,6 +4442,18 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(100),
   );
+  static const VerificationMeta _accessibilityStatusMeta =
+      const VerificationMeta('accessibilityStatus');
+  @override
+  late final GeneratedColumn<String> accessibilityStatus =
+      GeneratedColumn<String>(
+        'accessibility_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
   static const VerificationMeta _instructionMeta = const VerificationMeta(
     'instruction',
   );
@@ -4468,6 +4480,7 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     slopeLevel,
     widthLevel,
     reliabilityScore,
+    accessibilityStatus,
     instruction,
   ];
   @override
@@ -4578,6 +4591,15 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         ),
       );
     }
+    if (data.containsKey('accessibility_status')) {
+      context.handle(
+        _accessibilityStatusMeta,
+        accessibilityStatus.isAcceptableOrUnknown(
+          data['accessibility_status']!,
+          _accessibilityStatusMeta,
+        ),
+      );
+    }
     if (data.containsKey('instruction')) {
       context.handle(
         _instructionMeta,
@@ -4644,6 +4666,10 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         DriftSqlType.int,
         data['${effectivePrefix}reliability_score'],
       )!,
+      accessibilityStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accessibility_status'],
+      )!,
       instruction: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}instruction'],
@@ -4671,6 +4697,7 @@ class InternalRouteEdge extends DataClass
   final int slopeLevel;
   final int widthLevel;
   final int reliabilityScore;
+  final String accessibilityStatus;
   final String instruction;
   const InternalRouteEdge({
     required this.id,
@@ -4685,6 +4712,7 @@ class InternalRouteEdge extends DataClass
     required this.slopeLevel,
     required this.widthLevel,
     required this.reliabilityScore,
+    required this.accessibilityStatus,
     required this.instruction,
   });
   @override
@@ -4702,6 +4730,7 @@ class InternalRouteEdge extends DataClass
     map['slope_level'] = Variable<int>(slopeLevel);
     map['width_level'] = Variable<int>(widthLevel);
     map['reliability_score'] = Variable<int>(reliabilityScore);
+    map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['instruction'] = Variable<String>(instruction);
     return map;
   }
@@ -4720,6 +4749,7 @@ class InternalRouteEdge extends DataClass
       slopeLevel: Value(slopeLevel),
       widthLevel: Value(widthLevel),
       reliabilityScore: Value(reliabilityScore),
+      accessibilityStatus: Value(accessibilityStatus),
       instruction: Value(instruction),
     );
   }
@@ -4742,6 +4772,9 @@ class InternalRouteEdge extends DataClass
       slopeLevel: serializer.fromJson<int>(json['slopeLevel']),
       widthLevel: serializer.fromJson<int>(json['widthLevel']),
       reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
+      accessibilityStatus: serializer.fromJson<String>(
+        json['accessibilityStatus'],
+      ),
       instruction: serializer.fromJson<String>(json['instruction']),
     );
   }
@@ -4761,6 +4794,7 @@ class InternalRouteEdge extends DataClass
       'slopeLevel': serializer.toJson<int>(slopeLevel),
       'widthLevel': serializer.toJson<int>(widthLevel),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
+      'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'instruction': serializer.toJson<String>(instruction),
     };
   }
@@ -4778,6 +4812,7 @@ class InternalRouteEdge extends DataClass
     int? slopeLevel,
     int? widthLevel,
     int? reliabilityScore,
+    String? accessibilityStatus,
     String? instruction,
   }) => InternalRouteEdge(
     id: id ?? this.id,
@@ -4792,6 +4827,7 @@ class InternalRouteEdge extends DataClass
     slopeLevel: slopeLevel ?? this.slopeLevel,
     widthLevel: widthLevel ?? this.widthLevel,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+    accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     instruction: instruction ?? this.instruction,
   );
   InternalRouteEdge copyWithCompanion(InternalRouteEdgesCompanion data) {
@@ -4826,6 +4862,9 @@ class InternalRouteEdge extends DataClass
       reliabilityScore: data.reliabilityScore.present
           ? data.reliabilityScore.value
           : this.reliabilityScore,
+      accessibilityStatus: data.accessibilityStatus.present
+          ? data.accessibilityStatus.value
+          : this.accessibilityStatus,
       instruction: data.instruction.present
           ? data.instruction.value
           : this.instruction,
@@ -4847,6 +4886,7 @@ class InternalRouteEdge extends DataClass
           ..write('slopeLevel: $slopeLevel, ')
           ..write('widthLevel: $widthLevel, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('instruction: $instruction')
           ..write(')'))
         .toString();
@@ -4866,6 +4906,7 @@ class InternalRouteEdge extends DataClass
     slopeLevel,
     widthLevel,
     reliabilityScore,
+    accessibilityStatus,
     instruction,
   );
   @override
@@ -4884,6 +4925,7 @@ class InternalRouteEdge extends DataClass
           other.slopeLevel == this.slopeLevel &&
           other.widthLevel == this.widthLevel &&
           other.reliabilityScore == this.reliabilityScore &&
+          other.accessibilityStatus == this.accessibilityStatus &&
           other.instruction == this.instruction);
 }
 
@@ -4900,6 +4942,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
   final Value<int> slopeLevel;
   final Value<int> widthLevel;
   final Value<int> reliabilityScore;
+  final Value<String> accessibilityStatus;
   final Value<String> instruction;
   final Value<int> rowid;
   const InternalRouteEdgesCompanion({
@@ -4915,6 +4958,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.slopeLevel = const Value.absent(),
     this.widthLevel = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4931,6 +4975,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.slopeLevel = const Value.absent(),
     this.widthLevel = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4949,6 +4994,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Expression<int>? slopeLevel,
     Expression<int>? widthLevel,
     Expression<int>? reliabilityScore,
+    Expression<String>? accessibilityStatus,
     Expression<String>? instruction,
     Expression<int>? rowid,
   }) {
@@ -4965,6 +5011,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       if (slopeLevel != null) 'slope_level': slopeLevel,
       if (widthLevel != null) 'width_level': widthLevel,
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
+      if (accessibilityStatus != null)
+        'accessibility_status': accessibilityStatus,
       if (instruction != null) 'instruction': instruction,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4983,6 +5031,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Value<int>? slopeLevel,
     Value<int>? widthLevel,
     Value<int>? reliabilityScore,
+    Value<String>? accessibilityStatus,
     Value<String>? instruction,
     Value<int>? rowid,
   }) {
@@ -4999,6 +5048,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       slopeLevel: slopeLevel ?? this.slopeLevel,
       widthLevel: widthLevel ?? this.widthLevel,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+      accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       instruction: instruction ?? this.instruction,
       rowid: rowid ?? this.rowid,
     );
@@ -5043,6 +5093,9 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     if (reliabilityScore.present) {
       map['reliability_score'] = Variable<int>(reliabilityScore.value);
     }
+    if (accessibilityStatus.present) {
+      map['accessibility_status'] = Variable<String>(accessibilityStatus.value);
+    }
     if (instruction.present) {
       map['instruction'] = Variable<String>(instruction.value);
     }
@@ -5067,6 +5120,7 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
           ..write('slopeLevel: $slopeLevel, ')
           ..write('widthLevel: $widthLevel, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('instruction: $instruction, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7874,6 +7928,7 @@ typedef $$InternalRouteEdgesTableCreateCompanionBuilder =
       Value<int> slopeLevel,
       Value<int> widthLevel,
       Value<int> reliabilityScore,
+      Value<String> accessibilityStatus,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -7891,6 +7946,7 @@ typedef $$InternalRouteEdgesTableUpdateCompanionBuilder =
       Value<int> slopeLevel,
       Value<int> widthLevel,
       Value<int> reliabilityScore,
+      Value<String> accessibilityStatus,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -7961,6 +8017,11 @@ class $$InternalRouteEdgesTableFilterComposer
 
   ColumnFilters<int> get reliabilityScore => $composableBuilder(
     column: $table.reliabilityScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8039,6 +8100,11 @@ class $$InternalRouteEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get instruction => $composableBuilder(
     column: $table.instruction,
     builder: (column) => ColumnOrderings(column),
@@ -8108,6 +8174,11 @@ class $$InternalRouteEdgesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get instruction => $composableBuilder(
     column: $table.instruction,
     builder: (column) => column,
@@ -8166,6 +8237,7 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> slopeLevel = const Value.absent(),
                 Value<int> widthLevel = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion(
@@ -8181,6 +8253,7 @@ class $$InternalRouteEdgesTableTableManager
                 slopeLevel: slopeLevel,
                 widthLevel: widthLevel,
                 reliabilityScore: reliabilityScore,
+                accessibilityStatus: accessibilityStatus,
                 instruction: instruction,
                 rowid: rowid,
               ),
@@ -8198,6 +8271,7 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> slopeLevel = const Value.absent(),
                 Value<int> widthLevel = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion.insert(
@@ -8213,6 +8287,7 @@ class $$InternalRouteEdgesTableTableManager
                 slopeLevel: slopeLevel,
                 widthLevel: widthLevel,
                 reliabilityScore: reliabilityScore,
+                accessibilityStatus: accessibilityStatus,
                 instruction: instruction,
                 rowid: rowid,
               ),

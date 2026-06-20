@@ -204,6 +204,9 @@ class InternalRouteEdges extends Table {
       integer().named('width_level').withDefault(const Constant(2))();
   IntColumn get reliabilityScore =>
       integer().named('reliability_score').withDefault(const Constant(100))();
+  TextColumn get accessibilityStatus => text()
+      .named('accessibility_status')
+      .withDefault(const Constant('UNKNOWN'))();
   TextColumn get instruction => text().withDefault(const Constant(''))();
 
   @override

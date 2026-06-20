@@ -29,6 +29,7 @@ class InternalRouteEdge {
     this.widthLevel = 2,
     this.reliabilityScore = 100,
     this.isFacilityAvailable = true,
+    this.accessibilityStatus = 'AVAILABLE',
   });
 
   final String id;
@@ -45,6 +46,7 @@ class InternalRouteEdge {
   final int widthLevel;
   final int reliabilityScore;
   final bool isFacilityAvailable;
+  final String accessibilityStatus;
 }
 
 class InternalRouteGraph {
@@ -68,13 +70,19 @@ class LocalInternalRouteEngine {
   final InternalRouteGraph graph;
 
   LocalInternalRouteResult search(InternalRouteSearchRequest request) {
+    final blockedReasonCodes = <String>{};
     final path = _findLowestTimePath(
       request.fromNodeId,
       request.toNodeId,
       request.mobilityType,
+      blockedReasonCodes,
     );
     if (path == null) {
-      return LocalInternalRouteResult.blocked(const ['STAIR_ONLY_ACCESS']);
+      return LocalInternalRouteResult.blocked(
+        blockedReasonCodes.isEmpty
+            ? const ['STAIR_ONLY_ACCESS']
+            : blockedReasonCodes.toList(growable: false),
+      );
     }
 
     final warningCodes = <String>{};
@@ -106,6 +114,7 @@ class LocalInternalRouteEngine {
     String originNodeId,
     String destinationNodeId,
     MobilityType mobilityType,
+    Set<String> blockedReasonCodes,
   ) {
     final costs = <String, int>{originNodeId: 0};
     final previousNode = <String, String>{};
@@ -123,7 +132,7 @@ class LocalInternalRouteEngine {
       visited.add(current);
 
       for (final edge in graph.edgesFrom(current)) {
-        if (_isBlocked(edge, mobilityType)) {
+        if (_isBlocked(edge, mobilityType, blockedReasonCodes)) {
           continue;
         }
         final nextCost = costs[current]! + edge.estimatedSeconds;
@@ -150,11 +159,26 @@ class LocalInternalRouteEngine {
     return reversed.reversed.toList(growable: false);
   }
 
-  bool _isBlocked(InternalRouteEdge edge, MobilityType mobilityType) {
-    if (!edge.isFacilityAvailable) {
+  bool _isBlocked(
+    InternalRouteEdge edge,
+    MobilityType mobilityType,
+    Set<String> blockedReasonCodes,
+  ) {
+    final accessibilityStatus = edge.accessibilityStatus.toUpperCase();
+    if (edge.includesStairs && mobilityType.blocksStairOnlyAccess) {
+      blockedReasonCodes.add('STAIR_ONLY_ACCESS');
       return true;
     }
-    return edge.includesStairs && mobilityType.blocksStairOnlyAccess;
+    if (!edge.isFacilityAvailable || accessibilityStatus == 'UNAVAILABLE') {
+      blockedReasonCodes.add('FACILITY_UNAVAILABLE');
+      return true;
+    }
+    if (accessibilityStatus == 'UNKNOWN' &&
+        mobilityType.blocksStairOnlyAccess) {
+      blockedReasonCodes.add('ACCESSIBILITY_STATE_UNKNOWN');
+      return true;
+    }
+    return false;
   }
 
   String? _lowestUnvisitedNode(Map<String, int> costs, Set<String> visited) {
