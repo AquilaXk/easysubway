@@ -756,13 +756,20 @@ class RouteSearchStep {
 
   String get burdenLabel {
     final labels = <String>[
-      '약 $estimatedMinutes분',
+      _routeDurationLabel(estimatedMinutes),
       _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
       if (requiresAccessibilityCheck) '접근성 확인',
     ];
     return labels.join(' · ');
   }
+}
+
+String _routeDurationLabel(int estimatedMinutes) {
+  if (estimatedMinutes <= 0) {
+    return '시간 확인 필요';
+  }
+  return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {

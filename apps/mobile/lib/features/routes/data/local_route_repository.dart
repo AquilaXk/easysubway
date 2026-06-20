@@ -92,7 +92,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             lineName: lineName,
             fromStationId: fromStationId,
             toStationId: toStationId,
-            estimatedMinutes: (step.durationSeconds / 60).ceil().clamp(1, 999),
+            estimatedMinutes: _estimatedMinutesFor(step.durationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
             requiresAccessibilityCheck:
@@ -724,6 +724,9 @@ graph.RouteEdge _toGraphRouteEdge(
     baseCost: networkEdge.durationSeconds <= 0
         ? 60
         : networkEdge.durationSeconds,
+    durationSeconds: networkEdge.durationSeconds <= 0
+        ? 0
+        : networkEdge.durationSeconds,
     lineId: _lineIdForNode(effectiveFromNodeId),
     distanceMeters: networkEdge.distanceMeters,
     includesStairs: networkEdge.includesStairs,
@@ -732,6 +735,13 @@ graph.RouteEdge _toGraphRouteEdge(
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
   );
+}
+
+int _estimatedMinutesFor(int durationSeconds) {
+  if (durationSeconds <= 0) {
+    return 0;
+  }
+  return (durationSeconds / 60).ceil().clamp(1, 999);
 }
 
 String _lineIdForNode(String nodeId) {

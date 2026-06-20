@@ -1127,6 +1127,49 @@ void main() {
     expect(rideStep.estimatedMinutes, 2);
   });
 
+  test('step 소요시간은 측정값이 없으면 ranking fallback 시간으로 표시하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addDistanceMetersColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, accessibility_status, reliability_score,
+        stair_access_state, last_verified_at
+      )
+      VALUES (
+        'edge-a-b-duration-unknown',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        0,
+        850,
+        'RIDE',
+        'LOCAL',
+        'AVAILABLE',
+        100,
+        'STEP_FREE',
+        1700000000
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.lineId == 'line-test',
+    );
+    expect(result.status, 'FOUND');
+    expect(rideStep.estimatedMinutes, 0);
+    expect(rideStep.distanceMeters, 850);
+  });
+
   test('step 거리는 ranking cost에서 만들지 않고 측정값이 없으면 미확인으로 둔다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
