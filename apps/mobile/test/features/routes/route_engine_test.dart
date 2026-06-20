@@ -165,6 +165,26 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('휠체어 조건은 tri-state 계단 전용 값을 legacy flag보다 우선한다', () {
+      final engine = LocalRouteEngine(
+        graph: _conflictingStairAccessFixtureGraph(),
+      );
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.includesStairs, isFalse);
+      expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS']);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('낮은 신뢰도와 오래된 데이터는 경고 코드와 비용에 반영한다', () {
       final engine = LocalRouteEngine(graph: _lowQualityFixtureGraph());
 
@@ -586,6 +606,49 @@ NetworkGraph _unknownStairAccessFixtureGraph() {
         type: RouteEdgeType.entry,
         baseCost: 90,
         stairAccessState: RouteStairAccessState.unknown,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _conflictingStairAccessFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sangnoksu-stair-state-conflict',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        includesStairs: false,
+        stairAccessState: RouteStairAccessState.stairOnly,
       ),
       RouteEdge(
         id: 'ride-sangnoksu-sadang-line4',

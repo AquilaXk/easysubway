@@ -50,7 +50,8 @@ class AccessibilityCostCalculator {
       warningCodes.add('STAIR_ONLY_ACCESS_UNKNOWN');
     }
 
-    if (edge.includesStairs && mobilityType.blocksStairOnlyAccess) {
+    if (edge.stairAccessState == RouteStairAccessState.stairOnly &&
+        mobilityType.blocksStairOnlyAccess) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,
@@ -62,7 +63,7 @@ class AccessibilityCostCalculator {
     if (edge.type == RouteEdgeType.transfer) {
       cost += weight.transferPenalty;
     }
-    if (edge.includesStairs) {
+    if (edge.stairAccessState == RouteStairAccessState.stairOnly) {
       cost += weight.stairOnlyAccessPenalty;
       warningCodes.add('STAIR_ONLY_ACCESS');
     }

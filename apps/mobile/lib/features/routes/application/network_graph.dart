@@ -38,9 +38,9 @@ class RouteEdge {
            (includesStairs == true
                ? RouteStairAccessState.stairOnly
                : RouteStairAccessState.stepFree),
-       includesStairs =
-           includesStairs ??
-           stairAccessState == RouteStairAccessState.stairOnly,
+       includesStairs = stairAccessState == null
+           ? includesStairs ?? false
+           : stairAccessState == RouteStairAccessState.stairOnly,
        accessibilityState = isAvailable == null
            ? accessibilityState
            : isAvailable

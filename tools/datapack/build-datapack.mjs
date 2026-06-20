@@ -150,7 +150,7 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           row.edgeType ?? "WALK",
           row.servicePattern ?? "",
           row.includesStairs ? 1 : 0,
-          row.stairAccessState ?? (row.includesStairs ? "STAIR_ONLY" : "STEP_FREE"),
+          row.stairAccessState ?? (row.includesStairs ? "STAIR_ONLY" : "UNKNOWN"),
           row.accessibilityStatus ?? "UNKNOWN",
           row.reliabilityScore ?? 100,
           timestamp(row.lastVerifiedAt),
