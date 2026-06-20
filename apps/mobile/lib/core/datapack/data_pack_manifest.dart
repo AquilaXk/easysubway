@@ -534,7 +534,7 @@ String _requiredString(Map<String, Object?> json, String key) {
 }
 
 Uri _parsePackUrl(String rawUrl) {
-  if (_containsEncodedPathBoundary(rawUrl)) {
+  if (_containsRawDotSegment(rawUrl) || _containsEncodedPathBoundary(rawUrl)) {
     throw const FormatException('Invalid data pack URL.');
   }
   final uri = Uri.parse(rawUrl);
@@ -547,11 +547,14 @@ Uri _parsePackUrl(String rawUrl) {
   if (uri.hasAuthority ||
       rawUrl.startsWith('/') ||
       rawUrl.startsWith('//') ||
-      rawUrl.contains(r'\') ||
-      uri.pathSegments.any((segment) => segment == '..')) {
+      rawUrl.contains(r'\')) {
     throw const FormatException('Invalid data pack URL.');
   }
   return uri;
+}
+
+bool _containsRawDotSegment(String rawUrl) {
+  return rawUrl.split('/').any((segment) => segment == '..');
 }
 
 bool _containsEncodedPathBoundary(String rawUrl) {

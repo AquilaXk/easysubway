@@ -359,6 +359,26 @@ void main() {
       }),
       throwsFormatException,
     );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_fixturePack(url: 'catalog/../evil.sqlite.gz')],
+      }),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          _productionPack(
+            url: 'https://cdn.easysubway.example/catalog/../evil.sqlite.gz',
+          ),
+        ],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
   });
 
   test('데이터팩 manifest는 SQL 식별자로 안전하지 않은 테이블명을 거부한다', () {
