@@ -288,6 +288,7 @@ class _RouteCatalogSnapshot {
     final edges = <graph.RouteEdge>[];
     final nodeKeysByStation = <String, Map<String, _RouteNodeKey>>{};
     final explicitAccessPairs = <String>{};
+    final actualExplicitTransferPairs = <String>{};
     final explicitTransferPairs = <String>{};
     final explicitTransferLinePairs = <String>{};
     final stationLineKeys = {
@@ -319,6 +320,9 @@ class _RouteCatalogSnapshot {
         );
       }
       if (routeEdgeType == graph.RouteEdgeType.transfer) {
+        actualExplicitTransferPairs.add(
+          _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
+        );
         explicitTransferPairs.add(
           _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
         );
@@ -352,6 +356,10 @@ class _RouteCatalogSnapshot {
           continue;
         }
         final pairKey = _edgePairKey(pair.fromNodeId, pair.toNodeId);
+        if (routeEdgeType == graph.RouteEdgeType.transfer &&
+            actualExplicitTransferPairs.contains(pairKey)) {
+          continue;
+        }
         if (routeEdgeType == graph.RouteEdgeType.entry ||
             routeEdgeType == graph.RouteEdgeType.exit) {
           explicitAccessPairs.add(pairKey);
@@ -421,7 +429,8 @@ class _RouteCatalogSnapshot {
           if (from.nodeId == to.nodeId) {
             continue;
           }
-          if (from.lineId == to.lineId) {
+          if (from.lineId == to.lineId &&
+              !_isDifferentServicePatternTransfer(from, to)) {
             continue;
           }
           if (_hasExplicitTransferPair(
@@ -528,9 +537,19 @@ List<({String fromNodeId, String toNodeId})> _expandedExplicitEdgePairs(
         for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
           if (from.nodeId != to.nodeId)
             (fromNodeId: from.nodeId, toNodeId: to.nodeId),
+      for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
+        for (final from in _matchingNodeKeys(fromNode, nodeKeysByStation))
+          if (from.nodeId != to.nodeId)
+            (fromNodeId: to.nodeId, toNodeId: from.nodeId),
     ];
   }
   return const [];
+}
+
+bool _isDifferentServicePatternTransfer(_RouteNodeKey from, _RouteNodeKey to) {
+  return from.servicePattern.isNotEmpty &&
+      to.servicePattern.isNotEmpty &&
+      from.servicePattern != to.servicePattern;
 }
 
 List<_RouteNodeKey> _matchingNodeKeys(
