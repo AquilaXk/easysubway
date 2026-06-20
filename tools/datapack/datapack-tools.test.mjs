@@ -234,6 +234,49 @@ test("데이터팩 생성기는 stairAccessState 계단 전용 값을 legacy fla
   }
 });
 
+test("데이터팩 생성기는 stairAccessState 계단 없음 값을 legacy flag에 반영한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-step-free-legacy-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  fixture.packs[0].networkEdges[0].stairAccessState = "STEP_FREE";
+  fixture.packs[0].networkEdges[0].includesStairs = true;
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  const database = new DatabaseSync(path.join(outputDir, "catalog/capital-v1.sqlite"), {
+    readOnly: true,
+  });
+  try {
+    const stairStateRow = database
+      .prepare("SELECT includes_stairs, stair_access_state FROM network_edges WHERE id = ?")
+      .get("edge-sangnoksu-sadang-seoul-4");
+
+    assert.deepEqual(
+      { ...stairStateRow },
+      {
+        includes_stairs: 0,
+        stair_access_state: "STEP_FREE",
+      },
+    );
+  } finally {
+    database.close();
+  }
+});
+
 test("데이터팩 검증기는 manifest checksum 불일치를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-invalid-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });

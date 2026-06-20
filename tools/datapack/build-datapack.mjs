@@ -152,7 +152,7 @@ function buildSqlitePack(sqlitePath, schema, pack) {
             row.distanceMeters ?? 0,
             row.edgeType ?? "WALK",
             row.servicePattern ?? "",
-            stairAccessState === "STAIR_ONLY" || row.includesStairs ? 1 : 0,
+            stairAccessState === "STAIR_ONLY" ? 1 : 0,
             stairAccessState,
             row.accessibilityStatus ?? "UNKNOWN",
             row.reliabilityScore ?? 100,
