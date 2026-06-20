@@ -92,7 +92,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             lineName: lineName,
             fromStationId: fromStationId,
             toStationId: toStationId,
-            estimatedMinutes: (step.cost / 60).ceil().clamp(1, 999),
+            estimatedMinutes: (step.durationSeconds / 60).ceil().clamp(1, 999),
             distanceMeters: step.cost * 2,
             includesStairs: step.includesStairs,
             requiresAccessibilityCheck:
@@ -286,72 +286,177 @@ class _RouteCatalogSnapshot {
   graph.NetworkGraph toGraph() {
     final nodes = <graph.RouteNode>[];
     final edges = <graph.RouteEdge>[];
+    final nodeKeysByStation = <String, Map<String, _RouteNodeKey>>{};
+    final explicitAccessPairs = <String>{};
+    final actualExplicitTransferPairs = <String>{};
+    final explicitTransferPairs = <String>{};
+    final explicitTransferLinePairs = <String>{};
+    final stationLineKeys = {
+      for (final stationLine in stationLines)
+        _stationLineKey(stationLine.stationId, stationLine.lineId),
+    };
 
     for (final stationLine in stationLines) {
-      final nodeId = stationLine.nodeId;
-      nodes.add(
-        graph.RouteNode(
-          id: nodeId,
-          stationId: stationLine.stationId,
-          lineId: stationLine.lineId,
-        ),
-      );
-      edges.add(
-        graph.RouteEdge(
-          id: 'entry-${stationLine.stationId}-${stationLine.lineId}',
-          fromNodeId: stationLine.stationId,
-          toNodeId: nodeId,
-          type: graph.RouteEdgeType.entry,
-          baseCost: 90,
-        ),
-      );
-      edges.add(
-        graph.RouteEdge(
-          id: 'exit-${stationLine.stationId}-${stationLine.lineId}',
-          fromNodeId: nodeId,
-          toNodeId: stationLine.stationId,
-          type: graph.RouteEdgeType.exit,
-          baseCost: 60,
-        ),
-      );
+      _addRouteNodeKey(nodeKeysByStation, stationLine.routeNodeKey);
     }
 
+    for (final networkEdge in networkEdges) {
+      if (networkEdge.routeEdgeType == null) {
+        continue;
+      }
+      final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
+      final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
+      if (fromNode != null && _hasStationLine(fromNode, stationLineKeys)) {
+        _addRouteNodeKey(nodeKeysByStation, fromNode);
+      }
+      if (toNode != null && _hasStationLine(toNode, stationLineKeys)) {
+        _addRouteNodeKey(nodeKeysByStation, toNode);
+      }
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == graph.RouteEdgeType.entry ||
+          routeEdgeType == graph.RouteEdgeType.exit) {
+        explicitAccessPairs.add(
+          _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
+        );
+      }
+    }
+
+    for (final networkEdge in networkEdges) {
+      if (networkEdge.routeEdgeType != graph.RouteEdgeType.transfer) {
+        continue;
+      }
+      final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
+      final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
+      if (fromNode == null || toNode == null) {
+        continue;
+      }
+      actualExplicitTransferPairs.add(
+        _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
+      );
+      for (final pair in _expandedExplicitEdgePairs(
+        networkEdge,
+        nodeKeysByStation,
+      )) {
+        explicitTransferPairs.add(_edgePairKey(pair.fromNodeId, pair.toNodeId));
+      }
+      explicitTransferPairs.add(_edgePairKey(fromNode.nodeId, toNode.nodeId));
+      explicitTransferPairs.add(_edgePairKey(toNode.nodeId, fromNode.nodeId));
+      if (_isBaseStationLineNode(fromNode) && _isBaseStationLineNode(toNode)) {
+        explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
+        explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
+      }
+    }
+
+    final expandedExplicitEdges = <graph.RouteEdge>[];
     for (final networkEdge in networkEdges) {
       final routeEdgeType = networkEdge.routeEdgeType;
       if (routeEdgeType == null) {
         continue;
       }
-      edges.add(
-        graph.RouteEdge(
-          id: networkEdge.id,
-          fromNodeId: networkEdge.fromNodeId,
-          toNodeId: networkEdge.toNodeId,
-          type: routeEdgeType,
-          baseCost: networkEdge.durationSeconds <= 0
-              ? 60
-              : networkEdge.durationSeconds,
-          lineId: networkEdge.lineId,
-          includesStairs: networkEdge.includesStairs,
-          reliabilityScore: networkEdge.effectiveReliabilityScore,
-          isDataStale: networkEdge.isDataStale,
-          isAvailable: networkEdge.isAvailable,
-        ),
-      );
+      if (routeEdgeType != graph.RouteEdgeType.entry &&
+          routeEdgeType != graph.RouteEdgeType.exit &&
+          routeEdgeType != graph.RouteEdgeType.transfer) {
+        continue;
+      }
+      for (final pair in _expandedExplicitEdgePairs(
+        networkEdge,
+        nodeKeysByStation,
+      )) {
+        if (pair.fromNodeId == networkEdge.fromNodeId &&
+            pair.toNodeId == networkEdge.toNodeId) {
+          continue;
+        }
+        final pairKey = _edgePairKey(pair.fromNodeId, pair.toNodeId);
+        if (routeEdgeType == graph.RouteEdgeType.transfer &&
+            actualExplicitTransferPairs.contains(pairKey)) {
+          continue;
+        }
+        if (routeEdgeType == graph.RouteEdgeType.entry ||
+            routeEdgeType == graph.RouteEdgeType.exit) {
+          if (explicitAccessPairs.contains(pairKey)) {
+            continue;
+          }
+          explicitAccessPairs.add(pairKey);
+        }
+        expandedExplicitEdges.add(
+          _toGraphRouteEdge(
+            networkEdge,
+            routeEdgeType,
+            id: '${networkEdge.id}@$pairKey',
+            fromNodeId: pair.fromNodeId,
+            toNodeId: pair.toNodeId,
+          ),
+        );
+      }
     }
 
-    final stationIds = stationLines.map((line) => line.stationId).toSet();
-    for (final stationId in stationIds) {
-      final lines = stationLines
-          .where((line) => line.stationId == stationId)
-          .toList(growable: false);
-      for (final from in lines) {
-        for (final to in lines) {
-          if (from.lineId == to.lineId) {
+    for (final stationLine in stationLines) {
+      final stationNodes = nodeKeysByStation[stationLine.stationId]?.values;
+      if (stationNodes == null) {
+        continue;
+      }
+      for (final nodeKey in stationNodes.where(
+        (nodeKey) => nodeKey.lineId == stationLine.lineId,
+      )) {
+        nodes.add(
+          graph.RouteNode(
+            id: nodeKey.nodeId,
+            stationId: nodeKey.stationId,
+            lineId: nodeKey.lineId,
+          ),
+        );
+        final accessEdgeSuffix = nodeKey.accessEdgeSuffix;
+        if (!explicitAccessPairs.contains(
+          _edgePairKey(stationLine.stationId, nodeKey.nodeId),
+        )) {
+          edges.add(
+            graph.RouteEdge(
+              id: 'entry-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
+              fromNodeId: stationLine.stationId,
+              toNodeId: nodeKey.nodeId,
+              type: graph.RouteEdgeType.entry,
+              baseCost: 90,
+            ),
+          );
+        }
+        if (!explicitAccessPairs.contains(
+          _edgePairKey(nodeKey.nodeId, stationLine.stationId),
+        )) {
+          edges.add(
+            graph.RouteEdge(
+              id: 'exit-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
+              fromNodeId: nodeKey.nodeId,
+              toNodeId: stationLine.stationId,
+              type: graph.RouteEdgeType.exit,
+              baseCost: 60,
+            ),
+          );
+        }
+      }
+    }
+
+    for (final stationEntry in nodeKeysByStation.entries) {
+      final stationId = stationEntry.key;
+      final stationNodes = stationEntry.value.values.toList(growable: false);
+      for (final from in stationNodes) {
+        for (final to in stationNodes) {
+          if (from.nodeId == to.nodeId) {
+            continue;
+          }
+          if (!_isStationLineTransferAllowed(from, to, explicitAccessPairs)) {
+            continue;
+          }
+          if (_hasExplicitTransferPair(
+            from,
+            to,
+            explicitTransferPairs,
+            explicitTransferLinePairs,
+          )) {
             continue;
           }
           edges.add(
             graph.RouteEdge(
-              id: 'transfer-$stationId-${from.lineId}-${to.lineId}',
+              id: 'transfer-$stationId-${from.transferEdgeSuffix}-${to.transferEdgeSuffix}',
               fromNodeId: from.nodeId,
               toNodeId: to.nodeId,
               type: graph.RouteEdgeType.transfer,
@@ -363,7 +468,23 @@ class _RouteCatalogSnapshot {
       }
     }
 
+    edges.addAll(expandedExplicitEdges);
+
+    for (final networkEdge in networkEdges) {
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == null) {
+        continue;
+      }
+      edges.add(_toGraphRouteEdge(networkEdge, routeEdgeType));
+    }
+
     return graph.NetworkGraph(nodes: nodes, edges: edges);
+  }
+
+  bool _hasStationLine(_RouteNodeKey nodeKey, Set<String> stationLineKeys) {
+    return stationLineKeys.contains(
+      _stationLineKey(nodeKey.stationId, nodeKey.lineId),
+    );
   }
 
   String stationName(String stationId) {
@@ -389,6 +510,147 @@ class _RouteCatalogSnapshot {
   }
 }
 
+String _edgePairKey(String fromNodeId, String toNodeId) {
+  return '$fromNodeId->$toNodeId';
+}
+
+List<({String fromNodeId, String toNodeId})> _expandedExplicitEdgePairs(
+  _NetworkEdgeSnapshot networkEdge,
+  Map<String, Map<String, _RouteNodeKey>> nodeKeysByStation,
+) {
+  final routeEdgeType = networkEdge.routeEdgeType;
+  if (routeEdgeType == graph.RouteEdgeType.entry) {
+    final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
+    if (toNode == null) {
+      return const [];
+    }
+    return [
+      for (final candidate in _matchingNodeKeys(toNode, nodeKeysByStation))
+        (fromNodeId: networkEdge.fromNodeId, toNodeId: candidate.nodeId),
+    ];
+  }
+  if (routeEdgeType == graph.RouteEdgeType.exit) {
+    final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
+    if (fromNode == null) {
+      return const [];
+    }
+    return [
+      for (final candidate in _matchingNodeKeys(fromNode, nodeKeysByStation))
+        (fromNodeId: candidate.nodeId, toNodeId: networkEdge.toNodeId),
+    ];
+  }
+  if (routeEdgeType == graph.RouteEdgeType.transfer) {
+    final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
+    final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
+    if (fromNode == null || toNode == null) {
+      return const [];
+    }
+    return [
+      for (final from in _matchingNodeKeys(fromNode, nodeKeysByStation))
+        for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
+          if (from.nodeId != to.nodeId)
+            (fromNodeId: from.nodeId, toNodeId: to.nodeId),
+      for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
+        for (final from in _matchingNodeKeys(fromNode, nodeKeysByStation))
+          if (from.nodeId != to.nodeId)
+            (fromNodeId: to.nodeId, toNodeId: from.nodeId),
+    ];
+  }
+  return const [];
+}
+
+bool _isStationLineTransferAllowed(
+  _RouteNodeKey from,
+  _RouteNodeKey to,
+  Set<String> explicitAccessPairs,
+) {
+  if (from.lineId != to.lineId) {
+    return true;
+  }
+  if (from.servicePattern == to.servicePattern) {
+    return false;
+  }
+  if (from.servicePattern.isNotEmpty && to.servicePattern.isNotEmpty) {
+    return true;
+  }
+
+  final patternNode = from.servicePattern.isEmpty ? to : from;
+  return !explicitAccessPairs.contains(
+        _edgePairKey(patternNode.stationId, patternNode.nodeId),
+      ) &&
+      !explicitAccessPairs.contains(
+        _edgePairKey(patternNode.nodeId, patternNode.stationId),
+      );
+}
+
+List<_RouteNodeKey> _matchingNodeKeys(
+  _RouteNodeKey nodeKey,
+  Map<String, Map<String, _RouteNodeKey>> nodeKeysByStation,
+) {
+  if (nodeKey.servicePattern.isNotEmpty) {
+    return [nodeKey];
+  }
+  return nodeKeysByStation[nodeKey.stationId]?.values
+          .where((candidate) => candidate.lineId == nodeKey.lineId)
+          .toList(growable: false) ??
+      [nodeKey];
+}
+
+bool _hasExplicitTransferPair(
+  _RouteNodeKey from,
+  _RouteNodeKey to,
+  Set<String> explicitTransferPairs,
+  Set<String> explicitTransferLinePairs,
+) {
+  return explicitTransferPairs.contains(_edgePairKey(from.nodeId, to.nodeId)) ||
+      explicitTransferLinePairs.contains(_lineTransferPairKey(from, to));
+}
+
+bool _isBaseStationLineNode(_RouteNodeKey nodeKey) {
+  return nodeKey.servicePattern.isEmpty;
+}
+
+String _lineTransferPairKey(_RouteNodeKey from, _RouteNodeKey to) {
+  return '${_stationLineKey(from.stationId, from.lineId)}'
+      '->${_stationLineKey(to.stationId, to.lineId)}';
+}
+
+String _stationLineKey(String stationId, String lineId) {
+  return '$stationId:$lineId';
+}
+
+graph.RouteEdge _toGraphRouteEdge(
+  _NetworkEdgeSnapshot networkEdge,
+  graph.RouteEdgeType routeEdgeType, {
+  String? id,
+  String? fromNodeId,
+  String? toNodeId,
+}) {
+  final effectiveFromNodeId = fromNodeId ?? networkEdge.fromNodeId;
+  return graph.RouteEdge(
+    id: id ?? networkEdge.id,
+    fromNodeId: effectiveFromNodeId,
+    toNodeId: toNodeId ?? networkEdge.toNodeId,
+    type: routeEdgeType,
+    baseCost: networkEdge.durationSeconds <= 0
+        ? 60
+        : networkEdge.durationSeconds,
+    lineId: _lineIdForNode(effectiveFromNodeId),
+    includesStairs: networkEdge.includesStairs,
+    reliabilityScore: networkEdge.effectiveReliabilityScore,
+    isDataStale: networkEdge.isDataStale,
+    isAvailable: networkEdge.isAvailable,
+  );
+}
+
+String _lineIdForNode(String nodeId) {
+  final parts = nodeId.split(':');
+  if (parts.length < 2) {
+    return '';
+  }
+  return parts[1];
+}
+
 String _selectNetworkEdgeColumn(
   Set<String> columnNames,
   String columnName,
@@ -408,7 +670,62 @@ class _StationLineSnapshot {
   final String lineId;
   final int sequence;
 
-  String get nodeId => '$stationId:$lineId';
+  _RouteNodeKey get routeNodeKey =>
+      _RouteNodeKey(stationId: stationId, lineId: lineId, servicePattern: '');
+}
+
+void _addRouteNodeKey(
+  Map<String, Map<String, _RouteNodeKey>> nodeKeysByStation,
+  _RouteNodeKey nodeKey,
+) {
+  nodeKeysByStation
+      .putIfAbsent(nodeKey.stationId, () => <String, _RouteNodeKey>{})
+      .putIfAbsent(nodeKey.nodeId, () => nodeKey);
+}
+
+class _RouteNodeKey {
+  const _RouteNodeKey({
+    required this.stationId,
+    required this.lineId,
+    required this.servicePattern,
+  });
+
+  final String stationId;
+  final String lineId;
+  final String servicePattern;
+
+  static _RouteNodeKey? tryParse(String nodeId) {
+    final parts = nodeId.split(':');
+    if (parts.length < 2 || parts[0].isEmpty || parts[1].isEmpty) {
+      return null;
+    }
+    return _RouteNodeKey(
+      stationId: parts[0],
+      lineId: parts[1],
+      servicePattern: parts.length >= 3 ? parts[2] : '',
+    );
+  }
+
+  String get nodeId {
+    if (servicePattern.isEmpty) {
+      return '$stationId:$lineId';
+    }
+    return '$stationId:$lineId:$servicePattern';
+  }
+
+  String get accessEdgeSuffix {
+    if (servicePattern.isEmpty) {
+      return '';
+    }
+    return '-${servicePattern.toLowerCase()}';
+  }
+
+  String get transferEdgeSuffix {
+    if (servicePattern.isEmpty) {
+      return lineId;
+    }
+    return '$lineId-${servicePattern.toLowerCase()}';
+  }
 }
 
 class _NetworkEdgeSnapshot {
@@ -444,14 +761,6 @@ class _NetworkEdgeSnapshot {
       'EXIT' => graph.RouteEdgeType.exit,
       _ => null,
     };
-  }
-
-  String get lineId {
-    final parts = fromNodeId.split(':');
-    if (parts.length < 2) {
-      return '';
-    }
-    return parts[1];
   }
 
   String get _accessibilityStatusUpper => accessibilityStatus.toUpperCase();
