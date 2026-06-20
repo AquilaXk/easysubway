@@ -13,6 +13,10 @@ class RouteStep {
     this.lineId = '',
     this.transferStationId = '',
     this.includesStairs = false,
+    this.evidenceSources = const [],
+    this.timeSource = 'UNKNOWN',
+    this.distanceSource = 'UNKNOWN',
+    this.confidenceLabel = '확인 필요',
   });
 
   final int sequence;
@@ -26,4 +30,8 @@ class RouteStep {
   final String lineId;
   final String transferStationId;
   final bool includesStairs;
+  final List<String> evidenceSources;
+  final String timeSource;
+  final String distanceSource;
+  final String confidenceLabel;
 }

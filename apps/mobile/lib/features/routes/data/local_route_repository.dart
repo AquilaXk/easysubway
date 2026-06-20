@@ -4,6 +4,7 @@ import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
 import '../domain/route_result.dart' as local;
+import '../domain/route_step.dart' as local;
 
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({required this.catalogDatabase});
@@ -97,6 +98,18 @@ class LocalRouteRepository implements RouteSearchRepository {
             includesStairs: step.includesStairs,
             requiresAccessibilityCheck:
                 step.type.name == 'entry' || step.type.name == 'exit',
+            actionTitle: _stepActionTitle(step.type.name),
+            actionDetail: _stepActionDetail(
+              step.type.name,
+              fromName,
+              toName,
+              lineName,
+            ),
+            reason: _stepReason(step),
+            evidenceSources: step.evidenceSources,
+            timeSource: step.timeSource,
+            distanceSource: step.distanceSource,
+            confidenceLabel: step.confidenceLabel,
           );
         })
         .toList(growable: false);
@@ -125,6 +138,39 @@ class LocalRouteRepository implements RouteSearchRepository {
       'exit' => '도착역에서 계단 없는 출구 동선을 확인합니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
+  }
+
+  String _stepActionTitle(String type) {
+    return switch (type) {
+      'ride' => '열차 이동',
+      'transfer' => '환승',
+      'entry' => '승강장 접근',
+      'exit' => '출구 접근',
+      _ => '이동',
+    };
+  }
+
+  String _stepActionDetail(
+    String type,
+    String fromName,
+    String toName,
+    String lineName,
+  ) {
+    return switch (type) {
+      'ride' =>
+        '$fromName에서 $toName까지 ${lineName.isEmpty ? '열차' : lineName}를 이용합니다.',
+      'transfer' => '$fromName에서 다음 노선으로 갈아탈 준비를 합니다.',
+      'entry' => '$fromName역에서 계단 없는 승강장 접근 동선을 이용합니다.',
+      'exit' => '$toName역에서 계단 없는 출구 동선을 확인합니다.',
+      _ => '$fromName에서 $toName까지 이동합니다.',
+    };
+  }
+
+  String _stepReason(local.RouteStep step) {
+    final source = step.evidenceSources.isEmpty
+        ? '선택된 경로'
+        : '선택된 경로 ${step.evidenceSources.first}';
+    return '$source 근거로 안내합니다.';
   }
 
   int _scoreFromCost(int cost) {
