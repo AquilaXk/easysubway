@@ -152,8 +152,7 @@ class DataPackManifestEntry {
     if (expectedSizeBytes == null) {
       return;
     }
-    final canonical =
-        '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
+    final canonical = _signaturePayload(expectedSizeBytes);
     if (artifactKind == DataPackArtifactKind.production) {
       final publicKey = productionSigningPublicKey;
       if (publicKey == null) {
@@ -171,6 +170,15 @@ class DataPackManifestEntry {
     if (signature.value != sha256.convert(utf8.encode(canonical)).toString()) {
       throw const FormatException('Invalid data pack signature.');
     }
+  }
+
+  String _signaturePayload(int expectedSizeBytes) {
+    final fixturePayload =
+        '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
+    if (artifactKind == DataPackArtifactKind.production) {
+      return '$fixturePayload:${url.toString()}';
+    }
+    return fixturePayload;
   }
 }
 

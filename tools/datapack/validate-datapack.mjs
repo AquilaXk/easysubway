@@ -315,8 +315,8 @@ function validateRegionalQualityMetrics(metrics, label) {
 }
 
 function packSignature(pack) {
-  const canonical = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
   if (pack.artifactKind === "production") {
+    const canonical = productionSignaturePayload(pack);
     const signature = {
       algorithm: "rsa-sha256-pack-manifest-v1",
       value: pack.signature.value,
@@ -331,8 +331,16 @@ function packSignature(pack) {
   }
   return {
     algorithm: "sha256-pack-manifest-v1",
-    value: sha256(Buffer.from(canonical)),
+    value: sha256(Buffer.from(fixtureSignaturePayload(pack))),
   };
+}
+
+function fixtureSignaturePayload(pack) {
+  return `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+}
+
+function productionSignaturePayload(pack) {
+  return `${fixtureSignaturePayload(pack)}:${pack.url}`;
 }
 
 function signingPublicKey() {

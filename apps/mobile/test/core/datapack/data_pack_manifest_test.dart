@@ -10,7 +10,7 @@ const _productionSigningPublicKey = DataPackSigningPublicKey(
   exponentBase64Url: 'AQAB',
 );
 const _productionSignatureValue =
-    'f91YXZn2gD_RBLHjx2ICz5JPd4IXFWpcjESaegXjChW_-Ve3M_7GLqTAbQAYhkM0m2_d-xF7VysLCDhoZ65cuiez4PORyIyEXKp3uhQMssaQOrM52rH1bOHgZgwSxsNtNkAfBZn55YikbU9rdWKFWjk1IwM6XXBzoosXXrabaxX10Piapi76lnMF72c6u_1LL7yVMqK_U05y_Fa2ubDfKJjPbIhd-Jmex6ZtuebAbmf4A-vNVPeDDIxKmumg1pnUNDck0xsYCiLs_rvpaj3BrhiiNYOhSpm6xcpxVuO5GGZb8NcisaI-nWqQ8jHN0ev2MpPKsu4jaUKKfUQyH7R2Hw';
+    'iF48gj_9CEV0os3gJMEO2qdn0aAcBXT71zl8Qz6KIWQZ2qm1A0TmCb7f6wTJEoP3cFSZQdgmXcj7IPFNv9gLE9O_s0-DmwniFX7OIv8icwGe1BKHNJfFmHCqWyLs0uuUVZTmY6RwqS_YnElf_0caT1qDS7L32uu5zYXnWGTg5ul2xeRuBgDGW9gFs9I4UkvdF-MbNjVxCby4tyuCsQSHxUhpFLSLKluLGWc7lY4u688Ss2dR9Zs-zlYiWb4GQ6lxKU_lfx_0FSl3yipgrhX7OpAihyVBuxh-PA_MA5KAqJ0C5HqxAJ_lYZhgYKb5zvJ3eChI7uWc2OhyZ2ZyE-jYdw';
 
 void main() {
   test('데이터팩 manifest는 TTL과 pack 검증 조건을 파싱한다', () {
@@ -239,6 +239,19 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack(sourceUrl: 'http://example.invalid/source')],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          _productionPack(
+            url:
+                'https://mirror.easysubway.example/catalog/capital-v18.sqlite.gz',
+          ),
+        ],
       }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );

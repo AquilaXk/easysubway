@@ -380,6 +380,24 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
     { cwd: root, env: productionEnv },
   );
 
+  manifest.packs[0].url = "https://mirror.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /capital@1 signature mismatch/,
+  );
+
   manifest.packs[0].url = "https://cdn.easysubway.example/packs/capital-v1.sqlite.gz";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 

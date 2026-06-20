@@ -52,6 +52,7 @@ async function main() {
         id: pack.id,
         version: pack.version,
         artifactKind,
+        url: packUrl,
         sha256: compressedSha256,
         sqliteSha256,
         sizeBytes,
@@ -122,8 +123,8 @@ function stagedPackPath(pack) {
 }
 
 function packSignature(pack) {
-  const canonical = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
   if (pack.artifactKind === "production") {
+    const canonical = productionSignaturePayload(pack);
     return {
       algorithm: "rsa-sha256-pack-manifest-v1",
       value: rsaSha256Signature(signingPrivateKey(), canonical),
@@ -131,8 +132,16 @@ function packSignature(pack) {
   }
   return {
     algorithm: "sha256-pack-manifest-v1",
-    value: sha256(Buffer.from(canonical)),
+    value: sha256(Buffer.from(fixtureSignaturePayload(pack))),
   };
+}
+
+function fixtureSignaturePayload(pack) {
+  return `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+}
+
+function productionSignaturePayload(pack) {
+  return `${fixtureSignaturePayload(pack)}:${pack.url}`;
 }
 
 function signingPrivateKey() {
