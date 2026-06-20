@@ -108,6 +108,36 @@ void main() {
     expect(result.status, 'BLOCKED');
     expect(result.blockedReasons, isNotEmpty);
   });
+
+  test('WALK network edge는 열차 ride 경로로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type
+      )
+      VALUES (
+        'edge-a-c-walk',
+        'station-a:line-test',
+        'station-c:line-test',
+        180,
+        'WALK'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+  });
 }
 
 Future<void> _seedLineWithoutNetworkEdges(CatalogDatabase database) async {
