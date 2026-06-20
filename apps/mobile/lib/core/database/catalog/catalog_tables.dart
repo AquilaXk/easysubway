@@ -99,6 +99,8 @@ class NetworkEdges extends Table {
   TextColumn get toNodeId => text().named('to_node_id')();
   IntColumn get durationSeconds =>
       integer().named('duration_seconds').withDefault(const Constant(0))();
+  IntColumn get distanceMeters =>
+      integer().named('distance_meters').withDefault(const Constant(0))();
   TextColumn get edgeType =>
       text().named('edge_type').withDefault(const Constant('WALK'))();
   TextColumn get servicePattern =>
@@ -113,6 +115,7 @@ class NetworkEdges extends Table {
       .withDefault(const Constant('UNKNOWN'))();
   IntColumn get reliabilityScore =>
       integer().named('reliability_score').withDefault(const Constant(100))();
+  TextColumn get facilityId => text().named('facility_id').nullable()();
   DateTimeColumn get lastVerifiedAt =>
       dateTime().named('last_verified_at').nullable()();
 
