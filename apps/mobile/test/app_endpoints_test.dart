@@ -5,7 +5,8 @@ void main() {
   test('앱 endpoint는 데이터팩 base URL에서 manifest URI를 만든다', () {
     const endpoints = AppEndpoints(
       dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks/',
-      dataPackSigningKey: ' datapack-key ',
+      dataPackSigningPublicKeyModulus: ' public-modulus ',
+      dataPackSigningPublicKeyExponent: ' AQAB ',
       reportApiBaseUrl: 'https://api.easysubway.example',
     );
 
@@ -15,13 +16,21 @@ void main() {
         'https://cdn.easysubway.example/datapacks/catalog/current.json',
       ),
     );
-    expect(endpoints.productionDataPackSigningKey, 'datapack-key');
+    expect(
+      endpoints.productionDataPackSigningPublicKey?.modulusBase64Url,
+      'public-modulus',
+    );
+    expect(
+      endpoints.productionDataPackSigningPublicKey?.exponentBase64Url,
+      'AQAB',
+    );
   });
 
   test('앱 endpoint는 slash가 없는 데이터팩 base URL도 directory로 처리한다', () {
     const endpoints = AppEndpoints(
       dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks',
-      dataPackSigningKey: '',
+      dataPackSigningPublicKeyModulus: '',
+      dataPackSigningPublicKeyExponent: '',
       reportApiBaseUrl: 'https://api.easysubway.example',
     );
 
@@ -37,7 +46,8 @@ void main() {
     expect(
       const AppEndpoints(
         dataPackBaseUrl: '',
-        dataPackSigningKey: '',
+        dataPackSigningPublicKeyModulus: '',
+        dataPackSigningPublicKeyExponent: '',
         reportApiBaseUrl: 'https://api.easysubway.example',
       ).dataPackManifestUri,
       isNull,
@@ -45,7 +55,8 @@ void main() {
     expect(
       const AppEndpoints(
         dataPackBaseUrl: 'not-a-url',
-        dataPackSigningKey: '',
+        dataPackSigningPublicKeyModulus: '',
+        dataPackSigningPublicKeyExponent: '',
         reportApiBaseUrl: 'https://api.easysubway.example',
       ).dataPackManifestUri,
       isNull,

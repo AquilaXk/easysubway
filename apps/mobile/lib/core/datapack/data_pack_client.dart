@@ -11,7 +11,7 @@ class DataPackClient {
   DataPackClient({
     required this.manifestUri,
     required this.stateRepository,
-    this.productionSigningKey,
+    this.productionSigningPublicKey,
     HttpClient? httpClient,
     DateTime Function()? now,
   }) : _httpClient = httpClient ?? HttpClient(),
@@ -19,7 +19,7 @@ class DataPackClient {
 
   final Uri manifestUri;
   final DataPackUpdateStateRepository stateRepository;
-  final String? productionSigningKey;
+  final DataPackSigningPublicKey? productionSigningPublicKey;
   final HttpClient _httpClient;
   final DateTime Function() _now;
 
@@ -63,7 +63,7 @@ class DataPackClient {
     }
     final manifest = DataPackManifest.fromJson(
       decoded,
-      productionSigningKey: productionSigningKey,
+      productionSigningPublicKey: productionSigningPublicKey,
     );
     return DataPackManifestFetchResult(
       status: DataPackManifestFetchStatus.updated,

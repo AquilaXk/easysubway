@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createVerify } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
@@ -171,7 +171,7 @@ function validateManifest(manifest) {
     if (artifactKind !== "fixture" && artifactKind !== "production") {
       throw new Error(`${pack.id}@${pack.version} artifactKind must be fixture or production`);
     }
-    if (artifactKind === "production" && !/^https:\/\//.test(pack.url)) {
+    if (artifactKind === "production" && !isAbsoluteHttpsWithHost(pack.url)) {
       throw new Error(`${pack.id}@${pack.version} production pack url must be an absolute HTTPS URL`);
     }
     requiredSha256(pack.sha256, "pack.sha256");
@@ -205,6 +205,9 @@ function validateManifest(manifest) {
 
 function validatePackUrl(packUrl, label) {
   if (/^https:\/\//.test(packUrl)) {
+    if (!isAbsoluteHttpsWithHost(packUrl)) {
+      throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+    }
     return;
   }
   if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(packUrl) || packUrl.startsWith("/") || packUrl.startsWith("//") || packUrl.includes("\\")) {
@@ -239,10 +242,15 @@ function validateSignature(signature, label) {
     throw new Error(`${label} signature must be an object`);
   }
   const algorithm = requiredString(signature.algorithm, "signature.algorithm");
-  if (algorithm !== "sha256-pack-manifest-v1" && algorithm !== "hmac-sha256-pack-manifest-v1") {
+  if (algorithm !== "sha256-pack-manifest-v1" && algorithm !== "rsa-sha256-pack-manifest-v1") {
     throw new Error(`${label} signature algorithm is unsupported`);
   }
-  requiredSha256(signature.value, "signature.value");
+  const value = requiredString(signature.value, "signature.value");
+  if (algorithm === "sha256-pack-manifest-v1") {
+    requiredSha256(value, "signature.value");
+  } else if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error("signature.value must be a base64url string");
+  }
 }
 
 function validateSourceInventory(sourceInventory, artifactKind, label) {
@@ -270,10 +278,19 @@ function validateSourceInventory(sourceInventory, artifactKind, label) {
       if (licenseStatus !== "redistributable" || source.redistributionAllowed !== true) {
         throw new Error(`${label} production sourceInventory must be redistributable`);
       }
-      if (!/^https:\/\//.test(source.url)) {
+      if (!isAbsoluteHttpsWithHost(source.url)) {
         throw new Error(`${label} production sourceInventory.url must be HTTPS`);
       }
     }
+  }
+}
+
+function isAbsoluteHttpsWithHost(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname !== "";
+  } catch {
+    return false;
   }
 }
 
@@ -297,10 +314,17 @@ function validateRegionalQualityMetrics(metrics, label) {
 function packSignature(pack) {
   const canonical = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
   if (pack.artifactKind === "production") {
-    return {
-      algorithm: "hmac-sha256-pack-manifest-v1",
-      value: hmacSha256(signingKey(), canonical),
+    const signature = {
+      algorithm: "rsa-sha256-pack-manifest-v1",
+      value: pack.signature.value,
     };
+    if (!verifyRsaSha256Signature(signingPublicKey(), canonical, pack.signature.value)) {
+      return {
+        algorithm: signature.algorithm,
+        value: "",
+      };
+    }
+    return signature;
   }
   return {
     algorithm: "sha256-pack-manifest-v1",
@@ -308,16 +332,16 @@ function packSignature(pack) {
   };
 }
 
-function signingKey() {
-  const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY?.trim();
+function signingPublicKey() {
+  const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM?.trim();
   if (!key) {
-    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_KEY is required for production data pack signatures");
+    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM is required for production data pack validation");
   }
   return key;
 }
 
-function hmacSha256(key, value) {
-  return createHmac("sha256", key).update(value).digest("hex");
+function verifyRsaSha256Signature(publicKey, value, signature) {
+  return createVerify("RSA-SHA256").update(value).verify(publicKey, Buffer.from(signature, "base64url"));
 }
 
 function validatePackIdentity(value, label) {

@@ -59,10 +59,14 @@
               "algorithm": {
                 "enum": [
                   "sha256-pack-manifest-v1",
-                  "hmac-sha256-pack-manifest-v1"
+                  "rsa-sha256-pack-manifest-v1"
                 ]
               },
-              "value": { "$ref": "#/$defs/sha256" }
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$"
+              }
             }
           },
           "schemaVersion": { "type": "string", "minLength": 1 },

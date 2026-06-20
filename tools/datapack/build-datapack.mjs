@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createSign } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
@@ -86,6 +86,9 @@ function outputPathForPack(outputDir, packUrl, pack) {
 function validatePackUrl(packUrl, label) {
   requiredString(packUrl, label);
   if (/^https:\/\//.test(packUrl)) {
+    if (!isAbsoluteHttpsWithHost(packUrl)) {
+      throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+    }
     return;
   }
   if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(packUrl) || packUrl.startsWith("/") || packUrl.startsWith("//") || packUrl.includes("\\")) {
@@ -119,8 +122,8 @@ function packSignature(pack) {
   const canonical = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
   if (pack.artifactKind === "production") {
     return {
-      algorithm: "hmac-sha256-pack-manifest-v1",
-      value: hmacSha256(signingKey(), canonical),
+      algorithm: "rsa-sha256-pack-manifest-v1",
+      value: rsaSha256Signature(signingPrivateKey(), canonical),
     };
   }
   return {
@@ -129,16 +132,16 @@ function packSignature(pack) {
   };
 }
 
-function signingKey() {
-  const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY?.trim();
+function signingPrivateKey() {
+  const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM?.trim();
   if (!key) {
-    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_KEY is required for production data pack signatures");
+    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM is required for production data pack signatures");
   }
   return key;
 }
 
-function hmacSha256(key, value) {
-  return createHmac("sha256", key).update(value).digest("hex");
+function rsaSha256Signature(privateKey, value) {
+  return createSign("RSA-SHA256").update(value).sign(privateKey).toString("base64url");
 }
 
 function regionalQualityMetrics(pack) {
@@ -426,7 +429,7 @@ function validateFixture(fixture) {
     requiredString(pack.schemaVersion, "pack.schemaVersion");
     validatePackUrl(pack.url ?? stagedPackPath(pack), "pack.url");
     validatePackUrlMatchesStagedPath(pack.url ?? stagedPackPath(pack), pack, "pack.url");
-    if (artifactKind === "production" && !/^https:\/\//.test(pack.url)) {
+    if (artifactKind === "production" && !isAbsoluteHttpsWithHost(pack.url)) {
       throw new Error("production pack url must be an absolute HTTPS URL");
     }
     validateSourceInventory(pack.sourceInventory, artifactKind);
@@ -461,10 +464,19 @@ function validateSourceInventory(sourceInventory, artifactKind) {
       if (licenseStatus !== "redistributable" || source.redistributionAllowed !== true) {
         throw new Error("production sourceInventory must be redistributable");
       }
-      if (!/^https:\/\//.test(source.url)) {
+      if (!isAbsoluteHttpsWithHost(source.url)) {
         throw new Error("production sourceInventory.url must be HTTPS");
       }
     }
+  }
+}
+
+function isAbsoluteHttpsWithHost(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname !== "";
+  } catch {
+    return false;
   }
 }
 

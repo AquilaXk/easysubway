@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
@@ -14,7 +15,7 @@ class DataPackManifest {
 
   factory DataPackManifest.fromJson(
     Map<String, Object?> json, {
-    String? productionSigningKey,
+    DataPackSigningPublicKey? productionSigningPublicKey,
   }) {
     final ttlSeconds = json['ttlSeconds'];
     final rawPacks = json['packs'];
@@ -31,7 +32,7 @@ class DataPackManifest {
             }
             return DataPackManifestEntry.fromJson(
               rawPack,
-              productionSigningKey: productionSigningKey,
+              productionSigningPublicKey: productionSigningPublicKey,
             );
           })
           .toList(growable: false),
@@ -65,7 +66,7 @@ class DataPackManifestEntry {
 
   factory DataPackManifestEntry.fromJson(
     Map<String, Object?> json, {
-    String? productionSigningKey,
+    DataPackSigningPublicKey? productionSigningPublicKey,
   }) {
     final id = _readPackId(json['id']);
     final version = _readPackVersion(json['version']);
@@ -101,7 +102,7 @@ class DataPackManifestEntry {
           })
           .toList(growable: false),
       minimumTableRows: _parseMinimumTableRows(minimumTableRows),
-    ).._validateManifestContract(productionSigningKey);
+    ).._validateManifestContract(productionSigningPublicKey);
   }
 
   final String id;
@@ -118,15 +119,11 @@ class DataPackManifestEntry {
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
 
-  void _validateManifestContract(String? productionSigningKey) {
+  void _validateManifestContract(
+    DataPackSigningPublicKey? productionSigningPublicKey,
+  ) {
     final expectedSizeBytes = sizeBytes;
-    final expectedSignature = _signatureValue(
-      expectedSizeBytes,
-      productionSigningKey,
-    );
-    if (expectedSignature != null && signature.value != expectedSignature) {
-      throw const FormatException('Invalid data pack signature.');
-    }
+    _validateSignature(expectedSizeBytes, productionSigningPublicKey);
     if (artifactKind != DataPackArtifactKind.production) {
       return;
     }
@@ -144,32 +141,105 @@ class DataPackManifestEntry {
     }
   }
 
-  String? _signatureValue(
+  void _validateSignature(
     int? expectedSizeBytes,
-    String? productionSigningKey,
+    DataPackSigningPublicKey? productionSigningPublicKey,
   ) {
     if (expectedSizeBytes == null) {
-      return null;
+      return;
     }
     final canonical =
         '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
     if (artifactKind == DataPackArtifactKind.production) {
-      final signingKey = productionSigningKey?.trim();
-      if (signingKey == null || signingKey.isEmpty) {
+      final publicKey = productionSigningPublicKey;
+      if (publicKey == null) {
         throw const FormatException('Invalid data pack signature.');
       }
-      if (signature.algorithm != 'hmac-sha256-pack-manifest-v1') {
+      if (signature.algorithm != 'rsa-sha256-pack-manifest-v1' ||
+          !publicKey.verify(canonical, signature.value)) {
         throw const FormatException('Invalid data pack signature.');
       }
-      return Hmac(
-        sha256,
-        utf8.encode(signingKey),
-      ).convert(utf8.encode(canonical)).toString();
+      return;
     }
     if (signature.algorithm != 'sha256-pack-manifest-v1') {
       throw const FormatException('Invalid data pack signature.');
     }
-    return sha256.convert(utf8.encode(canonical)).toString();
+    if (signature.value != sha256.convert(utf8.encode(canonical)).toString()) {
+      throw const FormatException('Invalid data pack signature.');
+    }
+  }
+}
+
+class DataPackSigningPublicKey {
+  const DataPackSigningPublicKey({
+    required this.modulusBase64Url,
+    required this.exponentBase64Url,
+  });
+
+  final String modulusBase64Url;
+  final String exponentBase64Url;
+
+  bool verify(String message, String signatureBase64Url) {
+    try {
+      final modulusBytes = _base64UrlBytes(modulusBase64Url);
+      final exponentBytes = _base64UrlBytes(exponentBase64Url);
+      final signatureBytes = _base64UrlBytes(signatureBase64Url);
+      if (modulusBytes.isEmpty ||
+          exponentBytes.isEmpty ||
+          signatureBytes.length != modulusBytes.length) {
+        return false;
+      }
+      final modulus = _bigIntFromBytes(modulusBytes);
+      final exponent = _bigIntFromBytes(exponentBytes);
+      final signature = _bigIntFromBytes(signatureBytes);
+      if (modulus <= BigInt.zero ||
+          exponent <= BigInt.one ||
+          signature >= modulus) {
+        return false;
+      }
+      final encoded = _bigIntToFixedLengthBytes(
+        signature.modPow(exponent, modulus),
+        modulusBytes.length,
+      );
+      final digestInfo = <int>[
+        0x30,
+        0x31,
+        0x30,
+        0x0d,
+        0x06,
+        0x09,
+        0x60,
+        0x86,
+        0x48,
+        0x01,
+        0x65,
+        0x03,
+        0x04,
+        0x02,
+        0x01,
+        0x05,
+        0x00,
+        0x04,
+        0x20,
+        ...sha256.convert(utf8.encode(message)).bytes,
+      ];
+      final paddingLength = modulusBytes.length - digestInfo.length - 3;
+      if (paddingLength < 8) {
+        return false;
+      }
+      final expected = <int>[
+        0x00,
+        0x01,
+        ...List<int>.filled(paddingLength, 0xff),
+        0x00,
+        ...digestInfo,
+      ];
+      return _constantTimeBytesEquals(encoded, expected);
+    } on FormatException {
+      return false;
+    } on RangeError {
+      return false;
+    }
   }
 }
 
@@ -181,11 +251,12 @@ class DataPackSignature {
   factory DataPackSignature.fromJson(Map<String, Object?> json) {
     final algorithm = _requiredString(json, 'algorithm');
     if (algorithm != 'sha256-pack-manifest-v1' &&
-        algorithm != 'hmac-sha256-pack-manifest-v1') {
+        algorithm != 'rsa-sha256-pack-manifest-v1') {
       throw const FormatException('Invalid data pack signature.');
     }
     final value = _requiredString(json, 'value');
-    if (!_sha256Pattern.hasMatch(value)) {
+    if (!_sha256Pattern.hasMatch(value) &&
+        !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value)) {
       throw const FormatException('Invalid data pack signature.');
     }
     return DataPackSignature(algorithm: algorithm, value: value);
@@ -200,6 +271,42 @@ bool _isAbsoluteHttpsWithHost(Uri uri) {
       uri.scheme == 'https' &&
       uri.hasAuthority &&
       uri.host.isNotEmpty;
+}
+
+Uint8List _base64UrlBytes(String value) {
+  return base64Url.decode(base64Url.normalize(value));
+}
+
+BigInt _bigIntFromBytes(List<int> bytes) {
+  var result = BigInt.zero;
+  for (final byte in bytes) {
+    result = (result << 8) | BigInt.from(byte);
+  }
+  return result;
+}
+
+Uint8List _bigIntToFixedLengthBytes(BigInt value, int length) {
+  final bytes = List<int>.filled(length, 0);
+  var remaining = value;
+  for (var index = length - 1; index >= 0; index--) {
+    bytes[index] = (remaining & BigInt.from(0xff)).toInt();
+    remaining = remaining >> 8;
+  }
+  if (remaining != BigInt.zero) {
+    throw RangeError('RSA value exceeds modulus length.');
+  }
+  return Uint8List.fromList(bytes);
+}
+
+bool _constantTimeBytesEquals(List<int> left, List<int> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  var diff = 0;
+  for (var index = 0; index < left.length; index++) {
+    diff |= left[index] ^ right[index];
+  }
+  return diff == 0;
 }
 
 class DataPackSourceInventoryEntry {

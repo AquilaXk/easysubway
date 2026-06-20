@@ -149,7 +149,7 @@ Future<void> _defaultDataPackUpdateRunner({
     client: DataPackClient(
       manifestUri: manifestUri,
       stateRepository: stateRepository,
-      productionSigningKey: endpoints.productionDataPackSigningKey,
+      productionSigningPublicKey: endpoints.productionDataPackSigningPublicKey,
     ),
     installer: DataPackInstaller(
       catalogDirectory: catalogDirectory,

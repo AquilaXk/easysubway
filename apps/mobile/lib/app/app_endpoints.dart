@@ -1,7 +1,10 @@
+import '../core/datapack/data_pack_manifest.dart';
+
 class AppEndpoints {
   const AppEndpoints({
     required this.dataPackBaseUrl,
-    required this.dataPackSigningKey,
+    required this.dataPackSigningPublicKeyModulus,
+    required this.dataPackSigningPublicKeyExponent,
     required this.reportApiBaseUrl,
   });
 
@@ -11,8 +14,12 @@ class AppEndpoints {
         'EASYSUBWAY_DATA_PACK_BASE_URL',
         defaultValue: '',
       ),
-      dataPackSigningKey: String.fromEnvironment(
-        'EASYSUBWAY_DATAPACK_SIGNING_KEY',
+      dataPackSigningPublicKeyModulus: String.fromEnvironment(
+        'EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N',
+        defaultValue: '',
+      ),
+      dataPackSigningPublicKeyExponent: String.fromEnvironment(
+        'EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E',
         defaultValue: '',
       ),
       reportApiBaseUrl: String.fromEnvironment(
@@ -23,7 +30,8 @@ class AppEndpoints {
   }
 
   final String dataPackBaseUrl;
-  final String dataPackSigningKey;
+  final String dataPackSigningPublicKeyModulus;
+  final String dataPackSigningPublicKeyExponent;
   final String reportApiBaseUrl;
 
   Uri? get dataPackManifestUri {
@@ -39,8 +47,15 @@ class AppEndpoints {
     return base.resolve('catalog/current.json');
   }
 
-  String? get productionDataPackSigningKey {
-    final trimmed = dataPackSigningKey.trim();
-    return trimmed.isEmpty ? null : trimmed;
+  DataPackSigningPublicKey? get productionDataPackSigningPublicKey {
+    final modulus = dataPackSigningPublicKeyModulus.trim();
+    final exponent = dataPackSigningPublicKeyExponent.trim();
+    if (modulus.isEmpty || exponent.isEmpty) {
+      return null;
+    }
+    return DataPackSigningPublicKey(
+      modulusBase64Url: modulus,
+      exponentBase64Url: exponent,
+    );
   }
 }

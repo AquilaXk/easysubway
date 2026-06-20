@@ -4,7 +4,13 @@ import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _productionSigningKey = 'test-datapack-signing-key';
+const _productionSigningPublicKey = DataPackSigningPublicKey(
+  modulusBase64Url:
+      'itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w',
+  exponentBase64Url: 'AQAB',
+);
+const _productionSignatureValue =
+    'f91YXZn2gD_RBLHjx2ICz5JPd4IXFWpcjESaegXjChW_-Ve3M_7GLqTAbQAYhkM0m2_d-xF7VysLCDhoZ65cuiez4PORyIyEXKp3uhQMssaQOrM52rH1bOHgZgwSxsNtNkAfBZn55YikbU9rdWKFWjk1IwM6XXBzoosXXrabaxX10Piapi76lnMF72c6u_1LL7yVMqK_U05y_Fa2ubDfKJjPbIhd-Jmex6ZtuebAbmf4A-vNVPeDDIxKmumg1pnUNDck0xsYCiLs_rvpaj3BrhiiNYOhSpm6xcpxVuO5GGZb8NcisaI-nWqQ8jHN0ev2MpPKsu4jaUKKfUQyH7R2Hw';
 
 void main() {
   test('데이터팩 manifest는 TTL과 pack 검증 조건을 파싱한다', () {
@@ -215,7 +221,7 @@ void main() {
     final validManifest = DataPackManifest.fromJson({
       'ttlSeconds': 3600,
       'packs': [_productionPack()],
-    }, productionSigningKey: _productionSigningKey);
+    }, productionSigningPublicKey: _productionSigningPublicKey);
     expect(
       validManifest.packs.single.artifactKind,
       DataPackArtifactKind.production,
@@ -225,7 +231,7 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack(signatureValue: 'c' * 64)],
-      }, productionSigningKey: _productionSigningKey),
+      }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );
 
@@ -233,7 +239,7 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack(sourceUrl: 'http://example.invalid/source')],
-      }, productionSigningKey: _productionSigningKey),
+      }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );
 
@@ -241,7 +247,7 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack(url: 'https:catalog/capital-v18.sqlite.gz')],
-      }, productionSigningKey: _productionSigningKey),
+      }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );
 
@@ -249,7 +255,7 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack(sourceUrl: 'https://')],
-      }, productionSigningKey: _productionSigningKey),
+      }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );
 
@@ -420,16 +426,8 @@ Map<String, Object?> _productionPack({
     'sizeBytes': sizeBytes,
     'artifactKind': 'production',
     'signature': {
-      'algorithm': 'hmac-sha256-pack-manifest-v1',
-      'value':
-          signatureValue ??
-          _hmacSignatureValue(
-            id,
-            version,
-            compressedSha256,
-            sqliteSha256,
-            sizeBytes,
-          ),
+      'algorithm': 'rsa-sha256-pack-manifest-v1',
+      'value': signatureValue ?? _productionSignatureValue,
     },
     'sourceInventory': [
       {
@@ -453,20 +451,6 @@ Map<String, Object?> _productionPack({
     'schemaVersion': '1',
     'requiredTables': ['catalog_metadata'],
   };
-}
-
-String _hmacSignatureValue(
-  String id,
-  String version,
-  String compressedSha256,
-  String sqliteSha256,
-  int sizeBytes,
-) {
-  return Hmac(sha256, utf8.encode(_productionSigningKey))
-      .convert(
-        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
-      )
-      .toString();
 }
 
 String _signatureValue(
