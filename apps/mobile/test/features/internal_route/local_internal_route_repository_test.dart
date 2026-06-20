@@ -226,6 +226,22 @@ void main() {
     expect(step.widthLevel, 2);
     expect(step.reliabilityScore, 100);
     expect(result.warnings, isEmpty);
+
+    final wheelchairResult = await repository.searchInternalRoute(
+      const InternalRouteRequest(
+        stationId: 'station-sangnoksu',
+        fromNodeId: 'node-old-entry',
+        toNodeId: 'node-old-platform',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(wheelchairResult.status, 'BLOCKED');
+    expect(wheelchairResult.steps, isEmpty);
+    expect(
+      wheelchairResult.blockedReasons,
+      contains('내부 이동 경로 접근성 상태를 확인할 수 없습니다.'),
+    );
   });
 
   test('로컬 내부 이동 데이터가 없으면 API fallback 없이 빈 노드 목록을 반환한다', () async {

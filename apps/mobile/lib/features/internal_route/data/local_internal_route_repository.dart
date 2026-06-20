@@ -265,7 +265,7 @@ class _InternalRouteSnapshot {
     final accessibilityStatusSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
       'accessibility_status',
-      "'AVAILABLE'",
+      "'UNKNOWN'",
     );
     final edgeRows = await database
         .customSelect(
