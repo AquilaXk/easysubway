@@ -319,20 +319,31 @@ class _RouteCatalogSnapshot {
           _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
         );
       }
-      if (routeEdgeType == graph.RouteEdgeType.transfer) {
-        actualExplicitTransferPairs.add(
-          _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
-        );
-        explicitTransferPairs.add(
-          _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
-        );
-        explicitTransferPairs.add(
-          _edgePairKey(networkEdge.toNodeId, networkEdge.fromNodeId),
-        );
-        if (fromNode != null && toNode != null) {
-          explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
-          explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
-        }
+    }
+
+    for (final networkEdge in networkEdges) {
+      if (networkEdge.routeEdgeType != graph.RouteEdgeType.transfer) {
+        continue;
+      }
+      final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
+      final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
+      if (fromNode == null || toNode == null) {
+        continue;
+      }
+      actualExplicitTransferPairs.add(
+        _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
+      );
+      for (final pair in _expandedExplicitEdgePairs(
+        networkEdge,
+        nodeKeysByStation,
+      )) {
+        explicitTransferPairs.add(_edgePairKey(pair.fromNodeId, pair.toNodeId));
+      }
+      explicitTransferPairs.add(_edgePairKey(fromNode.nodeId, toNode.nodeId));
+      explicitTransferPairs.add(_edgePairKey(toNode.nodeId, fromNode.nodeId));
+      if (_isBaseStationLineNode(fromNode) && _isBaseStationLineNode(toNode)) {
+        explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
+        explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
       }
     }
 
@@ -593,6 +604,10 @@ bool _hasExplicitTransferPair(
 ) {
   return explicitTransferPairs.contains(_edgePairKey(from.nodeId, to.nodeId)) ||
       explicitTransferLinePairs.contains(_lineTransferPairKey(from, to));
+}
+
+bool _isBaseStationLineNode(_RouteNodeKey nodeKey) {
+  return nodeKey.servicePattern.isEmpty;
 }
 
 String _lineTransferPairKey(_RouteNodeKey from, _RouteNodeKey to) {

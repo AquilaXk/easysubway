@@ -633,6 +633,68 @@ void main() {
     expect(result.steps, isEmpty);
   });
 
+  test('service pattern explicit transfer는 다른 pattern의 환승을 막지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'edge-b-a-line-test-express',
+          'station-b:line-test:EXPRESS',
+          'station-a:line-test:EXPRESS',
+          90,
+          'RIDE',
+          'EXPRESS',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'transfer-a-local-alt-unavailable',
+          'station-a:line-test:LOCAL',
+          'station-a:line-alt',
+          140,
+          'TRANSFER',
+          'LOCAL',
+          'UNAVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-line-alt',
+          'station-a:line-alt',
+          'station-c:line-alt',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(
+      result.steps
+          .map((step) => step.lineId)
+          .where((id) => id.isNotEmpty)
+          .toSet(),
+      {'line-test', 'line-alt'},
+    );
+  });
+
   test('service pattern ride 뒤 base explicit transfer를 사용할 수 있다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
