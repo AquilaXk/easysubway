@@ -172,7 +172,7 @@ void main() {
     expect(result.steps, isEmpty);
   });
 
-  test('확인되지 않은 접근성 edge는 이동 가능 단정 없이 경고를 노출한다', () async {
+  test('확인되지 않은 접근성 edge는 휠체어 경로에서 이동 가능으로 안내하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
@@ -200,15 +200,14 @@ void main() {
       ),
     );
 
-    expect(result.status, 'FOUND');
-    expect(result.warnings.map((warning) => warning.code), {
-      'LOW_DATA_CONFIDENCE',
-      'STALE_ACCESSIBILITY_DATA',
-    });
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+    expect(result.warnings, isEmpty);
     expect(result.recommendationReasons.join('\n'), isNot(contains('확인했어요')));
   });
 
-  test('구형 catalog의 network_edges는 안전 기본값으로 읽는다', () async {
+  test('구형 catalog의 network_edges는 미확인 접근성 상태로 안전하게 차단한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
@@ -244,11 +243,10 @@ void main() {
       ),
     );
 
-    expect(result.status, 'FOUND');
-    expect(result.warnings.map((warning) => warning.code), {
-      'LOW_DATA_CONFIDENCE',
-      'STALE_ACCESSIBILITY_DATA',
-    });
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+    expect(result.warnings, isEmpty);
   });
 
   test('service pattern node는 역-노선 node로 뭉개지지 않고 출입구와 연결된다', () async {
@@ -486,7 +484,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, accessibility_status, reliability_score,
+        last_verified_at
       )
       VALUES (
         'edge-a-b-low-confidence',
@@ -495,8 +494,9 @@ void main() {
         120,
         'RIDE',
         'LOCAL',
-        'UNKNOWN',
-        50
+        'AVAILABLE',
+        50,
+        0
       )
     ''');
     final repository = LocalRouteRepository(catalogDatabase: database);
