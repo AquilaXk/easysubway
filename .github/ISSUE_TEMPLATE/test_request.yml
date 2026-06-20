@@ -39,6 +39,20 @@ body:
       required: true
 
   - type: textarea
+    id: evidence
+    attributes:
+      label: 필요 증거
+      description: 테스트 결과와 수동 QA 결과를 어떻게 남길지 적어 주세요.
+      placeholder: |
+        - [ ] 테스트 명령 결과
+        - [ ] Android/iOS 수동 확인 결과
+        - [ ] 스크린샷, 녹화, UI tree, 로그
+        - [ ] workflow 링크
+        - [ ] 증거가 필요 없는 경우 사유:
+    validations:
+      required: true
+
+  - type: textarea
     id: verify
     attributes:
       label: 검증
