@@ -480,6 +480,156 @@ void main() {
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
 
+  test('고장 시설에 연결된 entry edge는 접근 가능 경로에서 제외한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'OUT_OF_SERVICE',
+        'B1',
+        '1F',
+        '점검 중'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+  });
+
+  test('시설 품질 레코드는 연결된 edge의 신뢰도와 갱신 시각으로 전파된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'NORMAL',
+        'B1',
+        '1F',
+        ''
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO data_quality_records (
+        id, target_type, target_id, quality_level, checked_at
+      )
+      VALUES (
+        'quality-facility-a-elevator',
+        'facility',
+        'facility-a-elevator',
+        'LEVEL_3',
+        0
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, last_verified_at, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          1781827200,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          1781827200,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.warnings.map((warning) => warning.code), {
+      'LOW_DATA_CONFIDENCE',
+      'STALE_ACCESSIBILITY_DATA',
+    });
+  });
+
   test('명시 service pattern entry는 base entry 확장으로 우회하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -736,9 +886,7 @@ void main() {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
-    await database.customStatement(
-      'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
-    );
+    await _addDistanceMetersColumnIfMissing(database);
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters,
@@ -1318,6 +1466,34 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         VALUES (?, 'line-alt', ?, 1, '')
       ''',
       [station.$1, station.$2],
+    );
+  }
+}
+
+Future<void> _addFacilityIdColumnIfMissing(CatalogDatabase database) async {
+  final columns = await database
+      .customSelect('PRAGMA table_info(network_edges)')
+      .get();
+  final hasFacilityId = columns.any(
+    (row) => row.read<String>('name') == 'facility_id',
+  );
+  if (!hasFacilityId) {
+    await database.customStatement(
+      'ALTER TABLE network_edges ADD COLUMN facility_id TEXT',
+    );
+  }
+}
+
+Future<void> _addDistanceMetersColumnIfMissing(CatalogDatabase database) async {
+  final columns = await database
+      .customSelect('PRAGMA table_info(network_edges)')
+      .get();
+  final hasDistanceMeters = columns.any(
+    (row) => row.read<String>('name') == 'distance_meters',
+  );
+  if (!hasDistanceMeters) {
+    await database.customStatement(
+      'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
     );
   }
 }

@@ -4,14 +4,14 @@
     {
       "id": "core",
       "asset": "assets/datapacks/core.sqlite.gz",
-      "sha256": "185b148c9202353f98589a05be2a98d9b14d8fce4b1471c3369f94d9760a5453",
-      "sqliteSha256": "89601a83ee356711f097461524cc195c8e0475c9326989617017fd25b583ddc6"
+      "sha256": "e712d796e3ea183574aa3aa31967900ae1c53d3530a5e82075d1038e874c8211",
+      "sqliteSha256": "361d38291b080e2decb3306e3b2954f079609dcaeab5bbeb6676d549b05bbc04"
     },
     {
       "id": "capital",
       "asset": "assets/datapacks/capital.sqlite.gz",
-      "sha256": "185b148c9202353f98589a05be2a98d9b14d8fce4b1471c3369f94d9760a5453",
-      "sqliteSha256": "89601a83ee356711f097461524cc195c8e0475c9326989617017fd25b583ddc6"
+      "sha256": "e712d796e3ea183574aa3aa31967900ae1c53d3530a5e82075d1038e874c8211",
+      "sqliteSha256": "361d38291b080e2decb3306e3b2954f079609dcaeab5bbeb6676d549b05bbc04"
     }
   ]
 }
