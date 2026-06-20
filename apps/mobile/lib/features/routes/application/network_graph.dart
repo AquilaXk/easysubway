@@ -2,6 +2,8 @@ enum RouteEdgeType { ride, transfer, entry, exit }
 
 enum RouteAccessibilityState { available, unavailable, unknown }
 
+enum RouteStairAccessState { stepFree, stairOnly, unknown }
+
 class RouteNode {
   const RouteNode({
     required this.id,
@@ -24,13 +26,24 @@ class RouteEdge {
     this.distanceMeters = 0,
     this.lineId = '',
     this.transferStationId = '',
-    this.includesStairs = false,
+    bool? includesStairs,
+    RouteStairAccessState? stairAccessState,
     this.reliabilityScore = 100,
     this.isDataStale = false,
     RouteAccessibilityState accessibilityState =
         RouteAccessibilityState.available,
     bool? isAvailable,
-  }) : accessibilityState = isAvailable == null
+  }) : stairAccessState =
+           stairAccessState ??
+           (includesStairs == true
+               ? RouteStairAccessState.stairOnly
+               : type == RouteEdgeType.ride
+               ? RouteStairAccessState.stepFree
+               : RouteStairAccessState.unknown),
+       includesStairs = stairAccessState == null
+           ? includesStairs ?? false
+           : stairAccessState == RouteStairAccessState.stairOnly,
+       accessibilityState = isAvailable == null
            ? accessibilityState
            : isAvailable
            ? RouteAccessibilityState.available
@@ -45,6 +58,7 @@ class RouteEdge {
   final String lineId;
   final String transferStationId;
   final bool includesStairs;
+  final RouteStairAccessState stairAccessState;
   final int reliabilityScore;
   final bool isDataStale;
   final RouteAccessibilityState accessibilityState;

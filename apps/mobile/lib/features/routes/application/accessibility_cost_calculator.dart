@@ -39,7 +39,19 @@ class AccessibilityCostCalculator {
       warningCodes.add('ACCESSIBILITY_STATE_UNKNOWN');
     }
 
-    if (edge.includesStairs && mobilityType.blocksStairOnlyAccess) {
+    if (edge.stairAccessState == RouteStairAccessState.unknown) {
+      if (mobilityType.blocksStairOnlyAccess) {
+        return const AccessibilityCost(
+          cost: 0,
+          isBlocked: true,
+          warningCodes: ['STAIR_ONLY_ACCESS_UNKNOWN'],
+        );
+      }
+      warningCodes.add('STAIR_ONLY_ACCESS_UNKNOWN');
+    }
+
+    if (edge.stairAccessState == RouteStairAccessState.stairOnly &&
+        mobilityType.blocksStairOnlyAccess) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,
@@ -51,11 +63,14 @@ class AccessibilityCostCalculator {
     if (edge.type == RouteEdgeType.transfer) {
       cost += weight.transferPenalty;
     }
-    if (edge.includesStairs) {
+    if (edge.stairAccessState == RouteStairAccessState.stairOnly) {
       cost += weight.stairOnlyAccessPenalty;
       warningCodes.add('STAIR_ONLY_ACCESS');
     }
     if (edge.accessibilityState == RouteAccessibilityState.unknown) {
+      cost += weight.lowDataConfidencePenalty;
+    }
+    if (edge.stairAccessState == RouteStairAccessState.unknown) {
       cost += weight.lowDataConfidencePenalty;
     }
     if (edge.reliabilityScore < 80) {

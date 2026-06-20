@@ -77,7 +77,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES (
         'edge-a-b-local',
@@ -86,6 +87,7 @@ void main() {
         120,
         'RIDE',
         'LOCAL',
+        'STEP_FREE',
         'AVAILABLE',
         95
       )
@@ -155,14 +157,16 @@ void main() {
     await _seedLineWithoutNetworkEdges(database);
     await database.customStatement('''
       INSERT INTO network_edges (
-        id, from_node_id, to_node_id, duration_seconds, edge_type
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state
       )
       VALUES (
         'edge-a-c-walk',
         'station-a:line-test',
         'station-c:line-test',
         180,
-        'WALK'
+        'WALK',
+        'STEP_FREE'
       )
     ''');
     final repository = LocalRouteRepository(catalogDatabase: database);
@@ -186,7 +190,7 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        accessibility_status
+        stair_access_state, accessibility_status
       )
       VALUES (
         'edge-a-c-elevator-down',
@@ -194,6 +198,7 @@ void main() {
         'station-c:line-test',
         180,
         'RIDE',
+        'STEP_FREE',
         'UNAVAILABLE'
       )
     ''');
@@ -219,7 +224,7 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        accessibility_status
+        stair_access_state, accessibility_status
       )
       VALUES (
         'edge-a-c-unknown-access',
@@ -227,6 +232,7 @@ void main() {
         'station-c:line-test',
         180,
         'RIDE',
+        'STEP_FREE',
         'UNKNOWN'
       )
     ''');
@@ -289,6 +295,53 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('구형 catalog의 계단 여부 false 기본값은 계단 없는 경로로 단정하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('DROP TABLE network_edges');
+    await database.customStatement('''
+      CREATE TABLE network_edges (
+        id TEXT NOT NULL PRIMARY KEY,
+        from_node_id TEXT NOT NULL,
+        to_node_id TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        edge_type TEXT NOT NULL DEFAULT 'WALK',
+        includes_stairs INTEGER NOT NULL DEFAULT 0,
+        accessibility_status TEXT NOT NULL DEFAULT 'AVAILABLE'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        includes_stairs, accessibility_status
+      )
+      VALUES (
+        'edge-a-c-legacy-stair-default',
+        'station-a:line-test',
+        'station-c:line-test',
+        180,
+        'RIDE',
+        0,
+        'AVAILABLE'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+    expect(result.warnings, isEmpty);
+  });
+
   test('service pattern node는 역-노선 node로 뭉개지지 않고 출입구와 연결된다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -296,7 +349,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES (
         'edge-a-b-local',
@@ -305,6 +359,7 @@ void main() {
         120,
         'RIDE',
         'LOCAL',
+        'STEP_FREE',
         'AVAILABLE',
         95
       )
@@ -334,7 +389,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -344,6 +400,7 @@ void main() {
           90,
           'ENTRY',
           'LOCAL',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -354,6 +411,7 @@ void main() {
           120,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -380,7 +438,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -390,6 +449,7 @@ void main() {
           90,
           'ENTRY',
           '',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -400,6 +460,7 @@ void main() {
           120,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -426,7 +487,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -436,6 +498,7 @@ void main() {
           90,
           'ENTRY',
           '',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -446,6 +509,7 @@ void main() {
           90,
           'ENTRY',
           'LOCAL',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -456,6 +520,7 @@ void main() {
           120,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -482,7 +547,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES (
         'edge-a-c-express',
@@ -491,6 +557,7 @@ void main() {
         150,
         'RIDE',
         'EXPRESS',
+        'STEP_FREE',
         'AVAILABLE',
         95
       )
@@ -525,7 +592,7 @@ void main() {
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
         service_pattern, accessibility_status, reliability_score,
-        last_verified_at
+        stair_access_state, last_verified_at
       )
       VALUES (
         'edge-a-b-low-confidence',
@@ -536,6 +603,7 @@ void main() {
         'LOCAL',
         'AVAILABLE',
         50,
+        'STEP_FREE',
         0
       )
     ''');
@@ -568,7 +636,7 @@ void main() {
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
         service_pattern, accessibility_status, reliability_score,
-        last_verified_at
+        stair_access_state, last_verified_at
       )
       VALUES (
         'edge-a-b-low-confidence-distance-unknown',
@@ -579,6 +647,7 @@ void main() {
         'LOCAL',
         'AVAILABLE',
         50,
+        'STEP_FREE',
         0
       )
     ''');
@@ -611,7 +680,7 @@ void main() {
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters,
         edge_type, service_pattern, accessibility_status, reliability_score,
-        last_verified_at
+        stair_access_state, last_verified_at
       )
       VALUES (
         'edge-a-b-measured-distance',
@@ -623,6 +692,7 @@ void main() {
         'LOCAL',
         'AVAILABLE',
         50,
+        'STEP_FREE',
         0
       )
     ''');
@@ -652,7 +722,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -662,6 +733,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -672,6 +744,7 @@ void main() {
           140,
           'TRANSFER',
           '',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -682,6 +755,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -709,7 +783,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -719,6 +794,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -729,6 +805,7 @@ void main() {
           140,
           'TRANSFER',
           '',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -739,6 +816,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -765,7 +843,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -775,6 +854,7 @@ void main() {
           90,
           'RIDE',
           'EXPRESS',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -785,6 +865,7 @@ void main() {
           140,
           'TRANSFER',
           'LOCAL',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -795,6 +876,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -827,7 +909,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -837,6 +920,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -847,6 +931,7 @@ void main() {
           140,
           'TRANSFER',
           '',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -857,6 +942,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -888,7 +974,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -898,6 +985,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -908,6 +996,7 @@ void main() {
           90,
           'RIDE',
           'EXPRESS',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -937,7 +1026,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -947,6 +1037,7 @@ void main() {
           90,
           'RIDE',
           '',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -957,6 +1048,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -987,7 +1079,8 @@ void main() {
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -997,6 +1090,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -1007,6 +1101,7 @@ void main() {
           140,
           'TRANSFER',
           '',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -1017,6 +1112,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
@@ -1051,7 +1147,8 @@ void main() {
       await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, accessibility_status, reliability_score
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
       )
       VALUES
         (
@@ -1061,6 +1158,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         ),
@@ -1071,6 +1169,7 @@ void main() {
           140,
           'TRANSFER',
           '',
+          'STEP_FREE',
           'UNAVAILABLE',
           95
         ),
@@ -1081,6 +1180,7 @@ void main() {
           90,
           'RIDE',
           'LOCAL',
+          'STEP_FREE',
           'AVAILABLE',
           95
         )
