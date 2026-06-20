@@ -630,6 +630,75 @@ void main() {
     });
   });
 
+  test('시설 품질 테이블이 없는 catalog도 연결 시설 경로를 계산한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('DROP TABLE data_quality_records');
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'NORMAL',
+        'B1',
+        '1F',
+        ''
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, last_verified_at, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          1781827200,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          1781827200,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.warnings, isEmpty);
+  });
+
   test('명시 service pattern entry는 base entry 확장으로 우회하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

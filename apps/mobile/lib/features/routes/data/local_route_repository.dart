@@ -250,7 +250,14 @@ class _RouteCatalogSnapshot {
       'facility_id',
       'NULL',
     );
-    final facilityRows = await database.customSelect('''
+    final hasDataQualityRecords = await _tableExists(
+      database,
+      'data_quality_records',
+    );
+    final facilityRows = await database
+        .customSelect(
+          hasDataQualityRecords
+              ? '''
           SELECT f.id,
                  f.status,
                  (
@@ -271,7 +278,17 @@ class _RouteCatalogSnapshot {
                  ) AS checked_at
           FROM facilities f
           ORDER BY f.id
-          ''').get();
+          '''
+              : '''
+          SELECT f.id,
+                 f.status,
+                 NULL AS quality_level,
+                 NULL AS checked_at
+          FROM facilities f
+          ORDER BY f.id
+          ''',
+        )
+        .get();
     final facilitiesById = {
       for (final row in facilityRows)
         row.read<String>('id'): _FacilitySnapshot(
@@ -731,6 +748,17 @@ String _selectNetworkEdgeColumn(
   String fallbackExpression,
 ) {
   return columnNames.contains(columnName) ? columnName : fallbackExpression;
+}
+
+Future<bool> _tableExists(CatalogDatabase database, String tableName) async {
+  final row = await database.customSelect('''
+        SELECT name
+        FROM sqlite_schema
+        WHERE type = 'table'
+          AND name = '$tableName'
+        LIMIT 1
+        ''').getSingleOrNull();
+  return row != null;
 }
 
 class _StationLineSnapshot {
