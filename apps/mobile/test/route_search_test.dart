@@ -321,6 +321,44 @@ void main() {
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
   });
 
+  test('경로 검색 결과 음성 안내는 단계 행동 이유와 근거 출처를 같은 순서로 읽는다', () {
+    final result = _sampleRouteSearchResult(
+      recommendationReasons: const ['선택된 경로 edge:edge-a-b-local 근거로 안내합니다.'],
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          title: '출발역에서 중간역까지 테스트 노선 이동',
+          description: '출발역에서 중간역까지 열차를 이용합니다.',
+          lineId: 'line-test',
+          lineName: '테스트 노선',
+          fromStationId: 'station-a',
+          toStationId: 'station-b',
+          estimatedMinutes: 2,
+          distanceMeters: 830,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          actionTitle: '열차 이동',
+          actionDetail: '출발역에서 중간역까지 테스트 노선을 이용합니다.',
+          reason: '선택된 경로 edge:edge-a-b-local 근거로 안내합니다.',
+          evidenceSources: ['edge:edge-a-b-local'],
+          timeSource: 'STATIC_ESTIMATE',
+          distanceSource: 'MEASURED',
+          confidenceLabel: '높은 신뢰도',
+        ),
+      ],
+    );
+
+    final semanticLabel = result.semanticLabel;
+    expect(
+      semanticLabel,
+      contains(
+        '1번 열차 이동, 출발역에서 중간역까지 테스트 노선을 이용합니다., '
+        '선택된 경로 edge:edge-a-b-local 근거로 안내합니다., '
+        '시간 정적 추정, 거리 측정값, 높은 신뢰도, 근거 edge:edge-a-b-local',
+      ),
+    );
+  });
+
   test('경로 단계 이동 부담은 긴 거리를 킬로미터로 표시한다', () {
     const step = RouteSearchStep(
       sequence: 2,
@@ -524,7 +562,29 @@ class PendingRouteSearchRepository implements RouteSearchRepository {
   }
 }
 
-RouteSearchResult _sampleRouteSearchResult({String status = 'FOUND'}) {
+RouteSearchResult _sampleRouteSearchResult({
+  String status = 'FOUND',
+  List<RouteSearchStep> steps = const [
+    RouteSearchStep(
+      sequence: 1,
+      title: '상록수역에서 4호선 승강장으로 이동',
+      description: '엘리베이터를 이용해 승강장으로 이동합니다.',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      fromStationId: 'station-sangnoksu',
+      toStationId: 'station-sadang',
+      estimatedMinutes: 4,
+      distanceMeters: 180,
+      includesStairs: false,
+      requiresAccessibilityCheck: true,
+    ),
+  ],
+  List<String> recommendationReasons = const [
+    '엘리베이터 동선을 우선했어요',
+    '계단 없는 출구를 확인했어요',
+    '천천히 이동하기 쉬운 동선을 확인했어요',
+  ],
+}) {
   return RouteSearchResult(
     routeSearchId: 'route-1',
     originStationId: 'station-sangnoksu',
@@ -536,32 +596,14 @@ RouteSearchResult _sampleRouteSearchResult({String status = 'FOUND'}) {
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
     score: 92,
-    steps: const [
-      RouteSearchStep(
-        sequence: 1,
-        title: '상록수역에서 4호선 승강장으로 이동',
-        description: '엘리베이터를 이용해 승강장으로 이동합니다.',
-        lineId: 'seoul-4',
-        lineName: '수도권 4호선',
-        fromStationId: 'station-sangnoksu',
-        toStationId: 'station-sadang',
-        estimatedMinutes: 4,
-        distanceMeters: 180,
-        includesStairs: false,
-        requiresAccessibilityCheck: true,
-      ),
-    ],
+    steps: steps,
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
         message: '일부 시설 정보는 확인이 필요합니다.',
       ),
     ],
-    recommendationReasons: const [
-      '엘리베이터 동선을 우선했어요',
-      '계단 없는 출구를 확인했어요',
-      '천천히 이동하기 쉬운 동선을 확인했어요',
-    ],
+    recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
   );
