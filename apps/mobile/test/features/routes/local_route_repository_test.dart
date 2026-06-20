@@ -428,6 +428,63 @@ void main() {
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
+
+  test('service pattern transfer도 사용 불가 explicit transfer를 우회하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'edge-b-a-line-test-local',
+          'station-b:line-test:LOCAL',
+          'station-a:line-test:LOCAL',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'transfer-a-test-alt-unavailable',
+          'station-a:line-test',
+          'station-a:line-alt',
+          140,
+          'TRANSFER',
+          '',
+          'UNAVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-line-alt',
+          'station-a:line-alt',
+          'station-c:line-alt',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+  });
 }
 
 Future<void> _seedLineWithoutNetworkEdges(CatalogDatabase database) async {

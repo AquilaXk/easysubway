@@ -288,6 +288,7 @@ class _RouteCatalogSnapshot {
     final edges = <graph.RouteEdge>[];
     final nodeKeysByStation = <String, Map<String, _RouteNodeKey>>{};
     final explicitTransferPairs = <String>{};
+    final explicitTransferLinePairs = <String>{};
     final stationLineKeys = {
       for (final stationLine in stationLines)
         _stationLineKey(stationLine.stationId, stationLine.lineId),
@@ -313,6 +314,9 @@ class _RouteCatalogSnapshot {
         explicitTransferPairs.add(
           _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
         );
+        if (fromNode != null && toNode != null) {
+          explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
+        }
       }
     }
 
@@ -361,8 +365,11 @@ class _RouteCatalogSnapshot {
           if (from.nodeId == to.nodeId) {
             continue;
           }
-          if (explicitTransferPairs.contains(
-            _edgePairKey(from.nodeId, to.nodeId),
+          if (_hasExplicitTransferPair(
+            from,
+            to,
+            explicitTransferPairs,
+            explicitTransferLinePairs,
           )) {
             continue;
           }
@@ -437,6 +444,21 @@ class _RouteCatalogSnapshot {
 
 String _edgePairKey(String fromNodeId, String toNodeId) {
   return '$fromNodeId->$toNodeId';
+}
+
+bool _hasExplicitTransferPair(
+  _RouteNodeKey from,
+  _RouteNodeKey to,
+  Set<String> explicitTransferPairs,
+  Set<String> explicitTransferLinePairs,
+) {
+  return explicitTransferPairs.contains(_edgePairKey(from.nodeId, to.nodeId)) ||
+      explicitTransferLinePairs.contains(_lineTransferPairKey(from, to));
+}
+
+String _lineTransferPairKey(_RouteNodeKey from, _RouteNodeKey to) {
+  return '${_stationLineKey(from.stationId, from.lineId)}'
+      '->${_stationLineKey(to.stationId, to.lineId)}';
 }
 
 String _stationLineKey(String stationId, String lineId) {
