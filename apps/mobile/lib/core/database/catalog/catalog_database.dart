@@ -47,7 +47,6 @@ class CatalogDatabase extends _$CatalogDatabase {
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
-        await _backfillBaselineNetworkEdges();
       },
     );
   }
@@ -234,54 +233,5 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_internal_route_edges_from '
       'ON internal_route_edges(from_node_id)',
     );
-  }
-
-  Future<void> _backfillBaselineNetworkEdges() async {
-    await customStatement('''
-      INSERT OR IGNORE INTO network_edges (
-        id, from_node_id, to_node_id, duration_seconds, edge_type
-      )
-      SELECT
-        'edge-sangnoksu-sadang-seoul-4',
-        'station-sangnoksu:seoul-4',
-        'station-sadang:seoul-4',
-        420,
-        'RIDE'
-      WHERE EXISTS (
-        SELECT 1
-        FROM station_lines
-        WHERE station_id = 'station-sangnoksu'
-          AND line_id = 'seoul-4'
-      )
-        AND EXISTS (
-          SELECT 1
-          FROM station_lines
-          WHERE station_id = 'station-sadang'
-            AND line_id = 'seoul-4'
-        )
-    ''');
-    await customStatement('''
-      INSERT OR IGNORE INTO network_edges (
-        id, from_node_id, to_node_id, duration_seconds, edge_type
-      )
-      SELECT
-        'edge-sadang-sangnoksu-seoul-4',
-        'station-sadang:seoul-4',
-        'station-sangnoksu:seoul-4',
-        420,
-        'RIDE'
-      WHERE EXISTS (
-        SELECT 1
-        FROM station_lines
-        WHERE station_id = 'station-sadang'
-          AND line_id = 'seoul-4'
-      )
-        AND EXISTS (
-          SELECT 1
-          FROM station_lines
-          WHERE station_id = 'station-sangnoksu'
-            AND line_id = 'seoul-4'
-        )
-    ''');
   }
 }
