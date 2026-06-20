@@ -143,9 +143,12 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
       warnings: const [],
       blockedReasons: blockedReasonCodes
           .map(
-            (code) => code == 'STAIR_ONLY_ACCESS'
-                ? '계단 없는 내부 이동 경로가 없습니다.'
-                : '내부 이동 경로가 차단되었습니다.',
+            (code) => switch (code) {
+              'STAIR_ONLY_ACCESS' => '계단 없는 내부 이동 경로가 없습니다.',
+              'ACCESSIBILITY_STATE_UNKNOWN' => '내부 이동 경로 접근성 상태를 확인할 수 없습니다.',
+              'FACILITY_UNAVAILABLE' => '필수 내부 이동 시설을 사용할 수 없습니다.',
+              _ => '내부 이동 경로가 차단되었습니다.',
+            },
           )
           .toList(growable: false),
     );
@@ -259,6 +262,11 @@ class _InternalRouteSnapshot {
       'reliability_score',
       '100',
     );
+    final accessibilityStatusSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'accessibility_status',
+      "'UNKNOWN'",
+    );
     final edgeRows = await database
         .customSelect(
           '''
@@ -274,6 +282,7 @@ class _InternalRouteSnapshot {
              $slopeLevelSql AS slope_level,
              $widthLevelSql AS width_level,
              $reliabilityScoreSql AS reliability_score,
+             $accessibilityStatusSql AS accessibility_status,
              e.instruction
       FROM internal_route_edges e
       JOIN internal_route_nodes n ON n.id = e.from_node_id
@@ -298,6 +307,7 @@ class _InternalRouteSnapshot {
           slopeLevel: row.read<int>('slope_level'),
           widthLevel: row.read<int>('width_level'),
           reliabilityScore: row.read<int>('reliability_score'),
+          accessibilityStatus: row.read<String>('accessibility_status'),
           guidance: row.read<String>('instruction'),
         ),
     };
@@ -337,5 +347,7 @@ String _selectInternalRouteEdgeColumn(
   String columnName,
   String fallbackExpression,
 ) {
-  return columnNames.contains(columnName) ? 'e.$columnName' : fallbackExpression;
+  return columnNames.contains(columnName)
+      ? 'e.$columnName'
+      : fallbackExpression;
 }

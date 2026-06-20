@@ -121,6 +121,11 @@ void main() {
           FROM network_edges
           ORDER BY id
           ''').get();
+    final internalRouteEdges = await database.customSelect('''
+          SELECT id, edge_type, accessibility_status
+          FROM internal_route_edges
+          ORDER BY id
+          ''').get();
 
     expect(metadata.read<String>('value'), '1');
     expect(stations.map((row) => row.read<String>('name_ko')).toList(), [
@@ -183,6 +188,12 @@ void main() {
         'station-sangnoksu:seoul-4->station-sadang:seoul-4',
         'station-sadang:seoul-4->station-sangnoksu:seoul-4',
       },
+    );
+    expect(
+      internalRouteEdges
+          .map((row) => row.read<String>('accessibility_status'))
+          .toSet(),
+      {'AVAILABLE'},
     );
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
