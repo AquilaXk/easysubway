@@ -56,7 +56,12 @@
             "type": "object",
             "required": ["algorithm", "value"],
             "properties": {
-              "algorithm": { "const": "sha256-pack-manifest-v1" },
+              "algorithm": {
+                "enum": [
+                  "sha256-pack-manifest-v1",
+                  "hmac-sha256-pack-manifest-v1"
+                ]
+              },
               "value": { "$ref": "#/$defs/sha256" }
             }
           },

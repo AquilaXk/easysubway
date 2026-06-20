@@ -136,7 +136,8 @@ Future<void> _defaultDataPackUpdateRunner({
   required Directory supportDirectory,
   required UserDatabase userDatabase,
 }) async {
-  final manifestUri = AppEndpoints.fromEnvironment().dataPackManifestUri;
+  final endpoints = AppEndpoints.fromEnvironment();
+  final manifestUri = endpoints.dataPackManifestUri;
   if (manifestUri == null) {
     return;
   }
@@ -148,6 +149,7 @@ Future<void> _defaultDataPackUpdateRunner({
     client: DataPackClient(
       manifestUri: manifestUri,
       stateRepository: stateRepository,
+      productionSigningKey: endpoints.productionDataPackSigningKey,
     ),
     installer: DataPackInstaller(
       catalogDirectory: catalogDirectory,

@@ -11,6 +11,7 @@ class DataPackClient {
   DataPackClient({
     required this.manifestUri,
     required this.stateRepository,
+    this.productionSigningKey,
     HttpClient? httpClient,
     DateTime Function()? now,
   }) : _httpClient = httpClient ?? HttpClient(),
@@ -18,6 +19,7 @@ class DataPackClient {
 
   final Uri manifestUri;
   final DataPackUpdateStateRepository stateRepository;
+  final String? productionSigningKey;
   final HttpClient _httpClient;
   final DateTime Function() _now;
 
@@ -59,7 +61,10 @@ class DataPackClient {
     if (decoded is! Map<String, Object?>) {
       throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
     }
-    final manifest = DataPackManifest.fromJson(decoded);
+    final manifest = DataPackManifest.fromJson(
+      decoded,
+      productionSigningKey: productionSigningKey,
+    );
     return DataPackManifestFetchResult(
       status: DataPackManifestFetchStatus.updated,
       manifest: manifest,

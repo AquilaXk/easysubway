@@ -12,7 +12,10 @@ class DataPackManifest {
     this.emergencyOverride,
   });
 
-  factory DataPackManifest.fromJson(Map<String, Object?> json) {
+  factory DataPackManifest.fromJson(
+    Map<String, Object?> json, {
+    String? productionSigningKey,
+  }) {
     final ttlSeconds = json['ttlSeconds'];
     final rawPacks = json['packs'];
     if (ttlSeconds is! int || ttlSeconds <= 0 || rawPacks is! List) {
@@ -26,7 +29,10 @@ class DataPackManifest {
             if (rawPack is! Map<String, Object?>) {
               throw const FormatException('Invalid data pack entry.');
             }
-            return DataPackManifestEntry.fromJson(rawPack);
+            return DataPackManifestEntry.fromJson(
+              rawPack,
+              productionSigningKey: productionSigningKey,
+            );
           })
           .toList(growable: false),
       activePack: _parseActivePack(json['activePack']),
@@ -57,7 +63,10 @@ class DataPackManifestEntry {
     this.minimumTableRows = const {},
   });
 
-  factory DataPackManifestEntry.fromJson(Map<String, Object?> json) {
+  factory DataPackManifestEntry.fromJson(
+    Map<String, Object?> json, {
+    String? productionSigningKey,
+  }) {
     final id = _readPackId(json['id']);
     final version = _readPackVersion(json['version']);
     final url = _parsePackUrl(_requiredString(json, 'url'));
@@ -92,7 +101,7 @@ class DataPackManifestEntry {
           })
           .toList(growable: false),
       minimumTableRows: _parseMinimumTableRows(minimumTableRows),
-    ).._validateManifestContract();
+    ).._validateManifestContract(productionSigningKey);
   }
 
   final String id;
@@ -109,16 +118,19 @@ class DataPackManifestEntry {
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
 
-  void _validateManifestContract() {
+  void _validateManifestContract(String? productionSigningKey) {
     final expectedSizeBytes = sizeBytes;
-    if (expectedSizeBytes != null &&
-        signature.value != _signatureValue(expectedSizeBytes)) {
+    final expectedSignature = _signatureValue(
+      expectedSizeBytes,
+      productionSigningKey,
+    );
+    if (expectedSignature != null && signature.value != expectedSignature) {
       throw const FormatException('Invalid data pack signature.');
     }
     if (artifactKind != DataPackArtifactKind.production) {
       return;
     }
-    if (!url.isAbsolute || url.scheme != 'https') {
+    if (!_isAbsoluteHttpsWithHost(url)) {
       throw const FormatException('Invalid production data pack URL.');
     }
     if (sourceInventory.isEmpty ||
@@ -126,21 +138,38 @@ class DataPackManifestEntry {
           (source) =>
               source.licenseStatus != 'redistributable' ||
               !source.redistributionAllowed ||
-              !source.url.isAbsolute ||
-              source.url.scheme != 'https',
+              !_isAbsoluteHttpsWithHost(source.url),
         )) {
       throw const FormatException('Invalid production data pack source.');
     }
   }
 
-  String _signatureValue(int expectedSizeBytes) {
-    return sha256
-        .convert(
-          utf8.encode(
-            '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes',
-          ),
-        )
-        .toString();
+  String? _signatureValue(
+    int? expectedSizeBytes,
+    String? productionSigningKey,
+  ) {
+    if (expectedSizeBytes == null) {
+      return null;
+    }
+    final canonical =
+        '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
+    if (artifactKind == DataPackArtifactKind.production) {
+      final signingKey = productionSigningKey?.trim();
+      if (signingKey == null || signingKey.isEmpty) {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      if (signature.algorithm != 'hmac-sha256-pack-manifest-v1') {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      return Hmac(
+        sha256,
+        utf8.encode(signingKey),
+      ).convert(utf8.encode(canonical)).toString();
+    }
+    if (signature.algorithm != 'sha256-pack-manifest-v1') {
+      throw const FormatException('Invalid data pack signature.');
+    }
+    return sha256.convert(utf8.encode(canonical)).toString();
   }
 }
 
@@ -151,7 +180,8 @@ class DataPackSignature {
 
   factory DataPackSignature.fromJson(Map<String, Object?> json) {
     final algorithm = _requiredString(json, 'algorithm');
-    if (algorithm != 'sha256-pack-manifest-v1') {
+    if (algorithm != 'sha256-pack-manifest-v1' &&
+        algorithm != 'hmac-sha256-pack-manifest-v1') {
       throw const FormatException('Invalid data pack signature.');
     }
     final value = _requiredString(json, 'value');
@@ -163,6 +193,13 @@ class DataPackSignature {
 
   final String algorithm;
   final String value;
+}
+
+bool _isAbsoluteHttpsWithHost(Uri uri) {
+  return uri.isAbsolute &&
+      uri.scheme == 'https' &&
+      uri.hasAuthority &&
+      uri.host.isNotEmpty;
 }
 
 class DataPackSourceInventoryEntry {

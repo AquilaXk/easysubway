@@ -1,6 +1,7 @@
 class AppEndpoints {
   const AppEndpoints({
     required this.dataPackBaseUrl,
+    required this.dataPackSigningKey,
     required this.reportApiBaseUrl,
   });
 
@@ -8,6 +9,10 @@ class AppEndpoints {
     return const AppEndpoints(
       dataPackBaseUrl: String.fromEnvironment(
         'EASYSUBWAY_DATA_PACK_BASE_URL',
+        defaultValue: '',
+      ),
+      dataPackSigningKey: String.fromEnvironment(
+        'EASYSUBWAY_DATAPACK_SIGNING_KEY',
         defaultValue: '',
       ),
       reportApiBaseUrl: String.fromEnvironment(
@@ -18,6 +23,7 @@ class AppEndpoints {
   }
 
   final String dataPackBaseUrl;
+  final String dataPackSigningKey;
   final String reportApiBaseUrl;
 
   Uri? get dataPackManifestUri {
@@ -31,5 +37,10 @@ class AppEndpoints {
       return null;
     }
     return base.resolve('catalog/current.json');
+  }
+
+  String? get productionDataPackSigningKey {
+    final trimmed = dataPackSigningKey.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 }

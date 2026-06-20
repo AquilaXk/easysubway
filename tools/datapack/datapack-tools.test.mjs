@@ -11,6 +11,10 @@ import test from "node:test";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const productionEnv = {
+  ...process.env,
+  EASYSUBWAY_DATAPACK_SIGNING_KEY: "test-datapack-signing-key",
+};
 
 test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack을 만든다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-${Date.now()}`);
@@ -26,7 +30,7 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
       "--output",
       outputDir,
     ],
-    { cwd: root },
+    { cwd: root, env: productionEnv },
   );
 
   const manifest = JSON.parse(await readFile(path.join(outputDir, "current.json"), "utf8"));
@@ -81,7 +85,7 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
       "--root",
       outputDir,
     ],
-    { cwd: root },
+    { cwd: root, env: productionEnv },
   );
 
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
@@ -245,6 +249,24 @@ test("데이터팩 생성기는 production pack의 source metadata와 HTTPS URL�
     ),
     /sourceInventory.updatedAt must be a non-empty string/,
   );
+
+  fixture.packs[0].sourceInventory[0].updatedAt = "2026-06-19T00:00:00.000Z";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root, env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_KEY: "" } },
+    ),
+    /EASYSUBWAY_DATAPACK_SIGNING_KEY is required for production data pack signatures/,
+  );
 });
 
 test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불일치를 거부한다", async () => {
@@ -280,7 +302,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
       "--output",
       outputDir,
     ],
-    { cwd: root },
+    { cwd: root, env: productionEnv },
   );
 
   const manifestPath = path.join(outputDir, "current.json");
@@ -298,7 +320,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
       "--root",
       outputDir,
     ],
-    { cwd: root },
+    { cwd: root, env: productionEnv },
   );
 
   manifest.packs[0].url = "https://cdn.easysubway.example/packs/capital-v1.sqlite.gz";
@@ -314,7 +336,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
         "--root",
         outputDir,
       ],
-      { cwd: root },
+      { cwd: root, env: productionEnv },
     ),
     /pack.url absolute HTTPS URL path must end with catalog\/capital-v1\.sqlite\.gz/,
   );

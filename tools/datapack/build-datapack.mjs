@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
@@ -51,6 +51,7 @@ async function main() {
       signature: packSignature({
         id: pack.id,
         version: pack.version,
+        artifactKind,
         sha256: compressedSha256,
         sqliteSha256,
         sizeBytes,
@@ -115,10 +116,29 @@ function stagedPackPath(pack) {
 }
 
 function packSignature(pack) {
+  const canonical = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+  if (pack.artifactKind === "production") {
+    return {
+      algorithm: "hmac-sha256-pack-manifest-v1",
+      value: hmacSha256(signingKey(), canonical),
+    };
+  }
   return {
     algorithm: "sha256-pack-manifest-v1",
-    value: sha256(Buffer.from(`${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`)),
+    value: sha256(Buffer.from(canonical)),
   };
+}
+
+function signingKey() {
+  const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY?.trim();
+  if (!key) {
+    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_KEY is required for production data pack signatures");
+  }
+  return key;
+}
+
+function hmacSha256(key, value) {
+  return createHmac("sha256", key).update(value).digest("hex");
 }
 
 function regionalQualityMetrics(pack) {
