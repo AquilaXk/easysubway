@@ -721,7 +721,7 @@ class _RouteNodeKey {
     return _RouteNodeKey(
       stationId: parts[0],
       lineId: parts[1],
-      servicePattern: parts.length >= 3 ? parts[2] : '',
+      servicePattern: parts.length >= 3 ? parts.skip(2).join(':') : '',
     );
   }
 

@@ -584,6 +584,69 @@ void main() {
     expect(skippedStopResult.steps, isEmpty);
   });
 
+  test(
+    'service pattern 방향 suffix가 있는 node도 entry와 ride edge를 같은 node로 연결한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await _seedLineWithoutNetworkEdges(database);
+      await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score
+      )
+      VALUES
+        (
+          'edge-a-b-local-clockwise',
+          'station-a:line-test:LOCAL:CLOCKWISE',
+          'station-b:line-test:LOCAL:CLOCKWISE',
+          90,
+          'RIDE',
+          'LOCAL:CLOCKWISE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-b-c-local-clockwise',
+          'station-b:line-test:LOCAL:CLOCKWISE',
+          'station-c:line-test:LOCAL:CLOCKWISE',
+          90,
+          'RIDE',
+          'LOCAL:CLOCKWISE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        )
+    ''');
+      final repository = LocalRouteRepository(catalogDatabase: database);
+
+      final result = await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-c',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
+
+      expect(result.status, 'FOUND');
+      expect(result.blockedReasons, isEmpty);
+      expect(
+        result.steps.map((step) => step.fromStationId),
+        contains('station-a'),
+      );
+      expect(
+        result.steps.map((step) => step.toStationId),
+        contains('station-c'),
+      );
+      expect(
+        result.steps.map((step) => step.lineId).where((id) => id.isNotEmpty),
+        everyElement('line-test'),
+      );
+    },
+  );
+
   test('step 소요시간은 접근성 패널티가 아니라 사용된 edge 시간에서 만든다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
