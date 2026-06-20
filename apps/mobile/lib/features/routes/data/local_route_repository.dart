@@ -288,6 +288,10 @@ class _RouteCatalogSnapshot {
     final edges = <graph.RouteEdge>[];
     final nodeKeysByStation = <String, Map<String, _RouteNodeKey>>{};
     final explicitTransferPairs = <String>{};
+    final stationLineKeys = {
+      for (final stationLine in stationLines)
+        _stationLineKey(stationLine.stationId, stationLine.lineId),
+    };
 
     for (final stationLine in stationLines) {
       _addRouteNodeKey(nodeKeysByStation, stationLine.routeNodeKey);
@@ -299,10 +303,10 @@ class _RouteCatalogSnapshot {
       }
       final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
       final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
-      if (fromNode != null && _hasStationLine(fromNode)) {
+      if (fromNode != null && _hasStationLine(fromNode, stationLineKeys)) {
         _addRouteNodeKey(nodeKeysByStation, fromNode);
       }
-      if (toNode != null && _hasStationLine(toNode)) {
+      if (toNode != null && _hasStationLine(toNode, stationLineKeys)) {
         _addRouteNodeKey(nodeKeysByStation, toNode);
       }
       if (networkEdge.routeEdgeType == graph.RouteEdgeType.transfer) {
@@ -402,11 +406,9 @@ class _RouteCatalogSnapshot {
     return graph.NetworkGraph(nodes: nodes, edges: edges);
   }
 
-  bool _hasStationLine(_RouteNodeKey nodeKey) {
-    return stationLines.any(
-      (stationLine) =>
-          stationLine.stationId == nodeKey.stationId &&
-          stationLine.lineId == nodeKey.lineId,
+  bool _hasStationLine(_RouteNodeKey nodeKey, Set<String> stationLineKeys) {
+    return stationLineKeys.contains(
+      _stationLineKey(nodeKey.stationId, nodeKey.lineId),
     );
   }
 
@@ -435,6 +437,10 @@ class _RouteCatalogSnapshot {
 
 String _edgePairKey(String fromNodeId, String toNodeId) {
   return '$fromNodeId->$toNodeId';
+}
+
+String _stationLineKey(String stationId, String lineId) {
+  return '$stationId:$lineId';
 }
 
 String _selectNetworkEdgeColumn(
