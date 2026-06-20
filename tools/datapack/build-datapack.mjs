@@ -103,15 +103,20 @@ function packSignature(pack) {
 }
 
 function regionalQualityMetrics(pack) {
-  const stationCount = pack.stations?.length ?? 0;
-  const facilityCount = pack.facilities?.length ?? 0;
+  const stationIds = new Set((pack.stations ?? []).map((station) => station.id));
+  const stationCount = stationIds.size;
+  const coveredStationIds = new Set(
+    (pack.facilities ?? [])
+      .map((facility) => facility.stationId)
+      .filter((stationId) => stationIds.has(stationId)),
+  );
   const edgeCount = pack.networkEdges?.length ?? 0;
   const unknownAccessibilityCount = (pack.networkEdges ?? []).filter(
     (edge) => (edge.accessibilityStatus ?? "UNKNOWN") === "UNKNOWN",
   ).length;
   return {
     stationCount,
-    facilityCoverageRatio: stationCount === 0 ? 0 : Number((facilityCount / stationCount).toFixed(4)),
+    facilityCoverageRatio: stationCount === 0 ? 0 : Number((coveredStationIds.size / stationCount).toFixed(4)),
     edgeCount,
     unknownAccessibilityRatio: edgeCount === 0 ? 0 : Number((unknownAccessibilityCount / edgeCount).toFixed(4)),
   };
@@ -401,6 +406,9 @@ function validateSourceInventory(sourceInventory, artifactKind) {
     requiredString(source.url, "sourceInventory.url");
     requiredString(source.license, "sourceInventory.license");
     const licenseStatus = requiredString(source.licenseStatus, "sourceInventory.licenseStatus");
+    if (typeof source.redistributionAllowed !== "boolean") {
+      throw new Error("sourceInventory.redistributionAllowed must be a boolean");
+    }
     requiredString(source.updateFrequency, "sourceInventory.updateFrequency");
     requiredString(source.updatedAt, "sourceInventory.updatedAt");
     if (!Array.isArray(source.fields) || source.fields.length === 0) {

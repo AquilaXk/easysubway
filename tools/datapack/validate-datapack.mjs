@@ -235,6 +235,9 @@ function validateSourceInventory(sourceInventory, artifactKind, label) {
     requiredString(source.url, "sourceInventory.url");
     requiredString(source.license, "sourceInventory.license");
     const licenseStatus = requiredString(source.licenseStatus, "sourceInventory.licenseStatus");
+    if (typeof source.redistributionAllowed !== "boolean") {
+      throw new Error(`${label} sourceInventory.redistributionAllowed must be a boolean`);
+    }
     requiredString(source.updateFrequency, "sourceInventory.updateFrequency");
     requiredString(source.updatedAt, "sourceInventory.updatedAt");
     if (!Array.isArray(source.fields) || source.fields.length === 0) {

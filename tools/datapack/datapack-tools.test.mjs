@@ -288,6 +288,109 @@ test("데이터팩 도구는 relative pack URL의 경로 이탈을 거부한다"
   );
 });
 
+test("데이터팩 도구는 sourceInventory boolean 계약을 검증한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-source-bool-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  fixture.packs[0].sourceInventory[0].redistributionAllowed = "false";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /sourceInventory.redistributionAllowed must be a boolean/,
+  );
+
+  fixture.packs[0].sourceInventory[0].redistributionAllowed = false;
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  const manifestPath = path.join(outputDir, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.packs[0].sourceInventory[0].redistributionAllowed = "false";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /sourceInventory.redistributionAllowed must be a boolean/,
+  );
+});
+
+test("데이터팩 생성기는 시설 coverage를 시설이 있는 역 비율로 계산한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-coverage-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  fixture.packs[0].facilities.push({
+    ...fixture.packs[0].facilities[0],
+    id: "facility-sangnoksu-elevator-2",
+    name: "2번 출구 엘리베이터",
+  });
+  fixture.packs[0].minimumTableRows.facilities = 2;
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  const manifest = JSON.parse(await readFile(path.join(outputDir, "current.json"), "utf8"));
+  assert.equal(manifest.packs[0].regionalQualityMetrics.stationCount, 2);
+  assert.equal(manifest.packs[0].regionalQualityMetrics.facilityCoverageRatio, 0.5);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest",
+      path.join(outputDir, "current.json"),
+      "--root",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+});
+
 test("데이터팩 생성기는 stairAccessState 누락 edge를 미확인 상태로 보존한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-stair-state-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
