@@ -55,7 +55,7 @@ class LocalRouteEngine {
           durationSeconds: edge.baseCost,
           distanceMeters: edge.distanceMeters,
           lineId: edge.lineId,
-          transferStationId: edge.transferStationId,
+          transferStationId: _transferStationId(edge),
           includesStairs: edge.includesStairs,
         ),
       );
@@ -150,6 +150,25 @@ class LocalRouteEngine {
       RouteEdgeType.entry => RouteStepType.entry,
       RouteEdgeType.exit => RouteStepType.exit,
     };
+  }
+
+  String _transferStationId(RouteEdge edge) {
+    if (edge.transferStationId.isNotEmpty) {
+      return edge.transferStationId;
+    }
+    if (edge.type != RouteEdgeType.transfer) {
+      return '';
+    }
+    final fromStationId = _stationIdFromNode(edge.fromNodeId);
+    final toStationId = _stationIdFromNode(edge.toNodeId);
+    if (fromStationId.isEmpty || fromStationId != toStationId) {
+      return '';
+    }
+    return fromStationId;
+  }
+
+  String _stationIdFromNode(String nodeId) {
+    return nodeId.split(':').first;
   }
 
   String _warningMessage(String code) {

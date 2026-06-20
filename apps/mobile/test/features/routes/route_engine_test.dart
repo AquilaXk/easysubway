@@ -56,6 +56,31 @@ void main() {
       expect(result.includesStairs, isFalse);
     });
 
+    test('2회 환승 경로는 catalog transfer edge에서 환승역 순서를 보존한다', () {
+      final engine = LocalRouteEngine(graph: _twoTransferCatalogFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-d',
+          mobilityType: MobilityType.senior,
+        ),
+      );
+
+      expect(result.status, RouteStatus.found);
+      expect(result.lineIds, ['line-1', 'line-2', 'line-3']);
+      expect(result.transferStationIds, ['station-b', 'station-c']);
+      expect(result.edgeIds, [
+        'entry-a-line-1',
+        'ride-a-b-line-1',
+        'transfer-b-line-1-line-2',
+        'ride-b-c-line-2',
+        'transfer-c-line-2-line-3',
+        'ride-c-d-line-3',
+        'exit-d-line-3',
+      ]);
+    });
+
     test('휠체어 조건은 계단만 있는 경로를 비용 증가가 아니라 차단으로 처리한다', () {
       final engine = LocalRouteEngine(graph: _stairOnlyFixtureGraph());
 
@@ -204,6 +229,97 @@ NetworkGraph _capitalFixtureGraph() {
         id: 'exit-cityhall-step-free',
         fromNodeId: 'station-cityhall:seoul-2',
         toNodeId: 'station-cityhall',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _twoTransferCatalogFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-2',
+        stationId: 'station-b',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-c:line-2',
+        stationId: 'station-c',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-c:line-3',
+        stationId: 'station-c',
+        lineId: 'line-3',
+      ),
+      RouteNode(
+        id: 'station-d:line-3',
+        stationId: 'station-d',
+        lineId: 'line-3',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+      ),
+      RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'transfer-b-line-1-line-2',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-b:line-2',
+        type: RouteEdgeType.transfer,
+        baseCost: 140,
+      ),
+      RouteEdge(
+        id: 'ride-b-c-line-2',
+        fromNodeId: 'station-b:line-2',
+        toNodeId: 'station-c:line-2',
+        type: RouteEdgeType.ride,
+        baseCost: 210,
+        lineId: 'line-2',
+      ),
+      RouteEdge(
+        id: 'transfer-c-line-2-line-3',
+        fromNodeId: 'station-c:line-2',
+        toNodeId: 'station-c:line-3',
+        type: RouteEdgeType.transfer,
+        baseCost: 140,
+      ),
+      RouteEdge(
+        id: 'ride-c-d-line-3',
+        fromNodeId: 'station-c:line-3',
+        toNodeId: 'station-d:line-3',
+        type: RouteEdgeType.ride,
+        baseCost: 240,
+        lineId: 'line-3',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-3',
+        fromNodeId: 'station-d:line-3',
+        toNodeId: 'station-d',
         type: RouteEdgeType.exit,
         baseCost: 90,
       ),
