@@ -196,7 +196,9 @@ class LocalRouteEngine {
   }
 
   String _confidenceLabel(RouteEdge edge) {
-    if (edge.isDataStale || edge.accessibilityState.name == 'unknown') {
+    if (edge.isDataStale ||
+        edge.accessibilityState == RouteAccessibilityState.unknown ||
+        edge.stairAccessState == RouteStairAccessState.unknown) {
       return '확인 필요';
     }
     if (edge.reliabilityScore >= 80) {

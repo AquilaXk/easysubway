@@ -748,9 +748,7 @@ class RouteSearchStep {
         json,
         'requiresAccessibilityCheck',
       ),
-      actionTitle: _optionalRouteString(json, 'actionTitle').isEmpty
-          ? title
-          : _optionalRouteString(json, 'actionTitle'),
+      actionTitle: _optionalRouteString(json, 'actionTitle'),
       actionDetail: _optionalRouteString(json, 'actionDetail').isEmpty
           ? description
           : _optionalRouteString(json, 'actionDetail'),
@@ -805,6 +803,7 @@ class RouteSearchStep {
       '$sequence번 ${actionTitle.isEmpty ? title : actionTitle}',
       actionDetail.isEmpty ? description : actionDetail,
       if (reason.isNotEmpty) reason,
+      burdenLabel,
       '시간 ${_routeTimeSourceLabel(timeSource)}',
       '거리 ${_routeDistanceSourceLabel(distanceSource)}',
       confidenceLabel,
