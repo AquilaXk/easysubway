@@ -37,6 +37,20 @@ body:
       required: true
 
   - type: textarea
+    id: evidence
+    attributes:
+      label: 필요 증거
+      description: 동작 유지 확인에 필요한 증거 유형을 적어 주세요.
+      placeholder: |
+        - [ ] 테스트 명령 결과
+        - [ ] API 요청/응답 또는 계약 테스트 결과
+        - [ ] UI 변경이 있는 경우 Android/iOS 스크린샷
+        - [ ] 접근성 영향이 있는 경우 UI tree 또는 스크린리더 확인 결과
+        - [ ] 증거가 필요 없는 경우 사유:
+    validations:
+      required: true
+
+  - type: textarea
     id: todo
     attributes:
       label: 작업 목록
