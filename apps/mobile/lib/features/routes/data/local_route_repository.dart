@@ -432,8 +432,7 @@ class _RouteCatalogSnapshot {
           if (from.nodeId == to.nodeId) {
             continue;
           }
-          if (from.lineId == to.lineId &&
-              !_isDifferentServicePatternTransfer(from, to)) {
+          if (!_isStationLineTransferAllowed(from, to, explicitAccessPairs)) {
             continue;
           }
           if (_hasExplicitTransferPair(
@@ -549,10 +548,28 @@ List<({String fromNodeId, String toNodeId})> _expandedExplicitEdgePairs(
   return const [];
 }
 
-bool _isDifferentServicePatternTransfer(_RouteNodeKey from, _RouteNodeKey to) {
-  return from.servicePattern.isNotEmpty &&
-      to.servicePattern.isNotEmpty &&
-      from.servicePattern != to.servicePattern;
+bool _isStationLineTransferAllowed(
+  _RouteNodeKey from,
+  _RouteNodeKey to,
+  Set<String> explicitAccessPairs,
+) {
+  if (from.lineId != to.lineId) {
+    return true;
+  }
+  if (from.servicePattern == to.servicePattern) {
+    return false;
+  }
+  if (from.servicePattern.isNotEmpty && to.servicePattern.isNotEmpty) {
+    return true;
+  }
+
+  final patternNode = from.servicePattern.isEmpty ? to : from;
+  return !explicitAccessPairs.contains(
+        _edgePairKey(patternNode.stationId, patternNode.nodeId),
+      ) &&
+      !explicitAccessPairs.contains(
+        _edgePairKey(patternNode.nodeId, patternNode.stationId),
+      );
 }
 
 List<_RouteNodeKey> _matchingNodeKeys(
