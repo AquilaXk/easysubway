@@ -24,8 +24,11 @@ async function main() {
 }
 
 async function validatePack(root, temporaryDir, pack) {
-  const compressedPath = path.join(root, pack.url);
+  const compressedPath = localPackPathForUrl(root, pack);
   const compressedBytes = await readFile(compressedPath);
+  if (compressedBytes.length !== pack.sizeBytes) {
+    throw new Error(`${pack.id}@${pack.version} sizeBytes mismatch: ${compressedBytes.length}`);
+  }
   const compressedSha = sha256(compressedBytes);
   if (compressedSha !== pack.sha256) {
     throw new Error(`${pack.id}@${pack.version} compressed checksum mismatch: ${compressedSha}`);
@@ -36,10 +39,24 @@ async function validatePack(root, temporaryDir, pack) {
   if (sqliteSha !== pack.sqliteSha256) {
     throw new Error(`${pack.id}@${pack.version} sqlite checksum mismatch: ${sqliteSha}`);
   }
+  const signature = packSignature(pack);
+  if (
+    pack.signature.algorithm !== signature.algorithm ||
+    pack.signature.value !== signature.value
+  ) {
+    throw new Error(`${pack.id}@${pack.version} signature mismatch`);
+  }
 
   const sqlitePath = path.join(temporaryDir, `${pack.id}-v${pack.version}.sqlite`);
   await writeFile(sqlitePath, sqliteBytes);
   validateSqlite(sqlitePath, pack);
+}
+
+function localPackPathForUrl(root, pack) {
+  if (/^https:\/\//.test(pack.url)) {
+    return path.join(root, "catalog", `${pack.id}-v${pack.version}.sqlite.gz`);
+  }
+  return path.join(root, pack.url);
 }
 
 function validateSqlite(sqlitePath, pack) {
@@ -148,9 +165,22 @@ function validateManifest(manifest) {
   }
   for (const pack of manifest.packs) {
     validatePackIdentity(pack, "pack");
-    requiredString(pack.url, "pack.url");
+    validatePackUrl(requiredString(pack.url, "pack.url"), "pack.url");
+    const artifactKind = requiredString(pack.artifactKind, "pack.artifactKind");
+    if (artifactKind !== "fixture" && artifactKind !== "production") {
+      throw new Error(`${pack.id}@${pack.version} artifactKind must be fixture or production`);
+    }
+    if (artifactKind === "production" && !/^https:\/\//.test(pack.url)) {
+      throw new Error(`${pack.id}@${pack.version} production pack url must be an absolute HTTPS URL`);
+    }
     requiredSha256(pack.sha256, "pack.sha256");
     requiredSha256(pack.sqliteSha256, "pack.sqliteSha256");
+    if (!Number.isInteger(pack.sizeBytes) || pack.sizeBytes <= 0) {
+      throw new Error(`${pack.id}@${pack.version} sizeBytes must be a positive integer`);
+    }
+    validateSignature(pack.signature, `${pack.id}@${pack.version}`);
+    validateSourceInventory(pack.sourceInventory, artifactKind, `${pack.id}@${pack.version}`);
+    validateRegionalQualityMetrics(pack.regionalQualityMetrics, `${pack.id}@${pack.version}`);
     requiredString(pack.schemaVersion, "pack.schemaVersion");
     if (!Array.isArray(pack.requiredTables) || pack.requiredTables.length === 0) {
       throw new Error(`${pack.id}@${pack.version} requiredTables must be a non-empty array`);
@@ -170,6 +200,82 @@ function validateManifest(manifest) {
       }
     }
   }
+}
+
+function validatePackUrl(packUrl, label) {
+  if (/^https:\/\//.test(packUrl)) {
+    return;
+  }
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(packUrl) || packUrl.startsWith("/") || packUrl.startsWith("//") || packUrl.includes("\\")) {
+    throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+  }
+  const normalized = path.posix.normalize(packUrl);
+  if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) {
+    throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+  }
+}
+
+function validateSignature(signature, label) {
+  if (!signature || typeof signature !== "object") {
+    throw new Error(`${label} signature must be an object`);
+  }
+  if (requiredString(signature.algorithm, "signature.algorithm") !== "sha256-pack-manifest-v1") {
+    throw new Error(`${label} signature algorithm is unsupported`);
+  }
+  requiredSha256(signature.value, "signature.value");
+}
+
+function validateSourceInventory(sourceInventory, artifactKind, label) {
+  if (!Array.isArray(sourceInventory) || sourceInventory.length === 0) {
+    throw new Error(`${label} sourceInventory must be a non-empty array`);
+  }
+  for (const source of sourceInventory) {
+    requiredString(source.id, "sourceInventory.id");
+    requiredString(source.owner, "sourceInventory.owner");
+    requiredString(source.url, "sourceInventory.url");
+    requiredString(source.license, "sourceInventory.license");
+    const licenseStatus = requiredString(source.licenseStatus, "sourceInventory.licenseStatus");
+    requiredString(source.updateFrequency, "sourceInventory.updateFrequency");
+    requiredString(source.updatedAt, "sourceInventory.updatedAt");
+    if (!Array.isArray(source.fields) || source.fields.length === 0) {
+      throw new Error(`${label} sourceInventory.fields must be a non-empty array`);
+    }
+    for (const field of source.fields) {
+      requiredString(field, "sourceInventory.fields");
+    }
+    if (artifactKind === "production") {
+      if (licenseStatus !== "redistributable" || source.redistributionAllowed !== true) {
+        throw new Error(`${label} production sourceInventory must be redistributable`);
+      }
+      if (!/^https:\/\//.test(source.url)) {
+        throw new Error(`${label} production sourceInventory.url must be HTTPS`);
+      }
+    }
+  }
+}
+
+function validateRegionalQualityMetrics(metrics, label) {
+  if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) {
+    throw new Error(`${label} regionalQualityMetrics must be an object`);
+  }
+  if (!Number.isInteger(metrics.stationCount) || metrics.stationCount < 0) {
+    throw new Error(`${label} regionalQualityMetrics.stationCount must be a non-negative integer`);
+  }
+  if (!Number.isInteger(metrics.edgeCount) || metrics.edgeCount < 0) {
+    throw new Error(`${label} regionalQualityMetrics.edgeCount must be a non-negative integer`);
+  }
+  for (const key of ["facilityCoverageRatio", "unknownAccessibilityRatio"]) {
+    if (typeof metrics[key] !== "number" || metrics[key] < 0 || metrics[key] > 1) {
+      throw new Error(`${label} regionalQualityMetrics.${key} must be a ratio`);
+    }
+  }
+}
+
+function packSignature(pack) {
+  return {
+    algorithm: "sha256-pack-manifest-v1",
+    value: sha256(Buffer.from(`${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`)),
+  };
 }
 
 function validatePackIdentity(value, label) {

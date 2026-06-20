@@ -50,6 +50,8 @@ void main() {
                   'url': 'capital-v18.sqlite.gz',
                   'sha256': sha256.convert(corruptBytes).toString(),
                   'sqliteSha256': '1' * 64,
+                  'sizeBytes': corruptBytes.length,
+                  ..._fixtureManifestMetadata(),
                   'schemaVersion': '1',
                   'requiredTables': ['catalog_metadata'],
                 },
@@ -559,6 +561,8 @@ void main() {
                     'url': 'catalog/capital-v18.sqlite.gz',
                     'sha256': sha256.convert(corruptBytes).toString(),
                     'sqliteSha256': '1' * 64,
+                    'sizeBytes': corruptBytes.length,
+                    ..._fixtureManifestMetadata(),
                     'schemaVersion': '1',
                     'requiredTables': ['catalog_metadata'],
                   },
@@ -615,8 +619,36 @@ Map<String, Object?> _packJson({
     'url': url,
     'sha256': sha256.convert(compressedBytes).toString(),
     'sqliteSha256': sha256.convert(sqliteBytes).toString(),
+    'sizeBytes': compressedBytes.length,
+    ..._fixtureManifestMetadata(),
     'schemaVersion': '1',
     'requiredTables': ['catalog_metadata'],
+  };
+}
+
+Map<String, Object?> _fixtureManifestMetadata() {
+  return {
+    'artifactKind': 'fixture',
+    'signature': {'algorithm': 'sha256-pack-manifest-v1', 'value': 'c' * 64},
+    'sourceInventory': [
+      {
+        'id': 'fixture-capital-catalog',
+        'owner': '테스트',
+        'url': 'https://example.invalid/fixture',
+        'license': 'fixture-only',
+        'licenseStatus': 'fixture-only',
+        'redistributionAllowed': false,
+        'updateFrequency': 'manual',
+        'updatedAt': '2026-06-19T00:00:00.000Z',
+        'fields': ['stations'],
+      },
+    ],
+    'regionalQualityMetrics': {
+      'stationCount': 2,
+      'facilityCoverageRatio': 0.5,
+      'edgeCount': 2,
+      'unknownAccessibilityRatio': 0.0,
+    },
   };
 }
 

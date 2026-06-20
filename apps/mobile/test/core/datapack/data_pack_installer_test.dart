@@ -41,6 +41,7 @@ void main() {
         version: '18',
         sha256: sha256.convert(corruptBytes).toString(),
         sqliteSha256: '1' * 64,
+        sizeBytes: corruptBytes.length,
       ),
       compressedBytes: corruptBytes,
     );
@@ -72,6 +73,7 @@ void main() {
         version: '18',
         sha256: sha256.convert(compressedBytes).toString(),
         sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
       ),
       compressedBytes: compressedBytes,
     );
@@ -107,6 +109,7 @@ void main() {
         version: '18',
         sha256: sha256.convert(compressedBytes).toString(),
         sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
       ),
       compressedBytes: compressedBytes,
     );
@@ -147,6 +150,7 @@ void main() {
         version: '18',
         sha256: sha256.convert(compressedBytes).toString(),
         sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
       ),
       compressedBytes: compressedBytes,
     );
@@ -184,6 +188,7 @@ void main() {
         version: '19',
         sha256: sha256.convert(compressedBytes).toString(),
         sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
       ),
       compressedBytes: compressedBytes,
       protectedVersions: const {'17'},
@@ -229,6 +234,7 @@ void main() {
         version: '18',
         sha256: sha256.convert(compressedBytes).toString(),
         sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
       ),
       compressedBytes: compressedBytes,
       activateCurrent: false,
@@ -248,6 +254,7 @@ DataPackManifestEntry _pack({
   required String version,
   required String sha256,
   required String sqliteSha256,
+  required int sizeBytes,
 }) {
   return DataPackManifestEntry(
     id: 'capital',
@@ -255,6 +262,31 @@ DataPackManifestEntry _pack({
     url: Uri.parse('capital-v$version.sqlite.gz'),
     compressedSha256: sha256,
     sqliteSha256: sqliteSha256,
+    sizeBytes: sizeBytes,
+    artifactKind: DataPackArtifactKind.fixture,
+    signature: const DataPackSignature(
+      algorithm: 'sha256-pack-manifest-v1',
+      value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    ),
+    sourceInventory: [
+      DataPackSourceInventoryEntry(
+        id: 'fixture-capital-catalog',
+        owner: '테스트',
+        url: Uri.parse('https://example.invalid/fixture'),
+        license: 'fixture-only',
+        licenseStatus: 'fixture-only',
+        redistributionAllowed: false,
+        updateFrequency: 'manual',
+        updatedAt: '2026-06-19T00:00:00.000Z',
+        fields: ['stations'],
+      ),
+    ],
+    regionalQualityMetrics: const RegionalQualityMetrics(
+      stationCount: 2,
+      facilityCoverageRatio: 0.5,
+      edgeCount: 2,
+      unknownAccessibilityRatio: 0,
+    ),
     schemaVersion: '1',
     requiredTables: const ['catalog_metadata', 'stations', 'station_lines'],
     minimumTableRows: const {'stations': 2},
