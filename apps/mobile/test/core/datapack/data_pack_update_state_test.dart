@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
@@ -76,6 +77,37 @@ void main() {
                 'url': 'capital-v18.sqlite.gz',
                 'sha256': 'a' * 64,
                 'sqliteSha256': 'b' * 64,
+                'sizeBytes': 1024,
+                'artifactKind': 'fixture',
+                'signature': {
+                  'algorithm': 'sha256-pack-manifest-v1',
+                  'value': _signatureValue(
+                    'capital',
+                    '18',
+                    'a' * 64,
+                    'b' * 64,
+                    1024,
+                  ),
+                },
+                'sourceInventory': [
+                  {
+                    'id': 'fixture-capital-catalog',
+                    'owner': '테스트',
+                    'url': 'https://example.invalid/fixture',
+                    'license': 'fixture-only',
+                    'licenseStatus': 'fixture-only',
+                    'redistributionAllowed': false,
+                    'updateFrequency': 'manual',
+                    'updatedAt': '2026-06-19T00:00:00.000Z',
+                    'fields': ['stations'],
+                  },
+                ],
+                'regionalQualityMetrics': {
+                  'stationCount': 2,
+                  'facilityCoverageRatio': 0.5,
+                  'edgeCount': 2,
+                  'unknownAccessibilityRatio': 0.0,
+                },
                 'schemaVersion': '1',
                 'requiredTables': ['catalog_metadata'],
               },
@@ -102,4 +134,18 @@ void main() {
     expect(cache?.etag, 'etag-v18');
     expect(cache?.ttl, const Duration(minutes: 1));
   });
+}
+
+String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
 }
