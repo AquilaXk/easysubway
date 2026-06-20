@@ -276,12 +276,16 @@ class _RouteCatalogSnapshot {
     }
 
     for (final networkEdge in networkEdges) {
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == null) {
+        continue;
+      }
       edges.add(
         graph.RouteEdge(
           id: networkEdge.id,
           fromNodeId: networkEdge.fromNodeId,
           toNodeId: networkEdge.toNodeId,
-          type: networkEdge.routeEdgeType,
+          type: routeEdgeType,
           baseCost: networkEdge.durationSeconds <= 0
               ? 60
               : networkEdge.durationSeconds,
@@ -369,12 +373,13 @@ class _NetworkEdgeSnapshot {
   final int durationSeconds;
   final String edgeType;
 
-  graph.RouteEdgeType get routeEdgeType {
+  graph.RouteEdgeType? get routeEdgeType {
     return switch (edgeType.toUpperCase()) {
+      'RIDE' => graph.RouteEdgeType.ride,
       'TRANSFER' => graph.RouteEdgeType.transfer,
       'ENTRY' => graph.RouteEdgeType.entry,
       'EXIT' => graph.RouteEdgeType.exit,
-      _ => graph.RouteEdgeType.ride,
+      _ => null,
     };
   }
 

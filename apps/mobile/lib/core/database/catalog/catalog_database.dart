@@ -175,15 +175,15 @@ class CatalogDatabase extends _$CatalogDatabase {
         batch.insertAllOnConflictUpdate(networkEdges, [
           NetworkEdgesCompanion.insert(
             id: 'edge-sangnoksu-sadang-seoul-4',
-            fromNodeId: 'station-sangnoksu:seoul-4',
-            toNodeId: 'station-sadang:seoul-4',
+            fromNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
+            toNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
             durationSeconds: const Value(420),
             edgeType: const Value('RIDE'),
           ),
           NetworkEdgesCompanion.insert(
             id: 'edge-sadang-sangnoksu-seoul-4',
-            fromNodeId: 'station-sadang:seoul-4',
-            toNodeId: 'station-sangnoksu:seoul-4',
+            fromNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
+            toNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
             durationSeconds: const Value(420),
             edgeType: const Value('RIDE'),
           ),
@@ -235,3 +235,5 @@ class CatalogDatabase extends _$CatalogDatabase {
     );
   }
 }
+
+String _catalogNodeId(String stationId, String lineId) => '$stationId:$lineId';
