@@ -64,7 +64,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             ),
           )
           .toList(growable: false),
-      recommendationReasons: _recommendationReasons(request.mobilityType),
+      recommendationReasons: _recommendationReasons(result),
       blockedReasons: result.blockedReasonCodes
           .map(_blockedReasonMessage)
           .toList(growable: false),
@@ -134,16 +134,15 @@ class LocalRouteRepository implements RouteSearchRepository {
     return (100 - (cost / 20).round()).clamp(1, 100);
   }
 
-  List<String> _recommendationReasons(String mobilityType) {
+  List<String> _recommendationReasons(local.LocalRouteResult result) {
+    if (result.status != local.RouteStatus.found) {
+      return const [];
+    }
+
     return [
-      '현재 데이터 기준으로 이동 가능한 철도 구간을 계산했습니다.',
+      '현재 데이터 기준으로 선택된 경로 단계를 계산했습니다.',
       '출구와 시설 상태는 현장 안내를 함께 확인해 주세요.',
-      switch (mobilityType) {
-        'WHEELCHAIR' => '휠체어 이동 조건에서 차단된 계단 구간은 제외했습니다.',
-        'STROLLER' => '유모차 이동 조건에서 차단된 계단 구간은 제외했습니다.',
-        'SENIOR' => '고령자 이동 조건의 접근 비용을 반영했습니다.',
-        _ => '선택한 이동 조건의 접근 비용을 반영했습니다.',
-      },
+      if (result.warnings.isNotEmpty) '확인 필요 구간은 주의 안내와 함께 표시합니다.',
     ];
   }
 
