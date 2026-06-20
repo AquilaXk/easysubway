@@ -4274,6 +4274,30 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _edgeTypeMeta = const VerificationMeta(
+    'edgeType',
+  );
+  @override
+  late final GeneratedColumn<String> edgeType = GeneratedColumn<String>(
+    'edge_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('WALK'),
+  );
+  static const VerificationMeta _distanceMetersMeta = const VerificationMeta(
+    'distanceMeters',
+  );
+  @override
+  late final GeneratedColumn<int> distanceMeters = GeneratedColumn<int>(
+    'distance_meters',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
     'durationSeconds',
   );
@@ -4285,6 +4309,87 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     type: DriftSqlType.int,
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _includesStairsMeta = const VerificationMeta(
+    'includesStairs',
+  );
+  @override
+  late final GeneratedColumn<bool> includesStairs = GeneratedColumn<bool>(
+    'includes_stairs',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("includes_stairs" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _requiresElevatorMeta = const VerificationMeta(
+    'requiresElevator',
+  );
+  @override
+  late final GeneratedColumn<bool> requiresElevator = GeneratedColumn<bool>(
+    'requires_elevator',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_elevator" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _requiresEscalatorMeta = const VerificationMeta(
+    'requiresEscalator',
+  );
+  @override
+  late final GeneratedColumn<bool> requiresEscalator = GeneratedColumn<bool>(
+    'requires_escalator',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_escalator" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _slopeLevelMeta = const VerificationMeta(
+    'slopeLevel',
+  );
+  @override
+  late final GeneratedColumn<int> slopeLevel = GeneratedColumn<int>(
+    'slope_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _widthLevelMeta = const VerificationMeta(
+    'widthLevel',
+  );
+  @override
+  late final GeneratedColumn<int> widthLevel = GeneratedColumn<int>(
+    'width_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(2),
+  );
+  static const VerificationMeta _reliabilityScoreMeta = const VerificationMeta(
+    'reliabilityScore',
+  );
+  @override
+  late final GeneratedColumn<int> reliabilityScore = GeneratedColumn<int>(
+    'reliability_score',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
   );
   static const VerificationMeta _instructionMeta = const VerificationMeta(
     'instruction',
@@ -4303,7 +4408,15 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     id,
     fromNodeId,
     toNodeId,
+    edgeType,
+    distanceMeters,
     durationSeconds,
+    includesStairs,
+    requiresElevator,
+    requiresEscalator,
+    slopeLevel,
+    widthLevel,
+    reliabilityScore,
     instruction,
   ];
   @override
@@ -4342,12 +4455,75 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     } else if (isInserting) {
       context.missing(_toNodeIdMeta);
     }
+    if (data.containsKey('edge_type')) {
+      context.handle(
+        _edgeTypeMeta,
+        edgeType.isAcceptableOrUnknown(data['edge_type']!, _edgeTypeMeta),
+      );
+    }
+    if (data.containsKey('distance_meters')) {
+      context.handle(
+        _distanceMetersMeta,
+        distanceMeters.isAcceptableOrUnknown(
+          data['distance_meters']!,
+          _distanceMetersMeta,
+        ),
+      );
+    }
     if (data.containsKey('duration_seconds')) {
       context.handle(
         _durationSecondsMeta,
         durationSeconds.isAcceptableOrUnknown(
           data['duration_seconds']!,
           _durationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('includes_stairs')) {
+      context.handle(
+        _includesStairsMeta,
+        includesStairs.isAcceptableOrUnknown(
+          data['includes_stairs']!,
+          _includesStairsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_elevator')) {
+      context.handle(
+        _requiresElevatorMeta,
+        requiresElevator.isAcceptableOrUnknown(
+          data['requires_elevator']!,
+          _requiresElevatorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_escalator')) {
+      context.handle(
+        _requiresEscalatorMeta,
+        requiresEscalator.isAcceptableOrUnknown(
+          data['requires_escalator']!,
+          _requiresEscalatorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('slope_level')) {
+      context.handle(
+        _slopeLevelMeta,
+        slopeLevel.isAcceptableOrUnknown(data['slope_level']!, _slopeLevelMeta),
+      );
+    }
+    if (data.containsKey('width_level')) {
+      context.handle(
+        _widthLevelMeta,
+        widthLevel.isAcceptableOrUnknown(data['width_level']!, _widthLevelMeta),
+      );
+    }
+    if (data.containsKey('reliability_score')) {
+      context.handle(
+        _reliabilityScoreMeta,
+        reliabilityScore.isAcceptableOrUnknown(
+          data['reliability_score']!,
+          _reliabilityScoreMeta,
         ),
       );
     }
@@ -4381,9 +4557,41 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         DriftSqlType.string,
         data['${effectivePrefix}to_node_id'],
       )!,
+      edgeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}edge_type'],
+      )!,
+      distanceMeters: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}distance_meters'],
+      )!,
       durationSeconds: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}duration_seconds'],
+      )!,
+      includesStairs: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}includes_stairs'],
+      )!,
+      requiresElevator: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_elevator'],
+      )!,
+      requiresEscalator: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_escalator'],
+      )!,
+      slopeLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}slope_level'],
+      )!,
+      widthLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width_level'],
+      )!,
+      reliabilityScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reliability_score'],
       )!,
       instruction: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4403,13 +4611,29 @@ class InternalRouteEdge extends DataClass
   final String id;
   final String fromNodeId;
   final String toNodeId;
+  final String edgeType;
+  final int distanceMeters;
   final int durationSeconds;
+  final bool includesStairs;
+  final bool requiresElevator;
+  final bool requiresEscalator;
+  final int slopeLevel;
+  final int widthLevel;
+  final int reliabilityScore;
   final String instruction;
   const InternalRouteEdge({
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
+    required this.edgeType,
+    required this.distanceMeters,
     required this.durationSeconds,
+    required this.includesStairs,
+    required this.requiresElevator,
+    required this.requiresEscalator,
+    required this.slopeLevel,
+    required this.widthLevel,
+    required this.reliabilityScore,
     required this.instruction,
   });
   @override
@@ -4418,7 +4642,15 @@ class InternalRouteEdge extends DataClass
     map['id'] = Variable<String>(id);
     map['from_node_id'] = Variable<String>(fromNodeId);
     map['to_node_id'] = Variable<String>(toNodeId);
+    map['edge_type'] = Variable<String>(edgeType);
+    map['distance_meters'] = Variable<int>(distanceMeters);
     map['duration_seconds'] = Variable<int>(durationSeconds);
+    map['includes_stairs'] = Variable<bool>(includesStairs);
+    map['requires_elevator'] = Variable<bool>(requiresElevator);
+    map['requires_escalator'] = Variable<bool>(requiresEscalator);
+    map['slope_level'] = Variable<int>(slopeLevel);
+    map['width_level'] = Variable<int>(widthLevel);
+    map['reliability_score'] = Variable<int>(reliabilityScore);
     map['instruction'] = Variable<String>(instruction);
     return map;
   }
@@ -4428,7 +4660,15 @@ class InternalRouteEdge extends DataClass
       id: Value(id),
       fromNodeId: Value(fromNodeId),
       toNodeId: Value(toNodeId),
+      edgeType: Value(edgeType),
+      distanceMeters: Value(distanceMeters),
       durationSeconds: Value(durationSeconds),
+      includesStairs: Value(includesStairs),
+      requiresElevator: Value(requiresElevator),
+      requiresEscalator: Value(requiresEscalator),
+      slopeLevel: Value(slopeLevel),
+      widthLevel: Value(widthLevel),
+      reliabilityScore: Value(reliabilityScore),
       instruction: Value(instruction),
     );
   }
@@ -4442,7 +4682,15 @@ class InternalRouteEdge extends DataClass
       id: serializer.fromJson<String>(json['id']),
       fromNodeId: serializer.fromJson<String>(json['fromNodeId']),
       toNodeId: serializer.fromJson<String>(json['toNodeId']),
+      edgeType: serializer.fromJson<String>(json['edgeType']),
+      distanceMeters: serializer.fromJson<int>(json['distanceMeters']),
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
+      includesStairs: serializer.fromJson<bool>(json['includesStairs']),
+      requiresElevator: serializer.fromJson<bool>(json['requiresElevator']),
+      requiresEscalator: serializer.fromJson<bool>(json['requiresEscalator']),
+      slopeLevel: serializer.fromJson<int>(json['slopeLevel']),
+      widthLevel: serializer.fromJson<int>(json['widthLevel']),
+      reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
       instruction: serializer.fromJson<String>(json['instruction']),
     );
   }
@@ -4453,7 +4701,15 @@ class InternalRouteEdge extends DataClass
       'id': serializer.toJson<String>(id),
       'fromNodeId': serializer.toJson<String>(fromNodeId),
       'toNodeId': serializer.toJson<String>(toNodeId),
+      'edgeType': serializer.toJson<String>(edgeType),
+      'distanceMeters': serializer.toJson<int>(distanceMeters),
       'durationSeconds': serializer.toJson<int>(durationSeconds),
+      'includesStairs': serializer.toJson<bool>(includesStairs),
+      'requiresElevator': serializer.toJson<bool>(requiresElevator),
+      'requiresEscalator': serializer.toJson<bool>(requiresEscalator),
+      'slopeLevel': serializer.toJson<int>(slopeLevel),
+      'widthLevel': serializer.toJson<int>(widthLevel),
+      'reliabilityScore': serializer.toJson<int>(reliabilityScore),
       'instruction': serializer.toJson<String>(instruction),
     };
   }
@@ -4462,13 +4718,29 @@ class InternalRouteEdge extends DataClass
     String? id,
     String? fromNodeId,
     String? toNodeId,
+    String? edgeType,
+    int? distanceMeters,
     int? durationSeconds,
+    bool? includesStairs,
+    bool? requiresElevator,
+    bool? requiresEscalator,
+    int? slopeLevel,
+    int? widthLevel,
+    int? reliabilityScore,
     String? instruction,
   }) => InternalRouteEdge(
     id: id ?? this.id,
     fromNodeId: fromNodeId ?? this.fromNodeId,
     toNodeId: toNodeId ?? this.toNodeId,
+    edgeType: edgeType ?? this.edgeType,
+    distanceMeters: distanceMeters ?? this.distanceMeters,
     durationSeconds: durationSeconds ?? this.durationSeconds,
+    includesStairs: includesStairs ?? this.includesStairs,
+    requiresElevator: requiresElevator ?? this.requiresElevator,
+    requiresEscalator: requiresEscalator ?? this.requiresEscalator,
+    slopeLevel: slopeLevel ?? this.slopeLevel,
+    widthLevel: widthLevel ?? this.widthLevel,
+    reliabilityScore: reliabilityScore ?? this.reliabilityScore,
     instruction: instruction ?? this.instruction,
   );
   InternalRouteEdge copyWithCompanion(InternalRouteEdgesCompanion data) {
@@ -4478,9 +4750,31 @@ class InternalRouteEdge extends DataClass
           ? data.fromNodeId.value
           : this.fromNodeId,
       toNodeId: data.toNodeId.present ? data.toNodeId.value : this.toNodeId,
+      edgeType: data.edgeType.present ? data.edgeType.value : this.edgeType,
+      distanceMeters: data.distanceMeters.present
+          ? data.distanceMeters.value
+          : this.distanceMeters,
       durationSeconds: data.durationSeconds.present
           ? data.durationSeconds.value
           : this.durationSeconds,
+      includesStairs: data.includesStairs.present
+          ? data.includesStairs.value
+          : this.includesStairs,
+      requiresElevator: data.requiresElevator.present
+          ? data.requiresElevator.value
+          : this.requiresElevator,
+      requiresEscalator: data.requiresEscalator.present
+          ? data.requiresEscalator.value
+          : this.requiresEscalator,
+      slopeLevel: data.slopeLevel.present
+          ? data.slopeLevel.value
+          : this.slopeLevel,
+      widthLevel: data.widthLevel.present
+          ? data.widthLevel.value
+          : this.widthLevel,
+      reliabilityScore: data.reliabilityScore.present
+          ? data.reliabilityScore.value
+          : this.reliabilityScore,
       instruction: data.instruction.present
           ? data.instruction.value
           : this.instruction,
@@ -4493,15 +4787,36 @@ class InternalRouteEdge extends DataClass
           ..write('id: $id, ')
           ..write('fromNodeId: $fromNodeId, ')
           ..write('toNodeId: $toNodeId, ')
+          ..write('edgeType: $edgeType, ')
+          ..write('distanceMeters: $distanceMeters, ')
           ..write('durationSeconds: $durationSeconds, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('requiresElevator: $requiresElevator, ')
+          ..write('requiresEscalator: $requiresEscalator, ')
+          ..write('slopeLevel: $slopeLevel, ')
+          ..write('widthLevel: $widthLevel, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
           ..write('instruction: $instruction')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, fromNodeId, toNodeId, durationSeconds, instruction);
+  int get hashCode => Object.hash(
+    id,
+    fromNodeId,
+    toNodeId,
+    edgeType,
+    distanceMeters,
+    durationSeconds,
+    includesStairs,
+    requiresElevator,
+    requiresEscalator,
+    slopeLevel,
+    widthLevel,
+    reliabilityScore,
+    instruction,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4509,7 +4824,15 @@ class InternalRouteEdge extends DataClass
           other.id == this.id &&
           other.fromNodeId == this.fromNodeId &&
           other.toNodeId == this.toNodeId &&
+          other.edgeType == this.edgeType &&
+          other.distanceMeters == this.distanceMeters &&
           other.durationSeconds == this.durationSeconds &&
+          other.includesStairs == this.includesStairs &&
+          other.requiresElevator == this.requiresElevator &&
+          other.requiresEscalator == this.requiresEscalator &&
+          other.slopeLevel == this.slopeLevel &&
+          other.widthLevel == this.widthLevel &&
+          other.reliabilityScore == this.reliabilityScore &&
           other.instruction == this.instruction);
 }
 
@@ -4517,14 +4840,30 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
   final Value<String> id;
   final Value<String> fromNodeId;
   final Value<String> toNodeId;
+  final Value<String> edgeType;
+  final Value<int> distanceMeters;
   final Value<int> durationSeconds;
+  final Value<bool> includesStairs;
+  final Value<bool> requiresElevator;
+  final Value<bool> requiresEscalator;
+  final Value<int> slopeLevel;
+  final Value<int> widthLevel;
+  final Value<int> reliabilityScore;
   final Value<String> instruction;
   final Value<int> rowid;
   const InternalRouteEdgesCompanion({
     this.id = const Value.absent(),
     this.fromNodeId = const Value.absent(),
     this.toNodeId = const Value.absent(),
+    this.edgeType = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
     this.durationSeconds = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.requiresElevator = const Value.absent(),
+    this.requiresEscalator = const Value.absent(),
+    this.slopeLevel = const Value.absent(),
+    this.widthLevel = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4532,7 +4871,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     required String id,
     required String fromNodeId,
     required String toNodeId,
+    this.edgeType = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
     this.durationSeconds = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.requiresElevator = const Value.absent(),
+    this.requiresEscalator = const Value.absent(),
+    this.slopeLevel = const Value.absent(),
+    this.widthLevel = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4542,7 +4889,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Expression<String>? id,
     Expression<String>? fromNodeId,
     Expression<String>? toNodeId,
+    Expression<String>? edgeType,
+    Expression<int>? distanceMeters,
     Expression<int>? durationSeconds,
+    Expression<bool>? includesStairs,
+    Expression<bool>? requiresElevator,
+    Expression<bool>? requiresEscalator,
+    Expression<int>? slopeLevel,
+    Expression<int>? widthLevel,
+    Expression<int>? reliabilityScore,
     Expression<String>? instruction,
     Expression<int>? rowid,
   }) {
@@ -4550,7 +4905,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       if (id != null) 'id': id,
       if (fromNodeId != null) 'from_node_id': fromNodeId,
       if (toNodeId != null) 'to_node_id': toNodeId,
+      if (edgeType != null) 'edge_type': edgeType,
+      if (distanceMeters != null) 'distance_meters': distanceMeters,
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (includesStairs != null) 'includes_stairs': includesStairs,
+      if (requiresElevator != null) 'requires_elevator': requiresElevator,
+      if (requiresEscalator != null) 'requires_escalator': requiresEscalator,
+      if (slopeLevel != null) 'slope_level': slopeLevel,
+      if (widthLevel != null) 'width_level': widthLevel,
+      if (reliabilityScore != null) 'reliability_score': reliabilityScore,
       if (instruction != null) 'instruction': instruction,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4560,7 +4923,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Value<String>? id,
     Value<String>? fromNodeId,
     Value<String>? toNodeId,
+    Value<String>? edgeType,
+    Value<int>? distanceMeters,
     Value<int>? durationSeconds,
+    Value<bool>? includesStairs,
+    Value<bool>? requiresElevator,
+    Value<bool>? requiresEscalator,
+    Value<int>? slopeLevel,
+    Value<int>? widthLevel,
+    Value<int>? reliabilityScore,
     Value<String>? instruction,
     Value<int>? rowid,
   }) {
@@ -4568,7 +4939,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       id: id ?? this.id,
       fromNodeId: fromNodeId ?? this.fromNodeId,
       toNodeId: toNodeId ?? this.toNodeId,
+      edgeType: edgeType ?? this.edgeType,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      includesStairs: includesStairs ?? this.includesStairs,
+      requiresElevator: requiresElevator ?? this.requiresElevator,
+      requiresEscalator: requiresEscalator ?? this.requiresEscalator,
+      slopeLevel: slopeLevel ?? this.slopeLevel,
+      widthLevel: widthLevel ?? this.widthLevel,
+      reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       instruction: instruction ?? this.instruction,
       rowid: rowid ?? this.rowid,
     );
@@ -4586,8 +4965,32 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     if (toNodeId.present) {
       map['to_node_id'] = Variable<String>(toNodeId.value);
     }
+    if (edgeType.present) {
+      map['edge_type'] = Variable<String>(edgeType.value);
+    }
+    if (distanceMeters.present) {
+      map['distance_meters'] = Variable<int>(distanceMeters.value);
+    }
     if (durationSeconds.present) {
       map['duration_seconds'] = Variable<int>(durationSeconds.value);
+    }
+    if (includesStairs.present) {
+      map['includes_stairs'] = Variable<bool>(includesStairs.value);
+    }
+    if (requiresElevator.present) {
+      map['requires_elevator'] = Variable<bool>(requiresElevator.value);
+    }
+    if (requiresEscalator.present) {
+      map['requires_escalator'] = Variable<bool>(requiresEscalator.value);
+    }
+    if (slopeLevel.present) {
+      map['slope_level'] = Variable<int>(slopeLevel.value);
+    }
+    if (widthLevel.present) {
+      map['width_level'] = Variable<int>(widthLevel.value);
+    }
+    if (reliabilityScore.present) {
+      map['reliability_score'] = Variable<int>(reliabilityScore.value);
     }
     if (instruction.present) {
       map['instruction'] = Variable<String>(instruction.value);
@@ -4604,7 +5007,15 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
           ..write('id: $id, ')
           ..write('fromNodeId: $fromNodeId, ')
           ..write('toNodeId: $toNodeId, ')
+          ..write('edgeType: $edgeType, ')
+          ..write('distanceMeters: $distanceMeters, ')
           ..write('durationSeconds: $durationSeconds, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('requiresElevator: $requiresElevator, ')
+          ..write('requiresEscalator: $requiresEscalator, ')
+          ..write('slopeLevel: $slopeLevel, ')
+          ..write('widthLevel: $widthLevel, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
           ..write('instruction: $instruction, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7382,7 +7793,15 @@ typedef $$InternalRouteEdgesTableCreateCompanionBuilder =
       required String id,
       required String fromNodeId,
       required String toNodeId,
+      Value<String> edgeType,
+      Value<int> distanceMeters,
       Value<int> durationSeconds,
+      Value<bool> includesStairs,
+      Value<bool> requiresElevator,
+      Value<bool> requiresEscalator,
+      Value<int> slopeLevel,
+      Value<int> widthLevel,
+      Value<int> reliabilityScore,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -7391,7 +7810,15 @@ typedef $$InternalRouteEdgesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> fromNodeId,
       Value<String> toNodeId,
+      Value<String> edgeType,
+      Value<int> distanceMeters,
       Value<int> durationSeconds,
+      Value<bool> includesStairs,
+      Value<bool> requiresElevator,
+      Value<bool> requiresEscalator,
+      Value<int> slopeLevel,
+      Value<int> widthLevel,
+      Value<int> reliabilityScore,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -7420,8 +7847,48 @@ class $$InternalRouteEdgesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get edgeType => $composableBuilder(
+    column: $table.edgeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get durationSeconds => $composableBuilder(
     column: $table.durationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get slopeLevel => $composableBuilder(
+    column: $table.slopeLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get widthLevel => $composableBuilder(
+    column: $table.widthLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7455,8 +7922,48 @@ class $$InternalRouteEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get edgeType => $composableBuilder(
+    column: $table.edgeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get durationSeconds => $composableBuilder(
     column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get slopeLevel => $composableBuilder(
+    column: $table.slopeLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get widthLevel => $composableBuilder(
+    column: $table.widthLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7486,8 +7993,46 @@ class $$InternalRouteEdgesTableAnnotationComposer
   GeneratedColumn<String> get toNodeId =>
       $composableBuilder(column: $table.toNodeId, builder: (column) => column);
 
+  GeneratedColumn<String> get edgeType =>
+      $composableBuilder(column: $table.edgeType, builder: (column) => column);
+
+  GeneratedColumn<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get durationSeconds => $composableBuilder(
     column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get slopeLevel => $composableBuilder(
+    column: $table.slopeLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get widthLevel => $composableBuilder(
+    column: $table.widthLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
     builder: (column) => column,
   );
 
@@ -7540,14 +8085,30 @@ class $$InternalRouteEdgesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> fromNodeId = const Value.absent(),
                 Value<String> toNodeId = const Value.absent(),
+                Value<String> edgeType = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<bool> requiresElevator = const Value.absent(),
+                Value<bool> requiresEscalator = const Value.absent(),
+                Value<int> slopeLevel = const Value.absent(),
+                Value<int> widthLevel = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion(
                 id: id,
                 fromNodeId: fromNodeId,
                 toNodeId: toNodeId,
+                edgeType: edgeType,
+                distanceMeters: distanceMeters,
                 durationSeconds: durationSeconds,
+                includesStairs: includesStairs,
+                requiresElevator: requiresElevator,
+                requiresEscalator: requiresEscalator,
+                slopeLevel: slopeLevel,
+                widthLevel: widthLevel,
+                reliabilityScore: reliabilityScore,
                 instruction: instruction,
                 rowid: rowid,
               ),
@@ -7556,14 +8117,30 @@ class $$InternalRouteEdgesTableTableManager
                 required String id,
                 required String fromNodeId,
                 required String toNodeId,
+                Value<String> edgeType = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<bool> requiresElevator = const Value.absent(),
+                Value<bool> requiresEscalator = const Value.absent(),
+                Value<int> slopeLevel = const Value.absent(),
+                Value<int> widthLevel = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion.insert(
                 id: id,
                 fromNodeId: fromNodeId,
                 toNodeId: toNodeId,
+                edgeType: edgeType,
+                distanceMeters: distanceMeters,
                 durationSeconds: durationSeconds,
+                includesStairs: includesStairs,
+                requiresElevator: requiresElevator,
+                requiresEscalator: requiresEscalator,
+                slopeLevel: slopeLevel,
+                widthLevel: widthLevel,
+                reliabilityScore: reliabilityScore,
                 instruction: instruction,
                 rowid: rowid,
               ),

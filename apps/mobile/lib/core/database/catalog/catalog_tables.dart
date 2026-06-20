@@ -182,8 +182,24 @@ class InternalRouteEdges extends Table {
   TextColumn get id => text()();
   TextColumn get fromNodeId => text().named('from_node_id')();
   TextColumn get toNodeId => text().named('to_node_id')();
+  TextColumn get edgeType =>
+      text().named('edge_type').withDefault(const Constant('WALK'))();
+  IntColumn get distanceMeters =>
+      integer().named('distance_meters').withDefault(const Constant(0))();
   IntColumn get durationSeconds =>
       integer().named('duration_seconds').withDefault(const Constant(0))();
+  BoolColumn get includesStairs =>
+      boolean().named('includes_stairs').withDefault(const Constant(false))();
+  BoolColumn get requiresElevator =>
+      boolean().named('requires_elevator').withDefault(const Constant(false))();
+  BoolColumn get requiresEscalator =>
+      boolean().named('requires_escalator').withDefault(const Constant(false))();
+  IntColumn get slopeLevel =>
+      integer().named('slope_level').withDefault(const Constant(1))();
+  IntColumn get widthLevel =>
+      integer().named('width_level').withDefault(const Constant(2))();
+  IntColumn get reliabilityScore =>
+      integer().named('reliability_score').withDefault(const Constant(100))();
   TextColumn get instruction => text().withDefault(const Constant(''))();
 
   @override
