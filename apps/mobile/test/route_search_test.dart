@@ -235,6 +235,7 @@ void main() {
       '휠체어 이동에 맞춰 계단을 피했어요',
     ]);
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
+    expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.includesStairs, isFalse);
@@ -354,6 +355,7 @@ void main() {
       contains(
         '1번 열차 이동, 출발역에서 중간역까지 테스트 노선을 이용합니다., '
         '선택된 경로 edge:edge-a-b-local 근거로 안내합니다., '
+        '약 2분 · 830m, '
         '시간 정적 추정, 거리 측정값, 높은 신뢰도, 근거 edge:edge-a-b-local',
       ),
     );

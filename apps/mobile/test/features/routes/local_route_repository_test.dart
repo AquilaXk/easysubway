@@ -113,6 +113,48 @@ void main() {
     expect(rideStep.confidenceLabel, '높은 신뢰도');
   });
 
+  test('계단 없는 동선 여부가 미확인인 선택 경로는 높은 신뢰도로 표시하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES (
+        'edge-a-b-unknown-stair',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        120,
+        830,
+        'RIDE',
+        'UNKNOWN',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.lineId == 'line-test',
+    );
+    expect(result.status, 'FOUND');
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('STAIR_ONLY_ACCESS_UNKNOWN'),
+    );
+    expect(rideStep.confidenceLabel, '확인 필요');
+  });
+
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
