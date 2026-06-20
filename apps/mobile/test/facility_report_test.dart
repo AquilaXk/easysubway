@@ -97,6 +97,10 @@ void main() {
 
   test('시설 신고 API 저장소는 백엔드 계약에 맞춰 신고를 전송한다', () async {
     late String? authorizationHeader;
+    late String? uploadChecksumHeader;
+    late String? uploadSizeHeader;
+    late String? uploadContentTypeHeader;
+    late int uploadContentLength;
     late Map<String, Object?> uploadIntentBody;
     late List<int> uploadedPhotoBytes;
     late Map<String, Object?> requestBody;
@@ -121,11 +125,23 @@ void main() {
                   'uploadUrl':
                       '/api/v1/report-uploads/client-submission-1-photo.jpg',
                   'uploadMethod': 'PUT',
+                  'uploadHeaders': {
+                    'content-type': 'image/jpeg',
+                    'x-easysubway-upload-sha256':
+                        '2c8648d103e3dd7ad87660da0f126a1443b6d21ac1bd3ec000c5e24e2373a90c',
+                    'x-easysubway-upload-size': '11',
+                  },
                 },
               }),
             )
             ..close();
         case ('PUT', '/api/v1/report-uploads/client-submission-1-photo.jpg'):
+          uploadChecksumHeader = request.headers.value(
+            'x-easysubway-upload-sha256',
+          );
+          uploadSizeHeader = request.headers.value('x-easysubway-upload-size');
+          uploadContentTypeHeader = request.headers.contentType?.mimeType;
+          uploadContentLength = request.contentLength;
           uploadedPhotoBytes = await request.fold<List<int>>(
             <int>[],
             (bytes, chunk) => bytes..addAll(chunk),
@@ -196,6 +212,13 @@ void main() {
     expect(uploadIntentBody['photoContentType'], 'image/jpeg');
     expect(uploadIntentBody['photoSizeBytes'], 11);
     expect(uploadedPhotoBytes, utf8.encode('image-bytes'));
+    expect(
+      uploadChecksumHeader,
+      '2c8648d103e3dd7ad87660da0f126a1443b6d21ac1bd3ec000c5e24e2373a90c',
+    );
+    expect(uploadSizeHeader, '11');
+    expect(uploadContentTypeHeader, 'image/jpeg');
+    expect(uploadContentLength, 11);
     expect(requestBody['stationId'], 'station-sangnoksu');
     expect(requestBody['facilityId'], 'facility-sangnoksu-elevator-1');
     expect(requestBody['reportType'], 'BROKEN');

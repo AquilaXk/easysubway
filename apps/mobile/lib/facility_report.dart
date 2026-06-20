@@ -196,7 +196,11 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     final uploadRequest = await _httpClient
         .putUrl(uploadIntent.uploadUri(baseUri))
         .timeout(_facilityReportTimeout);
+    for (final header in uploadIntent.uploadHeaders.entries) {
+      uploadRequest.headers.set(header.key, header.value);
+    }
     uploadRequest.headers.contentType = ContentType.parse(contentType);
+    uploadRequest.contentLength = photoBytes.length;
     uploadRequest.add(photoBytes);
     final uploadResponse = await uploadRequest.close().timeout(
       _facilityReportTimeout,
@@ -495,6 +499,7 @@ class FacilityReportPhotoUploadIntent {
     required this.objectKey,
     required this.uploadUrl,
     required this.uploadMethod,
+    this.uploadHeaders = const {},
   });
 
   factory FacilityReportPhotoUploadIntent.fromBody(
@@ -513,12 +518,14 @@ class FacilityReportPhotoUploadIntent {
       objectKey: _requiredReportString(data, 'objectKey'),
       uploadUrl: _requiredReportString(data, 'uploadUrl'),
       uploadMethod: _requiredReportString(data, 'uploadMethod'),
+      uploadHeaders: _optionalStringMap(data, 'uploadHeaders'),
     );
   }
 
   final String objectKey;
   final String uploadUrl;
   final String uploadMethod;
+  final Map<String, String> uploadHeaders;
 
   Uri uploadUri(Uri baseUri) {
     final parsed = Uri.parse(uploadUrl);
@@ -527,6 +534,25 @@ class FacilityReportPhotoUploadIntent {
     }
     return baseUri.resolve(uploadUrl);
   }
+}
+
+Map<String, String> _optionalStringMap(
+  Map<String, Object?> data,
+  String fieldName,
+) {
+  final value = data[fieldName];
+  if (value == null) {
+    return const {};
+  }
+  if (value is! Map<String, Object?>) {
+    throw const FacilityReportException(_facilityReportErrorMessage);
+  }
+  return value.map((key, mapValue) {
+    if (mapValue is! String) {
+      throw const FacilityReportException(_facilityReportErrorMessage);
+    }
+    return MapEntry(key, mapValue);
+  });
 }
 
 class FacilityReportReceipt {
