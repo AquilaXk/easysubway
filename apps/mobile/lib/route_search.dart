@@ -766,6 +766,9 @@ class RouteSearchStep {
 }
 
 String _routeDistanceLabel(int distanceMeters) {
+  if (distanceMeters <= 0) {
+    return '거리 확인 필요';
+  }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
   }

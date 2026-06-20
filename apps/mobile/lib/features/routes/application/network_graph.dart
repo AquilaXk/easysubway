@@ -21,6 +21,7 @@ class RouteEdge {
     required this.toNodeId,
     required this.type,
     required this.baseCost,
+    this.distanceMeters = 0,
     this.lineId = '',
     this.transferStationId = '',
     this.includesStairs = false,
@@ -40,6 +41,7 @@ class RouteEdge {
   final String toNodeId;
   final RouteEdgeType type;
   final int baseCost;
+  final int distanceMeters;
   final String lineId;
   final String transferStationId;
   final bool includesStairs;

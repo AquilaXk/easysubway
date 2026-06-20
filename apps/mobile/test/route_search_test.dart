@@ -339,6 +339,24 @@ void main() {
     expect(step.burdenLabel, '약 30분 · 13.5km');
   });
 
+  test('경로 단계 이동 부담은 측정 거리 없음 상태를 0m로 표시하지 않는다', () {
+    const step = RouteSearchStep(
+      sequence: 2,
+      title: '수도권 4호선으로 사당역까지 이동',
+      description: '15개 역을 이동합니다. 환승은 없습니다.',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      fromStationId: 'station-sangnoksu',
+      toStationId: 'station-sadang',
+      estimatedMinutes: 30,
+      distanceMeters: 0,
+      includesStairs: false,
+      requiresAccessibilityCheck: false,
+    );
+
+    expect(step.burdenLabel, '약 30분 · 거리 확인 필요');
+  });
+
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
     final requestedMethods = <String>[];
     final requestedPaths = <String>[];
