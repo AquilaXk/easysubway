@@ -400,6 +400,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=http:\/\/localhost:9000$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=$/m);
+  assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_REGION=us-east-1$/m);
   assert.match(envExample, /^EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks$/m);
   assert.match(envExample, /^EASYSUBWAY_DATAPACK_SIGNING_KEY=$/m);
   assert.doesNotMatch(envExample, /^EASYSUBWAY_REDIS_/m);
@@ -1781,11 +1782,16 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(uploadIntents, /maxPendingBytes/);
   assert.match(uploadIntents, /record UploadIntent\(String uploadId, String objectKey, String contentType,/);
   assert.match(uploadIntents, /intent\.contentType\(\)\.equals\(contentType == null \? null : contentType\.trim\(\)\.toLowerCase\(Locale\.ROOT\)\)/);
+  assert.match(uploadIntents, /void consumeObjectKey\(String objectKey\)/);
   assert.match(uploadUrlSigner, /@Profile\("prod"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
-  assert.match(uploadUrlSigner, /signature=/);
+  assert.match(uploadUrlSigner, /AWS4-HMAC-SHA256/);
+  assert.match(uploadUrlSigner, /X-Amz-Credential/);
+  assert.match(uploadUrlSigner, /X-Amz-SignedHeaders/);
   assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\}/);
   assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_OBJECT_STORAGE_ENDPOINT:\}/);
+  assert.match(applicationProd, /object-storage-access-key: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:\}/);
   assert.match(applicationProd, /object-storage-secret-key: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:\}/);
+  assert.match(applicationProd, /object-storage-region: \$\{EASYSUBWAY_OBJECT_STORAGE_REGION:us-east-1\}/);
   assert.doesNotMatch(reportController, /myReports|\/api\/v1\/me\/reports/);
   assert.match(reportController, /record PageResponse<T>/);
   assert.match(reportController, /record FacilityReportStatusResponse\([^)]*String id,[^)]*String stationId,[^)]*String facilityId,[^)]*FacilityReportType reportType,[^)]*FacilityReportStatus status,[^)]*LocalDateTime createdAt,[^)]*LocalDateTime reviewedAt/);
