@@ -85,14 +85,14 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
           fromNodeName: snapshot.nodeName(edge.fromNodeId),
           toNodeId: edge.toNodeId,
           toNodeName: snapshot.nodeName(edge.toNodeId),
-          edgeType: 'WALK',
+          edgeType: edge.edgeType,
           distanceMeters: edge.distanceMeters,
           estimatedSeconds: edge.estimatedSeconds,
           includesStairs: edge.includesStairs,
           requiresElevator: edge.requiresElevator,
           requiresEscalator: edge.requiresEscalator,
-          slopeLevel: 1,
-          widthLevel: 2,
+          slopeLevel: edge.slopeLevel,
+          widthLevel: edge.widthLevel,
           reliabilityScore: edge.reliabilityScore,
           guidance: edge.guidance,
         ),
@@ -213,10 +213,68 @@ class _InternalRouteSnapshot {
           variables: [Variable.withString(stationId.trim())],
         )
         .get();
+    final edgeColumns = await database
+        .customSelect('PRAGMA table_info(internal_route_edges)')
+        .get();
+    final edgeColumnNames = {
+      for (final row in edgeColumns) row.read<String>('name'),
+    };
+    final edgeTypeSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'edge_type',
+      "'WALK'",
+    );
+    final distanceMetersSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'distance_meters',
+      '0',
+    );
+    final includesStairsSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'includes_stairs',
+      '0',
+    );
+    final requiresElevatorSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'requires_elevator',
+      '0',
+    );
+    final requiresEscalatorSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'requires_escalator',
+      '0',
+    );
+    final slopeLevelSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'slope_level',
+      '1',
+    );
+    final widthLevelSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'width_level',
+      '2',
+    );
+    final reliabilityScoreSql = _selectInternalRouteEdgeColumn(
+      edgeColumnNames,
+      'reliability_score',
+      '100',
+    );
     final edgeRows = await database
         .customSelect(
           '''
-      SELECT e.id, e.from_node_id, e.to_node_id, e.duration_seconds, e.instruction
+      SELECT e.id,
+             e.from_node_id,
+             e.to_node_id,
+             $edgeTypeSql AS edge_type,
+             $distanceMetersSql AS distance_meters,
+             e.duration_seconds,
+             $includesStairsSql AS includes_stairs,
+             $requiresElevatorSql AS requires_elevator,
+             $requiresEscalatorSql AS requires_escalator,
+             $slopeLevelSql AS slope_level,
+             $widthLevelSql AS width_level,
+             $reliabilityScoreSql AS reliability_score,
+             e.instruction
       FROM internal_route_edges e
       JOIN internal_route_nodes n ON n.id = e.from_node_id
       WHERE n.station_id = ?
@@ -231,8 +289,15 @@ class _InternalRouteSnapshot {
           id: row.read<String>('id'),
           fromNodeId: row.read<String>('from_node_id'),
           toNodeId: row.read<String>('to_node_id'),
-          distanceMeters: 0,
+          edgeType: row.read<String>('edge_type'),
+          distanceMeters: row.read<int>('distance_meters'),
           estimatedSeconds: row.read<int>('duration_seconds'),
+          includesStairs: row.read<bool>('includes_stairs'),
+          requiresElevator: row.read<bool>('requires_elevator'),
+          requiresEscalator: row.read<bool>('requires_escalator'),
+          slopeLevel: row.read<int>('slope_level'),
+          widthLevel: row.read<int>('width_level'),
+          reliabilityScore: row.read<int>('reliability_score'),
           guidance: row.read<String>('instruction'),
         ),
     };
@@ -265,4 +330,12 @@ class _InternalRouteSnapshot {
   String nodeName(String nodeId) {
     return nodesById[nodeId] ?? nodeId;
   }
+}
+
+String _selectInternalRouteEdgeColumn(
+  Set<String> columnNames,
+  String columnName,
+  String fallbackExpression,
+) {
+  return columnNames.contains(columnName) ? 'e.$columnName' : fallbackExpression;
 }
