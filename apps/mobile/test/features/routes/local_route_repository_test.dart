@@ -381,6 +381,62 @@ void main() {
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
 
+  test('명시 service pattern entry는 base entry 확장으로 우회하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'entry-a-line-test-available',
+          'station-a',
+          'station-a:line-test',
+          90,
+          'ENTRY',
+          '',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'entry-a-line-test-local-unavailable',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'UNAVAILABLE',
+          95
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+  });
+
   test('급행 pattern은 미정차역을 경유한 것처럼 연결하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

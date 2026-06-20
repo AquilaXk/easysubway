@@ -362,6 +362,9 @@ class _RouteCatalogSnapshot {
         }
         if (routeEdgeType == graph.RouteEdgeType.entry ||
             routeEdgeType == graph.RouteEdgeType.exit) {
+          if (explicitAccessPairs.contains(pairKey)) {
+            continue;
+          }
           explicitAccessPairs.add(pairKey);
         }
         expandedExplicitEdges.add(
