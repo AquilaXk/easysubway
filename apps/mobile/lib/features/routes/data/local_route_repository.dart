@@ -287,6 +287,7 @@ class _RouteCatalogSnapshot {
     final nodes = <graph.RouteNode>[];
     final edges = <graph.RouteEdge>[];
     final nodeKeysByStation = <String, Map<String, _RouteNodeKey>>{};
+    final explicitAccessPairs = <String>{};
     final explicitTransferPairs = <String>{};
     final explicitTransferLinePairs = <String>{};
     final stationLineKeys = {
@@ -310,7 +311,14 @@ class _RouteCatalogSnapshot {
       if (toNode != null && _hasStationLine(toNode, stationLineKeys)) {
         _addRouteNodeKey(nodeKeysByStation, toNode);
       }
-      if (networkEdge.routeEdgeType == graph.RouteEdgeType.transfer) {
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == graph.RouteEdgeType.entry ||
+          routeEdgeType == graph.RouteEdgeType.exit) {
+        explicitAccessPairs.add(
+          _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
+        );
+      }
+      if (routeEdgeType == graph.RouteEdgeType.transfer) {
         explicitTransferPairs.add(
           _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
         );
@@ -340,24 +348,32 @@ class _RouteCatalogSnapshot {
           ),
         );
         final accessEdgeSuffix = nodeKey.accessEdgeSuffix;
-        edges.add(
-          graph.RouteEdge(
-            id: 'entry-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
-            fromNodeId: stationLine.stationId,
-            toNodeId: nodeKey.nodeId,
-            type: graph.RouteEdgeType.entry,
-            baseCost: 90,
-          ),
-        );
-        edges.add(
-          graph.RouteEdge(
-            id: 'exit-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
-            fromNodeId: nodeKey.nodeId,
-            toNodeId: stationLine.stationId,
-            type: graph.RouteEdgeType.exit,
-            baseCost: 60,
-          ),
-        );
+        if (!explicitAccessPairs.contains(
+          _edgePairKey(stationLine.stationId, nodeKey.nodeId),
+        )) {
+          edges.add(
+            graph.RouteEdge(
+              id: 'entry-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
+              fromNodeId: stationLine.stationId,
+              toNodeId: nodeKey.nodeId,
+              type: graph.RouteEdgeType.entry,
+              baseCost: 90,
+            ),
+          );
+        }
+        if (!explicitAccessPairs.contains(
+          _edgePairKey(nodeKey.nodeId, stationLine.stationId),
+        )) {
+          edges.add(
+            graph.RouteEdge(
+              id: 'exit-${stationLine.stationId}-${stationLine.lineId}$accessEdgeSuffix',
+              fromNodeId: nodeKey.nodeId,
+              toNodeId: stationLine.stationId,
+              type: graph.RouteEdgeType.exit,
+              baseCost: 60,
+            ),
+          );
+        }
       }
     }
 
@@ -367,6 +383,9 @@ class _RouteCatalogSnapshot {
       for (final from in stationNodes) {
         for (final to in stationNodes) {
           if (from.nodeId == to.nodeId) {
+            continue;
+          }
+          if (from.lineId == to.lineId) {
             continue;
           }
           if (_hasExplicitTransferPair(
