@@ -151,6 +151,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     return switch (code) {
       'STAIR_ONLY_ACCESS' => '계단 없는 경로를 찾지 못했습니다.',
       'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
+      'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
       _ => '안내 가능한 경로를 찾지 못했습니다.',
     };
   }
@@ -639,7 +640,7 @@ graph.RouteEdge _toGraphRouteEdge(
     includesStairs: networkEdge.includesStairs,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
-    isAvailable: networkEdge.isAvailable,
+    accessibilityState: networkEdge.accessibilityState,
   );
 }
 
@@ -765,7 +766,13 @@ class _NetworkEdgeSnapshot {
 
   String get _accessibilityStatusUpper => accessibilityStatus.toUpperCase();
 
-  bool get isAvailable => _accessibilityStatusUpper != 'UNAVAILABLE';
+  graph.RouteAccessibilityState get accessibilityState {
+    return switch (_accessibilityStatusUpper) {
+      'UNAVAILABLE' => graph.RouteAccessibilityState.unavailable,
+      'UNKNOWN' => graph.RouteAccessibilityState.unknown,
+      _ => graph.RouteAccessibilityState.available,
+    };
+  }
 
   int get effectiveReliabilityScore {
     if (_accessibilityStatusUpper == 'UNKNOWN' && reliabilityScore > 60) {
