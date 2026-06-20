@@ -169,25 +169,13 @@ class LocalRouteRepository implements RouteSearchRepository {
 }
 
 class FallbackRouteSearchRepository implements RouteSearchRepository {
-  const FallbackRouteSearchRepository({
-    required this.localRepository,
-    required this.apiRepository,
-  });
+  const FallbackRouteSearchRepository({required this.localRepository});
 
   final LocalRouteRepository localRepository;
-  final RouteSearchRepository apiRepository;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
-    if (!await localRepository.canSearchRoute(request)) {
-      return apiRepository.searchRoute(request);
-    }
-
-    final localResult = await localRepository.searchRoute(request);
-    if (localResult.isBlocked) {
-      return apiRepository.searchRoute(request);
-    }
-    return localResult;
+    return localRepository.searchRoute(request);
   }
 }
 

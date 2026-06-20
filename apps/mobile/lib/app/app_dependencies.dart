@@ -94,7 +94,6 @@ class AppDependencies {
                   localRepository: LocalRouteRepository(
                     catalogDatabase: catalogDatabase,
                   ),
-                  apiRepository: RouteSearchApiRepository(baseUri: baseUri),
                 )),
       routeFeedbackRepository:
           routeFeedbackRepository ??
@@ -145,7 +144,6 @@ class AppDependencies {
                   localRepository: LocalInternalRouteRepository(
                     catalogDatabase: catalogDatabase,
                   ),
-                  apiRepository: InternalRouteApiRepository(baseUri: baseUri),
                 )),
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
