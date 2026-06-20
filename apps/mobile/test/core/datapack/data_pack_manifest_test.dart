@@ -292,6 +292,16 @@ void main() {
     expect(pack.regionalQualityMetrics.stationCount, 0);
   });
 
+  test('production key가 설정되면 fixture manifest를 거부한다', () {
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_fixturePack()],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
+  });
+
   test('데이터팩 manifest는 pack URL 경로 이탈을 거부한다', () {
     expect(
       () => DataPackManifest.fromJson({
@@ -338,6 +348,14 @@ void main() {
             'requiredTables': ['catalog_metadata'],
           },
         ],
+      }),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_fixturePack(url: 'catalog/%2e%2e/evil.sqlite.gz')],
       }),
       throwsFormatException,
     );
@@ -405,6 +423,56 @@ void main() {
       throwsFormatException,
     );
   });
+}
+
+Map<String, Object?> _fixturePack({
+  String url = 'catalog/capital-v18.sqlite.gz',
+}) {
+  const id = 'capital';
+  const version = '18';
+  final compressedSha256 = 'a' * 64;
+  final sqliteSha256 = 'b' * 64;
+  const sizeBytes = 1024;
+  return {
+    'id': id,
+    'version': version,
+    'url': url,
+    'sha256': compressedSha256,
+    'sqliteSha256': sqliteSha256,
+    'sizeBytes': sizeBytes,
+    'artifactKind': 'fixture',
+    'signature': {
+      'algorithm': 'sha256-pack-manifest-v1',
+      'value': _signatureValue(
+        id,
+        version,
+        compressedSha256,
+        sqliteSha256,
+        sizeBytes,
+      ),
+    },
+    'sourceInventory': [
+      {
+        'id': 'fixture-capital-catalog',
+        'owner': '테스트',
+        'url': 'https://example.invalid/fixture',
+        'license': 'fixture-only',
+        'licenseStatus': 'fixture-only',
+        'redistributionAllowed': false,
+        'updateFrequency': 'manual',
+        'updatedAt': '2026-06-19T00:00:00.000Z',
+        'fields': ['stations'],
+      },
+    ],
+    'regionalQualityMetrics': {
+      'stationCount': 2,
+      'facilityCoverageRatio': 0.5,
+      'edgeCount': 2,
+      'unknownAccessibilityRatio': 0.0,
+    },
+    'schemaVersion': '1',
+    'requiredTables': ['catalog_metadata'],
+  };
 }
 
 Map<String, Object?> _productionPack({

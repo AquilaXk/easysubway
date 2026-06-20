@@ -123,6 +123,10 @@ class DataPackManifestEntry {
     DataPackSigningPublicKey? productionSigningPublicKey,
   ) {
     final expectedSizeBytes = sizeBytes;
+    if (productionSigningPublicKey != null &&
+        artifactKind != DataPackArtifactKind.production) {
+      throw const FormatException('Invalid data pack artifact kind.');
+    }
     _validateSignature(expectedSizeBytes, productionSigningPublicKey);
     if (artifactKind != DataPackArtifactKind.production) {
       return;
@@ -530,6 +534,9 @@ String _requiredString(Map<String, Object?> json, String key) {
 }
 
 Uri _parsePackUrl(String rawUrl) {
+  if (_containsEncodedPathBoundary(rawUrl)) {
+    throw const FormatException('Invalid data pack URL.');
+  }
   final uri = Uri.parse(rawUrl);
   if (uri.isAbsolute) {
     if (uri.scheme != 'https') {
@@ -545,6 +552,10 @@ Uri _parsePackUrl(String rawUrl) {
     throw const FormatException('Invalid data pack URL.');
   }
   return uri;
+}
+
+bool _containsEncodedPathBoundary(String rawUrl) {
+  return RegExp(r'%(?:2e|2f|5c)', caseSensitive: false).hasMatch(rawUrl);
 }
 
 String _readRequiredString(Object? value) {

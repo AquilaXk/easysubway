@@ -461,6 +461,24 @@ test("데이터팩 도구는 relative pack URL의 경로 이탈을 거부한다"
     /pack.url must be a safe relative path or absolute HTTPS URL/,
   );
 
+  fixture.packs[0].url = "catalog/%2e%2e/capital-v1.sqlite.gz";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /pack.url must be a safe relative path or absolute HTTPS URL/,
+  );
+
   fixture.packs[0].url = "catalog/capital-v1.sqlite.gz";
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await execFileAsync(
@@ -495,6 +513,23 @@ test("데이터팩 도구는 relative pack URL의 경로 이탈을 거부한다"
   );
 
   manifest.packs[0].url = "catalog/../catalog/capital-v1.sqlite.gz";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /pack.url must be a safe relative path or absolute HTTPS URL/,
+  );
+
+  manifest.packs[0].url = "catalog/%2e%2e/capital-v1.sqlite.gz";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   await assert.rejects(
     execFileAsync(

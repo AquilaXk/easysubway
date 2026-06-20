@@ -204,6 +204,9 @@ function validateManifest(manifest) {
 }
 
 function validatePackUrl(packUrl, label) {
+  if (/%(?:2e|2f|5c)/i.test(packUrl)) {
+    throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+  }
   if (/^https:\/\//.test(packUrl)) {
     if (!isAbsoluteHttpsWithHost(packUrl)) {
       throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
