@@ -149,6 +149,7 @@ class LocalRouteRepository implements RouteSearchRepository {
   String _blockedReasonMessage(String code) {
     return switch (code) {
       'STAIR_ONLY_ACCESS' => '계단 없는 경로를 찾지 못했습니다.',
+      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
       _ => '안내 가능한 경로를 찾지 못했습니다.',
@@ -220,6 +221,10 @@ class _RouteCatalogSnapshot {
       'includes_stairs',
       '0',
     );
+    final stairAccessStateSql =
+        networkEdgeColumnNames.contains('stair_access_state')
+        ? 'stair_access_state'
+        : "CASE WHEN $includesStairsSql != 0 THEN 'STAIR_ONLY' ELSE 'UNKNOWN' END";
     final accessibilityStatusSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'accessibility_status',
@@ -245,6 +250,7 @@ class _RouteCatalogSnapshot {
                  $distanceMetersSql AS distance_meters,
                  $servicePatternSql AS service_pattern,
                  $includesStairsSql AS includes_stairs,
+                 $stairAccessStateSql AS stair_access_state,
                  $accessibilityStatusSql AS accessibility_status,
                  $reliabilityScoreSql AS reliability_score,
                  $lastVerifiedAtSql AS last_verified_at
@@ -281,6 +287,7 @@ class _RouteCatalogSnapshot {
               edgeType: row.read<String>('edge_type'),
               servicePattern: row.read<String>('service_pattern'),
               includesStairs: row.read<int>('includes_stairs') != 0,
+              stairAccessState: row.read<String>('stair_access_state'),
               accessibilityStatus: row.read<String>('accessibility_status'),
               reliabilityScore: row.read<int>('reliability_score'),
               lastVerifiedAtSeconds: row.readNullable<int>('last_verified_at'),
@@ -645,6 +652,7 @@ graph.RouteEdge _toGraphRouteEdge(
     lineId: _lineIdForNode(effectiveFromNodeId),
     distanceMeters: networkEdge.distanceMeters,
     includesStairs: networkEdge.includesStairs,
+    stairAccessState: networkEdge.routeStairAccessState,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
@@ -746,6 +754,7 @@ class _NetworkEdgeSnapshot {
     required this.edgeType,
     required this.servicePattern,
     required this.includesStairs,
+    required this.stairAccessState,
     required this.accessibilityStatus,
     required this.reliabilityScore,
     required this.lastVerifiedAtSeconds,
@@ -759,6 +768,7 @@ class _NetworkEdgeSnapshot {
   final String edgeType;
   final String servicePattern;
   final bool includesStairs;
+  final String stairAccessState;
   final String accessibilityStatus;
   final int reliabilityScore;
   final int? lastVerifiedAtSeconds;
@@ -774,6 +784,16 @@ class _NetworkEdgeSnapshot {
   }
 
   String get _accessibilityStatusUpper => accessibilityStatus.toUpperCase();
+
+  String get _stairAccessStateUpper => stairAccessState.toUpperCase();
+
+  graph.RouteStairAccessState get routeStairAccessState {
+    return switch (_stairAccessStateUpper) {
+      'STEP_FREE' => graph.RouteStairAccessState.stepFree,
+      'STAIR_ONLY' => graph.RouteStairAccessState.stairOnly,
+      _ => graph.RouteStairAccessState.unknown,
+    };
+  }
 
   graph.RouteAccessibilityState get accessibilityState {
     return switch (_accessibilityStatusUpper) {
