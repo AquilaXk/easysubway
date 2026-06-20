@@ -109,6 +109,58 @@ void main() {
     ]);
   });
 
+  test('로컬 내부 이동 repository는 미확인 접근성 edge를 휠체어 경로로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement(
+      "ALTER TABLE internal_route_edges ADD COLUMN accessibility_status TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await database.customStatement('''
+      INSERT INTO internal_route_nodes (id, station_id, label, node_type)
+      VALUES
+        ('node-entry-unknown', 'station-sangnoksu', '출입구 엘리베이터', 'ELEVATOR'),
+        ('node-platform-unknown', 'station-sangnoksu', '4호선 승강장', 'PLATFORM')
+      ''');
+    await database.customStatement('''
+      INSERT INTO internal_route_edges (
+        id,
+        from_node_id,
+        to_node_id,
+        edge_type,
+        duration_seconds,
+        requires_elevator,
+        accessibility_status,
+        instruction
+      )
+      VALUES (
+        'edge-entry-platform-unknown',
+        'node-entry-unknown',
+        'node-platform-unknown',
+        'ELEVATOR',
+        90,
+        1,
+        'UNKNOWN',
+        '엘리베이터 상태 확인이 필요한 내부 이동 경로입니다.'
+      )
+      ''');
+
+    final repository = LocalInternalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchInternalRoute(
+      const InternalRouteRequest(
+        stationId: 'station-sangnoksu',
+        fromNodeId: 'node-entry-unknown',
+        toNodeId: 'node-platform-unknown',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('내부 이동 경로 접근성 상태를 확인할 수 없습니다.'));
+  });
+
   test('로컬 내부 이동 repository는 구스키마 catalog edge를 기본값으로 읽는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
