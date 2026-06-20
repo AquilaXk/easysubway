@@ -117,7 +117,7 @@ void main() {
     final networkEdges = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
                  includes_stairs, accessibility_status, reliability_score,
-                 last_verified_at
+                 last_verified_at, distance_meters
           FROM network_edges
           ORDER BY id
           ''').get();
@@ -166,6 +166,10 @@ void main() {
     expect(
       networkEdges.map((row) => row.read<int>('last_verified_at')).toSet(),
       {1781827200},
+    );
+    expect(
+      networkEdges.map((row) => row.read<int>('distance_meters')).toSet(),
+      {18600},
     );
     expect(
       networkEdges
