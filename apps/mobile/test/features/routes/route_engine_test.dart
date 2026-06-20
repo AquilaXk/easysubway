@@ -94,6 +94,24 @@ void main() {
       expect(result.totalCost, 674);
       expect(result.includesStairs, isFalse);
     });
+
+    test('10000 node 그래프 경로 탐색은 2초 예산 안에서 완료한다', () {
+      final engine = LocalRouteEngine(graph: _largeLinearGraph(10000));
+      final stopwatch = Stopwatch()..start();
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-0',
+          destinationStationId: 'station-9999',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      stopwatch.stop();
+      expect(result.status, RouteStatus.found);
+      expect(result.edgeIds.length, 9999);
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    });
   });
 }
 
@@ -254,6 +272,30 @@ NetworkGraph _lowQualityFixtureGraph() {
         baseCost: 90,
         isDataStale: true,
       ),
+    ],
+  );
+}
+
+NetworkGraph _largeLinearGraph(int nodeCount) {
+  return NetworkGraph(
+    nodes: [
+      for (var index = 0; index < nodeCount; index++)
+        RouteNode(
+          id: 'station-$index',
+          stationId: 'station-$index',
+          lineId: 'line-large',
+        ),
+    ],
+    edges: [
+      for (var index = 0; index < nodeCount - 1; index++)
+        RouteEdge(
+          id: 'edge-$index-${index + 1}',
+          fromNodeId: 'station-$index',
+          toNodeId: 'station-${index + 1}',
+          type: RouteEdgeType.ride,
+          baseCost: 30,
+          lineId: 'line-large',
+        ),
     ],
   );
 }

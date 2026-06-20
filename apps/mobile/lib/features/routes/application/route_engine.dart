@@ -52,6 +52,7 @@ class LocalRouteEngine {
           toNodeId: edge.toNodeId,
           type: _stepType(edge.type),
           cost: accessCost.cost,
+          durationSeconds: edge.baseCost,
           lineId: edge.lineId,
           transferStationId: edge.transferStationId,
           includesStairs: edge.includesStairs,
@@ -90,6 +91,13 @@ class LocalRouteEngine {
       visited.add(current);
 
       for (final edge in graph.edgesFrom(current)) {
+        if (edge.type == RouteEdgeType.entry && current != originNodeId) {
+          continue;
+        }
+        if (edge.type == RouteEdgeType.exit &&
+            edge.toNodeId != destinationNodeId) {
+          continue;
+        }
         final edgeCost = costCalculator.costFor(edge, mobilityType);
         if (edgeCost.isBlocked) {
           blockedReasonCodes.addAll(edgeCost.warningCodes);
