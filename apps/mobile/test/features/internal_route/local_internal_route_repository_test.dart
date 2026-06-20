@@ -16,9 +16,16 @@ void main() {
         ('node-platform', 'station-sangnoksu', '4호선 승강장', 'PLATFORM')
       ''');
     await database.customStatement('''
-      INSERT INTO internal_route_edges (id, from_node_id, to_node_id, duration_seconds, instruction)
+      INSERT INTO internal_route_edges (
+        id,
+        from_node_id,
+        to_node_id,
+        duration_seconds,
+        accessibility_status,
+        instruction
+      )
       VALUES
-        ('edge-entry-platform', 'node-entry', 'node-platform', 90, '엘리베이터와 넓은 통로를 이용합니다.')
+        ('edge-entry-platform', 'node-entry', 'node-platform', 90, 'AVAILABLE', '엘리베이터와 넓은 통로를 이용합니다.')
       ''');
 
     final repository = LocalInternalRouteRepository(catalogDatabase: database);
@@ -64,6 +71,7 @@ void main() {
         slope_level,
         width_level,
         reliability_score,
+        accessibility_status,
         instruction
       )
       VALUES (
@@ -79,6 +87,7 @@ void main() {
         2,
         3,
         72,
+        'AVAILABLE',
         '엘리베이터를 타고 승강장으로 내려갑니다.'
       )
       ''');
@@ -113,9 +122,6 @@ void main() {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
-    await database.customStatement(
-      "ALTER TABLE internal_route_edges ADD COLUMN accessibility_status TEXT NOT NULL DEFAULT 'UNKNOWN'",
-    );
     await database.customStatement('''
       INSERT INTO internal_route_nodes (id, station_id, label, node_type)
       VALUES
