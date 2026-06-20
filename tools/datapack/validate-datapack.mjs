@@ -221,9 +221,9 @@ function validatePackUrlMatchesStagedPath(packUrl, pack, label) {
     return;
   }
   const url = new URL(packUrl);
-  const expectedPath = `/${stagedPackPath(pack)}`;
-  if (url.pathname !== expectedPath || url.search !== "" || url.hash !== "") {
-    throw new Error(`${label} absolute HTTPS URL path must match ${stagedPackPath(pack)}`);
+  const expectedPathSuffix = `/${stagedPackPath(pack)}`;
+  if (!url.pathname.endsWith(expectedPathSuffix) || url.search !== "" || url.hash !== "") {
+    throw new Error(`${label} absolute HTTPS URL path must end with ${stagedPackPath(pack)}`);
   }
 }
 
