@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
 
 class DataPackManifest {
@@ -88,7 +92,7 @@ class DataPackManifestEntry {
           })
           .toList(growable: false),
       minimumTableRows: _parseMinimumTableRows(minimumTableRows),
-    ).._validateProductionContract();
+    ).._validateManifestContract();
   }
 
   final String id;
@@ -105,7 +109,12 @@ class DataPackManifestEntry {
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
 
-  void _validateProductionContract() {
+  void _validateManifestContract() {
+    final expectedSizeBytes = sizeBytes;
+    if (expectedSizeBytes != null &&
+        signature.value != _signatureValue(expectedSizeBytes)) {
+      throw const FormatException('Invalid data pack signature.');
+    }
     if (artifactKind != DataPackArtifactKind.production) {
       return;
     }
@@ -116,10 +125,22 @@ class DataPackManifestEntry {
         sourceInventory.any(
           (source) =>
               source.licenseStatus != 'redistributable' ||
-              !source.redistributionAllowed,
+              !source.redistributionAllowed ||
+              !source.url.isAbsolute ||
+              source.url.scheme != 'https',
         )) {
       throw const FormatException('Invalid production data pack source.');
     }
+  }
+
+  String _signatureValue(int expectedSizeBytes) {
+    return sha256
+        .convert(
+          utf8.encode(
+            '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes',
+          ),
+        )
+        .toString();
   }
 }
 

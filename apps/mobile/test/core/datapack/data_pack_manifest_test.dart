@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,7 +20,7 @@ void main() {
           'artifactKind': 'fixture',
           'signature': {
             'algorithm': 'sha256-pack-manifest-v1',
-            'value': 'c' * 64,
+            'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
           },
           'sourceInventory': [
             {
@@ -132,7 +135,13 @@ void main() {
             'artifactKind': 'production',
             'signature': {
               'algorithm': 'sha256-pack-manifest-v1',
-              'value': 'c' * 64,
+              'value': _signatureValue(
+                'capital',
+                '18',
+                'a' * 64,
+                'b' * 64,
+                1024,
+              ),
             },
             'sourceInventory': [
               {
@@ -176,7 +185,13 @@ void main() {
             'artifactKind': 'production',
             'signature': {
               'algorithm': 'sha256-pack-manifest-v1',
-              'value': 'c' * 64,
+              'value': _signatureValue(
+                'capital',
+                '18',
+                'a' * 64,
+                'b' * 64,
+                1024,
+              ),
             },
             'sourceInventory': <Object?>[],
             'regionalQualityMetrics': {
@@ -189,6 +204,33 @@ void main() {
             'requiredTables': ['catalog_metadata'],
           },
         ],
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test('production 데이터팩 manifest는 signature와 source URL 출처 계약을 검증한다', () {
+    final validManifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [_productionPack()],
+    });
+    expect(
+      validManifest.packs.single.artifactKind,
+      DataPackArtifactKind.production,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_productionPack(signatureValue: 'c' * 64)],
+      }),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_productionPack(sourceUrl: 'http://example.invalid/source')],
       }),
       throwsFormatException,
     );
@@ -233,7 +275,13 @@ void main() {
             'artifactKind': 'fixture',
             'signature': {
               'algorithm': 'sha256-pack-manifest-v1',
-              'value': 'c' * 64,
+              'value': _signatureValue(
+                'capital',
+                '18',
+                'a' * 64,
+                'b' * 64,
+                1024,
+              ),
             },
             'sourceInventory': [
               {
@@ -325,4 +373,71 @@ void main() {
       throwsFormatException,
     );
   });
+}
+
+Map<String, Object?> _productionPack({
+  String? signatureValue,
+  String sourceUrl = 'https://example.invalid/source',
+}) {
+  const id = 'capital';
+  const version = '18';
+  final compressedSha256 = 'a' * 64;
+  final sqliteSha256 = 'b' * 64;
+  const sizeBytes = 1024;
+  return {
+    'id': id,
+    'version': version,
+    'url': 'https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz',
+    'sha256': compressedSha256,
+    'sqliteSha256': sqliteSha256,
+    'sizeBytes': sizeBytes,
+    'artifactKind': 'production',
+    'signature': {
+      'algorithm': 'sha256-pack-manifest-v1',
+      'value':
+          signatureValue ??
+          _signatureValue(
+            id,
+            version,
+            compressedSha256,
+            sqliteSha256,
+            sizeBytes,
+          ),
+    },
+    'sourceInventory': [
+      {
+        'id': 'capital-official-stations',
+        'owner': '수도권 운영기관',
+        'url': sourceUrl,
+        'license': '공공데이터 이용허락',
+        'licenseStatus': 'redistributable',
+        'redistributionAllowed': true,
+        'updateFrequency': 'daily',
+        'updatedAt': '2026-06-19T00:00:00.000Z',
+        'fields': ['stations'],
+      },
+    ],
+    'regionalQualityMetrics': {
+      'stationCount': 300,
+      'facilityCoverageRatio': 0.8,
+      'edgeCount': 600,
+      'unknownAccessibilityRatio': 0.1,
+    },
+    'schemaVersion': '1',
+    'requiredTables': ['catalog_metadata'],
+  };
+}
+
+String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
 }

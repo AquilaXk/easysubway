@@ -51,7 +51,12 @@ void main() {
                   'sha256': sha256.convert(corruptBytes).toString(),
                   'sqliteSha256': '1' * 64,
                   'sizeBytes': corruptBytes.length,
-                  ..._fixtureManifestMetadata(),
+                  ..._fixtureManifestMetadata(
+                    version: '18',
+                    compressedSha256: sha256.convert(corruptBytes).toString(),
+                    sqliteSha256: '1' * 64,
+                    sizeBytes: corruptBytes.length,
+                  ),
                   'schemaVersion': '1',
                   'requiredTables': ['catalog_metadata'],
                 },
@@ -562,7 +567,12 @@ void main() {
                     'sha256': sha256.convert(corruptBytes).toString(),
                     'sqliteSha256': '1' * 64,
                     'sizeBytes': corruptBytes.length,
-                    ..._fixtureManifestMetadata(),
+                    ..._fixtureManifestMetadata(
+                      version: '18',
+                      compressedSha256: sha256.convert(corruptBytes).toString(),
+                      sqliteSha256: '1' * 64,
+                      sizeBytes: corruptBytes.length,
+                    ),
                     'schemaVersion': '1',
                     'requiredTables': ['catalog_metadata'],
                   },
@@ -613,23 +623,44 @@ Map<String, Object?> _packJson({
   required List<int> compressedBytes,
   required List<int> sqliteBytes,
 }) {
+  final compressedSha256 = sha256.convert(compressedBytes).toString();
+  final sqliteSha256 = sha256.convert(sqliteBytes).toString();
   return {
     'id': 'capital',
     'version': version,
     'url': url,
-    'sha256': sha256.convert(compressedBytes).toString(),
-    'sqliteSha256': sha256.convert(sqliteBytes).toString(),
+    'sha256': compressedSha256,
+    'sqliteSha256': sqliteSha256,
     'sizeBytes': compressedBytes.length,
-    ..._fixtureManifestMetadata(),
+    ..._fixtureManifestMetadata(
+      version: version,
+      compressedSha256: compressedSha256,
+      sqliteSha256: sqliteSha256,
+      sizeBytes: compressedBytes.length,
+    ),
     'schemaVersion': '1',
     'requiredTables': ['catalog_metadata'],
   };
 }
 
-Map<String, Object?> _fixtureManifestMetadata() {
+Map<String, Object?> _fixtureManifestMetadata({
+  required String version,
+  required String compressedSha256,
+  required String sqliteSha256,
+  required int sizeBytes,
+}) {
   return {
     'artifactKind': 'fixture',
-    'signature': {'algorithm': 'sha256-pack-manifest-v1', 'value': 'c' * 64},
+    'signature': {
+      'algorithm': 'sha256-pack-manifest-v1',
+      'value': _signatureValue(
+        'capital',
+        version,
+        compressedSha256,
+        sqliteSha256,
+        sizeBytes,
+      ),
+    },
     'sourceInventory': [
       {
         'id': 'fixture-capital-catalog',
@@ -650,6 +681,20 @@ Map<String, Object?> _fixtureManifestMetadata() {
       'unknownAccessibilityRatio': 0.0,
     },
   };
+}
+
+String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
 }
 
 Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {

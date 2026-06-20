@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
@@ -80,7 +81,13 @@ void main() {
                 'artifactKind': 'fixture',
                 'signature': {
                   'algorithm': 'sha256-pack-manifest-v1',
-                  'value': 'c' * 64,
+                  'value': _signatureValue(
+                    'capital',
+                    '18',
+                    'a' * 64,
+                    'b' * 64,
+                    1024,
+                  ),
                 },
                 'sourceInventory': [
                   {
@@ -127,4 +134,18 @@ void main() {
     expect(cache?.etag, 'etag-v18');
     expect(cache?.ttl, const Duration(minutes: 1));
   });
+}
+
+String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
 }
