@@ -54,7 +54,7 @@ async function validatePack(root, temporaryDir, pack) {
 
 function localPackPathForUrl(root, pack) {
   if (/^https:\/\//.test(pack.url)) {
-    return path.join(root, "catalog", `${pack.id}-v${pack.version}.sqlite.gz`);
+    return path.join(root, stagedPackPath(pack));
   }
   return path.join(root, pack.url);
 }
@@ -166,6 +166,7 @@ function validateManifest(manifest) {
   for (const pack of manifest.packs) {
     validatePackIdentity(pack, "pack");
     validatePackUrl(requiredString(pack.url, "pack.url"), "pack.url");
+    validatePackUrlMatchesStagedPath(pack.url, pack, "pack.url");
     const artifactKind = requiredString(pack.artifactKind, "pack.artifactKind");
     if (artifactKind !== "fixture" && artifactKind !== "production") {
       throw new Error(`${pack.id}@${pack.version} artifactKind must be fixture or production`);
@@ -213,6 +214,21 @@ function validatePackUrl(packUrl, label) {
   if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
   }
+}
+
+function validatePackUrlMatchesStagedPath(packUrl, pack, label) {
+  if (!/^https:\/\//.test(packUrl)) {
+    return;
+  }
+  const url = new URL(packUrl);
+  const expectedPath = `/${stagedPackPath(pack)}`;
+  if (url.pathname !== expectedPath || url.search !== "" || url.hash !== "") {
+    throw new Error(`${label} absolute HTTPS URL path must match ${stagedPackPath(pack)}`);
+  }
+}
+
+function stagedPackPath(pack) {
+  return `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
 }
 
 function validateSignature(signature, label) {

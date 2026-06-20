@@ -86,6 +86,45 @@ void main() {
           {
             'id': 'capital',
             'version': '18',
+            'url':
+                'https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz',
+            'sha256': 'a' * 64,
+            'sqliteSha256': 'b' * 64,
+            'artifactKind': 'production',
+            'schemaVersion': '1',
+            'requiredTables': ['catalog_metadata'],
+          },
+        ],
+      }),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          {
+            'id': 'capital',
+            'version': '18',
+            'url':
+                'https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz',
+            'sha256': 'a' * 64,
+            'sqliteSha256': 'b' * 64,
+            'schemaVersion': '1',
+            'requiredTables': ['catalog_metadata'],
+          },
+        ],
+      }),
+      throwsFormatException,
+    );
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [
+          {
+            'id': 'capital',
+            'version': '18',
             'url': 'catalog/capital-v18.sqlite.gz',
             'sha256': 'a' * 64,
             'sqliteSha256': 'b' * 64,
@@ -153,6 +192,30 @@ void main() {
       }),
       throwsFormatException,
     );
+  });
+
+  test('legacy fixture manifest는 신규 metadata 없이도 파싱된다', () {
+    final manifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [
+        {
+          'id': 'capital',
+          'version': '18',
+          'url': 'catalog/capital-v18.sqlite.gz',
+          'sha256': 'a' * 64,
+          'sqliteSha256': 'b' * 64,
+          'schemaVersion': '1',
+          'requiredTables': ['catalog_metadata', 'stations'],
+        },
+      ],
+    });
+
+    final pack = manifest.packs.single;
+    expect(pack.artifactKind, DataPackArtifactKind.fixture);
+    expect(pack.sizeBytes, isNull);
+    expect(pack.signature.value, '0' * 64);
+    expect(pack.sourceInventory.single.id, 'legacy-fixture-manifest');
+    expect(pack.regionalQualityMetrics.stationCount, 0);
   });
 
   test('데이터팩 manifest는 pack URL 경로 이탈을 거부한다', () {

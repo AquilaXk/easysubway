@@ -27,7 +27,9 @@ class DataPackInstaller {
     bool activateCurrent = true,
   }) async {
     await catalogDirectory.create(recursive: true);
-    if (compressedBytes.length != pack.sizeBytes) {
+    final expectedSizeBytes = pack.sizeBytes;
+    if (expectedSizeBytes != null &&
+        compressedBytes.length != expectedSizeBytes) {
       return const DataPackInstallResult(
         status: DataPackInstallStatus.rejected,
         reason: DataPackInstallRejectionReason.sizeBytesMismatch,

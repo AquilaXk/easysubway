@@ -125,6 +125,34 @@ void main() {
     expect(installedRows.single.version, '18');
   });
 
+  test('installer는 legacy manifest에 sizeBytes가 없으면 길이 검사를 건너뛴다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-legacy-size-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: null,
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.version, '18');
+  });
+
   test('installer는 새 pack 설치 후 같은 pack의 오래된 버전을 정리한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-prune-',
@@ -254,7 +282,7 @@ DataPackManifestEntry _pack({
   required String version,
   required String sha256,
   required String sqliteSha256,
-  required int sizeBytes,
+  required int? sizeBytes,
 }) {
   return DataPackManifestEntry(
     id: 'capital',

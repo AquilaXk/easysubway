@@ -22,6 +22,7 @@ async function main() {
     const artifactKind = pack.artifactKind ?? "fixture";
     const packUrl = pack.url ?? `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
     validatePackUrl(packUrl, "pack.url");
+    validatePackUrlMatchesStagedPath(packUrl, pack, "pack.url");
     const outputPackPath = outputPathForPack(outputDir, packUrl, pack);
     const sqlitePath = outputPackPath.replace(/\.gz$/, "");
     const compressedPath = outputPackPath;
@@ -76,7 +77,7 @@ async function main() {
 
 function outputPathForPack(outputDir, packUrl, pack) {
   if (/^https:\/\//.test(packUrl)) {
-    return path.join(outputDir, "catalog", `${pack.id}-v${pack.version}.sqlite.gz`);
+    return path.join(outputDir, stagedPackPath(pack));
   }
   return path.join(outputDir, packUrl);
 }
@@ -93,6 +94,21 @@ function validatePackUrl(packUrl, label) {
   if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
   }
+}
+
+function validatePackUrlMatchesStagedPath(packUrl, pack, label) {
+  if (!/^https:\/\//.test(packUrl)) {
+    return;
+  }
+  const url = new URL(packUrl);
+  const expectedPath = `/${stagedPackPath(pack)}`;
+  if (url.pathname !== expectedPath || url.search !== "" || url.hash !== "") {
+    throw new Error(`${label} absolute HTTPS URL path must match ${stagedPackPath(pack)}`);
+  }
+}
+
+function stagedPackPath(pack) {
+  return `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
 }
 
 function packSignature(pack) {
@@ -385,7 +401,8 @@ function validateFixture(fixture) {
       throw new Error("pack.artifactKind must be fixture or production");
     }
     requiredString(pack.schemaVersion, "pack.schemaVersion");
-    validatePackUrl(pack.url ?? `catalog/${pack.id}-v${pack.version}.sqlite.gz`, "pack.url");
+    validatePackUrl(pack.url ?? stagedPackPath(pack), "pack.url");
+    validatePackUrlMatchesStagedPath(pack.url ?? stagedPackPath(pack), pack, "pack.url");
     if (artifactKind === "production" && !/^https:\/\//.test(pack.url)) {
       throw new Error("production pack url must be an absolute HTTPS URL");
     }

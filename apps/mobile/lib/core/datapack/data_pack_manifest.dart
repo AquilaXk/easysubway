@@ -57,6 +57,7 @@ class DataPackManifestEntry {
     final id = _readPackId(json['id']);
     final version = _readPackVersion(json['version']);
     final url = _parsePackUrl(_requiredString(json, 'url'));
+    final artifactKind = _parseArtifactKind(json['artifactKind'], url);
     final requiredTables = json['requiredTables'];
     final minimumTableRows = json['minimumTableRows'];
     if (requiredTables is! List || requiredTables.isEmpty) {
@@ -69,12 +70,16 @@ class DataPackManifestEntry {
       url: url,
       compressedSha256: _requiredString(json, 'sha256'),
       sqliteSha256: _requiredString(json, 'sqliteSha256'),
-      sizeBytes: _requiredPositiveInt(json, 'sizeBytes'),
-      artifactKind: _parseArtifactKind(json['artifactKind']),
-      signature: DataPackSignature.fromJson(_requiredObject(json, 'signature')),
-      sourceInventory: _parseSourceInventory(json['sourceInventory']),
-      regionalQualityMetrics: RegionalQualityMetrics.fromJson(
-        _requiredObject(json, 'regionalQualityMetrics'),
+      sizeBytes: _optionalPositiveInt(json, 'sizeBytes', artifactKind),
+      artifactKind: artifactKind,
+      signature: _parseSignature(json['signature'], artifactKind),
+      sourceInventory: _parseSourceInventory(
+        json['sourceInventory'],
+        artifactKind,
+      ),
+      regionalQualityMetrics: _parseRegionalQualityMetrics(
+        json['regionalQualityMetrics'],
+        artifactKind,
       ),
       schemaVersion: _requiredString(json, 'schemaVersion'),
       requiredTables: requiredTables
@@ -91,7 +96,7 @@ class DataPackManifestEntry {
   final Uri url;
   final String compressedSha256;
   final String sqliteSha256;
-  final int sizeBytes;
+  final int? sizeBytes;
   final DataPackArtifactKind artifactKind;
   final DataPackSignature signature;
   final List<DataPackSourceInventoryEntry> sourceInventory;
@@ -276,7 +281,41 @@ Map<String, int> _parseMinimumTableRows(Object? rawRows) {
   });
 }
 
-List<DataPackSourceInventoryEntry> _parseSourceInventory(Object? rawSources) {
+DataPackSignature _parseSignature(
+  Object? rawSignature,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawSignature == null && artifactKind == DataPackArtifactKind.fixture) {
+    return DataPackSignature(
+      algorithm: 'sha256-pack-manifest-v1',
+      value: '0' * 64,
+    );
+  }
+  if (rawSignature is! Map<String, Object?>) {
+    throw const FormatException('Invalid data pack signature.');
+  }
+  return DataPackSignature.fromJson(rawSignature);
+}
+
+List<DataPackSourceInventoryEntry> _parseSourceInventory(
+  Object? rawSources,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawSources == null && artifactKind == DataPackArtifactKind.fixture) {
+    return [
+      DataPackSourceInventoryEntry(
+        id: 'legacy-fixture-manifest',
+        owner: 'legacy-fixture',
+        url: Uri.parse('https://example.invalid/legacy-fixture'),
+        license: 'fixture-only',
+        licenseStatus: 'fixture-only',
+        redistributionAllowed: false,
+        updateFrequency: 'manual',
+        updatedAt: '1970-01-01T00:00:00.000Z',
+        fields: const ['legacy'],
+      ),
+    ];
+  }
   if (rawSources is! List || rawSources.isEmpty) {
     throw const FormatException('Invalid data pack source inventory.');
   }
@@ -290,7 +329,12 @@ List<DataPackSourceInventoryEntry> _parseSourceInventory(Object? rawSources) {
       .toList(growable: false);
 }
 
-DataPackArtifactKind _parseArtifactKind(Object? rawKind) {
+DataPackArtifactKind _parseArtifactKind(Object? rawKind, Uri url) {
+  if (rawKind == null) {
+    return url.isAbsolute
+        ? DataPackArtifactKind.production
+        : DataPackArtifactKind.fixture;
+  }
   return switch (_readRequiredString(rawKind)) {
     'fixture' => DataPackArtifactKind.fixture,
     'production' => DataPackArtifactKind.production,
@@ -298,12 +342,22 @@ DataPackArtifactKind _parseArtifactKind(Object? rawKind) {
   };
 }
 
-Map<String, Object?> _requiredObject(Map<String, Object?> json, String key) {
-  final value = json[key];
-  if (value is! Map<String, Object?>) {
-    throw const FormatException('Invalid data pack manifest value.');
+RegionalQualityMetrics _parseRegionalQualityMetrics(
+  Object? rawMetrics,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawMetrics == null && artifactKind == DataPackArtifactKind.fixture) {
+    return const RegionalQualityMetrics(
+      stationCount: 0,
+      facilityCoverageRatio: 0,
+      edgeCount: 0,
+      unknownAccessibilityRatio: 0,
+    );
   }
-  return value;
+  if (rawMetrics is! Map<String, Object?>) {
+    throw const FormatException('Invalid regional quality metrics.');
+  }
+  return RegionalQualityMetrics.fromJson(rawMetrics);
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
@@ -335,8 +389,15 @@ String _readRequiredString(Object? value) {
   return value.trim();
 }
 
-int _requiredPositiveInt(Map<String, Object?> json, String key) {
+int? _optionalPositiveInt(
+  Map<String, Object?> json,
+  String key,
+  DataPackArtifactKind artifactKind,
+) {
   final value = json[key];
+  if (value == null && artifactKind == DataPackArtifactKind.fixture) {
+    return null;
+  }
   if (value is! int || value <= 0) {
     throw const FormatException('Invalid data pack manifest value.');
   }
