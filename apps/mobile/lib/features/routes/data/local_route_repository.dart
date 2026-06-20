@@ -430,6 +430,7 @@ class _RouteCatalogSnapshot {
               toNodeId: nodeKey.nodeId,
               type: graph.RouteEdgeType.entry,
               baseCost: 90,
+              stairAccessState: graph.RouteStairAccessState.stepFree,
             ),
           );
         }
@@ -443,6 +444,7 @@ class _RouteCatalogSnapshot {
               toNodeId: stationLine.stationId,
               type: graph.RouteEdgeType.exit,
               baseCost: 60,
+              stairAccessState: graph.RouteStairAccessState.stepFree,
             ),
           );
         }
@@ -476,6 +478,7 @@ class _RouteCatalogSnapshot {
               type: graph.RouteEdgeType.transfer,
               baseCost: 140,
               transferStationId: stationId,
+              stairAccessState: graph.RouteStairAccessState.stepFree,
             ),
           );
         }
