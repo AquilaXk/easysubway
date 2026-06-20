@@ -53,6 +53,7 @@ class LocalRouteEngine {
           type: _stepType(edge.type),
           cost: accessCost.cost,
           durationSeconds: edge.baseCost,
+          distanceMeters: edge.distanceMeters,
           lineId: edge.lineId,
           transferStationId: edge.transferStationId,
           includesStairs: edge.includesStairs,

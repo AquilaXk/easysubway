@@ -9,6 +9,7 @@ class RouteStep {
     required this.type,
     required this.cost,
     required this.durationSeconds,
+    this.distanceMeters = 0,
     this.lineId = '',
     this.transferStationId = '',
     this.includesStairs = false,
@@ -21,6 +22,7 @@ class RouteStep {
   final RouteStepType type;
   final int cost;
   final int durationSeconds;
+  final int distanceMeters;
   final String lineId;
   final String transferStationId;
   final bool includesStairs;
