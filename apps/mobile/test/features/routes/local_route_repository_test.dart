@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/features/internal_route/data/local_internal_route_repository.dart';
@@ -49,6 +51,37 @@ void main() {
       ['seoul-4'],
     );
     expect(result.blockedReasons, isEmpty);
+  });
+
+  test('기존 baseline catalog는 비어 있는 철도 간선을 열 때 보강한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-route-catalog-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/catalog.sqlite');
+    final originalDatabase = CatalogDatabase.file(file);
+    await originalDatabase.seedBaselineIfEmpty();
+    await originalDatabase.customStatement('DELETE FROM network_edges');
+    await originalDatabase.close();
+
+    final reopenedDatabase = CatalogDatabase.file(file);
+    addTearDown(reopenedDatabase.close);
+    final repository = LocalRouteRepository(catalogDatabase: reopenedDatabase);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.lineId, 'seoul-4');
+    final edgeCount = await reopenedDatabase
+        .customSelect('SELECT COUNT(*) AS count FROM network_edges')
+        .getSingle();
+    expect(edgeCount.read<int>('count'), greaterThanOrEqualTo(2));
   });
 
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
