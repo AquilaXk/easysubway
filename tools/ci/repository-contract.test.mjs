@@ -1789,7 +1789,9 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(uploadIntents, /pendingCount\(String clientSubmissionId\)/);
   assert.match(uploadIntents, /intent\.contentType\(\)\.equals\(normalizedContentType\(contentType\)\)/);
   assert.match(uploadIntents, /void consumeObjectKey\(String objectKey\)/);
-  assert.match(uploadIntents, /void discardPendingObjectKey\(String objectKey, Consumer<String> deleteObject\)/);
+  assert.match(uploadIntents, /void discardPendingObjectKey\(\s*String clientSubmissionId,\s*String objectKey,\s*String contentType,\s*String sha256,\s*Long sizeBytes,\s*Consumer<String> deleteObject/);
+  assert.match(uploadIntents, /isValidSignedObjectKey\(clientSubmissionId, normalizedObjectKey, contentType, sha256, sizeBytes\)/);
+  assert.match(uploadIntents, /clientSubmissionId\.length\(\) <= 120 && clientSubmissionId\.matches\("\[A-Za-z0-9_-\]\+"\)/);
   assert.match(uploadUrlSigner, /@Profile\("prod"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
   assert.match(uploadUrlSigner, /AWS4-HMAC-SHA256/);
   assert.match(uploadUrlSigner, /X-Amz-Credential/);
