@@ -136,13 +136,13 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   List<String> _recommendationReasons(String mobilityType) {
     return [
-      '엘리베이터 동선을 우선했어요',
-      '계단 없는 출구를 확인했어요',
+      '현재 데이터 기준으로 이동 가능한 철도 구간을 계산했습니다.',
+      '출구와 시설 상태는 현장 안내를 함께 확인해 주세요.',
       switch (mobilityType) {
-        'WHEELCHAIR' => '휠체어 이동에 맞춰 계단을 피했어요',
-        'STROLLER' => '유모차 이동에 맞춰 넓은 동선을 확인했어요',
-        'SENIOR' => '천천히 이동하기 쉬운 동선을 확인했어요',
-        _ => '이동 조건에 맞는 동선을 확인했어요',
+        'WHEELCHAIR' => '휠체어 이동 조건에서 차단된 계단 구간은 제외했습니다.',
+        'STROLLER' => '유모차 이동 조건에서 차단된 계단 구간은 제외했습니다.',
+        'SENIOR' => '고령자 이동 조건의 접근 비용을 반영했습니다.',
+        _ => '선택한 이동 조건의 접근 비용을 반영했습니다.',
       },
     ];
   }
@@ -184,11 +184,13 @@ class _RouteCatalogSnapshot {
     required this.stationsById,
     required this.linesById,
     required this.stationLines,
+    required this.networkEdges,
   });
 
   final Map<String, String> stationsById;
   final Map<String, String> linesById;
   final List<_StationLineSnapshot> stationLines;
+  final List<_NetworkEdgeSnapshot> networkEdges;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final stationRows = await database
@@ -201,6 +203,11 @@ class _RouteCatalogSnapshot {
           SELECT station_id, line_id, line_sequence
           FROM station_lines
           ORDER BY line_id, line_sequence
+          ''').get();
+    final networkEdgeRows = await database.customSelect('''
+          SELECT id, from_node_id, to_node_id, duration_seconds, edge_type
+          FROM network_edges
+          ORDER BY id
           ''').get();
 
     return _RouteCatalogSnapshot(
@@ -218,6 +225,17 @@ class _RouteCatalogSnapshot {
               stationId: row.read<String>('station_id'),
               lineId: row.read<String>('line_id'),
               sequence: row.read<int>('line_sequence'),
+            ),
+          )
+          .toList(growable: false),
+      networkEdges: networkEdgeRows
+          .map(
+            (row) => _NetworkEdgeSnapshot(
+              id: row.read<String>('id'),
+              fromNodeId: row.read<String>('from_node_id'),
+              toNodeId: row.read<String>('to_node_id'),
+              durationSeconds: row.read<int>('duration_seconds'),
+              edgeType: row.read<String>('edge_type'),
             ),
           )
           .toList(growable: false),
@@ -257,23 +275,23 @@ class _RouteCatalogSnapshot {
       );
     }
 
-    for (final from in stationLines) {
-      for (final to in stationLines) {
-        if (from.lineId != to.lineId || from.stationId == to.stationId) {
-          continue;
-        }
-        final stops = (from.sequence - to.sequence).abs();
-        edges.add(
-          graph.RouteEdge(
-            id: 'ride-${from.stationId}-${to.stationId}-${from.lineId}',
-            fromNodeId: from.nodeId,
-            toNodeId: to.nodeId,
-            type: graph.RouteEdgeType.ride,
-            baseCost: stops * 28,
-            lineId: from.lineId,
-          ),
-        );
+    for (final networkEdge in networkEdges) {
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == null) {
+        continue;
       }
+      edges.add(
+        graph.RouteEdge(
+          id: networkEdge.id,
+          fromNodeId: networkEdge.fromNodeId,
+          toNodeId: networkEdge.toNodeId,
+          type: routeEdgeType,
+          baseCost: networkEdge.durationSeconds <= 0
+              ? 60
+              : networkEdge.durationSeconds,
+          lineId: networkEdge.lineId,
+        ),
+      );
     }
 
     final stationIds = stationLines.map((line) => line.stationId).toSet();
@@ -338,4 +356,38 @@ class _StationLineSnapshot {
   final int sequence;
 
   String get nodeId => '$stationId:$lineId';
+}
+
+class _NetworkEdgeSnapshot {
+  const _NetworkEdgeSnapshot({
+    required this.id,
+    required this.fromNodeId,
+    required this.toNodeId,
+    required this.durationSeconds,
+    required this.edgeType,
+  });
+
+  final String id;
+  final String fromNodeId;
+  final String toNodeId;
+  final int durationSeconds;
+  final String edgeType;
+
+  graph.RouteEdgeType? get routeEdgeType {
+    return switch (edgeType.toUpperCase()) {
+      'RIDE' => graph.RouteEdgeType.ride,
+      'TRANSFER' => graph.RouteEdgeType.transfer,
+      'ENTRY' => graph.RouteEdgeType.entry,
+      'EXIT' => graph.RouteEdgeType.exit,
+      _ => null,
+    };
+  }
+
+  String get lineId {
+    final parts = fromNodeId.split(':');
+    if (parts.length < 2) {
+      return '';
+    }
+    return parts[1];
+  }
 }
