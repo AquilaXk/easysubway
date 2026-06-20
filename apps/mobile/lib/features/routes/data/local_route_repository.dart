@@ -314,8 +314,12 @@ class _RouteCatalogSnapshot {
         explicitTransferPairs.add(
           _edgePairKey(networkEdge.fromNodeId, networkEdge.toNodeId),
         );
+        explicitTransferPairs.add(
+          _edgePairKey(networkEdge.toNodeId, networkEdge.fromNodeId),
+        );
         if (fromNode != null && toNode != null) {
           explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
+          explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
         }
       }
     }
