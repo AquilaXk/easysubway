@@ -210,6 +210,9 @@ function validatePackUrl(packUrl, label) {
   if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(packUrl) || packUrl.startsWith("/") || packUrl.startsWith("//") || packUrl.includes("\\")) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
   }
+  if (packUrl.split("/").includes("..")) {
+    throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
+  }
   const normalized = path.posix.normalize(packUrl);
   if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
