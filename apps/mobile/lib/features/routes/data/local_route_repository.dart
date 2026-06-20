@@ -803,7 +803,8 @@ String _effectiveAccessibilityStatus(
       status == 'AVAILABLE' ||
       status == 'IN_SERVICE' ||
       status == 'OPERATING' ||
-      status == 'OPEN') {
+      status == 'OPEN' ||
+      status == 'ADMIN_VERIFIED') {
     return edgeStatus;
   }
   if (status == 'UNKNOWN' || status == 'CHECK_REQUIRED') {
@@ -845,10 +846,10 @@ int? _effectiveLastVerifiedAtSeconds(
 
 int? _facilityQualityScore(String? qualityLevel) {
   return switch (qualityLevel?.toUpperCase()) {
-    'LEVEL_1' => 100,
-    'LEVEL_2' => 80,
-    'LEVEL_3' => 60,
-    'LEVEL_4' => 40,
+    'LEVEL_1' => 40,
+    'LEVEL_2' => 60,
+    'LEVEL_3' => 80,
+    'LEVEL_4' => 100,
     'UNKNOWN' => 60,
     null => null,
     _ => 60,
