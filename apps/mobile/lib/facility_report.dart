@@ -200,6 +200,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       uploadRequest.headers.set(header.key, header.value);
     }
     uploadRequest.headers.contentType = ContentType.parse(contentType);
+    uploadRequest.contentLength = photoBytes.length;
     uploadRequest.add(photoBytes);
     final uploadResponse = await uploadRequest.close().timeout(
       _facilityReportTimeout,

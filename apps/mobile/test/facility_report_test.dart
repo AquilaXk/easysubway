@@ -100,6 +100,7 @@ void main() {
     late String? uploadChecksumHeader;
     late String? uploadSizeHeader;
     late String? uploadContentTypeHeader;
+    late int uploadContentLength;
     late Map<String, Object?> uploadIntentBody;
     late List<int> uploadedPhotoBytes;
     late Map<String, Object?> requestBody;
@@ -140,6 +141,7 @@ void main() {
           );
           uploadSizeHeader = request.headers.value('x-easysubway-upload-size');
           uploadContentTypeHeader = request.headers.contentType?.mimeType;
+          uploadContentLength = request.contentLength;
           uploadedPhotoBytes = await request.fold<List<int>>(
             <int>[],
             (bytes, chunk) => bytes..addAll(chunk),
@@ -216,6 +218,7 @@ void main() {
     );
     expect(uploadSizeHeader, '11');
     expect(uploadContentTypeHeader, 'image/jpeg');
+    expect(uploadContentLength, 11);
     expect(requestBody['stationId'], 'station-sangnoksu');
     expect(requestBody['facilityId'], 'facility-sangnoksu-elevator-1');
     expect(requestBody['reportType'], 'BROKEN');
