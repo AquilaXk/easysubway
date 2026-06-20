@@ -700,7 +700,7 @@ class RouteSearchResult {
     final stepsForGuidance = movementSteps;
     if (stepsForGuidance.isNotEmpty) {
       parts.add(
-        '이동 안내 ${stepsForGuidance.map((step) => '${step.sequence}번 ${step.title}, ${step.burdenLabel}, ${step.description}').join(', ')}',
+        '이동 안내 ${stepsForGuidance.map((step) => step.semanticGuidanceLabel).join(', ')}',
       );
     }
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
@@ -721,13 +721,22 @@ class RouteSearchStep {
     required this.distanceMeters,
     required this.includesStairs,
     required this.requiresAccessibilityCheck,
+    this.actionTitle = '',
+    this.actionDetail = '',
+    this.reason = '',
+    this.evidenceSources = const [],
+    this.timeSource = '',
+    this.distanceSource = '',
+    this.confidenceLabel = '',
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
+    final title = _requiredRouteString(json, 'title');
+    final description = _requiredRouteString(json, 'description');
     return RouteSearchStep(
       sequence: _requiredRouteInt(json, 'sequence'),
-      title: _requiredRouteString(json, 'title'),
-      description: _requiredRouteString(json, 'description'),
+      title: title,
+      description: description,
       lineId: _optionalRouteString(json, 'lineId'),
       lineName: _optionalRouteString(json, 'lineName'),
       fromStationId: _optionalRouteString(json, 'fromStationId'),
@@ -739,6 +748,18 @@ class RouteSearchStep {
         json,
         'requiresAccessibilityCheck',
       ),
+      actionTitle: _optionalRouteString(json, 'actionTitle'),
+      actionDetail: _optionalRouteString(json, 'actionDetail').isEmpty
+          ? description
+          : _optionalRouteString(json, 'actionDetail'),
+      reason: _optionalRouteString(json, 'reason'),
+      evidenceSources: _routeStringList(
+        json['evidenceSources'],
+        'route step evidence source',
+      ),
+      timeSource: _optionalRouteString(json, 'timeSource'),
+      distanceSource: _optionalRouteString(json, 'distanceSource'),
+      confidenceLabel: _optionalRouteString(json, 'confidenceLabel'),
     );
   }
 
@@ -753,6 +774,13 @@ class RouteSearchStep {
   final int distanceMeters;
   final bool includesStairs;
   final bool requiresAccessibilityCheck;
+  final String actionTitle;
+  final String actionDetail;
+  final String reason;
+  final List<String> evidenceSources;
+  final String timeSource;
+  final String distanceSource;
+  final String confidenceLabel;
 
   String get burdenLabel {
     final labels = <String>[
@@ -762,6 +790,37 @@ class RouteSearchStep {
       if (requiresAccessibilityCheck) '접근성 확인',
     ];
     return labels.join(' · ');
+  }
+
+  String get semanticGuidanceLabel {
+    final labels = <String>[
+      '$sequence번 ${actionTitle.isEmpty ? title : actionTitle}',
+      actionDetail.isEmpty ? description : actionDetail,
+      if (reason.isNotEmpty) reason,
+      burdenLabel,
+      if (hasMetricSourceMetadata) '시간 ${_routeTimeSourceLabel(timeSource)}',
+      if (hasMetricSourceMetadata)
+        '거리 ${_routeDistanceSourceLabel(distanceSource)}',
+      if (hasMetricSourceMetadata) confidenceLabel,
+      if (evidenceSources.isNotEmpty) '근거 ${evidenceSources.join(', ')}',
+    ];
+    return labels.join(', ');
+  }
+
+  bool get hasMetricSourceMetadata =>
+      timeSource.isNotEmpty ||
+      distanceSource.isNotEmpty ||
+      confidenceLabel.isNotEmpty;
+
+  String get metricSourceLabel {
+    if (!hasMetricSourceMetadata) {
+      return '';
+    }
+    return [
+      '시간 ${_routeTimeSourceLabel(timeSource)}',
+      '거리 ${_routeDistanceSourceLabel(distanceSource)}',
+      confidenceLabel,
+    ].join(' · ');
   }
 }
 
@@ -785,6 +844,23 @@ String _routeDistanceLabel(int distanceMeters) {
     return '${kilometers.toStringAsFixed(0)}km';
   }
   return '${kilometers.toStringAsFixed(1)}km';
+}
+
+String _routeTimeSourceLabel(String source) {
+  return switch (source) {
+    'STATIC_ESTIMATE' => '정적 추정',
+    'REALTIME_ADJUSTED' => '실시간 보정',
+    'MEASURED' => '측정값',
+    _ => '확인 필요',
+  };
+}
+
+String _routeDistanceSourceLabel(String source) {
+  return switch (source) {
+    'MEASURED' => '측정값',
+    'STATIC_ESTIMATE' => '정적 추정',
+    _ => '확인 필요',
+  };
 }
 
 class RouteSearchWarning {
@@ -2213,6 +2289,17 @@ class _RouteStepTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (step.actionTitle.isNotEmpty) ...[
+                  Text(
+                    step.actionTitle,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF004A50),
+                      fontWeight: FontWeight.w900,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 Text(
                   step.title,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -2239,6 +2326,28 @@ class _RouteStepTile extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                if (step.reason.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    step.reason,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+                if (step.hasMetricSourceMetadata) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    step.metricSourceLabel,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

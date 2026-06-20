@@ -57,6 +57,10 @@ class LocalRouteEngine {
           lineId: edge.lineId,
           transferStationId: _transferStationId(edge),
           includesStairs: edge.includesStairs,
+          evidenceSources: _evidenceSources(edge),
+          timeSource: edge.durationSeconds > 0 ? 'STATIC_ESTIMATE' : 'UNKNOWN',
+          distanceSource: edge.distanceMeters > 0 ? 'MEASURED' : 'UNKNOWN',
+          confidenceLabel: _confidenceLabel(edge),
         ),
       );
     }
@@ -182,6 +186,28 @@ class LocalRouteEngine {
   String _lineIdFromNode(String nodeId) {
     final parts = nodeId.split(':');
     return parts.length >= 2 ? parts[1] : '';
+  }
+
+  List<String> _evidenceSources(RouteEdge edge) {
+    return [
+      'edge:${edge.id}',
+      if (edge.lineId.isNotEmpty) 'line:${edge.lineId}',
+    ];
+  }
+
+  String _confidenceLabel(RouteEdge edge) {
+    if (edge.isDataStale ||
+        edge.accessibilityState == RouteAccessibilityState.unknown ||
+        edge.stairAccessState == RouteStairAccessState.unknown) {
+      return '확인 필요';
+    }
+    if (edge.reliabilityScore >= 80) {
+      return '높은 신뢰도';
+    }
+    if (edge.reliabilityScore >= 60) {
+      return '보통 신뢰도';
+    }
+    return '낮은 신뢰도';
   }
 
   String _warningMessage(String code) {
