@@ -335,6 +335,52 @@ void main() {
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
 
+  test('base entry가 사용 불가이면 service pattern entry로 우회하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'entry-a-line-test-unavailable',
+          'station-a',
+          'station-a:line-test',
+          90,
+          'ENTRY',
+          '',
+          'UNAVAILABLE',
+          95
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+  });
+
   test('급행 pattern은 미정차역을 경유한 것처럼 연결하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -529,6 +575,68 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
+  });
+
+  test('service pattern ride 뒤 base explicit transfer를 사용할 수 있다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'edge-b-a-line-test-local',
+          'station-b:line-test:LOCAL',
+          'station-a:line-test:LOCAL',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'transfer-a-test-alt-available',
+          'station-a:line-test',
+          'station-a:line-alt',
+          140,
+          'TRANSFER',
+          '',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-line-alt',
+          'station-a:line-alt',
+          'station-c:line-alt',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(
+      result.steps
+          .map((step) => step.lineId)
+          .where((id) => id.isNotEmpty)
+          .toSet(),
+      {'line-test', 'line-alt'},
+    );
   });
 
   test(
