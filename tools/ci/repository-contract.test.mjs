@@ -2133,6 +2133,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcPushNotificationOutboxRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
+  const pushProcessingMigration = read(
+    "backend/src/main/resources/db/migration/postgresql/V6__push_notification_processing_claim.sql",
+  );
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
   const dashboardController = read(
     "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
@@ -2197,7 +2200,8 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(jdbcRepository, /List<PushNotification> loadPushNotifications\(String userId\)/);
   assert.match(jdbcRepository, /PushNotification savePushNotification\(PushNotification notification\)/);
   assert.match(jdbcRepository, /boolean claimPendingPushNotification\(PushNotification notification\)/);
-  assert.match(jdbcRepository, /UPDATE push_notification_outbox[\s\S]*SET status = \?[\s\S]*WHERE notification_id = \?[\s\S]*AND status = \?/);
+  assert.match(jdbcRepository, /processing_claimed_at = \?/);
+  assert.match(jdbcRepository, /processing_claimed_at < \?/);
   assert.match(jdbcRepository, /PushNotificationDashboardSummary summarizePushNotificationOutbox\(\)/);
   assert.match(jdbcRepository, /int deletePushNotifications\(String userId\)/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS push_notification_outbox/);
@@ -2205,7 +2209,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_platform/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_type/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_status/);
-  assert.match(batchPostgresSchema, /status IN \('PENDING', 'PROCESSING', 'SENT', 'FAILED'\)/);
+  assert.match(pushProcessingMigration, /ADD COLUMN IF NOT EXISTS processing_claimed_at TIMESTAMP/);
+  assert.match(pushProcessingMigration, /DROP CONSTRAINT IF EXISTS chk_push_notification_outbox_status/);
+  assert.match(pushProcessingMigration, /status IN \('PENDING', 'PROCESSING', 'SENT', 'FAILED'\)/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_failure_reason/);
   assert.match(batchPostgresSchema, /failure_reason IS NULL OR status = 'FAILED'/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_push_notification_outbox_user_created/);
