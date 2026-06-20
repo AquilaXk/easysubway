@@ -226,6 +226,18 @@ void main() {
       validManifest.packs.single.artifactKind,
       DataPackArtifactKind.production,
     );
+    final uppercaseHostManifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [
+        _productionPack(
+          url: 'https://CDN.easysubway.example/catalog/capital-v18.sqlite.gz',
+        ),
+      ],
+    }, productionSigningPublicKey: _productionSigningPublicKey);
+    expect(
+      uppercaseHostManifest.packs.single.url.toString(),
+      'https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz',
+    );
 
     expect(
       () => DataPackManifest.fromJson({

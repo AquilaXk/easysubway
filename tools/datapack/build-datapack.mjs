@@ -86,7 +86,7 @@ function outputPathForPack(outputDir, packUrl, pack) {
 
 function validatePackUrl(packUrl, label) {
   requiredString(packUrl, label);
-  if (/%(?:2e|2f|5c)/i.test(packUrl)) {
+  if (/%[0-9a-f]{2}/i.test(packUrl)) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
   }
   if (/^https:\/\//.test(packUrl)) {
@@ -141,7 +141,11 @@ function fixtureSignaturePayload(pack) {
 }
 
 function productionSignaturePayload(pack) {
-  return `${fixtureSignaturePayload(pack)}:${pack.url}`;
+  return `${fixtureSignaturePayload(pack)}:${canonicalProductionPackUrl(pack.url)}`;
+}
+
+function canonicalProductionPackUrl(packUrl) {
+  return new URL(packUrl).toString();
 }
 
 function signingPrivateKey() {

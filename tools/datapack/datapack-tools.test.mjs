@@ -334,7 +334,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
 
   const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   fixture.packs[0].artifactKind = "production";
-  fixture.packs[0].url = "https://cdn.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
+  fixture.packs[0].url = "https://CDN.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
   fixture.packs[0].sourceInventory = [
     {
       id: "capital-official-stations",
@@ -366,7 +366,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   assert.equal(
     manifest.packs[0].url,
-    "https://cdn.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz",
+    "https://CDN.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz",
   );
   await execFileAsync(
     process.execPath,
@@ -416,7 +416,7 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
     /pack.url absolute HTTPS URL path must end with catalog\/capital-v1\.sqlite\.gz/,
   );
 
-  manifest.packs[0].url = "https://cdn.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
+  manifest.packs[0].url = "https://CDN.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
   manifest.packs[0].sourceInventory[0].url = "https://";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
