@@ -725,9 +725,9 @@ class RouteSearchStep {
     this.actionDetail = '',
     this.reason = '',
     this.evidenceSources = const [],
-    this.timeSource = 'UNKNOWN',
-    this.distanceSource = 'UNKNOWN',
-    this.confidenceLabel = '확인 필요',
+    this.timeSource = '',
+    this.distanceSource = '',
+    this.confidenceLabel = '',
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -757,15 +757,9 @@ class RouteSearchStep {
         json['evidenceSources'],
         'route step evidence source',
       ),
-      timeSource: _optionalRouteString(json, 'timeSource').isEmpty
-          ? 'UNKNOWN'
-          : _optionalRouteString(json, 'timeSource'),
-      distanceSource: _optionalRouteString(json, 'distanceSource').isEmpty
-          ? 'UNKNOWN'
-          : _optionalRouteString(json, 'distanceSource'),
-      confidenceLabel: _optionalRouteString(json, 'confidenceLabel').isEmpty
-          ? '확인 필요'
-          : _optionalRouteString(json, 'confidenceLabel'),
+      timeSource: _optionalRouteString(json, 'timeSource'),
+      distanceSource: _optionalRouteString(json, 'distanceSource'),
+      confidenceLabel: _optionalRouteString(json, 'confidenceLabel'),
     );
   }
 
@@ -804,15 +798,24 @@ class RouteSearchStep {
       actionDetail.isEmpty ? description : actionDetail,
       if (reason.isNotEmpty) reason,
       burdenLabel,
-      '시간 ${_routeTimeSourceLabel(timeSource)}',
-      '거리 ${_routeDistanceSourceLabel(distanceSource)}',
-      confidenceLabel,
+      if (hasMetricSourceMetadata) '시간 ${_routeTimeSourceLabel(timeSource)}',
+      if (hasMetricSourceMetadata)
+        '거리 ${_routeDistanceSourceLabel(distanceSource)}',
+      if (hasMetricSourceMetadata) confidenceLabel,
       if (evidenceSources.isNotEmpty) '근거 ${evidenceSources.join(', ')}',
     ];
     return labels.join(', ');
   }
 
+  bool get hasMetricSourceMetadata =>
+      timeSource.isNotEmpty ||
+      distanceSource.isNotEmpty ||
+      confidenceLabel.isNotEmpty;
+
   String get metricSourceLabel {
+    if (!hasMetricSourceMetadata) {
+      return '';
+    }
     return [
       '시간 ${_routeTimeSourceLabel(timeSource)}',
       '거리 ${_routeDistanceSourceLabel(distanceSource)}',
@@ -2334,15 +2337,17 @@ class _RouteStepTile extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 4),
-                Text(
-                  step.metricSourceLabel,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF29484B),
-                    fontWeight: FontWeight.w800,
-                    height: 1.3,
+                if (step.hasMetricSourceMetadata) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    step.metricSourceLabel,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF29484B),
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
