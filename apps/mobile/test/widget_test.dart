@@ -3361,6 +3361,12 @@ void main() {
       expect(find.text('2번 출구의 엘리베이터를 먼저 확인하세요.'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
+      expect(find.text('열차 이동'), findsOneWidget);
+      expect(
+        find.text('선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.'),
+        findsOneWidget,
+      );
+      expect(find.text('시간 정적 추정 · 거리 측정값 · 높은 신뢰도'), findsOneWidget);
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
@@ -3383,7 +3389,7 @@ void main() {
           '추천 이유 엘리베이터 동선을 우선했어요, 계단 없는 출구를 확인했어요, 천천히 이동하기 쉬운 동선을 확인했어요, '
           '도착 안내 2번 출구의 엘리베이터를 먼저 확인하세요., '
           '주의 일부 시설 정보는 확인이 필요합니다., 접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요., '
-          '이동 안내 1번 상록수역에서 4호선 승강장으로 이동, 약 4분 · 180m · 접근성 확인, 엘리베이터를 이용해 승강장으로 이동합니다., '
+          '이동 안내 1번 열차 이동, 엘리베이터를 이용해 승강장으로 이동합니다., 선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다., 약 4분 · 180m · 접근성 확인, 시간 정적 추정, 거리 측정값, 높은 신뢰도, 근거 edge:edge-sangnoksu-sadang, '
           '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
         ),
         findsOneWidget,
@@ -6538,6 +6544,13 @@ RouteSearchResult _sampleRouteSearchResult({
         distanceMeters: 180,
         includesStairs: false,
         requiresAccessibilityCheck: true,
+        actionTitle: '열차 이동',
+        actionDetail: '엘리베이터를 이용해 승강장으로 이동합니다.',
+        reason: '선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.',
+        evidenceSources: ['edge:edge-sangnoksu-sadang'],
+        timeSource: 'STATIC_ESTIMATE',
+        distanceSource: 'MEASURED',
+        confidenceLabel: '높은 신뢰도',
       ),
       RouteSearchStep(
         sequence: 2,
