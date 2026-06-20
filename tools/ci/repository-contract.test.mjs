@@ -393,7 +393,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_DATA_PACK_BASE_URL=http:\/\/localhost:9000\/easysubway-datapacks$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_API_BASE_URL=http:\/\/localhost:8080$/m);
-  assert.match(envExample, /^EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_RECEIPT_PEPPER=$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900$/m);
@@ -409,7 +409,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
   assert.doesNotMatch(envExample, /prod|production/i);
-  assert.doesNotMatch(envExample, /^EASYSUBWAY_(REPORT_RECEIPT_TOKEN_PEPPER|OBJECT_STORAGE_SECRET_KEY|DATAPACK_SIGNING_KEY)=.+$/m);
+  assert.doesNotMatch(envExample, /^EASYSUBWAY_(REPORT_RECEIPT_PEPPER|OBJECT_STORAGE_SECRET_KEY|DATAPACK_SIGNING_KEY)=.+$/m);
 });
 
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
@@ -1749,6 +1749,9 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   const reportUseCase = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java");
   const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
   const reportController = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+  const uploadIntents = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntents.java");
+  const uploadUrlSigner = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportUploadUrlSigner.java");
+  const applicationProd = read("backend/src/main/resources/application-prod.yml");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const routeControllerPath = "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java";
 
@@ -1758,12 +1761,31 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.doesNotMatch(security, /"\/api\/v1\/routes\/\*\/feedback"/);
   assert.match(reportUseCase, /getUserReport\(String reportId, String userId\)/);
   assert.match(reportUseCase, /getReportByReceiptToken\(String reportId, String receiptToken\)/);
+  assert.match(reportUseCase, /confirmReportResultByReceiptToken\(String reportId, String receiptToken\)/);
   assert.match(reportService, /getUserReport\(String reportId, String userId\)/);
   assert.match(reportService, /getReportByReceiptToken\(String reportId, String receiptToken\)/);
+  assert.match(reportService, /confirmReportResultByReceiptToken\(String reportId, String receiptToken\)/);
   assert.match(reportService, /requireReportOwner\(report, userId\)/);
   assert.match(reportController, /report\(\s*@PathVariable String reportId,\s*Principal principal,\s*@RequestHeader\(name = "X-Easysubway-Report-Receipt-Token"/);
+  assert.match(reportController, /confirmReportResult\(\s*@PathVariable String reportId,\s*Principal principal,\s*@RequestHeader\(name = "X-Easysubway-Report-Receipt-Token"/);
   assert.match(reportController, /facilityReportUseCase\.getReportByReceiptToken\(reportId, receiptToken\)/);
   assert.match(reportController, /facilityReportUseCase\.getUserReport\(reportId, principal\.getName\(\)\)/);
+  assert.match(reportController, /facilityReportUseCase\.confirmReportResultByReceiptToken\(reportId, receiptToken\)/);
+  assert.match(reportController, /environment\.getActiveProfiles\(\)[\s\S]*contains\("prod"\)/);
+  assert.match(reportController, /"content-type", request\.normalizedPhotoContentType\(\)/);
+  assert.match(reportController, /@RequestHeader\(name = "Content-Type", required = false\) String contentType/);
+  assert.match(reportController, /uploadIntents\.requireUpload\(\s*uploadId,\s*contentType,/);
+  assert.match(uploadIntents, /OBJECT_KEY_PREFIX = "facility-reports\/unclaimed\/"/);
+  assert.match(uploadIntents, /cleanupExpired/);
+  assert.match(uploadIntents, /maxPendingCount/);
+  assert.match(uploadIntents, /maxPendingBytes/);
+  assert.match(uploadIntents, /record UploadIntent\(String uploadId, String objectKey, String contentType,/);
+  assert.match(uploadIntents, /intent\.contentType\(\)\.equals\(contentType == null \? null : contentType\.trim\(\)\.toLowerCase\(Locale\.ROOT\)\)/);
+  assert.match(uploadUrlSigner, /@Profile\("prod"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
+  assert.match(uploadUrlSigner, /signature=/);
+  assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\}/);
+  assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_OBJECT_STORAGE_ENDPOINT:\}/);
+  assert.match(applicationProd, /object-storage-secret-key: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:\}/);
   assert.doesNotMatch(reportController, /myReports|\/api\/v1\/me\/reports/);
   assert.match(reportController, /record PageResponse<T>/);
   assert.match(reportController, /record FacilityReportStatusResponse\([^)]*String id,[^)]*String stationId,[^)]*String facilityId,[^)]*FacilityReportType reportType,[^)]*FacilityReportStatus status,[^)]*LocalDateTime createdAt,[^)]*LocalDateTime reviewedAt/);
