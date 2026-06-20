@@ -744,6 +744,55 @@ void main() {
     );
   });
 
+  test('같은 역의 base node와 service pattern node를 연결해 혼합 경로를 찾는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'edge-a-b-base',
+          'station-a:line-test',
+          'station-b:line-test',
+          90,
+          'RIDE',
+          '',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-b-c-local',
+          'station-b:line-test:LOCAL',
+          'station-c:line-test:LOCAL',
+          90,
+          'RIDE',
+          'LOCAL',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+    expect(
+      result.steps.map((step) => step.lineId).where((id) => id.isNotEmpty),
+      everyElement('line-test'),
+    );
+  });
+
   test('단방향 explicit transfer가 역방향 환승 경로를 제거하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
