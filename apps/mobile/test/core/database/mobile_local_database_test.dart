@@ -114,6 +114,11 @@ void main() {
           FROM facilities
           WHERE station_id = 'station-sangnoksu'
           ''').get();
+    final networkEdges = await database.customSelect('''
+          SELECT id, edge_type
+          FROM network_edges
+          ORDER BY id
+          ''').get();
 
     expect(metadata.read<String>('value'), '1');
     expect(stations.map((row) => row.read<String>('name_ko')).toList(), [
@@ -134,6 +139,10 @@ void main() {
     expect(exits.single.read<String>('exit_number'), '1');
     expect(facilities.single.read<String>('type'), 'ELEVATOR');
     expect(facilities.single.read<String>('name'), '1번 출구 엘리베이터');
+    expect(networkEdges, hasLength(2));
+    expect(networkEdges.map((row) => row.read<String>('edge_type')).toSet(), {
+      'RIDE',
+    });
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
       isTrue,
