@@ -75,6 +75,25 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('휠체어 조건은 미확인 접근성 edge를 안전한 경로로 사용하지 않는다', () {
+      final engine = LocalRouteEngine(
+        graph: _unknownAccessibilityFixtureGraph(),
+      );
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.blockedReasonCodes, ['ACCESSIBILITY_STATE_UNKNOWN']);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('낮은 신뢰도와 오래된 데이터는 경고 코드와 비용에 반영한다', () {
       final engine = LocalRouteEngine(graph: _lowQualityFixtureGraph());
 
@@ -230,6 +249,48 @@ NetworkGraph _stairOnlyFixtureGraph() {
         type: RouteEdgeType.exit,
         baseCost: 45,
         includesStairs: true,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _unknownAccessibilityFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sangnoksu-unknown-elevator',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        accessibilityState: RouteAccessibilityState.unknown,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
       ),
     ],
   );

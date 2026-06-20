@@ -21,12 +21,22 @@ class AccessibilityCostCalculator {
     final weight = RouteWeight.from(mobilityType);
     final warningCodes = <String>[];
 
-    if (!edge.isAvailable) {
+    if (edge.accessibilityState == RouteAccessibilityState.unavailable) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,
         warningCodes: ['FACILITY_UNAVAILABLE'],
       );
+    }
+    if (edge.accessibilityState == RouteAccessibilityState.unknown) {
+      if (mobilityType.blocksStairOnlyAccess) {
+        return const AccessibilityCost(
+          cost: 0,
+          isBlocked: true,
+          warningCodes: ['ACCESSIBILITY_STATE_UNKNOWN'],
+        );
+      }
+      warningCodes.add('ACCESSIBILITY_STATE_UNKNOWN');
     }
 
     if (edge.includesStairs && mobilityType.blocksStairOnlyAccess) {
@@ -44,6 +54,9 @@ class AccessibilityCostCalculator {
     if (edge.includesStairs) {
       cost += weight.stairOnlyAccessPenalty;
       warningCodes.add('STAIR_ONLY_ACCESS');
+    }
+    if (edge.accessibilityState == RouteAccessibilityState.unknown) {
+      cost += weight.lowDataConfidencePenalty;
     }
     if (edge.reliabilityScore < 80) {
       cost += weight.lowDataConfidencePenalty;
