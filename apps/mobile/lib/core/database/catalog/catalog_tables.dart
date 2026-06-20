@@ -101,6 +101,17 @@ class NetworkEdges extends Table {
       integer().named('duration_seconds').withDefault(const Constant(0))();
   TextColumn get edgeType =>
       text().named('edge_type').withDefault(const Constant('WALK'))();
+  TextColumn get servicePattern =>
+      text().named('service_pattern').withDefault(const Constant(''))();
+  BoolColumn get includesStairs =>
+      boolean().named('includes_stairs').withDefault(const Constant(false))();
+  TextColumn get accessibilityStatus => text()
+      .named('accessibility_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  IntColumn get reliabilityScore =>
+      integer().named('reliability_score').withDefault(const Constant(100))();
+  DateTimeColumn get lastVerifiedAt =>
+      dateTime().named('last_verified_at').nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
