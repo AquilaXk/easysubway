@@ -27,6 +27,14 @@ class DataPackInstaller {
     bool activateCurrent = true,
   }) async {
     await catalogDirectory.create(recursive: true);
+    final expectedSizeBytes = pack.sizeBytes;
+    if (expectedSizeBytes != null &&
+        compressedBytes.length != expectedSizeBytes) {
+      return const DataPackInstallResult(
+        status: DataPackInstallStatus.rejected,
+        reason: DataPackInstallRejectionReason.sizeBytesMismatch,
+      );
+    }
     final compressedHash = sha256.convert(compressedBytes).toString();
     if (compressedHash != pack.compressedSha256) {
       return const DataPackInstallResult(
@@ -246,6 +254,7 @@ enum DataPackInstallStatus { installed, rejected }
 
 enum DataPackInstallRejectionReason {
   invalidArchive,
+  sizeBytesMismatch,
   sha256Mismatch,
   sqliteSha256Mismatch,
   invalidSqliteHeader,
