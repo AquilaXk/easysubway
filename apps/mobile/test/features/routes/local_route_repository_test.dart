@@ -547,6 +547,73 @@ void main() {
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
 
+  test('사용 불가 edge는 연결 시설 확인 필요 상태로 약화하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'CHECK_REQUIRED',
+        'B1',
+        '1F',
+        '확인 필요'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'UNAVAILABLE',
+          95,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+  });
+
   test('시설 품질 레코드는 연결된 edge의 신뢰도와 갱신 시각으로 전파된다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
