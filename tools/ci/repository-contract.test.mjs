@@ -1752,6 +1752,7 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   const reportController = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
   const uploadIntents = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntents.java");
   const uploadUrlSigner = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportUploadUrlSigner.java");
+  const objectStorage = read("backend/src/main/java/com/easysubway/report/adapter/out/storage/ObjectStorageFacilityReportPhotoStorage.java");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const routeControllerPath = "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java";
@@ -1780,13 +1781,18 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(uploadIntents, /cleanupExpired/);
   assert.match(uploadIntents, /maxPendingCount/);
   assert.match(uploadIntents, /maxPendingBytes/);
-  assert.match(uploadIntents, /record UploadIntent\(String uploadId, String objectKey, String contentType,/);
+  assert.match(uploadIntents, /String normalizedClientSubmissionId = clientSubmissionId\.trim\(\)/);
+  assert.match(uploadIntents, /record UploadIntent\([\s\S]*String uploadId,[\s\S]*String clientSubmissionId,[\s\S]*String objectKey,/);
+  assert.match(uploadIntents, /pendingCount\(String clientSubmissionId\)/);
   assert.match(uploadIntents, /intent\.contentType\(\)\.equals\(contentType == null \? null : contentType\.trim\(\)\.toLowerCase\(Locale\.ROOT\)\)/);
   assert.match(uploadIntents, /void consumeObjectKey\(String objectKey\)/);
   assert.match(uploadUrlSigner, /@Profile\("prod"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
   assert.match(uploadUrlSigner, /AWS4-HMAC-SHA256/);
   assert.match(uploadUrlSigner, /X-Amz-Credential/);
   assert.match(uploadUrlSigner, /X-Amz-SignedHeaders/);
+  assert.match(objectStorage, /@Profile\("prod"\)/);
+  assert.match(objectStorage, /implements[\s\S]*StoreFacilityReportPhotoPort,[\s\S]*LoadFacilityReportPhotoPort,[\s\S]*DeleteFacilityReportPhotoPort,[\s\S]*StoreFacilityReportUploadedPhotoPort/);
+  assert.match(objectStorage, /HttpRequest signedRequest\(String method, String objectKey, String contentType, byte\[] body\)/);
   assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\}/);
   assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_OBJECT_STORAGE_ENDPOINT:\}/);
   assert.match(applicationProd, /object-storage-access-key: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:\}/);
