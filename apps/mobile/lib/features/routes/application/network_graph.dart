@@ -23,6 +23,7 @@ class RouteEdge {
     required this.toNodeId,
     required this.type,
     required this.baseCost,
+    int? durationSeconds,
     this.distanceMeters = 0,
     this.lineId = '',
     this.transferStationId = '',
@@ -33,7 +34,8 @@ class RouteEdge {
     RouteAccessibilityState accessibilityState =
         RouteAccessibilityState.available,
     bool? isAvailable,
-  }) : stairAccessState =
+  }) : durationSeconds = durationSeconds ?? baseCost,
+       stairAccessState =
            stairAccessState ??
            (includesStairs == true
                ? RouteStairAccessState.stairOnly
@@ -54,6 +56,7 @@ class RouteEdge {
   final String toNodeId;
   final RouteEdgeType type;
   final int baseCost;
+  final int durationSeconds;
   final int distanceMeters;
   final String lineId;
   final String transferStationId;

@@ -52,7 +52,7 @@ class LocalRouteEngine {
           toNodeId: edge.toNodeId,
           type: _stepType(edge.type),
           cost: accessCost.cost,
-          durationSeconds: edge.baseCost,
+          durationSeconds: edge.durationSeconds,
           distanceMeters: edge.distanceMeters,
           lineId: edge.lineId,
           transferStationId: _transferStationId(edge),
