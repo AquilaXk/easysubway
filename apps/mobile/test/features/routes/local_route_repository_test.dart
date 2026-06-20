@@ -70,6 +70,46 @@ void main() {
     expect(reasons, contains('현장 안내'));
   });
 
+  test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, accessibility_status, reliability_score
+      )
+      VALUES (
+        'edge-a-b-local',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        120,
+        'RIDE',
+        'LOCAL',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    const unusedEvidenceClaim = '차단된 계단 구간은 제외했습니다.';
+    expect(result.status, 'FOUND');
+    expect(result.steps.any((step) => step.includesStairs), isFalse);
+    expect(
+      result.recommendationReasons.join('\n'),
+      isNot(contains(unusedEvidenceClaim)),
+    );
+    expect(result.semanticLabel, isNot(contains(unusedEvidenceClaim)));
+  });
+
   test('로컬 catalog가 모르는 역 경로는 API fallback 없이 차단 결과를 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
