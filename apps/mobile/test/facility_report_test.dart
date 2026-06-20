@@ -628,19 +628,18 @@ void main() {
     expect(result.statusLabel, '반영됨');
   });
 
-  test('내 신고 API 저장소는 백엔드 계약에 맞춰 신고 목록을 조회한다', () async {
-    late String requestMethod;
-    late String requestPath;
-    late String? authorizationHeader;
+  test('내 신고 API 저장소는 로컬 receipt 목록으로 상태 조회 API만 호출한다', () async {
+    final requestPaths = <String>[];
+    final receiptTokens = <String?>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) {
-      requestMethod = request.method;
-      requestPath = request.uri.path;
-      authorizationHeader = request.headers.value(
-        HttpHeaders.authorizationHeader,
+      requestPaths.add(request.uri.path);
+      receiptTokens.add(
+        request.headers.value('X-Easysubway-Report-Receipt-Token'),
       );
+      final reportId = request.uri.pathSegments.last;
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
@@ -648,29 +647,19 @@ void main() {
           jsonEncode({
             'success': true,
             'data': {
-              'items': [
-                {
-                  'id': 'report-2',
-                  'stationId': 'station-sangnoksu',
-                  'facilityId': 'facility-sangnoksu-elevator-1',
-                  'reportType': 'CLOSED',
-                  'description': '출입문이 막혀 있습니다.',
-                  'status': 'ACCEPTED',
-                  'createdAt': '2026-06-15T09:00:00',
-                },
-                {
-                  'id': 'report-1',
-                  'stationId': 'station-sangnoksu',
-                  'facilityId': 'facility-sangnoksu-elevator-2',
-                  'reportType': 'BROKEN',
-                  'description': '버튼이 눌리지 않습니다.',
-                  'status': 'SUBMITTED',
-                  'createdAt': '2026-06-14T09:00:00',
-                },
-              ],
-              'page': 0,
-              'size': 20,
-              'hasNext': false,
+              'id': reportId,
+              'stationId': 'station-sangnoksu',
+              'facilityId': reportId == 'report-2'
+                  ? 'facility-sangnoksu-elevator-1'
+                  : 'facility-sangnoksu-elevator-2',
+              'reportType': reportId == 'report-2' ? 'CLOSED' : 'BROKEN',
+              'description': reportId == 'report-2'
+                  ? '출입문이 막혀 있습니다.'
+                  : '버튼이 눌리지 않습니다.',
+              'status': reportId == 'report-2' ? 'ACCEPTED' : 'SUBMITTED',
+              'createdAt': reportId == 'report-2'
+                  ? '2026-06-15T09:00:00'
+                  : '2026-06-14T09:00:00',
             },
           }),
         )
@@ -679,80 +668,46 @@ void main() {
 
     final repository = FacilityReportApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      authProvider: const BasicAuthorizationHeaderProvider(
-        username: 'anonymous-user-1',
-        password: 'user-test-password',
-      ),
+      receiptStore: FakeFacilityReportReceiptStore({
+        'report-2': 'receipt-token-2',
+        'report-1': 'receipt-token-1',
+      }),
     );
 
     final reports = await repository.listMyReports();
 
-    expect(requestMethod, 'GET');
-    expect(requestPath, '/api/v1/me/reports');
-    expect(
-      authorizationHeader,
-      'Basic ${base64Encode(utf8.encode('anonymous-user-1:user-test-password'))}',
-    );
+    expect(requestPaths, [
+      '/api/v1/reports/report-2',
+      '/api/v1/reports/report-1',
+    ]);
+    expect(receiptTokens, ['receipt-token-2', 'receipt-token-1']);
     expect(reports, hasLength(2));
     expect(reports.first.id, 'report-2');
     expect(reports.first.statusLabel, '반영됨');
     expect(reports.last.statusLabel, '접수됨');
   });
 
-  test('내 신고 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
-    final authorizationHeaders = <String?>[];
+  test('내 신고 API 저장소는 receipt가 없으면 목록 조회 네트워크를 호출하지 않는다', () async {
     var requestCount = 0;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
     server.listen((request) {
       requestCount++;
-      authorizationHeaders.add(
-        request.headers.value(HttpHeaders.authorizationHeader),
-      );
-      request.response.headers.contentType = ContentType.json;
-
-      if (requestCount == 1) {
-        request.response
-          ..statusCode = HttpStatus.unauthorized
-          ..write(jsonEncode({'success': false}))
-          ..close();
-        return;
-      }
-
       request.response
-        ..statusCode = HttpStatus.ok
-        ..write(
-          jsonEncode({
-            'success': true,
-            'data': [
-              {
-                'id': 'report-1',
-                'stationId': 'station-sangnoksu',
-                'facilityId': 'facility-sangnoksu-elevator-1',
-                'reportType': 'BROKEN',
-                'description': '문이 열리지 않습니다.',
-                'status': 'SUBMITTED',
-                'createdAt': '2026-06-13T10:00:00',
-              },
-            ],
-          }),
-        )
+        ..statusCode = HttpStatus.internalServerError
         ..close();
     });
 
-    final authProvider = RetryAuthorizationHeaderProvider();
     final repository = FacilityReportApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      authProvider: authProvider,
+      receiptStore: FakeFacilityReportReceiptStore(),
     );
 
     final reports = await repository.listMyReports();
 
-    expect(reports.single.id, 'report-1');
-    expect(authorizationHeaders, ['Basic stale-token', 'Basic fresh-token']);
-    expect(authProvider.authorizationCount, 2);
-    expect(authProvider.invalidateCount, 1);
+    expect(reports, isEmpty);
+    expect(requestCount, 0);
   });
 
   test('시설 신고 API 저장소는 상태 조회 실패를 전용 안내 문구로 바꾼다', () async {
@@ -1019,6 +974,20 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
   @override
   Future<String?> receiptTokenForReport(String reportId) async {
     return _receiptTokens[reportId];
+  }
+
+  @override
+  Future<List<FacilityReportReceipt>> listReceipts() async {
+    return [
+      for (final entry in _receiptTokens.entries)
+        FacilityReportReceipt(
+          receiptId: entry.key,
+          reportId: entry.key,
+          status: 'SUBMITTED',
+          receiptToken: entry.value,
+          createdAt: DateTime(2026, 6, 13, 10),
+        ),
+    ];
   }
 }
 

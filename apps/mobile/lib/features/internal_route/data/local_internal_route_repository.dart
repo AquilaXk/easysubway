@@ -165,36 +165,20 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
 }
 
 class FallbackInternalRouteRepository implements InternalRouteRepository {
-  const FallbackInternalRouteRepository({
-    required this.localRepository,
-    required this.apiRepository,
-  });
+  const FallbackInternalRouteRepository({required this.localRepository});
 
   final LocalInternalRouteRepository localRepository;
-  final InternalRouteRepository apiRepository;
 
   @override
   Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
-    final localNodes = await localRepository.listRouteNodes(stationId);
-    if (localNodes.isEmpty) {
-      return apiRepository.listRouteNodes(stationId);
-    }
-    return localNodes;
+    return localRepository.listRouteNodes(stationId);
   }
 
   @override
   Future<InternalRouteResult> searchInternalRoute(
     InternalRouteRequest request,
   ) async {
-    if (!await localRepository.hasRouteNodes(request.stationId)) {
-      return apiRepository.searchInternalRoute(request);
-    }
-
-    final localResult = await localRepository.searchInternalRoute(request);
-    if (localResult.isBlocked) {
-      return apiRepository.searchInternalRoute(request);
-    }
-    return localResult;
+    return localRepository.searchInternalRoute(request);
   }
 }
 
