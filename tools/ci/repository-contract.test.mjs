@@ -1793,7 +1793,7 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(objectStorage, /@Profile\("prod"\)/);
   assert.match(objectStorage, /implements[\s\S]*StoreFacilityReportPhotoPort,[\s\S]*LoadFacilityReportPhotoPort,[\s\S]*DeleteFacilityReportPhotoPort,[\s\S]*StoreFacilityReportUploadedPhotoPort/);
   assert.match(objectStorage, /HttpRequest signedRequest\(String method, String objectKey, String contentType, byte\[] body\)/);
-  assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\}/);
+  assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\$\{EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER:\}\}/);
   assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_OBJECT_STORAGE_ENDPOINT:\}/);
   assert.match(applicationProd, /object-storage-access-key: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:\}/);
   assert.match(applicationProd, /object-storage-secret-key: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:\}/);
