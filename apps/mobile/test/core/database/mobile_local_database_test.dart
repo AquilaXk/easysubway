@@ -115,7 +115,9 @@ void main() {
           WHERE station_id = 'station-sangnoksu'
           ''').get();
     final networkEdges = await database.customSelect('''
-          SELECT id, from_node_id, to_node_id, edge_type
+          SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
+                 includes_stairs, accessibility_status, reliability_score,
+                 last_verified_at
           FROM network_edges
           ORDER BY id
           ''').get();
@@ -143,6 +145,28 @@ void main() {
     expect(networkEdges.map((row) => row.read<String>('edge_type')).toSet(), {
       'RIDE',
     });
+    expect(
+      networkEdges.map((row) => row.read<String>('service_pattern')).toSet(),
+      {'LOCAL'},
+    );
+    expect(
+      networkEdges.map((row) => row.read<bool>('includes_stairs')).toSet(),
+      {false},
+    );
+    expect(
+      networkEdges
+          .map((row) => row.read<String>('accessibility_status'))
+          .toSet(),
+      {'AVAILABLE'},
+    );
+    expect(
+      networkEdges.map((row) => row.read<int>('reliability_score')).toSet(),
+      {90},
+    );
+    expect(
+      networkEdges.map((row) => row.read<int>('last_verified_at')).toSet(),
+      {1781827200},
+    );
     expect(
       networkEdges
           .map(

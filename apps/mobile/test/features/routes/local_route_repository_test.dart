@@ -138,6 +138,118 @@ void main() {
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
   });
+
+  test('사용 불가 접근성 edge는 이동 가능 경로로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        accessibility_status
+      )
+      VALUES (
+        'edge-a-c-elevator-down',
+        'station-a:line-test',
+        'station-c:line-test',
+        180,
+        'RIDE',
+        'UNAVAILABLE'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.steps, isEmpty);
+  });
+
+  test('확인되지 않은 접근성 edge는 이동 가능 단정 없이 경고를 노출한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        accessibility_status
+      )
+      VALUES (
+        'edge-a-c-unknown-access',
+        'station-a:line-test',
+        'station-c:line-test',
+        180,
+        'RIDE',
+        'UNKNOWN'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.warnings.map((warning) => warning.code), {
+      'LOW_DATA_CONFIDENCE',
+      'STALE_ACCESSIBILITY_DATA',
+    });
+    expect(result.recommendationReasons.join('\n'), isNot(contains('확인했어요')));
+  });
+
+  test('구형 catalog의 network_edges는 안전 기본값으로 읽는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('DROP TABLE network_edges');
+    await database.customStatement('''
+      CREATE TABLE network_edges (
+        id TEXT NOT NULL PRIMARY KEY,
+        from_node_id TEXT NOT NULL,
+        to_node_id TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        edge_type TEXT NOT NULL DEFAULT 'WALK'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type
+      )
+      VALUES (
+        'edge-a-c-legacy',
+        'station-a:line-test',
+        'station-c:line-test',
+        180,
+        'RIDE'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.warnings.map((warning) => warning.code), {
+      'LOW_DATA_CONFIDENCE',
+      'STALE_ACCESSIBILITY_DATA',
+    });
+  });
 }
 
 Future<void> _seedLineWithoutNetworkEdges(CatalogDatabase database) async {

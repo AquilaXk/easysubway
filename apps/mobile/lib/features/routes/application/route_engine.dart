@@ -15,13 +15,19 @@ class LocalRouteEngine {
   final AccessibilityCostCalculator costCalculator;
 
   LocalRouteResult search(RouteRequest request) {
+    final blockedReasonCodes = <String>{};
     final path = _findLowestCostPath(
       request.originStationId,
       request.destinationStationId,
       request.mobilityType,
+      blockedReasonCodes,
     );
     if (path == null) {
-      return LocalRouteResult.blocked(const ['STAIR_ONLY_ACCESS']);
+      return LocalRouteResult.blocked(
+        blockedReasonCodes.isEmpty
+            ? const ['STAIR_ONLY_ACCESS']
+            : blockedReasonCodes.toList(growable: false),
+      );
     }
 
     final weight = RouteWeight.from(request.mobilityType);
@@ -66,6 +72,7 @@ class LocalRouteEngine {
     String originNodeId,
     String destinationNodeId,
     MobilityType mobilityType,
+    Set<String> blockedReasonCodes,
   ) {
     final costs = <String, int>{originNodeId: 0};
     final previousNode = <String, String>{};
@@ -85,6 +92,7 @@ class LocalRouteEngine {
       for (final edge in graph.edgesFrom(current)) {
         final edgeCost = costCalculator.costFor(edge, mobilityType);
         if (edgeCost.isBlocked) {
+          blockedReasonCodes.addAll(edgeCost.warningCodes);
           continue;
         }
         final nextCost = costs[current]! + edgeCost.cost;
