@@ -179,6 +179,10 @@ class CatalogDatabase extends _$CatalogDatabase {
             toNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
             durationSeconds: const Value(420),
             edgeType: const Value('RIDE'),
+            servicePattern: const Value('LOCAL'),
+            accessibilityStatus: const Value('AVAILABLE'),
+            reliabilityScore: const Value(90),
+            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
           ),
           NetworkEdgesCompanion.insert(
             id: 'edge-sadang-sangnoksu-seoul-4',
@@ -186,6 +190,10 @@ class CatalogDatabase extends _$CatalogDatabase {
             toNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
             durationSeconds: const Value(420),
             edgeType: const Value('RIDE'),
+            servicePattern: const Value('LOCAL'),
+            accessibilityStatus: const Value('AVAILABLE'),
+            reliabilityScore: const Value(90),
+            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
           ),
         ]);
         batch.insertAllOnConflictUpdate(stationExits, [

@@ -204,8 +204,44 @@ class _RouteCatalogSnapshot {
           FROM station_lines
           ORDER BY line_id, line_sequence
           ''').get();
+    final networkEdgeColumns = await database
+        .customSelect('PRAGMA table_info(network_edges)')
+        .get();
+    final networkEdgeColumnNames = {
+      for (final row in networkEdgeColumns) row.read<String>('name'),
+    };
+    final servicePatternSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'service_pattern',
+      "''",
+    );
+    final includesStairsSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'includes_stairs',
+      '0',
+    );
+    final accessibilityStatusSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'accessibility_status',
+      "'UNKNOWN'",
+    );
+    final reliabilityScoreSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'reliability_score',
+      '100',
+    );
+    final lastVerifiedAtSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'last_verified_at',
+      'NULL',
+    );
     final networkEdgeRows = await database.customSelect('''
-          SELECT id, from_node_id, to_node_id, duration_seconds, edge_type
+          SELECT id, from_node_id, to_node_id, duration_seconds, edge_type,
+                 $servicePatternSql AS service_pattern,
+                 $includesStairsSql AS includes_stairs,
+                 $accessibilityStatusSql AS accessibility_status,
+                 $reliabilityScoreSql AS reliability_score,
+                 $lastVerifiedAtSql AS last_verified_at
           FROM network_edges
           ORDER BY id
           ''').get();
@@ -236,6 +272,11 @@ class _RouteCatalogSnapshot {
               toNodeId: row.read<String>('to_node_id'),
               durationSeconds: row.read<int>('duration_seconds'),
               edgeType: row.read<String>('edge_type'),
+              servicePattern: row.read<String>('service_pattern'),
+              includesStairs: row.read<int>('includes_stairs') != 0,
+              accessibilityStatus: row.read<String>('accessibility_status'),
+              reliabilityScore: row.read<int>('reliability_score'),
+              lastVerifiedAtSeconds: row.readNullable<int>('last_verified_at'),
             ),
           )
           .toList(growable: false),
@@ -290,6 +331,10 @@ class _RouteCatalogSnapshot {
               ? 60
               : networkEdge.durationSeconds,
           lineId: networkEdge.lineId,
+          includesStairs: networkEdge.includesStairs,
+          reliabilityScore: networkEdge.effectiveReliabilityScore,
+          isDataStale: networkEdge.isDataStale,
+          isAvailable: networkEdge.isAvailable,
         ),
       );
     }
@@ -344,6 +389,14 @@ class _RouteCatalogSnapshot {
   }
 }
 
+String _selectNetworkEdgeColumn(
+  Set<String> columnNames,
+  String columnName,
+  String fallbackExpression,
+) {
+  return columnNames.contains(columnName) ? columnName : fallbackExpression;
+}
+
 class _StationLineSnapshot {
   const _StationLineSnapshot({
     required this.stationId,
@@ -365,6 +418,11 @@ class _NetworkEdgeSnapshot {
     required this.toNodeId,
     required this.durationSeconds,
     required this.edgeType,
+    required this.servicePattern,
+    required this.includesStairs,
+    required this.accessibilityStatus,
+    required this.reliabilityScore,
+    required this.lastVerifiedAtSeconds,
   });
 
   final String id;
@@ -372,6 +430,11 @@ class _NetworkEdgeSnapshot {
   final String toNodeId;
   final int durationSeconds;
   final String edgeType;
+  final String servicePattern;
+  final bool includesStairs;
+  final String accessibilityStatus;
+  final int reliabilityScore;
+  final int? lastVerifiedAtSeconds;
 
   graph.RouteEdgeType? get routeEdgeType {
     return switch (edgeType.toUpperCase()) {
@@ -389,5 +452,33 @@ class _NetworkEdgeSnapshot {
       return '';
     }
     return parts[1];
+  }
+
+  String get _accessibilityStatusUpper => accessibilityStatus.toUpperCase();
+
+  bool get isAvailable => _accessibilityStatusUpper != 'UNAVAILABLE';
+
+  int get effectiveReliabilityScore {
+    if (_accessibilityStatusUpper == 'UNKNOWN' && reliabilityScore > 60) {
+      return 60;
+    }
+    return reliabilityScore;
+  }
+
+  bool get isDataStale {
+    if (_accessibilityStatusUpper == 'UNKNOWN') {
+      return true;
+    }
+    final verifiedAt = lastVerifiedAtSeconds;
+    if (verifiedAt == null) {
+      return false;
+    }
+    final verifiedDate = DateTime.fromMillisecondsSinceEpoch(
+      verifiedAt * 1000,
+      isUtc: true,
+    );
+    return verifiedDate.isBefore(
+      DateTime.now().toUtc().subtract(const Duration(days: 365)),
+    );
   }
 }

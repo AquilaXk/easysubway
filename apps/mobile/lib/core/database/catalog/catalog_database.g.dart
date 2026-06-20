@@ -2200,6 +2200,69 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant('WALK'),
   );
+  static const VerificationMeta _servicePatternMeta = const VerificationMeta(
+    'servicePattern',
+  );
+  @override
+  late final GeneratedColumn<String> servicePattern = GeneratedColumn<String>(
+    'service_pattern',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _includesStairsMeta = const VerificationMeta(
+    'includesStairs',
+  );
+  @override
+  late final GeneratedColumn<bool> includesStairs = GeneratedColumn<bool>(
+    'includes_stairs',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("includes_stairs" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _accessibilityStatusMeta =
+      const VerificationMeta('accessibilityStatus');
+  @override
+  late final GeneratedColumn<String> accessibilityStatus =
+      GeneratedColumn<String>(
+        'accessibility_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _reliabilityScoreMeta = const VerificationMeta(
+    'reliabilityScore',
+  );
+  @override
+  late final GeneratedColumn<int> reliabilityScore = GeneratedColumn<int>(
+    'reliability_score',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2207,6 +2270,11 @@ class $NetworkEdgesTable extends NetworkEdges
     toNodeId,
     durationSeconds,
     edgeType,
+    servicePattern,
+    includesStairs,
+    accessibilityStatus,
+    reliabilityScore,
+    lastVerifiedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2259,6 +2327,51 @@ class $NetworkEdgesTable extends NetworkEdges
         edgeType.isAcceptableOrUnknown(data['edge_type']!, _edgeTypeMeta),
       );
     }
+    if (data.containsKey('service_pattern')) {
+      context.handle(
+        _servicePatternMeta,
+        servicePattern.isAcceptableOrUnknown(
+          data['service_pattern']!,
+          _servicePatternMeta,
+        ),
+      );
+    }
+    if (data.containsKey('includes_stairs')) {
+      context.handle(
+        _includesStairsMeta,
+        includesStairs.isAcceptableOrUnknown(
+          data['includes_stairs']!,
+          _includesStairsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('accessibility_status')) {
+      context.handle(
+        _accessibilityStatusMeta,
+        accessibilityStatus.isAcceptableOrUnknown(
+          data['accessibility_status']!,
+          _accessibilityStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reliability_score')) {
+      context.handle(
+        _reliabilityScoreMeta,
+        reliabilityScore.isAcceptableOrUnknown(
+          data['reliability_score']!,
+          _reliabilityScoreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2288,6 +2401,26 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.string,
         data['${effectivePrefix}edge_type'],
       )!,
+      servicePattern: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_pattern'],
+      )!,
+      includesStairs: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}includes_stairs'],
+      )!,
+      accessibilityStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accessibility_status'],
+      )!,
+      reliabilityScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reliability_score'],
+      )!,
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
     );
   }
 
@@ -2303,12 +2436,22 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final String toNodeId;
   final int durationSeconds;
   final String edgeType;
+  final String servicePattern;
+  final bool includesStairs;
+  final String accessibilityStatus;
+  final int reliabilityScore;
+  final DateTime? lastVerifiedAt;
   const NetworkEdge({
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
     required this.durationSeconds,
     required this.edgeType,
+    required this.servicePattern,
+    required this.includesStairs,
+    required this.accessibilityStatus,
+    required this.reliabilityScore,
+    this.lastVerifiedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2318,6 +2461,13 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['to_node_id'] = Variable<String>(toNodeId);
     map['duration_seconds'] = Variable<int>(durationSeconds);
     map['edge_type'] = Variable<String>(edgeType);
+    map['service_pattern'] = Variable<String>(servicePattern);
+    map['includes_stairs'] = Variable<bool>(includesStairs);
+    map['accessibility_status'] = Variable<String>(accessibilityStatus);
+    map['reliability_score'] = Variable<int>(reliabilityScore);
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
     return map;
   }
 
@@ -2328,6 +2478,13 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       toNodeId: Value(toNodeId),
       durationSeconds: Value(durationSeconds),
       edgeType: Value(edgeType),
+      servicePattern: Value(servicePattern),
+      includesStairs: Value(includesStairs),
+      accessibilityStatus: Value(accessibilityStatus),
+      reliabilityScore: Value(reliabilityScore),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
     );
   }
 
@@ -2342,6 +2499,13 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       toNodeId: serializer.fromJson<String>(json['toNodeId']),
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
       edgeType: serializer.fromJson<String>(json['edgeType']),
+      servicePattern: serializer.fromJson<String>(json['servicePattern']),
+      includesStairs: serializer.fromJson<bool>(json['includesStairs']),
+      accessibilityStatus: serializer.fromJson<String>(
+        json['accessibilityStatus'],
+      ),
+      reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
     );
   }
   @override
@@ -2353,6 +2517,11 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'toNodeId': serializer.toJson<String>(toNodeId),
       'durationSeconds': serializer.toJson<int>(durationSeconds),
       'edgeType': serializer.toJson<String>(edgeType),
+      'servicePattern': serializer.toJson<String>(servicePattern),
+      'includesStairs': serializer.toJson<bool>(includesStairs),
+      'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
+      'reliabilityScore': serializer.toJson<int>(reliabilityScore),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
     };
   }
 
@@ -2362,12 +2531,24 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     String? toNodeId,
     int? durationSeconds,
     String? edgeType,
+    String? servicePattern,
+    bool? includesStairs,
+    String? accessibilityStatus,
+    int? reliabilityScore,
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
   }) => NetworkEdge(
     id: id ?? this.id,
     fromNodeId: fromNodeId ?? this.fromNodeId,
     toNodeId: toNodeId ?? this.toNodeId,
     durationSeconds: durationSeconds ?? this.durationSeconds,
     edgeType: edgeType ?? this.edgeType,
+    servicePattern: servicePattern ?? this.servicePattern,
+    includesStairs: includesStairs ?? this.includesStairs,
+    accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+    reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
   );
   NetworkEdge copyWithCompanion(NetworkEdgesCompanion data) {
     return NetworkEdge(
@@ -2380,6 +2561,21 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ? data.durationSeconds.value
           : this.durationSeconds,
       edgeType: data.edgeType.present ? data.edgeType.value : this.edgeType,
+      servicePattern: data.servicePattern.present
+          ? data.servicePattern.value
+          : this.servicePattern,
+      includesStairs: data.includesStairs.present
+          ? data.includesStairs.value
+          : this.includesStairs,
+      accessibilityStatus: data.accessibilityStatus.present
+          ? data.accessibilityStatus.value
+          : this.accessibilityStatus,
+      reliabilityScore: data.reliabilityScore.present
+          ? data.reliabilityScore.value
+          : this.reliabilityScore,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
     );
   }
 
@@ -2390,14 +2586,29 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('fromNodeId: $fromNodeId, ')
           ..write('toNodeId: $toNodeId, ')
           ..write('durationSeconds: $durationSeconds, ')
-          ..write('edgeType: $edgeType')
+          ..write('edgeType: $edgeType, ')
+          ..write('servicePattern: $servicePattern, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, fromNodeId, toNodeId, durationSeconds, edgeType);
+  int get hashCode => Object.hash(
+    id,
+    fromNodeId,
+    toNodeId,
+    durationSeconds,
+    edgeType,
+    servicePattern,
+    includesStairs,
+    accessibilityStatus,
+    reliabilityScore,
+    lastVerifiedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2406,7 +2617,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.fromNodeId == this.fromNodeId &&
           other.toNodeId == this.toNodeId &&
           other.durationSeconds == this.durationSeconds &&
-          other.edgeType == this.edgeType);
+          other.edgeType == this.edgeType &&
+          other.servicePattern == this.servicePattern &&
+          other.includesStairs == this.includesStairs &&
+          other.accessibilityStatus == this.accessibilityStatus &&
+          other.reliabilityScore == this.reliabilityScore &&
+          other.lastVerifiedAt == this.lastVerifiedAt);
 }
 
 class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
@@ -2415,6 +2631,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<String> toNodeId;
   final Value<int> durationSeconds;
   final Value<String> edgeType;
+  final Value<String> servicePattern;
+  final Value<bool> includesStairs;
+  final Value<String> accessibilityStatus;
+  final Value<int> reliabilityScore;
+  final Value<DateTime?> lastVerifiedAt;
   final Value<int> rowid;
   const NetworkEdgesCompanion({
     this.id = const Value.absent(),
@@ -2422,6 +2643,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.toNodeId = const Value.absent(),
     this.durationSeconds = const Value.absent(),
     this.edgeType = const Value.absent(),
+    this.servicePattern = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NetworkEdgesCompanion.insert({
@@ -2430,6 +2656,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     required String toNodeId,
     this.durationSeconds = const Value.absent(),
     this.edgeType = const Value.absent(),
+    this.servicePattern = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        fromNodeId = Value(fromNodeId),
@@ -2440,6 +2671,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<String>? toNodeId,
     Expression<int>? durationSeconds,
     Expression<String>? edgeType,
+    Expression<String>? servicePattern,
+    Expression<bool>? includesStairs,
+    Expression<String>? accessibilityStatus,
+    Expression<int>? reliabilityScore,
+    Expression<DateTime>? lastVerifiedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2448,6 +2684,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (toNodeId != null) 'to_node_id': toNodeId,
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (edgeType != null) 'edge_type': edgeType,
+      if (servicePattern != null) 'service_pattern': servicePattern,
+      if (includesStairs != null) 'includes_stairs': includesStairs,
+      if (accessibilityStatus != null)
+        'accessibility_status': accessibilityStatus,
+      if (reliabilityScore != null) 'reliability_score': reliabilityScore,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2458,6 +2700,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<String>? toNodeId,
     Value<int>? durationSeconds,
     Value<String>? edgeType,
+    Value<String>? servicePattern,
+    Value<bool>? includesStairs,
+    Value<String>? accessibilityStatus,
+    Value<int>? reliabilityScore,
+    Value<DateTime?>? lastVerifiedAt,
     Value<int>? rowid,
   }) {
     return NetworkEdgesCompanion(
@@ -2466,6 +2713,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       toNodeId: toNodeId ?? this.toNodeId,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       edgeType: edgeType ?? this.edgeType,
+      servicePattern: servicePattern ?? this.servicePattern,
+      includesStairs: includesStairs ?? this.includesStairs,
+      accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+      reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2488,6 +2740,21 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (edgeType.present) {
       map['edge_type'] = Variable<String>(edgeType.value);
     }
+    if (servicePattern.present) {
+      map['service_pattern'] = Variable<String>(servicePattern.value);
+    }
+    if (includesStairs.present) {
+      map['includes_stairs'] = Variable<bool>(includesStairs.value);
+    }
+    if (accessibilityStatus.present) {
+      map['accessibility_status'] = Variable<String>(accessibilityStatus.value);
+    }
+    if (reliabilityScore.present) {
+      map['reliability_score'] = Variable<int>(reliabilityScore.value);
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2502,6 +2769,11 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('toNodeId: $toNodeId, ')
           ..write('durationSeconds: $durationSeconds, ')
           ..write('edgeType: $edgeType, ')
+          ..write('servicePattern: $servicePattern, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5964,6 +6236,11 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       required String toNodeId,
       Value<int> durationSeconds,
       Value<String> edgeType,
+      Value<String> servicePattern,
+      Value<bool> includesStairs,
+      Value<String> accessibilityStatus,
+      Value<int> reliabilityScore,
+      Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
 typedef $$NetworkEdgesTableUpdateCompanionBuilder =
@@ -5973,6 +6250,11 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<String> toNodeId,
       Value<int> durationSeconds,
       Value<String> edgeType,
+      Value<String> servicePattern,
+      Value<bool> includesStairs,
+      Value<String> accessibilityStatus,
+      Value<int> reliabilityScore,
+      Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
 
@@ -6007,6 +6289,31 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<String> get edgeType => $composableBuilder(
     column: $table.edgeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6044,6 +6351,31 @@ class $$NetworkEdgesTableOrderingComposer
     column: $table.edgeType,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$NetworkEdgesTableAnnotationComposer
@@ -6073,6 +6405,31 @@ class $$NetworkEdgesTableAnnotationComposer
 
   GeneratedColumn<String> get edgeType =>
       $composableBuilder(column: $table.edgeType, builder: (column) => column);
+
+  GeneratedColumn<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$NetworkEdgesTableTableManager
@@ -6113,6 +6470,11 @@ class $$NetworkEdgesTableTableManager
                 Value<String> toNodeId = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
+                Value<String> servicePattern = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion(
                 id: id,
@@ -6120,6 +6482,11 @@ class $$NetworkEdgesTableTableManager
                 toNodeId: toNodeId,
                 durationSeconds: durationSeconds,
                 edgeType: edgeType,
+                servicePattern: servicePattern,
+                includesStairs: includesStairs,
+                accessibilityStatus: accessibilityStatus,
+                reliabilityScore: reliabilityScore,
+                lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6129,6 +6496,11 @@ class $$NetworkEdgesTableTableManager
                 required String toNodeId,
                 Value<int> durationSeconds = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
+                Value<String> servicePattern = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion.insert(
                 id: id,
@@ -6136,6 +6508,11 @@ class $$NetworkEdgesTableTableManager
                 toNodeId: toNodeId,
                 durationSeconds: durationSeconds,
                 edgeType: edgeType,
+                servicePattern: servicePattern,
+                includesStairs: includesStairs,
+                accessibilityStatus: accessibilityStatus,
+                reliabilityScore: reliabilityScore,
+                lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
