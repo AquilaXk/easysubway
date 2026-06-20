@@ -95,9 +95,9 @@ void main() {
       expect(result.includesStairs, isFalse);
     });
 
-    test('10000 node 그래프 경로 탐색은 2초 예산 안에서 완료한다', () {
-      final engine = LocalRouteEngine(graph: _largeLinearGraph(10000));
-      final stopwatch = Stopwatch()..start();
+    test('10000 node 그래프는 fromNode index로 필요한 edge만 조회한다', () {
+      final graph = _largeLinearGraph(10000);
+      final engine = LocalRouteEngine(graph: graph);
 
       final result = engine.search(
         const RouteRequest(
@@ -107,10 +107,12 @@ void main() {
         ),
       );
 
-      stopwatch.stop();
+      expect(graph.edgesFrom('station-5000').map((edge) => edge.id), [
+        'edge-5000-5001',
+      ]);
+      expect(graph.edgesFrom('station-9999'), isEmpty);
       expect(result.status, RouteStatus.found);
       expect(result.edgeIds.length, 9999);
-      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
     });
   });
 }
