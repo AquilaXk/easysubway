@@ -2227,6 +2227,18 @@ class $NetworkEdgesTable extends NetworkEdges
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _stairAccessStateMeta = const VerificationMeta(
+    'stairAccessState',
+  );
+  @override
+  late final GeneratedColumn<String> stairAccessState = GeneratedColumn<String>(
+    'stair_access_state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
   static const VerificationMeta _accessibilityStatusMeta =
       const VerificationMeta('accessibilityStatus');
   @override
@@ -2272,6 +2284,7 @@ class $NetworkEdgesTable extends NetworkEdges
     edgeType,
     servicePattern,
     includesStairs,
+    stairAccessState,
     accessibilityStatus,
     reliabilityScore,
     lastVerifiedAt,
@@ -2345,6 +2358,15 @@ class $NetworkEdgesTable extends NetworkEdges
         ),
       );
     }
+    if (data.containsKey('stair_access_state')) {
+      context.handle(
+        _stairAccessStateMeta,
+        stairAccessState.isAcceptableOrUnknown(
+          data['stair_access_state']!,
+          _stairAccessStateMeta,
+        ),
+      );
+    }
     if (data.containsKey('accessibility_status')) {
       context.handle(
         _accessibilityStatusMeta,
@@ -2409,6 +2431,10 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.bool,
         data['${effectivePrefix}includes_stairs'],
       )!,
+      stairAccessState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stair_access_state'],
+      )!,
       accessibilityStatus: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}accessibility_status'],
@@ -2438,6 +2464,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final String edgeType;
   final String servicePattern;
   final bool includesStairs;
+  final String stairAccessState;
   final String accessibilityStatus;
   final int reliabilityScore;
   final DateTime? lastVerifiedAt;
@@ -2449,6 +2476,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     required this.edgeType,
     required this.servicePattern,
     required this.includesStairs,
+    required this.stairAccessState,
     required this.accessibilityStatus,
     required this.reliabilityScore,
     this.lastVerifiedAt,
@@ -2463,6 +2491,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['edge_type'] = Variable<String>(edgeType);
     map['service_pattern'] = Variable<String>(servicePattern);
     map['includes_stairs'] = Variable<bool>(includesStairs);
+    map['stair_access_state'] = Variable<String>(stairAccessState);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['reliability_score'] = Variable<int>(reliabilityScore);
     if (!nullToAbsent || lastVerifiedAt != null) {
@@ -2480,6 +2509,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       edgeType: Value(edgeType),
       servicePattern: Value(servicePattern),
       includesStairs: Value(includesStairs),
+      stairAccessState: Value(stairAccessState),
       accessibilityStatus: Value(accessibilityStatus),
       reliabilityScore: Value(reliabilityScore),
       lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
@@ -2501,6 +2531,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       edgeType: serializer.fromJson<String>(json['edgeType']),
       servicePattern: serializer.fromJson<String>(json['servicePattern']),
       includesStairs: serializer.fromJson<bool>(json['includesStairs']),
+      stairAccessState: serializer.fromJson<String>(json['stairAccessState']),
       accessibilityStatus: serializer.fromJson<String>(
         json['accessibilityStatus'],
       ),
@@ -2519,6 +2550,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'edgeType': serializer.toJson<String>(edgeType),
       'servicePattern': serializer.toJson<String>(servicePattern),
       'includesStairs': serializer.toJson<bool>(includesStairs),
+      'stairAccessState': serializer.toJson<String>(stairAccessState),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
       'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
@@ -2533,6 +2565,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     String? edgeType,
     String? servicePattern,
     bool? includesStairs,
+    String? stairAccessState,
     String? accessibilityStatus,
     int? reliabilityScore,
     Value<DateTime?> lastVerifiedAt = const Value.absent(),
@@ -2544,6 +2577,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     edgeType: edgeType ?? this.edgeType,
     servicePattern: servicePattern ?? this.servicePattern,
     includesStairs: includesStairs ?? this.includesStairs,
+    stairAccessState: stairAccessState ?? this.stairAccessState,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
     lastVerifiedAt: lastVerifiedAt.present
@@ -2567,6 +2601,9 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       includesStairs: data.includesStairs.present
           ? data.includesStairs.value
           : this.includesStairs,
+      stairAccessState: data.stairAccessState.present
+          ? data.stairAccessState.value
+          : this.stairAccessState,
       accessibilityStatus: data.accessibilityStatus.present
           ? data.accessibilityStatus.value
           : this.accessibilityStatus,
@@ -2589,6 +2626,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
           ..write('includesStairs: $includesStairs, ')
+          ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('lastVerifiedAt: $lastVerifiedAt')
@@ -2605,6 +2643,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     edgeType,
     servicePattern,
     includesStairs,
+    stairAccessState,
     accessibilityStatus,
     reliabilityScore,
     lastVerifiedAt,
@@ -2620,6 +2659,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.edgeType == this.edgeType &&
           other.servicePattern == this.servicePattern &&
           other.includesStairs == this.includesStairs &&
+          other.stairAccessState == this.stairAccessState &&
           other.accessibilityStatus == this.accessibilityStatus &&
           other.reliabilityScore == this.reliabilityScore &&
           other.lastVerifiedAt == this.lastVerifiedAt);
@@ -2633,6 +2673,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<String> edgeType;
   final Value<String> servicePattern;
   final Value<bool> includesStairs;
+  final Value<String> stairAccessState;
   final Value<String> accessibilityStatus;
   final Value<int> reliabilityScore;
   final Value<DateTime?> lastVerifiedAt;
@@ -2645,6 +2686,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
     this.includesStairs = const Value.absent(),
+    this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
@@ -2658,6 +2700,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
     this.includesStairs = const Value.absent(),
+    this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
@@ -2673,6 +2716,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<String>? edgeType,
     Expression<String>? servicePattern,
     Expression<bool>? includesStairs,
+    Expression<String>? stairAccessState,
     Expression<String>? accessibilityStatus,
     Expression<int>? reliabilityScore,
     Expression<DateTime>? lastVerifiedAt,
@@ -2686,6 +2730,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (edgeType != null) 'edge_type': edgeType,
       if (servicePattern != null) 'service_pattern': servicePattern,
       if (includesStairs != null) 'includes_stairs': includesStairs,
+      if (stairAccessState != null) 'stair_access_state': stairAccessState,
       if (accessibilityStatus != null)
         'accessibility_status': accessibilityStatus,
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
@@ -2702,6 +2747,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<String>? edgeType,
     Value<String>? servicePattern,
     Value<bool>? includesStairs,
+    Value<String>? stairAccessState,
     Value<String>? accessibilityStatus,
     Value<int>? reliabilityScore,
     Value<DateTime?>? lastVerifiedAt,
@@ -2715,6 +2761,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       edgeType: edgeType ?? this.edgeType,
       servicePattern: servicePattern ?? this.servicePattern,
       includesStairs: includesStairs ?? this.includesStairs,
+      stairAccessState: stairAccessState ?? this.stairAccessState,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
@@ -2746,6 +2793,9 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (includesStairs.present) {
       map['includes_stairs'] = Variable<bool>(includesStairs.value);
     }
+    if (stairAccessState.present) {
+      map['stair_access_state'] = Variable<String>(stairAccessState.value);
+    }
     if (accessibilityStatus.present) {
       map['accessibility_status'] = Variable<String>(accessibilityStatus.value);
     }
@@ -2771,6 +2821,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
           ..write('includesStairs: $includesStairs, ')
+          ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
@@ -6649,6 +6700,7 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       Value<String> edgeType,
       Value<String> servicePattern,
       Value<bool> includesStairs,
+      Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
       Value<DateTime?> lastVerifiedAt,
@@ -6663,6 +6715,7 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<String> edgeType,
       Value<String> servicePattern,
       Value<bool> includesStairs,
+      Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
       Value<DateTime?> lastVerifiedAt,
@@ -6710,6 +6763,11 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<bool> get includesStairs => $composableBuilder(
     column: $table.includesStairs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stairAccessState => $composableBuilder(
+    column: $table.stairAccessState,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6773,6 +6831,11 @@ class $$NetworkEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get stairAccessState => $composableBuilder(
+    column: $table.stairAccessState,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get accessibilityStatus => $composableBuilder(
     column: $table.accessibilityStatus,
     builder: (column) => ColumnOrderings(column),
@@ -6824,6 +6887,11 @@ class $$NetworkEdgesTableAnnotationComposer
 
   GeneratedColumn<bool> get includesStairs => $composableBuilder(
     column: $table.includesStairs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stairAccessState => $composableBuilder(
+    column: $table.stairAccessState,
     builder: (column) => column,
   );
 
@@ -6883,6 +6951,7 @@ class $$NetworkEdgesTableTableManager
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
+                Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
@@ -6895,6 +6964,7 @@ class $$NetworkEdgesTableTableManager
                 edgeType: edgeType,
                 servicePattern: servicePattern,
                 includesStairs: includesStairs,
+                stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
                 lastVerifiedAt: lastVerifiedAt,
@@ -6909,6 +6979,7 @@ class $$NetworkEdgesTableTableManager
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
+                Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
@@ -6921,6 +6992,7 @@ class $$NetworkEdgesTableTableManager
                 edgeType: edgeType,
                 servicePattern: servicePattern,
                 includesStairs: includesStairs,
+                stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
                 lastVerifiedAt: lastVerifiedAt,

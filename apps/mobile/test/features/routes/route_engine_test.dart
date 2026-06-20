@@ -147,6 +147,62 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('휠체어 조건은 계단 여부 미확인 edge를 안전한 경로로 사용하지 않는다', () {
+      final engine = LocalRouteEngine(graph: _unknownStairAccessFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.includesStairs, isFalse);
+      expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS_UNKNOWN']);
+      expect(result.warningCodes, isEmpty);
+    });
+
+    test('휠체어 조건은 계단 상태가 없는 기본 edge를 안전한 경로로 사용하지 않는다', () {
+      final engine = LocalRouteEngine(graph: _missingStairAccessFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.includesStairs, isFalse);
+      expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS_UNKNOWN']);
+      expect(result.warningCodes, isEmpty);
+    });
+
+    test('휠체어 조건은 tri-state 계단 전용 값을 legacy flag보다 우선한다', () {
+      final engine = LocalRouteEngine(
+        graph: _conflictingStairAccessFixtureGraph(),
+      );
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.includesStairs, isFalse);
+      expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS']);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('낮은 신뢰도와 오래된 데이터는 경고 코드와 비용에 반영한다', () {
       final engine = LocalRouteEngine(graph: _lowQualityFixtureGraph());
 
@@ -221,6 +277,7 @@ NetworkGraph _capitalFixtureGraph() {
         type: RouteEdgeType.entry,
         baseCost: 90,
         includesStairs: false,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-sangnoksu-sadang-line4',
@@ -237,6 +294,7 @@ NetworkGraph _capitalFixtureGraph() {
         type: RouteEdgeType.transfer,
         baseCost: 140,
         transferStationId: 'station-sadang',
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-sadang-cityhall-line2',
@@ -252,6 +310,7 @@ NetworkGraph _capitalFixtureGraph() {
         toNodeId: 'station-sadang',
         type: RouteEdgeType.exit,
         baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'exit-cityhall-step-free',
@@ -259,6 +318,7 @@ NetworkGraph _capitalFixtureGraph() {
         toNodeId: 'station-cityhall',
         type: RouteEdgeType.exit,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );
@@ -290,6 +350,7 @@ NetworkGraph _sameLineTransferCatalogFixtureGraph() {
         toNodeId: 'station-a:line-1:LOCAL',
         type: RouteEdgeType.entry,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'transfer-a-local-express',
@@ -297,6 +358,7 @@ NetworkGraph _sameLineTransferCatalogFixtureGraph() {
         toNodeId: 'station-a:line-1:EXPRESS',
         type: RouteEdgeType.transfer,
         baseCost: 80,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-a-b-line-1-express',
@@ -312,6 +374,7 @@ NetworkGraph _sameLineTransferCatalogFixtureGraph() {
         toNodeId: 'station-b',
         type: RouteEdgeType.exit,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );
@@ -343,6 +406,7 @@ NetworkGraph _crossStationTransferCatalogFixtureGraph() {
         toNodeId: 'station-a:line-1',
         type: RouteEdgeType.entry,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'transfer-a-b-cross-station',
@@ -350,6 +414,7 @@ NetworkGraph _crossStationTransferCatalogFixtureGraph() {
         toNodeId: 'station-b:line-2',
         type: RouteEdgeType.transfer,
         baseCost: 240,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-b-c-line-2',
@@ -365,6 +430,7 @@ NetworkGraph _crossStationTransferCatalogFixtureGraph() {
         toNodeId: 'station-c',
         type: RouteEdgeType.exit,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );
@@ -411,6 +477,7 @@ NetworkGraph _twoTransferCatalogFixtureGraph() {
         toNodeId: 'station-a:line-1',
         type: RouteEdgeType.entry,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-a-b-line-1',
@@ -426,6 +493,7 @@ NetworkGraph _twoTransferCatalogFixtureGraph() {
         toNodeId: 'station-b:line-2',
         type: RouteEdgeType.transfer,
         baseCost: 140,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-b-c-line-2',
@@ -441,6 +509,7 @@ NetworkGraph _twoTransferCatalogFixtureGraph() {
         toNodeId: 'station-c:line-3',
         type: RouteEdgeType.transfer,
         baseCost: 140,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-c-d-line-3',
@@ -456,6 +525,7 @@ NetworkGraph _twoTransferCatalogFixtureGraph() {
         toNodeId: 'station-d',
         type: RouteEdgeType.exit,
         baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );
@@ -526,6 +596,7 @@ NetworkGraph _unknownAccessibilityFixtureGraph() {
         type: RouteEdgeType.entry,
         baseCost: 90,
         accessibilityState: RouteAccessibilityState.unknown,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-sangnoksu-sadang-line4',
@@ -541,6 +612,137 @@ NetworkGraph _unknownAccessibilityFixtureGraph() {
         toNodeId: 'station-sadang',
         type: RouteEdgeType.exit,
         baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _unknownStairAccessFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sangnoksu-stair-state-unknown',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.unknown,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _conflictingStairAccessFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sangnoksu-stair-state-conflict',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        includesStairs: false,
+        stairAccessState: RouteStairAccessState.stairOnly,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _missingStairAccessFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sangnoksu-stair-state-missing',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );
@@ -568,6 +770,7 @@ NetworkGraph _lowQualityFixtureGraph() {
         type: RouteEdgeType.entry,
         baseCost: 90,
         reliabilityScore: 62,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
       RouteEdge(
         id: 'ride-sangnoksu-sadang-line4',
@@ -584,6 +787,7 @@ NetworkGraph _lowQualityFixtureGraph() {
         type: RouteEdgeType.exit,
         baseCost: 90,
         isDataStale: true,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );

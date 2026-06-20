@@ -105,6 +105,9 @@ class NetworkEdges extends Table {
       text().named('service_pattern').withDefault(const Constant(''))();
   BoolColumn get includesStairs =>
       boolean().named('includes_stairs').withDefault(const Constant(false))();
+  TextColumn get stairAccessState => text()
+      .named('stair_access_state')
+      .withDefault(const Constant('UNKNOWN'))();
   TextColumn get accessibilityStatus => text()
       .named('accessibility_status')
       .withDefault(const Constant('UNKNOWN'))();
@@ -192,8 +195,9 @@ class InternalRouteEdges extends Table {
       boolean().named('includes_stairs').withDefault(const Constant(false))();
   BoolColumn get requiresElevator =>
       boolean().named('requires_elevator').withDefault(const Constant(false))();
-  BoolColumn get requiresEscalator =>
-      boolean().named('requires_escalator').withDefault(const Constant(false))();
+  BoolColumn get requiresEscalator => boolean()
+      .named('requires_escalator')
+      .withDefault(const Constant(false))();
   IntColumn get slopeLevel =>
       integer().named('slope_level').withDefault(const Constant(1))();
   IntColumn get widthLevel =>

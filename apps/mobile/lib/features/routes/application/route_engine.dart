@@ -189,6 +189,7 @@ class LocalRouteEngine {
       'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
       'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
+      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };
