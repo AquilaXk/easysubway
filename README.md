@@ -14,7 +14,7 @@
 
 - Mobile: Flutter, Dart, Riverpod, go_router, Dio, Drift
 - Backend: Java, eGovFrame 5.0, Spring Boot 3.5, Spring MVC, Spring Security, Spring Batch
-- Data: PostgreSQL, PostGIS, Redis
+- Data: PostgreSQL, PostGIS
 - Infra: Docker, Docker Compose, GitHub Actions
 - Maps: Naver Map first, Kakao Map as a secondary candidate
 

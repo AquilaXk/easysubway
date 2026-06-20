@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -290,7 +290,27 @@ class FacilityReportApiRepository implements FacilityReportRepository {
   @override
   Future<List<FacilityReportResult>> listMyReports() async {
     try {
-      return await _getMyReportsWithAuthorizationRetry();
+      final receipts =
+          await receiptStore?.listReceipts().timeout(_facilityReportTimeout) ??
+          const <FacilityReportReceipt>[];
+      if (receipts.isEmpty) {
+        return const [];
+      }
+
+      return Future.wait(
+        receipts.map((receipt) async {
+          try {
+            return await getReport(receipt.reportId);
+          } catch (error, stackTrace) {
+            reportMobileError(
+              error,
+              stackTrace,
+              context: '시설 신고 receipt 기반 상태 조회 중 예외가 발생했습니다.',
+            );
+            return _reportResultFromReceipt(receipt);
+          }
+        }),
+      );
     } on FacilityReportException {
       rethrow;
     } catch (error, stackTrace) {
@@ -301,49 +321,6 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       );
       throw const FacilityReportException(_facilityReportListErrorMessage);
     }
-  }
-
-  Future<List<FacilityReportResult>>
-  _getMyReportsWithAuthorizationRetry() async {
-    for (var attempt = 0; attempt < 2; attempt++) {
-      final request = await _httpClient
-          .getUrl(baseUri.resolve('/api/v1/me/reports'))
-          .timeout(_facilityReportTimeout);
-      final authorizationHeader = await authProvider
-          ?.authorizationHeader()
-          .timeout(_facilityReportTimeout);
-      if (authorizationHeader != null) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          authorizationHeader,
-        );
-      }
-
-      final response = await request.close().timeout(_facilityReportTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_facilityReportTimeout);
-
-      if (response.statusCode == HttpStatus.unauthorized &&
-          authorizationHeader != null &&
-          attempt == 0) {
-        // 목록 조회 인증이 만료된 경우 한 번만 갱신한다.
-        await authProvider!.invalidateAuthorization().timeout(
-          _facilityReportTimeout,
-        );
-        continue;
-      }
-
-      if (response.statusCode != HttpStatus.ok) {
-        throw const FacilityReportException(_facilityReportListErrorMessage);
-      }
-
-      return _reportListFromBody(
-        body,
-        errorMessage: _facilityReportListErrorMessage,
-      );
-    }
-    throw const FacilityReportException(_facilityReportListErrorMessage);
   }
 
   FacilityReportResult _reportResultFromBody(
@@ -363,33 +340,17 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     return FacilityReportResult.fromJson(data);
   }
 
-  List<FacilityReportResult> _reportListFromBody(
-    String body, {
-    required String errorMessage,
-  }) {
-    final decoded = jsonDecode(body);
-    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-      throw FacilityReportException(errorMessage);
-    }
-
-    final data = decoded['data'];
-    final items = switch (data) {
-      {'items': final List<Object?> pageItems} => pageItems,
-      final List<Object?> listItems => listItems,
-      _ => throw FacilityReportException(errorMessage),
-    };
-
-    if (items.isEmpty) {
-      return const [];
-    }
-
-    return [
-      for (final item in items)
-        if (item is Map<String, Object?>)
-          FacilityReportResult.fromJson(item)
-        else
-          throw FacilityReportException(errorMessage),
-    ];
+  FacilityReportResult _reportResultFromReceipt(FacilityReportReceipt receipt) {
+    return FacilityReportResult(
+      id: receipt.reportId,
+      stationId: '',
+      facilityId: '',
+      reportType: '',
+      description: '',
+      status: receipt.status,
+      createdAt: receipt.createdAt.toIso8601String(),
+      receiptToken: receipt.receiptToken,
+    );
   }
 }
 
@@ -588,6 +549,8 @@ abstract interface class FacilityReportReceiptStore {
   Future<void> saveReceipt(FacilityReportReceipt receipt);
 
   Future<String?> receiptTokenForReport(String reportId);
+
+  Future<List<FacilityReportReceipt>> listReceipts();
 }
 
 class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
@@ -636,6 +599,36 @@ class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
     return storage.read(
       key: 'easysubway.facilityReport.receipt.${receipt.receiptId}',
     );
+  }
+
+  @override
+  Future<List<FacilityReportReceipt>> listReceipts() async {
+    final receipts = await (userDatabase.select(
+      userDatabase.reportReceipts,
+    )..orderBy([(row) => OrderingTerm.desc(row.createdAt)])).get();
+    final results = <FacilityReportReceipt>[];
+    for (final receipt in receipts) {
+      final reportId = receipt.reportId?.trim();
+      if (reportId == null || reportId.isEmpty) {
+        continue;
+      }
+      final receiptToken = await storage.read(
+        key: 'easysubway.facilityReport.receipt.${receipt.receiptId}',
+      );
+      if (receiptToken == null || receiptToken.isEmpty) {
+        continue;
+      }
+      results.add(
+        FacilityReportReceipt(
+          receiptId: receipt.receiptId,
+          reportId: reportId,
+          status: receipt.status,
+          receiptToken: receiptToken,
+          createdAt: receipt.createdAt,
+        ),
+      );
+    }
+    return results;
   }
 }
 

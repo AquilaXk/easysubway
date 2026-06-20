@@ -391,14 +391,25 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:5432\/easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_USERNAME=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
-  assert.match(envExample, /^EASYSUBWAY_REDIS_HOST=localhost$/m);
-  assert.match(envExample, /^EASYSUBWAY_REDIS_PORT=6379$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATA_PACK_BASE_URL=http:\/\/localhost:9000\/easysubway-datapacks$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_API_BASE_URL=http:\/\/localhost:8080$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900$/m);
+  assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=http:\/\/localhost:9000$/m);
+  assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=easysubway_local$/m);
+  assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATAPACK_SIGNING_KEY=$/m);
+  assert.doesNotMatch(envExample, /^EASYSUBWAY_REDIS_/m);
   assert.match(envExample, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=$/m);
   assert.match(envExample, /^EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
-  assert.doesNotMatch(envExample, /prod|production|secret|token/i);
+  assert.doesNotMatch(envExample, /prod|production/i);
+  assert.doesNotMatch(envExample, /^EASYSUBWAY_(REPORT_RECEIPT_TOKEN_PEPPER|OBJECT_STORAGE_SECRET_KEY|DATAPACK_SIGNING_KEY)=.+$/m);
 });
 
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
@@ -723,11 +734,14 @@ test("백엔드 런타임 의존성은 보안 패치 기준 버전을 사용한�
   assert.doesNotMatch(backendLockfile, /^org\.apache\.logging\.log4j:log4j-core:2\.24\.3=/m);
 });
 
-test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () => {
+test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고 관측성 선택 서비스를 profile로 분리한다", () => {
   const compose = read("infra/docker-compose.yml");
+  const postgresBlock = compose.match(/  postgres:\n[\s\S]*?\n\n  object-storage:/)?.[0] ?? "";
+  const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  prometheus:/)?.[0] ?? "";
 
   assert.match(compose, /postgres:\n/);
   assert.match(compose, /image: postgis\/postgis:16-3\.5/);
+  assert.doesNotMatch(postgresBlock, /profiles:/);
   assert.match(compose, /POSTGRES_DB: \$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
   assert.match(compose, /POSTGRES_USER: \$\{EASYSUBWAY_POSTGRES_USER:-easysubway\}/);
   assert.match(compose, /POSTGRES_PASSWORD: \$\{EASYSUBWAY_POSTGRES_PASSWORD:-easysubway_local\}/);
@@ -735,13 +749,21 @@ test("로컬 PostGIS와 Redis 서비스가 Docker Compose에 정의된다", () =
   assert.match(compose, /pg_isready -U \$\$\{POSTGRES_USER\} -d \$\$\{POSTGRES_DB\}/);
   assert.match(compose, /postgres-data:\/var\/lib\/postgresql\/data/);
 
-  assert.match(compose, /redis:\n/);
-  assert.match(compose, /image: redis:7\.4-alpine/);
-  assert.match(compose, /"\$\{EASYSUBWAY_REDIS_PORT:-6379\}:6379"/);
-  assert.match(compose, /redis-cli ping/);
-  assert.match(compose, /redis-data:\/data/);
+  assert.match(compose, /object-storage:\n/);
+  assert.match(compose, /image: minio\/minio:/);
+  assert.doesNotMatch(objectStorageBlock, /profiles:/);
+  assert.match(compose, /MINIO_ROOT_USER: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:-easysubway_local\}/);
+  assert.match(compose, /MINIO_ROOT_PASSWORD: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:-easysubway_local_secret\}/);
+  assert.match(compose, /"\$\{EASYSUBWAY_OBJECT_STORAGE_PORT:-9000\}:9000"/);
+  assert.match(compose, /object-storage-data:\/data/);
 
-  assert.match(compose, /^volumes:\n  postgres-data:\n  redis-data:/m);
+  assert.doesNotMatch(compose, /redis:\n/);
+  assert.doesNotMatch(compose, /EASYSUBWAY_REDIS_/);
+  assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /^volumes:\n  postgres-data:\n  object-storage-data:\n  prometheus-data:/m);
+  assert.doesNotMatch(compose, /^  redis-data:/m);
 });
 
 test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", () => {
@@ -829,6 +851,7 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
 
   assert.match(compose, /prometheus:\n/);
+  assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: prom\/prometheus:v[0-9]+\.[0-9]+\.[0-9]+/);
   assert.match(compose, /\.\/prometheus\/prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
   assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
@@ -836,6 +859,7 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(compose, /wget --spider -q http:\/\/localhost:9090\/-\/healthy/);
 
   assert.match(compose, /grafana:\n/);
+  assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/grafana:[0-9]+\.[0-9]+\.[0-9]+/);
   assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
   assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
@@ -860,6 +884,7 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   const prometheusDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(compose, /loki:\n/);
+  assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/loki:3\.6\.0/);
   assert.match(compose, /--config\.file=\/etc\/loki\/loki\.yml/);
   assert.match(compose, /\.\/loki\/loki\.yml:\/etc\/loki\/loki\.yml:ro/);
@@ -979,6 +1004,34 @@ test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 
   assert.match(legacyCredentialCleanup, /easysubway\.anonymousAuth\.credentials/);
 });
 
+test("백엔드는 모바일 기본 경로용 public transit, route, me API를 노출하지 않는다", () => {
+  const removedControllerPaths = [
+    "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java",
+    "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java",
+    "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteStationController.java",
+    "backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java",
+    "backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java",
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
+    "backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java",
+  ];
+  const javaFiles = execFileSync("git", ["ls-files", "backend/src/main/java/**/*.java"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+  const backendSources = javaFiles.map(read).join("\n");
+
+  for (const removedPath of removedControllerPaths) {
+    assert.equal(existsSync(path.join(root, removedPath)), false, `${removedPath} must not expose mobile-local APIs`);
+  }
+
+  assert.doesNotMatch(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/api\/v1\/stations(?:\/|\")/);
+  assert.doesNotMatch(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/api\/v1\/routes(?:\/|\")/);
+  assert.doesNotMatch(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/api\/v1\/me(?:\/|\")/);
+  assert.doesNotMatch(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/api\/v1\/devices(?:\/|\")/);
+  assert.match(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/api\/v1\/reports(?:\/|\")/);
+  assert.match(backendSources, /@(?:Get|Post|Put|Patch|Delete)Mapping\("\/admin\//);
+});
+
 test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", () => {
   const files = inMemoryRepositoryFiles();
   const readinessConfiguration = read(
@@ -1027,7 +1080,10 @@ test("백엔드 인메모리 저장소는 운영 프로필에서 제외된다", 
   }
   assert.match(applicationYml, /management:[\s\S]*endpoint:\s*\n\s*health:\s*\n\s*probes:\s*\n\s*enabled:\s*true/);
   assert.doesNotMatch(applicationYml, /productionReadiness/);
-  assert.match(applicationProdYml, /readiness:\s*\n\s*include:\s*["']?readinessState\s*,\s*db\s*,\s*redis\s*,\s*productionReadiness["']?/);
+  assert.match(applicationProdYml, /readiness:\s*\n\s*include:\s*["']?readinessState\s*,\s*db\s*,\s*productionReadiness["']?/);
+  assert.doesNotMatch(applicationProdYml, /redis/);
+  assert.doesNotMatch(readinessConfiguration, /RedisConnectionFactory|RedisConnection|redisReady/);
+  assert.doesNotMatch(readinessConfiguration, /pushExternalEnabled|pushReady/);
   assert.match(applicationProdYml, /external-enabled: \$\{EASYSUBWAY_PUSH_EXTERNAL_ENABLED:false\}/);
 });
 
@@ -1060,7 +1116,7 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
     "backend/src/main/java/com/easysubway/user/application/port/out/AnonymizeUserFacilityReportPort.java",
   );
   const service = read("backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java");
-  const controller = read("backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java");
+  const userDataControllerPath = "backend/src/main/java/com/easysubway/user/adapter/in/web/UserDataController.java";
   const favoriteStationRepository = read(
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteStationRepository.java",
   );
@@ -1125,10 +1181,7 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   assert.match(service, /DeleteUserPushNotificationPort/);
   assert.match(service, /DeleteUserMobilityProfilePort/);
   assert.match(service, /AnonymizeUserFacilityReportPort/);
-  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me"\)/);
-  assert.match(controller, /Principal principal/);
-  assert.match(controller, /principal\.getName\(\)/);
-  assert.match(controller, /UserDataDeletionUseCase/);
+  assert.equal(existsSync(path.join(root, userDataControllerPath)), false);
   assert.match(favoriteStationRepository, /DeleteUserFavoriteStationPort/);
   assert.match(favoriteFacilityRepository, /DeleteUserFavoriteFacilityPort/);
   assert.match(favoriteRouteRepository, /DeleteUserFavoriteRoutePort/);
@@ -1149,7 +1202,7 @@ test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른�
   assert.match(reportRepository, /DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다\."/);
   assert.match(reportRepository, /null,\s*\n\s*null,\s*\n\s*null,\s*\n\s*null,\s*\n\s*null,/);
   assert.match(reportService, /!report\.isAnonymizedUserData\(\)/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me"/);
+  assert.doesNotMatch(security, /"\/api\/v1\/me"/);
 });
 
 test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 따른다", () => {
@@ -1290,12 +1343,7 @@ test("백엔드 도시철도 마스터데이터는 헥사고날 API 경계를 �
     /saveSimplifiedStationLayoutStatus\([\s\S]*String layoutId,[\s\S]*SimplifiedStationLayoutStatus status,[\s\S]*String reviewedBy,[\s\S]*LocalDate updatedAt/,
   );
   assert.match(repository, /saveRouteNode\(RouteNode routeNode\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/operators"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/lines"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/stations"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/exits"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/stations\/\{stationId\}\/facilities"\)/);
+  assert.doesNotMatch(controller, /\/api\/v1\/operators|\/api\/v1\/lines|\/api\/v1\/stations/);
   assert.match(controller, /@GetMapping\("\/admin\/stations"\)/);
   assert.match(controller, /@GetMapping\("\/admin\/stations\/\{stationId\}"\)/);
   assert.match(controller, /record AdminStationSummaryResponse/);
@@ -1595,7 +1643,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(2\)[\s\S]*?securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
-  assert.match(security, /@Order\(3\)[\s\S]*?securityMatcher\([\s\S]*?"\/api\/v1\/me"/);
+  assert.match(security, /@Order\(3\)[\s\S]*?reportSecurityFilterChain/);
+  assert.doesNotMatch(security, /"\/api\/v1\/me"/);
   assert.match(security, /"\/api\/v1\/reports\/\*"/);
   assert.match(security, /"\/api\/v1\/reports\/\*\/confirm"/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
@@ -1700,13 +1749,13 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   const reportUseCase = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java");
   const reportService = read("backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java");
   const reportController = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
-  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const routeControllerPath = "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java";
 
   assert.match(security, /"\/api\/v1\/reports\/\*"/);
   assert.match(security, /"\/api\/v1\/report-uploads"/);
   assert.match(security, /"\/api\/v1\/report-uploads\/\*"/);
-  assert.match(security, /"\/api\/v1\/routes\/\*\/feedback"/);
+  assert.doesNotMatch(security, /"\/api\/v1\/routes\/\*\/feedback"/);
   assert.match(reportUseCase, /getUserReport\(String reportId, String userId\)/);
   assert.match(reportUseCase, /getReportByReceiptToken\(String reportId, String receiptToken\)/);
   assert.match(reportService, /getUserReport\(String reportId, String userId\)/);
@@ -1715,19 +1764,14 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(reportController, /report\(\s*@PathVariable String reportId,\s*Principal principal,\s*@RequestHeader\(name = "X-Easysubway-Report-Receipt-Token"/);
   assert.match(reportController, /facilityReportUseCase\.getReportByReceiptToken\(reportId, receiptToken\)/);
   assert.match(reportController, /facilityReportUseCase\.getUserReport\(reportId, principal\.getName\(\)\)/);
-  assert.match(reportController, /ApiResponse<PageResponse<FacilityReportStatusResponse>> myReports/);
-  assert.match(reportController, /FacilityReportPageRequest\.of\(page, size\)/);
-  assert.match(reportController, /PageResponse\.from\(reports, FacilityReportStatusResponse::from\)/);
+  assert.doesNotMatch(reportController, /myReports|\/api\/v1\/me\/reports/);
   assert.match(reportController, /record PageResponse<T>/);
   assert.match(reportController, /record FacilityReportStatusResponse\([^)]*String id,[^)]*String stationId,[^)]*String facilityId,[^)]*FacilityReportType reportType,[^)]*FacilityReportStatus status,[^)]*LocalDateTime createdAt,[^)]*LocalDateTime reviewedAt/);
   assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*String userId/);
   assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*photoFileName/);
   assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*BigDecimal latitude/);
   assert.doesNotMatch(reportController, /record FacilityReportStatusResponse\([^)]*String reviewedBy/);
-  assert.match(routeController, /submitRouteFeedback\([\s\S]*Principal principal[\s\S]*\)/);
-  assert.match(routeController, /request\.toCommand\(routeSearchId, principal\.getName\(\)\)/);
-  assert.match(routeController, /record SubmitRouteFeedbackRequest\(\s*RouteFeedbackRating rating,\s*String comment\s*\)/);
-  assert.doesNotMatch(routeController, /record SubmitRouteFeedbackRequest\([\s\S]*String userId/);
+  assert.equal(existsSync(path.join(root, routeControllerPath)), false);
 });
 
 test("운영기관 제휴 제안 export는 접근성 리포트 CSV를 제공한다", () => {
@@ -1776,7 +1820,7 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
     "backend/src/main/java/com/easysubway/profile/adapter/out/persistence/JdbcMobilityProfileRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const controller = read("backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/profile/adapter/in/web/MobilityProfileController.java";
 
   assert.match(profile, /record MobilityProfile/);
   assert.match(profile, /largeText/);
@@ -1809,8 +1853,7 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   assert.match(batchPostgresSchema, /user_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
   assert.match(batchPostgresSchema, /mobility_type VARCHAR\(40\) NOT NULL/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_mobility_profiles_updated_at/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/mobility-profile"\)/);
-  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/mobility-profile"\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
 });
 
 test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () => {
@@ -1833,7 +1876,7 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteStationRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteStationController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteStationController.java";
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(favorite, /record FavoriteStation/);
@@ -1870,13 +1913,8 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(batchPostgresSchema, /PRIMARY KEY \(user_id, station_id\)/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_stations_station_user/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_stations_user_added/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/stations"\)/);
-  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
-  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/stations\/\{stationId\}"\)/);
-  assert.match(controller, /Principal principal/);
-  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"/);
-  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
+  assert.doesNotMatch(security, /"\/api\/v1\/me\/favorites\/\*\*"/);
 });
 
 test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 경계를 따른다", () => {
@@ -1900,7 +1938,7 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
     "backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteFacilityRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteFacilityController.java";
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(favorite, /record FavoriteFacility/);
@@ -1942,15 +1980,8 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   assert.match(batchPostgresSchema, /PRIMARY KEY \(user_id, facility_id\)/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_facilities_facility_user/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_facilities_user_added/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/facilities"\)/);
-  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
-  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/facilities\/\{facilityId\}"\)/);
-  assert.match(controller, /Principal principal/);
-  assert.match(controller, /AccessibilityFacilityStatus/);
-  assert.match(controller, /DataConfidenceLevel/);
-  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"/);
-  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
+  assert.doesNotMatch(security, /"\/api\/v1\/me\/favorites\/\*\*"/);
 });
 
 test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 API 경계를 따른다", () => {
@@ -1971,7 +2002,7 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   const repository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/InMemoryFavoriteRouteRepository.java");
   const jdbcRepository = read("backend/src/main/java/com/easysubway/favorite/adapter/out/persistence/JdbcFavoriteRouteRepository.java");
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const controller = read("backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/favorite/adapter/in/web/FavoriteRouteController.java";
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(favorite, /record FavoriteRoute/);
@@ -2013,13 +2044,8 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS favorite_route_stations/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_routes_user_added/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_favorite_route_stations_station_user/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
-  assert.match(controller, /@PostMapping\("\/api\/v1\/me\/favorites\/routes"\)/);
-  assert.match(controller, /@DeleteMapping\("\/api\/v1\/me\/favorites\/routes\/\{favoriteRouteId\}"\)/);
-  assert.match(controller, /Principal principal/);
-  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"/);
-  assert.match(security, /anyRequest\(\)\.authenticated\(\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
+  assert.doesNotMatch(security, /"\/api\/v1\/me\/favorites\/\*\*"/);
 });
 
 test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계를 따른다", () => {
@@ -2039,7 +2065,7 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcNotificationPreferenceRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
-  const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/notification/adapter/in/web/NotificationPreferenceController.java";
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.match(device, /record RegisteredDevice/);
@@ -2077,12 +2103,8 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   assert.match(batchPostgresSchema, /CONSTRAINT uq_registered_devices_platform_token/);
   assert.match(batchPostgresSchema, /CHECK \(platform IN \('ANDROID', 'IOS'\)\)/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_registered_devices_user_registered/);
-  assert.match(controller, /@PostMapping\("\/api\/v1\/devices"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/me\/notification-settings"\)/);
-  assert.match(controller, /@PutMapping\("\/api\/v1\/me\/notification-settings"\)/);
-  assert.match(controller, /Principal principal/);
-  assert.doesNotMatch(controller, /RequestParam\(required = false\) String userId/);
-  assert.match(security, /securityMatcher\([\s\S]*"\/api\/v1\/me\/favorites\/\*\*"[\s\S]*"\/api\/v1\/devices"[\s\S]*"\/api\/v1\/me\/notification-settings"[\s\S]*\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
+  assert.doesNotMatch(security, /"\/api\/v1\/devices"|\"\/api\/v1\/me\/notification-settings"/);
 });
 
 test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 따른다", () => {
@@ -2113,6 +2135,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
     "backend/src/main/java/com/easysubway/notification/adapter/out/persistence/JdbcPushNotificationOutboxRepository.java",
   );
   const batchPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V1__baseline_schema.sql");
+  const pushProcessingMigration = read(
+    "backend/src/main/resources/db/migration/postgresql/V6__push_notification_processing_claim.sql",
+  );
   const controller = read("backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java");
   const dashboardController = read(
     "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationAdminPageController.java",
@@ -2155,6 +2180,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(type, /REPORT_STATUS/);
   assert.match(type, /DATA_QUALITY/);
   assert.match(status, /PENDING/);
+  assert.match(status, /PROCESSING/);
   assert.match(invalidPush, /extends InvalidRequestException/);
   assert.match(useCase, /interface PushNotificationDispatchUseCase/);
   assert.match(useCase, /dispatch/);
@@ -2175,6 +2201,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(jdbcRepository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*SummarizePushNotificationOutboxPort[\s\S]*DeleteUserPushNotificationPort/);
   assert.match(jdbcRepository, /List<PushNotification> loadPushNotifications\(String userId\)/);
   assert.match(jdbcRepository, /PushNotification savePushNotification\(PushNotification notification\)/);
+  assert.match(jdbcRepository, /boolean claimPendingPushNotification\(PushNotification notification\)/);
+  assert.match(jdbcRepository, /processing_claimed_at = \?/);
+  assert.match(jdbcRepository, /processing_claimed_at < \?/);
   assert.match(jdbcRepository, /PushNotificationDashboardSummary summarizePushNotificationOutbox\(\)/);
   assert.match(jdbcRepository, /int deletePushNotifications\(String userId\)/);
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS push_notification_outbox/);
@@ -2182,6 +2211,9 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_platform/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_type/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_status/);
+  assert.match(pushProcessingMigration, /ADD COLUMN IF NOT EXISTS processing_claimed_at TIMESTAMP/);
+  assert.match(pushProcessingMigration, /DROP CONSTRAINT IF EXISTS chk_push_notification_outbox_status/);
+  assert.match(pushProcessingMigration, /status IN \('PENDING', 'PROCESSING', 'SENT', 'FAILED'\)/);
   assert.match(batchPostgresSchema, /CONSTRAINT chk_push_notification_outbox_failure_reason/);
   assert.match(batchPostgresSchema, /failure_reason IS NULL OR status = 'FAILED'/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_push_notification_outbox_user_created/);
@@ -2827,7 +2859,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   );
   const repository = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/InMemoryRouteSearchRepository.java");
   const jdbcRepository = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteSearchRepository.java");
-  const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const controllerPath = "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java";
   const searchDashboardController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchAdminPageController.java",
   );
@@ -2950,8 +2982,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(batchPostgresSchema, /CREATE TABLE IF NOT EXISTS route_feedbacks/);
   assert.match(batchPostgresSchema, /CHECK \(status IN \('FOUND', 'BLOCKED'\)\)/);
   assert.match(batchPostgresSchema, /CHECK \(rating IN \('HELPFUL', 'NOT_HELPFUL', 'BLOCKED_BY_REAL_WORLD'\)\)/);
-  assert.match(controller, /@PostMapping\("\/api\/v1\/routes\/search"\)/);
-  assert.match(controller, /@GetMapping\("\/api\/v1\/routes\/\{routeSearchId\}"\)/);
+  assert.equal(existsSync(path.join(root, controllerPath)), false);
   assert.match(searchDashboardController, /@GetMapping\("\/admin\/routes\/searches\/page"\)/);
   assert.match(searchDashboardController, /RouteSearchDashboardUseCase/);
   assert.match(searchDashboardController, /RouteSearchDashboardView\.from\(summary\)/);

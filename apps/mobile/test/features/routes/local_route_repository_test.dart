@@ -51,14 +51,12 @@ void main() {
     expect(result.blockedReasons, isEmpty);
   });
 
-  test('로컬 catalog가 모르는 역 경로는 API repository로 fallback한다', () async {
+  test('로컬 catalog가 모르는 역 경로는 API fallback 없이 차단 결과를 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
-    final apiRepository = _RecordingRouteSearchRepository();
     final repository = FallbackRouteSearchRepository(
       localRepository: LocalRouteRepository(catalogDatabase: database),
-      apiRepository: apiRepository,
     );
 
     final result = await repository.searchRoute(
@@ -69,37 +67,8 @@ void main() {
       ),
     );
 
-    expect(apiRepository.requests, hasLength(1));
-    expect(
-      apiRepository.requests.single.destinationStationId,
-      'station-outside-pack',
-    );
-    expect(result.routeSearchId, 'api-route-1');
-    expect(result.isLocalResult, isFalse);
+    expect(result.status, 'BLOCKED');
+    expect(result.destinationStationName, '확인 필요 역');
+    expect(result.isLocalResult, isTrue);
   });
-}
-
-class _RecordingRouteSearchRepository implements RouteSearchRepository {
-  final requests = <RouteSearchRequest>[];
-
-  @override
-  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
-    requests.add(request);
-    return RouteSearchResult(
-      routeSearchId: 'api-route-1',
-      originStationId: request.originStationId,
-      originStationName: '상록수',
-      destinationStationId: request.destinationStationId,
-      destinationStationName: '외부역',
-      mobilityType: request.mobilityType,
-      status: 'FOUND',
-      lineId: 'api-line',
-      lineName: 'API 노선',
-      score: 80,
-      steps: const [],
-      warnings: const [],
-      blockedReasons: const [],
-      createdAt: '2026-06-19T00:00:00',
-    );
-  }
 }
