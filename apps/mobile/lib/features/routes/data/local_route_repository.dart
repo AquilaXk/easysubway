@@ -794,7 +794,8 @@ String _effectiveAccessibilityStatus(
   String edgeStatus,
   _FacilitySnapshot? facility,
 ) {
-  if (facility == null) {
+  final edgeStatusUpper = edgeStatus.toUpperCase();
+  if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
     return edgeStatus;
   }
   final status = facility.status.toUpperCase();
