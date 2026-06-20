@@ -40,59 +40,16 @@ void main() {
     expect(result.steps.single.guidance, '엘리베이터와 넓은 통로를 이용합니다.');
   });
 
-  test('로컬 내부 이동 데이터가 없으면 API repository로 fallback한다', () async {
+  test('로컬 내부 이동 데이터가 없으면 API fallback 없이 빈 노드 목록을 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
-    final apiRepository = _RecordingInternalRouteRepository();
     final repository = FallbackInternalRouteRepository(
       localRepository: LocalInternalRouteRepository(catalogDatabase: database),
-      apiRepository: apiRepository,
     );
 
     final nodes = await repository.listRouteNodes('station-sangnoksu');
 
-    expect(apiRepository.nodeStationIds, ['station-sangnoksu']);
-    expect(nodes.single.displayLabel, 'API 내부 노드');
+    expect(nodes, isEmpty);
   });
-}
-
-class _RecordingInternalRouteRepository implements InternalRouteRepository {
-  final nodeStationIds = <String>[];
-
-  @override
-  Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
-    nodeStationIds.add(stationId);
-    return [
-      InternalRouteNode(
-        id: 'api-node',
-        stationId: stationId,
-        type: 'ENTRANCE',
-        name: 'API 내부 노드',
-        facilityId: '',
-        displayLabel: 'API 내부 노드',
-      ),
-    ];
-  }
-
-  @override
-  Future<InternalRouteResult> searchInternalRoute(
-    InternalRouteRequest request,
-  ) async {
-    return InternalRouteResult(
-      stationId: request.stationId,
-      stationName: '상록수',
-      fromNodeId: request.fromNodeId,
-      fromNodeName: '출발',
-      toNodeId: request.toNodeId,
-      toNodeName: '도착',
-      mobilityType: request.mobilityType,
-      status: 'FOUND',
-      totalDistanceMeters: 0,
-      totalEstimatedSeconds: 0,
-      steps: const [],
-      warnings: const [],
-      blockedReasons: const [],
-    );
-  }
 }
