@@ -18,12 +18,15 @@ class InternalRouteEdge {
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
+    this.edgeType = 'WALK',
     required this.distanceMeters,
     required this.estimatedSeconds,
     required this.guidance,
     this.includesStairs = false,
     this.requiresElevator = false,
     this.requiresEscalator = false,
+    this.slopeLevel = 1,
+    this.widthLevel = 2,
     this.reliabilityScore = 100,
     this.isFacilityAvailable = true,
   });
@@ -31,12 +34,15 @@ class InternalRouteEdge {
   final String id;
   final String fromNodeId;
   final String toNodeId;
+  final String edgeType;
   final int distanceMeters;
   final int estimatedSeconds;
   final String guidance;
   final bool includesStairs;
   final bool requiresElevator;
   final bool requiresEscalator;
+  final int slopeLevel;
+  final int widthLevel;
   final int reliabilityScore;
   final bool isFacilityAvailable;
 }
