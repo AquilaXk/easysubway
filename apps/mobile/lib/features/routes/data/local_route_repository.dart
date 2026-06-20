@@ -245,6 +245,59 @@ class _RouteCatalogSnapshot {
       'distance_meters',
       '0',
     );
+    final facilityIdSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'facility_id',
+      'NULL',
+    );
+    final hasDataQualityRecords = await _tableExists(
+      database,
+      'data_quality_records',
+    );
+    final facilityRows = await database
+        .customSelect(
+          hasDataQualityRecords
+              ? '''
+          SELECT f.id,
+                 f.status,
+                 (
+                   SELECT q.quality_level
+                   FROM data_quality_records q
+                   WHERE UPPER(q.target_type) = 'FACILITY'
+                     AND q.target_id = f.id
+                   ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                   LIMIT 1
+                 ) AS quality_level,
+                 (
+                   SELECT q.checked_at
+                   FROM data_quality_records q
+                   WHERE UPPER(q.target_type) = 'FACILITY'
+                     AND q.target_id = f.id
+                   ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                   LIMIT 1
+                 ) AS checked_at
+          FROM facilities f
+          ORDER BY f.id
+          '''
+              : '''
+          SELECT f.id,
+                 f.status,
+                 NULL AS quality_level,
+                 NULL AS checked_at
+          FROM facilities f
+          ORDER BY f.id
+          ''',
+        )
+        .get();
+    final facilitiesById = {
+      for (final row in facilityRows)
+        row.read<String>('id'): _FacilitySnapshot(
+          id: row.read<String>('id'),
+          status: row.read<String>('status'),
+          qualityLevel: row.readNullable<String>('quality_level'),
+          checkedAtSeconds: row.readNullable<int>('checked_at'),
+        ),
+    };
     final networkEdgeRows = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, duration_seconds, edge_type,
                  $distanceMetersSql AS distance_meters,
@@ -253,7 +306,8 @@ class _RouteCatalogSnapshot {
                  $stairAccessStateSql AS stair_access_state,
                  $accessibilityStatusSql AS accessibility_status,
                  $reliabilityScoreSql AS reliability_score,
-                 $lastVerifiedAtSql AS last_verified_at
+                 $lastVerifiedAtSql AS last_verified_at,
+                 $facilityIdSql AS facility_id
           FROM network_edges
           ORDER BY id
           ''').get();
@@ -277,8 +331,17 @@ class _RouteCatalogSnapshot {
           )
           .toList(growable: false),
       networkEdges: networkEdgeRows
-          .map(
-            (row) => _NetworkEdgeSnapshot(
+          .map((row) {
+            final facility =
+                facilitiesById[row.readNullable<String>('facility_id')];
+            final accessibilityStatus = row.read<String>(
+              'accessibility_status',
+            );
+            final reliabilityScore = row.read<int>('reliability_score');
+            final lastVerifiedAtSeconds = row.readNullable<int>(
+              'last_verified_at',
+            );
+            return _NetworkEdgeSnapshot(
               id: row.read<String>('id'),
               fromNodeId: row.read<String>('from_node_id'),
               toNodeId: row.read<String>('to_node_id'),
@@ -288,11 +351,20 @@ class _RouteCatalogSnapshot {
               servicePattern: row.read<String>('service_pattern'),
               includesStairs: row.read<int>('includes_stairs') != 0,
               stairAccessState: row.read<String>('stair_access_state'),
-              accessibilityStatus: row.read<String>('accessibility_status'),
-              reliabilityScore: row.read<int>('reliability_score'),
-              lastVerifiedAtSeconds: row.readNullable<int>('last_verified_at'),
-            ),
-          )
+              accessibilityStatus: _effectiveAccessibilityStatus(
+                accessibilityStatus,
+                facility,
+              ),
+              reliabilityScore: _effectiveReliabilityScore(
+                reliabilityScore,
+                facility,
+              ),
+              lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
+                lastVerifiedAtSeconds,
+                facility,
+              ),
+            );
+          })
           .toList(growable: false),
     );
   }
@@ -678,6 +750,17 @@ String _selectNetworkEdgeColumn(
   return columnNames.contains(columnName) ? columnName : fallbackExpression;
 }
 
+Future<bool> _tableExists(CatalogDatabase database, String tableName) async {
+  final row = await database.customSelect('''
+        SELECT name
+        FROM sqlite_schema
+        WHERE type = 'table'
+          AND name = '$tableName'
+        LIMIT 1
+        ''').getSingleOrNull();
+  return row != null;
+}
+
 class _StationLineSnapshot {
   const _StationLineSnapshot({
     required this.stationId,
@@ -691,6 +774,86 @@ class _StationLineSnapshot {
 
   _RouteNodeKey get routeNodeKey =>
       _RouteNodeKey(stationId: stationId, lineId: lineId, servicePattern: '');
+}
+
+class _FacilitySnapshot {
+  const _FacilitySnapshot({
+    required this.id,
+    required this.status,
+    required this.qualityLevel,
+    required this.checkedAtSeconds,
+  });
+
+  final String id;
+  final String status;
+  final String? qualityLevel;
+  final int? checkedAtSeconds;
+}
+
+String _effectiveAccessibilityStatus(
+  String edgeStatus,
+  _FacilitySnapshot? facility,
+) {
+  final edgeStatusUpper = edgeStatus.toUpperCase();
+  if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
+    return edgeStatus;
+  }
+  final status = facility.status.toUpperCase();
+  if (status == 'NORMAL' ||
+      status == 'AVAILABLE' ||
+      status == 'IN_SERVICE' ||
+      status == 'OPERATING' ||
+      status == 'OPEN' ||
+      status == 'ADMIN_VERIFIED') {
+    return edgeStatus;
+  }
+  if (status == 'UNKNOWN' || status == 'CHECK_REQUIRED') {
+    return 'UNKNOWN';
+  }
+  return 'UNAVAILABLE';
+}
+
+int _effectiveReliabilityScore(
+  int edgeReliabilityScore,
+  _FacilitySnapshot? facility,
+) {
+  final facilityReliabilityScore = _facilityQualityScore(
+    facility?.qualityLevel,
+  );
+  if (facilityReliabilityScore == null) {
+    return edgeReliabilityScore;
+  }
+  return edgeReliabilityScore < facilityReliabilityScore
+      ? edgeReliabilityScore
+      : facilityReliabilityScore;
+}
+
+int? _effectiveLastVerifiedAtSeconds(
+  int? edgeLastVerifiedAtSeconds,
+  _FacilitySnapshot? facility,
+) {
+  final facilityCheckedAtSeconds = facility?.checkedAtSeconds;
+  if (facilityCheckedAtSeconds == null) {
+    return edgeLastVerifiedAtSeconds;
+  }
+  if (edgeLastVerifiedAtSeconds == null) {
+    return facilityCheckedAtSeconds;
+  }
+  return edgeLastVerifiedAtSeconds < facilityCheckedAtSeconds
+      ? edgeLastVerifiedAtSeconds
+      : facilityCheckedAtSeconds;
+}
+
+int? _facilityQualityScore(String? qualityLevel) {
+  return switch (qualityLevel?.toUpperCase()) {
+    'LEVEL_1' => 40,
+    'LEVEL_2' => 60,
+    'LEVEL_3' => 80,
+    'LEVEL_4' => 100,
+    'UNKNOWN' => 60,
+    null => null,
+    _ => 60,
+  };
 }
 
 void _addRouteNodeKey(

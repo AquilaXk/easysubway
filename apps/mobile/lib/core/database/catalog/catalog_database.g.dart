@@ -2188,6 +2188,18 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _distanceMetersMeta = const VerificationMeta(
+    'distanceMeters',
+  );
+  @override
+  late final GeneratedColumn<int> distanceMeters = GeneratedColumn<int>(
+    'distance_meters',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _edgeTypeMeta = const VerificationMeta(
     'edgeType',
   );
@@ -2263,6 +2275,17 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(100),
   );
+  static const VerificationMeta _facilityIdMeta = const VerificationMeta(
+    'facilityId',
+  );
+  @override
+  late final GeneratedColumn<String> facilityId = GeneratedColumn<String>(
+    'facility_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
     'lastVerifiedAt',
   );
@@ -2281,12 +2304,14 @@ class $NetworkEdgesTable extends NetworkEdges
     fromNodeId,
     toNodeId,
     durationSeconds,
+    distanceMeters,
     edgeType,
     servicePattern,
     includesStairs,
     stairAccessState,
     accessibilityStatus,
     reliabilityScore,
+    facilityId,
     lastVerifiedAt,
   ];
   @override
@@ -2331,6 +2356,15 @@ class $NetworkEdgesTable extends NetworkEdges
         durationSeconds.isAcceptableOrUnknown(
           data['duration_seconds']!,
           _durationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('distance_meters')) {
+      context.handle(
+        _distanceMetersMeta,
+        distanceMeters.isAcceptableOrUnknown(
+          data['distance_meters']!,
+          _distanceMetersMeta,
         ),
       );
     }
@@ -2385,6 +2419,12 @@ class $NetworkEdgesTable extends NetworkEdges
         ),
       );
     }
+    if (data.containsKey('facility_id')) {
+      context.handle(
+        _facilityIdMeta,
+        facilityId.isAcceptableOrUnknown(data['facility_id']!, _facilityIdMeta),
+      );
+    }
     if (data.containsKey('last_verified_at')) {
       context.handle(
         _lastVerifiedAtMeta,
@@ -2419,6 +2459,10 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.int,
         data['${effectivePrefix}duration_seconds'],
       )!,
+      distanceMeters: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}distance_meters'],
+      )!,
       edgeType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}edge_type'],
@@ -2443,6 +2487,10 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.int,
         data['${effectivePrefix}reliability_score'],
       )!,
+      facilityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}facility_id'],
+      ),
       lastVerifiedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_verified_at'],
@@ -2461,24 +2509,28 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final String fromNodeId;
   final String toNodeId;
   final int durationSeconds;
+  final int distanceMeters;
   final String edgeType;
   final String servicePattern;
   final bool includesStairs;
   final String stairAccessState;
   final String accessibilityStatus;
   final int reliabilityScore;
+  final String? facilityId;
   final DateTime? lastVerifiedAt;
   const NetworkEdge({
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
     required this.durationSeconds,
+    required this.distanceMeters,
     required this.edgeType,
     required this.servicePattern,
     required this.includesStairs,
     required this.stairAccessState,
     required this.accessibilityStatus,
     required this.reliabilityScore,
+    this.facilityId,
     this.lastVerifiedAt,
   });
   @override
@@ -2488,12 +2540,16 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['from_node_id'] = Variable<String>(fromNodeId);
     map['to_node_id'] = Variable<String>(toNodeId);
     map['duration_seconds'] = Variable<int>(durationSeconds);
+    map['distance_meters'] = Variable<int>(distanceMeters);
     map['edge_type'] = Variable<String>(edgeType);
     map['service_pattern'] = Variable<String>(servicePattern);
     map['includes_stairs'] = Variable<bool>(includesStairs);
     map['stair_access_state'] = Variable<String>(stairAccessState);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['reliability_score'] = Variable<int>(reliabilityScore);
+    if (!nullToAbsent || facilityId != null) {
+      map['facility_id'] = Variable<String>(facilityId);
+    }
     if (!nullToAbsent || lastVerifiedAt != null) {
       map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
     }
@@ -2506,12 +2562,16 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       fromNodeId: Value(fromNodeId),
       toNodeId: Value(toNodeId),
       durationSeconds: Value(durationSeconds),
+      distanceMeters: Value(distanceMeters),
       edgeType: Value(edgeType),
       servicePattern: Value(servicePattern),
       includesStairs: Value(includesStairs),
       stairAccessState: Value(stairAccessState),
       accessibilityStatus: Value(accessibilityStatus),
       reliabilityScore: Value(reliabilityScore),
+      facilityId: facilityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(facilityId),
       lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastVerifiedAt),
@@ -2528,6 +2588,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       fromNodeId: serializer.fromJson<String>(json['fromNodeId']),
       toNodeId: serializer.fromJson<String>(json['toNodeId']),
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
+      distanceMeters: serializer.fromJson<int>(json['distanceMeters']),
       edgeType: serializer.fromJson<String>(json['edgeType']),
       servicePattern: serializer.fromJson<String>(json['servicePattern']),
       includesStairs: serializer.fromJson<bool>(json['includesStairs']),
@@ -2536,6 +2597,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
         json['accessibilityStatus'],
       ),
       reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
+      facilityId: serializer.fromJson<String?>(json['facilityId']),
       lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
     );
   }
@@ -2547,12 +2609,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'fromNodeId': serializer.toJson<String>(fromNodeId),
       'toNodeId': serializer.toJson<String>(toNodeId),
       'durationSeconds': serializer.toJson<int>(durationSeconds),
+      'distanceMeters': serializer.toJson<int>(distanceMeters),
       'edgeType': serializer.toJson<String>(edgeType),
       'servicePattern': serializer.toJson<String>(servicePattern),
       'includesStairs': serializer.toJson<bool>(includesStairs),
       'stairAccessState': serializer.toJson<String>(stairAccessState),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
+      'facilityId': serializer.toJson<String?>(facilityId),
       'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
     };
   }
@@ -2562,24 +2626,28 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     String? fromNodeId,
     String? toNodeId,
     int? durationSeconds,
+    int? distanceMeters,
     String? edgeType,
     String? servicePattern,
     bool? includesStairs,
     String? stairAccessState,
     String? accessibilityStatus,
     int? reliabilityScore,
+    Value<String?> facilityId = const Value.absent(),
     Value<DateTime?> lastVerifiedAt = const Value.absent(),
   }) => NetworkEdge(
     id: id ?? this.id,
     fromNodeId: fromNodeId ?? this.fromNodeId,
     toNodeId: toNodeId ?? this.toNodeId,
     durationSeconds: durationSeconds ?? this.durationSeconds,
+    distanceMeters: distanceMeters ?? this.distanceMeters,
     edgeType: edgeType ?? this.edgeType,
     servicePattern: servicePattern ?? this.servicePattern,
     includesStairs: includesStairs ?? this.includesStairs,
     stairAccessState: stairAccessState ?? this.stairAccessState,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+    facilityId: facilityId.present ? facilityId.value : this.facilityId,
     lastVerifiedAt: lastVerifiedAt.present
         ? lastVerifiedAt.value
         : this.lastVerifiedAt,
@@ -2594,6 +2662,9 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       durationSeconds: data.durationSeconds.present
           ? data.durationSeconds.value
           : this.durationSeconds,
+      distanceMeters: data.distanceMeters.present
+          ? data.distanceMeters.value
+          : this.distanceMeters,
       edgeType: data.edgeType.present ? data.edgeType.value : this.edgeType,
       servicePattern: data.servicePattern.present
           ? data.servicePattern.value
@@ -2610,6 +2681,9 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       reliabilityScore: data.reliabilityScore.present
           ? data.reliabilityScore.value
           : this.reliabilityScore,
+      facilityId: data.facilityId.present
+          ? data.facilityId.value
+          : this.facilityId,
       lastVerifiedAt: data.lastVerifiedAt.present
           ? data.lastVerifiedAt.value
           : this.lastVerifiedAt,
@@ -2623,12 +2697,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('fromNodeId: $fromNodeId, ')
           ..write('toNodeId: $toNodeId, ')
           ..write('durationSeconds: $durationSeconds, ')
+          ..write('distanceMeters: $distanceMeters, ')
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
           ..write('includesStairs: $includesStairs, ')
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('facilityId: $facilityId, ')
           ..write('lastVerifiedAt: $lastVerifiedAt')
           ..write(')'))
         .toString();
@@ -2640,12 +2716,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     fromNodeId,
     toNodeId,
     durationSeconds,
+    distanceMeters,
     edgeType,
     servicePattern,
     includesStairs,
     stairAccessState,
     accessibilityStatus,
     reliabilityScore,
+    facilityId,
     lastVerifiedAt,
   );
   @override
@@ -2656,12 +2734,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.fromNodeId == this.fromNodeId &&
           other.toNodeId == this.toNodeId &&
           other.durationSeconds == this.durationSeconds &&
+          other.distanceMeters == this.distanceMeters &&
           other.edgeType == this.edgeType &&
           other.servicePattern == this.servicePattern &&
           other.includesStairs == this.includesStairs &&
           other.stairAccessState == this.stairAccessState &&
           other.accessibilityStatus == this.accessibilityStatus &&
           other.reliabilityScore == this.reliabilityScore &&
+          other.facilityId == this.facilityId &&
           other.lastVerifiedAt == this.lastVerifiedAt);
 }
 
@@ -2670,12 +2750,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<String> fromNodeId;
   final Value<String> toNodeId;
   final Value<int> durationSeconds;
+  final Value<int> distanceMeters;
   final Value<String> edgeType;
   final Value<String> servicePattern;
   final Value<bool> includesStairs;
   final Value<String> stairAccessState;
   final Value<String> accessibilityStatus;
   final Value<int> reliabilityScore;
+  final Value<String?> facilityId;
   final Value<DateTime?> lastVerifiedAt;
   final Value<int> rowid;
   const NetworkEdgesCompanion({
@@ -2683,12 +2765,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.fromNodeId = const Value.absent(),
     this.toNodeId = const Value.absent(),
     this.durationSeconds = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
     this.includesStairs = const Value.absent(),
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.facilityId = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2697,12 +2781,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     required String fromNodeId,
     required String toNodeId,
     this.durationSeconds = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
     this.includesStairs = const Value.absent(),
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.facilityId = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2713,12 +2799,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<String>? fromNodeId,
     Expression<String>? toNodeId,
     Expression<int>? durationSeconds,
+    Expression<int>? distanceMeters,
     Expression<String>? edgeType,
     Expression<String>? servicePattern,
     Expression<bool>? includesStairs,
     Expression<String>? stairAccessState,
     Expression<String>? accessibilityStatus,
     Expression<int>? reliabilityScore,
+    Expression<String>? facilityId,
     Expression<DateTime>? lastVerifiedAt,
     Expression<int>? rowid,
   }) {
@@ -2727,6 +2815,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (fromNodeId != null) 'from_node_id': fromNodeId,
       if (toNodeId != null) 'to_node_id': toNodeId,
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (distanceMeters != null) 'distance_meters': distanceMeters,
       if (edgeType != null) 'edge_type': edgeType,
       if (servicePattern != null) 'service_pattern': servicePattern,
       if (includesStairs != null) 'includes_stairs': includesStairs,
@@ -2734,6 +2823,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (accessibilityStatus != null)
         'accessibility_status': accessibilityStatus,
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
+      if (facilityId != null) 'facility_id': facilityId,
       if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2744,12 +2834,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<String>? fromNodeId,
     Value<String>? toNodeId,
     Value<int>? durationSeconds,
+    Value<int>? distanceMeters,
     Value<String>? edgeType,
     Value<String>? servicePattern,
     Value<bool>? includesStairs,
     Value<String>? stairAccessState,
     Value<String>? accessibilityStatus,
     Value<int>? reliabilityScore,
+    Value<String?>? facilityId,
     Value<DateTime?>? lastVerifiedAt,
     Value<int>? rowid,
   }) {
@@ -2758,12 +2850,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       fromNodeId: fromNodeId ?? this.fromNodeId,
       toNodeId: toNodeId ?? this.toNodeId,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
       edgeType: edgeType ?? this.edgeType,
       servicePattern: servicePattern ?? this.servicePattern,
       includesStairs: includesStairs ?? this.includesStairs,
       stairAccessState: stairAccessState ?? this.stairAccessState,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+      facilityId: facilityId ?? this.facilityId,
       lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2784,6 +2878,9 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (durationSeconds.present) {
       map['duration_seconds'] = Variable<int>(durationSeconds.value);
     }
+    if (distanceMeters.present) {
+      map['distance_meters'] = Variable<int>(distanceMeters.value);
+    }
     if (edgeType.present) {
       map['edge_type'] = Variable<String>(edgeType.value);
     }
@@ -2802,6 +2899,9 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (reliabilityScore.present) {
       map['reliability_score'] = Variable<int>(reliabilityScore.value);
     }
+    if (facilityId.present) {
+      map['facility_id'] = Variable<String>(facilityId.value);
+    }
     if (lastVerifiedAt.present) {
       map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
     }
@@ -2818,12 +2918,14 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('fromNodeId: $fromNodeId, ')
           ..write('toNodeId: $toNodeId, ')
           ..write('durationSeconds: $durationSeconds, ')
+          ..write('distanceMeters: $distanceMeters, ')
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
           ..write('includesStairs: $includesStairs, ')
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('facilityId: $facilityId, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6751,12 +6853,14 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       required String fromNodeId,
       required String toNodeId,
       Value<int> durationSeconds,
+      Value<int> distanceMeters,
       Value<String> edgeType,
       Value<String> servicePattern,
       Value<bool> includesStairs,
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
+      Value<String?> facilityId,
       Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
@@ -6766,12 +6870,14 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<String> fromNodeId,
       Value<String> toNodeId,
       Value<int> durationSeconds,
+      Value<int> distanceMeters,
       Value<String> edgeType,
       Value<String> servicePattern,
       Value<bool> includesStairs,
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
+      Value<String?> facilityId,
       Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
@@ -6805,6 +6911,11 @@ class $$NetworkEdgesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get edgeType => $composableBuilder(
     column: $table.edgeType,
     builder: (column) => ColumnFilters(column),
@@ -6832,6 +6943,11 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<int> get reliabilityScore => $composableBuilder(
     column: $table.reliabilityScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6870,6 +6986,11 @@ class $$NetworkEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get edgeType => $composableBuilder(
     column: $table.edgeType,
     builder: (column) => ColumnOrderings(column),
@@ -6897,6 +7018,11 @@ class $$NetworkEdgesTableOrderingComposer
 
   ColumnOrderings<int> get reliabilityScore => $composableBuilder(
     column: $table.reliabilityScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6931,6 +7057,11 @@ class $$NetworkEdgesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get edgeType =>
       $composableBuilder(column: $table.edgeType, builder: (column) => column);
 
@@ -6956,6 +7087,11 @@ class $$NetworkEdgesTableAnnotationComposer
 
   GeneratedColumn<int> get reliabilityScore => $composableBuilder(
     column: $table.reliabilityScore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
     builder: (column) => column,
   );
 
@@ -7002,12 +7138,14 @@ class $$NetworkEdgesTableTableManager
                 Value<String> fromNodeId = const Value.absent(),
                 Value<String> toNodeId = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String?> facilityId = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion(
@@ -7015,12 +7153,14 @@ class $$NetworkEdgesTableTableManager
                 fromNodeId: fromNodeId,
                 toNodeId: toNodeId,
                 durationSeconds: durationSeconds,
+                distanceMeters: distanceMeters,
                 edgeType: edgeType,
                 servicePattern: servicePattern,
                 includesStairs: includesStairs,
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
+                facilityId: facilityId,
                 lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
@@ -7030,12 +7170,14 @@ class $$NetworkEdgesTableTableManager
                 required String fromNodeId,
                 required String toNodeId,
                 Value<int> durationSeconds = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String?> facilityId = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion.insert(
@@ -7043,12 +7185,14 @@ class $$NetworkEdgesTableTableManager
                 fromNodeId: fromNodeId,
                 toNodeId: toNodeId,
                 durationSeconds: durationSeconds,
+                distanceMeters: distanceMeters,
                 edgeType: edgeType,
                 servicePattern: servicePattern,
                 includesStairs: includesStairs,
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
+                facilityId: facilityId,
                 lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
