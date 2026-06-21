@@ -842,6 +842,46 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   );
 });
 
+test("공개 source contract 불변식은 README와 public interfaces에 남는다", () => {
+  const readme = read("README.md");
+  const facilityReportUseCase = read(
+    "backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java",
+  );
+  const storePhotoPort = read(
+    "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportPhotoPort.java",
+  );
+  const storeUploadedPhotoPort = read(
+    "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportUploadedPhotoPort.java",
+  );
+  const loadPhotoPort = read(
+    "backend/src/main/java/com/easysubway/report/application/port/out/LoadFacilityReportPhotoPort.java",
+  );
+  const dataPackInstaller = read("apps/mobile/lib/core/datapack/data_pack_installer.dart");
+  const dataPackManifest = read("apps/mobile/lib/core/datapack/data_pack_manifest.dart");
+  const catalogDatabase = read("apps/mobile/lib/core/database/catalog/catalog_database.dart");
+  const userDatabase = read("apps/mobile/lib/core/database/user/user_database.dart");
+
+  for (const marker of [
+    "local-first mobile runtime",
+    "backend control-plane runtime",
+    "receipt-token report boundary",
+    "data-pack pointer contract",
+    "user-data preservation contract",
+  ]) {
+    assert.match(readme, new RegExp(marker), `README must document ${marker}`);
+  }
+
+  assert.match(facilityReportUseCase, /receipt-token report boundary/);
+  assert.match(facilityReportUseCase, /plain receipt token must never be logged or returned after issuance/);
+  assert.match(storePhotoPort, /object key is the durable photo reference/);
+  assert.match(storeUploadedPhotoPort, /object key is the durable photo reference/);
+  assert.match(loadPhotoPort, /photo bytes must only be loaded through authorized review or receipt-token flows/);
+  assert.match(dataPackInstaller, /data-pack pointer contract/);
+  assert.match(dataPackManifest, /production signatures bind the pack URL/);
+  assert.match(catalogDatabase, /catalog database is replaceable installed-pack state/);
+  assert.match(userDatabase, /user-data preservation contract/);
+});
+
 test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 보관 계약을 고정한다", () => {
   const gatePath = "apps/mobile/release/operations-observability-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)), "operations observability gate artifact must exist");
