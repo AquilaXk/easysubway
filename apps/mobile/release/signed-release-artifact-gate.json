@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "mobile-signed-release-artifacts",
+  "storeReadyStatus": "blocked_external_distribution_evidence_missing",
+  "officialRequirements": {
+    "android": {
+      "targetApiLevelMinimum": 35,
+      "requiredFrom": "2025-08-31",
+      "source": "https://support.google.com/googleplay/android-developer/answer/11926878"
+    },
+    "ios": {
+      "minimumXcodeMajor": 26,
+      "minimumSdkMajor": 26,
+      "requiredFrom": "2026-04-28",
+      "source": "https://developer.apple.com/news/upcoming-requirements/"
+    }
+  },
+  "artifacts": {
+    "android": {
+      "format": "aab",
+      "ciArtifactStoreReady": false,
+      "ciSigningKeyType": "temporary-self-signed",
+      "symbolArtifact": "mapping.txt",
+      "symbolRetentionDays": 90,
+      "storeReadyRequires": [
+        "production signing key material",
+        "Play App Signing enrollment",
+        "Play internal track upload or pre-launch report evidence"
+      ]
+    },
+    "ios": {
+      "format": "Runner.app.zip",
+      "ciArtifactStoreReady": false,
+      "ciSigningKeyType": "no-codesign",
+      "symbolArtifact": "dSYM",
+      "symbolRetentionDays": 90,
+      "storeReadyRequires": [
+        "Apple distribution signing",
+        "export archive",
+        "TestFlight or signed-device install evidence"
+      ]
+    }
+  },
+  "evidencePolicy": {
+    "localOnlyEvidencePath": ".codex/evidence/release/mobile-signed-artifacts/",
+    "githubUploadPolicy": "summary-only"
+  }
+}

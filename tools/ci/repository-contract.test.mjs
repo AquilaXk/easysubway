@@ -659,6 +659,63 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
+test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
+  const gatePath = "apps/mobile/release/signed-release-artifact-gate.json";
+
+  assert.equal(existsSync(path.join(root, gatePath)), true, "signed release artifact gate must exist");
+
+  const gate = readJson(gatePath);
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "mobile-signed-release-artifacts");
+  assert.equal(gate.storeReadyStatus, "blocked_external_distribution_evidence_missing");
+
+  assert.equal(gate.officialRequirements.android.targetApiLevelMinimum, 35);
+  assert.equal(gate.officialRequirements.android.requiredFrom, "2025-08-31");
+  assert.match(gate.officialRequirements.android.source, /^https:\/\/support\.google\.com\/googleplay\/android-developer\/answer\/11926878/);
+  assert.equal(gate.officialRequirements.ios.minimumXcodeMajor, 26);
+  assert.equal(gate.officialRequirements.ios.minimumSdkMajor, 26);
+  assert.equal(gate.officialRequirements.ios.requiredFrom, "2026-04-28");
+  assert.match(gate.officialRequirements.ios.source, /^https:\/\/developer\.apple\.com\/news\/upcoming-requirements\//);
+
+  assert.equal(gate.artifacts.android.format, "aab");
+  assert.equal(gate.artifacts.android.ciArtifactStoreReady, false);
+  assert.equal(gate.artifacts.android.ciSigningKeyType, "temporary-self-signed");
+  assert.equal(gate.artifacts.android.symbolArtifact, "mapping.txt");
+  assert.equal(gate.artifacts.android.symbolRetentionDays, 90);
+  assert.ok(gate.artifacts.android.storeReadyRequires.includes("production signing key material"));
+  assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play internal track upload or pre-launch report evidence"));
+
+  assert.equal(gate.artifacts.ios.format, "Runner.app.zip");
+  assert.equal(gate.artifacts.ios.ciArtifactStoreReady, false);
+  assert.equal(gate.artifacts.ios.ciSigningKeyType, "no-codesign");
+  assert.equal(gate.artifacts.ios.symbolArtifact, "dSYM");
+  assert.equal(gate.artifacts.ios.symbolRetentionDays, 90);
+  assert.ok(gate.artifacts.ios.storeReadyRequires.includes("Apple distribution signing"));
+  assert.ok(gate.artifacts.ios.storeReadyRequires.includes("TestFlight or signed-device install evidence"));
+
+  assert.equal(gate.evidencePolicy.localOnlyEvidencePath, ".codex/evidence/release/mobile-signed-artifacts/");
+  assert.equal(gate.evidencePolicy.githubUploadPolicy, "summary-only");
+
+  assert.match(workflow, /toolchain_policy=apps\/mobile\/release\/signed-release-artifact-gate\.json/);
+  assert.match(workflow, /store_ready=false/);
+  assert.match(workflow, /signing_key_type=temporary-self-signed/);
+  assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
+  assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
+  assert.match(workflow, /signing_key_type=no-codesign/);
+  assert.match(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
+  assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
+
+  assert.match(readme, /signed release artifact gate/);
+  assert.match(readme, /Android 15 \(API 35\)/);
+  assert.match(readme, /Xcode 26/);
+  assert.match(readme, /TestFlight/);
+  assert.match(readme, /Play internal track/);
+});
+
 test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 산출물 빌드를 실행한다", async () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
   const detector = read("tools/ci/detect-changed-paths.sh");
