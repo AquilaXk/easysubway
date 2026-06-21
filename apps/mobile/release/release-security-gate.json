@@ -71,9 +71,9 @@
       "severity": "release-blocker",
       "titleKo": "관리자 Basic auth 운영 전환 기준",
       "ownerKo": "백엔드/운영 담당",
-      "readyWhenKo": "현재 Basic auth는 임시 운영 보호 수단이며, 상용 출시 전에는 lockout 정책 또는 OIDC/MFA/SSO 전환 결정과 구현 증거가 PR 검증 증거에 남아야 한다.",
-      "evidence": ["admin-auth-transition-decision-record", "lockout-or-oidc-mfa-implementation-evidence", "admin-security-config-review"],
-      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", ".github/pull_request_template.md", "tools/ci/repository-contract.test.mjs"]
+      "readyWhenKo": "현재 Basic auth는 임시 운영 보호 수단이며, 상용 출시 전에는 관리자와 운영기관 인증 실패 lockout 정책 또는 OIDC/MFA/SSO 전환 결정과 구현 증거가 PR 검증 증거에 남아야 한다.",
+      "evidence": ["admin-auth-transition-decision-record", "lockout-or-oidc-mfa-implementation-evidence", "admin-basic-auth-lockout-tests", "admin-security-config-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java", "backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java", ".github/pull_request_template.md", "tools/ci/repository-contract.test.mjs"]
     },
     {
       "id": "backend_role_authorization",
