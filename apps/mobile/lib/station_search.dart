@@ -194,7 +194,7 @@ class StationSearchApiRepository
         .replace(queryParameters: queryParameters);
 
     final data = await _getData(uri);
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
 
@@ -220,7 +220,7 @@ class StationSearchApiRepository
   @override
   Future<List<SubwayLineOption>> listLines() async {
     final data = await _getData(baseUri.resolve('/api/v1/lines'));
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
 
@@ -261,7 +261,7 @@ class StationSearchApiRepository
         );
 
     final data = await _getData(uri);
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
 
@@ -307,7 +307,7 @@ class StationSearchApiRepository
       '/api/v1/stations/${Uri.encodeComponent(stationId)}/exits',
     );
     final data = await _getData(uri);
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
     try {
@@ -337,7 +337,7 @@ class StationSearchApiRepository
       '/api/v1/stations/${Uri.encodeComponent(stationId)}/facilities',
     );
     final data = await _getData(uri);
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
     try {
@@ -442,7 +442,7 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
       baseUri.resolve('/api/v1/me/favorites/stations'),
       errorMessage: _favoriteStationLoadErrorMessage,
     );
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const FavoriteStationException(_favoriteStationLoadErrorMessage);
     }
 
@@ -588,7 +588,7 @@ class FavoriteStation {
 
   factory FavoriteStation.fromJson(Map<String, Object?> json) {
     final rawLines = json['lines'];
-    if (rawLines is! List) {
+    if (rawLines is! List<Object?>) {
       throw const FormatException('Invalid favorite station lines payload');
     }
 
@@ -657,7 +657,7 @@ class StationSearchResult {
 
   factory StationSearchResult.fromJson(Map<String, Object?> json) {
     final rawLines = json['lines'];
-    if (rawLines is! List) {
+    if (rawLines is! List<Object?>) {
       throw const FormatException('Invalid station lines payload');
     }
 
@@ -740,7 +740,7 @@ class StationDetail {
 
   factory StationDetail.fromJson(Map<String, Object?> json) {
     final rawLines = json['lines'];
-    if (rawLines is! List) {
+    if (rawLines is! List<Object?>) {
       throw const FormatException('Invalid station detail lines payload');
     }
 

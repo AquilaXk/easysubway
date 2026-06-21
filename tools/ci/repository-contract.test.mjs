@@ -3493,6 +3493,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /flutter_secure_storage:/);
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
+  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
   assert.match(androidManifest, /android:allowBackup="false"/);
   assert.match(androidManifest, /android:fullBackupContent="false"/);

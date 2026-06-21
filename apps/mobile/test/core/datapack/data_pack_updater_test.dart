@@ -165,7 +165,7 @@ void main() {
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({'ttlSeconds': 60, 'packs': []}))
+        ..write(jsonEncode({'ttlSeconds': 60, 'packs': <Object?>[]}))
         ..close();
     });
     final stateRepository = DataPackUpdateStateRepository(
