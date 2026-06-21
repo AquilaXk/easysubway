@@ -127,13 +127,54 @@ class DataPackInstaller {
   }) async {
     final target = File(p.join(catalogDirectory.path, '$id-v$version.sqlite'));
     if (!await target.exists()) {
+      return _readInstalledPointerByNumericVersion(id: id, version: version);
+    }
+    return _pointerForInstalledFile(file: target, id: id, version: version);
+  }
+
+  Future<InstalledDataPackPointer?> _readInstalledPointerByNumericVersion({
+    required String id,
+    required String version,
+  }) async {
+    final requestedVersion = int.tryParse(version);
+    if (requestedVersion == null || !await catalogDirectory.exists()) {
       return null;
     }
+    final candidates = await catalogDirectory
+        .list()
+        .where((entity) => entity is File)
+        .cast<File>()
+        .where((file) => _versionNumber(file.path) == requestedVersion)
+        .where((file) => _versionText(file.path, id) != null)
+        .toList();
+    candidates.sort((left, right) {
+      return p.basename(left.path).compareTo(p.basename(right.path));
+    });
+    if (candidates.isEmpty) {
+      return null;
+    }
+    final candidate = candidates.first;
+    final candidateVersion = _versionText(candidate.path, id);
+    if (candidateVersion == null) {
+      return null;
+    }
+    return _pointerForInstalledFile(
+      file: candidate,
+      id: id,
+      version: candidateVersion,
+    );
+  }
+
+  Future<InstalledDataPackPointer> _pointerForInstalledFile({
+    required File file,
+    required String id,
+    required String version,
+  }) async {
     return InstalledDataPackPointer(
       id: id,
       version: version,
-      path: target.path,
-      sha256: sha256.convert(await target.readAsBytes()).toString(),
+      path: file.path,
+      sha256: sha256.convert(await file.readAsBytes()).toString(),
     );
   }
 
@@ -349,4 +390,9 @@ int _versionNumber(String path) {
     return 0;
   }
   return int.tryParse(match.group(1)!) ?? 0;
+}
+
+String? _versionText(String path, String packId) {
+  final pattern = RegExp('^${RegExp.escape(packId)}-v([0-9]+)\\.sqlite\$');
+  return pattern.firstMatch(p.basename(path))?.group(1);
 }
