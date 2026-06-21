@@ -266,7 +266,7 @@
       "decisionOwnerKo": "개인정보/모바일 담당",
       "readyWhenKo": "Play Data safety, App Privacy, PrivacyInfo.xcprivacy, 앱 도움말 안내가 같은 데이터 수집 범위와 삭제 요청 경로를 설명한다.",
       "evidence": ["privacy-cross-check", "release-help-screen-review"],
-      "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy", "apps/mobile/lib/main.dart"],
+      "linkedArtifacts": ["README.md", "apps/mobile/release/store-privacy-inventory.json", "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy", "apps/mobile/lib/main.dart"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL", "EASYSUBWAY_DATA_DELETION_EMAIL"]
     },
     {
