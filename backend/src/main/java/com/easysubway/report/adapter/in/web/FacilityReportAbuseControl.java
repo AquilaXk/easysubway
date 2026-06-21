@@ -34,11 +34,13 @@ class FacilityReportAbuseControl extends OncePerRequestFilter {
 		@Value("${easysubway.report.abuse-control.report-submit-limit:1000}") int reportSubmitLimit,
 		@Value("${easysubway.report.abuse-control.status-limit:1000}") int statusLimit,
 		@Value("${easysubway.report.abuse-control.confirm-limit:1000}") int confirmLimit,
+		@Value("${easysubway.report.abuse-control.max-counter-keys:4096}") int maxCounterKeys,
 		@Value("${easysubway.auth.client-ip.trusted-proxies:}") String trustedProxies,
 		ObjectProvider<Clock> clockProvider
 	) {
 		FacilityReportAbuseControlPolicy policy = new FacilityReportAbuseControlPolicy(
 			windowSeconds,
+			maxCounterKeys,
 			Map.of(
 				ReportAbuseGroup.UPLOAD_INTENT, uploadIntentLimit,
 				ReportAbuseGroup.UPLOAD_CLAIM, uploadClaimLimit,
@@ -105,11 +107,18 @@ enum ReportAbuseGroup {
 	}
 }
 
-record FacilityReportAbuseControlPolicy(long windowSeconds, Map<ReportAbuseGroup, Integer> limits) {
+record FacilityReportAbuseControlPolicy(
+	long windowSeconds,
+	int maxCounterKeys,
+	Map<ReportAbuseGroup, Integer> limits
+) {
 
 	FacilityReportAbuseControlPolicy {
 		if (windowSeconds < 1) {
 			throw new IllegalArgumentException("report abuse control window must be positive");
+		}
+		if (maxCounterKeys < 1) {
+			throw new IllegalArgumentException("report abuse control max counter keys must be positive");
 		}
 	}
 
@@ -135,15 +144,32 @@ class FacilityReportAbuseControlLimiter {
 			return true;
 		}
 		long windowStartedAt = currentWindowStartedAt(Instant.now(clock));
-		WindowCounter counter = counters.computeIfAbsent(
-			new LimiterKey(group, clientIdentity),
-			ignored -> new WindowCounter(windowStartedAt)
-		);
-		boolean allowed = counter.incrementWithin(windowStartedAt, limit);
-		if (counters.size() > 1024) {
-			counters.entrySet().removeIf(entry -> entry.getValue().isBefore(windowStartedAt));
+		WindowCounter counter = counterFor(new LimiterKey(group, clientIdentity), windowStartedAt);
+		if (counter == null) {
+			return false;
 		}
+		boolean allowed = counter.incrementWithin(windowStartedAt, limit);
 		return allowed;
+	}
+
+	private WindowCounter counterFor(LimiterKey key, long windowStartedAt) {
+		WindowCounter existingCounter = counters.get(key);
+		if (existingCounter != null) {
+			return existingCounter;
+		}
+		synchronized (counters) {
+			WindowCounter counter = counters.get(key);
+			if (counter != null) {
+				return counter;
+			}
+			counters.entrySet().removeIf(entry -> entry.getValue().isBefore(windowStartedAt));
+			if (counters.size() >= policy.maxCounterKeys()) {
+				return null;
+			}
+			WindowCounter newCounter = new WindowCounter(windowStartedAt);
+			counters.put(key, newCounter);
+			return newCounter;
+		}
 	}
 
 	private long currentWindowStartedAt(Instant now) {

@@ -1,5 +1,6 @@
 package com.easysubway.report.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,6 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +30,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 	"easysubway.report.abuse-control.report-submit-limit=2",
 	"easysubway.report.abuse-control.status-limit=2",
 	"easysubway.report.abuse-control.confirm-limit=2",
+	"easysubway.report.abuse-control.max-counter-keys=64",
 	"easysubway.auth.client-ip.trusted-proxies=10.0.0.0/8"
 })
 @AutoConfigureMockMvc
@@ -103,6 +109,20 @@ class FacilityReportAbuseControlTest {
 
 		getUnknownStatusFromForwardedClient("203.0.113.11")
 			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("limiter는 현재 window 신규 client key 증가를 상한에서 차단한다")
+	void limiterRejectsNewClientIdentityWhenCurrentWindowKeyCapIsReached() {
+		var limiter = new FacilityReportAbuseControlLimiter(
+			new FacilityReportAbuseControlPolicy(60, 2, Map.of(ReportAbuseGroup.STATUS, 100)),
+			Clock.fixed(Instant.parse("2026-06-22T00:00:00Z"), ZoneOffset.UTC)
+		);
+
+		assertThat(limiter.tryAcquire(ReportAbuseGroup.STATUS, "ip:203.0.113.1")).isTrue();
+		assertThat(limiter.tryAcquire(ReportAbuseGroup.STATUS, "ip:203.0.113.2")).isTrue();
+		assertThat(limiter.tryAcquire(ReportAbuseGroup.STATUS, "ip:203.0.113.1")).isTrue();
+		assertThat(limiter.tryAcquire(ReportAbuseGroup.STATUS, "ip:203.0.113.3")).isFalse();
 	}
 
 	private org.springframework.test.web.servlet.ResultActions createUploadIntent(String clientSubmissionId, String remoteAddr)

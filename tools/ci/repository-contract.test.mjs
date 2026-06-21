@@ -1999,6 +1999,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.report-submit-limit/);
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.status-limit/);
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.confirm-limit/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.max-counter-keys/);
+  assert.match(abuseControl, /maxCounterKeys/);
   assert.match(abuseControl, /easysubway\.auth\.client-ip\.trusted-proxies/);
   assert.match(abuseControl, /X-Forwarded-For/);
   assert.doesNotMatch(abuseControl, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
@@ -2008,6 +2010,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_REPORT_SUBMIT_LIMIT:30/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_STATUS_LIMIT:120/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_CONFIRM_LIMIT:30/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_MAX_COUNTER_KEYS:4096/);
   assert.match(adminPageController, /REPORT_SURGE_ALERT_THRESHOLD = 10/);
   assert.match(adminPageController, /REPORT_SURGE_LOOKBACK_HOURS = 24/);
   assert.match(adminPageController, /ReportSurgeAlertView/);
