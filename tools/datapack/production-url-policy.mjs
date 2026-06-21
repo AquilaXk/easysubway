@@ -58,6 +58,10 @@ function isNonPublicIpv6(hostname) {
   if (mappedIpv4 !== null) {
     return isNonPublicIpv4Octets(mappedIpv4);
   }
+  const compatibleIpv4 = parseIpv4CompatibleIpv6(hostname);
+  if (compatibleIpv4 !== null) {
+    return isNonPublicIpv4Octets(compatibleIpv4);
+  }
   const [first = null, second = null, third = null] = parseIpv6LeadingHextets(hostname);
   return (
     hostname === "::" ||
@@ -97,7 +101,17 @@ function parseIpv4MappedIpv6(hostname) {
   if (!hostname.startsWith("::ffff:")) {
     return null;
   }
-  const suffix = hostname.slice("::ffff:".length);
+  return parseIpv6TailAsIpv4(hostname.slice("::ffff:".length));
+}
+
+function parseIpv4CompatibleIpv6(hostname) {
+  if (!hostname.startsWith("::") || hostname.startsWith("::ffff:")) {
+    return null;
+  }
+  return parseIpv6TailAsIpv4(hostname.slice(2));
+}
+
+function parseIpv6TailAsIpv4(suffix) {
   if (suffix.includes(".")) {
     return parseIpv4Octets(suffix);
   }
