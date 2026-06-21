@@ -36,6 +36,7 @@ function applyAdminReviewOverrides(fixture, overrides) {
         if (facility.id === facilityId) {
           facility.status = status;
           applyRouteAccessibilityOverride(pack, facility, status);
+          applyStationAccessibilitySummaryOverride(pack, facility, status);
           matchedFacilities.push(facility);
         }
       }
@@ -78,6 +79,50 @@ function latestFacilityUpdates(updates) {
     }
   });
   return latest;
+}
+
+function applyStationAccessibilitySummaryOverride(pack, facility, status) {
+  const stationId = requiredString(facility.stationId, "facility.stationId");
+  const facilityName = requiredString(facility.name, "facility.name");
+  const summaries = pack.stationAccessibilitySummaries ?? [];
+  pack.stationAccessibilitySummaries = summaries;
+  let summary = summaries.find((row) => row.stationId === stationId);
+  if (summary == null) {
+    summary = { stationId, summary: "", warning: "" };
+    summaries.push(summary);
+  }
+  const message = stationAccessibilityMessage(facilityName, status);
+  summary.summary = message.summary;
+  summary.warning = message.warning;
+}
+
+function stationAccessibilityMessage(facilityName, status) {
+  switch (status) {
+    case "NORMAL":
+      return { summary: `${facilityName} 이용 가능`, warning: "" };
+    case "UNKNOWN":
+      return {
+        summary: `${facilityName} 상태 확인 필요`,
+        warning: `${facilityName} 상태가 관리자 검수에서 확인 필요로 표시되었습니다.`,
+      };
+    case "BROKEN":
+      return {
+        summary: `${facilityName} 이용 제한`,
+        warning: `${facilityName} 고장으로 우회가 필요합니다.`,
+      };
+    case "UNDER_CONSTRUCTION":
+      return {
+        summary: `${facilityName} 이용 제한`,
+        warning: `${facilityName} 공사 중으로 우회가 필요합니다.`,
+      };
+    case "CLOSED":
+      return {
+        summary: `${facilityName} 이용 제한`,
+        warning: `${facilityName} 폐쇄로 우회가 필요합니다.`,
+      };
+    default:
+      throw new Error(`facilityStatusUpdates.status is not supported: ${status}`);
+  }
 }
 
 function applyRouteAccessibilityOverride(pack, facility, status) {
