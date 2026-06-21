@@ -1,0 +1,70 @@
+name: Store Distribution Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-distribution-evidence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Store Distribution Evidence / Preflight
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+
+    steps:
+      - name: Store Distribution Evidence / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Store Distribution Evidence / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Store Distribution Evidence / Restore GitHub Actions dotenv secret
+        env:
+          EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
+            echo "::error title=Store distribution evidence env::EASYSUBWAY_ENV secret is not configured."
+            exit 1
+          fi
+          env_file="${RUNNER_TEMP}/easysubway-store-distribution.env"
+          printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+          chmod 600 "${env_file}"
+          echo "EASYSUBWAY_ENV_FILE=${env_file}" >> "${GITHUB_ENV}"
+
+      - name: Store Distribution Evidence / Check credential and publish env readiness
+        id: store-env
+        run: |
+          set -euo pipefail
+          node tools/ci/check-store-distribution-evidence-env.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --github-output "${GITHUB_OUTPUT}" \
+            --report "${RUNNER_TEMP}/store-distribution-evidence-preflight.txt"
+
+      - name: Store Distribution Evidence / Validate data pack object storage publish env
+        id: datapack-env
+        run: |
+          set -euo pipefail
+          node tools/datapack/export-publish-env.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --github-env "${GITHUB_ENV}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Store Distribution Evidence / Upload preflight evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: store-distribution-evidence-preflight-${{ github.sha }}
+          path: ${{ runner.temp }}/store-distribution-evidence-preflight.txt
+          if-no-files-found: warn
+          retention-days: 14
