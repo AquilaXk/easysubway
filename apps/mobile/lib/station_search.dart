@@ -4062,6 +4062,30 @@ Uri defaultStationApiBaseUri() {
   );
 }
 
+Uri? defaultOptionalStationApiBaseUri() {
+  const configuredBaseUrl = String.fromEnvironment('EASYSUBWAY_API_BASE_URL');
+  return optionalStationApiBaseUriForEnvironment(
+    configuredBaseUrl: configuredBaseUrl,
+    isAndroid: Platform.isAndroid,
+    isReleaseMode: kReleaseMode,
+  );
+}
+
+Uri? optionalStationApiBaseUriForEnvironment({
+  required String configuredBaseUrl,
+  required bool isAndroid,
+  required bool isReleaseMode,
+}) {
+  if (configuredBaseUrl.trim().isEmpty && isReleaseMode) {
+    return null;
+  }
+  return stationApiBaseUriForEnvironment(
+    configuredBaseUrl: configuredBaseUrl,
+    isAndroid: isAndroid,
+    isReleaseMode: isReleaseMode,
+  );
+}
+
 Uri stationApiBaseUriForEnvironment({
   required String configuredBaseUrl,
   required bool isAndroid,
