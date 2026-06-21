@@ -660,6 +660,10 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   const verifyIndex = workflow.indexOf("Data Pack Release / Verify uploaded pack checksums before manifest publish");
   const preflightIndex = workflow.indexOf("Data Pack Release / Create manifest-last publish preflight plan");
   const executorDryRunIndex = workflow.indexOf("Data Pack Release / Validate object storage publish executor dry run");
+  const restoreSecretIndex = workflow.indexOf("Data Pack Release / Restore GitHub Actions dotenv secret");
+  const remoteEnvIndex = workflow.indexOf("Data Pack Release / Validate remote object storage publish env");
+  const remotePublishIndex = workflow.indexOf("Data Pack Release / Publish staged data packs to object storage");
+  const artifactIndex = workflow.indexOf("Data Pack Release / Upload staged data packs");
   const manifestIndex = workflow.indexOf("Data Pack Release / Stage manifest");
   const jobEnvBlock = workflow.match(/\n    env:\n[\s\S]*?\n\n    steps:/)?.[0] ?? "";
 
@@ -686,6 +690,16 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /Verify uploaded pack checksums before manifest publish/);
   assert.match(workflow, /Create manifest-last publish preflight plan/);
   assert.match(workflow, /Validate object storage publish executor dry run/);
+  assert.match(workflow, /Data Pack Release \/ Restore GitHub Actions dotenv secret[\s\S]*?EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
+  assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
+  assert.doesNotMatch(workflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
+  assert.match(workflow, /tools\/datapack\/export-publish-env\.mjs/);
+  assert.match(workflow, /--github-output "\$\{GITHUB_OUTPUT\}"/);
+  assert.match(workflow, /id: remote-publish-env/);
+  assert.match(workflow, /steps\.remote-publish-env\.outputs\.enabled == 'true'/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /Data Pack Release \/ Upload staged data packs[\s\S]*?if: \$\{\{ always\(\) \}\}/);
   assert.match(workflow, /\$\{EASYSUBWAY_DATAPACK_STAGE\}\/catalog\/current\.json/);
   assert.match(workflow, /publish-plan\.json/);
   assert.doesNotMatch(workflow, /\$\{EASYSUBWAY_DATAPACK_STAGE\}\/current\.json/);
@@ -695,6 +709,10 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(manifestIndex > verifyIndex, "workflow must stage manifest after pack checksum verification");
   assert.ok(preflightIndex > manifestIndex, "workflow must create publish preflight plan after manifest staging");
   assert.ok(executorDryRunIndex > preflightIndex, "workflow must validate publish executor after plan creation");
+  assert.ok(restoreSecretIndex > executorDryRunIndex, "workflow must restore dotenv secret after dry-run validation");
+  assert.ok(remoteEnvIndex > restoreSecretIndex, "workflow must validate remote publish env after secret restore");
+  assert.ok(remotePublishIndex > remoteEnvIndex, "workflow must publish remotely after env validation");
+  assert.ok(artifactIndex > remotePublishIndex, "workflow must keep artifact upload after remote publish attempt");
   assert.match(workflow, /name: easysubway-datapacks-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);
 });
