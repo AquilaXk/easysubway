@@ -816,7 +816,7 @@ function validateSourceInventory(sourceInventory, artifactKind, label) {
 
 function usesLocalPlaceholderHost(value) {
   try {
-    const hostname = new URL(value).hostname.toLowerCase();
+    const hostname = new URL(value).hostname.toLowerCase().replace(/\.$/, "");
     return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local");
   } catch {
     return false;

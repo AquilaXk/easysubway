@@ -782,6 +782,24 @@ test("데이터팩 생성기는 production pack의 source metadata와 HTTPS URL�
     /production pack url must not use a local placeholder host/,
   );
 
+  fixture.packs[0].url = "https://easysubway.local./easysubway-datapacks/catalog/capital-v1.sqlite.gz";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /production pack url must not use a local placeholder host/,
+  );
+
   fixture.packs[0].url = "https://cdn.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
   fixture.packs[0].sourceInventory[0].updatedAt = "";
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
@@ -821,6 +839,24 @@ test("데이터팩 생성기는 production pack의 source metadata와 HTTPS URL�
   );
 
   fixture.packs[0].sourceInventory[0].url = "https://easysubway.local/fixtures/catalog-fixture.json";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /production sourceInventory.url must not use a local placeholder host/,
+  );
+
+  fixture.packs[0].sourceInventory[0].url = "https://foo.localhost./fixtures/catalog-fixture.json";
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
 
   await assert.rejects(
@@ -986,6 +1022,24 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
     /production pack url must not use a local placeholder host/,
   );
 
+  manifest.packs[0].url = "https://localhost./easysubway-datapacks/catalog/capital-v1.sqlite.gz";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /production pack url must not use a local placeholder host/,
+  );
+
   manifest.packs[0].url = "https://CDN.easysubway.example/easysubway-datapacks/catalog/capital-v1.sqlite.gz";
   manifest.packs[0].sourceInventory[0].url = "https://";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -1006,6 +1060,24 @@ test("데이터팩 검증기는 production HTTPS URL과 staged artifact path 불
   );
 
   manifest.packs[0].sourceInventory[0].url = "https://easysubway.local/fixtures/catalog-fixture.json";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /production sourceInventory.url must not use a local placeholder host/,
+  );
+
+  manifest.packs[0].sourceInventory[0].url = "https://easysubway.local./fixtures/catalog-fixture.json";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   await assert.rejects(
