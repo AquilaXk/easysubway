@@ -22,6 +22,7 @@ class MainActivity : FlutterActivity() {
     private val locationPermissionRequestCode = 2401
     private val notificationPermissionRequestCode = 2402
     private val locationTimeoutMillis = 10_000L
+    private val nearbyLocationMaxAgeMillis = 5 * 60 * 1000L
 
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingNotificationPermissionResult: MethodChannel.Result? = null
@@ -134,7 +135,7 @@ class MainActivity : FlutterActivity() {
         val lastKnownLocation = providers
             .mapNotNull { provider -> locationManager.safeLastKnownLocation(provider) }
             .maxByOrNull { location -> location.time }
-        if (lastKnownLocation != null) {
+        if (lastKnownLocation != null && lastKnownLocation.isFreshEnoughForNearbySearch()) {
             result.success(lastKnownLocation.toFlutterMap())
             return
         }
@@ -289,5 +290,10 @@ class MainActivity : FlutterActivity() {
             @Suppress("DEPRECATION")
             isFromMockProvider
         }
+    }
+
+    private fun Location.isFreshEnoughForNearbySearch(): Boolean {
+        val ageMillis = System.currentTimeMillis() - time
+        return ageMillis in 0..nearbyLocationMaxAgeMillis
     }
 }
