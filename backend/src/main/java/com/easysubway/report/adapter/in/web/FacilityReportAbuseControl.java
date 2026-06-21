@@ -120,10 +120,16 @@ record FacilityReportAbuseControlPolicy(
 		if (maxCounterKeys < 1) {
 			throw new IllegalArgumentException("report abuse control max counter keys must be positive");
 		}
+		for (ReportAbuseGroup group : ReportAbuseGroup.values()) {
+			Integer limit = limits.get(group);
+			if (limit == null || limit < 1) {
+				throw new IllegalArgumentException("report abuse control limit must be positive: " + group);
+			}
+		}
 	}
 
 	int limit(ReportAbuseGroup group) {
-		return limits.getOrDefault(group, 0);
+		return limits.get(group);
 	}
 }
 
@@ -230,11 +236,11 @@ class FacilityReportClientIdentityResolver {
 		String[] addresses = forwardedFor.split(",");
 		for (int index = addresses.length - 1; index >= 0; index--) {
 			String candidate = normalizeAddress(addresses[index]);
-			if (!isTrustedProxy(candidate)) {
+			if (!isTrustedProxy(candidate) && IpCidr.isValidIpv4(candidate)) {
 				return candidate;
 			}
 		}
-		return normalizeAddress(addresses[addresses.length - 1]);
+		return "unknown";
 	}
 
 	private boolean isTrustedProxy(String remoteAddress) {
@@ -266,7 +272,10 @@ class FacilityReportClientIdentityResolver {
 record IpCidr(int address, int mask) {
 
 	static IpCidr parse(String value) {
-		String[] parts = value.split("/");
+		String[] parts = value.split("/", -1);
+		if (parts.length < 1 || parts.length > 2 || parts[0].isBlank()) {
+			throw new IllegalArgumentException("invalid IPv4 CIDR: " + value);
+		}
 		String address = parts[0].trim();
 		int prefixLength = parts.length == 2 ? Integer.parseInt(parts[1].trim()) : 32;
 		if (prefixLength < 0 || prefixLength > 32) {
@@ -279,6 +288,15 @@ record IpCidr(int address, int mask) {
 	boolean contains(String candidateAddress) {
 		try {
 			return (ipv4ToInt(candidateAddress) & mask) == (address & mask);
+		} catch (IllegalArgumentException exception) {
+			return false;
+		}
+	}
+
+	static boolean isValidIpv4(String value) {
+		try {
+			ipv4ToInt(value);
+			return true;
 		} catch (IllegalArgumentException exception) {
 			return false;
 		}

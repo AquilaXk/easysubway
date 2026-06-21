@@ -2001,9 +2001,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.confirm-limit/);
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.max-counter-keys/);
   assert.match(abuseControl, /maxCounterKeys/);
+  assert.match(abuseControl, /ReportAbuseGroup\.values\(\)/);
   assert.match(abuseControl, /easysubway\.auth\.client-ip\.trusted-proxies/);
   assert.match(abuseControl, /X-Forwarded-For/);
   assert.match(abuseControl, /trustedClientAddress/);
+  assert.match(abuseControl, /isValidIpv4/);
+  assert.match(abuseControl, /split\("\/", -1\)/);
   assert.doesNotMatch(abuseControl, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS:60/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_UPLOAD_INTENT_LIMIT:60/);
