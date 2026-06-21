@@ -882,6 +882,23 @@ test("공개 source contract 불변식은 README와 public interfaces에 남는�
   assert.match(userDatabase, /user-data preservation contract/);
 });
 
+test("경로 source contract 불변식은 접근성 안전과 metric fallback 의미를 고정한다", () => {
+  const networkGraph = read("apps/mobile/lib/features/routes/application/network_graph.dart");
+  const accessibilityCostCalculator = read(
+    "apps/mobile/lib/features/routes/application/accessibility_cost_calculator.dart",
+  );
+  const localRouteRepository = read("apps/mobile/lib/features/routes/data/local_route_repository.dart");
+  const routeSearch = read("apps/mobile/lib/route_search.dart");
+
+  assert.match(networkGraph, /route contract: baseCost seconds/);
+  assert.match(networkGraph, /route contract: reliability thresholds/);
+  assert.match(accessibilityCostCalculator, /route contract: unknown accessibility data/);
+  assert.match(accessibilityCostCalculator, /route contract: stair-only block/);
+  assert.match(localRouteRepository, /route contract: synthetic connector edge/);
+  assert.match(localRouteRepository, /route contract: local metric fallback/);
+  assert.match(routeSearch, /route contract: realtime ETA fallback/);
+});
+
 test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 보관 계약을 고정한다", () => {
   const gatePath = "apps/mobile/release/operations-observability-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)), "operations observability gate artifact must exist");
