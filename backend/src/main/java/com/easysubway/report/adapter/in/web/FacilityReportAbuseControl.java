@@ -220,10 +220,21 @@ class FacilityReportClientIdentityResolver {
 		if (isTrustedProxy(remoteAddress)) {
 			String forwardedFor = request.getHeader("X-Forwarded-For");
 			if (forwardedFor != null && !forwardedFor.isBlank()) {
-				return "ip:" + normalizeAddress(forwardedFor.split(",")[0]);
+				return "ip:" + trustedClientAddress(forwardedFor);
 			}
 		}
 		return "ip:" + remoteAddress;
+	}
+
+	private String trustedClientAddress(String forwardedFor) {
+		String[] addresses = forwardedFor.split(",");
+		for (int index = addresses.length - 1; index >= 0; index--) {
+			String candidate = normalizeAddress(addresses[index]);
+			if (!isTrustedProxy(candidate)) {
+				return candidate;
+			}
+		}
+		return normalizeAddress(addresses[addresses.length - 1]);
 	}
 
 	private boolean isTrustedProxy(String remoteAddress) {

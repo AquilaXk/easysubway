@@ -2003,6 +2003,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(abuseControl, /maxCounterKeys/);
   assert.match(abuseControl, /easysubway\.auth\.client-ip\.trusted-proxies/);
   assert.match(abuseControl, /X-Forwarded-For/);
+  assert.match(abuseControl, /trustedClientAddress/);
   assert.doesNotMatch(abuseControl, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS:60/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_UPLOAD_INTENT_LIMIT:60/);

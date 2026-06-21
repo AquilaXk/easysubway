@@ -112,6 +112,16 @@ class FacilityReportAbuseControlTest {
 	}
 
 	@Test
+	@DisplayName("trusted proxy 요청은 spoofed X-Forwarded-For leftmost 값을 client identity로 쓰지 않는다")
+	void trustedProxyIgnoresSpoofedLeftmostForwardedFor() throws Exception {
+		getUnknownStatusFromForwardedChain("198.51.100.200, 203.0.113.20").andExpect(status().isNotFound());
+		getUnknownStatusFromForwardedChain("198.51.100.201, 203.0.113.20").andExpect(status().isNotFound());
+
+		getUnknownStatusFromForwardedChain("198.51.100.202, 203.0.113.20")
+			.andExpect(status().isTooManyRequests());
+	}
+
+	@Test
 	@DisplayName("limiter는 현재 window 신규 client key 증가를 상한에서 차단한다")
 	void limiterRejectsNewClientIdentityWhenCurrentWindowKeyCapIsReached() {
 		var limiter = new FacilityReportAbuseControlLimiter(
@@ -183,6 +193,11 @@ class FacilityReportAbuseControlTest {
 	}
 
 	private org.springframework.test.web.servlet.ResultActions getUnknownStatusFromForwardedClient(String forwardedFor)
+		throws Exception {
+		return getUnknownStatusFromForwardedChain(forwardedFor);
+	}
+
+	private org.springframework.test.web.servlet.ResultActions getUnknownStatusFromForwardedChain(String forwardedFor)
 		throws Exception {
 		return mockMvc.perform(get("/api/v1/reports/unknown-forwarded-report")
 			.with(remoteAddr("10.0.0.10"))
