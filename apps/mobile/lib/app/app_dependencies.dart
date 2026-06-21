@@ -49,9 +49,27 @@ class AppDependencies {
     UserDataDeletionRepository? userDataDeletionRepository,
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
+    Uri? Function() apiBaseUri = defaultOptionalStationApiBaseUri,
     required bool enablePushNotifications,
   }) {
-    final baseUri = defaultStationApiBaseUri();
+    Uri? cachedBaseUri;
+    var baseUriResolved = false;
+    Uri? optionalBaseUri() {
+      if (!baseUriResolved) {
+        cachedBaseUri = apiBaseUri();
+        baseUriResolved = true;
+      }
+      return cachedBaseUri;
+    }
+
+    Uri requireBaseUri() {
+      final baseUri = optionalBaseUri();
+      if (baseUri == null) {
+        throw StateError('Release API base URL must be configured.');
+      }
+      return baseUri;
+    }
+
     final pushNotificationsEnabled =
         enablePushNotifications ||
         notificationRepository != null ||
@@ -63,7 +81,7 @@ class AppDependencies {
                       userDatabase: userDatabase,
                     )
                   : _defaultNotificationSettingsRepository(
-                      baseUri: baseUri,
+                      baseUri: requireBaseUri,
                       authProvider: null,
                     ))
         : null;
@@ -76,20 +94,17 @@ class AppDependencies {
           repository ??
           (catalogDatabase != null
               ? DriftStationRepository(database: catalogDatabase)
-              : StationSearchApiRepository(baseUri: baseUri)),
+              : StationSearchApiRepository(baseUri: requireBaseUri())),
       reportRepository:
           reportRepository ??
-          FacilityReportApiRepository(
-            baseUri: baseUri,
-            authProvider: null,
-            receiptStore: userDatabase == null
-                ? null
-                : DriftFacilityReportReceiptStore(userDatabase: userDatabase),
+          _defaultFacilityReportRepository(
+            baseUri: optionalBaseUri,
+            userDatabase: userDatabase,
           ),
       routeRepository:
           routeRepository ??
           (catalogDatabase == null
-              ? RouteSearchApiRepository(baseUri: baseUri)
+              ? RouteSearchApiRepository(baseUri: requireBaseUri())
               : FallbackRouteSearchRepository(
                   localRepository: LocalRouteRepository(
                     catalogDatabase: catalogDatabase,
@@ -97,7 +112,10 @@ class AppDependencies {
                 )),
       routeFeedbackRepository:
           routeFeedbackRepository ??
-          _defaultRouteFeedbackRepository(baseUri: baseUri, authProvider: null),
+          _defaultRouteFeedbackRepository(
+            baseUri: requireBaseUri,
+            authProvider: null,
+          ),
       favoriteRepository:
           favoriteRepository ??
           (catalogDatabase != null && userDatabase != null
@@ -106,7 +124,7 @@ class AppDependencies {
                   userDatabase: userDatabase,
                 )
               : _defaultFavoriteStationRepository(
-                  baseUri: baseUri,
+                  baseUri: requireBaseUri,
                   authProvider: null,
                 )),
       favoriteFacilityRepository:
@@ -117,7 +135,7 @@ class AppDependencies {
                   userDatabase: userDatabase,
                 )
               : _defaultFavoriteFacilityRepository(
-                  baseUri: baseUri,
+                  baseUri: requireBaseUri,
                   authProvider: null,
                 )),
       favoriteRouteRepository:
@@ -128,7 +146,7 @@ class AppDependencies {
                   userDatabase: userDatabase,
                 )
               : _defaultFavoriteRouteRepository(
-                  baseUri: baseUri,
+                  baseUri: requireBaseUri,
                   authProvider: null,
                 )),
       searchHistoryRepository:
@@ -139,7 +157,7 @@ class AppDependencies {
       internalRouteRepository:
           internalRouteRepository ??
           (catalogDatabase == null
-              ? InternalRouteApiRepository(baseUri: baseUri)
+              ? InternalRouteApiRepository(baseUri: requireBaseUri())
               : FallbackInternalRouteRepository(
                   localRepository: LocalInternalRouteRepository(
                     catalogDatabase: catalogDatabase,
@@ -152,7 +170,7 @@ class AppDependencies {
       userDataDeletionRepository:
           userDataDeletionRepository ??
           _defaultUserDataDeletionRepository(
-            baseUri: baseUri,
+            baseUri: requireBaseUri,
             authProvider: null,
             userDatabase: userDatabase,
           ),
@@ -174,8 +192,25 @@ class AppDependencies {
   final UserDataDeletionRepository? userDataDeletionRepository;
 }
 
+FacilityReportRepository _defaultFacilityReportRepository({
+  required Uri? Function() baseUri,
+  required UserDatabase? userDatabase,
+}) {
+  final resolvedBaseUri = baseUri();
+  if (resolvedBaseUri == null) {
+    return const UnavailableFacilityReportRepository();
+  }
+  return FacilityReportApiRepository(
+    baseUri: resolvedBaseUri,
+    authProvider: null,
+    receiptStore: userDatabase == null
+        ? null
+        : DriftFacilityReportReceiptStore(userDatabase: userDatabase),
+  );
+}
+
 UserDataDeletionRepository? _defaultUserDataDeletionRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
   required UserDatabase? userDatabase,
 }) {
@@ -185,7 +220,7 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
   final remoteRepository = authProvider == null
       ? null
       : UserDataDeletionApiRepository(
-          baseUri: baseUri,
+          baseUri: baseUri(),
           authProvider: authProvider,
         );
   if (remoteRepository != null && localRepository != null) {
@@ -198,66 +233,66 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
 }
 
 FavoriteStationRepository? _defaultFavoriteStationRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
 }) {
   if (authProvider == null) {
     return null;
   }
   return FavoriteStationApiRepository(
-    baseUri: baseUri,
+    baseUri: baseUri(),
     authProvider: authProvider,
   );
 }
 
 FavoriteFacilityRepository? _defaultFavoriteFacilityRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
 }) {
   if (authProvider == null) {
     return null;
   }
   return FavoriteFacilityApiRepository(
-    baseUri: baseUri,
+    baseUri: baseUri(),
     authProvider: authProvider,
   );
 }
 
 FavoriteRouteRepository? _defaultFavoriteRouteRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
 }) {
   if (authProvider == null) {
     return null;
   }
   return FavoriteRouteApiRepository(
-    baseUri: baseUri,
+    baseUri: baseUri(),
     authProvider: authProvider,
   );
 }
 
 RouteFeedbackRepository? _defaultRouteFeedbackRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
 }) {
   if (authProvider == null) {
     return null;
   }
   return RouteFeedbackApiRepository(
-    baseUri: baseUri,
+    baseUri: baseUri(),
     authProvider: authProvider,
   );
 }
 
 NotificationSettingsRepository? _defaultNotificationSettingsRepository({
-  required Uri baseUri,
+  required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
 }) {
   if (authProvider == null) {
     return null;
   }
   return NotificationSettingsApiRepository(
-    baseUri: baseUri,
+    baseUri: baseUri(),
     authProvider: authProvider,
   );
 }
