@@ -37,6 +37,10 @@ while IFS= read -r file; do
       ci=true
       repository=true
       ;;
+    backend/quality/**)
+      ci=true
+      repository=true
+      ;;
     .github/**|.gitignore|.coderabbit.yaml)
       repository=true
       ;;
