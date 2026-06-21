@@ -155,7 +155,7 @@ class CatalogDatabaseOpener {
       throw const FormatException('Invalid data pack index.');
     }
     final rawPacks = decoded['packs'];
-    if (rawPacks is! List) {
+    if (rawPacks is! List<Object?>) {
       throw const FormatException('Invalid data pack list.');
     }
 
