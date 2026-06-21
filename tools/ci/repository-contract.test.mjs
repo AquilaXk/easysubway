@@ -768,11 +768,14 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   const importer = read("tools/datapack/import-official-sources.mjs");
 
   assert.match(importer, /source inventory missing/);
+  assert.match(importer, /source inventory schemaVersion must be 1/);
+  assert.match(importer, /inventory\.region must match input\.region/);
   assert.match(importer, /source mapping missing/);
   assert.match(importer, /station id reuse is forbidden/);
   assert.match(importer, /station line mapping conflict/);
   assert.match(importer, /stationLineId must equal stationId:lineId/);
   assert.match(importer, /station mapping evidence is required/);
+  assert.match(importer, /duplicate argument/);
   assert.match(importer, /sourceIngestAdapter: "official-source-ingest-v1"/);
 });
 
