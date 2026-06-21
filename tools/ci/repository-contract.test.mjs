@@ -3968,6 +3968,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "mobile_test_credentials_absent",
     "mobile_error_stacktrace_sanitized",
     "backend_admin_auth_required",
+    "backend_admin_basic_auth_transition_gate",
     "backend_role_authorization",
     "backend_report_photo_upload_limits",
     "backend_error_response_sanitized",
@@ -4010,6 +4011,13 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(securityConfig, /hasRole\("ADMIN"\)/);
   assert.match(securityConfig, /hasRole\("OPERATOR_ADMIN"\)/);
   assert.match(securityConfig, /validateProdAdminCredentials/);
+  const adminBasicAuthGate = items.get("backend_admin_basic_auth_transition_gate");
+  assert.match(adminBasicAuthGate.readyWhenKo, /lockout|OIDC|MFA|SSO/i);
+  assert.match(adminBasicAuthGate.readyWhenKo, /Basic auth/);
+  assert.ok(adminBasicAuthGate.evidence.includes("admin-auth-transition-decision-record"));
+  assert.ok(adminBasicAuthGate.evidence.includes("lockout-or-oidc-mfa-implementation-evidence"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/pull_request_template.md"));
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_BYTES = 900 \* 1024/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_WIDTH = 4_096/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_PIXELS = 12_000_000/);
