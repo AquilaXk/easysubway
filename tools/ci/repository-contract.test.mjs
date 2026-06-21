@@ -847,6 +847,42 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);
 });
 
+test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {
+  assert.ok(
+    existsSync(path.join(root, ".github/workflows/store-distribution-evidence.yml")),
+    "store distribution evidence workflow must exist",
+  );
+  assert.ok(
+    existsSync(path.join(root, "tools/ci/check-store-distribution-evidence-env.mjs")),
+    "store distribution evidence env preflight must exist",
+  );
+
+  const workflow = read(".github/workflows/store-distribution-evidence.yml");
+  const preflight = read("tools/ci/check-store-distribution-evidence-env.mjs");
+
+  assert.match(workflow, /^name: Store Distribution Evidence$/m);
+  assert.match(workflow, /workflow_dispatch:/);
+  assertActionsEnvSecretPolicy(".github/workflows/store-distribution-evidence.yml", workflow);
+  assert.match(workflow, /EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
+  assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
+  assert.match(workflow, /node tools\/ci\/check-store-distribution-evidence-env\.mjs/);
+  assert.match(workflow, /--env-file "\$\{EASYSUBWAY_ENV_FILE\}"/);
+  assert.match(workflow, /--github-output "\$\{GITHUB_OUTPUT\}"/);
+  assert.match(workflow, /--report "\$\{RUNNER_TEMP\}\/store-distribution-evidence-preflight\.txt"/);
+  assert.match(workflow, /node tools\/datapack\/export-publish-env\.mjs/);
+  assert.match(workflow, /store-distribution-evidence-preflight-\$\{\{ github\.sha \}\}/);
+
+  assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON/);
+  assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME/);
+  assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_KEY_ID/);
+  assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID/);
+  assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM/);
+  assert.match(preflight, /EASYSUBWAY_APP_STORE_APPLE_ID/);
+  assert.match(preflight, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED/);
+  assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
+});
+
 test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고정한다", () => {
   const fixture = JSON.parse(read("tools/datapack/fixtures/catalog-fixture.json"));
   const schema = read("tools/datapack/schema/catalog-schema.sql");
