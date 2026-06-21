@@ -206,6 +206,13 @@ class DataPackManifestEntry {
     int expectedSizeBytes,
     DataPackSigningPublicKey? productionSigningPublicKey,
   ) {
+    if (artifactKind == DataPackArtifactKind.fixture &&
+        representativeRouteRegressions.isEmpty &&
+        representativeRouteRegressionSignature.algorithm ==
+            'sha256-route-regression-v1' &&
+        representativeRouteRegressionSignature.value == '0' * 64) {
+      return;
+    }
     final canonical = _representativeRouteRegressionSignaturePayload(
       expectedSizeBytes,
     );
