@@ -697,6 +697,88 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
   assert.match(stdout, /^deploy=true$/m);
 });
 
+test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 보관 계약을 고정한다", () => {
+  const gatePath = "apps/mobile/release/operations-observability-gate.json";
+  assert.ok(existsSync(path.join(root, gatePath)), "operations observability gate artifact must exist");
+
+  const gate = readJson(gatePath);
+  const readme = read("README.md");
+  const datapackWorkflow = read(".github/workflows/datapack-release.yml");
+  const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
+  const applicationProd = read("backend/src/main/resources/application-prod.yml");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "operations-observability");
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.equal(gate.sensitiveLogPolicy.forbidReceiptTokens, true);
+  assert.equal(gate.sensitiveLogPolicy.forbidUploadUrls, true);
+  assert.equal(gate.sensitiveLogPolicy.forbidPhotoMetadata, true);
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO)\b|\.{3}/i);
+
+  const signals = new Map(gate.signals.map((signal) => [signal.id, signal]));
+  const requiredSignalIds = [
+    "backend_health_readiness_storage_datapack_report",
+    "report_api_error_rate",
+    "admin_review_latency",
+    "datapack_release_publish_result",
+    "mobile_crash_free_rate",
+    "mobile_anr_rate",
+    "mobile_app_start_failure_rate",
+    "route_search_found_blocked_unknown_distribution",
+    "datapack_install_rollback_failure_rate",
+    "realtime_provider_success_stale_timeout_latency_eta_error",
+    "report_upload_failure_duplicate_orphan_cleanup_rate",
+    "cross_version_correlation_ids",
+    "android_mapping_retention",
+    "ios_dsym_retention",
+  ];
+  assert.deepEqual([...signals.keys()].sort(), requiredSignalIds.toSorted());
+
+  for (const id of requiredSignalIds) {
+    const signal = signals.get(id);
+    assert.match(signal.area, /^(backend|datapack|mobile|realtime|release)$/);
+    assert.equal(typeof signal.ownerKo, "string", `${id} must define owner`);
+    assert.ok(signal.ownerKo.length > 0, `${id} owner must not be empty`);
+    assert.equal(typeof signal.thresholdKo, "string", `${id} must define threshold`);
+    assert.ok(signal.thresholdKo.length > 0, `${id} threshold must not be empty`);
+    assert.equal(typeof signal.firstResponseKo, "string", `${id} must define first response`);
+    assert.ok(signal.firstResponseKo.length > 0, `${id} first response must not be empty`);
+    assert.ok(Array.isArray(signal.evidence), `${id} must list evidence`);
+    assert.ok(signal.evidence.length > 0, `${id} must require evidence`);
+    assert.ok(Array.isArray(signal.linkedArtifacts), `${id} must list linked artifacts`);
+    for (const artifact of signal.linkedArtifacts) {
+      assert.ok(existsSync(path.join(root, artifact)), `${id} linked artifact must exist: ${artifact}`);
+    }
+  }
+
+  assert.ok(signals.get("android_mapping_retention").evidence.includes("android-mapping-artifact-retention"));
+  assert.ok(signals.get("ios_dsym_retention").evidence.includes("ios-dsym-artifact-retention"));
+  assert.ok(signals.get("cross_version_correlation_ids").evidence.includes("app-datapack-route-provider-correlation"));
+
+  assert.match(readme, /## Operations/);
+  assert.match(readme, /operations-observability-gate\.json/);
+  assert.match(readme, /backend_health_readiness_storage_datapack_report/);
+  assert.match(readme, /realtime_provider_success_stale_timeout_latency_eta_error/);
+  assert.match(readme, /receipt token|upload URL|photo metadata/i);
+
+  assert.match(applicationProd, /management:[\s\S]*health:[\s\S]*readiness:[\s\S]*productionReadiness/);
+  assert.match(datapackWorkflow, /Data Pack Release \/ Write observability metadata/);
+  assert.match(datapackWorkflow, /datapack-observability\.txt/);
+  assert.match(datapackWorkflow, /pack_version=/);
+  assert.match(datapackWorkflow, /manifest\.activePack/);
+  assert.match(datapackWorkflow, /\$\{activePack\.id\}@\$\{activePack\.version\}/);
+  assert.match(datapackWorkflow, /source_updated_at=/);
+  assert.match(datapackWorkflow, /publish_result=/);
+  assert.match(datapackWorkflow, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_RESULT=success/);
+  assert.match(datapackWorkflow, /remotePublishEnabled !== "false"/);
+  assert.match(datapackWorkflow, /if \(isMainBranch && remotePublishEnabled !== "false"\)/);
+  assert.match(datapackWorkflow, /remotePublishResult === "success" \? "success" : "failed"/);
+  assert.match(releaseArtifactsWorkflow, /mapping_retention_days=90/);
+  assert.match(releaseArtifactsWorkflow, /dsym_retention_days=90/);
+  assert.match(releaseArtifactsWorkflow, /retention-days: 90/);
+});
+
 test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정책으로 고정한다", () => {
   const gatePath = "apps/mobile/release/server-minimized-qa-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)), "server minimized QA gate artifact must exist");
