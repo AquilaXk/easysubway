@@ -30,7 +30,7 @@ class InternalRouteApiRepository implements InternalRouteRepository {
 
     try {
       final data = await _getData(uri);
-      if (data is! List) {
+      if (data is! List<Object?>) {
         throw const InternalRouteException(_internalRouteErrorMessage);
       }
       return data
@@ -231,9 +231,9 @@ class InternalRouteResult {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
     final rawBlockedReasons = json['blockedReasons'];
-    if (rawSteps is! List ||
-        rawWarnings is! List ||
-        rawBlockedReasons is! List) {
+    if (rawSteps is! List<Object?> ||
+        rawWarnings is! List<Object?> ||
+        rawBlockedReasons is! List<Object?>) {
       throw const FormatException('Invalid internal route payload');
     }
 
