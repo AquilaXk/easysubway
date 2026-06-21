@@ -55,6 +55,12 @@ class RouteEdge {
   final String fromNodeId;
   final String toNodeId;
   final RouteEdgeType type;
+
+  /// route contract: baseCost seconds
+  ///
+  /// `baseCost` is the routing weight in seconds before profile penalties.
+  /// `durationSeconds` may stay 0 when source data has no reliable duration,
+  /// but route ordering still needs a positive fallback weight.
   final int baseCost;
   final int durationSeconds;
   final int distanceMeters;
@@ -62,6 +68,12 @@ class RouteEdge {
   final String transferStationId;
   final bool includesStairs;
   final RouteStairAccessState stairAccessState;
+
+  /// route contract: reliability thresholds
+  ///
+  /// 100 means verified or default confidence, values below 80 trigger a
+  /// low-confidence penalty, and UNKNOWN source accessibility data is capped
+  /// by the repository before it reaches the route engine.
   final int reliabilityScore;
   final bool isDataStale;
   final RouteAccessibilityState accessibilityState;
