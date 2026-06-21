@@ -4,6 +4,7 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const allowedFacilityStatuses = new Set(["NORMAL", "BROKEN", "UNDER_CONSTRUCTION", "CLOSED", "UNKNOWN"]);
+const availableFacilityStatuses = new Set(["NORMAL"]);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -42,6 +43,7 @@ function applyAdminReviewOverrides(fixture, overrides) {
       for (const facility of facilities) {
         if (facility.id === facilityId) {
           facility.status = status;
+          applyRouteAccessibilityOverride(pack, facility, status);
           matchedFacilities.push(facility);
         }
       }
@@ -60,6 +62,51 @@ function applyAdminReviewOverrides(fixture, overrides) {
       adminReviewOverrideExportedAt: requiredString(overrides.exportedAt, "exportedAt"),
     };
   }
+}
+
+function applyRouteAccessibilityOverride(pack, facility, status) {
+  const accessibilityStatus = routeAccessibilityStatus(status);
+  if (accessibilityStatus == null) {
+    return;
+  }
+
+  for (const edge of pack.networkEdges ?? []) {
+    if (edge.facilityId === facility.id) {
+      edge.accessibilityStatus = accessibilityStatus;
+    }
+  }
+
+  const facilityType = requiredString(facility.type, "facility.type").toUpperCase();
+  if (facilityType !== "ELEVATOR" && facilityType !== "ESCALATOR") {
+    return;
+  }
+  const stationId = requiredString(facility.stationId, "facility.stationId");
+  const stationNodeIds = new Set(
+    (pack.internalRouteNodes ?? [])
+      .filter((node) => node.stationId === stationId)
+      .map((node) => requiredString(node.id, "internalRouteNodes.id")),
+  );
+  for (const edge of pack.internalRouteEdges ?? []) {
+    if (!stationNodeIds.has(edge.fromNodeId) && !stationNodeIds.has(edge.toNodeId)) {
+      continue;
+    }
+    if (facilityType === "ELEVATOR" && (edge.requiresElevator === true || edge.edgeType === "ELEVATOR")) {
+      edge.accessibilityStatus = accessibilityStatus;
+    }
+    if (facilityType === "ESCALATOR" && (edge.requiresEscalator === true || edge.edgeType === "ESCALATOR")) {
+      edge.accessibilityStatus = accessibilityStatus;
+    }
+  }
+}
+
+function routeAccessibilityStatus(status) {
+  if (availableFacilityStatuses.has(status)) {
+    return null;
+  }
+  if (status === "UNKNOWN") {
+    return "UNKNOWN";
+  }
+  return "UNAVAILABLE";
 }
 
 function parseArgs(argv) {
