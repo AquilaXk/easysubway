@@ -3945,6 +3945,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const androidDebugManifest = read("apps/mobile/android/app/src/debug/AndroidManifest.xml");
   const androidProfileManifest = read("apps/mobile/android/app/src/profile/AndroidManifest.xml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const gitignore = read(".gitignore");
   const commonExceptionHandler = read("backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java");
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
@@ -3978,6 +3979,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "backend_api_traffic_monitoring",
     "backend_sensitive_log_minimization",
     "repository_secrets_not_tracked",
+    "repository_provider_storage_exposure_guard",
     "repository_dependency_review",
     "repository_codex_security_scan_before_release",
     "cross_store_privacy_security_consistency",
@@ -4039,6 +4041,16 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(gitignore, /^\*.pem$/m);
   assert.match(gitignore, /^\*.key$/m);
   assert.match(gitignore, /^google-services\.json$/m);
+  const providerStorageExposureGuard = items.get("repository_provider_storage_exposure_guard");
+  assert.match(providerStorageExposureGuard.readyWhenKo, /provider key|object storage|signed URL/i);
+  assert.ok(providerStorageExposureGuard.evidence.includes("release-artifact-credential-search"));
+  assert.ok(providerStorageExposureGuard.evidence.includes("signed-upload-url-expiry-contract"));
+  assert.ok(providerStorageExposureGuard.linkedArtifacts.includes(".github/workflows/release-artifacts.yml"));
+  assert.ok(providerStorageExposureGuard.linkedArtifacts.includes("backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntentsTest.java"));
+  assert.ok(providerStorageExposureGuard.linkedArtifacts.includes("tools/ci/repository-contract.test.mjs"));
+  assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_OBJECT_STORAGE_(?:ACCESS_KEY|SECRET_KEY|ENDPOINT|REGION)/);
+  assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_[A-Z0-9_]*(?:PROVIDER|REALTIME)[A-Z0-9_]*KEY/);
+  assert.doesNotMatch(androidBuildGradle, /EASYSUBWAY_OBJECT_STORAGE|PROVIDER_API_KEY|REALTIME_PROVIDER_KEY/);
   const dependencyReview = items.get("repository_dependency_review");
   assert.ok(dependencyReview.evidence.includes("osv-scanner-pr-result"));
   assert.match(dependencyReview.readyWhenKo, /OSV Scanner|취약/);
