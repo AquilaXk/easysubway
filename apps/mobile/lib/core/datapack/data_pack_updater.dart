@@ -53,7 +53,7 @@ class DataPackUpdater {
     if (results.every(
       (result) => result.status == DataPackInstallStatus.installed,
     )) {
-      final currentPointer = _currentPointerForManifest(
+      final currentPointer = await _currentPointerForManifest(
         manifest: manifest,
         results: results,
       );
@@ -84,14 +84,10 @@ class DataPackUpdater {
     return results;
   }
 
-  InstalledDataPackPointer? _currentPointerForManifest({
+  Future<InstalledDataPackPointer?> _currentPointerForManifest({
     required DataPackManifest manifest,
     required List<DataPackInstallResult> results,
-  }) {
-    if (results.isEmpty) {
-      return null;
-    }
-
+  }) async {
     final activePack = manifest.activePack;
     if (activePack != null) {
       for (final result in results) {
@@ -102,7 +98,18 @@ class DataPackUpdater {
           return pointer;
         }
       }
+      final installedPointer = await installer.readInstalledPointer(
+        id: activePack.id,
+        version: activePack.version,
+      );
+      if (installedPointer != null) {
+        return installedPointer;
+      }
       throw const DataPackClientException('활성 데이터팩을 선택하지 못했습니다.');
+    }
+
+    if (results.isEmpty) {
+      return null;
     }
 
     InstalledDataPackPointer? selected;
