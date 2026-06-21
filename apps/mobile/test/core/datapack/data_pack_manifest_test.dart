@@ -11,6 +11,50 @@ const _productionSigningPublicKey = DataPackSigningPublicKey(
 );
 const _productionSignatureValue =
     'iF48gj_9CEV0os3gJMEO2qdn0aAcBXT71zl8Qz6KIWQZ2qm1A0TmCb7f6wTJEoP3cFSZQdgmXcj7IPFNv9gLE9O_s0-DmwniFX7OIv8icwGe1BKHNJfFmHCqWyLs0uuUVZTmY6RwqS_YnElf_0caT1qDS7L32uu5zYXnWGTg5ul2xeRuBgDGW9gFs9I4UkvdF-MbNjVxCby4tyuCsQSHxUhpFLSLKluLGWc7lY4u688Ss2dR9Zs-zlYiWb4GQ6lxKU_lfx_0FSl3yipgrhX7OpAihyVBuxh-PA_MA5KAqJ0C5HqxAJ_lYZhgYKb5zvJ3eChI7uWc2OhyZ2ZyE-jYdw';
+const _productionRouteRegressionSignatureValue =
+    'UmI9-5bLdUMmyxNcnOJb5Tyirv4KvKKvxXKcr-MgwCQhfI4baUYXvq2igeS6PVZsgBMv4nXD6BNeF5L8VW49afvfU9ZT15NXftD1wg986tEMwjf0YSXXDjriKWy_u-3cbsNIhHOW3oqvnAwCOb0ofvJ8I26bTcVQFjVh4QjXtSiwzCQqr8WHDGvBc2UbOk-3TOuPR7U3YwsNcXUl2uvo7qn5IwEgCh62k5NQPx222y2khlQz5p9do5DzaJKuHXM3kfwcXA-mJDKptx6pZIqx3n5brahAcPjX4dd6Kr6mYDiWU38y-23redacmWk-YgA8gXXXHSH92SLlqXEedOIiDg';
+const _representativeRouteRegressions = [
+  {
+    'id': 'direct-local-capital',
+    'pattern': 'DIRECT',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-b-line-1',
+    'requiredEdgeIds': ['edge-a-b'],
+  },
+  {
+    'id': 'transfer-capital',
+    'pattern': 'TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-a-b', 'edge-b-transfer', 'edge-b-c'],
+  },
+  {
+    'id': 'multi-transfer-capital',
+    'pattern': 'MULTI_TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-d-line-3',
+    'requiredEdgeIds': [
+      'edge-a-b',
+      'edge-b-transfer',
+      'edge-c-transfer',
+      'edge-c-d',
+    ],
+  },
+  {
+    'id': 'loop-branch-capital',
+    'pattern': 'LOOP_BRANCH',
+    'fromNodeId': 'station-branch-line-2',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-branch-loop', 'edge-loop-c'],
+  },
+  {
+    'id': 'express-local-capital',
+    'pattern': 'EXPRESS_LOCAL',
+    'fromNodeId': 'station-a-line-1-express',
+    'toNodeId': 'station-b-line-1-express',
+    'requiredEdgeIds': ['edge-a-b-express'],
+  },
+];
 
 void main() {
   test('데이터팩 manifest는 TTL과 pack 검증 조건을 파싱한다', () {
@@ -26,6 +70,17 @@ void main() {
           'sqliteSha256': 'b' * 64,
           'sizeBytes': 1024,
           'artifactKind': 'fixture',
+          'representativeRouteRegressions': _representativeRouteRegressions,
+          'representativeRouteRegressionSignature': {
+            'algorithm': 'sha256-route-regression-v1',
+            'value': _routeRegressionSignatureValue(
+              'capital',
+              '18',
+              'a' * 64,
+              'b' * 64,
+              1024,
+            ),
+          },
           'signature': {
             'algorithm': 'sha256-pack-manifest-v1',
             'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
@@ -268,6 +323,41 @@ void main() {
       throwsFormatException,
     );
 
+    final changedRouteContract = _productionPack();
+    changedRouteContract['representativeRouteRegressions'] = [
+      {
+        'id': 'direct-local-capital',
+        'pattern': 'DIRECT',
+        'fromNodeId': 'station-a-line-1',
+        'toNodeId': 'station-c-line-1',
+        'requiredEdgeIds': ['edge-a-c'],
+      },
+    ];
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [changedRouteContract],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
+
+    final missingPatternContract = _productionPack();
+    missingPatternContract['representativeRouteRegressions'] =
+        _representativeRouteRegressions
+            .where((route) => route['pattern'] != 'MULTI_TRANSFER')
+            .toList(growable: false);
+    missingPatternContract['representativeRouteRegressionSignature'] = {
+      'algorithm': 'rsa-sha256-route-regression-v1',
+      'value': _productionRouteRegressionSignatureValue,
+    };
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [missingPatternContract],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
+
     expect(
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
@@ -315,6 +405,46 @@ void main() {
     expect(pack.signature.value, '0' * 64);
     expect(pack.sourceInventory.single.id, 'legacy-fixture-manifest');
     expect(pack.regionalQualityMetrics.stationCount, 0);
+  });
+
+  test('legacy fixture manifest는 sizeBytes와 기존 서명만 있어도 파싱된다', () {
+    const id = 'capital';
+    const version = '18';
+    final compressedSha256 = 'a' * 64;
+    final sqliteSha256 = 'b' * 64;
+    const sizeBytes = 1024;
+
+    final manifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [
+        {
+          'id': id,
+          'version': version,
+          'url': 'catalog/capital-v18.sqlite.gz',
+          'sha256': compressedSha256,
+          'sqliteSha256': sqliteSha256,
+          'sizeBytes': sizeBytes,
+          'signature': {
+            'algorithm': 'sha256-pack-manifest-v1',
+            'value': _signatureValue(
+              id,
+              version,
+              compressedSha256,
+              sqliteSha256,
+              sizeBytes,
+            ),
+          },
+          'schemaVersion': '1',
+          'requiredTables': ['catalog_metadata', 'stations'],
+        },
+      ],
+    });
+
+    final pack = manifest.packs.single;
+    expect(pack.artifactKind, DataPackArtifactKind.fixture);
+    expect(pack.sizeBytes, sizeBytes);
+    expect(pack.representativeRouteRegressions, isEmpty);
+    expect(pack.representativeRouteRegressionSignature.value, '0' * 64);
   });
 
   test('production key가 설정되면 fixture manifest를 거부한다', () {
@@ -486,6 +616,17 @@ Map<String, Object?> _fixturePack({
     'sqliteSha256': sqliteSha256,
     'sizeBytes': sizeBytes,
     'artifactKind': 'fixture',
+    'representativeRouteRegressions': _representativeRouteRegressions,
+    'representativeRouteRegressionSignature': {
+      'algorithm': 'sha256-route-regression-v1',
+      'value': _routeRegressionSignatureValue(
+        id,
+        version,
+        compressedSha256,
+        sqliteSha256,
+        sizeBytes,
+      ),
+    },
     'signature': {
       'algorithm': 'sha256-pack-manifest-v1',
       'value': _signatureValue(
@@ -538,6 +679,11 @@ Map<String, Object?> _productionPack({
     'sqliteSha256': sqliteSha256,
     'sizeBytes': sizeBytes,
     'artifactKind': 'production',
+    'representativeRouteRegressions': _representativeRouteRegressions,
+    'representativeRouteRegressionSignature': {
+      'algorithm': 'rsa-sha256-route-regression-v1',
+      'value': _productionRouteRegressionSignatureValue,
+    },
     'signature': {
       'algorithm': 'rsa-sha256-pack-manifest-v1',
       'value': signatureValue ?? _productionSignatureValue,
@@ -576,6 +722,22 @@ String _signatureValue(
   return sha256
       .convert(
         utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
+}
+
+String _routeRegressionSignatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode(
+          '$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes:${jsonEncode(_representativeRouteRegressions)}',
+        ),
       )
       .toString();
 }
