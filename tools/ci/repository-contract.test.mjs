@@ -1814,6 +1814,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
   );
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const adminOperatorAuditFilter = read(
+    "backend/src/main/java/com/easysubway/common/security/AdminOperatorAuditFilter.java",
+  );
   const operatorReportController = read(
     "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
   );
@@ -2036,9 +2039,13 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
+  assert.match(security, /adminSecurityFilterChain\(HttpSecurity http, AdminOperatorAuditFilter auditFilter\)/);
+  assert.match(security, /adminSecurityFilterChain[\s\S]*addFilterAfter\(auditFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /@Order\(2\)[\s\S]*?securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
+  assert.match(security, /operatorSecurityFilterChain\(HttpSecurity http, AdminOperatorAuditFilter auditFilter\)/);
+  assert.match(security, /operatorSecurityFilterChain[\s\S]*addFilterAfter\(auditFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /@Order\(3\)[\s\S]*?reportSecurityFilterChain/);
   assert.doesNotMatch(security, /"\/api\/v1\/me"/);
   assert.match(security, /"\/api\/v1\/reports\/\*"/);
@@ -2058,6 +2065,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
   assert.match(security, /passwordEncoder\.encode\(operatorPassword\)/);
+  assert.match(security, /AdminOperatorAuditFilter adminOperatorAuditFilter\(\)/);
+  assert.match(security, /return new AdminOperatorAuditFilter\(\)/);
+  assert.match(adminOperatorAuditFilter, /extends OncePerRequestFilter/);
+  assert.match(adminOperatorAuditFilter, /MUTATING_METHODS = Set\.of\("POST", "PUT", "PATCH", "DELETE"\)/);
+  assert.match(adminOperatorAuditFilter, /path\.startsWith\("\/admin\/"\) \|\| path\.startsWith\("\/operator\/"\)/);
+  assert.match(adminOperatorAuditFilter, /admin_operator_state_change_audit method=\{\} path=\{\} principal=\{\} roles=\{\} status=\{\}/);
+  assert.match(adminOperatorAuditFilter, /HandlerMapping\.BEST_MATCHING_PATTERN_ATTRIBUTE/);
+  assert.doesNotMatch(adminOperatorAuditFilter, /getQueryString|getParameter|getParameterMap|getInputStream|getReader/);
+  assert.doesNotMatch(adminOperatorAuditFilter, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
   assert.match(operatorReportController, /@GetMapping\("\/operator\/api\/accessibility-report"\)/);
   assert.match(operatorReportController, /ApiResponse<OperatorAccessibilityReportView>/);
   assert.match(operatorReportController, /reportAssembler\.assemble\(\)/);
