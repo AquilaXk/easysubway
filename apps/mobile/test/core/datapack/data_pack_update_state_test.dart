@@ -16,6 +16,39 @@ const _representativeRouteRegressions = [
     'toNodeId': 'station-b-line-1',
     'requiredEdgeIds': ['edge-a-b'],
   },
+  {
+    'id': 'transfer-capital',
+    'pattern': 'TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-a-b', 'edge-b-transfer', 'edge-b-c'],
+  },
+  {
+    'id': 'multi-transfer-capital',
+    'pattern': 'MULTI_TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-d-line-3',
+    'requiredEdgeIds': [
+      'edge-a-b',
+      'edge-b-transfer',
+      'edge-c-transfer',
+      'edge-c-d',
+    ],
+  },
+  {
+    'id': 'loop-branch-capital',
+    'pattern': 'LOOP_BRANCH',
+    'fromNodeId': 'station-branch-line-2',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-branch-loop', 'edge-loop-c'],
+  },
+  {
+    'id': 'express-local-capital',
+    'pattern': 'EXPRESS_LOCAL',
+    'fromNodeId': 'station-a-line-1-express',
+    'toNodeId': 'station-b-line-1-express',
+    'requiredEdgeIds': ['edge-a-b-express'],
+  },
 ];
 
 void main() {
