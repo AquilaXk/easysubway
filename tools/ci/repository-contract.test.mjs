@@ -619,10 +619,9 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
   assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
   assert.match(workflow, /flutter build appbundle --release/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/api\.easysubway\.local/);
   assert.equal(
-    (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/api\.easysubway\.local/g) ?? []).length,
-    2,
+    (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
+    0,
   );
   assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway\.local\/privacy/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL=support@easysubway\.local/);

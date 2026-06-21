@@ -42,6 +42,27 @@ abstract class FacilityReportRepository {
   Future<List<FacilityReportResult>> listMyReports();
 }
 
+class UnavailableFacilityReportRepository implements FacilityReportRepository {
+  const UnavailableFacilityReportRepository();
+
+  @override
+  Future<FacilityReportResult> createReport(
+    FacilityReportRequest request,
+  ) async {
+    throw const FacilityReportException(_facilityReportErrorMessage);
+  }
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) async {
+    throw const FacilityReportException(_facilityReportStatusErrorMessage);
+  }
+
+  @override
+  Future<List<FacilityReportResult>> listMyReports() async {
+    throw const FacilityReportException(_facilityReportListErrorMessage);
+  }
+}
+
 class FacilityReportApiRepository implements FacilityReportRepository {
   FacilityReportApiRepository({
     required this.baseUri,
