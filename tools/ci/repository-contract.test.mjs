@@ -623,10 +623,13 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
     (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
     0,
   );
-  assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway\.local\/privacy/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL=support@easysubway\.local/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway\.local/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL=security@easysubway\.local/);
+  assert.match(workflow, /Release Artifacts \/ Restore GitHub Actions dotenv secret/);
+  assert.match(workflow, /tools\/ci\/validate-store-privacy-env\.mjs --env-file "\$\{env_file\}" --github-env "\$\{GITHUB_ENV\}"/);
+  assert.match(workflow, /EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="\$\{EASYSUBWAY_PRIVACY_POLICY_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
   assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
@@ -695,6 +698,83 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
   assert.match(stdout, /^ios=true$/m);
   assert.match(stdout, /^repository=true$/m);
   assert.match(stdout, /^deploy=true$/m);
+});
+
+test("스토어 개인정보 제출 기준선은 release artifact placeholder 값을 거부한다", async () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const readme = read("README.md");
+  const storeReadiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+
+  assert.doesNotMatch(workflow, /easysubway\.local|@easysubway\.local/);
+  assert.match(workflow, /Release Artifacts \/ Restore GitHub Actions dotenv secret/);
+  assert.match(workflow, /tools\/ci\/validate-store-privacy-env\.mjs/);
+  assert.match(workflow, /EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="\$\{EASYSUBWAY_PRIVACY_POLICY_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
+
+  assert.equal(privacyInventory.privacyPolicyUrlSource, "EASYSUBWAY_PRIVACY_POLICY_URL dart-define");
+  assert.equal(privacyInventory.userDataDeletionSupported, true);
+  assert.equal(privacyInventory.encryptionInTransitRequired, true);
+  assert.equal(privacyInventory.tracking, false);
+  assert.equal(privacyInventory.sharesDataWithThirdParties, false);
+
+  const readinessItems = new Map(storeReadiness.items.map((item) => [item.id, item]));
+  for (const id of [
+    "play_privacy_policy_url",
+    "play_account_data_deletion",
+    "appstore_privacy_policy_url",
+    "appstore_support_url",
+    "cross_store_privacy_consistency",
+  ]) {
+    const item = readinessItems.get(id);
+    assert.ok(item, `${id} must be present in store submission readiness`);
+    assert.ok(item.linkedArtifacts.includes("README.md"), `${id} must link README for public user-facing path`);
+  }
+
+  assert.match(readme, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(readme, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.doesNotMatch(readme, /easysubway\.local|@easysubway\.local/);
+
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-privacy-env-"));
+  const validEnv = path.join(dir, "valid.env");
+  await writeFile(validEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "",
+  ].join("\n"));
+  const githubEnv = path.join(dir, "github.env");
+  await execFileAsync(
+    process.execPath,
+    ["tools/ci/validate-store-privacy-env.mjs", "--env-file", validEnv, "--github-env", githubEnv],
+    {
+      cwd: root,
+    },
+  );
+  const githubEnvOutput = readFileSync(githubEnv, "utf8");
+  assert.match(githubEnvOutput, /^EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway\.app\/privacy$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@easysubway\.app$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@easysubway\.app$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway\.app$/m);
+
+  const invalidEnv = path.join(dir, "invalid.env");
+  await writeFile(invalidEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.local/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.local",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.local",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.local",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, ["tools/ci/validate-store-privacy-env.mjs", "--env-file", invalidEnv], {
+      cwd: root,
+    }),
+    /must not use local or placeholder values/,
+  );
 });
 
 test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 보관 계약을 고정한다", () => {
