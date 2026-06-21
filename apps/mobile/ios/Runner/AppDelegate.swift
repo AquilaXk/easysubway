@@ -107,7 +107,7 @@ import UserNotifications
       "accuracyMeters": location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil,
       "measuredAtMillis": Int(location.timestamp.timeIntervalSince1970 * 1000),
       "provider": "core-location",
-      "isMocked": false,
+      "isMocked": isMockedLocation(location),
       "permissionPrecision": permissionPrecision(),
     ])
   }
@@ -152,6 +152,13 @@ import UserNotifications
       return locationManager.accuracyAuthorization == .fullAccuracy ? "precise" : "approximate"
     }
     return "precise"
+  }
+
+  private func isMockedLocation(_ location: CLLocation) -> Bool {
+    if #available(iOS 15.0, *) {
+      return location.sourceInformation?.isSimulatedBySoftware ?? false
+    }
+    return false
   }
 
   private func openLocationSettings(_ result: @escaping FlutterResult) {
