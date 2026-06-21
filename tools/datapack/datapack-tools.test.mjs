@@ -2645,6 +2645,78 @@ test("관리자 검수 override는 같은 시설의 최신 reviewedAt 결과만 
   assert.equal(reviewedFixture.packs[0].metadata.adminReviewOverrideCount, "1");
 });
 
+test("관리자 검수 override는 같은 역의 제한 시설 경고를 정상 시설로 지우지 않는다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-admin-review-overrides-station-summary-${Date.now()}`);
+  const inputPath = path.join(outputDir, "catalog-fixture.json");
+  const overridePath = path.join(outputDir, "admin-review-overrides.json");
+  const outputPath = path.join(outputDir, "catalog-fixture.reviewed.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  fixture.packs[0].facilities.push({
+    id: "facility-sangnoksu-escalator-1",
+    stationId: "station-sangnoksu",
+    exitId: "exit-sangnoksu-1",
+    type: "ESCALATOR",
+    name: "1번 출구 에스컬레이터",
+    status: "NORMAL",
+    floorFrom: "B1",
+    floorTo: "1F",
+    description: "대합실과 1번 출구 지상을 연결",
+  });
+  await writeFile(inputPath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await writeFile(
+    overridePath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        source: "facility-report-admin-review",
+        exportedAt: "2026-06-21T00:00:00.000Z",
+        facilityStatusUpdates: [
+          {
+            reportId: "report-admin-approved-broken-elevator",
+            facilityId: "facility-sangnoksu-elevator-1",
+            status: "BROKEN",
+            reviewedBy: "admin-user",
+            reviewedAt: "2026-06-21T00:00:00.000Z",
+          },
+          {
+            reportId: "report-admin-approved-normal-escalator",
+            facilityId: "facility-sangnoksu-escalator-1",
+            status: "NORMAL",
+            reviewedBy: "admin-user",
+            reviewedAt: "2026-06-21T00:01:00.000Z",
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/apply-admin-review-overrides.mjs",
+      "--fixture",
+      inputPath,
+      "--overrides",
+      overridePath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: root },
+  );
+
+  const reviewedFixture = JSON.parse(await readFile(outputPath, "utf8"));
+  const reviewedSummary = reviewedFixture.packs[0].stationAccessibilitySummaries.find(
+    (summary) => summary.stationId === "station-sangnoksu",
+  );
+  assert.equal(reviewedSummary.summary, "1번 출구 엘리베이터 이용 제한");
+  assert.equal(reviewedSummary.warning, "1번 출구 엘리베이터 고장으로 우회가 필요합니다.");
+  assert.equal(reviewedFixture.packs[0].metadata.adminReviewOverrideCount, "2");
+});
+
 test("공식 source ingest adapter는 mapping 없는 source row를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-missing-mapping-${Date.now()}`);
   const input = sourceIngestInput();

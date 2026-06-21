@@ -26,6 +26,7 @@ function applyAdminReviewOverrides(fixture, overrides) {
   const updates = requiredArray(overrides.facilityStatusUpdates, "facilityStatusUpdates");
   const packs = requiredArray(fixture.packs, "fixture.packs");
   const latestUpdates = latestFacilityUpdates(updates);
+  const affectedStationIdsByPack = new Map();
   let appliedCount = 0;
 
   for (const { facilityId, status } of latestUpdates.values()) {
@@ -36,7 +37,7 @@ function applyAdminReviewOverrides(fixture, overrides) {
         if (facility.id === facilityId) {
           facility.status = status;
           applyRouteAccessibilityOverride(pack, facility, status);
-          applyStationAccessibilitySummaryOverride(pack, facility, status);
+          markAffectedStation(affectedStationIdsByPack, pack, facility);
           matchedFacilities.push(facility);
         }
       }
@@ -45,6 +46,12 @@ function applyAdminReviewOverrides(fixture, overrides) {
       throw new Error(`facilityStatusUpdates.facilityId was not found in fixture: ${facilityId}`);
     }
     appliedCount += matchedFacilities.length;
+  }
+
+  for (const [pack, stationIds] of affectedStationIdsByPack.entries()) {
+    for (const stationId of stationIds) {
+      applyStationAccessibilitySummaryOverride(pack, stationId);
+    }
   }
 
   for (const pack of packs) {
@@ -81,9 +88,17 @@ function latestFacilityUpdates(updates) {
   return latest;
 }
 
-function applyStationAccessibilitySummaryOverride(pack, facility, status) {
+function markAffectedStation(affectedStationIdsByPack, pack, facility) {
   const stationId = requiredString(facility.stationId, "facility.stationId");
-  const facilityName = requiredString(facility.name, "facility.name");
+  let stationIds = affectedStationIdsByPack.get(pack);
+  if (stationIds == null) {
+    stationIds = new Set();
+    affectedStationIdsByPack.set(pack, stationIds);
+  }
+  stationIds.add(stationId);
+}
+
+function applyStationAccessibilitySummaryOverride(pack, stationId) {
   const summaries = pack.stationAccessibilitySummaries ?? [];
   pack.stationAccessibilitySummaries = summaries;
   let summary = summaries.find((row) => row.stationId === stationId);
@@ -91,9 +106,46 @@ function applyStationAccessibilitySummaryOverride(pack, facility, status) {
     summary = { stationId, summary: "", warning: "" };
     summaries.push(summary);
   }
-  const message = stationAccessibilityMessage(facilityName, status);
+  const representativeFacility = representativeStationFacility(pack, stationId);
+  if (representativeFacility == null) {
+    return;
+  }
+  const message = stationAccessibilityMessage(
+    requiredString(representativeFacility.name, "facility.name"),
+    requiredString(representativeFacility.status, "facility.status"),
+  );
   summary.summary = message.summary;
   summary.warning = message.warning;
+}
+
+function representativeStationFacility(pack, stationId) {
+  const facilities = requiredArray(pack.facilities, "pack.facilities").filter(
+    (facility) => facility.stationId === stationId,
+  );
+  return facilities
+    .map((facility, sequence) => ({
+      facility,
+      sequence,
+      rank: stationSummaryStatusRank(requiredString(facility.status, "facility.status")),
+    }))
+    .sort((left, right) => right.rank - left.rank || left.sequence - right.sequence)[0]?.facility;
+}
+
+function stationSummaryStatusRank(status) {
+  switch (status) {
+    case "CLOSED":
+      return 5;
+    case "BROKEN":
+      return 4;
+    case "UNDER_CONSTRUCTION":
+      return 3;
+    case "UNKNOWN":
+      return 2;
+    case "NORMAL":
+      return 1;
+    default:
+      throw new Error(`facility.status is not supported: ${status}`);
+  }
 }
 
 function stationAccessibilityMessage(facilityName, status) {
