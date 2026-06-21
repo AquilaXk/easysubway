@@ -34,12 +34,16 @@ class AdminOperatorAuditFilter extends OncePerRequestFilter {
 		FilterChain filterChain
 	)
 		throws ServletException, IOException {
+		Exception failure = null;
 		try {
 			filterChain.doFilter(request, response);
+		} catch (ServletException | IOException | RuntimeException exception) {
+			failure = exception;
+			throw exception;
 		} finally {
 			Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 			if (isAuthenticated(authentication)) {
-				writeAuditLog(request, response, authentication);
+				writeAuditLog(request, response, authentication, failure);
 			}
 		}
 	}
@@ -47,7 +51,8 @@ class AdminOperatorAuditFilter extends OncePerRequestFilter {
 	private void writeAuditLog(
 		HttpServletRequest request,
 		HttpServletResponse response,
-		Authentication authentication
+		Authentication authentication,
+		Exception failure
 	) {
 		log.info(
 			"admin_operator_state_change_audit method={} path={} principal={} roles={} status={}",
@@ -55,8 +60,15 @@ class AdminOperatorAuditFilter extends OncePerRequestFilter {
 			normalizedPath(request),
 			authentication.getName(),
 			roles(authentication),
-			response.getStatus()
+			status(response, failure)
 		);
+	}
+
+	private static int status(HttpServletResponse response, Exception failure) {
+		if (failure == null || response.getStatus() >= HttpServletResponse.SC_BAD_REQUEST) {
+			return response.getStatus();
+		}
+		return HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 	}
 
 	private static boolean isAuthenticated(Authentication authentication) {

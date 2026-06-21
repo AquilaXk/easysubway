@@ -1,6 +1,7 @@
 package com.easysubway.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,10 +14,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-test",
@@ -31,6 +36,24 @@ class AdminOperatorAuditFilterTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@TestConfiguration
+	static class FailingAdminMutationConfiguration {
+
+		@Bean
+		FailingAdminMutationController failingAdminMutationController() {
+			return new FailingAdminMutationController();
+		}
+	}
+
+	@RestController
+	static class FailingAdminMutationController {
+
+		@PostMapping("/admin/audit-test/fail")
+		void fail() {
+			throw new IllegalStateException("forced admin audit failure");
+		}
+	}
 
 	@Test
 	@DisplayName("관리자 상태 변경 요청은 민감값 없는 감사 로그를 남긴다")
@@ -58,6 +81,23 @@ class AdminOperatorAuditFilterTest {
 			.doesNotContain("37.302421")
 			.doesNotContain("do-not-log-private-note")
 			.doesNotContain("https://storage.example/upload");
+	}
+
+	@Test
+	@DisplayName("관리자 상태 변경 예외 요청은 500 감사 로그를 남긴다")
+	void adminMutationFailureWritesServerErrorAuditLog(CapturedOutput output) {
+		assertThatThrownBy(() -> mockMvc.perform(post("/admin/audit-test/fail")
+				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf()))
+			.andReturn())
+			.hasRootCauseMessage("forced admin audit failure");
+
+		assertThat(output.getOut())
+			.contains("admin_operator_state_change_audit")
+			.contains("method=POST")
+			.contains("path=/admin/audit-test/fail")
+			.contains("principal=admin-test")
+			.contains("status=500");
 	}
 
 	@Test
