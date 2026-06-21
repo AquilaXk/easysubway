@@ -2013,12 +2013,17 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(security, /"\/api\/v1\/me"/);
   assert.match(security, /"\/api\/v1\/reports\/\*"/);
   assert.match(security, /"\/api\/v1\/reports\/\*\/confirm"/);
-  assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
+  assert.match(security, /@Order\(4\)[\s\S]*?publicSecurityFilterChain/);
+  assert.match(
+    security,
+    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/\*\*"[\s\S]*\)\.permitAll\(\)/,
+  );
+  assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
   assert.match(security, /roles\("OPERATOR_ADMIN"\)/);
   assert.match(security, /validateOperatorCredentials/);
-  assert.match(security, /anyRequest\(\)\.permitAll\(\)/);
+  assert.doesNotMatch(security, /publicSecurityFilterChain[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /httpBasic/);
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
