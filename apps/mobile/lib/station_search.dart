@@ -1480,6 +1480,7 @@ class StationSearchController extends ChangeNotifier {
           results: const [],
           message: blockedMessage,
         );
+        _notifyIfActive(requestId);
         return;
       }
       final results = await repository.searchNearbyStations(location);

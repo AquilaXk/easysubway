@@ -972,6 +972,10 @@ void main() {
       location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
     );
     final controller = StationSearchController(repository: repository);
+    var notificationCount = 0;
+    controller.addListener(() {
+      notificationCount++;
+    });
 
     await controller.searchNearby(locationProvider);
 
@@ -982,6 +986,7 @@ void main() {
       controller.state.message,
       '현재 위치 정확도 정보를 확인하지 못했어요. 출발역을 직접 선택해 주세요.',
     );
+    expect(notificationCount, 2);
   });
 
   test('역 검색 컨트롤러는 오래된 위치를 주변역 검색에 쓰지 않는다', () async {
