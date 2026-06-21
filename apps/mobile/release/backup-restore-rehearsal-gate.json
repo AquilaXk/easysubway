@@ -29,7 +29,7 @@
       "area": "object-storage",
       "ownerKo": "신고 운영 담당자",
       "backupCommand": "tools/ops/facility-report-photo-backup.sh",
-      "restoreRehearsalCommand": "tools/ops/backup-restore-rehearsal-check.mjs",
+      "restoreRehearsalCommand": "node tools/ops/facility-report-photo-restore-check.mjs \"$EASYSUBWAY_PHOTO_RESTORE_DIR\"",
       "successEvidence": "manifest.tsv와 objects 경로가 생성되고 누락 object key가 없음을 확인",
       "failureConditions": [
         "photo object key가 비어 있거나 경로 traversal을 포함함",
@@ -38,6 +38,7 @@
       ],
       "linkedArtifacts": [
         "tools/ops/facility-report-photo-backup.sh",
+        "tools/ops/facility-report-photo-restore-check.mjs",
         "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
         "README.md"
       ]
