@@ -25,18 +25,10 @@ function applyAdminReviewOverrides(fixture, overrides) {
   const source = requiredString(overrides.source, "source");
   const updates = requiredArray(overrides.facilityStatusUpdates, "facilityStatusUpdates");
   const packs = requiredArray(fixture.packs, "fixture.packs");
+  const latestUpdates = latestFacilityUpdates(updates);
   let appliedCount = 0;
 
-  for (const update of updates) {
-    const facilityId = requiredString(update.facilityId, "facilityStatusUpdates.facilityId");
-    const status = requiredString(update.status, "facilityStatusUpdates.status").toUpperCase();
-    requiredString(update.reportId, "facilityStatusUpdates.reportId");
-    requiredString(update.reviewedBy, "facilityStatusUpdates.reviewedBy");
-    requiredString(update.reviewedAt, "facilityStatusUpdates.reviewedAt");
-    if (!allowedFacilityStatuses.has(status)) {
-      throw new Error(`facilityStatusUpdates.status is not supported: ${status}`);
-    }
-
+  for (const { facilityId, status } of latestUpdates.values()) {
     const matchedFacilities = [];
     for (const pack of packs) {
       const facilities = requiredArray(pack.facilities, "pack.facilities");
@@ -62,6 +54,30 @@ function applyAdminReviewOverrides(fixture, overrides) {
       adminReviewOverrideExportedAt: requiredString(overrides.exportedAt, "exportedAt"),
     };
   }
+}
+
+function latestFacilityUpdates(updates) {
+  const latest = new Map();
+  updates.forEach((update, sequence) => {
+    const facilityId = requiredString(update.facilityId, "facilityStatusUpdates.facilityId");
+    const status = requiredString(update.status, "facilityStatusUpdates.status").toUpperCase();
+    requiredString(update.reportId, "facilityStatusUpdates.reportId");
+    requiredString(update.reviewedBy, "facilityStatusUpdates.reviewedBy");
+    const reviewedAt = reviewedAtMillis(update.reviewedAt);
+    if (!allowedFacilityStatuses.has(status)) {
+      throw new Error(`facilityStatusUpdates.status is not supported: ${status}`);
+    }
+
+    const current = latest.get(facilityId);
+    if (
+      current == null ||
+      reviewedAt > current.reviewedAt ||
+      (reviewedAt === current.reviewedAt && sequence > current.sequence)
+    ) {
+      latest.set(facilityId, { facilityId, status, reviewedAt, sequence });
+    }
+  });
+  return latest;
 }
 
 function applyRouteAccessibilityOverride(pack, facility, status) {
@@ -107,6 +123,15 @@ function routeAccessibilityStatus(status) {
     return "UNKNOWN";
   }
   return "UNAVAILABLE";
+}
+
+function reviewedAtMillis(value) {
+  const reviewedAt = requiredString(value, "facilityStatusUpdates.reviewedAt");
+  const millis = Date.parse(reviewedAt);
+  if (Number.isNaN(millis)) {
+    throw new Error(`facilityStatusUpdates.reviewedAt is invalid: ${reviewedAt}`);
+  }
+  return millis;
 }
 
 function parseArgs(argv) {

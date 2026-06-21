@@ -2564,6 +2564,67 @@ test("관리자 검수 override는 복구 상태를 route 접근성에 다시 �
   assert.equal(reviewedInternalRouteEdge.accessibilityStatus, "AVAILABLE");
 });
 
+test("관리자 검수 override는 같은 시설의 최신 reviewedAt 결과만 적용한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-admin-review-overrides-latest-${Date.now()}`);
+  const overridePath = path.join(outputDir, "admin-review-overrides.json");
+  const outputPath = path.join(outputDir, "catalog-fixture.reviewed.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(
+    overridePath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        source: "facility-report-admin-review",
+        exportedAt: "2026-06-21T00:00:00.000Z",
+        facilityStatusUpdates: [
+          {
+            reportId: "report-admin-approved-recovered-elevator",
+            facilityId: "facility-sangnoksu-elevator-1",
+            status: "NORMAL",
+            reviewedBy: "admin-user",
+            reviewedAt: "2026-06-21T00:10:00.000Z",
+          },
+          {
+            reportId: "report-admin-approved-older-broken-elevator",
+            facilityId: "facility-sangnoksu-elevator-1",
+            status: "BROKEN",
+            reviewedBy: "admin-user",
+            reviewedAt: "2026-06-21T00:00:00.000Z",
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/apply-admin-review-overrides.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--overrides",
+      overridePath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: root },
+  );
+
+  const reviewedFixture = JSON.parse(await readFile(outputPath, "utf8"));
+  const reviewedFacility = reviewedFixture.packs[0].facilities.find(
+    (facility) => facility.id === "facility-sangnoksu-elevator-1",
+  );
+  const reviewedInternalRouteEdge = reviewedFixture.packs[0].internalRouteEdges.find(
+    (edge) => edge.id === "edge-sangnoksu-concourse-exit-1",
+  );
+  assert.equal(reviewedFacility.status, "NORMAL");
+  assert.equal(reviewedInternalRouteEdge.accessibilityStatus, "AVAILABLE");
+  assert.equal(reviewedFixture.packs[0].metadata.adminReviewOverrideCount, "1");
+});
+
 test("공식 source ingest adapter는 mapping 없는 source row를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-missing-mapping-${Date.now()}`);
   const input = sourceIngestInput();
