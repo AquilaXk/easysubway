@@ -19,7 +19,9 @@ class DataPackManifest {
   }) {
     final ttlSeconds = json['ttlSeconds'];
     final rawPacks = json['packs'];
-    if (ttlSeconds is! int || ttlSeconds <= 0 || rawPacks is! List) {
+    if (ttlSeconds is! int ||
+        ttlSeconds <= 0 ||
+        rawPacks is! List<Object?>) {
       throw const FormatException('Invalid data pack manifest.');
     }
 
@@ -76,7 +78,7 @@ class DataPackManifestEntry {
     final artifactKind = _parseArtifactKind(json['artifactKind'], url);
     final requiredTables = json['requiredTables'];
     final minimumTableRows = json['minimumTableRows'];
-    if (requiredTables is! List || requiredTables.isEmpty) {
+    if (requiredTables is! List<Object?> || requiredTables.isEmpty) {
       throw const FormatException('Invalid required data pack tables.');
     }
 
@@ -419,7 +421,7 @@ class DataPackSourceInventoryEntry {
 
   factory DataPackSourceInventoryEntry.fromJson(Map<String, Object?> json) {
     final fields = json['fields'];
-    if (fields is! List || fields.isEmpty) {
+    if (fields is! List<Object?> || fields.isEmpty) {
       throw const FormatException('Invalid data pack source fields.');
     }
     return DataPackSourceInventoryEntry(
@@ -492,7 +494,7 @@ class DataPackRepresentativeRouteRegression {
     Map<String, Object?> json,
   ) {
     final rawRequiredEdgeIds = json['requiredEdgeIds'];
-    if (rawRequiredEdgeIds is! List || rawRequiredEdgeIds.isEmpty) {
+    if (rawRequiredEdgeIds is! List<Object?> || rawRequiredEdgeIds.isEmpty) {
       throw const FormatException('Invalid representative route regression.');
     }
     final pattern = _requiredString(json, 'pattern');
@@ -648,7 +650,7 @@ List<DataPackSourceInventoryEntry> _parseSourceInventory(
       ),
     ];
   }
-  if (rawSources is! List || rawSources.isEmpty) {
+  if (rawSources is! List<Object?> || rawSources.isEmpty) {
     throw const FormatException('Invalid data pack source inventory.');
   }
   return rawSources
@@ -700,7 +702,7 @@ _parseRepresentativeRouteRegressions(
   if (rawRoutes == null && artifactKind == DataPackArtifactKind.fixture) {
     return const [];
   }
-  if (rawRoutes is! List || rawRoutes.isEmpty) {
+  if (rawRoutes is! List<Object?> || rawRoutes.isEmpty) {
     throw const FormatException('Invalid representative route regressions.');
   }
   final routes = rawRoutes

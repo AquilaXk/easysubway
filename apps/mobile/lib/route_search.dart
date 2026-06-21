@@ -273,7 +273,7 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
       baseUri.resolve('/api/v1/me/favorites/routes'),
       errorMessage: _favoriteRouteLoadErrorMessage,
     );
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const FavoriteRouteException(_favoriteRouteLoadErrorMessage);
     }
 
@@ -536,11 +536,11 @@ class RouteSearchResult {
     final rawWarnings = json['warnings'];
     final rawRecommendationReasons = json['recommendationReasons'];
     final rawBlockedReasons = json['blockedReasons'];
-    if (rawSteps is! List ||
-        rawWarnings is! List ||
+    if (rawSteps is! List<Object?> ||
+        rawWarnings is! List<Object?> ||
         (rawRecommendationReasons != null &&
-            rawRecommendationReasons is! List) ||
-        rawBlockedReasons is! List) {
+            rawRecommendationReasons is! List<Object?>) ||
+        rawBlockedReasons is! List<Object?>) {
       throw const FormatException('Invalid route payload');
     }
 
@@ -3070,7 +3070,7 @@ List<String> _routeStringList(Object? value, String label) {
   if (value == null) {
     return const [];
   }
-  if (value is! List) {
+  if (value is! List<Object?>) {
     throw FormatException('Invalid $label payload');
   }
   return value

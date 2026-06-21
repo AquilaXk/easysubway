@@ -37,7 +37,7 @@ class FavoriteFacilityApiRepository implements FavoriteFacilityRepository {
       baseUri.resolve('/api/v1/me/favorites/facilities'),
       errorMessage: _favoriteFacilityLoadErrorMessage,
     );
-    if (data is! List) {
+    if (data is! List<Object?>) {
       throw const FavoriteFacilityException(_favoriteFacilityLoadErrorMessage);
     }
 
