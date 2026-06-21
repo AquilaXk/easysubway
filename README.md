@@ -82,6 +82,8 @@ Migration 실패를 무시하고 DB를 삭제하거나 재생성하지 않습니
 
 운영 로그와 artifact에는 receipt token, upload URL, photo metadata를 남기지 않습니다. 장애 증거에는 app version, datapack version, route engine version, provider snapshot id를 함께 기록해야 하며, 외부 provider나 store console이 필요한 신호는 PR 검증 증거에 외부 차단 조건과 남은 리스크를 기록합니다.
 
+백업과 복구 리허설 기준선은 `apps/mobile/release/backup-restore-rehearsal-gate.json`으로 검증합니다. PR과 릴리즈 후보에서는 `node tools/ops/backup-restore-rehearsal-check.mjs`로 PostgreSQL dump, 신고 사진 object manifest, 데이터팩 source inventory, 데이터팩 release manifest history가 모두 복구 리허설 대상에 포함되는지 확인합니다. 실제 database dump, 사진 object, signed URL, credential, receipt token은 GitHub에 올리지 않고 `.codex/evidence/backup-restore-rehearsal/<date>/` 아래 로컬 전용 증거로만 보관합니다.
+
 ## Workflow
 
 Tracked work follows this order:
