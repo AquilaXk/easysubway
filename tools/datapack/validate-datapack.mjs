@@ -816,11 +816,51 @@ function validateSourceInventory(sourceInventory, artifactKind, label) {
 
 function usesLocalPlaceholderHost(value) {
   try {
-    const hostname = new URL(value).hostname.toLowerCase().replace(/\.$/, "");
-    return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local");
+    let hostname = new URL(value).hostname.toLowerCase().replace(/\.$/, "");
+    if (hostname.startsWith("[") && hostname.endsWith("]")) {
+      hostname = hostname.slice(1, -1);
+    }
+    return isLocalPlaceholderHostname(hostname) || isNonPublicIpv4(hostname) || isNonPublicIpv6(hostname);
   } catch {
     return false;
   }
+}
+
+function isLocalPlaceholderHostname(hostname) {
+  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local");
+}
+
+function isNonPublicIpv4(hostname) {
+  const parts = hostname.split(".");
+  if (parts.length !== 4) {
+    return false;
+  }
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return false;
+  }
+  const [first, second] = octets;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+function isNonPublicIpv6(hostname) {
+  if (!hostname.includes(":")) {
+    return false;
+  }
+  return (
+    hostname === "::" ||
+    hostname === "::1" ||
+    hostname.startsWith("fc") ||
+    hostname.startsWith("fd") ||
+    /^fe[89ab]/.test(hostname)
+  );
 }
 
 function isAbsoluteHttpsWithHost(value) {
