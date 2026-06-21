@@ -554,6 +554,38 @@ void main() {
     );
   });
 
+  test('앱 부트스트랩은 API와 데이터팩 base가 없어도 HTTP request를 열지 않는다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-bootstrap-no-network-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    var httpRequestCount = 0;
+
+    AppBootstrap? bootstrap;
+    addTearDown(() => bootstrap?.close());
+    bootstrap = await HttpOverrides.runZoned(
+      () => AppBootstrap.initialize(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+        enablePushNotifications: false,
+      ),
+      createHttpClient: (context) {
+        return _RequestCountingHttpClient(() {
+          httpRequestCount++;
+        });
+      },
+    );
+
+    final metadata = await bootstrap!.catalogDatabase.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'schemaVersion'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), '1');
+    expect(httpRequestCount, 0);
+  });
+
   test('user DB는 catalog 데이터팩 교체와 독립적으로 즐겨찾기와 신고 receipt를 보존한다', () async {
     final directory = await Directory.systemTemp.createTemp('easysubway-user-');
     addTearDown(() => directory.delete(recursive: true));
@@ -598,4 +630,25 @@ void main() {
     expect(receipts.single.reportId, 'report-1');
     expect(receipts.single.status, 'RECEIVED');
   });
+}
+
+class _RequestCountingHttpClient implements HttpClient {
+  _RequestCountingHttpClient(this.onRequest);
+
+  final void Function() onRequest;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) => openUrl('GET', url);
+
+  @override
+  Future<HttpClientRequest> postUrl(Uri url) => openUrl('POST', url);
+
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri url) {
+    onRequest();
+    throw StateError('startup must not open HTTP request: $method $url');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
