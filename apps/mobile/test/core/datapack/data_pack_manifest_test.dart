@@ -12,7 +12,7 @@ const _productionSigningPublicKey = DataPackSigningPublicKey(
 const _productionSignatureValue =
     'iF48gj_9CEV0os3gJMEO2qdn0aAcBXT71zl8Qz6KIWQZ2qm1A0TmCb7f6wTJEoP3cFSZQdgmXcj7IPFNv9gLE9O_s0-DmwniFX7OIv8icwGe1BKHNJfFmHCqWyLs0uuUVZTmY6RwqS_YnElf_0caT1qDS7L32uu5zYXnWGTg5ul2xeRuBgDGW9gFs9I4UkvdF-MbNjVxCby4tyuCsQSHxUhpFLSLKluLGWc7lY4u688Ss2dR9Zs-zlYiWb4GQ6lxKU_lfx_0FSl3yipgrhX7OpAihyVBuxh-PA_MA5KAqJ0C5HqxAJ_lYZhgYKb5zvJ3eChI7uWc2OhyZ2ZyE-jYdw';
 const _productionRouteRegressionSignatureValue =
-    'UkRPUdvrHybjorn-_dvvOqT2ZPsFEF0aF7r5ThuP0NUAZ4nd-u_2OaPqvCZS3QJ1aBSSiiBgoWbAFrjJgLf3oGW3a6HbrVMUkHLdpz5cbUty5RTo5M5GiinYdbr7eQH2CzimKEOKAEmfyqfBuum8TORMVfTTRS-RDHymwQmtf7Hln7rscCtvThcSdmj6BfrcMgsR7L3sUx_Q598lhjFS38KSuaTzAbpIVku3K6-fFk3O76Opy_9n-cbyQEjGrfLvOvh3OxI1ReBxW5XI6P9Q2O5YcsZbkqb1gqR0we6EQx6tKIBk92fA5LV4_dAK0HrCK4-PZ0m7H1emxhflkBG-WQ';
+    'UmI9-5bLdUMmyxNcnOJb5Tyirv4KvKKvxXKcr-MgwCQhfI4baUYXvq2igeS6PVZsgBMv4nXD6BNeF5L8VW49afvfU9ZT15NXftD1wg986tEMwjf0YSXXDjriKWy_u-3cbsNIhHOW3oqvnAwCOb0ofvJ8I26bTcVQFjVh4QjXtSiwzCQqr8WHDGvBc2UbOk-3TOuPR7U3YwsNcXUl2uvo7qn5IwEgCh62k5NQPx222y2khlQz5p9do5DzaJKuHXM3kfwcXA-mJDKptx6pZIqx3n5brahAcPjX4dd6Kr6mYDiWU38y-23redacmWk-YgA8gXXXHSH92SLlqXEedOIiDg';
 const _representativeRouteRegressions = [
   {
     'id': 'direct-local-capital',
@@ -20,6 +20,39 @@ const _representativeRouteRegressions = [
     'fromNodeId': 'station-a-line-1',
     'toNodeId': 'station-b-line-1',
     'requiredEdgeIds': ['edge-a-b'],
+  },
+  {
+    'id': 'transfer-capital',
+    'pattern': 'TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-a-b', 'edge-b-transfer', 'edge-b-c'],
+  },
+  {
+    'id': 'multi-transfer-capital',
+    'pattern': 'MULTI_TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-d-line-3',
+    'requiredEdgeIds': [
+      'edge-a-b',
+      'edge-b-transfer',
+      'edge-c-transfer',
+      'edge-c-d',
+    ],
+  },
+  {
+    'id': 'loop-branch-capital',
+    'pattern': 'LOOP_BRANCH',
+    'fromNodeId': 'station-branch-line-2',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-branch-loop', 'edge-loop-c'],
+  },
+  {
+    'id': 'express-local-capital',
+    'pattern': 'EXPRESS_LOCAL',
+    'fromNodeId': 'station-a-line-1-express',
+    'toNodeId': 'station-b-line-1-express',
+    'requiredEdgeIds': ['edge-a-b-express'],
   },
 ];
 
@@ -304,6 +337,23 @@ void main() {
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [changedRouteContract],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
+      throwsFormatException,
+    );
+
+    final missingPatternContract = _productionPack();
+    missingPatternContract['representativeRouteRegressions'] =
+        _representativeRouteRegressions
+            .where((route) => route['pattern'] != 'MULTI_TRANSFER')
+            .toList(growable: false);
+    missingPatternContract['representativeRouteRegressionSignature'] = {
+      'algorithm': 'rsa-sha256-route-regression-v1',
+      'value': _productionRouteRegressionSignatureValue,
+    };
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [missingPatternContract],
       }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );

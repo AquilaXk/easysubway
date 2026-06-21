@@ -696,7 +696,7 @@ _parseRepresentativeRouteRegressions(
   if (rawRoutes is! List || rawRoutes.isEmpty) {
     throw const FormatException('Invalid representative route regressions.');
   }
-  return rawRoutes
+  final routes = rawRoutes
       .map((route) {
         if (route is! Map<String, Object?>) {
           throw const FormatException(
@@ -706,6 +706,11 @@ _parseRepresentativeRouteRegressions(
         return DataPackRepresentativeRouteRegression.fromJson(route);
       })
       .toList(growable: false);
+  final seenPatterns = routes.map((route) => route.pattern).toSet();
+  if (!_representativeRoutePatterns.every(seenPatterns.contains)) {
+    throw const FormatException('Invalid representative route regressions.');
+  }
+  return routes;
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
