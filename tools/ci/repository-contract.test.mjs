@@ -2016,7 +2016,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(4\)[\s\S]*?publicSecurityFilterChain/);
   assert.match(
     security,
-    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/\*\*"[\s\S]*\)\.permitAll\(\)/,
+    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/\*\*"[\s\S]*"\/actuator\/prometheus"[\s\S]*\)\.permitAll\(\)/,
   );
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
