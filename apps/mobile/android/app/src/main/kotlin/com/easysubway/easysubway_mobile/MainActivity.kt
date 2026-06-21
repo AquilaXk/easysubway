@@ -23,6 +23,7 @@ class MainActivity : FlutterActivity() {
     private val notificationPermissionRequestCode = 2402
     private val locationTimeoutMillis = 10_000L
     private val nearbyLocationMaxAgeMillis = 5 * 60 * 1000L
+    private val nearbyLocationMaxAccuracyMeters = 500f
 
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingNotificationPermissionResult: MethodChannel.Result? = null
@@ -132,11 +133,12 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val lastKnownLocation = providers
+        val cachedLocation = providers
             .mapNotNull { provider -> locationManager.safeLastKnownLocation(provider) }
+            .filter { location -> location.canUseCachedForNearbySearch() }
             .maxByOrNull { location -> location.time }
-        if (lastKnownLocation != null && lastKnownLocation.isFreshEnoughForNearbySearch()) {
-            result.success(lastKnownLocation.toFlutterMap())
+        if (cachedLocation != null) {
+            result.success(cachedLocation.toFlutterMap())
             return
         }
 
@@ -292,8 +294,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun Location.isFreshEnoughForNearbySearch(): Boolean {
+    private fun Location.canUseCachedForNearbySearch(): Boolean {
         val ageMillis = System.currentTimeMillis() - time
-        return ageMillis in 0..nearbyLocationMaxAgeMillis
+        return ageMillis in 0..nearbyLocationMaxAgeMillis &&
+            !isMockLocation() &&
+            hasAccuracy() &&
+            accuracy <= nearbyLocationMaxAccuracyMeters
     }
 }
