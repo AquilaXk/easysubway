@@ -8,6 +8,16 @@ import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _representativeRouteRegressions = [
+  {
+    'id': 'direct-local-capital',
+    'pattern': 'DIRECT',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-b-line-1',
+    'requiredEdgeIds': ['edge-a-b'],
+  },
+];
+
 void main() {
   test('manifest client는 TTL 안에서는 네트워크를 호출하지 않는다', () async {
     final userDatabase = user_db.UserDatabase.memory();
@@ -79,6 +89,8 @@ void main() {
                 'sqliteSha256': 'b' * 64,
                 'sizeBytes': 1024,
                 'artifactKind': 'fixture',
+                'representativeRouteRegressions':
+                    _representativeRouteRegressions,
                 'signature': {
                   'algorithm': 'sha256-pack-manifest-v1',
                   'value': _signatureValue(
@@ -145,7 +157,9 @@ String _signatureValue(
 ) {
   return sha256
       .convert(
-        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+        utf8.encode(
+          '$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes:${jsonEncode(_representativeRouteRegressions)}',
+        ),
       )
       .toString();
 }
