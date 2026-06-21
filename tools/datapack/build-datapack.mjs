@@ -503,6 +503,9 @@ function validateFixture(fixture) {
     if (artifactKind === "production" && !isAbsoluteHttpsWithHost(pack.url)) {
       throw new Error("production pack url must be an absolute HTTPS URL");
     }
+    if (artifactKind === "production" && usesLocalPlaceholderHost(pack.url)) {
+      throw new Error("production pack url must not use a local placeholder host");
+    }
     validateSourceInventory(pack.sourceInventory, artifactKind);
     validateRepresentativeRouteRegressions(pack.representativeRouteRegressions);
     if (!Array.isArray(pack.requiredTables) || pack.requiredTables.length === 0) {
@@ -574,7 +577,19 @@ function validateSourceInventory(sourceInventory, artifactKind) {
       if (!isAbsoluteHttpsWithHost(source.url)) {
         throw new Error("production sourceInventory.url must be HTTPS");
       }
+      if (usesLocalPlaceholderHost(source.url)) {
+        throw new Error("production sourceInventory.url must not use a local placeholder host");
+      }
     }
+  }
+}
+
+function usesLocalPlaceholderHost(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local");
+  } catch {
+    return false;
   }
 }
 
