@@ -104,6 +104,11 @@ import UserNotifications
     finishLocationRequest(value: [
       "latitude": location.coordinate.latitude,
       "longitude": location.coordinate.longitude,
+      "accuracyMeters": location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil,
+      "measuredAtMillis": Int(location.timestamp.timeIntervalSince1970 * 1000),
+      "provider": "core-location",
+      "isMocked": false,
+      "permissionPrecision": permissionPrecision(),
     ])
   }
 
@@ -140,6 +145,13 @@ import UserNotifications
     @unknown default:
       return true
     }
+  }
+
+  private func permissionPrecision() -> String {
+    if #available(iOS 14.0, *) {
+      return locationManager.accuracyAuthorization == .fullAccuracy ? "precise" : "approximate"
+    }
+    return "precise"
   }
 
   private func openLocationSettings(_ result: @escaping FlutterResult) {
