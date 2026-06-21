@@ -2645,7 +2645,7 @@ test("관리자 검수 override는 같은 시설의 최신 reviewedAt 결과만 
   assert.equal(reviewedFixture.packs[0].metadata.adminReviewOverrideCount, "1");
 });
 
-test("관리자 검수 override는 같은 역의 제한 시설 경고를 정상 시설로 지우지 않는다", async () => {
+test("관리자 검수 override는 같은 역의 제한 시설 상태를 정상 시설로 지우지 않는다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-admin-review-overrides-station-summary-${Date.now()}`);
   const inputPath = path.join(outputDir, "catalog-fixture.json");
   const overridePath = path.join(outputDir, "admin-review-overrides.json");
@@ -2654,11 +2654,11 @@ test("관리자 검수 override는 같은 역의 제한 시설 경고를 정상 
   await mkdir(outputDir, { recursive: true });
   const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   fixture.packs[0].facilities.push({
-    id: "facility-sangnoksu-escalator-1",
+    id: "facility-sangnoksu-elevator-2",
     stationId: "station-sangnoksu",
     exitId: "exit-sangnoksu-1",
-    type: "ESCALATOR",
-    name: "1번 출구 에스컬레이터",
+    type: "ELEVATOR",
+    name: "2번 출구 엘리베이터",
     status: "NORMAL",
     floorFrom: "B1",
     floorTo: "1F",
@@ -2681,8 +2681,8 @@ test("관리자 검수 override는 같은 역의 제한 시설 경고를 정상 
             reviewedAt: "2026-06-21T00:00:00.000Z",
           },
           {
-            reportId: "report-admin-approved-normal-escalator",
-            facilityId: "facility-sangnoksu-escalator-1",
+            reportId: "report-admin-approved-normal-second-elevator",
+            facilityId: "facility-sangnoksu-elevator-2",
             status: "NORMAL",
             reviewedBy: "admin-user",
             reviewedAt: "2026-06-21T00:01:00.000Z",
@@ -2712,6 +2712,10 @@ test("관리자 검수 override는 같은 역의 제한 시설 경고를 정상 
   const reviewedSummary = reviewedFixture.packs[0].stationAccessibilitySummaries.find(
     (summary) => summary.stationId === "station-sangnoksu",
   );
+  const reviewedInternalRouteEdge = reviewedFixture.packs[0].internalRouteEdges.find(
+    (edge) => edge.id === "edge-sangnoksu-concourse-exit-1",
+  );
+  assert.equal(reviewedInternalRouteEdge.accessibilityStatus, "UNAVAILABLE");
   assert.equal(reviewedSummary.summary, "1번 출구 엘리베이터 이용 제한");
   assert.equal(reviewedSummary.warning, "1번 출구 엘리베이터 고장으로 우회가 필요합니다.");
   assert.equal(reviewedFixture.packs[0].metadata.adminReviewOverrideCount, "2");

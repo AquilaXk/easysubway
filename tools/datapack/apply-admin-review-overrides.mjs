@@ -27,6 +27,7 @@ function applyAdminReviewOverrides(fixture, overrides) {
   const packs = requiredArray(fixture.packs, "fixture.packs");
   const latestUpdates = latestFacilityUpdates(updates);
   const affectedStationIdsByPack = new Map();
+  const affectedInternalRouteTypesByPack = new Map();
   let appliedCount = 0;
 
   for (const { facilityId, status } of latestUpdates.values()) {
@@ -36,8 +37,9 @@ function applyAdminReviewOverrides(fixture, overrides) {
       for (const facility of facilities) {
         if (facility.id === facilityId) {
           facility.status = status;
-          applyRouteAccessibilityOverride(pack, facility, status);
+          applyNetworkRouteAccessibilityOverride(pack, facility, status);
           markAffectedStation(affectedStationIdsByPack, pack, facility);
+          markAffectedInternalRouteType(affectedInternalRouteTypesByPack, pack, facility);
           matchedFacilities.push(facility);
         }
       }
@@ -51,6 +53,14 @@ function applyAdminReviewOverrides(fixture, overrides) {
   for (const [pack, stationIds] of affectedStationIdsByPack.entries()) {
     for (const stationId of stationIds) {
       applyStationAccessibilitySummaryOverride(pack, stationId);
+    }
+  }
+
+  for (const [pack, routeTypesByStation] of affectedInternalRouteTypesByPack.entries()) {
+    for (const [stationId, facilityTypes] of routeTypesByStation.entries()) {
+      for (const facilityType of facilityTypes) {
+        applyInternalRouteAccessibilityOverride(pack, stationId, facilityType);
+      }
     }
   }
 
@@ -96,6 +106,25 @@ function markAffectedStation(affectedStationIdsByPack, pack, facility) {
     affectedStationIdsByPack.set(pack, stationIds);
   }
   stationIds.add(stationId);
+}
+
+function markAffectedInternalRouteType(affectedInternalRouteTypesByPack, pack, facility) {
+  const facilityType = requiredString(facility.type, "facility.type").toUpperCase();
+  if (facilityType !== "ELEVATOR" && facilityType !== "ESCALATOR") {
+    return;
+  }
+  const stationId = requiredString(facility.stationId, "facility.stationId");
+  let routeTypesByStation = affectedInternalRouteTypesByPack.get(pack);
+  if (routeTypesByStation == null) {
+    routeTypesByStation = new Map();
+    affectedInternalRouteTypesByPack.set(pack, routeTypesByStation);
+  }
+  let facilityTypes = routeTypesByStation.get(stationId);
+  if (facilityTypes == null) {
+    facilityTypes = new Set();
+    routeTypesByStation.set(stationId, facilityTypes);
+  }
+  facilityTypes.add(facilityType);
 }
 
 function applyStationAccessibilitySummaryOverride(pack, stationId) {
@@ -177,7 +206,7 @@ function stationAccessibilityMessage(facilityName, status) {
   }
 }
 
-function applyRouteAccessibilityOverride(pack, facility, status) {
+function applyNetworkRouteAccessibilityOverride(pack, facility, status) {
   const accessibilityStatus = routeAccessibilityStatus(status);
   if (accessibilityStatus == null) {
     return;
@@ -188,12 +217,13 @@ function applyRouteAccessibilityOverride(pack, facility, status) {
       edge.accessibilityStatus = accessibilityStatus;
     }
   }
+}
 
-  const facilityType = requiredString(facility.type, "facility.type").toUpperCase();
-  if (facilityType !== "ELEVATOR" && facilityType !== "ESCALATOR") {
+function applyInternalRouteAccessibilityOverride(pack, stationId, facilityType) {
+  const accessibilityStatus = representativeInternalRouteAccessibilityStatus(pack, stationId, facilityType);
+  if (accessibilityStatus == null) {
     return;
   }
-  const stationId = requiredString(facility.stationId, "facility.stationId");
   const stationNodeIds = new Set(
     (pack.internalRouteNodes ?? [])
       .filter((node) => node.stationId === stationId)
@@ -209,6 +239,35 @@ function applyRouteAccessibilityOverride(pack, facility, status) {
     if (facilityType === "ESCALATOR" && (edge.requiresEscalator === true || edge.edgeType === "ESCALATOR")) {
       edge.accessibilityStatus = accessibilityStatus;
     }
+  }
+}
+
+function representativeInternalRouteAccessibilityStatus(pack, stationId, facilityType) {
+  return requiredArray(pack.facilities, "pack.facilities")
+    .filter((facility) => facility.stationId === stationId)
+    .filter((facility) => requiredString(facility.type, "facility.type").toUpperCase() === facilityType)
+    .map((facility, sequence) => ({
+      sequence,
+      status: routeAccessibilityStatus(requiredString(facility.status, "facility.status")),
+    }))
+    .filter((row) => row.status != null)
+    .sort(
+      (left, right) =>
+        routeAccessibilityStatusRank(right.status) - routeAccessibilityStatusRank(left.status) ||
+        left.sequence - right.sequence,
+    )[0]?.status;
+}
+
+function routeAccessibilityStatusRank(status) {
+  switch (status) {
+    case "UNAVAILABLE":
+      return 3;
+    case "UNKNOWN":
+      return 2;
+    case "AVAILABLE":
+      return 1;
+    default:
+      throw new Error(`accessibilityStatus is not supported: ${status}`);
   }
 }
 
