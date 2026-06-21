@@ -51,6 +51,19 @@ while IFS= read -r file; do
       ios=true
       deploy=true
       ;;
+    apps/mobile/release/**)
+      mobile=true
+      android=true
+      ios=true
+      ;;
+    apps/mobile/android/app/build.gradle.kts)
+      mobile=true
+      android=true
+      ;;
+    apps/mobile/ios/Runner.xcodeproj/**|apps/mobile/ios/Runner/PrivacyInfo.xcprivacy|apps/mobile/ios/Runner/Info.plist)
+      mobile=true
+      ios=true
+      ;;
     scripts/**)
       repository=true
       ;;
