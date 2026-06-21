@@ -98,7 +98,7 @@ void main() {
 
       request.response
         ..statusCode = HttpStatus.ok
-        ..write(jsonEncode({'success': true, 'data': []}))
+        ..write(jsonEncode({'success': true, 'data': <Object?>[]}))
         ..close();
     });
 

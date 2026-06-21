@@ -639,7 +639,7 @@ void main() {
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({'success': true, 'data': []}))
+        ..write(jsonEncode({'success': true, 'data': <Object?>[]}))
         ..close();
     });
 
@@ -746,7 +746,7 @@ void main() {
               'dataQualityLevel': 'LEVEL_1',
               'dataSourceType': 'OFFICIAL_FILE',
               'lastVerifiedAt': '2026-06-12',
-              'lines': const [],
+              'lines': const <Object?>[],
               'addedAt': '2026-06-13T10:00:00',
             },
           }),
