@@ -35,8 +35,8 @@ void main() {
               'registeredAt': '2026-06-15T09:00:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = DeviceRegistrationApiRepository(
@@ -87,8 +87,8 @@ void main() {
       if (requestCount == 1) {
         request.response
           ..statusCode = HttpStatus.unauthorized
-          ..write(jsonEncode({'success': false}))
-          ..close();
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
         return;
       }
 
@@ -104,8 +104,8 @@ void main() {
               'registeredAt': '2026-06-15T09:05:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final authProvider = RetryAuthorizationHeaderProvider();
@@ -136,8 +136,8 @@ void main() {
       request.response
         ..statusCode = HttpStatus.badRequest
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({'success': false}))
-        ..close();
+        ..write(jsonEncode({'success': false}));
+      await request.response.close();
     });
 
     final repository = DeviceRegistrationApiRepository(
@@ -168,7 +168,7 @@ void main() {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
-    server.listen((request) {
+    server.listen((request) async {
       requestedUri = request.uri;
       authorizationHeader = request.headers.value(
         HttpHeaders.authorizationHeader,
@@ -188,8 +188,8 @@ void main() {
               'updatedAt': '2026-06-14T09:00:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = NotificationSettingsApiRepository(
@@ -241,8 +241,8 @@ void main() {
               'updatedAt': '2026-06-14T09:05:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = NotificationSettingsApiRepository(
