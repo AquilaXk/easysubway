@@ -946,7 +946,14 @@ void main() {
         ),
       ];
     final locationProvider = FakeCurrentLocationProvider(
-      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      location: CurrentLocation(
+        latitude: 37.3028,
+        longitude: 126.8665,
+        accuracyMeters: 25,
+        measuredAt: DateTime.now(),
+        provider: 'gps',
+        permissionPrecision: LocationPermissionPrecision.precise,
+      ),
     );
     final controller = StationSearchController(repository: repository);
 
@@ -957,6 +964,104 @@ void main() {
     expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
     expect(controller.state.status, StationSearchStatus.success);
     expect(controller.state.results.single.distanceLabel, '230m 거리');
+  });
+
+  test('역 검색 컨트롤러는 정확도 정보가 없는 기존 위치 응답을 주변역 검색에 쓰지 않는다', () async {
+    final repository = FakeStationSearchRepository();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+    );
+    final controller = StationSearchController(repository: repository);
+    var notificationCount = 0;
+    controller.addListener(() {
+      notificationCount++;
+    });
+
+    await controller.searchNearby(locationProvider);
+
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, isEmpty);
+    expect(controller.state.status, StationSearchStatus.failure);
+    expect(
+      controller.state.message,
+      '현재 위치 정확도 정보를 확인하지 못했어요. 출발역을 직접 선택해 주세요.',
+    );
+    expect(notificationCount, 2);
+  });
+
+  test('역 검색 컨트롤러는 오래된 위치를 주변역 검색에 쓰지 않는다', () async {
+    final repository = FakeStationSearchRepository();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: CurrentLocation(
+        latitude: 37.3028,
+        longitude: 126.8665,
+        accuracyMeters: 25,
+        measuredAt: DateTime.now().subtract(const Duration(minutes: 20)),
+        provider: 'gps',
+        permissionPrecision: LocationPermissionPrecision.precise,
+      ),
+    );
+    final controller = StationSearchController(repository: repository);
+
+    await controller.searchNearby(locationProvider);
+
+    expect(repository.requestedNearbyLocations, isEmpty);
+    expect(controller.state.status, StationSearchStatus.failure);
+    expect(
+      controller.state.message,
+      '현재 위치가 오래되어 가까운 역을 정확히 찾기 어려워요. 출발역을 직접 선택해 주세요.',
+    );
+  });
+
+  test('역 검색 컨트롤러는 낮은 정확도와 모의 위치를 서로 다른 안내 문구로 막는다', () async {
+    final coarseRepository = FakeStationSearchRepository();
+    final coarseController = StationSearchController(
+      repository: coarseRepository,
+    );
+
+    await coarseController.searchNearby(
+      FakeCurrentLocationProvider(
+        location: CurrentLocation(
+          latitude: 37.3028,
+          longitude: 126.8665,
+          accuracyMeters: 1200,
+          measuredAt: DateTime.now(),
+          provider: 'network',
+          permissionPrecision: LocationPermissionPrecision.approximate,
+        ),
+      ),
+    );
+
+    expect(coarseRepository.requestedNearbyLocations, isEmpty);
+    expect(
+      coarseController.state.message,
+      '현재 위치 정확도가 낮아 가까운 역을 정확히 찾기 어려워요. 출발역을 직접 선택해 주세요.',
+    );
+
+    final mockedRepository = FakeStationSearchRepository();
+    final mockedController = StationSearchController(
+      repository: mockedRepository,
+    );
+
+    await mockedController.searchNearby(
+      FakeCurrentLocationProvider(
+        location: CurrentLocation(
+          latitude: 37.3028,
+          longitude: 126.8665,
+          accuracyMeters: 20,
+          measuredAt: DateTime.now(),
+          provider: 'gps',
+          isMocked: true,
+          permissionPrecision: LocationPermissionPrecision.precise,
+        ),
+      ),
+    );
+
+    expect(mockedRepository.requestedNearbyLocations, isEmpty);
+    expect(
+      mockedController.state.message,
+      '모의 위치는 가까운 역 찾기에 사용할 수 없어요. 출발역을 직접 선택해 주세요.',
+    );
   });
 
   test('역 검색 컨트롤러는 위치 조회 실패를 쉬운 문구로 표시한다', () async {
@@ -980,7 +1085,14 @@ void main() {
 
     final searchFuture = controller.searchNearby(
       FakeCurrentLocationProvider(
-        location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+        location: CurrentLocation(
+          latitude: 37.3028,
+          longitude: 126.8665,
+          accuracyMeters: 25,
+          measuredAt: DateTime.now(),
+          provider: 'gps',
+          permissionPrecision: LocationPermissionPrecision.precise,
+        ),
       ),
     );
     await Future<void>.delayed(Duration.zero);

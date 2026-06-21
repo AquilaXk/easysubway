@@ -15,6 +15,16 @@ import 'mobile_error_reporter.dart';
 const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _nearbyLocationMaxAge = Duration(minutes: 5);
+const _nearbyLocationMaxAccuracyMeters = 500.0;
+const _locationQualityUnavailableMessage =
+    '현재 위치 정확도 정보를 확인하지 못했어요. 출발역을 직접 선택해 주세요.';
+const _locationQualityStaleMessage =
+    '현재 위치가 오래되어 가까운 역을 정확히 찾기 어려워요. 출발역을 직접 선택해 주세요.';
+const _locationQualityCoarseMessage =
+    '현재 위치 정확도가 낮아 가까운 역을 정확히 찾기 어려워요. 출발역을 직접 선택해 주세요.';
+const _locationQualityMockedMessage =
+    '모의 위치는 가까운 역 찾기에 사용할 수 없어요. 출발역을 직접 선택해 주세요.';
 const _locationPermissionRationaleTitle = '현재 위치 사용';
 const _locationPermissionRationalePurpose =
     '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
@@ -58,11 +68,73 @@ abstract class StationLineFilterRepository {
   );
 }
 
+enum LocationPermissionPrecision { precise, approximate, unknown }
+
+enum CurrentLocationQualityStatus {
+  freshPrecise,
+  unavailable,
+  stale,
+  coarse,
+  mocked,
+}
+
 class CurrentLocation {
-  const CurrentLocation({required this.latitude, required this.longitude});
+  const CurrentLocation({
+    required this.latitude,
+    required this.longitude,
+    this.accuracyMeters,
+    this.measuredAt,
+    this.provider = 'unknown',
+    this.isMocked = false,
+    this.permissionPrecision = LocationPermissionPrecision.unknown,
+  });
 
   final double latitude;
   final double longitude;
+  final double? accuracyMeters;
+  final DateTime? measuredAt;
+  final String provider;
+  final bool isMocked;
+  final LocationPermissionPrecision permissionPrecision;
+
+  CurrentLocationQualityStatus qualityStatus({
+    DateTime? now,
+    Duration maxAge = _nearbyLocationMaxAge,
+    double maxAccuracyMeters = _nearbyLocationMaxAccuracyMeters,
+  }) {
+    if (isMocked) {
+      return CurrentLocationQualityStatus.mocked;
+    }
+    final measuredAt = this.measuredAt;
+    final accuracyMeters = this.accuracyMeters;
+    if (measuredAt == null || accuracyMeters == null) {
+      return CurrentLocationQualityStatus.unavailable;
+    }
+    final age = (now ?? DateTime.now()).difference(measuredAt);
+    if (age > maxAge || age.isNegative) {
+      return CurrentLocationQualityStatus.stale;
+    }
+    if (permissionPrecision == LocationPermissionPrecision.approximate ||
+        accuracyMeters > maxAccuracyMeters) {
+      return CurrentLocationQualityStatus.coarse;
+    }
+    return CurrentLocationQualityStatus.freshPrecise;
+  }
+
+  bool canUseForNearbySearch({DateTime? now}) {
+    return qualityStatus(now: now) == CurrentLocationQualityStatus.freshPrecise;
+  }
+
+  String? nearbySearchBlockedMessage({DateTime? now}) {
+    return switch (qualityStatus(now: now)) {
+      CurrentLocationQualityStatus.freshPrecise => null,
+      CurrentLocationQualityStatus.unavailable =>
+        _locationQualityUnavailableMessage,
+      CurrentLocationQualityStatus.stale => _locationQualityStaleMessage,
+      CurrentLocationQualityStatus.coarse => _locationQualityCoarseMessage,
+      CurrentLocationQualityStatus.mocked => _locationQualityMockedMessage,
+    };
+  }
 }
 
 abstract class CurrentLocationProvider {
@@ -119,7 +191,17 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
       if (latitude == null || longitude == null) {
         throw const CurrentLocationException('현재 위치를 확인하지 못했습니다.');
       }
-      return CurrentLocation(latitude: latitude, longitude: longitude);
+      return CurrentLocation(
+        latitude: latitude,
+        longitude: longitude,
+        accuracyMeters: _doubleFrom(response, 'accuracyMeters'),
+        measuredAt: _dateTimeFromMillis(response, 'measuredAtMillis'),
+        provider: _stringFrom(response, 'provider') ?? 'unknown',
+        isMocked: _boolFrom(response, 'isMocked') ?? false,
+        permissionPrecision: _permissionPrecisionFrom(
+          _stringFrom(response, 'permissionPrecision'),
+        ),
+      );
     } on CurrentLocationException {
       rethrow;
     } on PlatformException catch (error) {
@@ -153,6 +235,55 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
       return double.tryParse(value);
     }
     return null;
+  }
+
+  double? _doubleFrom(Map<String, Object?>? response, String key) {
+    final value = response?[key];
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value);
+    }
+    return null;
+  }
+
+  DateTime? _dateTimeFromMillis(Map<String, Object?>? response, String key) {
+    final value = response?[key];
+    final millis = switch (value) {
+      int() => value,
+      double() => value.round(),
+      String() => int.tryParse(value),
+      _ => null,
+    };
+    if (millis == null) {
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+  }
+
+  String? _stringFrom(Map<String, Object?>? response, String key) {
+    final value = response?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value;
+    }
+    return null;
+  }
+
+  bool? _boolFrom(Map<String, Object?>? response, String key) {
+    final value = response?[key];
+    if (value is bool) {
+      return value;
+    }
+    return null;
+  }
+
+  LocationPermissionPrecision _permissionPrecisionFrom(String? value) {
+    return switch (value) {
+      'precise' => LocationPermissionPrecision.precise,
+      'approximate' => LocationPermissionPrecision.approximate,
+      _ => LocationPermissionPrecision.unknown,
+    };
   }
 
   String _locationErrorMessage(String code) {
@@ -1339,6 +1470,19 @@ class StationSearchController extends ChangeNotifier {
 
     try {
       final location = await locationProvider.currentLocation();
+      final blockedMessage = location.nearbySearchBlockedMessage();
+      if (blockedMessage != null) {
+        if (!_isActiveRequest(requestId)) {
+          return;
+        }
+        _state = StationSearchState(
+          status: StationSearchStatus.failure,
+          results: const [],
+          message: blockedMessage,
+        );
+        _notifyIfActive(requestId);
+        return;
+      }
       final results = await repository.searchNearbyStations(location);
       if (!_isActiveRequest(requestId)) {
         return;
