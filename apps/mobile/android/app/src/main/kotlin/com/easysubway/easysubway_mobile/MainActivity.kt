@@ -270,10 +270,24 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun Location.toFlutterMap(): Map<String, Double> {
+    private fun Location.toFlutterMap(): Map<String, Any?> {
         return mapOf(
             "latitude" to latitude,
             "longitude" to longitude,
+            "accuracyMeters" to if (hasAccuracy()) accuracy.toDouble() else null,
+            "measuredAtMillis" to time,
+            "provider" to provider,
+            "isMocked" to isMockLocation(),
+            "permissionPrecision" to if (hasFineLocationPermission()) "precise" else "approximate",
         )
+    }
+
+    private fun Location.isMockLocation(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            isMock
+        } else {
+            @Suppress("DEPRECATION")
+            isFromMockProvider
+        }
     }
 }

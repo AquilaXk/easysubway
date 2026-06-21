@@ -216,7 +216,7 @@ void main() {
 
   testWidgets('첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
-      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      location: _freshCurrentLocation(),
     );
 
     await tester.pumpWidget(
@@ -2225,7 +2225,7 @@ void main() {
   testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
-      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      location: _freshCurrentLocation(),
       needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
@@ -2283,7 +2283,7 @@ void main() {
 
   testWidgets('역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
-      location: const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
+      location: _freshCurrentLocation(),
     );
     final repository = FakeStationSearchRepository(
       nearbyResults: [
@@ -2364,9 +2364,7 @@ void main() {
     expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 1);
 
-    locationCompleter.complete(
-      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
-    );
+    locationCompleter.complete(_freshCurrentLocation());
     await tester.pumpAndSettle();
 
     expect(repository.requestedNearbyLocations, hasLength(1));
@@ -2409,9 +2407,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
     await tester.pump();
 
-    locationCompleter.complete(
-      const CurrentLocation(latitude: 37.3028, longitude: 126.8665),
-    );
+    locationCompleter.complete(_freshCurrentLocation());
     await tester.pumpAndSettle();
 
     expect(repository.requestedNearbyLocations, hasLength(1));
@@ -6434,6 +6430,20 @@ StationSearchResult _stationResult({
   );
 }
 
+CurrentLocation _freshCurrentLocation({
+  double latitude = 37.3028,
+  double longitude = 126.8665,
+}) {
+  return CurrentLocation(
+    latitude: latitude,
+    longitude: longitude,
+    accuracyMeters: 25,
+    measuredAt: DateTime.now(),
+    provider: 'test',
+    permissionPrecision: LocationPermissionPrecision.precise,
+  );
+}
+
 class FakeCurrentLocationProvider implements CurrentLocationProvider {
   FakeCurrentLocationProvider({
     this.location,
@@ -6473,8 +6483,7 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
     if (currentError != null) {
       throw currentError;
     }
-    return location ??
-        const CurrentLocation(latitude: 37.3028, longitude: 126.8665);
+    return location ?? _freshCurrentLocation();
   }
 
   @override
