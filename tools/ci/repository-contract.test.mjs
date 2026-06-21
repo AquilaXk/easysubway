@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -1260,6 +1260,101 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n'/);
   assert.match(backupScript, /trap cleanup EXIT/);
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
+});
+
+test("시설 신고 사진 복구 리허설은 manifest와 object 산출물을 검증한다", async () => {
+  const restoreCheckPath = "tools/ops/facility-report-photo-restore-check.mjs";
+  const restoreCheckScript = read(restoreCheckPath);
+  const fixtureDir = await mkdtemp(path.join(tmpdir(), "easysubway-photo-restore-"));
+  const objectsDir = path.join(fixtureDir, "objects", "facility-reports", "report-1");
+  const objectPath = path.join(objectsDir, "photo.jpg");
+  const objectBytes = Buffer.from("photo-bytes");
+  const objectSha256 = "dac6f451810bc38390a3b6e278d686b332a77cf21b2ea95145ad73722b77035d";
+
+  await mkdir(objectsDir, { recursive: true });
+  await writeFile(objectPath, objectBytes);
+  await writeFile(
+    path.join(fixtureDir, "manifest.tsv"),
+    [
+      "report_id\tfile_name\tcontent_type\tobject_key\tthumbnail_object_key\tsha256\tsize_bytes\tobject_path\tthumbnail_path",
+      `report-1\televator.jpg\timage/jpeg\tfacility-reports/report-1/photo.jpg\t\t${objectSha256}\t${objectBytes.length}\tobjects/facility-reports/report-1/photo.jpg\tobjects/`,
+    ].join("\n"),
+  );
+
+  assert.match(restoreCheckScript, /Usage: node tools\/ops\/facility-report-photo-restore-check\.mjs <restored-photo-backup-dir>/);
+  assert.match(restoreCheckScript, /manifest\.tsv/);
+  assert.match(restoreCheckScript, /object_path must match object_key/);
+  assert.match(restoreCheckScript, /object size mismatch/);
+  assert.match(restoreCheckScript, /object sha256 mismatch/);
+
+  const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
+  assert.match(result, /facility report photo restore rehearsal ok/);
+});
+
+test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검증 명령을 고정한다", () => {
+  const gatePath = "apps/mobile/release/backup-restore-rehearsal-gate.json";
+  const checkScriptPath = "tools/ops/backup-restore-rehearsal-check.mjs";
+  const photoRestoreCheckPath = "tools/ops/facility-report-photo-restore-check.mjs";
+  assert.ok(existsSync(path.join(root, gatePath)), "backup restore rehearsal gate artifact must exist");
+  assert.ok(existsSync(path.join(root, checkScriptPath)), "backup restore rehearsal check script must exist");
+  assert.ok(existsSync(path.join(root, photoRestoreCheckPath)), "photo restore rehearsal check script must exist");
+
+  const gate = readJson(gatePath);
+  const checkScript = read(checkScriptPath);
+  const photoRestoreCheckScript = read(photoRestoreCheckPath);
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "backup-restore-rehearsal");
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
+
+  const backupTargets = new Map(gate.backupTargets.map((target) => [target.id, target]));
+  const requiredBackupTargetIds = [
+    "postgres_application_database",
+    "facility_report_photo_objects",
+    "datapack_source_inventory",
+    "datapack_release_manifest_history",
+  ];
+  assert.deepEqual([...backupTargets.keys()].sort(), requiredBackupTargetIds.toSorted());
+
+  for (const id of requiredBackupTargetIds) {
+    const target = backupTargets.get(id);
+    assert.match(target.ownerKo, /담당자/);
+    assert.ok(target.backupCommand.length > 0, `${id} must define backup command`);
+    assert.ok(target.restoreRehearsalCommand.length > 0, `${id} must define restore rehearsal command`);
+    assert.ok(target.successEvidence.length > 0, `${id} must define success evidence`);
+    assert.ok(target.failureConditions.length > 0, `${id} must define failure conditions`);
+    for (const artifact of target.linkedArtifacts) {
+      assert.ok(existsSync(path.join(root, artifact)), `${id} linked artifact must exist: ${artifact}`);
+    }
+  }
+
+  const photoTarget = backupTargets.get("facility_report_photo_objects");
+  assert.equal(
+    photoTarget.restoreRehearsalCommand,
+    'node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"',
+  );
+  assert.ok(
+    photoTarget.linkedArtifacts.includes(photoRestoreCheckPath),
+    "facility photo restore target must link the restore check script",
+  );
+
+  assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
+  assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
+  assert.match(gate.rehearsalPolicy.requiredOutputKo, /backup-restore-rehearsal/);
+  assert.match(checkScript, /backup-restore-rehearsal-gate\.json/);
+  assert.match(checkScript, /postgres_application_database/);
+  assert.match(checkScript, /datapack_release_manifest_history/);
+  assert.match(photoRestoreCheckScript, /manifest\.tsv/);
+  assert.match(photoRestoreCheckScript, /sha256/);
+  assert.match(readme, /backup-restore-rehearsal-gate\.json/);
+  assert.match(readme, /tools\/ops\/backup-restore-rehearsal-check\.mjs/);
+  assert.match(readme, /tools\/ops\/facility-report-photo-restore-check\.mjs/);
+  assert.doesNotMatch(readme, /backup secret|restore secret/i);
+
+  execFileSync(process.execPath, [checkScriptPath], { cwd: root, encoding: "utf8" });
 });
 
 test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () => {
