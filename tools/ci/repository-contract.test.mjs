@@ -1627,6 +1627,51 @@ test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 �
   assert.doesNotMatch(applicationProdYml, /spring\.profiles\.active|on-profile/);
 });
 
+test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약으로 고정한다", () => {
+  const gatePath = "backend/quality/static-analysis-gate.json";
+
+  assert.equal(existsSync(path.join(root, gatePath)), true, "backend static analysis gate must exist");
+
+  const gate = readJson(gatePath);
+  const build = read("backend/build.gradle");
+  const ci = read(".github/workflows/ci.yml");
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.gateId, "backend-static-analysis-feasibility");
+  assert.equal(gate.defaultPolicy, "contract-only-before-enforcement");
+  assert.equal(gate.enforcementStatus, "deferred_until_p0_release_contracts_stabilize");
+  assert.equal(gate.ciRuntimeBudgetMinutes.maxAdditionalMinutes, 3);
+  assert.equal(gate.ciRuntimeBudgetMinutes.measurementRequiredBeforeEnforcement, true);
+
+  const tools = new Map(gate.tools.map((tool) => [tool.id, tool]));
+  for (const id of ["checkstyle", "spotbugs", "errorprone", "archunit", "jacoco"]) {
+    const tool = tools.get(id);
+    assert.ok(tool, `${id} must be listed in backend static analysis gate`);
+    assert.equal(tool.enforcement, "not_enabled_in_this_slice");
+    assert.ok(tool.requires.length > 0, `${id} must declare enforcement prerequisites`);
+  }
+
+  assert.equal(tools.get("archunit").firstAllowedGate, "public_mobile_api_absence");
+  assert.equal(tools.get("jacoco").firstAllowedGate, "coverage_baseline_after_p0_tests_stabilize");
+  assert.ok(gate.mustNotDo.includes("enable_style_or_coverage_plugins_without_runtime_budget_evidence"));
+  assert.ok(gate.mustNotDo.includes("reformat_unrelated_backend_sources"));
+  assert.ok(gate.mustNotDo.includes("weaken_security_route_or_release_contract_tests"));
+
+  assert.match(ci, /Repository CI \/ Run contract tests/);
+  assert.doesNotMatch(build, /id ['"]checkstyle['"]/);
+  assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
+  assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
+  assert.doesNotMatch(build, /id ['"]jacoco['"]/);
+  assert.doesNotMatch(build, /com\.tngtech\.archunit/);
+
+  assert.match(readme, /backend static analysis feasibility gate/);
+  assert.match(readme, /Checkstyle/);
+  assert.match(readme, /SpotBugs/);
+  assert.match(readme, /ArchUnit/);
+  assert.match(readme, /JaCoCo/);
+});
+
 test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 않는다", () => {
   const removedPaths = [
     "apps/mobile/lib/anonymous_auth.dart",
