@@ -58,13 +58,39 @@ function isNonPublicIpv6(hostname) {
   if (mappedIpv4 !== null) {
     return isNonPublicIpv4Octets(mappedIpv4);
   }
+  const [first = null, second = null, third = null] = parseIpv6LeadingHextets(hostname);
   return (
     hostname === "::" ||
     hostname === "::1" ||
     hostname.startsWith("fc") ||
     hostname.startsWith("fd") ||
-    /^fe[89ab]/.test(hostname)
+    /^fe[89ab]/.test(hostname) ||
+    (first !== null && first >= 0xff00) ||
+    (first === 0x0064 && second === 0xff9b && third === 0x0001) ||
+    first === 0x0100 ||
+    (first === 0x2001 && second !== null && second <= 0x01ff) ||
+    (first === 0x2001 && second === 0x0002) ||
+    (first === 0x2001 && second === 0x0db8) ||
+    first === 0x2002
   );
+}
+
+function parseIpv6LeadingHextets(hostname) {
+  const hextets = [];
+  for (const part of hostname.split(":")) {
+    if (part === "") {
+      continue;
+    }
+    const value = Number.parseInt(part, 16);
+    if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
+      return [];
+    }
+    hextets.push(value);
+    if (hextets.length === 3) {
+      break;
+    }
+  }
+  return hextets;
 }
 
 function parseIpv4MappedIpv6(hostname) {
