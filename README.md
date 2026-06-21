@@ -86,6 +86,8 @@ Migration 실패를 무시하고 DB를 삭제하거나 재생성하지 않습니
 
 백업과 복구 리허설 기준선은 `apps/mobile/release/backup-restore-rehearsal-gate.json`으로 검증합니다. PR과 릴리즈 후보에서는 `node tools/ops/backup-restore-rehearsal-check.mjs`로 PostgreSQL dump, 신고 사진 object manifest, 데이터팩 source inventory, 데이터팩 release manifest history가 모두 복구 리허설 대상에 포함되는지 확인하고, 신고 사진 백업은 `node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"`로 `manifest.tsv`와 `objects/` 산출물을 검증합니다. 실제 database dump, 사진 object, signed URL, credential, receipt token은 GitHub에 올리지 않고 `.codex/evidence/backup-restore-rehearsal/<date>/` 아래 로컬 전용 증거로만 보관합니다.
 
+backend static analysis feasibility gate는 `backend/quality/static-analysis-gate.json`으로 검증합니다. Checkstyle, SpotBugs, Error Prone, ArchUnit, JaCoCo는 P0 보안/경로/release contract가 안정화되고 CI runtime budget 측정이 끝나기 전까지 한 번에 필수 gate로 켜지 않습니다. 새 품질 도구를 추가할 때는 baseline 위반 수, suppression 근거, 추가 CI 시간, 기존 security/route/release 테스트 보존 여부를 먼저 PR 증거에 남깁니다.
+
 ## Workflow
 
 Tracked work follows this order:
