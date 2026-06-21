@@ -554,7 +554,7 @@ void main() {
     );
   });
 
-  test('user DB는 catalog 데이터팩 교체와 독립적으로 즐겨찾기를 보존한다', () async {
+  test('user DB는 catalog 데이터팩 교체와 독립적으로 즐겨찾기와 신고 receipt를 보존한다', () async {
     final directory = await Directory.systemTemp.createTemp('easysubway-user-');
     addTearDown(() => directory.delete(recursive: true));
 
@@ -565,6 +565,16 @@ void main() {
           FavoriteStationsCompanion.insert(
             stationId: 'station-sangnoksu',
             addedAt: DateTime.parse('2026-06-19T10:00:00Z'),
+          ),
+        );
+    await first
+        .into(first.reportReceipts)
+        .insert(
+          ReportReceiptsCompanion.insert(
+            receiptId: 'receipt-1',
+            reportId: const Value('report-1'),
+            status: 'RECEIVED',
+            createdAt: DateTime.parse('2026-06-19T10:05:00Z'),
           ),
         );
     await first.close();
@@ -579,8 +589,13 @@ void main() {
     addTearDown(reopened.close);
 
     final favorites = await reopened.select(reopened.favoriteStations).get();
+    final receipts = await reopened.select(reopened.reportReceipts).get();
 
     expect(favorites, hasLength(1));
     expect(favorites.single.stationId, 'station-sangnoksu');
+    expect(receipts, hasLength(1));
+    expect(receipts.single.receiptId, 'receipt-1');
+    expect(receipts.single.reportId, 'report-1');
+    expect(receipts.single.status, 'RECEIVED');
   });
 }
