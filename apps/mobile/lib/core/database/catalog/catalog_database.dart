@@ -24,6 +24,10 @@ part 'catalog_database.g.dart';
     DataQualityRecords,
   ],
 )
+/// The catalog database is replaceable installed-pack state.
+///
+/// Data pack updates may swap station, route, facility, and quality records,
+/// but must not store user-owned favorites, receipts, drafts, or preferences.
 class CatalogDatabase extends _$CatalogDatabase {
   CatalogDatabase(super.executor);
 

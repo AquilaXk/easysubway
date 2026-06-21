@@ -19,9 +19,7 @@ class DataPackManifest {
   }) {
     final ttlSeconds = json['ttlSeconds'];
     final rawPacks = json['packs'];
-    if (ttlSeconds is! int ||
-        ttlSeconds <= 0 ||
-        rawPacks is! List<Object?>) {
+    if (ttlSeconds is! int || ttlSeconds <= 0 || rawPacks is! List<Object?>) {
       throw const FormatException('Invalid data pack manifest.');
     }
 
@@ -49,6 +47,10 @@ class DataPackManifest {
   final EmergencyOverrideManifest? emergencyOverride;
 }
 
+/// Production manifests sign the source inventory, regional quality metrics,
+/// and representative route regressions.
+///
+/// Contract marker: production signatures bind the pack URL.
 class DataPackManifestEntry {
   const DataPackManifestEntry({
     required this.id,

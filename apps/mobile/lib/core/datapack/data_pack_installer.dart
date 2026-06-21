@@ -9,6 +9,11 @@ import '../database/catalog/catalog_database.dart';
 import '../database/user/user_database.dart' as user_db;
 import 'data_pack_manifest.dart';
 
+/// Enforces the data-pack pointer contract.
+///
+/// A pack can replace `current.json` only after archive, hash, schema, table,
+/// and quick-check validation. Rejected installs leave the active pointer and
+/// user-owned database rows untouched.
 class DataPackInstaller {
   DataPackInstaller({
     required this.catalogDirectory,

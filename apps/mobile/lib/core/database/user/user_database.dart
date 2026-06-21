@@ -20,6 +20,10 @@ part 'user_database.g.dart';
     ReportDrafts,
   ],
 )
+/// Enforces the user-data preservation contract.
+///
+/// App updates and catalog pack swaps must preserve favorites, search history,
+/// report receipts, drafts, preferences, and installed-pack audit rows.
 class UserDatabase extends _$UserDatabase {
   UserDatabase(super.executor);
 
