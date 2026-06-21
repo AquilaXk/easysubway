@@ -648,6 +648,132 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
+test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 산출물 빌드를 실행한다", async () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const detector = read("tools/ci/detect-changed-paths.sh");
+  const androidReleaseJob = jobBlock(workflow, "android-release", "ios-release");
+  const iosReleaseJob = jobBlock(workflow, "ios-release", "backend-release");
+  const backendReleaseJob = workflow.match(/\n  backend-release:[\s\S]*$/)?.[0] ?? "";
+
+  assert.match(workflow, /changes:\s*\n\s*name: Changes/);
+  assert.match(workflow, /outputs:[\s\S]*android: \$\{\{ steps\.filter\.outputs\.android \}\}/);
+  assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
+  assert.match(androidReleaseJob, /needs: changes/);
+  assert.match(androidReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.android == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
+  assert.match(iosReleaseJob, /needs: changes/);
+  assert.match(iosReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.ios == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
+  assert.match(backendReleaseJob, /needs: changes/);
+  assert.match(backendReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.backend == 'true' \|\| needs\.changes\.outputs\.deploy == 'true' \}\}/);
+  assert.match(detector, /apps\/mobile\/release\/\*\*/);
+  assert.match(detector, /apps\/mobile\/android\/app\/build\.gradle\.kts/);
+  assert.match(detector, /apps\/mobile\/ios\/Runner\.xcodeproj\/\*\*/);
+
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-release-paths-"));
+  const changedFiles = path.join(tempDir, "changed-files.txt");
+  await writeFile(
+    changedFiles,
+    [
+      "apps/mobile/release/store-submission-readiness.json",
+      "apps/mobile/android/app/build.gradle.kts",
+      "apps/mobile/ios/Runner.xcodeproj/project.pbxproj",
+      "tools/datapack/build-datapack.mjs",
+    ].join("\n") + "\n",
+  );
+  const detectorEnv = { ...process.env };
+  delete detectorEnv.GITHUB_OUTPUT;
+  delete detectorEnv.GITHUB_STEP_SUMMARY;
+  const { stdout } = await execFileAsync("bash", ["tools/ci/detect-changed-paths.sh", changedFiles], {
+    cwd: root,
+    env: detectorEnv,
+  });
+  assert.match(stdout, /^android=true$/m);
+  assert.match(stdout, /^mobile=true$/m);
+  assert.match(stdout, /^ios=true$/m);
+  assert.match(stdout, /^repository=true$/m);
+  assert.match(stdout, /^deploy=true$/m);
+});
+
+test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정책으로 고정한다", () => {
+  const gatePath = "apps/mobile/release/server-minimized-qa-gate.json";
+  assert.ok(existsSync(path.join(root, gatePath)), "server minimized QA gate artifact must exist");
+
+  const gate = readJson(gatePath);
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "server-minimized-device-qa");
+  assert.equal(gate.localOnlyEvidence, true);
+  assert.match(gate.evidenceRoot, /^\.codex\/evidence\/server-minimization\/pr10$/);
+  assert.equal(gate.platformCompletionRule.androidRequired, true);
+  assert.equal(gate.platformCompletionRule.iosRequired, true);
+  assert.equal(gate.platformCompletionRule.singlePlatformEvidenceIsInsufficient, true);
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO)\b|\.{3}/i);
+
+  const requiredFinalAcceptanceIds = [
+    "app_starts_without_backend",
+    "airplane_station_search",
+    "airplane_route_search",
+    "airplane_station_detail",
+    "no_api_call_on_app_start",
+    "manifest_ttl_or_etag_only",
+    "datapack_failure_keeps_existing_pack",
+    "datapack_update_preserves_user_data",
+    "no_anonymous_auth_tokens",
+    "no_report_photo_base64",
+    "receipt_token_only_report_status",
+    "admin_review_reaches_override_or_next_pack",
+    "redis_push_not_mvp_required",
+  ];
+  const coveredFinalAcceptanceIds = new Set(gate.checks.flatMap((check) => check.finalAcceptanceIds));
+  assert.deepEqual([...coveredFinalAcceptanceIds].sort(), requiredFinalAcceptanceIds.toSorted());
+
+  const requiredAndroidChecks = [
+    "android_app_start_backend_down",
+    "android_airplane_station_search",
+    "android_airplane_route_search",
+    "android_corrupt_datapack_keeps_previous_pack",
+    "android_app_update_user_db_migration",
+    "android_photo_picker_process_death_recovery",
+    "android_cdn_timeout_behavior",
+    "android_talkback_search_route_report_error",
+    "android_font_scale_150_no_overflow",
+    "android_high_contrast_visible_controls",
+    "android_location_permission_denied_fallback",
+    "android_internal_test_track_install",
+  ];
+  const requiredIosChecks = [
+    "ios_app_start_backend_down",
+    "ios_voiceover_focus_order",
+    "ios_dynamic_type_max_no_overflow",
+    "ios_bold_text_increase_contrast_reduce_motion",
+    "ios_permission_dialog_copy",
+    "ios_signed_upload_failure_message",
+    "ios_receipt_token_missing_message",
+    "ios_archive_contains_baseline_pack",
+    "ios_archive_contains_privacy_manifest",
+    "ios_testflight_or_signed_device_install",
+  ];
+  const idsByPlatform = new Map([
+    ["android", gate.checks.filter((check) => check.platform === "android").map((check) => check.id).sort()],
+    ["ios", gate.checks.filter((check) => check.platform === "ios").map((check) => check.id).sort()],
+  ]);
+  assert.deepEqual(idsByPlatform.get("android"), requiredAndroidChecks.toSorted());
+  assert.deepEqual(idsByPlatform.get("ios"), requiredIosChecks.toSorted());
+
+  for (const check of gate.checks) {
+    assert.match(check.platform, /^(android|ios)$/);
+    assert.ok(Array.isArray(check.finalAcceptanceIds), `${check.id} must map final acceptance ids`);
+    assert.ok(check.finalAcceptanceIds.length > 0, `${check.id} must map at least one final acceptance id`);
+    assert.ok(Array.isArray(check.evidence), `${check.id} must list evidence`);
+    assert.ok(check.evidence.length > 0, `${check.id} must require evidence`);
+    assert.ok(check.command || check.manualTarget, `${check.id} must define command or manual target`);
+    assert.ok(check.localEvidencePath.startsWith(`${gate.evidenceRoot}/${check.platform}/`));
+    assert.doesNotMatch(check.localEvidencePath, /\.md$/i, `${check.id} evidence must not be tracked Markdown`);
+    for (const artifact of check.linkedArtifacts ?? []) {
+      assert.ok(existsSync(path.join(root, artifact)), `${check.id} linked artifact must exist: ${artifact}`);
+    }
+  }
+});
+
 test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강제한다", () => {
   assert.ok(
     existsSync(path.join(root, ".github/workflows/datapack-release.yml")),
