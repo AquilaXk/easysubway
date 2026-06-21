@@ -8,6 +8,49 @@ import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _representativeRouteRegressions = [
+  {
+    'id': 'direct-local-capital',
+    'pattern': 'DIRECT',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-b-line-1',
+    'requiredEdgeIds': ['edge-a-b'],
+  },
+  {
+    'id': 'transfer-capital',
+    'pattern': 'TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-a-b', 'edge-b-transfer', 'edge-b-c'],
+  },
+  {
+    'id': 'multi-transfer-capital',
+    'pattern': 'MULTI_TRANSFER',
+    'fromNodeId': 'station-a-line-1',
+    'toNodeId': 'station-d-line-3',
+    'requiredEdgeIds': [
+      'edge-a-b',
+      'edge-b-transfer',
+      'edge-c-transfer',
+      'edge-c-d',
+    ],
+  },
+  {
+    'id': 'loop-branch-capital',
+    'pattern': 'LOOP_BRANCH',
+    'fromNodeId': 'station-branch-line-2',
+    'toNodeId': 'station-c-line-2',
+    'requiredEdgeIds': ['edge-branch-loop', 'edge-loop-c'],
+  },
+  {
+    'id': 'express-local-capital',
+    'pattern': 'EXPRESS_LOCAL',
+    'fromNodeId': 'station-a-line-1-express',
+    'toNodeId': 'station-b-line-1-express',
+    'requiredEdgeIds': ['edge-a-b-express'],
+  },
+];
+
 void main() {
   test('manifest client는 TTL 안에서는 네트워크를 호출하지 않는다', () async {
     final userDatabase = user_db.UserDatabase.memory();
@@ -79,6 +122,18 @@ void main() {
                 'sqliteSha256': 'b' * 64,
                 'sizeBytes': 1024,
                 'artifactKind': 'fixture',
+                'representativeRouteRegressions':
+                    _representativeRouteRegressions,
+                'representativeRouteRegressionSignature': {
+                  'algorithm': 'sha256-route-regression-v1',
+                  'value': _routeRegressionSignatureValue(
+                    'capital',
+                    '18',
+                    'a' * 64,
+                    'b' * 64,
+                    1024,
+                  ),
+                },
                 'signature': {
                   'algorithm': 'sha256-pack-manifest-v1',
                   'value': _signatureValue(
@@ -146,6 +201,22 @@ String _signatureValue(
   return sha256
       .convert(
         utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
+}
+
+String _routeRegressionSignatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode(
+          '$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes:${jsonEncode(_representativeRouteRegressions)}',
+        ),
       )
       .toString();
 }

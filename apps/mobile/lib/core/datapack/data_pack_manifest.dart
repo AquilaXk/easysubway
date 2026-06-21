@@ -59,6 +59,8 @@ class DataPackManifestEntry {
     required this.signature,
     required this.sourceInventory,
     required this.regionalQualityMetrics,
+    required this.representativeRouteRegressions,
+    required this.representativeRouteRegressionSignature,
     required this.schemaVersion,
     required this.requiredTables,
     this.minimumTableRows = const {},
@@ -95,6 +97,15 @@ class DataPackManifestEntry {
         json['regionalQualityMetrics'],
         artifactKind,
       ),
+      representativeRouteRegressions: _parseRepresentativeRouteRegressions(
+        json['representativeRouteRegressions'],
+        artifactKind,
+      ),
+      representativeRouteRegressionSignature:
+          _parseRepresentativeRouteRegressionSignature(
+            json['representativeRouteRegressionSignature'],
+            artifactKind,
+          ),
       schemaVersion: _requiredString(json, 'schemaVersion'),
       requiredTables: requiredTables
           .map((table) {
@@ -115,6 +126,9 @@ class DataPackManifestEntry {
   final DataPackSignature signature;
   final List<DataPackSourceInventoryEntry> sourceInventory;
   final RegionalQualityMetrics regionalQualityMetrics;
+  final List<DataPackRepresentativeRouteRegression>
+  representativeRouteRegressions;
+  final DataPackSignature representativeRouteRegressionSignature;
   final String schemaVersion;
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
@@ -162,6 +176,10 @@ class DataPackManifestEntry {
           !publicKey.verify(canonical, signature.value)) {
         throw const FormatException('Invalid data pack signature.');
       }
+      _validateRepresentativeRouteRegressionSignature(
+        expectedSizeBytes,
+        productionSigningPublicKey,
+      );
       return;
     }
     if (signature.algorithm != 'sha256-pack-manifest-v1') {
@@ -170,15 +188,78 @@ class DataPackManifestEntry {
     if (signature.value != sha256.convert(utf8.encode(canonical)).toString()) {
       throw const FormatException('Invalid data pack signature.');
     }
+    _validateRepresentativeRouteRegressionSignature(
+      expectedSizeBytes,
+      productionSigningPublicKey,
+    );
   }
 
   String _signaturePayload(int expectedSizeBytes) {
-    final fixturePayload =
-        '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
+    final fixturePayload = _fixtureSignaturePayload(expectedSizeBytes);
     if (artifactKind == DataPackArtifactKind.production) {
       return '$fixturePayload:${url.toString()}';
     }
     return fixturePayload;
+  }
+
+  void _validateRepresentativeRouteRegressionSignature(
+    int expectedSizeBytes,
+    DataPackSigningPublicKey? productionSigningPublicKey,
+  ) {
+    if (artifactKind == DataPackArtifactKind.fixture &&
+        representativeRouteRegressions.isEmpty &&
+        representativeRouteRegressionSignature.algorithm ==
+            'sha256-route-regression-v1' &&
+        representativeRouteRegressionSignature.value == '0' * 64) {
+      return;
+    }
+    final canonical = _representativeRouteRegressionSignaturePayload(
+      expectedSizeBytes,
+    );
+    if (artifactKind == DataPackArtifactKind.production) {
+      final publicKey = productionSigningPublicKey;
+      if (publicKey == null) {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      if (representativeRouteRegressionSignature.algorithm !=
+              'rsa-sha256-route-regression-v1' ||
+          !publicKey.verify(
+            canonical,
+            representativeRouteRegressionSignature.value,
+          )) {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      return;
+    }
+    if (representativeRouteRegressionSignature.algorithm !=
+        'sha256-route-regression-v1') {
+      throw const FormatException('Invalid data pack signature.');
+    }
+    if (representativeRouteRegressionSignature.value !=
+        sha256.convert(utf8.encode(canonical)).toString()) {
+      throw const FormatException('Invalid data pack signature.');
+    }
+  }
+
+  String _representativeRouteRegressionSignaturePayload(int expectedSizeBytes) {
+    final fixturePayload =
+        '${_fixtureSignaturePayload(expectedSizeBytes)}:${_representativeRouteRegressionPayload()}';
+    if (artifactKind == DataPackArtifactKind.production) {
+      return '$fixturePayload:${url.toString()}';
+    }
+    return fixturePayload;
+  }
+
+  String _fixtureSignaturePayload(int expectedSizeBytes) {
+    return '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
+  }
+
+  String _representativeRouteRegressionPayload() {
+    return jsonEncode(
+      representativeRouteRegressions
+          .map((route) => route.toSignatureJson())
+          .toList(growable: false),
+    );
   }
 }
 
@@ -263,7 +344,9 @@ class DataPackSignature {
   factory DataPackSignature.fromJson(Map<String, Object?> json) {
     final algorithm = _requiredString(json, 'algorithm');
     if (algorithm != 'sha256-pack-manifest-v1' &&
-        algorithm != 'rsa-sha256-pack-manifest-v1') {
+        algorithm != 'rsa-sha256-pack-manifest-v1' &&
+        algorithm != 'sha256-route-regression-v1' &&
+        algorithm != 'rsa-sha256-route-regression-v1') {
       throw const FormatException('Invalid data pack signature.');
     }
     final value = _requiredString(json, 'value');
@@ -396,6 +479,62 @@ class RegionalQualityMetrics {
   final double unknownAccessibilityRatio;
 }
 
+class DataPackRepresentativeRouteRegression {
+  const DataPackRepresentativeRouteRegression({
+    required this.id,
+    required this.pattern,
+    required this.fromNodeId,
+    required this.toNodeId,
+    required this.requiredEdgeIds,
+  });
+
+  factory DataPackRepresentativeRouteRegression.fromJson(
+    Map<String, Object?> json,
+  ) {
+    final rawRequiredEdgeIds = json['requiredEdgeIds'];
+    if (rawRequiredEdgeIds is! List || rawRequiredEdgeIds.isEmpty) {
+      throw const FormatException('Invalid representative route regression.');
+    }
+    final pattern = _requiredString(json, 'pattern');
+    if (!_representativeRoutePatterns.contains(pattern)) {
+      throw const FormatException('Invalid representative route regression.');
+    }
+    return DataPackRepresentativeRouteRegression(
+      id: _requiredString(json, 'id'),
+      pattern: pattern,
+      fromNodeId: _requiredString(json, 'fromNodeId'),
+      toNodeId: _requiredString(json, 'toNodeId'),
+      requiredEdgeIds: rawRequiredEdgeIds
+          .map((edgeId) => _readRequiredString(edgeId))
+          .toList(growable: false),
+    );
+  }
+
+  final String id;
+  final String pattern;
+  final String fromNodeId;
+  final String toNodeId;
+  final List<String> requiredEdgeIds;
+
+  Map<String, Object?> toSignatureJson() {
+    return {
+      'id': id,
+      'pattern': pattern,
+      'fromNodeId': fromNodeId,
+      'toNodeId': toNodeId,
+      'requiredEdgeIds': requiredEdgeIds,
+    };
+  }
+}
+
+const _representativeRoutePatterns = {
+  'DIRECT',
+  'TRANSFER',
+  'MULTI_TRANSFER',
+  'LOOP_BRANCH',
+  'EXPRESS_LOCAL',
+};
+
 class EmergencyOverrideManifest {
   const EmergencyOverrideManifest({
     required this.id,
@@ -474,6 +613,22 @@ DataPackSignature _parseSignature(
   return DataPackSignature.fromJson(rawSignature);
 }
 
+DataPackSignature _parseRepresentativeRouteRegressionSignature(
+  Object? rawSignature,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawSignature == null && artifactKind == DataPackArtifactKind.fixture) {
+    return DataPackSignature(
+      algorithm: 'sha256-route-regression-v1',
+      value: '0' * 64,
+    );
+  }
+  if (rawSignature is! Map<String, Object?>) {
+    throw const FormatException('Invalid data pack signature.');
+  }
+  return DataPackSignature.fromJson(rawSignature);
+}
+
 List<DataPackSourceInventoryEntry> _parseSourceInventory(
   Object? rawSources,
   DataPackArtifactKind artifactKind,
@@ -535,6 +690,34 @@ RegionalQualityMetrics _parseRegionalQualityMetrics(
     throw const FormatException('Invalid regional quality metrics.');
   }
   return RegionalQualityMetrics.fromJson(rawMetrics);
+}
+
+List<DataPackRepresentativeRouteRegression>
+_parseRepresentativeRouteRegressions(
+  Object? rawRoutes,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawRoutes == null && artifactKind == DataPackArtifactKind.fixture) {
+    return const [];
+  }
+  if (rawRoutes is! List || rawRoutes.isEmpty) {
+    throw const FormatException('Invalid representative route regressions.');
+  }
+  final routes = rawRoutes
+      .map((route) {
+        if (route is! Map<String, Object?>) {
+          throw const FormatException(
+            'Invalid representative route regression.',
+          );
+        }
+        return DataPackRepresentativeRouteRegression.fromJson(route);
+      })
+      .toList(growable: false);
+  final seenPatterns = routes.map((route) => route.pattern).toSet();
+  if (!_representativeRoutePatterns.every(seenPatterns.contains)) {
+    throw const FormatException('Invalid representative route regressions.');
+  }
+  return routes;
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
