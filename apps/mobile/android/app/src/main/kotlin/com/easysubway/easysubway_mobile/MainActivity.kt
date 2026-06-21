@@ -22,6 +22,8 @@ class MainActivity : FlutterActivity() {
     private val locationPermissionRequestCode = 2401
     private val notificationPermissionRequestCode = 2402
     private val locationTimeoutMillis = 10_000L
+    private val nearbyLocationMaxAgeMillis = 5 * 60 * 1000L
+    private val nearbyLocationMaxAccuracyMeters = 500f
 
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingNotificationPermissionResult: MethodChannel.Result? = null
@@ -131,11 +133,12 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val lastKnownLocation = providers
+        val cachedLocation = providers
             .mapNotNull { provider -> locationManager.safeLastKnownLocation(provider) }
+            .filter { location -> location.canUseCachedForNearbySearch() }
             .maxByOrNull { location -> location.time }
-        if (lastKnownLocation != null) {
-            result.success(lastKnownLocation.toFlutterMap())
+        if (cachedLocation != null) {
+            result.success(cachedLocation.toFlutterMap())
             return
         }
 
@@ -270,10 +273,32 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun Location.toFlutterMap(): Map<String, Double> {
+    private fun Location.toFlutterMap(): Map<String, Any?> {
         return mapOf(
             "latitude" to latitude,
             "longitude" to longitude,
+            "accuracyMeters" to if (hasAccuracy()) accuracy.toDouble() else null,
+            "measuredAtMillis" to time,
+            "provider" to provider,
+            "isMocked" to isMockLocation(),
+            "permissionPrecision" to if (hasFineLocationPermission()) "precise" else "approximate",
         )
+    }
+
+    private fun Location.isMockLocation(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            isMock
+        } else {
+            @Suppress("DEPRECATION")
+            isFromMockProvider
+        }
+    }
+
+    private fun Location.canUseCachedForNearbySearch(): Boolean {
+        val ageMillis = System.currentTimeMillis() - time
+        return ageMillis in 0..nearbyLocationMaxAgeMillis &&
+            !isMockLocation() &&
+            hasAccuracy() &&
+            accuracy <= nearbyLocationMaxAccuracyMeters
     }
 }
