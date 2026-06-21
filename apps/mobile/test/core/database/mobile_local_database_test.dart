@@ -630,6 +630,66 @@ void main() {
     expect(receipts.single.reportId, 'report-1');
     expect(receipts.single.status, 'RECEIVED');
   });
+
+  test('user DB migration은 v1 사용자 데이터를 현재 schema로 보존한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-user-migration-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final strategyDatabase = UserDatabase.memory();
+    final strategy = strategyDatabase.migration;
+    expect(strategy.beforeOpen, isNot(equals(null)));
+    expect(strategy.onUpgrade, isNot(equals(null)));
+    await strategyDatabase.close();
+
+    final first = await UserDatabaseOpener(databaseDirectory: directory).open();
+    await first
+        .into(first.favoriteStations)
+        .insert(
+          FavoriteStationsCompanion.insert(
+            stationId: 'station-sangnoksu',
+            addedAt: DateTime.parse('2026-06-19T10:00:00Z'),
+          ),
+        );
+    await first
+        .into(first.searchHistory)
+        .insert(
+          SearchHistoryCompanion.insert(
+            query: '상록수',
+            searchedAt: DateTime.parse('2026-06-19T10:01:00Z'),
+          ),
+        );
+    await first
+        .into(first.reportReceipts)
+        .insert(
+          ReportReceiptsCompanion.insert(
+            receiptId: 'receipt-migration-1',
+            reportId: const Value('report-migration-1'),
+            status: 'RECEIVED',
+            createdAt: DateTime.parse('2026-06-19T10:05:00Z'),
+          ),
+        );
+    await first.close();
+
+    final reopened = await UserDatabaseOpener(
+      databaseDirectory: directory,
+    ).open();
+    addTearDown(reopened.close);
+
+    final favorites = await reopened.select(reopened.favoriteStations).get();
+    final searchRows = await reopened
+        .customSelect(
+          'SELECT query FROM search_history ORDER BY searched_at DESC',
+        )
+        .get();
+    final receipts = await reopened.select(reopened.reportReceipts).get();
+
+    expect(favorites.single.stationId, 'station-sangnoksu');
+    expect(searchRows.single.read<String>('query'), '상록수');
+    expect(receipts.single.receiptId, 'receipt-migration-1');
+    expect(receipts.single.reportId, 'report-migration-1');
+  });
 }
 
 class _RequestCountingHttpClient implements HttpClient {

@@ -40,6 +40,14 @@ class UserDatabase extends _$UserDatabase {
       onCreate: (migrator) async {
         await migrator.createAll();
       },
+      onUpgrade: (_, from, to) async {
+        if (from < 1) {
+          throw StateError('Unsupported user database schema version: $from');
+        }
+      },
+      beforeOpen: (_) async {
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
     );
   }
 }
