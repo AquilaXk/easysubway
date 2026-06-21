@@ -3948,6 +3948,9 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const gitignore = read(".gitignore");
   const commonExceptionHandler = read("backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java");
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const adminOperatorLockoutProvider = read(
+    "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java",
+  );
   const facilityReportPhotoProcessor = read(
     "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
   );
@@ -4016,8 +4019,14 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminBasicAuthGate.readyWhenKo, /Basic auth/);
   assert.ok(adminBasicAuthGate.evidence.includes("admin-auth-transition-decision-record"));
   assert.ok(adminBasicAuthGate.evidence.includes("lockout-or-oidc-mfa-implementation-evidence"));
+  assert.ok(adminBasicAuthGate.evidence.includes("admin-basic-auth-lockout-tests"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/pull_request_template.md"));
+  assert.match(adminOperatorLockoutProvider, /LockedException/);
+  assert.match(adminOperatorLockoutProvider, /BadCredentialsException/);
+  assert.match(adminOperatorLockoutProvider, /lockedUntil/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_BYTES = 900 \* 1024/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_WIDTH = 4_096/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_PIXELS = 12_000_000/);
