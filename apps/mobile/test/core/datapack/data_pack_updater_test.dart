@@ -662,6 +662,16 @@ Map<String, Object?> _fixtureManifestMetadata({
   return {
     'artifactKind': 'fixture',
     'representativeRouteRegressions': _representativeRouteRegressions,
+    'representativeRouteRegressionSignature': {
+      'algorithm': 'sha256-route-regression-v1',
+      'value': _routeRegressionSignatureValue(
+        'capital',
+        version,
+        compressedSha256,
+        sqliteSha256,
+        sizeBytes,
+      ),
+    },
     'signature': {
       'algorithm': 'sha256-pack-manifest-v1',
       'value': _signatureValue(
@@ -695,6 +705,20 @@ Map<String, Object?> _fixtureManifestMetadata({
 }
 
 String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
+}
+
+String _routeRegressionSignatureValue(
   String id,
   String version,
   String compressedSha256,
