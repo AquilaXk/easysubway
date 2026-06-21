@@ -770,6 +770,7 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   assert.match(importer, /source inventory missing/);
   assert.match(importer, /source mapping missing/);
   assert.match(importer, /station id reuse is forbidden/);
+  assert.match(importer, /station line mapping conflict/);
   assert.match(importer, /stationLineId must equal stationId:lineId/);
   assert.match(importer, /station mapping evidence is required/);
   assert.match(importer, /sourceIngestAdapter: "official-source-ingest-v1"/);
