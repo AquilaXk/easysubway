@@ -60,6 +60,7 @@ class DataPackManifestEntry {
     required this.sourceInventory,
     required this.regionalQualityMetrics,
     required this.representativeRouteRegressions,
+    required this.representativeRouteRegressionSignature,
     required this.schemaVersion,
     required this.requiredTables,
     this.minimumTableRows = const {},
@@ -100,6 +101,11 @@ class DataPackManifestEntry {
         json['representativeRouteRegressions'],
         artifactKind,
       ),
+      representativeRouteRegressionSignature:
+          _parseRepresentativeRouteRegressionSignature(
+            json['representativeRouteRegressionSignature'],
+            artifactKind,
+          ),
       schemaVersion: _requiredString(json, 'schemaVersion'),
       requiredTables: requiredTables
           .map((table) {
@@ -122,6 +128,7 @@ class DataPackManifestEntry {
   final RegionalQualityMetrics regionalQualityMetrics;
   final List<DataPackRepresentativeRouteRegression>
   representativeRouteRegressions;
+  final DataPackSignature representativeRouteRegressionSignature;
   final String schemaVersion;
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
@@ -169,6 +176,10 @@ class DataPackManifestEntry {
           !publicKey.verify(canonical, signature.value)) {
         throw const FormatException('Invalid data pack signature.');
       }
+      _validateRepresentativeRouteRegressionSignature(
+        expectedSizeBytes,
+        productionSigningPublicKey,
+      );
       return;
     }
     if (signature.algorithm != 'sha256-pack-manifest-v1') {
@@ -177,15 +188,63 @@ class DataPackManifestEntry {
     if (signature.value != sha256.convert(utf8.encode(canonical)).toString()) {
       throw const FormatException('Invalid data pack signature.');
     }
+    _validateRepresentativeRouteRegressionSignature(
+      expectedSizeBytes,
+      productionSigningPublicKey,
+    );
   }
 
   String _signaturePayload(int expectedSizeBytes) {
-    final fixturePayload =
-        '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes:${_representativeRouteRegressionPayload()}';
+    final fixturePayload = _fixtureSignaturePayload(expectedSizeBytes);
     if (artifactKind == DataPackArtifactKind.production) {
       return '$fixturePayload:${url.toString()}';
     }
     return fixturePayload;
+  }
+
+  void _validateRepresentativeRouteRegressionSignature(
+    int expectedSizeBytes,
+    DataPackSigningPublicKey? productionSigningPublicKey,
+  ) {
+    final canonical = _representativeRouteRegressionSignaturePayload(
+      expectedSizeBytes,
+    );
+    if (artifactKind == DataPackArtifactKind.production) {
+      final publicKey = productionSigningPublicKey;
+      if (publicKey == null) {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      if (representativeRouteRegressionSignature.algorithm !=
+              'rsa-sha256-route-regression-v1' ||
+          !publicKey.verify(
+            canonical,
+            representativeRouteRegressionSignature.value,
+          )) {
+        throw const FormatException('Invalid data pack signature.');
+      }
+      return;
+    }
+    if (representativeRouteRegressionSignature.algorithm !=
+        'sha256-route-regression-v1') {
+      throw const FormatException('Invalid data pack signature.');
+    }
+    if (representativeRouteRegressionSignature.value !=
+        sha256.convert(utf8.encode(canonical)).toString()) {
+      throw const FormatException('Invalid data pack signature.');
+    }
+  }
+
+  String _representativeRouteRegressionSignaturePayload(int expectedSizeBytes) {
+    final fixturePayload =
+        '${_fixtureSignaturePayload(expectedSizeBytes)}:${_representativeRouteRegressionPayload()}';
+    if (artifactKind == DataPackArtifactKind.production) {
+      return '$fixturePayload:${url.toString()}';
+    }
+    return fixturePayload;
+  }
+
+  String _fixtureSignaturePayload(int expectedSizeBytes) {
+    return '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
   }
 
   String _representativeRouteRegressionPayload() {
@@ -278,7 +337,9 @@ class DataPackSignature {
   factory DataPackSignature.fromJson(Map<String, Object?> json) {
     final algorithm = _requiredString(json, 'algorithm');
     if (algorithm != 'sha256-pack-manifest-v1' &&
-        algorithm != 'rsa-sha256-pack-manifest-v1') {
+        algorithm != 'rsa-sha256-pack-manifest-v1' &&
+        algorithm != 'sha256-route-regression-v1' &&
+        algorithm != 'rsa-sha256-route-regression-v1') {
       throw const FormatException('Invalid data pack signature.');
     }
     final value = _requiredString(json, 'value');
@@ -536,6 +597,22 @@ DataPackSignature _parseSignature(
   if (rawSignature == null && artifactKind == DataPackArtifactKind.fixture) {
     return DataPackSignature(
       algorithm: 'sha256-pack-manifest-v1',
+      value: '0' * 64,
+    );
+  }
+  if (rawSignature is! Map<String, Object?>) {
+    throw const FormatException('Invalid data pack signature.');
+  }
+  return DataPackSignature.fromJson(rawSignature);
+}
+
+DataPackSignature _parseRepresentativeRouteRegressionSignature(
+  Object? rawSignature,
+  DataPackArtifactKind artifactKind,
+) {
+  if (rawSignature == null && artifactKind == DataPackArtifactKind.fixture) {
+    return DataPackSignature(
+      algorithm: 'sha256-route-regression-v1',
       value: '0' * 64,
     );
   }

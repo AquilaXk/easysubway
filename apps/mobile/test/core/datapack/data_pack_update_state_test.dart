@@ -91,6 +91,16 @@ void main() {
                 'artifactKind': 'fixture',
                 'representativeRouteRegressions':
                     _representativeRouteRegressions,
+                'representativeRouteRegressionSignature': {
+                  'algorithm': 'sha256-route-regression-v1',
+                  'value': _routeRegressionSignatureValue(
+                    'capital',
+                    '18',
+                    'a' * 64,
+                    'b' * 64,
+                    1024,
+                  ),
+                },
                 'signature': {
                   'algorithm': 'sha256-pack-manifest-v1',
                   'value': _signatureValue(
@@ -149,6 +159,20 @@ void main() {
 }
 
 String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
+}
+
+String _routeRegressionSignatureValue(
   String id,
   String version,
   String compressedSha256,

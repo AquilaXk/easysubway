@@ -10,6 +10,8 @@ const _productionSigningPublicKey = DataPackSigningPublicKey(
   exponentBase64Url: 'AQAB',
 );
 const _productionSignatureValue =
+    'iF48gj_9CEV0os3gJMEO2qdn0aAcBXT71zl8Qz6KIWQZ2qm1A0TmCb7f6wTJEoP3cFSZQdgmXcj7IPFNv9gLE9O_s0-DmwniFX7OIv8icwGe1BKHNJfFmHCqWyLs0uuUVZTmY6RwqS_YnElf_0caT1qDS7L32uu5zYXnWGTg5ul2xeRuBgDGW9gFs9I4UkvdF-MbNjVxCby4tyuCsQSHxUhpFLSLKluLGWc7lY4u688Ss2dR9Zs-zlYiWb4GQ6lxKU_lfx_0FSl3yipgrhX7OpAihyVBuxh-PA_MA5KAqJ0C5HqxAJ_lYZhgYKb5zvJ3eChI7uWc2OhyZ2ZyE-jYdw';
+const _productionRouteRegressionSignatureValue =
     'UkRPUdvrHybjorn-_dvvOqT2ZPsFEF0aF7r5ThuP0NUAZ4nd-u_2OaPqvCZS3QJ1aBSSiiBgoWbAFrjJgLf3oGW3a6HbrVMUkHLdpz5cbUty5RTo5M5GiinYdbr7eQH2CzimKEOKAEmfyqfBuum8TORMVfTTRS-RDHymwQmtf7Hln7rscCtvThcSdmj6BfrcMgsR7L3sUx_Q598lhjFS38KSuaTzAbpIVku3K6-fFk3O76Opy_9n-cbyQEjGrfLvOvh3OxI1ReBxW5XI6P9Q2O5YcsZbkqb1gqR0we6EQx6tKIBk92fA5LV4_dAK0HrCK4-PZ0m7H1emxhflkBG-WQ';
 const _representativeRouteRegressions = [
   {
@@ -36,6 +38,16 @@ void main() {
           'sizeBytes': 1024,
           'artifactKind': 'fixture',
           'representativeRouteRegressions': _representativeRouteRegressions,
+          'representativeRouteRegressionSignature': {
+            'algorithm': 'sha256-route-regression-v1',
+            'value': _routeRegressionSignatureValue(
+              'capital',
+              '18',
+              'a' * 64,
+              'b' * 64,
+              1024,
+            ),
+          },
           'signature': {
             'algorithm': 'sha256-pack-manifest-v1',
             'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
@@ -515,6 +527,16 @@ Map<String, Object?> _fixturePack({
     'sizeBytes': sizeBytes,
     'artifactKind': 'fixture',
     'representativeRouteRegressions': _representativeRouteRegressions,
+    'representativeRouteRegressionSignature': {
+      'algorithm': 'sha256-route-regression-v1',
+      'value': _routeRegressionSignatureValue(
+        id,
+        version,
+        compressedSha256,
+        sqliteSha256,
+        sizeBytes,
+      ),
+    },
     'signature': {
       'algorithm': 'sha256-pack-manifest-v1',
       'value': _signatureValue(
@@ -568,6 +590,10 @@ Map<String, Object?> _productionPack({
     'sizeBytes': sizeBytes,
     'artifactKind': 'production',
     'representativeRouteRegressions': _representativeRouteRegressions,
+    'representativeRouteRegressionSignature': {
+      'algorithm': 'rsa-sha256-route-regression-v1',
+      'value': _productionRouteRegressionSignatureValue,
+    },
     'signature': {
       'algorithm': 'rsa-sha256-pack-manifest-v1',
       'value': signatureValue ?? _productionSignatureValue,
@@ -597,6 +623,20 @@ Map<String, Object?> _productionPack({
 }
 
 String _signatureValue(
+  String id,
+  String version,
+  String compressedSha256,
+  String sqliteSha256,
+  int sizeBytes,
+) {
+  return sha256
+      .convert(
+        utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
+      )
+      .toString();
+}
+
+String _routeRegressionSignatureValue(
   String id,
   String version,
   String compressedSha256,

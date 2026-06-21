@@ -316,6 +316,10 @@ DataPackManifestEntry _pack({
       unknownAccessibilityRatio: 0,
     ),
     representativeRouteRegressions: const [],
+    representativeRouteRegressionSignature: const DataPackSignature(
+      algorithm: 'sha256-route-regression-v1',
+      value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    ),
     schemaVersion: '1',
     requiredTables: const ['catalog_metadata', 'stations', 'station_lines'],
     minimumTableRows: const {'stations': 2},
