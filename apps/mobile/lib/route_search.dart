@@ -847,6 +847,10 @@ String _routeDistanceLabel(int distanceMeters) {
 }
 
 String _routeTimeSourceLabel(String source) {
+  // route contract: realtime ETA fallback
+  // Local route results may carry STATIC_ESTIMATE when realtime providers are
+  // unavailable. Unknown labels must stay explicit instead of implying live ETA
+  // accuracy.
   return switch (source) {
     'STATIC_ESTIMATE' => '정적 추정',
     'REALTIME_ADJUSTED' => '실시간 보정',

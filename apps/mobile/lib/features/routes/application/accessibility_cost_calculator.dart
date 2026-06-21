@@ -28,6 +28,10 @@ class AccessibilityCostCalculator {
         warningCodes: ['FACILITY_UNAVAILABLE'],
       );
     }
+
+    // route contract: unknown accessibility data
+    // Missing source data must not be treated as accessible for profiles that
+    // cannot safely use stairs; other profiles keep the route with a warning.
     if (edge.accessibilityState == RouteAccessibilityState.unknown) {
       if (mobilityType.blocksStairOnlyAccess) {
         return const AccessibilityCost(
@@ -39,6 +43,9 @@ class AccessibilityCostCalculator {
       warningCodes.add('ACCESSIBILITY_STATE_UNKNOWN');
     }
 
+    // route contract: stair-only block
+    // Stair-only or unknown stair state blocks wheelchair-style profiles and
+    // only becomes a penalty/warning for profiles that can still choose it.
     if (edge.stairAccessState == RouteStairAccessState.unknown) {
       if (mobilityType.blocksStairOnlyAccess) {
         return const AccessibilityCost(

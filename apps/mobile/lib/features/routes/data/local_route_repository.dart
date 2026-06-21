@@ -569,6 +569,11 @@ class _RouteCatalogSnapshot {
       }
     }
 
+    // route contract: synthetic connector edge
+    // These fixture-derived entry, exit, and transfer edges only connect known
+    // station-line nodes when explicit source edges are absent. They are
+    // step-free defaults for local fallback routing, not proof of field-verified
+    // elevator or ramp availability.
     for (final stationEntry in nodeKeysByStation.entries) {
       final stationId = stationEntry.key;
       final stationNodes = stationEntry.value.values.toList(growable: false);
@@ -762,6 +767,11 @@ graph.RouteEdge _toGraphRouteEdge(
   String? toNodeId,
 }) {
   final effectiveFromNodeId = fromNodeId ?? networkEdge.fromNodeId;
+
+  // route contract: local metric fallback
+  // Source durations of 0 keep `durationSeconds` at 0 so UI can say the time
+  // needs checking, while `baseCost` gets a conservative 60-second routing
+  // weight so the graph remains searchable.
   return graph.RouteEdge(
     id: id ?? networkEdge.id,
     fromNodeId: effectiveFromNodeId,
@@ -1026,6 +1036,8 @@ class _NetworkEdgeSnapshot {
   }
 
   int get effectiveReliabilityScore {
+    // UNKNOWN accessibility is stale by definition and cannot carry a high
+    // confidence score into accessibility-safe routing.
     if (_accessibilityStatusUpper == 'UNKNOWN' && reliabilityScore > 60) {
       return 60;
     }
