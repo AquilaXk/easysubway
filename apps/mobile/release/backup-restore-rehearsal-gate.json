@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "backup-restore-rehearsal",
+  "releaseBlockerPolicy": true,
+  "policyRefreshKo": "상용 배포 전 백업 대상과 복구 리허설 경로를 최신 main 기준으로 확인한다.",
+  "backupTargets": [
+    {
+      "id": "postgres_application_database",
+      "area": "database",
+      "ownerKo": "백엔드 운영 담당자",
+      "backupCommand": "tools/ops/postgres-backup.sh",
+      "restoreRehearsalCommand": "tools/ops/postgres-restore-rehearsal.sh <backup-file>",
+      "successEvidence": "restore rehearsal succeeded 로그와 격리 restore database 생성/삭제 확인",
+      "failureConditions": [
+        "pg_dump 산출물이 비어 있음",
+        "보호 database 이름으로 restore 시도",
+        "pg_restore 실패"
+      ],
+      "linkedArtifacts": [
+        "tools/ops/postgres-backup.sh",
+        "tools/ops/postgres-restore-rehearsal.sh",
+        "infra/docker-compose.yml",
+        "backend/src/main/resources/application-prod.yml"
+      ]
+    },
+    {
+      "id": "facility_report_photo_objects",
+      "area": "object-storage",
+      "ownerKo": "신고 운영 담당자",
+      "backupCommand": "tools/ops/facility-report-photo-backup.sh",
+      "restoreRehearsalCommand": "tools/ops/backup-restore-rehearsal-check.mjs",
+      "successEvidence": "manifest.tsv와 objects 경로가 생성되고 누락 object key가 없음을 확인",
+      "failureConditions": [
+        "photo object key가 비어 있거나 경로 traversal을 포함함",
+        "manifest에 있는 object file이 로컬 storage에 없음",
+        "manifest column이 누락됨"
+      ],
+      "linkedArtifacts": [
+        "tools/ops/facility-report-photo-backup.sh",
+        "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
+        "README.md"
+      ]
+    },
+    {
+      "id": "datapack_source_inventory",
+      "area": "datapack",
+      "ownerKo": "데이터팩 운영 담당자",
+      "backupCommand": "tools/ops/data-source-raw-archive.sh",
+      "restoreRehearsalCommand": "node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json",
+      "successEvidence": "source archive manifest와 source-inventory validation 통과",
+      "failureConditions": [
+        "source inventory license 또는 updatedAt 누락",
+        "source archive manifest가 비어 있음",
+        "official source 원본 경로가 재현 불가"
+      ],
+      "linkedArtifacts": [
+        "tools/ops/data-source-raw-archive.sh",
+        "tools/datapack/source-inventory.json",
+        "tools/datapack/validate-source-inventory.mjs"
+      ]
+    },
+    {
+      "id": "datapack_release_manifest_history",
+      "area": "datapack",
+      "ownerKo": "릴리즈 운영 담당자",
+      "backupCommand": "gh run download <data-pack-release-run> --name easysubway-datapacks-<sha>",
+      "restoreRehearsalCommand": "node tools/datapack/validate-datapack.mjs --manifest <restored>/catalog/current.json --root <restored>",
+      "successEvidence": "restored catalog/current.json과 pack sqlite checksum validation 통과",
+      "failureConditions": [
+        "manifest history artifact를 찾을 수 없음",
+        "current.json이 pack보다 먼저 복구됨",
+        "restored sqlite checksum이 manifest와 불일치"
+      ],
+      "linkedArtifacts": [
+        ".github/workflows/datapack-release.yml",
+        "tools/datapack/validate-datapack.mjs",
+        "tools/datapack/create-publish-plan.mjs"
+      ]
+    }
+  ],
+  "rehearsalPolicy": {
+    "frequencyKo": "월 1회 또는 릴리즈 후보 freeze 전 1회 실행한다.",
+    "dataSafetyKo": "운영 데이터 직접 복원 금지, 격리 restore database와 로컬 전용 object directory에서만 리허설한다.",
+    "requiredOutputKo": ".codex/evidence/backup-restore-rehearsal/<date>/ 아래 명령 출력, manifest checksum, 실패 조건 확인 결과를 로컬 전용으로 보관한다.",
+    "sensitiveDataPolicyKo": "database dump, 사진 object, signed URL, credential, receipt token은 GitHub에 업로드하지 않는다."
+  }
+}

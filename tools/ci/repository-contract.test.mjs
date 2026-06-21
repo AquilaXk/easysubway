@@ -1262,6 +1262,56 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
 });
 
+test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검증 명령을 고정한다", () => {
+  const gatePath = "apps/mobile/release/backup-restore-rehearsal-gate.json";
+  const checkScriptPath = "tools/ops/backup-restore-rehearsal-check.mjs";
+  assert.ok(existsSync(path.join(root, gatePath)), "backup restore rehearsal gate artifact must exist");
+  assert.ok(existsSync(path.join(root, checkScriptPath)), "backup restore rehearsal check script must exist");
+
+  const gate = readJson(gatePath);
+  const checkScript = read(checkScriptPath);
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "backup-restore-rehearsal");
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
+
+  const backupTargets = new Map(gate.backupTargets.map((target) => [target.id, target]));
+  const requiredBackupTargetIds = [
+    "postgres_application_database",
+    "facility_report_photo_objects",
+    "datapack_source_inventory",
+    "datapack_release_manifest_history",
+  ];
+  assert.deepEqual([...backupTargets.keys()].sort(), requiredBackupTargetIds.toSorted());
+
+  for (const id of requiredBackupTargetIds) {
+    const target = backupTargets.get(id);
+    assert.match(target.ownerKo, /담당자/);
+    assert.ok(target.backupCommand.length > 0, `${id} must define backup command`);
+    assert.ok(target.restoreRehearsalCommand.length > 0, `${id} must define restore rehearsal command`);
+    assert.ok(target.successEvidence.length > 0, `${id} must define success evidence`);
+    assert.ok(target.failureConditions.length > 0, `${id} must define failure conditions`);
+    for (const artifact of target.linkedArtifacts) {
+      assert.ok(existsSync(path.join(root, artifact)), `${id} linked artifact must exist: ${artifact}`);
+    }
+  }
+
+  assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
+  assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
+  assert.match(gate.rehearsalPolicy.requiredOutputKo, /backup-restore-rehearsal/);
+  assert.match(checkScript, /backup-restore-rehearsal-gate\.json/);
+  assert.match(checkScript, /postgres_application_database/);
+  assert.match(checkScript, /datapack_release_manifest_history/);
+  assert.match(readme, /backup-restore-rehearsal-gate\.json/);
+  assert.match(readme, /tools\/ops\/backup-restore-rehearsal-check\.mjs/);
+  assert.doesNotMatch(readme, /backup secret|restore secret/i);
+
+  execFileSync(process.execPath, [checkScriptPath], { cwd: root, encoding: "utf8" });
+});
+
 test("저장소 지속적 통합은 Docker Compose 설정을 검증한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
