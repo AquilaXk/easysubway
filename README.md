@@ -59,6 +59,29 @@ Migration 실패를 무시하고 DB를 삭제하거나 재생성하지 않습니
 - `scripts/`: data import and local development utilities
 - `tools/ci/`: repository and CI contract checks
 
+## Operations
+
+운영 관측성과 알림 기준선은 `apps/mobile/release/operations-observability-gate.json`을 기준으로 검증합니다. 이 gate는 release blocker이며, PR에서는 `node --test tools/ci/*.test.mjs`로 필수 신호와 artifact 보관 계약을 확인합니다.
+
+필수 운영 신호 ID:
+
+- `backend_health_readiness_storage_datapack_report`
+- `report_api_error_rate`
+- `admin_review_latency`
+- `datapack_release_publish_result`
+- `mobile_crash_free_rate`
+- `mobile_anr_rate`
+- `mobile_app_start_failure_rate`
+- `route_search_found_blocked_unknown_distribution`
+- `datapack_install_rollback_failure_rate`
+- `realtime_provider_success_stale_timeout_latency_eta_error`
+- `report_upload_failure_duplicate_orphan_cleanup_rate`
+- `cross_version_correlation_ids`
+- `android_mapping_retention`
+- `ios_dsym_retention`
+
+운영 로그와 artifact에는 receipt token, upload URL, photo metadata를 남기지 않습니다. 장애 증거에는 app version, datapack version, route engine version, provider snapshot id를 함께 기록해야 하며, 외부 provider나 store console이 필요한 신호는 PR 검증 증거에 외부 차단 조건과 남은 리스크를 기록합니다.
+
 ## Workflow
 
 Tracked work follows this order:

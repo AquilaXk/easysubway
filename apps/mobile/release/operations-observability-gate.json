@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "operations-observability",
+  "releaseBlockerPolicy": true,
+  "policyRefreshKo": "상용 배포 전 운영 관측성과 알림 기준을 최신 main 기준으로 확인한다.",
+  "sensitiveLogPolicy": {
+    "forbidReceiptTokens": true,
+    "forbidUploadUrls": true,
+    "forbidPhotoMetadata": true
+  },
+  "signals": [
+    {
+      "id": "backend_health_readiness_storage_datapack_report",
+      "area": "backend",
+      "ownerKo": "백엔드 운영 담당자",
+      "thresholdKo": "readiness가 DOWN이거나 storage/datapack/report 상태가 5분 이상 비정상이면 배포 차단",
+      "firstResponseKo": "최근 CD, DB 연결, object storage 설정, report upload 설정을 확인한다.",
+      "evidence": ["actuator-readiness", "productionReadiness-health-group", "backend-log-review"],
+      "linkedArtifacts": ["backend/src/main/resources/application-prod.yml", "README.md"]
+    },
+    {
+      "id": "report_api_error_rate",
+      "area": "backend",
+      "ownerKo": "백엔드 운영 담당자",
+      "thresholdKo": "5분 API 오류율 5% 이상 또는 신고 제출 오류 3건 이상이면 조사",
+      "firstResponseKo": "사용자 활동 API 오류율, report controller 로그, abuse control 설정을 확인한다.",
+      "evidence": ["admin-usage-api-error-rate", "report-controller-error-log"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java", "README.md"]
+    },
+    {
+      "id": "admin_review_latency",
+      "area": "backend",
+      "ownerKo": "운영 검수 담당자",
+      "thresholdKo": "신고 평균 검수 시간이 24시간을 넘거나 미검수 backlog가 증가하면 담당자 확인",
+      "firstResponseKo": "관리자 신고 검수 화면의 평균 처리 시간과 최근 review audit을 확인한다.",
+      "evidence": ["report-processing-time-summary", "review-audit-log"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/domain/ReportProcessingTimeSummary.java", "README.md"]
+    },
+    {
+      "id": "datapack_release_publish_result",
+      "area": "datapack",
+      "ownerKo": "데이터팩 운영 담당자",
+      "thresholdKo": "main 데이터팩 릴리즈 실패, publish_result 실패, source_updated_at 누락은 배포 차단",
+      "firstResponseKo": "Data Pack Release workflow의 datapack-observability.txt와 staged manifest를 확인한다.",
+      "evidence": ["datapack-observability-artifact", "pack-version", "source-updated-at", "publish-result"],
+      "linkedArtifacts": [".github/workflows/datapack-release.yml", "tools/datapack/source-inventory.json", "README.md"]
+    },
+    {
+      "id": "mobile_crash_free_rate",
+      "area": "mobile",
+      "ownerKo": "모바일 릴리즈 담당자",
+      "thresholdKo": "릴리즈 후보 crash-free sessions 99.5% 미만이면 공개 배포 보류",
+      "firstResponseKo": "store internal track 또는 crash provider 대시보드의 crash-free 세션을 확인한다.",
+      "evidence": ["crash-free-session-dashboard-or-external-blocker"],
+      "linkedArtifacts": ["apps/mobile/release/release-security-gate.json", "README.md"]
+    },
+    {
+      "id": "mobile_anr_rate",
+      "area": "mobile",
+      "ownerKo": "Android 릴리즈 담당자",
+      "thresholdKo": "Android vitals ANR rate가 Play bad behavior 기준에 근접하면 공개 배포 보류",
+      "firstResponseKo": "Play Console pre-launch report와 Android vitals를 확인한다.",
+      "evidence": ["play-vitals-anr-or-external-blocker"],
+      "linkedArtifacts": ["apps/mobile/release/accessibility-release-qa.json", "README.md"]
+    },
+    {
+      "id": "mobile_app_start_failure_rate",
+      "area": "mobile",
+      "ownerKo": "모바일 릴리즈 담당자",
+      "thresholdKo": "앱 시작 실패 또는 빈 화면 신고가 릴리즈 후보에서 재현되면 배포 차단",
+      "firstResponseKo": "릴리즈 산출물 smoke log, app start test, store install evidence를 확인한다.",
+      "evidence": ["release-app-start-smoke", "store-install-log"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "README.md"]
+    },
+    {
+      "id": "route_search_found_blocked_unknown_distribution",
+      "area": "mobile",
+      "ownerKo": "경로 품질 담당자",
+      "thresholdKo": "FOUND/BLOCKED/UNKNOWN 분포가 이전 릴리즈 대비 급변하면 데이터팩 또는 route engine 회귀로 조사",
+      "firstResponseKo": "route search test, 데이터팩 manifest, route engine version을 함께 확인한다.",
+      "evidence": ["route-result-distribution", "route-engine-version"],
+      "linkedArtifacts": ["apps/mobile/test/route_search_test.dart", "README.md"]
+    },
+    {
+      "id": "datapack_install_rollback_failure_rate",
+      "area": "mobile",
+      "ownerKo": "데이터팩 클라이언트 담당자",
+      "thresholdKo": "설치 실패 후 기존 pack 유지 또는 rollback 실패가 1건이라도 재현되면 배포 차단",
+      "firstResponseKo": "data pack updater test와 릴리즈 로그에서 active pack version 변화를 확인한다.",
+      "evidence": ["datapack-updater-test", "rollback-log"],
+      "linkedArtifacts": ["apps/mobile/test/core/datapack/data_pack_updater_test.dart", "README.md"]
+    },
+    {
+      "id": "realtime_provider_success_stale_timeout_latency_eta_error",
+      "area": "realtime",
+      "ownerKo": "실시간 정보 담당자",
+      "thresholdKo": "provider timeout/stale/ETA error가 지속되면 앱은 fallback label을 표시하고 운영자는 provider 상태를 조사",
+      "firstResponseKo": "provider snapshot source age, timeout count, fallback label count를 확인한다.",
+      "evidence": ["provider-success-rate", "source-age", "timeout-count", "fallback-label-count-or-external-blocker"],
+      "linkedArtifacts": ["README.md"]
+    },
+    {
+      "id": "report_upload_failure_duplicate_orphan_cleanup_rate",
+      "area": "backend",
+      "ownerKo": "신고 업로드 운영 담당자",
+      "thresholdKo": "업로드 실패, 중복 claim, orphan cleanup 실패가 증가하면 object storage와 receipt flow를 조사",
+      "firstResponseKo": "report upload intent, claim, cleanup 로그에서 receipt token과 upload URL이 제거됐는지 확인한다.",
+      "evidence": ["report-upload-failure-count", "duplicate-claim-count", "orphan-cleanup-count"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report", "README.md"]
+    },
+    {
+      "id": "cross_version_correlation_ids",
+      "area": "release",
+      "ownerKo": "릴리즈 운영 담당자",
+      "thresholdKo": "장애 증거에 app/datapack/route/provider version 중 하나라도 없으면 release readiness 미충족",
+      "firstResponseKo": "앱 버전, 데이터팩 버전, route engine version, provider snapshot id를 같은 증거 묶음으로 기록한다.",
+      "evidence": ["app-datapack-route-provider-correlation", "release-metadata"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", ".github/workflows/datapack-release.yml", "README.md"]
+    },
+    {
+      "id": "android_mapping_retention",
+      "area": "release",
+      "ownerKo": "Android 릴리즈 담당자",
+      "thresholdKo": "mapping.txt가 릴리즈 artifact에 90일 보관되지 않으면 배포 차단",
+      "firstResponseKo": "Release Artifacts workflow의 Android artifact와 release-metadata를 확인한다.",
+      "evidence": ["android-mapping-artifact-retention"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "README.md"]
+    },
+    {
+      "id": "ios_dsym_retention",
+      "area": "release",
+      "ownerKo": "iOS 릴리즈 담당자",
+      "thresholdKo": "dSYM zip이 릴리즈 artifact에 90일 보관되지 않으면 배포 차단",
+      "firstResponseKo": "Release Artifacts workflow의 iOS artifact와 release-metadata를 확인한다.",
+      "evidence": ["ios-dsym-artifact-retention"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "README.md"]
+    }
+  ]
+}
