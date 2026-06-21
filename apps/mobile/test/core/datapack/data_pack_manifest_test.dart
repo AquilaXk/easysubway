@@ -407,6 +407,46 @@ void main() {
     expect(pack.regionalQualityMetrics.stationCount, 0);
   });
 
+  test('legacy fixture manifest는 sizeBytes와 기존 서명만 있어도 파싱된다', () {
+    const id = 'capital';
+    const version = '18';
+    final compressedSha256 = 'a' * 64;
+    final sqliteSha256 = 'b' * 64;
+    const sizeBytes = 1024;
+
+    final manifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [
+        {
+          'id': id,
+          'version': version,
+          'url': 'catalog/capital-v18.sqlite.gz',
+          'sha256': compressedSha256,
+          'sqliteSha256': sqliteSha256,
+          'sizeBytes': sizeBytes,
+          'signature': {
+            'algorithm': 'sha256-pack-manifest-v1',
+            'value': _signatureValue(
+              id,
+              version,
+              compressedSha256,
+              sqliteSha256,
+              sizeBytes,
+            ),
+          },
+          'schemaVersion': '1',
+          'requiredTables': ['catalog_metadata', 'stations'],
+        },
+      ],
+    });
+
+    final pack = manifest.packs.single;
+    expect(pack.artifactKind, DataPackArtifactKind.fixture);
+    expect(pack.sizeBytes, sizeBytes);
+    expect(pack.representativeRouteRegressions, isEmpty);
+    expect(pack.representativeRouteRegressionSignature.value, '0' * 64);
+  });
+
   test('production key가 설정되면 fixture manifest를 거부한다', () {
     expect(
       () => DataPackManifest.fromJson({
