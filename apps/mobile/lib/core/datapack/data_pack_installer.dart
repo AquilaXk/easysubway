@@ -121,6 +121,22 @@ class DataPackInstaller {
     return InstalledDataPackPointer.fromJson(decoded);
   }
 
+  Future<InstalledDataPackPointer?> readInstalledPointer({
+    required String id,
+    required String version,
+  }) async {
+    final target = File(p.join(catalogDirectory.path, '$id-v$version.sqlite'));
+    if (!await target.exists()) {
+      return null;
+    }
+    return InstalledDataPackPointer(
+      id: id,
+      version: version,
+      path: target.path,
+      sha256: sha256.convert(await target.readAsBytes()).toString(),
+    );
+  }
+
   Future<void> activateCurrentPointer(InstalledDataPackPointer pointer) async {
     await _writeCurrentPointer(pointer);
   }
