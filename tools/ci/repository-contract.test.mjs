@@ -1807,7 +1807,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     "backend/src/main/resources/db/migration/postgresql/V3__facility_report_receipt_tokens.sql";
   const dropBase64MigrationPath =
     "backend/src/main/resources/db/migration/postgresql/V4__drop_facility_report_base64_payload.sql";
+  const prodConfig = read("backend/src/main/resources/application-prod.yml");
   const controller = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportController.java");
+  const abuseControl = read("backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java");
   const adminPageController = read(
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
   );
@@ -1985,6 +1987,27 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /Principal principal/);
   assert.match(controller, /principal\.getName\(\)/);
   assert.match(controller, /@ResponseStatus\(HttpStatus\.CREATED\)/);
+  assert.match(abuseControl, /extends OncePerRequestFilter/);
+  assert.match(abuseControl, /TOO_MANY_REQUESTS/);
+  assert.match(abuseControl, /UPLOAD_INTENT[\s\S]*UPLOAD_CLAIM[\s\S]*REPORT_SUBMIT[\s\S]*STATUS[\s\S]*CONFIRM/);
+  assert.match(abuseControl, /"\/api\/v1\/report-uploads"/);
+  assert.match(abuseControl, /"\/api\/v1\/reports"/);
+  assert.match(abuseControl, /Pattern\.compile\("\^\/api\/v1\/reports\/\[\^\/\]\+\/confirm\$/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.window-seconds/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.upload-intent-limit/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.upload-claim-limit/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.report-submit-limit/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.status-limit/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.confirm-limit/);
+  assert.match(abuseControl, /easysubway\.auth\.client-ip\.trusted-proxies/);
+  assert.match(abuseControl, /X-Forwarded-For/);
+  assert.doesNotMatch(abuseControl, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS:60/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_UPLOAD_INTENT_LIMIT:60/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_UPLOAD_CLAIM_LIMIT:120/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_REPORT_SUBMIT_LIMIT:30/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_STATUS_LIMIT:120/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_CONFIRM_LIMIT:30/);
   assert.match(adminPageController, /REPORT_SURGE_ALERT_THRESHOLD = 10/);
   assert.match(adminPageController, /REPORT_SURGE_LOOKBACK_HOURS = 24/);
   assert.match(adminPageController, /ReportSurgeAlertView/);
