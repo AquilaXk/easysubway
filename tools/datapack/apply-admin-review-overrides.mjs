@@ -101,7 +101,7 @@ function applyRouteAccessibilityOverride(pack, facility, status) {
 
 function routeAccessibilityStatus(status) {
   if (availableFacilityStatuses.has(status)) {
-    return null;
+    return "AVAILABLE";
   }
   if (status === "UNKNOWN") {
     return "UNKNOWN";
