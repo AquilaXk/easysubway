@@ -3949,6 +3949,24 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(operatorRouteFeedbackReportTemplate, /<form|_csrf|routeSearchId|userId|comment|\/admin\/reports/);
 });
 
+test("모바일 async lint 기준선은 Future 처리 누락을 analyzer에서 잡는다", () => {
+  const analysisOptions = read("apps/mobile/analysis_options.yaml");
+  const asyncLintBaseline = readJson("apps/mobile/analysis/async-lint-baseline.json");
+
+  assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
+  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.match(analysisOptions, /^\s{4}unawaited_futures: true$/m);
+  assert.match(analysisOptions, /^\s{4}discarded_futures: false # staged in apps\/mobile\/analysis\/async-lint-baseline\.json$/m);
+  assert.equal(asyncLintBaseline.schema, "easysubway.mobile_async_lint_baseline.v1");
+  assert.deepEqual(asyncLintBaseline.enabledNow, ["unawaited_futures"]);
+  assert.equal(asyncLintBaseline.staged.discarded_futures.status, "staged_existing_findings");
+  assert.ok(asyncLintBaseline.staged.discarded_futures.findingCount > 0);
+  assert.deepEqual(asyncLintBaseline.staged.discarded_futures.target, [
+    "convert callback-only Future calls to unawaited() when fire-and-forget is intentional",
+    "await Future-returning test matchers and setup operations where order matters",
+  ]);
+});
+
 test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다", () => {
   const pubspec = read("apps/mobile/pubspec.yaml");
   const analysisOptions = read("apps/mobile/analysis_options.yaml");

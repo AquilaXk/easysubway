@@ -1,0 +1,16 @@
+{
+  "schema": "easysubway.mobile_async_lint_baseline.v1",
+  "enabledNow": [
+    "unawaited_futures"
+  ],
+  "staged": {
+    "discarded_futures": {
+      "status": "staged_existing_findings",
+      "findingCount": 82,
+      "target": [
+        "convert callback-only Future calls to unawaited() when fire-and-forget is intentional",
+        "await Future-returning test matchers and setup operations where order matters"
+      ]
+    }
+  }
+}
