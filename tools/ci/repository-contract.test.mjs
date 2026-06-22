@@ -1688,19 +1688,25 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
   assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
 });
 
-test("KRIC 열차운영기관정보 후보는 샘플 근거만 기록하고 라이선스 partial을 유지한다", () => {
+test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
   const candidates = readJson("tools/datapack/source-candidates.json");
   const candidate = candidates.candidates.find(({ id }) => id === "kric-train-operation-organ");
 
   assert.ok(candidate);
-  assert.equal(candidate.licenseEvidenceStatus, "partial");
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
-  assert.equal(candidate.admissionStatus, "needs_sample_and_license_evidence");
-  assert.equal(candidate.evidence.listPageUrl, candidate.detailUrl);
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(
+    candidate.detailUrl,
+    "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
+  );
+  assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
-  assert.deepEqual(candidate.evidence.missingEvidence.sort(), ["licenseDetail", "outputFields"]);
+  assert.deepEqual(candidate.evidence.outputFields.sort(), ["railOprIsttCd", "railOprIsttNm"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
 });
 
 test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
