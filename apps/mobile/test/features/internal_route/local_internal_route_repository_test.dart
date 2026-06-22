@@ -206,6 +206,7 @@ void main() {
       )
       VALUES
         ('quality-edge-field-verified', 'internal_route_edge', 'edge-field-verified', 'FIELD_VERIFIED', 1781827200),
+        ('quality-edge-field-verified-old', 'internal_route_edge', 'edge-field-verified', 'FIELD_STALE', 1748736000),
         ('quality-edge-field-unknown', 'internal_route_edge', 'edge-field-unknown', 'FIELD_UNKNOWN', NULL),
         ('quality-edge-field-stale', 'internal_route_edge', 'edge-field-stale', 'FIELD_STALE', 1748736000)
       ''');

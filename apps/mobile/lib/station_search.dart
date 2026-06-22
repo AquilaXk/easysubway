@@ -1372,7 +1372,8 @@ String _dataConfidenceLabel(String dataConfidence) {
 }
 
 String _fieldValidationLabel(String fieldValidationStatus) {
-  return switch (fieldValidationStatus) {
+  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
+  return switch (normalizedStatus) {
     'VERIFIED' => '현장 검증됨',
     'STALE' => '현장 재확인 필요',
     'UNKNOWN' => '현장 검증 전',

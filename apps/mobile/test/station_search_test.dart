@@ -1292,6 +1292,7 @@ void main() {
       status: 'ADMIN_VERIFIED',
       dataConfidence: 'HIGH',
       lastUpdatedAt: '2026-06-13',
+      fieldValidationStatus: ' verified ',
     );
 
     expect(ramp.typeLabel, '경사로');
@@ -1303,7 +1304,9 @@ void main() {
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
+    expect(customerCenter.fieldValidationLabel, '현장 검증됨');
     expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
+    expect(customerCenter.semanticLabel, contains('현장 검증됨'));
   });
 }
 

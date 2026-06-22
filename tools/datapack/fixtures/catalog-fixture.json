@@ -43,7 +43,8 @@
         "station_lines",
         "network_edges",
         "station_exits",
-        "facilities"
+        "facilities",
+        "data_quality_records"
       ],
       "minimumTableRows": {
         "catalog_metadata": 2,
@@ -53,7 +54,8 @@
         "station_lines": 9,
         "network_edges": 15,
         "station_exits": 1,
-        "facilities": 3
+        "facilities": 3,
+        "data_quality_records": 5
       },
       "metadata": {
         "activePack": "capital"

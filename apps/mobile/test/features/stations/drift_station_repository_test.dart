@@ -131,6 +131,36 @@ void main() {
     expect(toilet.semanticLabel, contains('현장 재확인 필요'));
   });
 
+  test('상록수역 시설은 최신 현장 검증 record를 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO data_quality_records (
+        id,
+        target_type,
+        target_id,
+        quality_level,
+        checked_at
+      )
+      VALUES
+        ('quality-facility-elevator-stale-newer', 'facility', 'facility-sangnoksu-elevator-1', 'FIELD_STALE', 1781913600),
+        ('quality-facility-elevator-unknown-undated', 'facility', 'facility-sangnoksu-elevator-1', 'FIELD_UNKNOWN', NULL)
+      ''');
+    final repository = DriftStationRepository(database: database);
+
+    final facilities = await repository.listStationFacilities(
+      'station-sangnoksu',
+    );
+
+    final elevator = facilities.singleWhere(
+      (facility) => facility.id == 'facility-sangnoksu-elevator-1',
+    );
+    expect(elevator.dataConfidence, 'LOW');
+    expect(elevator.lastUpdatedAt, '2026-06-20');
+    expect(elevator.semanticLabel, contains('현장 재확인 필요'));
+  });
+
   test('존재하지 않는 역 상세 조회는 역 검색 예외를 던진다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

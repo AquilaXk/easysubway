@@ -182,6 +182,31 @@ void main() {
           .toSet(),
       {'FIELD_STALE', 'FIELD_UNKNOWN', 'FIELD_VERIFIED'},
     );
+    final expectedFieldValidationRecords = {
+      'exit-sangnoksu-1': ('station_exit', 'FIELD_VERIFIED'),
+      'facility-sangnoksu-elevator-1': ('facility', 'FIELD_VERIFIED'),
+      'facility-sangnoksu-escalator-1': ('facility', 'FIELD_UNKNOWN'),
+      'facility-sangnoksu-accessible-toilet-1': ('facility', 'FIELD_STALE'),
+      'edge-sangnoksu-concourse-exit-1': (
+        'internal_route_edge',
+        'FIELD_VERIFIED',
+      ),
+    };
+    expect(
+      fieldValidationRecords,
+      hasLength(expectedFieldValidationRecords.length),
+    );
+    for (final row in fieldValidationRecords) {
+      final targetId = row.read<String>('target_id');
+      final expectedRecord = expectedFieldValidationRecords[targetId];
+      expect(expectedRecord == null, isFalse, reason: targetId);
+      expect(row.read<String>('target_type'), expectedRecord!.$1);
+      final qualityLevel = row.read<String>('quality_level');
+      expect(qualityLevel, expectedRecord.$2);
+      if (qualityLevel == 'FIELD_VERIFIED') {
+        expect(row.read<int?>('checked_at') == null, isFalse, reason: targetId);
+      }
+    }
     expect(networkEdges, hasLength(2));
     expect(networkEdges.map((row) => row.read<String>('edge_type')).toSet(), {
       'RIDE',

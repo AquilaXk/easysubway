@@ -284,14 +284,25 @@ class _InternalRouteSnapshot {
              $widthLevelSql AS width_level,
              $reliabilityScoreSql AS reliability_score,
              $accessibilityStatusSql AS accessibility_status,
-             dqr.quality_level AS field_quality_level,
-             CAST(dqr.checked_at AS INTEGER) AS field_checked_at_value,
+             (
+               SELECT q.quality_level
+               FROM data_quality_records q
+               WHERE UPPER(q.target_type) = 'INTERNAL_ROUTE_EDGE'
+                 AND q.target_id = e.id
+               ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+               LIMIT 1
+             ) AS field_quality_level,
+             (
+               SELECT q.checked_at
+               FROM data_quality_records q
+               WHERE UPPER(q.target_type) = 'INTERNAL_ROUTE_EDGE'
+                 AND q.target_id = e.id
+               ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+               LIMIT 1
+             ) AS field_checked_at_value,
              e.instruction
       FROM internal_route_edges e
       JOIN internal_route_nodes n ON n.id = e.from_node_id
-      LEFT JOIN data_quality_records dqr
-        ON dqr.target_type = 'internal_route_edge'
-       AND dqr.target_id = e.id
       WHERE n.station_id = ?
       ''',
           variables: [Variable.withString(stationId.trim())],
