@@ -137,6 +137,8 @@ class DriftStationRepository
             e.exit_number,
             e.description,
             s.data_source_type,
+            dqr.quality_level AS field_quality_level,
+            CAST(dqr.checked_at AS INTEGER) AS field_checked_at_value,
             EXISTS(
               SELECT 1
               FROM facilities f
@@ -145,6 +147,9 @@ class DriftStationRepository
             ) AS has_elevator_connection
           FROM station_exits e
           JOIN stations s ON s.id = e.station_id
+          LEFT JOIN data_quality_records dqr
+            ON dqr.target_type = 'station_exit'
+           AND dqr.target_id = e.id
           WHERE e.station_id = ?
           ORDER BY CAST(e.exit_number AS INTEGER), e.exit_number
           ''',
@@ -162,8 +167,14 @@ class DriftStationRepository
             hasElevatorConnection:
                 row.read<int>('has_elevator_connection') == 1,
             hasStairOnlyPath: false,
-            dataConfidence: 'MEDIUM',
+            dataConfidence: _fieldValidationConfidence(
+              row.read<String?>('field_quality_level'),
+            ),
             dataSourceType: row.read<String>('data_source_type'),
+            fieldValidationStatus: _fieldValidationStatus(
+              row.read<String?>('field_quality_level'),
+              row.read<int?>('field_checked_at_value'),
+            ),
           ),
         )
         .toList(growable: false);
@@ -187,9 +198,14 @@ class DriftStationRepository
             f.floor_to,
             f.description,
             s.data_source_type,
-            CAST(s.last_verified_at AS INTEGER) AS last_verified_at_value
+            CAST(s.last_verified_at AS INTEGER) AS last_verified_at_value,
+            dqr.quality_level AS field_quality_level,
+            CAST(dqr.checked_at AS INTEGER) AS field_checked_at_value
           FROM facilities f
           JOIN stations s ON s.id = f.station_id
+          LEFT JOIN data_quality_records dqr
+            ON dqr.target_type = 'facility'
+           AND dqr.target_id = f.id
           WHERE f.station_id = ?
           ORDER BY f.type, f.name
           ''',
@@ -209,10 +225,17 @@ class DriftStationRepository
             floorTo: row.read<String?>('floor_to') ?? '',
             description: row.read<String?>('description') ?? '',
             status: row.read<String?>('status') ?? '',
-            dataConfidence: 'MEDIUM',
+            dataConfidence: _fieldValidationConfidence(
+              row.read<String?>('field_quality_level'),
+            ),
             dataSourceType: row.read<String?>('data_source_type') ?? '',
             lastUpdatedAt: _dateLabelFromEpoch(
-              row.read<int?>('last_verified_at_value'),
+              row.read<int?>('field_checked_at_value') ??
+                  row.read<int?>('last_verified_at_value'),
+            ),
+            fieldValidationStatus: _fieldValidationStatus(
+              row.read<String?>('field_quality_level'),
+              row.read<int?>('field_checked_at_value'),
             ),
           ),
         )
@@ -430,6 +453,25 @@ String _dateLabel(DateTime value) {
   return '${utc.year.toString().padLeft(4, '0')}-'
       '${utc.month.toString().padLeft(2, '0')}-'
       '${utc.day.toString().padLeft(2, '0')}';
+}
+
+String _fieldValidationStatus(String? qualityLevel, int? checkedAt) {
+  final normalizedLevel = qualityLevel?.trim().toUpperCase();
+  return switch (normalizedLevel) {
+    'FIELD_VERIFIED' when checkedAt != null => 'VERIFIED',
+    'FIELD_STALE' => 'STALE',
+    'FIELD_UNKNOWN' => 'UNKNOWN',
+    _ => 'UNKNOWN',
+  };
+}
+
+String _fieldValidationConfidence(String? qualityLevel) {
+  final normalizedLevel = qualityLevel?.trim().toUpperCase();
+  return switch (normalizedLevel) {
+    'FIELD_VERIFIED' => 'HIGH',
+    'FIELD_STALE' || 'FIELD_UNKNOWN' => 'LOW',
+    _ => 'LOW',
+  };
 }
 
 int _distanceMeters({

@@ -30,6 +30,7 @@ class InternalRouteEdge {
     this.reliabilityScore = 100,
     this.isFacilityAvailable = true,
     this.accessibilityStatus = 'AVAILABLE',
+    this.fieldValidationStatus = 'UNKNOWN',
   });
 
   final String id;
@@ -47,6 +48,7 @@ class InternalRouteEdge {
   final int reliabilityScore;
   final bool isFacilityAvailable;
   final String accessibilityStatus;
+  final String fieldValidationStatus;
 }
 
 class InternalRouteGraph {

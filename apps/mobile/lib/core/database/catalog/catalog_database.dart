@@ -221,6 +221,56 @@ class CatalogDatabase extends _$CatalogDatabase {
             floorTo: const Value('1F'),
             description: const Value('대합실과 1번 출구 지상을 연결'),
           ),
+          FacilitiesCompanion.insert(
+            id: 'facility-sangnoksu-escalator-1',
+            stationId: 'station-sangnoksu',
+            exitId: const Value('exit-sangnoksu-1'),
+            type: 'ESCALATOR',
+            name: '1번 출구 에스컬레이터',
+            floorFrom: const Value('B1'),
+            floorTo: const Value('1F'),
+            description: const Value('현장 검증 전 이동 보조 시설'),
+          ),
+          FacilitiesCompanion.insert(
+            id: 'facility-sangnoksu-accessible-toilet-1',
+            stationId: 'station-sangnoksu',
+            exitId: const Value(null),
+            type: 'ACCESSIBLE_TOILET',
+            name: '대합실 장애인 화장실',
+            floorFrom: const Value('B1'),
+            floorTo: const Value('B1'),
+            description: const Value('대합실 내부'),
+          ),
+        ]);
+        batch.insertAllOnConflictUpdate(dataQualityRecords, [
+          DataQualityRecordsCompanion.insert(
+            id: 'quality-exit-sangnoksu-1-field',
+            targetType: 'station_exit',
+            targetId: 'exit-sangnoksu-1',
+            qualityLevel: 'FIELD_VERIFIED',
+            checkedAt: Value(DateTime.utc(2026, 6, 19)),
+          ),
+          DataQualityRecordsCompanion.insert(
+            id: 'quality-facility-sangnoksu-elevator-1-field',
+            targetType: 'facility',
+            targetId: 'facility-sangnoksu-elevator-1',
+            qualityLevel: 'FIELD_VERIFIED',
+            checkedAt: Value(DateTime.utc(2026, 6, 19)),
+          ),
+          DataQualityRecordsCompanion.insert(
+            id: 'quality-facility-sangnoksu-escalator-1-field',
+            targetType: 'facility',
+            targetId: 'facility-sangnoksu-escalator-1',
+            qualityLevel: 'FIELD_UNKNOWN',
+            checkedAt: const Value(null),
+          ),
+          DataQualityRecordsCompanion.insert(
+            id: 'quality-facility-sangnoksu-accessible-toilet-1-field',
+            targetType: 'facility',
+            targetId: 'facility-sangnoksu-accessible-toilet-1',
+            qualityLevel: 'FIELD_STALE',
+            checkedAt: Value(DateTime.utc(2025, 6, 1)),
+          ),
         ]);
       });
     });

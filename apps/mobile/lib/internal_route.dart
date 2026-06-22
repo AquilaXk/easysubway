@@ -358,6 +358,7 @@ class InternalRouteStep {
     required this.widthLevel,
     required this.reliabilityScore,
     required this.guidance,
+    this.fieldValidationStatus = 'UNKNOWN',
   });
 
   factory InternalRouteStep.fromJson(Map<String, Object?> json) {
@@ -378,6 +379,10 @@ class InternalRouteStep {
       widthLevel: _requiredInternalRouteInt(json, 'widthLevel'),
       reliabilityScore: _requiredInternalRouteInt(json, 'reliabilityScore'),
       guidance: _requiredInternalRouteString(json, 'guidance'),
+      fieldValidationStatus:
+          _optionalInternalRouteString(json, 'fieldValidationStatus').isEmpty
+          ? 'UNKNOWN'
+          : _optionalInternalRouteString(json, 'fieldValidationStatus'),
     );
   }
 
@@ -397,6 +402,7 @@ class InternalRouteStep {
   final int widthLevel;
   final int reliabilityScore;
   final String guidance;
+  final String fieldValidationStatus;
 
   String get title => '$fromNodeName에서 $toNodeName까지';
 
@@ -404,6 +410,7 @@ class InternalRouteStep {
     final labels = <String>[
       _internalRouteSecondsLabel(estimatedSeconds),
       _internalRouteDistanceLabel(distanceMeters),
+      _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터 필요',
       if (requiresEscalator) '에스컬레이터 확인',
@@ -618,6 +625,15 @@ String _internalRouteDistanceLabel(int distanceMeters) {
     return '${kilometers.toStringAsFixed(0)}km';
   }
   return '${kilometers.toStringAsFixed(1)}km';
+}
+
+String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
+  return switch (fieldValidationStatus) {
+    'VERIFIED' => '현장 검증됨',
+    'STALE' => '현장 재확인 필요',
+    'UNKNOWN' => '현장 검증 전',
+    _ => '현장 검증 전',
+  };
 }
 
 String _internalRouteSecondsLabel(int seconds) {

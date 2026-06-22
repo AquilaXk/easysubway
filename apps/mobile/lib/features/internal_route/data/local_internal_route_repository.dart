@@ -95,6 +95,7 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
           widthLevel: edge.widthLevel,
           reliabilityScore: edge.reliabilityScore,
           guidance: edge.guidance,
+          fieldValidationStatus: edge.fieldValidationStatus,
         ),
       );
     }
@@ -283,9 +284,14 @@ class _InternalRouteSnapshot {
              $widthLevelSql AS width_level,
              $reliabilityScoreSql AS reliability_score,
              $accessibilityStatusSql AS accessibility_status,
+             dqr.quality_level AS field_quality_level,
+             CAST(dqr.checked_at AS INTEGER) AS field_checked_at_value,
              e.instruction
       FROM internal_route_edges e
       JOIN internal_route_nodes n ON n.id = e.from_node_id
+      LEFT JOIN data_quality_records dqr
+        ON dqr.target_type = 'internal_route_edge'
+       AND dqr.target_id = e.id
       WHERE n.station_id = ?
       ''',
           variables: [Variable.withString(stationId.trim())],
@@ -308,6 +314,10 @@ class _InternalRouteSnapshot {
           widthLevel: row.read<int>('width_level'),
           reliabilityScore: row.read<int>('reliability_score'),
           accessibilityStatus: row.read<String>('accessibility_status'),
+          fieldValidationStatus: _fieldValidationStatus(
+            row.read<String?>('field_quality_level'),
+            row.read<int?>('field_checked_at_value'),
+          ),
           guidance: row.read<String>('instruction'),
         ),
     };
@@ -350,4 +360,14 @@ String _selectInternalRouteEdgeColumn(
   return columnNames.contains(columnName)
       ? 'e.$columnName'
       : fallbackExpression;
+}
+
+String _fieldValidationStatus(String? qualityLevel, int? checkedAt) {
+  final normalizedLevel = qualityLevel?.trim().toUpperCase();
+  return switch (normalizedLevel) {
+    'FIELD_VERIFIED' when checkedAt != null => 'VERIFIED',
+    'FIELD_STALE' => 'STALE',
+    'FIELD_UNKNOWN' => 'UNKNOWN',
+    _ => 'UNKNOWN',
+  };
 }

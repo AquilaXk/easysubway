@@ -95,8 +95,40 @@ void main() {
     expect(detail.lastVerifiedAt, '2026-06-19');
     expect(exits.single.name, '1번 출구');
     expect(exits.single.hasElevatorConnection, isTrue);
-    expect(facilities.single.type, 'ELEVATOR');
-    expect(facilities.single.lastUpdatedAt, '2026-06-19');
+    final elevator = facilities.singleWhere(
+      (facility) => facility.id == 'facility-sangnoksu-elevator-1',
+    );
+    expect(elevator.type, 'ELEVATOR');
+    expect(elevator.lastUpdatedAt, '2026-06-19');
+  });
+
+  test('상록수역 시설은 검증됨, 알 수 없음, 오래됨 현장 상태를 구분한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = DriftStationRepository(database: database);
+
+    final facilities = await repository.listStationFacilities(
+      'station-sangnoksu',
+    );
+
+    final elevator = facilities.singleWhere(
+      (facility) => facility.id == 'facility-sangnoksu-elevator-1',
+    );
+    final escalator = facilities.singleWhere(
+      (facility) => facility.id == 'facility-sangnoksu-escalator-1',
+    );
+    final toilet = facilities.singleWhere(
+      (facility) => facility.id == 'facility-sangnoksu-accessible-toilet-1',
+    );
+
+    expect(elevator.dataConfidence, 'HIGH');
+    expect(elevator.semanticLabel, contains('현장 검증됨'));
+    expect(elevator.lastUpdatedAt, '2026-06-19');
+    expect(escalator.dataConfidence, 'LOW');
+    expect(escalator.semanticLabel, contains('현장 검증 전'));
+    expect(toilet.dataConfidence, 'LOW');
+    expect(toilet.semanticLabel, contains('현장 재확인 필요'));
   });
 
   test('존재하지 않는 역 상세 조회는 역 검색 예외를 던진다', () async {
