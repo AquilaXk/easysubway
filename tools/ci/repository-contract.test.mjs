@@ -1483,6 +1483,7 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
     assert.match(source, /productionMinimumTableRowNames = \["stations", "station_lines", "network_edges", "facilities"\]/);
     assert.match(source, /production minimumTableRows must define positive stations, station_lines, network_edges, and facilities/);
     assert.match(source, /validateSourceInventoryCoverageScope/);
+    assert.match(source, /production sourceInventory\.coverageScope/);
     assert.match(source, /sourceInventory\.coverageScope/);
   }
 });

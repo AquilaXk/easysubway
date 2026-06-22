@@ -622,8 +622,11 @@ function validateSourceInventory(sourceInventory, artifactKind) {
     for (const field of source.fields) {
       requiredString(field, "sourceInventory.fields");
     }
-    if (source.coverageScope !== undefined) {
-      validateSourceInventoryCoverageScope(source.coverageScope, "sourceInventory.coverageScope");
+    if (artifactKind === "production" || source.coverageScope !== undefined) {
+      validateSourceInventoryCoverageScope(
+        source.coverageScope,
+        artifactKind === "production" ? "production sourceInventory.coverageScope" : "sourceInventory.coverageScope",
+      );
     }
     if (artifactKind === "production") {
       if (licenseStatus !== "redistributable" || source.redistributionAllowed !== true) {
