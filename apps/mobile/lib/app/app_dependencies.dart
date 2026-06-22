@@ -1,6 +1,7 @@
 import '../auth_headers.dart';
 import '../core/database/catalog/catalog_database.dart';
 import '../core/database/user/user_database.dart';
+import '../core/network/api_client.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
 import '../features/favorites/data/drift_favorite_repositories.dart';
@@ -219,10 +220,14 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
       : UserDataDeletionLocalRepository(userDatabase: userDatabase);
   final remoteRepository = authProvider == null
       ? null
-      : UserDataDeletionApiRepository(
-          baseUri: baseUri(),
-          authProvider: authProvider,
-        );
+      : (() {
+          final resolvedBaseUri = baseUri();
+          return UserDataDeletionApiRepository(
+            baseUri: resolvedBaseUri,
+            apiClient: ApiClient(baseUri: resolvedBaseUri),
+            authProvider: authProvider,
+          );
+        })();
   if (remoteRepository != null && localRepository != null) {
     return UserDataDeletionCompositeRepository(
       remoteRepository: remoteRepository,
