@@ -1786,17 +1786,6 @@ void main() {
           95
         ),
         (
-          'transfer-a-local-alt-available',
-          'station-a:line-test:LOCAL',
-          'station-a:line-alt',
-          140,
-          'TRANSFER',
-          'LOCAL',
-          'STEP_FREE',
-          'AVAILABLE',
-          95
-        ),
-        (
           'edge-a-c-line-alt',
           'station-a:line-alt',
           'station-c:line-alt',
@@ -1981,17 +1970,6 @@ void main() {
           'transfer-a-test-alt-available',
           'station-a:line-test',
           'station-a:line-alt',
-          140,
-          'TRANSFER',
-          '',
-          'STEP_FREE',
-          'AVAILABLE',
-          95
-        ),
-        (
-          'transfer-a-alt-test-available',
-          'station-a:line-alt',
-          'station-a:line-test',
           140,
           'TRANSFER',
           '',
