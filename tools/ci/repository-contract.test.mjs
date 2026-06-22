@@ -4001,6 +4001,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
   const notificationSettingsTest = read("apps/mobile/test/notification_settings_test.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const supportAccessInfoTest = read("apps/mobile/test/support_access_info_test.dart");
   const apiClient = read("apps/mobile/lib/core/network/api_client.dart");
   const apiError = read("apps/mobile/lib/core/network/api_error.dart");
   const apiClientTest = read("apps/mobile/test/core/network/api_client_test.dart");
@@ -4238,12 +4239,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
   assert.match(read("README.md"), /EASYSUBWAY_SECURITY_EMAIL/);
   assert.match(read("README.md"), /릴리즈 빌드는 아래 값이 비어 있으면 시작 단계에서 실패/);
-  assert.match(widgetTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
-  assert.match(widgetTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
-  assert.match(widgetTest, /Release privacy policy URL must use HTTPS\./);
-  assert.match(widgetTest, /Release support email must be a valid email address\./);
-  assert.match(widgetTest, /Release data deletion email must be configured\./);
-  assert.match(widgetTest, /Release security email must be configured\./);
+  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
+  assert.match(supportAccessInfoTest, /Release privacy policy URL must use HTTPS\./);
+  assert.match(supportAccessInfoTest, /Release support email must be a valid email address\./);
+  assert.match(supportAccessInfoTest, /Release data deletion email must be configured\./);
+  assert.match(supportAccessInfoTest, /Release security email must be configured\./);
   assert.match(routeSearch, /routeSearchFailureNextAction/);
   assert.match(routeSearch, /역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요\./);
   assert.match(routeSearch, /다음 행동 \$_routeSearchFailureNextAction/);
