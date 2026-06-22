@@ -4255,6 +4255,27 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /네트워크 상태를 확인한 뒤 다시 불러와 주세요\./);
   assert.match(widgetTest, /즐겨찾기 경로 저장 실패는 다음 행동을 쉬운 문구로 안내한다/);
   assert.match(widgetTest, /즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다/);
+  assert.match(routeSearch, /import 'core\/network\/api_client\.dart';/);
+  assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*_apiClient\.postJson\(/);
+  assert.doesNotMatch(
+    routeSearch,
+    /class RouteSearchApiRepository[\s\S]*?_httpClient[\s\S]*?class RouteFeedbackApiRepository/,
+  );
+  assert.match(routeSearch, /class RouteFeedbackApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(routeSearch, /class RouteFeedbackApiRepository[\s\S]*_apiClient\.postJson\(/);
+  assert.doesNotMatch(
+    routeSearch,
+    /class RouteFeedbackApiRepository[\s\S]*?_httpClient[\s\S]*?class RouteFeedbackException/,
+  );
+  assert.match(routeSearch, /class FavoriteRouteApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(routeSearch, /class FavoriteRouteApiRepository[\s\S]*_apiClient\.getJson\(/);
+  assert.match(routeSearch, /class FavoriteRouteApiRepository[\s\S]*_apiClient\.postJson\(/);
+  assert.match(routeSearch, /class FavoriteRouteApiRepository[\s\S]*_apiClient\.deleteJson\(/);
+  assert.doesNotMatch(
+    routeSearch,
+    /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
+  );
   assert.match(main, /개인정보 사용 안내/);
   assert.match(main, /안전과 데이터 안내/);
   assert.match(main, /현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다/);
