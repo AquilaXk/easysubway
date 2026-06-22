@@ -72,14 +72,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     ApiClient? apiClient,
     HttpClient? httpClient,
   }) : _apiClient =
-           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient),
-       _httpClient = httpClient ?? HttpClient();
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final AuthorizationHeaderProvider? authProvider;
   final FacilityReportReceiptStore? receiptStore;
   final ApiClient _apiClient;
-  final HttpClient _httpClient;
 
   @override
   Future<FacilityReportResult> createReport(
@@ -201,20 +199,13 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     if (uploadIntent.uploadMethod.trim().toUpperCase() != 'PUT') {
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
-    final uploadRequest = await _httpClient
-        .putUrl(uploadIntent.uploadUri(baseUri))
-        .timeout(_facilityReportTimeout);
-    for (final header in uploadIntent.uploadHeaders.entries) {
-      uploadRequest.headers.set(header.key, header.value);
-    }
-    uploadRequest.headers.contentType = ContentType.parse(contentType);
-    uploadRequest.contentLength = photoBytes.length;
-    uploadRequest.add(photoBytes);
-    final uploadResponse = await uploadRequest.close().timeout(
-      _facilityReportTimeout,
+    final uploadResponse = await _apiClient.putBytes(
+      uploadIntent.uploadUri(baseUri),
+      body: photoBytes,
+      contentType: ContentType.parse(contentType),
+      headers: uploadIntent.uploadHeaders,
     );
-    await uploadResponse.drain<void>();
-    if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
+    if (!uploadResponse.isSuccess) {
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
   }

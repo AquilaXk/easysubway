@@ -46,6 +46,46 @@ class ApiClient {
     );
   }
 
+  Future<ApiResponse> putBytes(
+    Uri uri, {
+    required List<int> body,
+    required ContentType contentType,
+    Map<String, String> headers = const {},
+  }) async {
+    try {
+      final request = await _httpClient.putUrl(uri).timeout(timeout);
+      headers.forEach(request.headers.set);
+      request.headers.contentType = contentType;
+      request.contentLength = body.length;
+      request.add(body);
+
+      final response = await request.close().timeout(timeout);
+      await response.drain<void>().timeout(timeout);
+      return ApiResponse(statusCode: response.statusCode, jsonBody: null);
+    } on TimeoutException catch (error, stackTrace) {
+      throw ApiException(
+        'API 요청 시간이 초과되었습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
+    } on SocketException catch (error, stackTrace) {
+      throw ApiException(
+        'API 서버에 연결하지 못했습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
+    } catch (error, stackTrace) {
+      throw ApiException(
+        'API 요청을 처리하지 못했습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
+    }
+  }
+
   Future<ApiResponse> _requestJson(
     HttpMethod method,
     String path, {
@@ -119,6 +159,7 @@ class ApiResponse {
 
   bool get isUnauthorized => statusCode == HttpStatus.unauthorized;
   bool get isOk => statusCode == HttpStatus.ok;
+  bool get isSuccess => _isSuccessStatus(statusCode);
 }
 
 enum HttpMethod { get, delete, post }
