@@ -998,6 +998,11 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   assert.equal(gate.releaseGate, "server-minimized-device-qa");
   assert.equal(gate.localOnlyEvidence, true);
   assert.match(gate.evidenceRoot, /^\.codex\/evidence\/server-minimization\/pr10$/);
+  assert.doesNotMatch(
+    JSON.stringify(gate),
+    /com\.easysubway\.mobile/,
+    "server minimized QA gate must not reference the retired Android package",
+  );
   assert.equal(gate.platformCompletionRule.androidRequired, true);
   assert.equal(gate.platformCompletionRule.iosRequired, true);
   assert.equal(gate.platformCompletionRule.singlePlatformEvidenceIsInsufficient, true);
@@ -1055,6 +1060,13 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   assert.deepEqual(idsByPlatform.get("ios"), requiredIosChecks.toSorted());
 
   for (const check of gate.checks) {
+    if (check.platform === "android" && check.command?.includes("com.easysubway")) {
+      assert.match(
+        check.command,
+        /com\.easysubway\.app/,
+        `${check.id} Android adb command must target the production applicationId`,
+      );
+    }
     assert.match(check.platform, /^(android|ios)$/);
     assert.ok(Array.isArray(check.finalAcceptanceIds), `${check.id} must map final acceptance ids`);
     assert.ok(check.finalAcceptanceIds.length > 0, `${check.id} must map at least one final acceptance id`);
