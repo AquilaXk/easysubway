@@ -405,6 +405,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_REGION=us-east-1$/m);
+  assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=$/m);
   assert.match(envExample, /^EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks$/m);
   assert.match(envExample, /^EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM=$/m);
   assert.match(envExample, /^EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM=$/m);
@@ -419,7 +420,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.doesNotMatch(envExample, /prod|production/i);
   assert.doesNotMatch(
     envExample,
-    /^EASYSUBWAY_(REPORT_RECEIPT_PEPPER|OBJECT_STORAGE_SECRET_KEY|DATAPACK_SIGNING_PRIVATE_KEY_PEM|DATAPACK_SIGNING_PUBLIC_KEY_PEM|DATAPACK_SIGNING_PUBLIC_KEY_N|DATAPACK_SIGNING_PUBLIC_KEY_E)=.+$/m,
+    /^EASYSUBWAY_(REPORT_RECEIPT_PEPPER|OBJECT_STORAGE_SECRET_KEY|OBJECT_STORAGE_PREAUTH_BASE_URL|DATAPACK_SIGNING_PRIVATE_KEY_PEM|DATAPACK_SIGNING_PUBLIC_KEY_PEM|DATAPACK_SIGNING_PUBLIC_KEY_N|DATAPACK_SIGNING_PUBLIC_KEY_E)=.+$/m,
   );
 });
 
@@ -531,6 +532,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
     "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
+    "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=",
     "EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks",
     "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM=private-key-pem",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM=public-key-pem",
