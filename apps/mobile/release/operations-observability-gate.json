@@ -131,10 +131,10 @@
       "id": "ios_dsym_retention",
       "area": "release",
       "ownerKo": "iOS 릴리즈 담당자",
-      "thresholdKo": "dSYM zip이 릴리즈 artifact에 90일 보관되지 않으면 배포 차단",
-      "firstResponseKo": "Release Artifacts workflow의 iOS artifact와 release-metadata를 확인한다.",
-      "evidence": ["ios-dsym-artifact-retention"],
-      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "README.md"]
+      "thresholdKo": "Android-first 배포에서는 후순위 범위로 둔다. iOS 출시 준비 PR에서 dSYM zip 90일 보관 workflow를 복구하지 않으면 iOS 배포 차단",
+      "firstResponseKo": "Android-first release에서는 deferred 상태를 확인하고, iOS release PR에서 dSYM artifact producer와 release-metadata를 함께 복구한다.",
+      "evidence": ["ios-dsym-artifact-retention-deferred"],
+      "linkedArtifacts": ["apps/mobile/release/signed-release-artifact-gate.json", "README.md"]
     }
   ]
 }

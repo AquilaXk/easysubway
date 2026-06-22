@@ -33,7 +33,8 @@
     "ios": {
       "format": "Runner.app.zip",
       "ciArtifactStoreReady": false,
-      "ciSigningKeyType": "no-codesign",
+      "ciArtifactProducer": "deferred_until_ios_release_phase",
+      "ciSigningKeyType": "not-produced",
       "symbolArtifact": "dSYM",
       "symbolRetentionDays": 90,
       "storeReadyRequires": [
