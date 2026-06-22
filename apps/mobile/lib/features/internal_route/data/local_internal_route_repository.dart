@@ -95,6 +95,7 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
           widthLevel: edge.widthLevel,
           reliabilityScore: edge.reliabilityScore,
           guidance: edge.guidance,
+          fieldValidationStatus: edge.fieldValidationStatus,
         ),
       );
     }
@@ -283,6 +284,22 @@ class _InternalRouteSnapshot {
              $widthLevelSql AS width_level,
              $reliabilityScoreSql AS reliability_score,
              $accessibilityStatusSql AS accessibility_status,
+             (
+               SELECT q.quality_level
+               FROM data_quality_records q
+               WHERE UPPER(q.target_type) = 'INTERNAL_ROUTE_EDGE'
+                 AND q.target_id = e.id
+               ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+               LIMIT 1
+             ) AS field_quality_level,
+             (
+               SELECT q.checked_at
+               FROM data_quality_records q
+               WHERE UPPER(q.target_type) = 'INTERNAL_ROUTE_EDGE'
+                 AND q.target_id = e.id
+               ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+               LIMIT 1
+             ) AS field_checked_at_value,
              e.instruction
       FROM internal_route_edges e
       JOIN internal_route_nodes n ON n.id = e.from_node_id
@@ -308,6 +325,10 @@ class _InternalRouteSnapshot {
           widthLevel: row.read<int>('width_level'),
           reliabilityScore: row.read<int>('reliability_score'),
           accessibilityStatus: row.read<String>('accessibility_status'),
+          fieldValidationStatus: _fieldValidationStatus(
+            row.read<String?>('field_quality_level'),
+            row.read<int?>('field_checked_at_value'),
+          ),
           guidance: row.read<String>('instruction'),
         ),
     };
@@ -350,4 +371,14 @@ String _selectInternalRouteEdgeColumn(
   return columnNames.contains(columnName)
       ? 'e.$columnName'
       : fallbackExpression;
+}
+
+String _fieldValidationStatus(String? qualityLevel, int? checkedAt) {
+  final normalizedLevel = qualityLevel?.trim().toUpperCase();
+  return switch (normalizedLevel) {
+    'FIELD_VERIFIED' when checkedAt != null => 'VERIFIED',
+    'FIELD_STALE' => 'STALE',
+    'FIELD_UNKNOWN' => 'UNKNOWN',
+    _ => 'UNKNOWN',
+  };
 }

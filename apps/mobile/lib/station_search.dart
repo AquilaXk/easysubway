@@ -937,6 +937,7 @@ class StationExitInfo {
     required this.hasStairOnlyPath,
     required this.dataConfidence,
     this.dataSourceType = '',
+    this.fieldValidationStatus = 'UNKNOWN',
   });
 
   factory StationExitInfo.fromJson(Map<String, Object?> json) {
@@ -951,6 +952,11 @@ class StationExitInfo {
       hasStairOnlyPath: _requiredBool(json, 'hasStairOnlyPath'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
+      fieldValidationStatus: _stringOrDefault(
+        json,
+        'fieldValidationStatus',
+        'UNKNOWN',
+      ),
     );
   }
 
@@ -964,6 +970,7 @@ class StationExitInfo {
   final bool hasStairOnlyPath;
   final String dataConfidence;
   final String dataSourceType;
+  final String fieldValidationStatus;
 
   String get elevatorConnectionLabel {
     return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결 확인 필요';
@@ -977,8 +984,11 @@ class StationExitInfo {
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
+  String get fieldValidationLabel =>
+      _fieldValidationLabel(fieldValidationStatus);
+
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel, $confidenceLabel, $dataSourceLabel';
+    return '$name, $elevatorConnectionLabel, $stairPathLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel';
   }
 }
 
@@ -998,6 +1008,7 @@ class StationFacilityInfo {
     required this.dataConfidence,
     this.dataSourceType = '',
     required this.lastUpdatedAt,
+    this.fieldValidationStatus = 'UNKNOWN',
   });
 
   factory StationFacilityInfo.fromJson(Map<String, Object?> json) {
@@ -1016,6 +1027,11 @@ class StationFacilityInfo {
       dataConfidence: _requiredString(json, 'dataConfidence'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
       lastUpdatedAt: _requiredString(json, 'lastUpdatedAt'),
+      fieldValidationStatus: _stringOrDefault(
+        json,
+        'fieldValidationStatus',
+        'UNKNOWN',
+      ),
     );
   }
 
@@ -1033,6 +1049,7 @@ class StationFacilityInfo {
   final String dataConfidence;
   final String dataSourceType;
   final String lastUpdatedAt;
+  final String fieldValidationStatus;
 
   String get typeLabel {
     return switch (type) {
@@ -1118,6 +1135,9 @@ class StationFacilityInfo {
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
+  String get fieldValidationLabel =>
+      _fieldValidationLabel(fieldValidationStatus);
+
   String get locationLabel {
     if (description.trim().isNotEmpty) {
       return description;
@@ -1131,7 +1151,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel';
+    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel';
   }
 }
 
@@ -1274,6 +1294,18 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
   return '';
 }
 
+String _stringOrDefault(
+  Map<String, Object?> json,
+  String key,
+  String fallback,
+) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value;
+  }
+  return fallback;
+}
+
 bool _requiredBool(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is bool) {
@@ -1336,6 +1368,16 @@ String _dataConfidenceLabel(String dataConfidence) {
     'MEDIUM' => '정보 신뢰도 보통',
     'LOW' => '정보 확인 필요',
     _ => '정보 확인 필요',
+  };
+}
+
+String _fieldValidationLabel(String fieldValidationStatus) {
+  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
+  return switch (normalizedStatus) {
+    'VERIFIED' => '현장 검증됨',
+    'STALE' => '현장 재확인 필요',
+    'UNKNOWN' => '현장 검증 전',
+    _ => '현장 검증 전',
   };
 }
 

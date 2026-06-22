@@ -110,15 +110,32 @@ void main() {
           WHERE station_id = 'station-sangnoksu'
           ''').get();
     final facilities = await database.customSelect('''
-          SELECT type, name
+          SELECT id, type, name
           FROM facilities
           WHERE station_id = 'station-sangnoksu'
+          ORDER BY id
+          ''').get();
+    final fieldValidationRecords = await database.customSelect('''
+          SELECT target_type, target_id, quality_level, checked_at
+          FROM data_quality_records
+          WHERE target_id IN (
+            'exit-sangnoksu-1',
+            'facility-sangnoksu-elevator-1',
+            'facility-sangnoksu-escalator-1',
+            'facility-sangnoksu-accessible-toilet-1',
+            'edge-sangnoksu-concourse-exit-1'
+          )
+          ORDER BY target_id
           ''').get();
     final networkEdges = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
                  includes_stairs, accessibility_status, reliability_score,
                  facility_id, last_verified_at, distance_meters
           FROM network_edges
+          WHERE id IN (
+            'edge-sangnoksu-sadang-seoul-4',
+            'edge-sadang-sangnoksu-seoul-4'
+          )
           ORDER BY id
           ''').get();
     final internalRouteEdges = await database.customSelect('''
@@ -144,8 +161,52 @@ void main() {
       '상록수역',
     ]);
     expect(exits.single.read<String>('exit_number'), '1');
-    expect(facilities.single.read<String>('type'), 'ELEVATOR');
-    expect(facilities.single.read<String>('name'), '1번 출구 엘리베이터');
+    expect(facilities.map((row) => row.read<String>('type')).toSet(), {
+      'ACCESSIBLE_TOILET',
+      'ELEVATOR',
+      'ESCALATOR',
+    });
+    expect(
+      facilities.map((row) => row.read<String>('name')),
+      containsAll(['1번 출구 엘리베이터', '1번 출구 에스컬레이터', '대합실 장애인 화장실']),
+    );
+    expect(
+      fieldValidationRecords
+          .map((row) => row.read<String>('target_type'))
+          .toSet(),
+      {'facility', 'internal_route_edge', 'station_exit'},
+    );
+    expect(
+      fieldValidationRecords
+          .map((row) => row.read<String>('quality_level'))
+          .toSet(),
+      {'FIELD_STALE', 'FIELD_UNKNOWN', 'FIELD_VERIFIED'},
+    );
+    final expectedFieldValidationRecords = {
+      'exit-sangnoksu-1': ('station_exit', 'FIELD_VERIFIED'),
+      'facility-sangnoksu-elevator-1': ('facility', 'FIELD_VERIFIED'),
+      'facility-sangnoksu-escalator-1': ('facility', 'FIELD_UNKNOWN'),
+      'facility-sangnoksu-accessible-toilet-1': ('facility', 'FIELD_STALE'),
+      'edge-sangnoksu-concourse-exit-1': (
+        'internal_route_edge',
+        'FIELD_VERIFIED',
+      ),
+    };
+    expect(
+      fieldValidationRecords,
+      hasLength(expectedFieldValidationRecords.length),
+    );
+    for (final row in fieldValidationRecords) {
+      final targetId = row.read<String>('target_id');
+      final expectedRecord = expectedFieldValidationRecords[targetId];
+      expect(expectedRecord == null, isFalse, reason: targetId);
+      expect(row.read<String>('target_type'), expectedRecord!.$1);
+      final qualityLevel = row.read<String>('quality_level');
+      expect(qualityLevel, expectedRecord.$2);
+      if (qualityLevel == 'FIELD_VERIFIED') {
+        expect(row.read<int?>('checked_at') == null, isFalse, reason: targetId);
+      }
+    }
     expect(networkEdges, hasLength(2));
     expect(networkEdges.map((row) => row.read<String>('edge_type')).toSet(), {
       'RIDE',
