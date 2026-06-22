@@ -97,13 +97,16 @@ function fieldsFromJson(raw) {
 }
 
 function fieldsFromXml(raw) {
-  const item = raw.match(/<item\b[^>]*>([\s\S]*?)<\/item>/i)?.[1] ?? raw;
+  const items = [...raw.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map((match) => match[1]);
+  const fragments = items.length > 0 ? items : [raw];
   const fields = new Set();
-  const tagPattern = /<([A-Za-z_][\w.-]*)\b[^>]*>([\s\S]*?)<\/\1>/g;
-  for (const match of item.matchAll(tagPattern)) {
-    const [, tagName, body] = match;
-    if (!/<[A-Za-z_][\w.-]*\b/.test(body)) {
-      fields.add(tagName);
+  for (const fragment of fragments) {
+    const tagPattern = /<([A-Za-z_][\w.-]*)\b[^>]*>([\s\S]*?)<\/\1>/g;
+    for (const match of fragment.matchAll(tagPattern)) {
+      const [, tagName, body] = match;
+      if (!/<[A-Za-z_][\w.-]*\b/.test(body)) {
+        fields.add(tagName);
+      }
     }
   }
   if (fields.size === 0) {
