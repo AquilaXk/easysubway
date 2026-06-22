@@ -1493,13 +1493,43 @@ test("KRIC 부분확인 source 후보는 production inventory와 분리한다", 
 
   for (const candidate of candidates.candidates) {
     assert.equal(candidate.priority, "P0");
-    assert.equal(candidate.licenseEvidenceStatus, "partial");
-    assert.equal(candidate.admissionStatus, "needs_sample_and_license_evidence");
+    assert.ok(["partial", "confirmed_attribution"].includes(candidate.licenseEvidenceStatus));
+    assert.ok(["needs_sample_and_license_evidence", "evidence_recorded_admin_review_required"].includes(candidate.admissionStatus));
     assert.equal(productionSourceIds.has(candidate.id), false, `${candidate.id} must not be in production source inventory`);
     assert.match(candidate.detailUrl, /^https:\/\/data\.kric\.go\.kr\/rips\/M_01_02\//);
     assert.match(candidate.requestUrl, /^https:\/\/openapi\.kric\.go\.kr\/openapi\//);
     assert.ok(candidate.nextAction);
   }
+});
+
+test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const candidate = candidates.candidates.find(({ id }) => id === "kric-transfer-movement-detailed");
+
+  assert.ok(candidate);
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
+  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
+  assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.deepEqual(
+    candidate.evidence.outputFields.sort(),
+    [
+      "chtnMvTpOrdr",
+      "edMovePath",
+      "elvtSttCd",
+      "elvtTpCd",
+      "imgPath",
+      "mvContDtl",
+      "mvPathMgNo",
+      "stMovePath",
+    ],
+  );
+  assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
 });
 
 test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 retired id 재사용 금지를 강제한다", () => {
