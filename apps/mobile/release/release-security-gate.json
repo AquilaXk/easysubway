@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
   "releaseGate": "release-security-gate",
   "releaseBlockerPolicy": true,
   "policyRefreshKo": "출시 전 최신 모바일 스토어 보안 요구사항, 백엔드 운영 보안 설정, 의존성 취약점 상태를 다시 확인한다.",

@@ -670,6 +670,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "mobile-signed-release-artifacts");
   assert.equal(gate.storeReadyStatus, "blocked_external_distribution_evidence_missing");
 
@@ -4030,6 +4031,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidProfileManifest, /android:usesCleartextTraffic="true"/);
   assert.match(androidProfileManifest, /tools:replace="android:usesCleartextTraffic"/);
   assert.match(androidManifest, /<uses-permission android:name="android\.permission\.INTERNET"\/>/);
+  assert.match(androidBuildGradle, /applicationId\s*=\s*"com\.easysubway\.app"/);
   assert.match(androidBuildGradle, /targetSdk\s*=\s*maxOf\(35,\s*flutter\.targetSdkVersion\)/);
   assert.match(androidBuildGradle, /create\("release"\)/);
   assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
@@ -4403,6 +4405,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
 
   assert.equal(readiness.schemaVersion, 1);
   assert.equal(readiness.applicationId, "easysubway");
+  assert.equal(readiness.androidApplicationId, "com.easysubway.app");
   assert.equal(readiness.releaseGate, "store-submission-readiness");
   assert.equal(readiness.appNameKo, "쉬운 지하철");
   assert.equal(readiness.appNameEn, "easysubway");
@@ -4497,6 +4500,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "release-security-gate");
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.match(gate.policyRefreshKo, /출시 전|최신/);

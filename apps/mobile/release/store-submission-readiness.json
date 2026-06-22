@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
   "releaseGate": "store-submission-readiness",
   "appNameKo": "쉬운 지하철",
   "appNameEn": "easysubway",

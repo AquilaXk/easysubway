@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
   "releaseGate": "mobile-signed-release-artifacts",
   "storeReadyStatus": "blocked_external_distribution_evidence_missing",
   "officialRequirements": {
