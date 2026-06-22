@@ -3352,17 +3352,14 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
     `${JSON.stringify({
       response: {
         body: {
+          pageNo: 1,
+          numOfRows: 10,
+          totalCount: 1,
           items: {
             item: [
               {
-                lnCd: "A1",
-                mreaWideCd: "01",
                 railOprIsttCd: "S1",
-                routCd: "A1",
-                routNm: "1호선",
-                stinCd: "100",
-                stinConsOrdr: "1",
-                stinNm: "테스트역",
+                railOprIsttNm: "서울교통공사",
               },
             ],
           },
@@ -3376,7 +3373,7 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
     [
       "tools/datapack/build-source-candidate-sample-evidence.mjs",
       "--candidate",
-      "kric-subway-route-info",
+      "kric-train-operation-organ",
       "--response",
       responsePath,
     ],
@@ -3389,7 +3386,7 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
     [
       "tools/datapack/validate-source-candidate-sample.mjs",
       "--candidate",
-      "kric-subway-route-info",
+      "kric-train-operation-organ",
       "--sample",
       evidencePath,
     ],
@@ -3444,7 +3441,7 @@ test("source candidate sample evidence builder는 raw response의 serviceKey cre
   await mkdir(outputDir, { recursive: true });
   await writeFile(
     responsePath,
-    `<response><echo>https://openapi.kric.go.kr/openapi/convenientInfo/trainOperationOrgan?serviceKey=actual-secret</echo></response>\n`,
+    `${JSON.stringify({ response: { body: { serviceKey: "actual-secret" } } })}\n`,
   );
 
   await assert.rejects(

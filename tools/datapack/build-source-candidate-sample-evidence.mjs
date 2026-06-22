@@ -29,7 +29,11 @@ async function readJson(filePath) {
 }
 
 function assertNoServiceKey(value) {
-  if (/serviceKey=(?!\[서비스키값\])[^&\s<"]+/i.test(value)) {
+  if (
+    /serviceKey=(?!\[서비스키값\])[^&\s<"]+/i.test(value) ||
+    /"serviceKey"\s*:\s*"(?!\[서비스키값\]")[^"]+"/i.test(value) ||
+    /<serviceKey\b[^>]*>\s*(?!\[서비스키값\]\s*<\/serviceKey>)[\s\S]*?<\/serviceKey>/i.test(value)
+  ) {
     throw new Error("raw sample response must not contain serviceKey credentials");
   }
 }
@@ -63,9 +67,27 @@ function bestJsonRow(value, best = { row: null, count: 0 }) {
   return best;
 }
 
+function itemRows(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(itemRows);
+  }
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  if (Object.hasOwn(value, "item")) {
+    return Array.isArray(value.item)
+      ? value.item.filter((item) => item && typeof item === "object")
+      : value.item && typeof value.item === "object" ? [value.item] : [];
+  }
+  return Object.values(value).flatMap(itemRows);
+}
+
 function fieldsFromJson(raw) {
   const parsed = JSON.parse(raw);
-  const { row } = bestJsonRow(parsed);
+  const rows = itemRows(parsed);
+  const row = rows.length > 0
+    ? rows.reduce((best, item) => (scalarFieldCount(item) > scalarFieldCount(best) ? item : best))
+    : bestJsonRow(parsed).row;
   if (!row) {
     throw new Error("JSON response has no object fields");
   }
