@@ -1469,6 +1469,11 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   assert.match(importer, /station mapping evidence is required/);
   assert.match(importer, /minimumProductionCoverage must be an object for production pack/);
   assert.match(importer, /production coverage \${label} \${actualCount} is below required minimum \${value}/);
+  assert.match(importer, /coverageEvidence must be a non-empty array for production pack/);
+  assert.match(importer, /coverage evidence unsupported by source inventory/);
+  assert.match(importer, /production coverage evidence missing/);
+  assert.match(importer, /productionCoverageEvidence: JSON\.stringify\(productionCoverageEvidence\)/);
+  assert.match(importer, /coverageScope: \{/);
   assert.match(importer, /duplicate argument/);
   assert.match(importer, /sourceIngestAdapter: "official-source-ingest-v1"/);
 
@@ -1477,6 +1482,9 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   for (const source of [builder, validator]) {
     assert.match(source, /productionMinimumTableRowNames = \["stations", "station_lines", "network_edges", "facilities"\]/);
     assert.match(source, /production minimumTableRows must define positive stations, station_lines, network_edges, and facilities/);
+    assert.match(source, /validateSourceInventoryCoverageScope/);
+    assert.match(source, /production sourceInventory\.coverageScope/);
+    assert.match(source, /sourceInventory\.coverageScope/);
   }
 });
 
