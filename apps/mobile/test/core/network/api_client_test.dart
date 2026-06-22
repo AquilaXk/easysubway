@@ -5,6 +5,53 @@ import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('ApiClient는 GET 요청에 공통 header와 custom header를 적용한다', () async {
+    late String requestedMethod;
+    late Uri requestedUri;
+    late String? acceptHeader;
+    late String? receiptTokenHeader;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedMethod = request.method;
+      requestedUri = request.uri;
+      acceptHeader = request.headers.value(HttpHeaders.acceptHeader);
+      receiptTokenHeader = request.headers.value(
+        'X-Easysubway-Report-Receipt-Token',
+      );
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {'id': 'report-1', 'status': 'ACCEPTED'},
+          }),
+        )
+        ..close();
+    });
+
+    final client = ApiClient(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final response = await client.getJson(
+      '/api/v1/reports/report-1',
+      headers: const {'X-Easysubway-Report-Receipt-Token': 'receipt-token-1'},
+    );
+
+    expect(requestedMethod, 'GET');
+    expect(requestedUri.path, '/api/v1/reports/report-1');
+    expect(acceptHeader, ContentType.json.mimeType);
+    expect(receiptTokenHeader, 'receipt-token-1');
+    expect(response.statusCode, HttpStatus.ok);
+    expect(response.jsonBody, {
+      'success': true,
+      'data': {'id': 'report-1', 'status': 'ACCEPTED'},
+    });
+  });
+
   test('ApiClient는 POST 요청에 JSON body와 공통 header를 적용한다', () async {
     late String requestedMethod;
     late Uri requestedUri;
