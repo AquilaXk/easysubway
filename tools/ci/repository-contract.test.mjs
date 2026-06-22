@@ -4004,6 +4004,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const supportAccessInfoTest = read("apps/mobile/test/support_access_info_test.dart");
   const easySubwayAppDefaultsTest = read("apps/mobile/test/easy_subway_app_defaults_test.dart");
+  const onboardingAppFlowTest = read("apps/mobile/test/onboarding_app_flow_test.dart");
   const apiClient = read("apps/mobile/lib/core/network/api_client.dart");
   const apiError = read("apps/mobile/lib/core/network/api_error.dart");
   const apiClientTest = read("apps/mobile/test/core/network/api_client_test.dart");
@@ -4059,6 +4060,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(`${main}\n${appDependencies}`, /NotificationSettingsApiRepository/);
   assert.match(main, /OnboardingScreen/);
   assert.match(main, /initialOnboardingState/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다/);
+  assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
+  assert.match(onboardingAppFlowTest, /앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다/);
   assert.match(stationSearch, /stationSearchFailureNextAction/);
   assert.match(stationSearch, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
@@ -4096,7 +4105,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /_RouteMobilityTypeSummary\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeRequested: _showMobilityTypePicker/);
   assert.match(routeSearch, /routeSimpleMobilityTypeButton/);
   assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
-  assert.match(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
+  assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
   assert.match(widgetTest, /MediaQuery\.textScalerOf/);
@@ -4216,7 +4225,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/lib/onboarding.dart"), /onboardingNotificationFailureNextAction/);
   assert.match(read("apps/mobile/lib/onboarding.dart"), /나중에 알림 설정에서 다시 켤 수 있습니다\./);
   assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 다음 행동을 안내한다/);
-  assert.match(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
+  assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
   assert.match(stationSearch, /가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다/);
   assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
   assert.match(facilityReport, /사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다/);
