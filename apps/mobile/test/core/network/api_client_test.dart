@@ -105,6 +105,51 @@ void main() {
     });
   });
 
+  test('ApiClient는 PUT bytes 요청에 body와 upload header를 적용한다', () async {
+    late String requestedMethod;
+    late Uri requestedUri;
+    late String? checksumHeader;
+    late ContentType? contentType;
+    late int? contentLength;
+    late List<int> requestBody;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestedMethod = request.method;
+      requestedUri = request.uri;
+      checksumHeader = request.headers.value('x-amz-checksum-sha256');
+      contentType = request.headers.contentType;
+      contentLength = request.headers.contentLength;
+      requestBody = await request.fold<List<int>>(
+        <int>[],
+        (bytes, chunk) => bytes..addAll(chunk),
+      );
+      request.response.statusCode = HttpStatus.created;
+      await request.response.close();
+    });
+
+    final client = ApiClient(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final response = await client.putBytes(
+      Uri.parse('http://${server.address.host}:${server.port}/uploads/photo'),
+      body: const [1, 2, 3, 4],
+      contentType: ContentType('image', 'jpeg'),
+      headers: const {'x-amz-checksum-sha256': 'checksum-1'},
+    );
+
+    expect(requestedMethod, 'PUT');
+    expect(requestedUri.path, '/uploads/photo');
+    expect(checksumHeader, 'checksum-1');
+    expect(contentType?.mimeType, 'image/jpeg');
+    expect(contentLength, 4);
+    expect(requestBody, [1, 2, 3, 4]);
+    expect(response.statusCode, HttpStatus.created);
+    expect(response.isSuccess, isTrue);
+  });
+
   test('ApiClient는 DELETE 요청에 공통 timeout과 JSON decode 경계를 적용한다', () async {
     late String requestedMethod;
     late Uri requestedUri;
