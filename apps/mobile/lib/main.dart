@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'facility_report.dart';
@@ -942,14 +943,14 @@ class _HomeScreenState extends State<HomeScreen> {
               title: '개인 설정',
               groupKey: const Key('homeSettingsActionsGroup'),
               children: [
-                _HomeSecondaryActionButton(
+                AccessibleShortcutButton(
                   key: const Key('mobilityProfileButton'),
                   onPressed: _openMobilityProfile,
                   icon: const Icon(Icons.accessibility_new),
                   label: '이동 조건',
                 ),
                 if (notificationRepository != null)
-                  _HomeSecondaryActionButton(
+                  AccessibleShortcutButton(
                     key: const Key('notificationSettingsButton'),
                     onPressed: () {
                       Navigator.of(context).push(
@@ -973,7 +974,7 @@ class _HomeScreenState extends State<HomeScreen> {
               groupKey: const Key('homeMyInfoActionsGroup'),
               children: [
                 if (hasFavorites)
-                  _HomeSecondaryActionButton(
+                  AccessibleShortcutButton(
                     key: const Key('favoritesButton'),
                     onPressed: () {
                       Navigator.of(context).push(
@@ -997,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: const Icon(Icons.star_outline),
                     label: '즐겨찾기',
                   ),
-                _HomeSecondaryActionButton(
+                AccessibleShortcutButton(
                   key: const Key('myReportsButton'),
                   onPressed: () {
                     Navigator.of(context).push(
@@ -1109,43 +1110,20 @@ class _HomeActionSection extends StatelessWidget {
               runSpacing: spacing,
               children: [
                 for (final child in children)
-                  SizedBox(width: itemWidth, height: 56, child: child),
+                  SizedBox(
+                    width: itemWidth,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: EasySubwayTouchTarget.general,
+                      ),
+                      child: child,
+                    ),
+                  ),
               ],
             );
           },
         ),
       ],
-    );
-  }
-}
-
-class _HomeSecondaryActionButton extends StatelessWidget {
-  const _HomeSecondaryActionButton({
-    required this.onPressed,
-    required this.icon,
-    required this.label,
-    super.key,
-  });
-
-  final VoidCallback onPressed;
-  final Widget icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        alignment: Alignment.center,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF006D77),
-        side: BorderSide(color: colorScheme.outlineVariant),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-      ),
-      icon: IconTheme.merge(data: const IconThemeData(size: 22), child: icon),
-      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 }
