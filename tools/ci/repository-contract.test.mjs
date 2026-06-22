@@ -1548,6 +1548,21 @@ test("KRIC 출입구 승강장 이동경로 후보는 샘플 근거만 기록하
   assert.deepEqual(candidate.evidence.missingEvidence.sort(), ["licenseDetail", "outputFields"]);
 });
 
+test("KRIC 도시철도 전체노선정보 후보는 샘플 근거만 기록하고 라이선스 partial을 유지한다", () => {
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const candidate = candidates.candidates.find(({ id }) => id === "kric-subway-route-info");
+
+  assert.ok(candidate);
+  assert.equal(candidate.licenseEvidenceStatus, "partial");
+  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.admissionStatus, "needs_sample_and_license_evidence");
+  assert.equal(candidate.evidence.listPageUrl, candidate.detailUrl);
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
+  assert.deepEqual(candidate.evidence.missingEvidence.sort(), ["licenseDetail", "outputFields"]);
+});
+
 test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 retired id 재사용 금지를 강제한다", () => {
   const importer = read("tools/datapack/import-official-sources.mjs");
 
