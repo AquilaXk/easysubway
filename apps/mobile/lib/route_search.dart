@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
+import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
 import 'station_search.dart';
@@ -78,33 +79,29 @@ class RouteFeedbackRequest {
 }
 
 class RouteSearchApiRepository implements RouteSearchRepository {
-  RouteSearchApiRepository({required this.baseUri, HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  RouteSearchApiRepository({
+    required this.baseUri,
+    ApiClient? apiClient,
+    HttpClient? httpClient,
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest routeRequest) async {
-    final uri = baseUri.resolve('/api/v1/routes/search');
-
     try {
-      final request = await _httpClient
-          .postUrl(uri)
-          .timeout(_routeSearchTimeout);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(routeRequest.toJson()));
+      final response = await _apiClient.postJson(
+        '/api/v1/routes/search',
+        body: routeRequest.toJson(),
+      );
 
-      final response = await request.close().timeout(_routeSearchTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_routeSearchTimeout);
-
-      if (response.statusCode != HttpStatus.ok) {
+      if (!response.isOk) {
         throw const RouteSearchException(_routeSearchErrorMessage);
       }
 
-      final decoded = jsonDecode(body);
+      final decoded = response.jsonBody;
       if (decoded is! Map<String, Object?> || decoded['success'] != true) {
         throw const RouteSearchException(_routeSearchErrorMessage);
       }
@@ -132,12 +129,14 @@ class RouteFeedbackApiRepository implements RouteFeedbackRepository {
   RouteFeedbackApiRepository({
     required this.baseUri,
     required this.authProvider,
+    ApiClient? apiClient,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final AuthorizationHeaderProvider authProvider;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<void> submitRouteFeedback(RouteFeedbackRequest feedbackRequest) async {
@@ -146,9 +145,8 @@ class RouteFeedbackApiRepository implements RouteFeedbackRepository {
       throw const RouteFeedbackException(_routeFeedbackErrorMessage);
     }
 
-    final uri = baseUri.resolve(
-      '/api/v1/routes/${Uri.encodeComponent(trimmedRequest.routeSearchId)}/feedback',
-    );
+    final path =
+        '/api/v1/routes/${Uri.encodeComponent(trimmedRequest.routeSearchId)}/feedback';
 
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
@@ -161,34 +159,25 @@ class RouteFeedbackApiRepository implements RouteFeedbackRepository {
           throw const RouteFeedbackException(_routeFeedbackErrorMessage);
         }
 
-        final request = await _httpClient
-            .postUrl(uri)
-            .timeout(_routeSearchTimeout);
-        request.headers.contentType = ContentType.json;
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          authorizationHeader!,
+        final response = await _apiClient.postJson(
+          path,
+          body: trimmedRequest.toJson(userId: userId),
+          headers: {HttpHeaders.authorizationHeader: authorizationHeader!},
         );
-        request.write(jsonEncode(trimmedRequest.toJson(userId: userId)));
-
-        final response = await request.close().timeout(_routeSearchTimeout);
-        final body = await utf8
-            .decodeStream(response)
-            .timeout(_routeSearchTimeout);
 
         // 저장된 인증이 만료된 경우 한 번만 재시도한다.
-        if (response.statusCode == HttpStatus.unauthorized && attempt == 0) {
+        if (response.isUnauthorized && attempt == 0) {
           await authProvider.invalidateAuthorization().timeout(
             _routeSearchTimeout,
           );
           continue;
         }
 
-        if (response.statusCode != HttpStatus.ok) {
+        if (!response.isOk) {
           throw const RouteFeedbackException(_routeFeedbackErrorMessage);
         }
 
-        final decoded = jsonDecode(body);
+        final decoded = response.jsonBody;
         if (decoded is! Map<String, Object?> || decoded['success'] != true) {
           throw const RouteFeedbackException(_routeFeedbackErrorMessage);
         }
@@ -259,18 +248,20 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
   FavoriteRouteApiRepository({
     required this.baseUri,
     required this.authProvider,
+    ApiClient? apiClient,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final AuthorizationHeaderProvider authProvider;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<List<FavoriteRoute>> listFavoriteRoutes() async {
     final data = await _requestData(
       'GET',
-      baseUri.resolve('/api/v1/me/favorites/routes'),
+      '/api/v1/me/favorites/routes',
       errorMessage: _favoriteRouteLoadErrorMessage,
     );
     if (data is! List<Object?>) {
@@ -303,7 +294,7 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
   }) async {
     final data = await _requestData(
       'POST',
-      baseUri.resolve('/api/v1/me/favorites/routes'),
+      '/api/v1/me/favorites/routes',
       body: {'routeSearchId': routeSearchId},
       errorMessage: _favoriteRouteErrorMessage,
     );
@@ -327,42 +318,35 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
   Future<void> removeFavoriteRoute(String favoriteRouteId) async {
     await _requestData(
       'DELETE',
-      baseUri.resolve('/api/v1/me/favorites/routes/$favoriteRouteId'),
+      '/api/v1/me/favorites/routes/$favoriteRouteId',
       errorMessage: _favoriteRouteErrorMessage,
     );
   }
 
   Future<Object?> _requestData(
     String method,
-    Uri uri, {
+    String path, {
     Map<String, Object?>? body,
     required String errorMessage,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final request = await _httpClient
-            .openUrl(method, uri)
-            .timeout(_routeSearchTimeout);
         final authorizationHeader = await authProvider
             .authorizationHeader()
             .timeout(_routeSearchTimeout);
+        final headers = <String, String>{};
         if (authorizationHeader != null) {
-          request.headers.set(
-            HttpHeaders.authorizationHeader,
-            authorizationHeader,
-          );
-        }
-        if (body != null) {
-          request.headers.contentType = ContentType.json;
-          request.write(jsonEncode(body));
+          headers[HttpHeaders.authorizationHeader] = authorizationHeader;
         }
 
-        final response = await request.close().timeout(_routeSearchTimeout);
-        final responseBody = await utf8
-            .decodeStream(response)
-            .timeout(_routeSearchTimeout);
+        final response = await switch (method) {
+          'GET' => _apiClient.getJson(path, headers: headers),
+          'POST' => _apiClient.postJson(path, body: body!, headers: headers),
+          'DELETE' => _apiClient.deleteJson(path, headers: headers),
+          _ => throw FavoriteRouteException(errorMessage),
+        };
 
-        if (response.statusCode == HttpStatus.unauthorized &&
+        if (response.isUnauthorized &&
             authorizationHeader != null &&
             attempt == 0) {
           // 만료된 인증은 비우고 한 번만 다시 시도한다.
@@ -372,12 +356,11 @@ class FavoriteRouteApiRepository implements FavoriteRouteRepository {
           continue;
         }
 
-        if (response.statusCode < HttpStatus.ok ||
-            response.statusCode >= HttpStatus.multipleChoices) {
+        if (!response.isSuccess) {
           throw FavoriteRouteException(errorMessage);
         }
 
-        final decoded = jsonDecode(responseBody);
+        final decoded = response.jsonBody;
         if (decoded is! Map<String, Object?> || decoded['success'] != true) {
           throw FavoriteRouteException(errorMessage);
         }
