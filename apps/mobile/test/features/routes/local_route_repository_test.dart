@@ -1,26 +1,38 @@
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
-import 'package:easysubway_mobile/features/internal_route/data/local_internal_route_repository.dart';
+import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('catalog DB가 있으면 기본 경로 repository는 route API 대신 로컬 구현을 사용한다', () async {
+  test('catalog DB가 있으면 기본 경로 repository는 API 주소 없이 로컬 결과를 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
 
     final dependencies = AppDependencies.resolve(
       catalogDatabase: database,
+      reportRepository: const UnavailableFacilityReportRepository(),
+      apiBaseUri: () {
+        throw StateError('Local route defaults must not read API base URL.');
+      },
       enablePushNotifications: false,
     );
 
-    expect(dependencies.routeRepository, isA<FallbackRouteSearchRepository>());
-    expect(
-      dependencies.internalRouteRepository,
-      isA<FallbackInternalRouteRepository>(),
+    final routeResult = await dependencies.routeRepository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
     );
+    final internalNodes = await dependencies.internalRouteRepository
+        .listRouteNodes('station-sangnoksu');
+
+    expect(routeResult.status, 'FOUND');
+    expect(routeResult.isLocalResult, isTrue);
+    expect(internalNodes, isEmpty);
   });
 
   test('로컬 경로 repository는 baseline catalog에서 상록수-사당 경로를 계산한다', () async {
@@ -201,7 +213,7 @@ void main() {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
-    final repository = FallbackRouteSearchRepository(
+    final repository = LocalFirstRouteSearchRepository(
       localRepository: LocalRouteRepository(catalogDatabase: database),
     );
 
