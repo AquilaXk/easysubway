@@ -21,6 +21,17 @@ class AccessibilityCostCalculator {
     final weight = RouteWeight.from(mobilityType);
     final warningCodes = <String>[];
 
+    // route contract: generated connector strict block
+    // Generated connectors are topology scaffolding, not verified step-free
+    // accessibility evidence for profiles that cannot safely use stairs.
+    if (edge.isGeneratedConnector && mobilityType.blocksStairOnlyAccess) {
+      return const AccessibilityCost(
+        cost: 0,
+        isBlocked: true,
+        warningCodes: ['GENERATED_CONNECTOR_UNVERIFIED'],
+      );
+    }
+
     if (edge.accessibilityState == RouteAccessibilityState.unavailable) {
       return const AccessibilityCost(
         cost: 0,

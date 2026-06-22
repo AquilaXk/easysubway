@@ -968,6 +968,7 @@ test("경로 source contract 불변식은 접근성 안전과 metric fallback �
   assert.match(networkGraph, /route contract: generated connector ratio/);
   assert.match(accessibilityCostCalculator, /route contract: unknown accessibility data/);
   assert.match(accessibilityCostCalculator, /route contract: stair-only block/);
+  assert.match(accessibilityCostCalculator, /route contract: generated connector strict block/);
   assert.match(localRouteRepository, /route contract: synthetic connector edge/);
   assert.match(localRouteRepository, /isGeneratedConnector: true/);
   assert.match(localRouteRepository, /route contract: local metric fallback/);
