@@ -60,6 +60,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
     ).getSingleOrNull();
     if (existing != null) {
+      await _backfillBaselineAccessEdges();
       return;
     }
 
@@ -201,6 +202,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             reliabilityScore: const Value(90),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
           ),
+          ..._baselineAccessEdges(),
         ]);
         batch.insertAllOnConflictUpdate(stationExits, [
           StationExitsCompanion.insert(
@@ -274,6 +276,139 @@ class CatalogDatabase extends _$CatalogDatabase {
         ]);
       });
     });
+  }
+
+  Future<void> _backfillBaselineAccessEdges() async {
+    if (!await _canBackfillBaselineAccessEdges()) {
+      return;
+    }
+    if (!await _isBaselineFixtureCatalog()) {
+      return;
+    }
+    await transaction(() async {
+      for (final edge in _baselineAccessEdges()) {
+        await into(networkEdges).insert(edge, mode: InsertMode.insertOrIgnore);
+      }
+    });
+  }
+
+  Future<bool> _canBackfillBaselineAccessEdges() async {
+    final columns = await customSelect(
+      'PRAGMA table_info(network_edges)',
+    ).get();
+    final columnNames = {for (final row in columns) row.read<String>('name')};
+    const requiredColumns = {
+      'id',
+      'from_node_id',
+      'to_node_id',
+      'duration_seconds',
+      'edge_type',
+      'stair_access_state',
+      'accessibility_status',
+      'reliability_score',
+      'last_verified_at',
+    };
+    return columnNames.containsAll(requiredColumns);
+  }
+
+  Future<bool> _isBaselineFixtureCatalog() async {
+    final row = await customSelect('''
+      SELECT
+        (SELECT value
+         FROM catalog_metadata
+         WHERE key = 'activePack') AS active_pack,
+        (SELECT COUNT(*) FROM operators) AS operator_count,
+        (SELECT COUNT(*) FROM lines) AS line_count,
+        (SELECT COUNT(*) FROM stations) AS station_count,
+        (SELECT COUNT(*) FROM station_lines) AS station_line_count,
+        (SELECT COUNT(*) FROM network_edges) AS network_edge_count,
+        (SELECT COUNT(*)
+         FROM station_lines
+         WHERE (station_id = 'station-sangnoksu' AND line_id = 'seoul-4')
+            OR (station_id = 'station-sadang' AND line_id = 'seoul-4'))
+        +
+        (SELECT COUNT(*)
+         FROM network_edges
+         WHERE id IN (
+           'edge-sangnoksu-sadang-seoul-4',
+           'edge-sadang-sangnoksu-seoul-4'
+         )) AS match_count
+    ''').getSingle();
+    if (row.readNullable<String>('active_pack') != 'capital') {
+      return false;
+    }
+    if (row.read<int>('match_count') != 4) {
+      return false;
+    }
+    final operatorCount = row.read<int>('operator_count');
+    final lineCount = row.read<int>('line_count');
+    final stationCount = row.read<int>('station_count');
+    final stationLineCount = row.read<int>('station_line_count');
+    final networkEdgeCount = row.read<int>('network_edge_count');
+    final localSeedBaseline =
+        operatorCount == 2 &&
+        lineCount == 2 &&
+        stationCount == 2 &&
+        stationLineCount == 3 &&
+        networkEdgeCount >= 2 &&
+        networkEdgeCount <= 6;
+    final bundledFixture =
+        operatorCount == 2 &&
+        lineCount == 4 &&
+        stationCount == 6 &&
+        stationLineCount == 9 &&
+        networkEdgeCount >= 15 &&
+        networkEdgeCount <= 19;
+    return localSeedBaseline || bundledFixture;
+  }
+
+  List<NetworkEdgesCompanion> _baselineAccessEdges() {
+    return [
+      NetworkEdgesCompanion.insert(
+        id: 'entry-sangnoksu-seoul-4',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
+        durationSeconds: const Value(90),
+        edgeType: const Value('ENTRY'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'exit-sangnoksu-seoul-4',
+        fromNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
+        toNodeId: 'station-sangnoksu',
+        durationSeconds: const Value(60),
+        edgeType: const Value('EXIT'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'entry-sadang-seoul-4',
+        fromNodeId: 'station-sadang',
+        toNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
+        durationSeconds: const Value(90),
+        edgeType: const Value('ENTRY'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'exit-sadang-seoul-4',
+        fromNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
+        toNodeId: 'station-sadang',
+        durationSeconds: const Value(60),
+        edgeType: const Value('EXIT'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+    ];
   }
 
   Future<void> _createIndexes() async {
