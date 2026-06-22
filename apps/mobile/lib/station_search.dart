@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -552,18 +551,20 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
   FavoriteStationApiRepository({
     required this.baseUri,
     required this.authProvider,
+    ApiClient? apiClient,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final FavoriteStationAuthProvider authProvider;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<List<FavoriteStation>> listFavoriteStations() async {
     final data = await _requestData(
       'GET',
-      baseUri.resolve('/api/v1/me/favorites/stations'),
+      '/api/v1/me/favorites/stations',
       errorMessage: _favoriteStationLoadErrorMessage,
     );
     if (data is! List<Object?>) {
@@ -591,12 +592,11 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
 
   @override
   Future<FavoriteStation> saveFavoriteStation(String stationId) async {
-    final uri = baseUri.resolve(
-      '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}',
-    );
+    final path =
+        '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}';
     final data = await _requestData(
       'PUT',
-      uri,
+      path,
       errorMessage: _favoriteStationChangeErrorMessage,
     );
     if (data is! Map<String, Object?>) {
@@ -617,40 +617,34 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
 
   @override
   Future<void> removeFavoriteStation(String stationId) async {
-    final uri = baseUri.resolve(
-      '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}',
-    );
+    final path =
+        '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}';
     await _requestData(
       'DELETE',
-      uri,
+      path,
       errorMessage: _favoriteStationChangeErrorMessage,
     );
   }
 
   Future<Object?> _requestData(
     String method,
-    Uri uri, {
+    String path, {
     required String errorMessage,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final request = await _httpClient
-            .openUrl(method, uri)
-            .timeout(_favoriteStationTimeout);
         final authorizationHeader = await authProvider
             .authorizationHeader()
             .timeout(_favoriteStationTimeout);
-        if (authorizationHeader != null) {
-          request.headers.set(
-            HttpHeaders.authorizationHeader,
-            authorizationHeader,
-          );
-        }
-
-        final response = await request.close().timeout(_favoriteStationTimeout);
-        final body = await utf8
-            .decodeStream(response)
-            .timeout(_favoriteStationTimeout);
+        final headers = authorizationHeader == null
+            ? const <String, String>{}
+            : {HttpHeaders.authorizationHeader: authorizationHeader};
+        final response = await switch (method) {
+          'GET' => _apiClient.getJson(path, headers: headers),
+          'PUT' => _apiClient.putJson(path, headers: headers),
+          'DELETE' => _apiClient.deleteJson(path, headers: headers),
+          _ => throw FavoriteStationException(errorMessage),
+        };
 
         if (response.statusCode == HttpStatus.unauthorized &&
             authorizationHeader != null &&
@@ -667,7 +661,7 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
           throw FavoriteStationException(errorMessage);
         }
 
-        final decoded = jsonDecode(body);
+        final decoded = response.jsonBody;
         if (decoded is! Map<String, Object?> || decoded['success'] != true) {
           throw FavoriteStationException(errorMessage);
         }

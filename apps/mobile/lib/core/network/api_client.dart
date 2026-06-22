@@ -46,6 +46,19 @@ class ApiClient {
     );
   }
 
+  Future<ApiResponse> putJson(
+    String path, {
+    Map<String, Object?>? body,
+    Map<String, String> headers = const {},
+  }) {
+    return _requestJson(
+      HttpMethod.put,
+      path,
+      headers: headers,
+      requestBody: body,
+    );
+  }
+
   Future<ApiResponse> putBytes(
     Uri uri, {
     required List<int> body,
@@ -147,6 +160,8 @@ class ApiClient {
         return _httpClient.deleteUrl(uri);
       case HttpMethod.post:
         return _httpClient.postUrl(uri);
+      case HttpMethod.put:
+        return _httpClient.putUrl(uri);
     }
   }
 }
@@ -162,7 +177,7 @@ class ApiResponse {
   bool get isSuccess => _isSuccessStatus(statusCode);
 }
 
-enum HttpMethod { get, delete, post }
+enum HttpMethod { get, delete, post, put }
 
 Object? _decodeJson(String body, {required int statusCode, required Uri uri}) {
   try {

@@ -105,6 +105,64 @@ void main() {
     });
   });
 
+  test('ApiClient는 PUT 요청에 JSON body와 공통 header를 적용한다', () async {
+    late String requestedMethod;
+    late Uri requestedUri;
+    late String? acceptHeader;
+    late String? authorizationHeader;
+    late ContentType? contentType;
+    late Map<String, Object?> requestBody;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) async {
+      requestedMethod = request.method;
+      requestedUri = request.uri;
+      acceptHeader = request.headers.value(HttpHeaders.acceptHeader);
+      authorizationHeader = request.headers.value(
+        HttpHeaders.authorizationHeader,
+      );
+      contentType = request.headers.contentType;
+      requestBody =
+          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {'stationId': 'station-sangnoksu'},
+          }),
+        );
+      await request.response.close();
+    });
+
+    final client = ApiClient(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final response = await client.putJson(
+      '/api/v1/me/favorites/stations/station-sangnoksu',
+      body: const {'source': 'station-detail'},
+      headers: const {HttpHeaders.authorizationHeader: 'Basic token-1'},
+    );
+
+    expect(requestedMethod, 'PUT');
+    expect(
+      requestedUri.path,
+      '/api/v1/me/favorites/stations/station-sangnoksu',
+    );
+    expect(acceptHeader, ContentType.json.mimeType);
+    expect(authorizationHeader, 'Basic token-1');
+    expect(contentType?.mimeType, ContentType.json.mimeType);
+    expect(requestBody, {'source': 'station-detail'});
+    expect(response.statusCode, HttpStatus.ok);
+    expect(response.jsonBody, {
+      'success': true,
+      'data': {'stationId': 'station-sangnoksu'},
+    });
+  });
+
   test('ApiClient는 PUT bytes 요청에 body와 upload header를 적용한다', () async {
     late String requestedMethod;
     late Uri requestedUri;
