@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "region": "capital",
+  "region": "nationwide",
   "artifactKind": "production-source-inventory",
-  "retrievedAt": "2026-06-21",
+  "retrievedAt": "2026-06-22",
   "sources": [
     {
       "id": "seoulmetro-station-line-info",
