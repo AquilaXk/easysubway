@@ -48,6 +48,54 @@ void main() {
     expect(internalNodes, isEmpty);
   });
 
+  test('로컬 데이터베이스 기본 의존성은 시설 신고 fallback 때문에 API 주소를 읽지 않는다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    var apiBaseReads = 0;
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      apiBaseUri: () {
+        apiBaseReads++;
+        throw StateError('Local app defaults must not read API base URL.');
+      },
+      enablePushNotifications: false,
+    );
+
+    expect(apiBaseReads, 0);
+    expect(dependencies.repository, isA<DriftStationRepository>());
+  });
+
+  test('시설 신고 기본 의존성은 API 주소가 없으면 호출 시점에 unavailable로 동작한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      apiBaseUri: () => null,
+      enablePushNotifications: false,
+    );
+
+    await expectLater(
+      dependencies.reportRepository.createReport(
+        const FacilityReportRequest(
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-elevator-sangnoksu-1',
+          reportType: 'BROKEN',
+          description: '승강기 고장',
+        ),
+      ),
+      throwsA(isA<FacilityReportException>()),
+    );
+  });
+
   test('로컬 데이터베이스가 없으면 API 주소 없는 원격 fallback을 만들지 않는다', () {
     expect(
       () => AppDependencies.resolve(
