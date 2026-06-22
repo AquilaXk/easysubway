@@ -285,9 +285,11 @@ class CatalogDatabase extends _$CatalogDatabase {
     if (!await _isBaselineFixtureCatalog()) {
       return;
     }
-    for (final edge in _baselineAccessEdges()) {
-      await into(networkEdges).insert(edge, mode: InsertMode.insertOrIgnore);
-    }
+    await transaction(() async {
+      for (final edge in _baselineAccessEdges()) {
+        await into(networkEdges).insert(edge, mode: InsertMode.insertOrIgnore);
+      }
+    });
   }
 
   Future<bool> _canBackfillBaselineAccessEdges() async {
@@ -338,14 +340,26 @@ class CatalogDatabase extends _$CatalogDatabase {
     if (row.read<int>('match_count') != 4) {
       return false;
     }
-    final shape = (
-      row.read<int>('operator_count'),
-      row.read<int>('line_count'),
-      row.read<int>('station_count'),
-      row.read<int>('station_line_count'),
-      row.read<int>('network_edge_count'),
-    );
-    return shape == (2, 2, 2, 3, 2) || shape == (2, 4, 6, 9, 15);
+    final operatorCount = row.read<int>('operator_count');
+    final lineCount = row.read<int>('line_count');
+    final stationCount = row.read<int>('station_count');
+    final stationLineCount = row.read<int>('station_line_count');
+    final networkEdgeCount = row.read<int>('network_edge_count');
+    final localSeedBaseline =
+        operatorCount == 2 &&
+        lineCount == 2 &&
+        stationCount == 2 &&
+        stationLineCount == 3 &&
+        networkEdgeCount >= 2 &&
+        networkEdgeCount <= 6;
+    final bundledFixture =
+        operatorCount == 2 &&
+        lineCount == 4 &&
+        stationCount == 6 &&
+        stationLineCount == 9 &&
+        networkEdgeCount >= 15 &&
+        networkEdgeCount <= 19;
+    return localSeedBaseline || bundledFixture;
   }
 
   List<NetworkEdgesCompanion> _baselineAccessEdges() {

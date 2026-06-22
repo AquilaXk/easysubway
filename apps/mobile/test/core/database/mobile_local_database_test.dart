@@ -424,6 +424,67 @@ void main() {
     },
   );
 
+  test('catalog opener는 부분 적용된 baseline access edge를 끝까지 보강한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-current-access-backfill-partial-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final updatedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    final updatedDatabase = CatalogDatabase.file(updatedPack);
+    await updatedDatabase.seedBaselineIfEmpty();
+    await updatedDatabase.customStatement('''
+      DELETE FROM network_edges
+      WHERE edge_type IN ('ENTRY', 'EXIT')
+    ''');
+    await updatedDatabase.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score,
+        last_verified_at
+      )
+      VALUES (
+        'entry-sangnoksu-seoul-4',
+        'station-sangnoksu',
+        'station-sangnoksu:seoul-4',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        90,
+        1781827200
+      )
+    ''');
+    await updatedDatabase.close();
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': updatedPack.path,
+        'sha256': 'local-fixture',
+      }),
+    );
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    ).open();
+    addTearDown(database.close);
+    final accessEdgeCount = await database.customSelect('''
+      SELECT COUNT(*) AS count
+      FROM network_edges
+      WHERE id IN (
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''').getSingle();
+
+    expect(accessEdgeCount.read<int>('count'), 4);
+  });
+
   test(
     'catalog opener는 baseline보다 큰 current pack에 access edge를 주입하지 않는다',
     () async {
