@@ -13,9 +13,11 @@ const iosRequiredAll = [
   "EASYSUBWAY_APP_STORE_APPLE_ID",
   "EASYSUBWAY_APP_STORE_BUNDLE_ID",
 ];
-const datapackRequiredAll = [
+const datapackCommonRequiredAll = [
   "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED",
   "EASYSUBWAY_DATA_PACK_BASE_URL",
+];
+const datapackLegacyRequiredAll = [
   "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT",
   "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY",
   "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY",
@@ -71,24 +73,34 @@ function credentialGroupStatus(env, group) {
 }
 
 function datapackStatus(env) {
-  const base = credentialGroupStatus(env, {
-    label: "datapack_object_storage_publish",
-    requiredAll: datapackRequiredAll,
-    requiredAny: [],
-  });
-  const missing = [...base.missing];
+  const missing = datapackCommonRequiredAll.filter((name) => !hasValue(env, name));
+  const present = datapackCommonRequiredAll.filter((name) => hasValue(env, name));
+  const hasPreauthUrl = hasValue(env, "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL");
+  const legacyMissing = datapackLegacyRequiredAll.filter((name) => !hasValue(env, name));
+
   if (env.EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED !== "true") {
     missing.push("EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED:true");
   }
-  for (const name of ["EASYSUBWAY_DATA_PACK_BASE_URL", "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT"]) {
+  if (hasPreauthUrl) {
+    present.push("EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL");
+  } else {
+    missing.push(...legacyMissing);
+    present.push(...datapackLegacyRequiredAll.filter((name) => hasValue(env, name)));
+  }
+  for (const name of [
+    "EASYSUBWAY_DATA_PACK_BASE_URL",
+    ...(hasPreauthUrl ? ["EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL"] : ["EASYSUBWAY_OBJECT_STORAGE_ENDPOINT"]),
+  ]) {
     if (hasValue(env, name) && !isPublicHttps(env[name])) {
       missing.push(`${name}:public_https`);
     }
   }
   return {
-    ...base,
+    label: "datapack_object_storage_publish",
+    outputName: outputName("datapack_object_storage_publish"),
     ready: missing.length === 0,
     missing,
+    present,
   };
 }
 

@@ -29,6 +29,9 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_OBJECT_STORAGE_REGION)
       true
       ;;
+    EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL)
+      true
+      ;;
     *)
       false
       ;;
