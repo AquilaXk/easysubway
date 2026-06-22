@@ -172,31 +172,23 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     required String photoSha256,
     required int photoSizeBytes,
   }) async {
-    final uploadRequest = await _httpClient
-        .postUrl(baseUri.resolve('/api/v1/report-uploads'))
-        .timeout(_facilityReportTimeout);
-    uploadRequest.headers.contentType = ContentType.json;
-    uploadRequest.write(
-      jsonEncode({
+    final uploadResponse = await _apiClient.postJson(
+      '/api/v1/report-uploads',
+      body: {
         'clientSubmissionId': clientSubmissionId,
         'photoFileName': request.photoFileName,
         'photoContentType': request.photoContentType,
         'photoSha256': photoSha256,
         'photoSizeBytes': photoSizeBytes,
-      }),
+      },
     );
-    final uploadResponse = await uploadRequest.close().timeout(
-      _facilityReportTimeout,
-    );
-    final body = await utf8
-        .decodeStream(uploadResponse)
-        .timeout(_facilityReportTimeout);
+
     if (uploadResponse.statusCode != HttpStatus.created &&
-        uploadResponse.statusCode != HttpStatus.ok) {
+        !uploadResponse.isOk) {
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
-    return FacilityReportPhotoUploadIntent.fromBody(
-      body,
+    return FacilityReportPhotoUploadIntent.fromJson(
+      uploadResponse.jsonBody,
       errorMessage: _facilityReportErrorMessage,
     );
   }
@@ -509,11 +501,10 @@ class FacilityReportPhotoUploadIntent {
     this.uploadHeaders = const {},
   });
 
-  factory FacilityReportPhotoUploadIntent.fromBody(
-    String body, {
+  factory FacilityReportPhotoUploadIntent.fromJson(
+    Object? decoded, {
     required String errorMessage,
   }) {
-    final decoded = jsonDecode(body);
     if (decoded is! Map<String, Object?> || decoded['success'] != true) {
       throw FacilityReportException(errorMessage);
     }

@@ -98,6 +98,7 @@ void main() {
 
   test('시설 신고 API 저장소는 백엔드 계약에 맞춰 신고를 전송한다', () async {
     late String? authorizationHeader;
+    late String? uploadIntentAcceptHeader;
     late String? uploadChecksumHeader;
     late String? uploadSizeHeader;
     late String? uploadContentTypeHeader;
@@ -111,6 +112,9 @@ void main() {
     server.listen((request) async {
       switch ((request.method, request.uri.path)) {
         case ('POST', '/api/v1/report-uploads'):
+          uploadIntentAcceptHeader = request.headers.value(
+            HttpHeaders.acceptHeader,
+          );
           uploadIntentBody =
               jsonDecode(await utf8.decodeStream(request))
                   as Map<String, Object?>;
@@ -206,6 +210,7 @@ void main() {
       ),
     );
 
+    expect(uploadIntentAcceptHeader, ContentType.json.mimeType);
     expect(uploadIntentBody['clientSubmissionId'], 'client-submission-1');
     expect(uploadIntentBody['photoFileName'], 'elevator-door.jpg');
     expect(uploadIntentBody['photoContentType'], 'image/jpeg');
