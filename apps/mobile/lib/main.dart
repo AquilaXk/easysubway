@@ -412,6 +412,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
         onUserDataDeleted: _handleUserDataDeleted,
+        onMobilityProfileChanged: _saveMobilityProfile,
       ),
     );
   }
@@ -484,6 +485,24 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         context: '온보딩 설정을 저장하는 중 예외가 발생했습니다.',
       );
     }
+  }
+
+  Future<void> _saveMobilityProfile(MobilityProfileOption profile) async {
+    final currentResult = _onboardingState.result;
+    if (currentResult == null) {
+      return;
+    }
+    final nextResult = OnboardingResult(
+      profile: profile,
+      preferences: currentResult.preferences,
+    );
+    await _saveOnboardingResult(nextResult);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _onboardingState = OnboardingState.completed(result: nextResult);
+    });
   }
 
   void _schedulePendingFacilityReportPhotoRecovery() {
@@ -720,7 +739,7 @@ TextStyle _boldTextStyle(TextStyle? style) {
   );
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   HomeScreen({
     required this.repository,
     required this.reportRepository,
@@ -738,6 +757,7 @@ class HomeScreen extends StatelessWidget {
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
+    required this.onMobilityProfileChanged,
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
     String? initialMobilityType,
@@ -761,19 +781,58 @@ class HomeScreen extends StatelessWidget {
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final Future<void> Function()? onUserDataDeleted;
+  final Future<void> Function(MobilityProfileOption profile)?
+  onMobilityProfileChanged;
   final String initialMobilityType;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late String _mobilityType;
+
+  @override
+  void initState() {
+    super.initState();
+    _mobilityType = widget.initialMobilityType;
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_mobilityType == oldWidget.initialMobilityType &&
+        widget.initialMobilityType != oldWidget.initialMobilityType) {
+      _mobilityType = widget.initialMobilityType;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final favoriteRepository = this.favoriteRepository;
-    final favoriteFacilityRepository = this.favoriteFacilityRepository;
-    final favoriteRouteRepository = this.favoriteRouteRepository;
-    final routeFeedbackRepository = this.routeFeedbackRepository;
-    final notificationRepository = this.notificationRepository;
-    final notificationPermissionProvider = this.notificationPermissionProvider;
+    final repository = widget.repository;
+    final reportRepository = widget.reportRepository;
+    final routeRepository = widget.routeRepository;
+    final favoriteRepository = widget.favoriteRepository;
+    final favoriteFacilityRepository = widget.favoriteFacilityRepository;
+    final favoriteRouteRepository = widget.favoriteRouteRepository;
+    final searchHistoryRepository = widget.searchHistoryRepository;
+    final internalRouteRepository = widget.internalRouteRepository;
+    final routeFeedbackRepository = widget.routeFeedbackRepository;
+    final notificationRepository = widget.notificationRepository;
+    final notificationPermissionProvider =
+        widget.notificationPermissionProvider;
+    final locationProvider = widget.locationProvider;
+    final supportAccessInfo = widget.supportAccessInfo;
+    final supportAccessLauncher = widget.supportAccessLauncher;
+    final userDataDeletionRepository = widget.userDataDeletionRepository;
+    final onUserDataDeleted = widget.onUserDataDeleted;
+    final simpleViewEnabled = widget.simpleViewEnabled;
+    final facilityReportDraftTargetStore =
+        widget.facilityReportDraftTargetStore;
+    final initialMobilityType = _mobilityType;
     final hasFavorites =
         favoriteRepository != null ||
         favoriteFacilityRepository != null ||
@@ -885,13 +944,7 @@ class HomeScreen extends StatelessWidget {
               children: [
                 _HomeSecondaryActionButton(
                   key: const Key('mobilityProfileButton'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<MobilityProfileOption>(
-                        builder: (_) => const MobilityProfileScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _openMobilityProfile,
                   icon: const Icon(Icons.accessibility_new),
                   label: '이동 조건',
                 ),
@@ -963,6 +1016,31 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openMobilityProfile() async {
+    final currentProfile = mobilityProfileOptions.firstWhere(
+      (option) => option.mobilityType == _mobilityType,
+      orElse: () => mobilityProfileOptions.first,
+    );
+    final selectedProfile = await Navigator.of(context).push(
+      MaterialPageRoute<MobilityProfileOption>(
+        builder: (_) => MobilityProfileScreen(initialSelection: currentProfile),
+      ),
+    );
+    if (!mounted || selectedProfile == null) {
+      return;
+    }
+    setState(() {
+      _mobilityType = selectedProfile.mobilityType;
+    });
+    await widget.onMobilityProfileChanged?.call(selectedProfile);
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${selectedProfile.title} 조건으로 변경했습니다')),
     );
   }
 }
