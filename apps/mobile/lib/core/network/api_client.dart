@@ -26,24 +26,42 @@ class ApiClient {
     return _requestJson(HttpMethod.delete, path, headers: headers);
   }
 
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) {
+    return _requestJson(
+      HttpMethod.post,
+      path,
+      headers: headers,
+      requestBody: body,
+    );
+  }
+
   Future<ApiResponse> _requestJson(
     HttpMethod method,
     String path, {
     required Map<String, String> headers,
+    Map<String, Object?>? requestBody,
   }) async {
     final uri = baseUri.resolve(path);
     try {
       final request = await _open(method, uri).timeout(timeout);
       request.headers.set(HttpHeaders.acceptHeader, ContentType.json.mimeType);
       headers.forEach(request.headers.set);
+      if (requestBody != null) {
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(requestBody));
+      }
 
       final response = await request.close().timeout(timeout);
-      final body = await utf8.decodeStream(response).timeout(timeout);
+      final responseBody = await utf8.decodeStream(response).timeout(timeout);
       if (!_isSuccessStatus(response.statusCode)) {
         return ApiResponse(statusCode: response.statusCode, jsonBody: null);
       }
       final decoded = _decodeJson(
-        body,
+        responseBody,
         statusCode: response.statusCode,
         uri: uri,
       );
@@ -78,6 +96,8 @@ class ApiClient {
     switch (method) {
       case HttpMethod.delete:
         return _httpClient.deleteUrl(uri);
+      case HttpMethod.post:
+        return _httpClient.postUrl(uri);
     }
   }
 }
@@ -92,16 +112,18 @@ class ApiResponse {
   bool get isOk => statusCode == HttpStatus.ok;
 }
 
-enum HttpMethod { delete }
+enum HttpMethod { delete, post }
 
 Object? _decodeJson(String body, {required int statusCode, required Uri uri}) {
   try {
     return jsonDecode(body);
-  } on FormatException {
+  } on FormatException catch (error, stackTrace) {
     throw ApiException(
       'API JSON 응답을 해석하지 못했습니다.',
       statusCode: statusCode,
       path: uri.path,
+      cause: error,
+      causeStackTrace: stackTrace,
     );
   }
 }

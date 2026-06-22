@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/auth_headers.dart';
+import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:flutter/foundation.dart';
@@ -595,7 +596,11 @@ void main() {
     });
 
     expect(reportedErrors, hasLength(1));
-    expect(reportedErrors.single.exception, isA<FormatException>());
+    expect(reportedErrors.single.exception, isA<ApiException>());
+    expect(
+      (reportedErrors.single.exception as ApiException).cause,
+      isA<FormatException>(),
+    );
     expect(reportedErrors.single.stack, isNotNull);
   });
 
