@@ -4259,6 +4259,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
   assert.match(apiClient, /class ApiClient/);
   assert.match(apiClient, /const defaultApiTimeout = Duration\(seconds: 8\)/);
+  assert.match(apiClient, /Future<ApiResponse> getJson/);
   assert.match(apiClient, /Future<ApiResponse> deleteJson/);
   assert.match(apiClient, /Future<ApiResponse> postJson/);
   assert.match(apiClient, /HttpHeaders\.acceptHeader/);
@@ -4268,8 +4269,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(apiError, /class ApiException implements Exception/);
   assert.match(facilityReport, /import 'core\/network\/api_client\.dart';/);
   assert.match(facilityReport, /final ApiClient _apiClient;/);
+  assert.match(
+    facilityReport,
+    /_apiClient\.getJson\([\s\S]*'\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}'/,
+  );
+  assert.match(facilityReport, /X-Easysubway-Report-Receipt-Token/);
   assert.match(facilityReport, /_apiClient\.postJson\([\s\S]*'\/api\/v1\/reports'/);
   assert.match(appDependencies, /FacilityReportApiRepository\([\s\S]*apiClient: ApiClient\(baseUri: resolvedBaseUri\)/);
+  assert.match(apiClientTest, /ApiClient는 GET 요청에 공통 header와 custom header를 적용한다/);
   assert.match(apiClientTest, /ApiClient는 POST 요청에 JSON body와 공통 header를 적용한다/);
   assert.match(apiClientTest, /ApiClient는 DELETE 요청에 공통 timeout과 JSON decode 경계를 적용한다/);
   assert.match(apiClientTest, /ApiClient 예외는 인증 토큰을 노출하지 않는다/);
