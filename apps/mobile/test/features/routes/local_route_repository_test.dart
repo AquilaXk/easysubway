@@ -66,6 +66,39 @@ void main() {
     expect(result.blockedReasons, isEmpty);
   });
 
+  test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      DELETE FROM network_edges
+      WHERE id IN (
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+    expect(
+      result.steps.expand((step) => step.evidenceSources),
+      containsAll(['edge:entry-sangnoksu-seoul-4', 'edge:exit-sadang-seoul-4']),
+    );
+  });
+
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

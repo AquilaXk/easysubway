@@ -60,6 +60,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
     ).getSingleOrNull();
     if (existing != null) {
+      await _backfillBaselineAccessEdges();
       return;
     }
 
@@ -201,50 +202,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             reliabilityScore: const Value(90),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
           ),
-          NetworkEdgesCompanion.insert(
-            id: 'entry-sangnoksu-seoul-4',
-            fromNodeId: 'station-sangnoksu',
-            toNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
-            durationSeconds: const Value(90),
-            edgeType: const Value('ENTRY'),
-            stairAccessState: const Value('STEP_FREE'),
-            accessibilityStatus: const Value('AVAILABLE'),
-            reliabilityScore: const Value(90),
-            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
-          ),
-          NetworkEdgesCompanion.insert(
-            id: 'exit-sangnoksu-seoul-4',
-            fromNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
-            toNodeId: 'station-sangnoksu',
-            durationSeconds: const Value(60),
-            edgeType: const Value('EXIT'),
-            stairAccessState: const Value('STEP_FREE'),
-            accessibilityStatus: const Value('AVAILABLE'),
-            reliabilityScore: const Value(90),
-            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
-          ),
-          NetworkEdgesCompanion.insert(
-            id: 'entry-sadang-seoul-4',
-            fromNodeId: 'station-sadang',
-            toNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
-            durationSeconds: const Value(90),
-            edgeType: const Value('ENTRY'),
-            stairAccessState: const Value('STEP_FREE'),
-            accessibilityStatus: const Value('AVAILABLE'),
-            reliabilityScore: const Value(90),
-            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
-          ),
-          NetworkEdgesCompanion.insert(
-            id: 'exit-sadang-seoul-4',
-            fromNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
-            toNodeId: 'station-sadang',
-            durationSeconds: const Value(60),
-            edgeType: const Value('EXIT'),
-            stairAccessState: const Value('STEP_FREE'),
-            accessibilityStatus: const Value('AVAILABLE'),
-            reliabilityScore: const Value(90),
-            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
-          ),
+          ..._baselineAccessEdges(),
         ]);
         batch.insertAllOnConflictUpdate(stationExits, [
           StationExitsCompanion.insert(
@@ -318,6 +276,61 @@ class CatalogDatabase extends _$CatalogDatabase {
         ]);
       });
     });
+  }
+
+  Future<void> _backfillBaselineAccessEdges() async {
+    await batch((batch) {
+      batch.insertAllOnConflictUpdate(networkEdges, _baselineAccessEdges());
+    });
+  }
+
+  List<NetworkEdgesCompanion> _baselineAccessEdges() {
+    return [
+      NetworkEdgesCompanion.insert(
+        id: 'entry-sangnoksu-seoul-4',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
+        durationSeconds: const Value(90),
+        edgeType: const Value('ENTRY'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'exit-sangnoksu-seoul-4',
+        fromNodeId: _catalogNodeId('station-sangnoksu', 'seoul-4'),
+        toNodeId: 'station-sangnoksu',
+        durationSeconds: const Value(60),
+        edgeType: const Value('EXIT'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'entry-sadang-seoul-4',
+        fromNodeId: 'station-sadang',
+        toNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
+        durationSeconds: const Value(90),
+        edgeType: const Value('ENTRY'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+      NetworkEdgesCompanion.insert(
+        id: 'exit-sadang-seoul-4',
+        fromNodeId: _catalogNodeId('station-sadang', 'seoul-4'),
+        toNodeId: 'station-sadang',
+        durationSeconds: const Value(60),
+        edgeType: const Value('EXIT'),
+        stairAccessState: const Value('STEP_FREE'),
+        accessibilityStatus: const Value('AVAILABLE'),
+        reliabilityScore: const Value(90),
+        lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+      ),
+    ];
   }
 
   Future<void> _createIndexes() async {
