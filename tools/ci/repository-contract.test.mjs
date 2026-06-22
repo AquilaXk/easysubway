@@ -1442,8 +1442,17 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   assert.match(importer, /station line mapping conflict/);
   assert.match(importer, /stationLineId must equal stationId:lineId/);
   assert.match(importer, /station mapping evidence is required/);
+  assert.match(importer, /minimumProductionCoverage must be an object for production pack/);
+  assert.match(importer, /production coverage \${label} \${actualCount} is below required minimum \${value}/);
   assert.match(importer, /duplicate argument/);
   assert.match(importer, /sourceIngestAdapter: "official-source-ingest-v1"/);
+
+  const builder = read("tools/datapack/build-datapack.mjs");
+  const validator = read("tools/datapack/validate-datapack.mjs");
+  for (const source of [builder, validator]) {
+    assert.match(source, /productionMinimumTableRowNames = \["stations", "station_lines", "network_edges", "facilities"\]/);
+    assert.match(source, /production minimumTableRows must define positive stations, station_lines, network_edges, and facilities/);
+  }
 });
 
 test("backend release image는 bootJar 산출물만 포함하는 runtime image로 패키징된다", () => {
