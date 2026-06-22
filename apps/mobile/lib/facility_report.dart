@@ -268,31 +268,23 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
 
-    final uri = baseUri.resolve(
-      '/api/v1/reports/${Uri.encodeComponent(trimmedReportId)}',
-    );
-
     try {
-      final request = await _httpClient
-          .getUrl(uri)
-          .timeout(_facilityReportTimeout);
       final receiptToken = await receiptStore
           ?.receiptTokenForReport(trimmedReportId)
           .timeout(_facilityReportTimeout);
-      if (receiptToken != null && receiptToken.isNotEmpty) {
-        request.headers.set('X-Easysubway-Report-Receipt-Token', receiptToken);
-      }
-      final response = await request.close().timeout(_facilityReportTimeout);
+      final response = await _apiClient.getJson(
+        '/api/v1/reports/${Uri.encodeComponent(trimmedReportId)}',
+        headers: receiptToken == null || receiptToken.isEmpty
+            ? const {}
+            : {'X-Easysubway-Report-Receipt-Token': receiptToken},
+      );
 
-      if (response.statusCode != HttpStatus.ok) {
+      if (!response.isOk) {
         throw const FacilityReportException(_facilityReportStatusErrorMessage);
       }
 
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_facilityReportTimeout);
-      return _reportResultFromBody(
-        body,
+      return _reportResultFromJson(
+        response.jsonBody,
         errorMessage: _facilityReportStatusErrorMessage,
       );
     } on FacilityReportException {
@@ -341,14 +333,6 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       );
       throw const FacilityReportException(_facilityReportListErrorMessage);
     }
-  }
-
-  FacilityReportResult _reportResultFromBody(
-    String body, {
-    required String errorMessage,
-  }) {
-    final decoded = jsonDecode(body);
-    return _reportResultFromJson(decoded, errorMessage: errorMessage);
   }
 
   FacilityReportResult _reportResultFromJson(

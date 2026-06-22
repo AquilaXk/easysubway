@@ -19,6 +19,13 @@ class ApiClient {
   final Duration timeout;
   final HttpClient _httpClient;
 
+  Future<ApiResponse> getJson(
+    String path, {
+    Map<String, String> headers = const {},
+  }) {
+    return _requestJson(HttpMethod.get, path, headers: headers);
+  }
+
   Future<ApiResponse> deleteJson(
     String path, {
     Map<String, String> headers = const {},
@@ -94,6 +101,8 @@ class ApiClient {
 
   Future<HttpClientRequest> _open(HttpMethod method, Uri uri) {
     switch (method) {
+      case HttpMethod.get:
+        return _httpClient.getUrl(uri);
       case HttpMethod.delete:
         return _httpClient.deleteUrl(uri);
       case HttpMethod.post:
@@ -112,7 +121,7 @@ class ApiResponse {
   bool get isOk => statusCode == HttpStatus.ok;
 }
 
-enum HttpMethod { delete, post }
+enum HttpMethod { get, delete, post }
 
 Object? _decodeJson(String body, {required int statusCode, required Uri uri}) {
   try {
