@@ -1,9 +1,17 @@
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode, this.path});
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.path,
+    this.cause,
+    this.causeStackTrace,
+  });
 
   final String message;
   final int? statusCode;
   final String? path;
+  final Object? cause;
+  final StackTrace? causeStackTrace;
 
   @override
   String toString() {

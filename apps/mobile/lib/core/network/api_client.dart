@@ -50,12 +50,27 @@ class ApiClient {
       return ApiResponse(statusCode: response.statusCode, jsonBody: decoded);
     } on ApiException {
       rethrow;
-    } on TimeoutException {
-      throw ApiException('API 요청 시간이 초과되었습니다.', path: uri.path);
-    } on SocketException {
-      throw ApiException('API 서버에 연결하지 못했습니다.', path: uri.path);
-    } catch (_) {
-      throw ApiException('API 요청을 처리하지 못했습니다.', path: uri.path);
+    } on TimeoutException catch (error, stackTrace) {
+      throw ApiException(
+        'API 요청 시간이 초과되었습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
+    } on SocketException catch (error, stackTrace) {
+      throw ApiException(
+        'API 서버에 연결하지 못했습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
+    } catch (error, stackTrace) {
+      throw ApiException(
+        'API 요청을 처리하지 못했습니다.',
+        path: uri.path,
+        cause: error,
+        causeStackTrace: stackTrace,
+      );
     }
   }
 
