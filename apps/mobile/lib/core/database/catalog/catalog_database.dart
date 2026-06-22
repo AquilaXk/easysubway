@@ -279,9 +279,30 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   Future<void> _backfillBaselineAccessEdges() async {
-    await batch((batch) {
-      batch.insertAllOnConflictUpdate(networkEdges, _baselineAccessEdges());
-    });
+    if (!await _isBaselineFixtureCatalog()) {
+      return;
+    }
+    for (final edge in _baselineAccessEdges()) {
+      await into(networkEdges).insert(edge, mode: InsertMode.insertOrIgnore);
+    }
+  }
+
+  Future<bool> _isBaselineFixtureCatalog() async {
+    final row = await customSelect('''
+      SELECT
+        (SELECT COUNT(*)
+         FROM station_lines
+         WHERE (station_id = 'station-sangnoksu' AND line_id = 'seoul-4')
+            OR (station_id = 'station-sadang' AND line_id = 'seoul-4'))
+        +
+        (SELECT COUNT(*)
+         FROM network_edges
+         WHERE id IN (
+           'edge-sangnoksu-sadang-seoul-4',
+           'edge-sadang-sangnoksu-seoul-4'
+         )) AS match_count
+    ''').getSingle();
+    return row.read<int>('match_count') == 4;
   }
 
   List<NetworkEdgesCompanion> _baselineAccessEdges() {

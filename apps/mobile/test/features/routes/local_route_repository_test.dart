@@ -99,6 +99,30 @@ void main() {
     );
   });
 
+  test('기존 baseline access edge 값은 보강 과정에서 덮어쓰지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET accessibility_status = 'UNAVAILABLE',
+          duration_seconds = 999,
+          reliability_score = 30
+      WHERE id = 'entry-sangnoksu-seoul-4'
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT accessibility_status, duration_seconds, reliability_score
+            FROM network_edges
+            WHERE id = 'entry-sangnoksu-seoul-4'
+          ''').getSingle();
+    expect(edge.read<String>('accessibility_status'), 'UNAVAILABLE');
+    expect(edge.read<int>('duration_seconds'), 999);
+    expect(edge.read<int>('reliability_score'), 30);
+  });
+
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
