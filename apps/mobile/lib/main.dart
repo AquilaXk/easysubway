@@ -834,6 +834,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final facilityReportDraftTargetStore =
         widget.facilityReportDraftTargetStore;
     final initialMobilityType = _mobilityType;
+    final currentProfile = mobilityProfileOptions.firstWhere(
+      (option) => option.mobilityType == _mobilityType,
+      orElse: () => mobilityProfileOptions.first,
+    );
     final hasFavorites =
         favoriteRepository != null ||
         favoriteFacilityRepository != null ||
@@ -871,16 +875,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            Text(
-              '안녕하세요',
-              style: textTheme.titleLarge?.copyWith(
-                color: const Color(0xFF466467),
-                fontWeight: FontWeight.w800,
-                height: 1.25,
-              ),
-            ),
+            _HomeTripControlPanel(profile: currentProfile),
             const SizedBox(height: 6),
             Semantics(
               header: true,
@@ -1042,6 +1039,70 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${selectedProfile.title} 조건으로 변경했습니다')),
+    );
+  }
+}
+
+class _HomeTripControlPanel extends StatelessWidget {
+  const _HomeTripControlPanel({required this.profile});
+
+  final MobilityProfileOption profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      container: true,
+      label: '현재 이동 조건, ${profile.title}, ${profile.summary}',
+      child: Container(
+        key: const Key('homeTripControlPanel'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: EasySubwayAccessibleColors.surface,
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              '안녕하세요',
+              style: textTheme.titleMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+            Text(
+              '현재 이동 조건',
+              style: textTheme.labelLarge?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+            Text(
+              profile.title,
+              style: textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w900,
+                height: 1.2,
+              ),
+            ),
+            Text(
+              profile.summary,
+              style: textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
