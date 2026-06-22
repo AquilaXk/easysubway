@@ -118,7 +118,10 @@ void main() {
     expect(result.statusLabel, '내부 이동 경로를 찾았습니다');
     expect(result.summaryLabel, '1번 출구 엘리베이터에서 개찰구까지');
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
-    expect(result.steps.single.burdenLabel, '약 1분 15초 · 28m · 엘리베이터 필요');
+    expect(
+      result.steps.single.burdenLabel,
+      '약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요',
+    );
     expect(result.semanticLabel, contains('1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지'));
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
   });
