@@ -215,8 +215,8 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 }
 
-class FallbackRouteSearchRepository implements RouteSearchRepository {
-  const FallbackRouteSearchRepository({required this.localRepository});
+class LocalFirstRouteSearchRepository implements RouteSearchRepository {
+  const LocalFirstRouteSearchRepository({required this.localRepository});
 
   final LocalRouteRepository localRepository;
 
