@@ -202,8 +202,8 @@ void main() {
               'createdAt': '2026-06-13T04:20:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = RouteSearchApiRepository(
@@ -510,8 +510,8 @@ void main() {
               'createdAt': '2026-06-15T12:00:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = RouteFeedbackApiRepository(

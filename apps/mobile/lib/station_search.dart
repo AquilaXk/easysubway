@@ -2839,7 +2839,7 @@ class _FavoriteStationListContentState
     if (!mounted) {
       return;
     }
-    _controller.load();
+    unawaited(_controller.load());
   }
 }
 

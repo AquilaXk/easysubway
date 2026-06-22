@@ -535,19 +535,21 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FacilityReportScreen(
-          repository: widget.reportRepository,
-          target: target!,
-          locationLoader: _facilityReportLocationLoader(
-            widget.locationProvider,
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => FacilityReportScreen(
+            repository: widget.reportRepository,
+            target: target!,
+            locationLoader: _facilityReportLocationLoader(
+              widget.locationProvider,
+            ),
+            needsLocationPermissionRequest:
+                widget.locationProvider.needsLocationPermissionRequest,
+            openLocationSettings: widget.locationProvider.openLocationSettings,
+            draftTargetStore: draftTargetStore,
+            initialPhotoAttachment: photoAttachment,
           ),
-          needsLocationPermissionRequest:
-              widget.locationProvider.needsLocationPermissionRequest,
-          openLocationSettings: widget.locationProvider.openLocationSettings,
-          draftTargetStore: draftTargetStore,
-          initialPhotoAttachment: photoAttachment,
         ),
       ),
     );

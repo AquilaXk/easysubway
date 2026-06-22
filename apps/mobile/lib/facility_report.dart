@@ -1805,13 +1805,15 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         return;
       }
     }
-    _controller.submit(
-      target: widget.target,
-      selectedType: _selectedType,
-      description: _descriptionController.text,
-      photoAttachment: _photoAttachment,
-      latitude: _attachedLocation?.latitude,
-      longitude: _attachedLocation?.longitude,
+    unawaited(
+      _controller.submit(
+        target: widget.target,
+        selectedType: _selectedType,
+        description: _descriptionController.text,
+        photoAttachment: _photoAttachment,
+        latitude: _attachedLocation?.latitude,
+        longitude: _attachedLocation?.longitude,
+      ),
     );
   }
 

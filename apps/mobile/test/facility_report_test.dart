@@ -133,8 +133,8 @@ void main() {
                   },
                 },
               }),
-            )
-            ..close();
+            );
+          await request.response.close();
         case ('PUT', '/api/v1/report-uploads/client-submission-1-photo.jpg'):
           uploadChecksumHeader = request.headers.value(
             'x-easysubway-upload-sha256',
@@ -146,9 +146,8 @@ void main() {
             <int>[],
             (bytes, chunk) => bytes..addAll(chunk),
           );
-          request.response
-            ..statusCode = HttpStatus.noContent
-            ..close();
+          request.response.statusCode = HttpStatus.noContent;
+          await request.response.close();
         case ('POST', '/api/v1/reports'):
           authorizationHeader = request.headers.value(
             HttpHeaders.authorizationHeader,
@@ -173,13 +172,12 @@ void main() {
                   'receiptToken': 'receipt-token-1',
                 },
               }),
-            )
-            ..close();
+            );
+          await request.response.close();
         default:
           await utf8.decodeStream(request);
-          request.response
-            ..statusCode = HttpStatus.notFound
-            ..close();
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
       }
     });
 
@@ -299,8 +297,8 @@ void main() {
               'receiptToken': 'receipt-token-1',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = FacilityReportApiRepository(
@@ -349,8 +347,8 @@ void main() {
               'receiptToken': 'receipt-token-1',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = FacilityReportApiRepository(
@@ -396,8 +394,8 @@ void main() {
               'uploadMethod': 'POST',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final repository = FacilityReportApiRepository(
@@ -467,8 +465,8 @@ void main() {
       if (requestCount == 1) {
         request.response
           ..statusCode = HttpStatus.unauthorized
-          ..write(jsonEncode({'success': false}))
-          ..close();
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
         return;
       }
 
@@ -487,8 +485,8 @@ void main() {
               'createdAt': '2026-06-13T10:00:00',
             },
           }),
-        )
-        ..close();
+        );
+      await request.response.close();
     });
 
     final authProvider = RetryAuthorizationHeaderProvider();
