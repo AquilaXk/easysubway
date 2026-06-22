@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
@@ -396,6 +397,43 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('홈 보조 행동은 좁은 화면과 큰 글자에서도 줄임표 없이 터치 기준을 지킨다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final mobilityButton = find.byKey(const Key('mobilityProfileButton'));
+    final favoritesButton = find.byKey(const Key('favoritesButton'));
+
+    expect(EasySubwayTouchTarget.iconOnly, 48);
+    expect(EasySubwayTouchTarget.general, 56);
+    expect(EasySubwayTouchTarget.primary, 60);
+    expect(find.text('이동 조건'), findsOneWidget);
+    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(tester.getSize(mobilityButton).height, greaterThan(56));
+    expect(tester.getSize(favoritesButton).height, greaterThan(56));
+    expect(tester.getSize(mobilityButton).height, greaterThanOrEqualTo(60));
   });
 
   testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {
