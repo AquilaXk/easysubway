@@ -196,6 +196,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     return switch (code) {
       'STAIR_ONLY_ACCESS' => '계단 없는 경로를 찾지 못했습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+      'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
       _ => '안내 가능한 경로를 찾지 못했습니다.',
