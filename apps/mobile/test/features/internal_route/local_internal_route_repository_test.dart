@@ -320,7 +320,7 @@ void main() {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
-    final repository = FallbackInternalRouteRepository(
+    final repository = LocalFirstInternalRouteRepository(
       localRepository: LocalInternalRouteRepository(catalogDatabase: database),
     );
 

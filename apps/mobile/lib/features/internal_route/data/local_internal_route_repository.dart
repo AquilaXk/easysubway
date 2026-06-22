@@ -168,8 +168,8 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
   }
 }
 
-class FallbackInternalRouteRepository implements InternalRouteRepository {
-  const FallbackInternalRouteRepository({required this.localRepository});
+class LocalFirstInternalRouteRepository implements InternalRouteRepository {
+  const LocalFirstInternalRouteRepository({required this.localRepository});
 
   final LocalInternalRouteRepository localRepository;
 
