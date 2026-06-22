@@ -548,7 +548,7 @@ class _RouteCatalogSnapshot {
               toNodeId: nodeKey.nodeId,
               type: graph.RouteEdgeType.entry,
               baseCost: 90,
-              stairAccessState: graph.RouteStairAccessState.stepFree,
+              stairAccessState: graph.RouteStairAccessState.unknown,
             ),
           );
         }
@@ -562,7 +562,7 @@ class _RouteCatalogSnapshot {
               toNodeId: stationLine.stationId,
               type: graph.RouteEdgeType.exit,
               baseCost: 60,
-              stairAccessState: graph.RouteStairAccessState.stepFree,
+              stairAccessState: graph.RouteStairAccessState.unknown,
             ),
           );
         }
@@ -572,8 +572,8 @@ class _RouteCatalogSnapshot {
     // route contract: synthetic connector edge
     // These fixture-derived entry, exit, and transfer edges only connect known
     // station-line nodes when explicit source edges are absent. They are
-    // step-free defaults for local fallback routing, not proof of field-verified
-    // elevator or ramp availability.
+    // UNKNOWN for strict mobility profiles because they are not proof of
+    // field-verified elevator or ramp availability.
     for (final stationEntry in nodeKeysByStation.entries) {
       final stationId = stationEntry.key;
       final stationNodes = stationEntry.value.values.toList(growable: false);
@@ -601,7 +601,7 @@ class _RouteCatalogSnapshot {
               type: graph.RouteEdgeType.transfer,
               baseCost: 140,
               transferStationId: stationId,
-              stairAccessState: graph.RouteStairAccessState.stepFree,
+              stairAccessState: graph.RouteStairAccessState.unknown,
             ),
           );
         }
