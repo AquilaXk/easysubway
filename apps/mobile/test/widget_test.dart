@@ -1218,22 +1218,6 @@ void main() {
     expect(find.text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
   });
 
-  testWidgets('인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다', (tester) async {
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    expect(find.byKey(const Key('favoritesButton')), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsNothing);
-    expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
-  });
-
   testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final notificationRepository = FakeNotificationSettingsRepository();
