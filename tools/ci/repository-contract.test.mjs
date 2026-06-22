@@ -3995,6 +3995,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationApiRepository = read(
+    "apps/mobile/lib/features/stations/data/station_api_repository.dart",
+  );
   const mapAdapter = read("apps/mobile/lib/map_adapter.dart");
   const mapAdapterTest = read("apps/mobile/test/map_adapter_test.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
@@ -4136,28 +4139,30 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
-  assert.match(stationSearch, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
+  assert.match(stationApiRepository, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
   assert.match(stationSearch, /final double\? latitude/);
   assert.match(stationSearch, /final double\? longitude/);
   assert.match(stationSearch, /_optionalDouble\(json, 'latitude'\)/);
   assert.match(stationSearch, /_optionalDouble\(json, 'longitude'\)/);
-  assert.match(stationSearch, /import 'core\/network\/api_client\.dart';/);
-  assert.match(stationSearch, /class StationSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
-  assert.match(stationSearch, /_apiClient\.getJson\(/);
+  assert.doesNotMatch(stationSearch, /import 'core\/network\/api_client\.dart';/);
+  assert.doesNotMatch(stationSearch, /class StationSearchApiRepository/);
+  assert.match(stationApiRepository, /class StationSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(stationApiRepository, /_apiClient\.getJson\(/);
   assert.doesNotMatch(
-    stationSearch,
+    stationApiRepository,
     /class StationSearchApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteStationApiRepository/,
   );
-  assert.match(stationSearch, /class FavoriteStationApiRepository[\s\S]*final ApiClient _apiClient;/);
-  assert.match(stationSearch, /class FavoriteStationApiRepository[\s\S]*_apiClient\.getJson\(/);
-  assert.match(stationSearch, /class FavoriteStationApiRepository[\s\S]*_apiClient\.putJson\(/);
-  assert.match(stationSearch, /class FavoriteStationApiRepository[\s\S]*_apiClient\.deleteJson\(/);
+  assert.doesNotMatch(stationSearch, /class FavoriteStationApiRepository/);
+  assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*_apiClient\.getJson\(/);
+  assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*_apiClient\.putJson\(/);
+  assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*_apiClient\.deleteJson\(/);
   assert.doesNotMatch(
-    stationSearch,
+    stationApiRepository,
     /class FavoriteStationApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteStationException/,
   );
-  assert.match(stationSearch, /HttpStatus\.unauthorized/);
-  assert.match(stationSearch, /invalidateAuthorization\(\)/);
+  assert.match(stationApiRepository, /HttpStatus\.unauthorized/);
+  assert.match(stationApiRepository, /invalidateAuthorization\(\)/);
   assert.match(stationSearch, /package:flutter\/foundation\.dart/);
   assert.match(stationSearch, /const configuredBaseUrl = String\.fromEnvironment\('EASYSUBWAY_API_BASE_URL'\)/);
   assert.match(stationSearch, /isReleaseMode: kReleaseMode/);
