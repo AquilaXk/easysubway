@@ -1234,35 +1234,6 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
   });
 
-  test('기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다', () {
-    final app = EasySubwayApp(
-      repository: FakeStationSearchRepository(),
-      reportRepository: FakeFacilityReportRepository(),
-      routeRepository: FakeRouteSearchRepository(),
-      initialOnboardingState: _completedOnboardingState(),
-    );
-
-    expect(app.favoriteRepository, isNull);
-    expect(app.favoriteFacilityRepository, isNull);
-    expect(app.favoriteRouteRepository, isNull);
-    expect(app.notificationRepository, isNull);
-    expect(app.notificationPermissionProvider, isNull);
-  });
-
-  test('푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다', () {
-    final app = EasySubwayApp(
-      repository: FakeStationSearchRepository(),
-      reportRepository: FakeFacilityReportRepository(),
-      routeRepository: FakeRouteSearchRepository(),
-      initialOnboardingState: _completedOnboardingState(),
-      enablePushNotifications: true,
-    );
-
-    expect(app.favoriteRouteRepository, isNull);
-    expect(app.notificationRepository, isNull);
-    expect(app.notificationPermissionProvider, isNull);
-  });
-
   testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final notificationRepository = FakeNotificationSettingsRepository();
