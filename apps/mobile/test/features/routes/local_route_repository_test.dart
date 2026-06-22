@@ -57,10 +57,70 @@ void main() {
     expect(result.lineName, '수도권 4호선');
     expect(result.isLocalResult, isTrue);
     expect(
-      result.steps.map((step) => step.lineId).where((id) => id.isNotEmpty),
-      ['seoul-4'],
+      result.steps
+          .map((step) => step.lineId)
+          .where((id) => id.isNotEmpty)
+          .toSet(),
+      {'seoul-4'},
     );
     expect(result.blockedReasons, isEmpty);
+  });
+
+  test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      DELETE FROM network_edges
+      WHERE id IN (
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+    expect(
+      result.steps.expand((step) => step.evidenceSources),
+      containsAll(['edge:entry-sangnoksu-seoul-4', 'edge:exit-sadang-seoul-4']),
+    );
+  });
+
+  test('기존 baseline access edge 값은 보강 과정에서 덮어쓰지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET accessibility_status = 'UNAVAILABLE',
+          duration_seconds = 999,
+          reliability_score = 30
+      WHERE id = 'entry-sangnoksu-seoul-4'
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT accessibility_status, duration_seconds, reliability_score
+            FROM network_edges
+            WHERE id = 'entry-sangnoksu-seoul-4'
+          ''').getSingle();
+    expect(edge.read<String>('accessibility_status'), 'UNAVAILABLE');
+    expect(edge.read<int>('duration_seconds'), 999);
+    expect(edge.read<int>('reliability_score'), 30);
   });
 
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
@@ -114,7 +174,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.lineId == 'line-test',
+      (step) => step.evidenceSources.contains('edge:edge-a-b-local'),
     );
     expect(rideStep.actionTitle, '열차 이동');
     expect(rideStep.actionDetail, contains('출발역에서 중간역까지'));
@@ -128,7 +188,10 @@ void main() {
   test('계단 없는 동선 여부가 미확인인 선택 경로는 높은 신뢰도로 표시하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
-    await _seedLineWithoutNetworkEdges(database);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters,
@@ -388,7 +451,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
     expect(result.warnings, isEmpty);
   });
 
@@ -439,6 +502,31 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('구형 catalog schema는 baseline access backfill 없이 계속 열린다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('DROP TABLE network_edges');
+    await database.customStatement('''
+      CREATE TABLE network_edges (
+        id TEXT NOT NULL PRIMARY KEY,
+        from_node_id TEXT NOT NULL,
+        to_node_id TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        edge_type TEXT NOT NULL DEFAULT 'WALK'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final rows = await database
+        .customSelect(
+          "SELECT id FROM network_edges WHERE id LIKE 'entry-%' OR id LIKE 'exit-%'",
+        )
+        .get();
+    expect(rows, isEmpty);
+  });
+
   test('service pattern node는 역-노선 node로 뭉개지지 않고 출입구와 연결된다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -473,10 +561,121 @@ void main() {
 
     expect(result.status, 'FOUND');
     expect(
-      result.steps.map((step) => step.lineId).where((id) => id.isNotEmpty),
-      ['line-test'],
+      result.steps
+          .map((step) => step.lineId)
+          .where((id) => id.isNotEmpty)
+          .toSet(),
+      {'line-test'},
     );
     expect(result.blockedReasons, isEmpty);
+  });
+
+  test('생성 access edge만 있는 휠체어 경로는 검증된 경로로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES (
+        'edge-a-b-step-free',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        'RIDE',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+  });
+
+  test('생성 transfer edge만 있는 휠체어 환승 경로는 검증된 경로로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await _addSecondLineForTransferFixture(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'entry-b-line-test-explicit',
+          'station-b',
+          'station-b:line-test',
+          90,
+          'ENTRY',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-b-a-line-test',
+          'station-b:line-test',
+          'station-a:line-test',
+          90,
+          'RIDE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-line-alt',
+          'station-a:line-alt',
+          'station-c:line-alt',
+          90,
+          'RIDE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'exit-c-line-alt-explicit',
+          'station-c:line-alt',
+          'station-c',
+          60,
+          'EXIT',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
   });
 
   test('service pattern entry가 사용 불가이면 생성 entry로 우회하지 않는다', () async {
@@ -1214,7 +1413,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.lineId == 'line-test',
+      (step) => step.evidenceSources.contains('edge:edge-a-b-low-confidence'),
     );
     expect(result.status, 'FOUND');
     expect(result.warnings.map((warning) => warning.code), {
@@ -1260,7 +1459,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.lineId == 'line-test',
+      (step) => step.evidenceSources.contains('edge:edge-a-b-duration-unknown'),
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 0);
@@ -1301,7 +1500,9 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.lineId == 'line-test',
+      (step) => step.evidenceSources.contains(
+        'edge:edge-a-b-low-confidence-distance-unknown',
+      ),
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 2);
@@ -1344,7 +1545,8 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.lineId == 'line-test',
+      (step) =>
+          step.evidenceSources.contains('edge:edge-a-b-measured-distance'),
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 2);
@@ -1507,6 +1709,17 @@ void main() {
           95
         ),
         (
+          'transfer-a-express-alt-available',
+          'station-a:line-test:EXPRESS',
+          'station-a:line-alt',
+          140,
+          'TRANSFER',
+          'EXPRESS',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
           'edge-a-c-line-alt',
           'station-a:line-alt',
           'station-c:line-alt',
@@ -1627,6 +1840,17 @@ void main() {
           95
         ),
         (
+          'transfer-b-local-express',
+          'station-b:line-test:LOCAL',
+          'station-b:line-test:EXPRESS',
+          140,
+          'TRANSFER',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
           'edge-b-c-express',
           'station-b:line-test:EXPRESS',
           'station-c:line-test:EXPRESS',
@@ -1673,6 +1897,17 @@ void main() {
           'station-b:line-test',
           90,
           'RIDE',
+          '',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'transfer-b-base-local',
+          'station-b:line-test',
+          'station-b:line-test:LOCAL',
+          140,
+          'TRANSFER',
           '',
           'STEP_FREE',
           'AVAILABLE',
@@ -1838,7 +2073,10 @@ void main() {
   );
 }
 
-Future<void> _seedLineWithoutNetworkEdges(CatalogDatabase database) async {
+Future<void> _seedLineWithoutNetworkEdges(
+  CatalogDatabase database, {
+  bool includeExplicitAccessEdges = true,
+}) async {
   await database.customStatement('''
     INSERT INTO catalog_metadata (key, value, updated_at)
     VALUES ('schemaVersion', '1', 1771459200000)
@@ -1876,6 +2114,79 @@ Future<void> _seedLineWithoutNetworkEdges(CatalogDatabase database) async {
       [station.$1, station.$3.toString(), station.$3],
     );
   }
+  if (includeExplicitAccessEdges) {
+    await _addExplicitAccessEdges(database);
+  }
+}
+
+Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
+  await database.customStatement('''
+    INSERT INTO network_edges (
+      id, from_node_id, to_node_id, duration_seconds, edge_type,
+      stair_access_state, accessibility_status, reliability_score
+    )
+    VALUES
+      (
+        'entry-station-a-line-test',
+        'station-a',
+        'station-a:line-test',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'exit-station-a-line-test',
+        'station-a:line-test',
+        'station-a',
+        60,
+        'EXIT',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'entry-station-b-line-test',
+        'station-b',
+        'station-b:line-test',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'exit-station-b-line-test',
+        'station-b:line-test',
+        'station-b',
+        60,
+        'EXIT',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'entry-station-c-line-test',
+        'station-c',
+        'station-c:line-test',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'exit-station-c-line-test',
+        'station-c:line-test',
+        'station-c',
+        60,
+        'EXIT',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      )
+  ''');
 }
 
 Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
@@ -1894,6 +2205,53 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
       [station.$1, station.$2],
     );
   }
+  await database.customStatement('''
+    INSERT INTO network_edges (
+      id, from_node_id, to_node_id, duration_seconds, edge_type,
+      stair_access_state, accessibility_status, reliability_score
+    )
+    VALUES
+      (
+        'entry-station-a-line-alt',
+        'station-a',
+        'station-a:line-alt',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'exit-station-a-line-alt',
+        'station-a:line-alt',
+        'station-a',
+        60,
+        'EXIT',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'entry-station-c-line-alt',
+        'station-c',
+        'station-c:line-alt',
+        90,
+        'ENTRY',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      ),
+      (
+        'exit-station-c-line-alt',
+        'station-c:line-alt',
+        'station-c',
+        60,
+        'EXIT',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      )
+  ''');
 }
 
 Future<void> _addFacilityIdColumnIfMissing(CatalogDatabase database) async {
