@@ -14,7 +14,7 @@ import '../station_search.dart';
 import '../user_data_deletion.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
 import '../features/routes/data/local_route_repository.dart'
-    show FallbackRouteSearchRepository, LocalRouteRepository;
+    show LocalFirstRouteSearchRepository, LocalRouteRepository;
 
 class AppDependencies {
   const AppDependencies({
@@ -105,7 +105,7 @@ class AppDependencies {
           routeRepository ??
           (catalogDatabase == null
               ? RouteSearchApiRepository(baseUri: requireBaseUri())
-              : FallbackRouteSearchRepository(
+              : LocalFirstRouteSearchRepository(
                   localRepository: LocalRouteRepository(
                     catalogDatabase: catalogDatabase,
                   ),
@@ -158,7 +158,7 @@ class AppDependencies {
           internalRouteRepository ??
           (catalogDatabase == null
               ? InternalRouteApiRepository(baseUri: requireBaseUri())
-              : FallbackInternalRouteRepository(
+              : LocalFirstInternalRouteRepository(
                   localRepository: LocalInternalRouteRepository(
                     catalogDatabase: catalogDatabase,
                   ),
