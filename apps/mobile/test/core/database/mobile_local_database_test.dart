@@ -9,8 +9,10 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
 import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
+import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
+import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -366,6 +368,61 @@ void main() {
 
     expect(metadata.read<String>('value'), 'capital-v18');
   });
+
+  test(
+    'catalog opener는 설치된 current pack의 baseline access edge를 보강한다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-current-access-backfill-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      final updatedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+      final updatedDatabase = CatalogDatabase.file(updatedPack);
+      await updatedDatabase.seedBaselineIfEmpty();
+      await updatedDatabase.customStatement('''
+      DELETE FROM network_edges
+      WHERE edge_type IN ('ENTRY', 'EXIT')
+    ''');
+      await updatedDatabase.close();
+      await File('${catalogDirectory.path}/current.json').writeAsString(
+        jsonEncode({
+          'id': 'capital',
+          'version': '18',
+          'path': updatedPack.path,
+          'sha256': 'local-fixture',
+        }),
+      );
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+      final accessEdgeCount = await database.customSelect('''
+      SELECT COUNT(*) AS count
+      FROM network_edges
+      WHERE id IN (
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''').getSingle();
+      final route = await LocalRouteRepository(catalogDatabase: database)
+          .searchRoute(
+            const RouteSearchRequest(
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityType: 'WHEELCHAIR',
+            ),
+          );
+
+      expect(accessEdgeCount.read<int>('count'), 4);
+      expect(route.status, 'FOUND');
+    },
+  );
 
   test(
     'catalog opener는 이전 컨테이너 경로의 current pointer도 현재 catalog에서 복원한다',

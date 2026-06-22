@@ -124,6 +124,7 @@ class CatalogDatabaseOpener {
     var returned = false;
     try {
       if (await _isUsableCatalogDatabase(database)) {
+        await database.seedBaselineIfEmpty();
         returned = true;
         return database;
       }
