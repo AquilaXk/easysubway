@@ -4128,8 +4128,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /final double\? longitude/);
   assert.match(stationSearch, /_optionalDouble\(json, 'latitude'\)/);
   assert.match(stationSearch, /_optionalDouble\(json, 'longitude'\)/);
-  assert.match(stationSearch, /_httpClient\s*\.\s*getUrl\(uri\)\s*\.\s*timeout\(_stationSearchTimeout\)/);
-  assert.match(stationSearch, /request\.close\(\)\.timeout\(_stationSearchTimeout\)/);
+  assert.match(stationSearch, /import 'core\/network\/api_client\.dart';/);
+  assert.match(stationSearch, /class StationSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
+  assert.match(stationSearch, /_apiClient\.getJson\(/);
+  assert.doesNotMatch(
+    stationSearch,
+    /class StationSearchApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteStationApiRepository/,
+  );
   assert.match(stationSearch, /HttpStatus\.unauthorized/);
   assert.match(stationSearch, /invalidateAuthorization\(\)/);
   assert.match(stationSearch, /package:flutter\/foundation\.dart/);
