@@ -296,33 +296,36 @@ test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추�
 test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
+  assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /name: Changes/);
   assert.match(workflow, /name: Repository CI/);
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
   assert.match(workflow, /name: Android CI/);
-  assert.match(workflow, /name: iOS CI/);
+  assert.doesNotMatch(workflow, /name: iOS CI/);
+  assert.doesNotMatch(workflow, /runs-on: macos-latest/);
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
   assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
-  assert.match(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
+  assert.doesNotMatch(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
+  const androidJob = workflow.match(/\n  android:[\s\S]*$/)?.[0] ?? "";
 
   assert.match(workflow, /Repository CI \/ Skip unchanged area/);
   assert.match(workflow, /Backend CI \/ Skip unchanged area/);
   assert.match(workflow, /Mobile App CI \/ Skip unchanged area/);
   assert.match(workflow, /Android CI \/ Skip unchanged area/);
-  assert.match(workflow, /iOS CI \/ Skip unchanged area/);
+  assert.doesNotMatch(workflow, /iOS CI \/ Skip unchanged area/);
 
   assert.doesNotMatch(jobBlock(workflow, "repository-contracts", "backend"), /\n    if:/);
   assert.doesNotMatch(jobBlock(workflow, "backend", "mobile-app"), /\n    if:/);
   assert.doesNotMatch(jobBlock(workflow, "mobile-app", "android"), /\n    if:/);
-  assert.doesNotMatch(jobBlock(workflow, "android", "ios"), /\n    if:/);
+  assert.doesNotMatch(androidJob, /\n    if:/);
 });
 
 test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을 검증한다", () => {
@@ -639,16 +642,11 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
 
-  assert.match(workflow, /ios-release:/);
-  assert.match(workflow, /name: iOS Release Artifact/);
-  assert.match(workflow, /runs-on: macos-latest/);
-  assert.match(workflow, /flutter build ios --release --no-codesign/);
-  assert.match(workflow, /build\/ios\/iphoneos\/Runner\.app/);
-  assert.match(workflow, /find build\/ios -name "\*\.dSYM" -print0/);
-  assert.match(workflow, /release-artifacts\/ios\/dSYMs\/\$\{dsym_path#build\/ios\/\}/);
-  assert.match(workflow, /ditto -c -k release-artifacts\/ios\/dSYMs release-artifacts\/ios\/dsym\.zip/);
-  assert.match(workflow, /dsym_count=\$\{dsym_count\}/);
-  assert.match(workflow, /name: easysubway-ios-release-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ios-release:/);
+  assert.doesNotMatch(workflow, /name: iOS Release Artifact/);
+  assert.doesNotMatch(workflow, /runs-on: macos-latest/);
+  assert.doesNotMatch(workflow, /flutter build ios --release --no-codesign/);
+  assert.doesNotMatch(workflow, /name: easysubway-ios-release-\$\{\{ github\.sha \}\}/);
 
   assert.match(workflow, /backend-release:/);
   assert.match(workflow, /name: Backend Release Image/);
@@ -692,7 +690,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
   assert.equal(gate.artifacts.ios.format, "Runner.app.zip");
   assert.equal(gate.artifacts.ios.ciArtifactStoreReady, false);
-  assert.equal(gate.artifacts.ios.ciSigningKeyType, "no-codesign");
+  assert.equal(gate.artifacts.ios.ciArtifactProducer, "deferred_until_ios_release_phase");
+  assert.equal(gate.artifacts.ios.ciSigningKeyType, "not-produced");
   assert.equal(gate.artifacts.ios.symbolArtifact, "dSYM");
   assert.equal(gate.artifacts.ios.symbolRetentionDays, 90);
   assert.ok(gate.artifacts.ios.storeReadyRequires.includes("Apple distribution signing"));
@@ -706,22 +705,23 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /signing_key_type=temporary-self-signed/);
   assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
-  assert.match(workflow, /signing_key_type=no-codesign/);
-  assert.match(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
-  assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
+  assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
+  assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
+  assert.doesNotMatch(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
 
   assert.match(readme, /signed release artifact gate/);
+  assert.match(readme, /Android-first 배포 파이프라인은 Android AAB와 backend image만 생성/);
   assert.match(readme, /Android 15 \(API 35\)/);
   assert.match(readme, /Xcode 26/);
   assert.match(readme, /TestFlight/);
+  assert.match(readme, /dSYM 90일 보관 workflow/);
   assert.match(readme, /Play internal track/);
 });
 
 test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 산출물 빌드를 실행한다", async () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
   const detector = read("tools/ci/detect-changed-paths.sh");
-  const androidReleaseJob = jobBlock(workflow, "android-release", "ios-release");
-  const iosReleaseJob = jobBlock(workflow, "ios-release", "backend-release");
+  const androidReleaseJob = jobBlock(workflow, "android-release", "backend-release");
   const backendReleaseJob = workflow.match(/\n  backend-release:[\s\S]*$/)?.[0] ?? "";
 
   assert.match(workflow, /changes:\s*\n\s*name: Changes/);
@@ -729,8 +729,7 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
   assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
   assert.match(androidReleaseJob, /needs: changes/);
   assert.match(androidReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.android == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
-  assert.match(iosReleaseJob, /needs: changes/);
-  assert.match(iosReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.ios == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
+  assert.doesNotMatch(workflow, /ios-release:/);
   assert.match(backendReleaseJob, /needs: changes/);
   assert.match(backendReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.backend == 'true' \|\| needs\.changes\.outputs\.deploy == 'true' \}\}/);
   assert.match(detector, /apps\/mobile\/release\/\*\*/);
@@ -962,7 +961,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   }
 
   assert.ok(signals.get("android_mapping_retention").evidence.includes("android-mapping-artifact-retention"));
-  assert.ok(signals.get("ios_dsym_retention").evidence.includes("ios-dsym-artifact-retention"));
+  assert.ok(signals.get("ios_dsym_retention").evidence.includes("ios-dsym-artifact-retention-deferred"));
+  assert.match(signals.get("ios_dsym_retention").thresholdKo, /Android-first 배포에서는 후순위 범위/);
   assert.ok(signals.get("cross_version_correlation_ids").evidence.includes("app-datapack-route-provider-correlation"));
 
   assert.match(readme, /## Operations/);
@@ -984,7 +984,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(datapackWorkflow, /if \(isMainBranch && remotePublishEnabled !== "false"\)/);
   assert.match(datapackWorkflow, /remotePublishResult === "success" \? "success" : "failed"/);
   assert.match(releaseArtifactsWorkflow, /mapping_retention_days=90/);
-  assert.match(releaseArtifactsWorkflow, /dsym_retention_days=90/);
+  assert.doesNotMatch(releaseArtifactsWorkflow, /dsym_retention_days=90/);
   assert.match(releaseArtifactsWorkflow, /retention-days: 90/);
 });
 
