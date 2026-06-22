@@ -242,6 +242,44 @@ void main() {
       expect(result.status, RouteStatus.found);
       expect(result.edgeIds.length, 9999);
     });
+
+    test('generated connector edge 비율을 일반 접근성 edge와 별도로 계산한다', () {
+      final graph = NetworkGraph(
+        nodes: const [
+          RouteNode(
+            id: 'station-a:line-1',
+            stationId: 'station-a',
+            lineId: 'line-1',
+          ),
+          RouteNode(
+            id: 'station-b:line-1',
+            stationId: 'station-b',
+            lineId: 'line-1',
+          ),
+        ],
+        edges: const [
+          RouteEdge(
+            id: 'entry-a-generated',
+            fromNodeId: 'station-a',
+            toNodeId: 'station-a:line-1',
+            type: RouteEdgeType.entry,
+            baseCost: 90,
+            stairAccessState: RouteStairAccessState.unknown,
+            isGeneratedConnector: true,
+          ),
+          RouteEdge(
+            id: 'ride-a-b',
+            fromNodeId: 'station-a:line-1',
+            toNodeId: 'station-b:line-1',
+            type: RouteEdgeType.ride,
+            baseCost: 180,
+            lineId: 'line-1',
+          ),
+        ],
+      );
+
+      expect(graph.generatedConnectorEdgeRatio, 0.5);
+    });
   });
 }
 
