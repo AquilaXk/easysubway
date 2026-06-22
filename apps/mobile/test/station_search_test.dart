@@ -1292,6 +1292,7 @@ void main() {
       status: 'ADMIN_VERIFIED',
       dataConfidence: 'HIGH',
       lastUpdatedAt: '2026-06-13',
+      fieldValidationStatus: ' verified ',
     );
 
     expect(ramp.typeLabel, '경사로');
@@ -1299,11 +1300,13 @@ void main() {
     expect(ramp.confidenceLabel, '정보 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 정보 확인 필요, 출처 확인 필요',
+      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 현장 검증 전, 정보 확인 필요, 출처 확인 필요',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
+    expect(customerCenter.fieldValidationLabel, '현장 검증됨');
     expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
+    expect(customerCenter.semanticLabel, contains('현장 검증됨'));
   });
 }
 

@@ -2549,6 +2549,7 @@ void main() {
           hasStairOnlyPath: false,
           dataConfidence: 'HIGH',
           dataSourceType: 'OFFICIAL_FILE',
+          fieldValidationStatus: 'VERIFIED',
         ),
       ],
       stationFacilities: const [
@@ -2567,6 +2568,7 @@ void main() {
           dataConfidence: 'HIGH',
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-12',
+          fieldValidationStatus: 'VERIFIED',
         ),
         StationFacilityInfo(
           id: 'facility-sangnoksu-elevator-2',
@@ -2581,6 +2583,7 @@ void main() {
           dataConfidence: 'HIGH',
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-14',
+          fieldValidationStatus: 'VERIFIED',
         ),
       ],
     );
@@ -2670,7 +2673,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -2684,7 +2687,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -2700,7 +2703,7 @@ void main() {
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 정보 신뢰도 높음, 출처 공식 파일',
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일',
         ),
         findsOneWidget,
       );
@@ -2730,7 +2733,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일',
         ),
         findsOneWidget,
       );
@@ -2914,10 +2917,10 @@ void main() {
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
     expect(find.text('엘리베이터에서 개찰구까지 이동합니다.'), findsOneWidget);
-    expect(find.text('약 1분 15초 · 28m · 엘리베이터 필요'), findsOneWidget);
+    expect(find.text('약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        '내부 이동 안내, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 엘리베이터 필요, 엘리베이터에서 개찰구까지 이동합니다.',
+        '내부 이동 안내, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요, 엘리베이터에서 개찰구까지 이동합니다.',
       ),
       findsOneWidget,
     );

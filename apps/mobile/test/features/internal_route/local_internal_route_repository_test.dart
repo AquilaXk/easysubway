@@ -167,6 +167,78 @@ void main() {
     expect(result.blockedReasons, contains('내부 이동 경로 접근성 상태를 확인할 수 없습니다.'));
   });
 
+  test('로컬 내부 이동 단계는 현장 검증 상태를 부담 라벨에서 구분한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO internal_route_nodes (id, station_id, label, node_type)
+      VALUES
+        ('node-verified-from', 'station-sangnoksu', '검증 출발', 'CONCOURSE'),
+        ('node-verified-to', 'station-sangnoksu', '검증 도착', 'PLATFORM'),
+        ('node-unknown-from', 'station-sangnoksu', '미확인 출발', 'CONCOURSE'),
+        ('node-unknown-to', 'station-sangnoksu', '미확인 도착', 'PLATFORM'),
+        ('node-stale-from', 'station-sangnoksu', '오래됨 출발', 'CONCOURSE'),
+        ('node-stale-to', 'station-sangnoksu', '오래됨 도착', 'PLATFORM')
+      ''');
+    await database.customStatement('''
+      INSERT INTO internal_route_edges (
+        id,
+        from_node_id,
+        to_node_id,
+        edge_type,
+        duration_seconds,
+        accessibility_status,
+        instruction
+      )
+      VALUES
+        ('edge-field-verified', 'node-verified-from', 'node-verified-to', 'WALK', 60, 'AVAILABLE', '검증된 통로입니다.'),
+        ('edge-field-unknown', 'node-unknown-from', 'node-unknown-to', 'WALK', 60, 'AVAILABLE', '현장 확인 전 통로입니다.'),
+        ('edge-field-stale', 'node-stale-from', 'node-stale-to', 'WALK', 60, 'AVAILABLE', '재확인이 필요한 통로입니다.')
+      ''');
+    await database.customStatement('''
+      INSERT INTO data_quality_records (
+        id,
+        target_type,
+        target_id,
+        quality_level,
+        checked_at
+      )
+      VALUES
+        ('quality-edge-field-verified', 'internal_route_edge', 'edge-field-verified', 'FIELD_VERIFIED', 1781827200),
+        ('quality-edge-field-verified-old', 'internal_route_edge', 'edge-field-verified', 'FIELD_STALE', 1748736000),
+        ('quality-edge-field-unknown', 'internal_route_edge', 'edge-field-unknown', 'FIELD_UNKNOWN', NULL),
+        ('quality-edge-field-stale', 'internal_route_edge', 'edge-field-stale', 'FIELD_STALE', 1748736000)
+      ''');
+
+    final repository = LocalInternalRouteRepository(catalogDatabase: database);
+
+    Future<String> burdenLabelFor(String fromNodeId, String toNodeId) async {
+      final result = await repository.searchInternalRoute(
+        InternalRouteRequest(
+          stationId: 'station-sangnoksu',
+          fromNodeId: fromNodeId,
+          toNodeId: toNodeId,
+          mobilityType: 'SENIOR',
+        ),
+      );
+      return result.steps.single.burdenLabel;
+    }
+
+    expect(
+      await burdenLabelFor('node-verified-from', 'node-verified-to'),
+      contains('현장 검증됨'),
+    );
+    expect(
+      await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
+      contains('현장 검증 전'),
+    );
+    expect(
+      await burdenLabelFor('node-stale-from', 'node-stale-to'),
+      contains('현장 재확인 필요'),
+    );
+  });
+
   test('로컬 내부 이동 repository는 구스키마 catalog edge를 기본값으로 읽는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
