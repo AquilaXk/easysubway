@@ -7,12 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'auth_headers.dart';
+import 'core/network/api_client.dart';
 import 'facility_report.dart';
 import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
 
-const _stationSearchTimeout = Duration(seconds: 8);
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
 const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _nearbyLocationMaxAge = Duration(minutes: 5);
@@ -298,11 +298,15 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
 
 class StationSearchApiRepository
     implements StationSearchRepository, StationLineFilterRepository {
-  StationSearchApiRepository({required this.baseUri, HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  StationSearchApiRepository({
+    required this.baseUri,
+    ApiClient? apiClient,
+    HttpClient? httpClient,
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -320,11 +324,12 @@ class StationSearchApiRepository
   Future<List<StationSearchResult>> _searchStations(
     Map<String, String> queryParameters,
   ) async {
-    final uri = baseUri
-        .resolve('/api/v1/stations')
-        .replace(queryParameters: queryParameters);
+    final path = Uri(
+      path: '/api/v1/stations',
+      queryParameters: queryParameters,
+    ).toString();
 
-    final data = await _getData(uri);
+    final data = await _getData(path);
     if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -350,7 +355,7 @@ class StationSearchApiRepository
 
   @override
   Future<List<SubwayLineOption>> listLines() async {
-    final data = await _getData(baseUri.resolve('/api/v1/lines'));
+    final data = await _getData('/api/v1/lines');
     if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -380,18 +385,17 @@ class StationSearchApiRepository
     int radiusMeters = 2000,
     int limit = 10,
   }) async {
-    final uri = baseUri
-        .resolve('/api/v1/stations/nearby')
-        .replace(
-          queryParameters: {
-            'lat': location.latitude.toString(),
-            'lng': location.longitude.toString(),
-            'radiusMeters': radiusMeters.toString(),
-            'limit': limit.toString(),
-          },
-        );
+    final path = Uri(
+      path: '/api/v1/stations/nearby',
+      queryParameters: {
+        'lat': location.latitude.toString(),
+        'lng': location.longitude.toString(),
+        'radiusMeters': radiusMeters.toString(),
+        'limit': limit.toString(),
+      },
+    ).toString();
 
-    final data = await _getData(uri);
+    final data = await _getData(path);
     if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -417,10 +421,9 @@ class StationSearchApiRepository
 
   @override
   Future<StationDetail> getStationDetail(String stationId) async {
-    final uri = baseUri.resolve(
+    final data = await _getData(
       '/api/v1/stations/${Uri.encodeComponent(stationId)}',
     );
-    final data = await _getData(uri);
     if (data is! Map<String, Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -434,10 +437,9 @@ class StationSearchApiRepository
 
   @override
   Future<List<StationExitInfo>> listStationExits(String stationId) async {
-    final uri = baseUri.resolve(
+    final data = await _getData(
       '/api/v1/stations/${Uri.encodeComponent(stationId)}/exits',
     );
-    final data = await _getData(uri);
     if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -464,10 +466,9 @@ class StationSearchApiRepository
   Future<List<StationFacilityInfo>> listStationFacilities(
     String stationId,
   ) async {
-    final uri = baseUri.resolve(
+    final data = await _getData(
       '/api/v1/stations/${Uri.encodeComponent(stationId)}/facilities',
     );
-    final data = await _getData(uri);
     if (data is! List<Object?>) {
       throw const StationSearchException(_stationSearchErrorMessage);
     }
@@ -490,21 +491,13 @@ class StationSearchApiRepository
     }
   }
 
-  Future<Object?> _getData(Uri uri) async {
+  Future<Object?> _getData(String path) async {
     try {
-      final request = await _httpClient
-          .getUrl(uri)
-          .timeout(_stationSearchTimeout);
-      final response = await request.close().timeout(_stationSearchTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_stationSearchTimeout);
-
+      final response = await _apiClient.getJson(path);
       if (response.statusCode != HttpStatus.ok) {
         throw const StationSearchException(_stationSearchErrorMessage);
       }
-
-      final decoded = jsonDecode(body);
+      final decoded = response.jsonBody;
       if (decoded is! Map<String, Object?> || decoded['success'] != true) {
         throw const StationSearchException(_stationSearchErrorMessage);
       }
