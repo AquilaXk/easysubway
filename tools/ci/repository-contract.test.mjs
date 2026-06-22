@@ -1532,20 +1532,36 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
 });
 
-test("KRIC 출입구 승강장 이동경로 후보는 샘플 근거만 기록하고 라이선스 partial을 유지한다", () => {
+test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
   const candidates = readJson("tools/datapack/source-candidates.json");
   const candidate = candidates.candidates.find(({ id }) => id === "kric-station-movement-detailed");
 
   assert.ok(candidate);
-  assert.equal(candidate.licenseEvidenceStatus, "partial");
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
-  assert.equal(candidate.admissionStatus, "needs_sample_and_license_evidence");
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
-  assert.equal(candidate.evidence.listPageUrl, candidate.detailUrl);
+  assert.equal(
+    candidate.detailUrl,
+    "https://data.kric.go.kr/rips/M_01_02/detail.do?id=306&service=vulnerableUserInfo&operation=stationMovement&page=2",
+  );
+  assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
-  assert.deepEqual(candidate.evidence.missingEvidence.sort(), ["licenseDetail", "outputFields"]);
+  assert.deepEqual(candidate.evidence.outputFields.sort(), [
+    "edMovePath",
+    "elvtSttCd",
+    "elvtTpCd",
+    "exitMvTpOrdr",
+    "imgPath",
+    "mvContDtl",
+    "mvPathMgNo",
+    "stMovePath",
+  ]);
+  assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
 });
 
 test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
