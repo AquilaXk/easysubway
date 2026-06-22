@@ -197,18 +197,56 @@ FacilityReportRepository _defaultFacilityReportRepository({
   required Uri? Function() baseUri,
   required UserDatabase? userDatabase,
 }) {
-  final resolvedBaseUri = baseUri();
-  if (resolvedBaseUri == null) {
-    return const UnavailableFacilityReportRepository();
+  return _LazyDefaultFacilityReportRepository(baseUri, userDatabase);
+}
+
+class _LazyDefaultFacilityReportRepository implements FacilityReportRepository {
+  _LazyDefaultFacilityReportRepository(this._baseUri, this._userDatabase);
+
+  // 시설 신고 API는 선택 기능이라 앱 시작 중 base URL을 강제 평가하지 않는다.
+  final Uri? Function() _baseUri;
+  final UserDatabase? _userDatabase;
+  FacilityReportRepository? _delegate;
+
+  @override
+  Future<FacilityReportResult> createReport(FacilityReportRequest request) {
+    return _resolveDelegate().createReport(request);
   }
-  return FacilityReportApiRepository(
-    baseUri: resolvedBaseUri,
-    apiClient: ApiClient(baseUri: resolvedBaseUri),
-    authProvider: null,
-    receiptStore: userDatabase == null
-        ? null
-        : DriftFacilityReportReceiptStore(userDatabase: userDatabase),
-  );
+
+  @override
+  Future<FacilityReportResult> getReport(String reportId) {
+    return _resolveDelegate().getReport(reportId);
+  }
+
+  @override
+  Future<List<FacilityReportResult>> listMyReports() {
+    return _resolveDelegate().listMyReports();
+  }
+
+  FacilityReportRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) {
+      return cachedDelegate;
+    }
+    final resolvedDelegate = _createDelegate();
+    _delegate = resolvedDelegate;
+    return resolvedDelegate;
+  }
+
+  FacilityReportRepository _createDelegate() {
+    final resolvedBaseUri = _baseUri();
+    if (resolvedBaseUri == null) {
+      return const UnavailableFacilityReportRepository();
+    }
+    return FacilityReportApiRepository(
+      baseUri: resolvedBaseUri,
+      apiClient: ApiClient(baseUri: resolvedBaseUri),
+      authProvider: null,
+      receiptStore: _userDatabase == null
+          ? null
+          : DriftFacilityReportReceiptStore(userDatabase: _userDatabase),
+    );
+  }
 }
 
 UserDataDeletionRepository? _defaultUserDataDeletionRepository({
