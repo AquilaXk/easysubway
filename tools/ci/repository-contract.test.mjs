@@ -4274,6 +4274,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /_apiClient\.getJson\([\s\S]*'\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}'/,
   );
   assert.match(facilityReport, /X-Easysubway-Report-Receipt-Token/);
+  assert.match(facilityReport, /_apiClient\.postJson\([\s\S]*'\/api\/v1\/report-uploads'/);
+  assert.doesNotMatch(facilityReport, /postUrl\(baseUri\.resolve\('\/api\/v1\/report-uploads'\)\)/);
   assert.match(facilityReport, /_apiClient\.postJson\([\s\S]*'\/api\/v1\/reports'/);
   assert.match(appDependencies, /FacilityReportApiRepository\([\s\S]*apiClient: ApiClient\(baseUri: resolvedBaseUri\)/);
   assert.match(apiClientTest, /ApiClient는 GET 요청에 공통 header와 custom header를 적용한다/);
