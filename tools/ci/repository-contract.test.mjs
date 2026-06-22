@@ -1451,7 +1451,7 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   const validator = read("tools/datapack/validate-datapack.mjs");
   for (const source of [builder, validator]) {
     assert.match(source, /productionMinimumTableRowNames = \["stations", "station_lines", "network_edges", "facilities"\]/);
-    assert.match(source, /production minimumTableRows must define stations, station_lines, network_edges, and facilities/);
+    assert.match(source, /production minimumTableRows must define positive stations, station_lines, network_edges, and facilities/);
   }
 });
 
