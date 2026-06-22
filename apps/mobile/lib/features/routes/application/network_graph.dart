@@ -31,6 +31,7 @@ class RouteEdge {
     RouteStairAccessState? stairAccessState,
     this.reliabilityScore = 100,
     this.isDataStale = false,
+    this.isGeneratedConnector = false,
     RouteAccessibilityState accessibilityState =
         RouteAccessibilityState.available,
     bool? isAvailable,
@@ -76,6 +77,7 @@ class RouteEdge {
   /// by the repository before it reaches the route engine.
   final int reliabilityScore;
   final bool isDataStale;
+  final bool isGeneratedConnector;
   final RouteAccessibilityState accessibilityState;
 
   bool get isAvailable =>
@@ -94,6 +96,21 @@ class NetworkGraph {
 
   Iterable<RouteEdge> edgesFrom(String nodeId) {
     return _edgesByFromNodeId[nodeId] ?? const [];
+  }
+
+  /// route contract: generated connector ratio
+  ///
+  /// Generated entry, exit, and transfer connector edges are source gaps, not
+  /// verified step-free coverage. Report their share separately from
+  /// accessibility availability metrics.
+  double get generatedConnectorEdgeRatio {
+    if (edges.isEmpty) {
+      return 0;
+    }
+    final generatedCount = edges
+        .where((edge) => edge.isGeneratedConnector)
+        .length;
+    return generatedCount / edges.length;
   }
 }
 

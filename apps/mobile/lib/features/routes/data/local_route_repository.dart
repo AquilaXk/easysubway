@@ -549,6 +549,7 @@ class _RouteCatalogSnapshot {
               type: graph.RouteEdgeType.entry,
               baseCost: 90,
               stairAccessState: graph.RouteStairAccessState.unknown,
+              isGeneratedConnector: true,
             ),
           );
         }
@@ -563,6 +564,7 @@ class _RouteCatalogSnapshot {
               type: graph.RouteEdgeType.exit,
               baseCost: 60,
               stairAccessState: graph.RouteStairAccessState.unknown,
+              isGeneratedConnector: true,
             ),
           );
         }
@@ -602,6 +604,7 @@ class _RouteCatalogSnapshot {
               baseCost: 140,
               transferStationId: stationId,
               stairAccessState: graph.RouteStairAccessState.unknown,
+              isGeneratedConnector: true,
             ),
           );
         }
