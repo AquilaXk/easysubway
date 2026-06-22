@@ -294,9 +294,7 @@ class CatalogDatabase extends _$CatalogDatabase {
     final columns = await customSelect(
       'PRAGMA table_info(network_edges)',
     ).get();
-    final columnNames = {
-      for (final row in columns) row.read<String>('name'),
-    };
+    final columnNames = {for (final row in columns) row.read<String>('name')};
     const requiredColumns = {
       'id',
       'from_node_id',
@@ -314,6 +312,14 @@ class CatalogDatabase extends _$CatalogDatabase {
   Future<bool> _isBaselineFixtureCatalog() async {
     final row = await customSelect('''
       SELECT
+        (SELECT value
+         FROM catalog_metadata
+         WHERE key = 'activePack') AS active_pack,
+        (SELECT COUNT(*) FROM operators) AS operator_count,
+        (SELECT COUNT(*) FROM lines) AS line_count,
+        (SELECT COUNT(*) FROM stations) AS station_count,
+        (SELECT COUNT(*) FROM station_lines) AS station_line_count,
+        (SELECT COUNT(*) FROM network_edges) AS network_edge_count,
         (SELECT COUNT(*)
          FROM station_lines
          WHERE (station_id = 'station-sangnoksu' AND line_id = 'seoul-4')
@@ -326,7 +332,20 @@ class CatalogDatabase extends _$CatalogDatabase {
            'edge-sadang-sangnoksu-seoul-4'
          )) AS match_count
     ''').getSingle();
-    return row.read<int>('match_count') == 4;
+    if (row.readNullable<String>('active_pack') != 'capital') {
+      return false;
+    }
+    if (row.read<int>('match_count') != 4) {
+      return false;
+    }
+    final shape = (
+      row.read<int>('operator_count'),
+      row.read<int>('line_count'),
+      row.read<int>('station_count'),
+      row.read<int>('station_line_count'),
+      row.read<int>('network_edge_count'),
+    );
+    return shape == (2, 2, 2, 3, 2) || shape == (2, 4, 6, 9, 15);
   }
 
   List<NetworkEdgesCompanion> _baselineAccessEdges() {

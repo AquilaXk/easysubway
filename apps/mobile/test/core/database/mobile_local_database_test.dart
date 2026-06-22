@@ -425,6 +425,70 @@ void main() {
   );
 
   test(
+    'catalog opener는 baseline보다 큰 current pack에 access edge를 주입하지 않는다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-current-access-backfill-skip-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      final updatedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+      final updatedDatabase = CatalogDatabase.file(updatedPack);
+      await updatedDatabase.seedBaselineIfEmpty();
+      await updatedDatabase.customStatement('''
+      DELETE FROM network_edges
+      WHERE edge_type IN ('ENTRY', 'EXIT')
+    ''');
+      await updatedDatabase
+          .into(updatedDatabase.stations)
+          .insert(
+            StationsCompanion.insert(
+              id: 'station-extra',
+              nameKo: '추가역',
+              normalizedName: '추가역',
+            ),
+          );
+      await updatedDatabase.close();
+      await File('${catalogDirectory.path}/current.json').writeAsString(
+        jsonEncode({
+          'id': 'capital',
+          'version': '18',
+          'path': updatedPack.path,
+          'sha256': 'local-fixture',
+        }),
+      );
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+      final accessEdgeCount = await database.customSelect('''
+      SELECT COUNT(*) AS count
+      FROM network_edges
+      WHERE id IN (
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''').getSingle();
+      final route = await LocalRouteRepository(catalogDatabase: database)
+          .searchRoute(
+            const RouteSearchRequest(
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityType: 'WHEELCHAIR',
+            ),
+          );
+
+      expect(accessEdgeCount.read<int>('count'), 0);
+      expect(route.status, 'BLOCKED');
+    },
+  );
+
+  test(
     'catalog opener는 이전 컨테이너 경로의 current pointer도 현재 catalog에서 복원한다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
