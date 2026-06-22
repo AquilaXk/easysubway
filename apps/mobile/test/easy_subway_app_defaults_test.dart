@@ -1,7 +1,10 @@
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/main.dart';
+import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,6 +34,33 @@ void main() {
     expect(app.notificationRepository, isNull);
     expect(app.notificationPermissionProvider, isNull);
   });
+
+  testWidgets('인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: _UnusedStationSearchRepository(),
+        reportRepository: _UnusedFacilityReportRepository(),
+        routeRepository: _UnusedRouteSearchRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    expect(find.byKey(const Key('favoritesButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsNothing);
+    expect(find.byKey(const Key('notificationSettingsButton')), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
+  });
+}
+
+OnboardingState _completedOnboardingState() {
+  return OnboardingState.completed(
+    result: OnboardingResult(
+      profile: mobilityProfileOptions.firstWhere(
+        (option) => option.id == 'elderly',
+      ),
+      preferences: const OnboardingViewPreferences.defaults(),
+    ),
+  );
 }
 
 class _UnusedStationSearchRepository implements StationSearchRepository {
