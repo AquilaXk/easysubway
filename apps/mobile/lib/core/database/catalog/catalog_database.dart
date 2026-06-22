@@ -279,12 +279,36 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   Future<void> _backfillBaselineAccessEdges() async {
+    if (!await _canBackfillBaselineAccessEdges()) {
+      return;
+    }
     if (!await _isBaselineFixtureCatalog()) {
       return;
     }
     for (final edge in _baselineAccessEdges()) {
       await into(networkEdges).insert(edge, mode: InsertMode.insertOrIgnore);
     }
+  }
+
+  Future<bool> _canBackfillBaselineAccessEdges() async {
+    final columns = await customSelect(
+      'PRAGMA table_info(network_edges)',
+    ).get();
+    final columnNames = {
+      for (final row in columns) row.read<String>('name'),
+    };
+    const requiredColumns = {
+      'id',
+      'from_node_id',
+      'to_node_id',
+      'duration_seconds',
+      'edge_type',
+      'stair_access_state',
+      'accessibility_status',
+      'reliability_score',
+      'last_verified_at',
+    };
+    return columnNames.containsAll(requiredColumns);
   }
 
   Future<bool> _isBaselineFixtureCatalog() async {

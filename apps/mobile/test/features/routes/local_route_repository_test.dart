@@ -502,6 +502,31 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('구형 catalog schema는 baseline access backfill 없이 계속 열린다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('DROP TABLE network_edges');
+    await database.customStatement('''
+      CREATE TABLE network_edges (
+        id TEXT NOT NULL PRIMARY KEY,
+        from_node_id TEXT NOT NULL,
+        to_node_id TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        edge_type TEXT NOT NULL DEFAULT 'WALK'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final rows = await database
+        .customSelect(
+          "SELECT id FROM network_edges WHERE id LIKE 'entry-%' OR id LIKE 'exit-%'",
+        )
+        .get();
+    expect(rows, isEmpty);
+  });
+
   test('service pattern node는 역-노선 node로 뭉개지지 않고 출입구와 연결된다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
