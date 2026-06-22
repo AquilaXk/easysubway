@@ -3275,6 +3275,11 @@ test("공식 source ingest adapter는 stable id mapping으로 catalog fixture pa
   assert.equal(pack.sourceInventory.length, 2);
   assert.ok(seoulMetroSource);
   assert.equal(seoulMetroSource.licenseStatus, "redistributable");
+  assert.deepEqual(seoulMetroSource.coverageScope, {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    sourceDomains: ["station_line_membership"],
+  });
   assert.match(seoulMetroSource.updatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}T00:00:00\.000Z$/);
   assert.deepEqual(
     pack.stations.map((station) => station.id),
@@ -3339,6 +3344,90 @@ test("공식 source ingest adapter는 production pack의 최소 coverage 기준 
   );
 });
 
+test("공식 source ingest adapter는 production pack의 coverage evidence 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-evidence-missing-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  delete input.coverageEvidence;
+  const inputPath = path.join(outputDir, "official-source-input.json");
+  const outputPath = path.join(outputDir, "catalog-fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /coverageEvidence must be a non-empty array for production pack/,
+  );
+});
+
+test("공식 source ingest adapter는 source inventory가 뒷받침하지 않는 coverage evidence를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-evidence-unsupported-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.coverageEvidence[0].regionId = "busan";
+  const inputPath = path.join(outputDir, "official-source-input.json");
+  const outputPath = path.join(outputDir, "catalog-fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /coverage evidence unsupported by source inventory: busan:seoul-metro:station_line_membership/,
+  );
+});
+
+test("공식 source ingest adapter는 selected source가 claim한 coverage evidence 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-evidence-claim-missing-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.coverageEvidence = input.coverageEvidence.filter((entry) => entry.sourceDomain !== "realtime_arrivals");
+  const inputPath = path.join(outputDir, "official-source-input.json");
+  const outputPath = path.join(outputDir, "catalog-fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production coverage evidence missing: capital:seoul-metro:realtime_arrivals/,
+  );
+});
+
 test("공식 source ingest adapter는 production pack의 최소 coverage 미달을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-small-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -3392,6 +3481,44 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
 
   const generated = JSON.parse(await readFile(outputPath, "utf8"));
   assert.equal(generated.packs[0].artifactKind, "production");
+  assert.deepEqual(
+    generated.packs[0].sourceInventory.map((source) => ({
+      id: source.id,
+      coverageScope: source.coverageScope,
+    })),
+    [
+      {
+        id: "seoulmetro-station-line-info",
+        coverageScope: {
+          regionIds: ["capital"],
+          operatorIds: ["seoul-metro"],
+          sourceDomains: ["station_line_membership"],
+        },
+      },
+      {
+        id: "seoul-realtime-arrival-station-info",
+        coverageScope: {
+          regionIds: ["capital"],
+          operatorIds: ["seoul-metro"],
+          sourceDomains: ["realtime_arrivals"],
+        },
+      },
+    ],
+  );
+  assert.deepEqual(JSON.parse(generated.packs[0].metadata.productionCoverageEvidence), [
+    {
+      regionId: "capital",
+      operatorId: "seoul-metro",
+      sourceDomain: "realtime_arrivals",
+      sourceIds: ["seoul-realtime-arrival-station-info"],
+    },
+    {
+      regionId: "capital",
+      operatorId: "seoul-metro",
+      sourceDomain: "station_line_membership",
+      sourceIds: ["seoulmetro-station-line-info"],
+    },
+  ]);
   assert.deepEqual(generated.packs[0].minimumTableRows, {
     catalog_metadata: 2,
     operators: 1,
@@ -4287,6 +4414,22 @@ function productionSourceIngestInput() {
     routeEdges: 2,
     facilities: 1,
   };
+  input.coverageEvidence = [
+    {
+      regionId: "capital",
+      operatorId: "seoul-metro",
+      sourceDomain: "station_line_membership",
+      sourceIds: ["seoulmetro-station-line-info"],
+      evidence: "서울교통공사 노선별 지하철역 정보 source inventory coverageScope",
+    },
+    {
+      regionId: "capital",
+      operatorId: "seoul-metro",
+      sourceDomain: "realtime_arrivals",
+      sourceIds: ["seoul-realtime-arrival-station-info"],
+      evidence: "서울시 실시간 도착정보 역정보 source inventory coverageScope",
+    },
+  ];
   return input;
 }
 
