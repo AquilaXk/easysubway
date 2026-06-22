@@ -4228,6 +4228,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /enablePushNotifications: true/);
+  assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
   assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
