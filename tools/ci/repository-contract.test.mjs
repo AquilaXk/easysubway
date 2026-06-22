@@ -4001,6 +4001,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
   const notificationSettingsTest = read("apps/mobile/test/notification_settings_test.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const apiClient = read("apps/mobile/lib/core/network/api_client.dart");
+  const apiError = read("apps/mobile/lib/core/network/api_error.dart");
+  const apiClientTest = read("apps/mobile/test/core/network/api_client_test.dart");
   const accessibilityBaselineTest = read("apps/mobile/test/accessibility_baseline_test.dart");
 
   assert.ok(existsSync(path.join(root, "apps/mobile/android")));
@@ -4254,8 +4257,18 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
+  assert.match(apiClient, /class ApiClient/);
+  assert.match(apiClient, /const defaultApiTimeout = Duration\(seconds: 8\)/);
+  assert.match(apiClient, /Future<ApiResponse> deleteJson/);
+  assert.match(apiClient, /HttpHeaders\.acceptHeader/);
+  assert.match(apiClient, /ContentType\.json\.mimeType/);
+  assert.match(apiClient, /jsonDecode\(body\)/);
+  assert.match(apiClient, /class ApiResponse/);
+  assert.match(apiError, /class ApiException implements Exception/);
+  assert.match(apiClientTest, /ApiClient는 DELETE 요청에 공통 timeout과 JSON decode 경계를 적용한다/);
+  assert.match(apiClientTest, /ApiClient 예외는 인증 토큰을 노출하지 않는다/);
   assert.match(userDataDeletion, /class UserDataDeletionApiRepository implements UserDataDeletionRepository/);
-  assert.match(userDataDeletion, /deleteUrl\(baseUri\.resolve\('\/api\/v1\/me'\)\)/);
+  assert.match(userDataDeletion, /_apiClient\.deleteJson\([\s\S]*'\/api\/v1\/me'/);
   assert.match(userDataDeletion, /HttpHeaders\.authorizationHeader/);
   assert.match(userDataDeletion, /refreshExistingAuthorization/);
   assert.match(

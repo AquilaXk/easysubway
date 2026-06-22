@@ -4,10 +4,11 @@ import 'dart:io';
 
 import 'auth_headers.dart';
 import 'core/database/user/user_database.dart';
+import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
 const userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
-const _userDataDeletionTimeout = Duration(seconds: 8);
+const _userDataDeletionTimeout = defaultApiTimeout;
 
 abstract class UserDataDeletionRepository {
   Future<UserDataDeletionResult> deleteCurrentUserData();
@@ -18,14 +19,17 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
     required this.baseUri,
     required this.authProvider,
     this.refreshExistingAuthorization,
+    ApiClient? apiClient,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : assert(apiClient == null || httpClient == null),
+       _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final AuthorizationHeaderProvider authProvider;
   final Future<bool> Function(String authorizationHeader)?
   refreshExistingAuthorization;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<UserDataDeletionResult> deleteCurrentUserData() async {
@@ -46,25 +50,17 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
   Future<UserDataDeletionResult>
   _deleteCurrentUserDataWithAuthorizationRetry() async {
     for (var attempt = 0; attempt < 2; attempt++) {
-      final request = await _httpClient
-          .deleteUrl(baseUri.resolve('/api/v1/me'))
-          .timeout(_userDataDeletionTimeout);
       final authorizationHeader = await authProvider
           .authorizationHeader()
           .timeout(_userDataDeletionTimeout);
-      if (authorizationHeader != null) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          authorizationHeader,
-        );
-      }
+      final response = await _apiClient.deleteJson(
+        '/api/v1/me',
+        headers: authorizationHeader == null
+            ? const {}
+            : {HttpHeaders.authorizationHeader: authorizationHeader},
+      );
 
-      final response = await request.close().timeout(_userDataDeletionTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_userDataDeletionTimeout);
-
-      if (response.statusCode == HttpStatus.unauthorized &&
+      if (response.isUnauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
         final refreshedAuthorization = await _refreshExistingAuthorization(
@@ -76,11 +72,11 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
         continue;
       }
 
-      if (response.statusCode != HttpStatus.ok) {
+      if (!response.isOk) {
         throw const UserDataDeletionException(userDataDeletionErrorMessage);
       }
 
-      return UserDataDeletionResult.fromResponseBody(body);
+      return UserDataDeletionResult.fromResponseJson(response.jsonBody);
     }
     throw const UserDataDeletionException(userDataDeletionErrorMessage);
   }
@@ -217,6 +213,10 @@ class UserDataDeletionResult {
 
   factory UserDataDeletionResult.fromResponseBody(String body) {
     final decoded = jsonDecode(body);
+    return UserDataDeletionResult.fromResponseJson(decoded);
+  }
+
+  factory UserDataDeletionResult.fromResponseJson(Object? decoded) {
     if (decoded is! Map<String, Object?> || decoded['success'] != true) {
       throw const UserDataDeletionException(userDataDeletionErrorMessage);
     }
