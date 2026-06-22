@@ -108,7 +108,9 @@ const mobilityProfileOptions = <MobilityProfileOption>[
 ];
 
 class MobilityProfileScreen extends StatefulWidget {
-  const MobilityProfileScreen({super.key});
+  const MobilityProfileScreen({this.initialSelection, super.key});
+
+  final MobilityProfileOption? initialSelection;
 
   @override
   State<MobilityProfileScreen> createState() => _MobilityProfileScreenState();
@@ -116,6 +118,12 @@ class MobilityProfileScreen extends StatefulWidget {
 
 class _MobilityProfileScreenState extends State<MobilityProfileScreen> {
   MobilityProfileOption? _selectedOption;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOption = widget.initialSelection;
+  }
 
   @override
   Widget build(BuildContext context) {
