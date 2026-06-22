@@ -280,6 +280,63 @@ void main() {
 
       expect(graph.generatedConnectorEdgeRatio, 0.5);
     });
+
+    test('휠체어 경로는 generated connector edge가 stepFree여도 FOUND가 되지 않는다', () {
+      final engine = LocalRouteEngine(
+        graph: NetworkGraph(
+          nodes: const [
+            RouteNode(
+              id: 'station-a:line-1',
+              stationId: 'station-a',
+              lineId: 'line-1',
+            ),
+            RouteNode(
+              id: 'station-b:line-1',
+              stationId: 'station-b',
+              lineId: 'line-1',
+            ),
+          ],
+          edges: const [
+            RouteEdge(
+              id: 'entry-a-generated',
+              fromNodeId: 'station-a',
+              toNodeId: 'station-a:line-1',
+              type: RouteEdgeType.entry,
+              baseCost: 90,
+              stairAccessState: RouteStairAccessState.stepFree,
+              isGeneratedConnector: true,
+            ),
+            RouteEdge(
+              id: 'ride-a-b',
+              fromNodeId: 'station-a:line-1',
+              toNodeId: 'station-b:line-1',
+              type: RouteEdgeType.ride,
+              baseCost: 180,
+              lineId: 'line-1',
+            ),
+            RouteEdge(
+              id: 'exit-b-step-free',
+              fromNodeId: 'station-b:line-1',
+              toNodeId: 'station-b',
+              type: RouteEdgeType.exit,
+              baseCost: 60,
+              stairAccessState: RouteStairAccessState.stepFree,
+            ),
+          ],
+        ),
+      );
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-b',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.blockedReasonCodes, ['GENERATED_CONNECTOR_UNVERIFIED']);
+    });
   });
 }
 
