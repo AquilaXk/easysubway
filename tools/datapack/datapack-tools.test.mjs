@@ -3122,7 +3122,7 @@ test("전국 coverage gap report는 allow-gaps 모드에서 감사 가능한 rep
   assert.ok(report.requirements.every((entry) => Array.isArray(entry.sourceIds)));
 });
 
-test("전국 coverage gap report는 TAGO와 부산 source inventory coverage를 반영한다", async () => {
+test("전국 coverage gap report는 TAGO, 국가철도공단, 부산 source inventory coverage를 반영한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-coverage-gap-official-source-${Date.now()}`);
   const reportPath = path.join(outputDir, "coverage-gap-report.json");
   await rm(outputDir, { recursive: true, force: true });
@@ -3156,6 +3156,7 @@ test("전국 coverage gap report는 TAGO와 부산 source inventory coverage를 
   );
   assert.deepEqual(busanStationMembership?.sourceIds, [
     "busan-transportation-urban-rail-station-info",
+    "kric-metropolitan-rail-station-info",
     "molit-tago-subway-info",
   ]);
 });

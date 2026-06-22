@@ -222,6 +222,67 @@
         "longitude",
         "phone_number"
       ]
+    },
+    {
+      "id": "kric-metropolitan-rail-station-info",
+      "displayName": "국가철도공단_도시광역철도_역사정보",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털 표준데이터",
+      "datasetUrl": "https://www.data.go.kr/data/15093755/fileData.do",
+      "datasetKind": "standard-file-data",
+      "coverage": "전국 도시광역철도 역사 기본 정보, 환승 여부와 환승 노선, 위치, 운영기관 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "annual",
+      "observedDataUpdatedAt": "2025-12-05",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/dcat/metadata/15093755"
+      },
+      "fieldsProvided": [
+        "station_number",
+        "station_name",
+        "line_number",
+        "line_name",
+        "english_station_name",
+        "chinese_station_name",
+        "transfer_station_flag",
+        "transfer_lines",
+        "latitude",
+        "longitude",
+        "operator_name",
+        "road_address",
+        "phone_number",
+        "data_reference_date"
+      ]
     }
   ]
 }
