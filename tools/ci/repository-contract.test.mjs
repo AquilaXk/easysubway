@@ -4150,7 +4150,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationApiRepository, /_apiClient\.getJson\(/);
   assert.doesNotMatch(
     stationApiRepository,
-    /class StationSearchApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteStationApiRepository/,
+    /class StationSearchApiRepository[\s\S]*?_httpClient[\s\S]*?typedef FavoriteStationAuthProvider/,
   );
   assert.doesNotMatch(stationSearch, /class FavoriteStationApiRepository/);
   assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*final ApiClient _apiClient;/);
@@ -4159,7 +4159,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationApiRepository, /class FavoriteStationApiRepository[\s\S]*_apiClient\.deleteJson\(/);
   assert.doesNotMatch(
     stationApiRepository,
-    /class FavoriteStationApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteStationException/,
+    /class FavoriteStationApiRepository[\s\S]*?_httpClient/,
   );
   assert.match(stationApiRepository, /HttpStatus\.unauthorized/);
   assert.match(stationApiRepository, /invalidateAuthorization\(\)/);
