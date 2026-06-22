@@ -423,6 +423,62 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   );
 });
 
+test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터팩 출력 계약을 제공한다", () => {
+  const terraformDir = "infra/terraform/oci/always-free-a1-flex";
+  const trackedInfraFiles = execFileSync("git", ["ls-files", "--cached", terraformDir], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+
+  assert.ok(trackedInfraFiles.includes(`${terraformDir}/terraform.tfvars.example`));
+  assert.ok(trackedInfraFiles.includes(`${terraformDir}/datapack_object_storage.tf`));
+  assert.equal(
+    trackedInfraFiles.some((file) => /(?:^|\/)(terraform\.tfvars|terraform\.tfvars\.json|[^/]+\.auto\.tfvars|[^/]+\.auto\.tfvars\.json)$/.test(file)),
+    false,
+    "real Terraform variable files must stay untracked",
+  );
+  assert.equal(
+    trackedInfraFiles.some((file) =>
+      /\.(tfstate|tfplan|pem|key|ppk)$/.test(file)
+      || /(?:^|\/)id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?$/.test(file)
+      || file.includes("/.terraform/")
+    ),
+    false,
+    "Terraform state, plan, provider cache, and private keys must stay untracked",
+  );
+
+  const gitignore = read(".gitignore");
+  assert.match(gitignore, /^\*\*\/\.terraform\/$/m);
+  assert.match(gitignore, /^\*\*\/\*\.tfstate$/m);
+  assert.match(gitignore, /^\*\*\/\*\.tfplan$/m);
+  assert.match(gitignore, /^\*\*\/terraform\.tfvars$/m);
+  assert.match(gitignore, /^!\*\*\/terraform\.tfvars\.example$/m);
+
+  const variables = read(`${terraformDir}/variables.tf`);
+  const locals = read(`${terraformDir}/locals.tf`);
+  const datapackStorage = read(`${terraformDir}/datapack_object_storage.tf`);
+  const outputs = read(`${terraformDir}/outputs.tf`);
+  const tfvarsExample = read(`${terraformDir}/terraform.tfvars.example`);
+
+  assert.match(variables, /default\s+= "easysubway-a1"/);
+  assert.match(variables, /default\s+= "easysubway-datapacks"/);
+  assert.match(variables, /variable "datapack_object_prefix"[\s\S]*?default\s+= ""/);
+  assert.match(variables, /default\s+= "ObjectReadWithoutList"/);
+  assert.match(variables, /datapack_public_base_url_override/);
+  assert.match(locals, /datapack\.aquilaxk\.site|datapack_oci_base_url/);
+  assert.match(datapackStorage, /resource "oci_objectstorage_bucket" "datapack"/);
+  assert.match(datapackStorage, /access_type\s+= var\.datapack_bucket_public_access_type/);
+  assert.match(datapackStorage, /versioning\s+= "Enabled"/);
+  assert.match(outputs, /EASYSUBWAY_DATA_PACK_BASE_URL/);
+  assert.match(outputs, /EASYSUBWAY_DATAPACK_BUCKET/);
+  assert.match(outputs, /EASYSUBWAY_OBJECT_STORAGE_ENDPOINT/);
+  assert.match(outputs, /EASYSUBWAY_OBJECT_STORAGE_REGION/);
+  assert.doesNotMatch(outputs, /EASYSUBWAY_OBJECT_STORAGE_(?:ACCESS_KEY|SECRET_KEY)/);
+  assert.match(tfvarsExample, /fingerprint\s+= "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"/);
+  assert.match(tfvarsExample, /datapack\.aquilaxk\.site/);
+  assert.doesNotMatch(tfvarsExample, /ocid1\.(?:tenancy|user|compartment)\.oc1\.[a-z0-9]{20,}/);
+});
+
 test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
