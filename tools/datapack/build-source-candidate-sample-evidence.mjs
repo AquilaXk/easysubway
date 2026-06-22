@@ -85,9 +85,22 @@ function itemRows(value) {
 function fieldsFromJson(raw) {
   const parsed = JSON.parse(raw);
   const rows = itemRows(parsed);
-  const row = rows.length > 0
-    ? rows.reduce((best, item) => (scalarFieldCount(item) > scalarFieldCount(best) ? item : best))
-    : bestJsonRow(parsed).row;
+  if (rows.length > 0) {
+    const fields = new Set();
+    for (const row of rows) {
+      for (const [key, value] of Object.entries(row)) {
+        if (value == null || typeof value !== "object") {
+          fields.add(key);
+        }
+      }
+    }
+    if (fields.size === 0) {
+      throw new Error("JSON response has no object fields");
+    }
+    return [...fields].sort();
+  }
+
+  const row = bestJsonRow(parsed).row;
   if (!row) {
     throw new Error("JSON response has no object fields");
   }
@@ -101,6 +114,10 @@ function fieldsFromXml(raw) {
   const fragments = items.length > 0 ? items : [raw];
   const fields = new Set();
   for (const fragment of fragments) {
+    const selfClosingTagPattern = /<([A-Za-z_][\w.-]*)\b[^>]*\/>/g;
+    for (const match of fragment.matchAll(selfClosingTagPattern)) {
+      fields.add(match[1]);
+    }
     const tagPattern = /<([A-Za-z_][\w.-]*)\b[^>]*>([\s\S]*?)<\/\1>/g;
     for (const match of fragment.matchAll(tagPattern)) {
       const [, tagName, body] = match;

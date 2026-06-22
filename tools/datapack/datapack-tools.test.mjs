@@ -3359,6 +3359,8 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
             item: [
               {
                 railOprIsttCd: "S1",
+              },
+              {
                 railOprIsttNm: "서울교통공사",
               },
             ],
@@ -3406,7 +3408,7 @@ test("source candidate sample evidence builder는 raw XML response를 validator 
       <railOprIsttCd>S1</railOprIsttCd>
     </item><item>
       <railOprIsttCd>S2</railOprIsttCd>
-      <railOprIsttNm>서울교통공사</railOprIsttNm>
+      <railOprIsttNm/>
     </item></items></body></response>\n`,
   );
 
