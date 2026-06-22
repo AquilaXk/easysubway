@@ -1060,6 +1060,13 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   assert.deepEqual(idsByPlatform.get("ios"), requiredIosChecks.toSorted());
 
   for (const check of gate.checks) {
+    if (check.id === "android_app_start_backend_down") {
+      assert.equal(
+        check.command,
+        "adb shell am start -n com.easysubway.app/com.easysubway.easysubway_mobile.MainActivity",
+        "Android app start command must use the production applicationId and actual Activity class",
+      );
+    }
     if (check.platform === "android" && check.command?.includes("com.easysubway")) {
       assert.match(
         check.command,

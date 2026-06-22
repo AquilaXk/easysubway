@@ -15,7 +15,7 @@
       "platform": "android",
       "titleKo": "Android backend down app start",
       "finalAcceptanceIds": ["app_starts_without_backend", "no_api_call_on_app_start", "no_anonymous_auth_tokens"],
-      "command": "adb shell am start -n com.easysubway.app/.MainActivity",
+      "command": "adb shell am start -n com.easysubway.app/com.easysubway.easysubway_mobile.MainActivity",
       "manualTarget": "backend stopped or airplane mode, first screen visible",
       "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/app-start-backend-down",
       "evidence": ["screenshot", "logcat_excerpt", "network_request_count_zero"],
