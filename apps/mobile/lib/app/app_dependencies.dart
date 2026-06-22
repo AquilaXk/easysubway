@@ -203,6 +203,7 @@ FacilityReportRepository _defaultFacilityReportRepository({
   }
   return FacilityReportApiRepository(
     baseUri: resolvedBaseUri,
+    apiClient: ApiClient(baseUri: resolvedBaseUri),
     authProvider: null,
     receiptStore: userDatabase == null
         ? null

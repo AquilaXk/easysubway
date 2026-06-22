@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'auth_headers.dart';
 import 'core/database/user/user_database.dart' as user_db;
+import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 import 'secure_key_value_storage.dart';
 
@@ -68,12 +69,16 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     required this.baseUri,
     this.authProvider,
     this.receiptStore,
+    ApiClient? apiClient,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient),
+       _httpClient = httpClient ?? HttpClient();
 
   final Uri baseUri;
   final AuthorizationHeaderProvider? authProvider;
   final FacilityReportReceiptStore? receiptStore;
+  final ApiClient _apiClient;
   final HttpClient _httpClient;
 
   @override
@@ -99,27 +104,18 @@ class FacilityReportApiRepository implements FacilityReportRepository {
   ) async {
     final preparedRequest = await _prepareReportRequest(reportRequest);
     for (var attempt = 0; attempt < 2; attempt++) {
-      final request = await _httpClient
-          .postUrl(baseUri.resolve('/api/v1/reports'))
-          .timeout(_facilityReportTimeout);
       final authorizationHeader = await authProvider
           ?.authorizationHeader()
           .timeout(_facilityReportTimeout);
-      if (authorizationHeader != null) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          authorizationHeader,
-        );
-      }
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(preparedRequest.toJson()));
+      final response = await _apiClient.postJson(
+        '/api/v1/reports',
+        body: preparedRequest.toJson(),
+        headers: authorizationHeader == null
+            ? const {}
+            : {HttpHeaders.authorizationHeader: authorizationHeader},
+      );
 
-      final response = await request.close().timeout(_facilityReportTimeout);
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(_facilityReportTimeout);
-
-      if (response.statusCode == HttpStatus.unauthorized &&
+      if (response.isUnauthorized &&
           authorizationHeader != null &&
           attempt == 0) {
         // 만료된 인증은 비우고 한 번만 다시 시도한다.
@@ -129,13 +125,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         continue;
       }
 
-      if (response.statusCode != HttpStatus.created &&
-          response.statusCode != HttpStatus.ok) {
+      if (response.statusCode != HttpStatus.created && !response.isOk) {
         throw const FacilityReportException(_facilityReportErrorMessage);
       }
 
-      final result = _reportResultFromBody(
-        body,
+      final result = _reportResultFromJson(
+        response.jsonBody,
         errorMessage: _facilityReportErrorMessage,
       );
       await _saveReceiptIfPresentSafely(result);
@@ -353,6 +348,13 @@ class FacilityReportApiRepository implements FacilityReportRepository {
     required String errorMessage,
   }) {
     final decoded = jsonDecode(body);
+    return _reportResultFromJson(decoded, errorMessage: errorMessage);
+  }
+
+  FacilityReportResult _reportResultFromJson(
+    Object? decoded, {
+    required String errorMessage,
+  }) {
     if (decoded is! Map<String, Object?> || decoded['success'] != true) {
       throw FacilityReportException(errorMessage);
     }
