@@ -532,7 +532,6 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
     "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
-    "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=",
     "EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks",
     "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM=private-key-pem",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM=public-key-pem",
@@ -1260,7 +1259,66 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_APPLE_ID/);
   assert.match(preflight, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED/);
+  assert.match(preflight, /EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL/);
   assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
+});
+
+test("스토어 배포 증거 preflight는 legacy S3와 PAR 데이터팩 publish env를 모두 허용한다", async () => {
+  const commonEnvLines = [
+    "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+    "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+    "EASYSUBWAY_APP_STORE_CONNECT_KEY_ID=key-id",
+    "EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID=issuer-id",
+    "EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM=private-key",
+    "EASYSUBWAY_APP_STORE_APPLE_ID=123456789",
+    "EASYSUBWAY_APP_STORE_BUNDLE_ID=com.easysubway.app",
+    "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+  ];
+  const cases = [
+    {
+      name: "legacy",
+      lines: [
+        "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
+        "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
+        "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
+        "EASYSUBWAY_OBJECT_STORAGE_REGION=ap-northeast-2",
+        "EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks",
+      ],
+    },
+    {
+      name: "par",
+      lines: [
+        "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
+      ],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const dir = await mkdtemp(path.join(tmpdir(), `easysubway-store-env-${testCase.name}-`));
+    const envFile = path.join(dir, "deploy.env");
+    const outputFile = path.join(dir, "github-output.txt");
+    const reportFile = path.join(dir, "report.txt");
+    await writeFile(envFile, [...commonEnvLines, ...testCase.lines, ""].join("\n"));
+
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/ci/check-store-distribution-evidence-env.mjs",
+        "--env-file",
+        envFile,
+        "--github-output",
+        outputFile,
+        "--report",
+        reportFile,
+      ],
+      { cwd: root },
+    );
+
+    const report = readFileSync(reportFile, "utf8");
+    assert.match(report, /^datapack_object_storage_publish\.ready=true$/m);
+    assert.match(readFileSync(outputFile, "utf8"), /^datapack_object_storage_publish_ready=true$/m);
+  }
 });
 
 test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고정한다", () => {
