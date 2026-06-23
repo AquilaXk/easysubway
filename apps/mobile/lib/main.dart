@@ -1162,7 +1162,9 @@ class _HomePrototypeHero extends StatelessWidget {
                             backgroundColor: Colors.white,
                             foregroundColor:
                                 EasySubwayAccessibleColors.brandDark,
-                            minimumSize: const Size.fromHeight(52),
+                            minimumSize: const Size.fromHeight(
+                              EasySubwayTouchTarget.primary,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),

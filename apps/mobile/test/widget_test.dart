@@ -412,7 +412,10 @@ void main() {
       );
 
       expect(stationButtonSize.height, greaterThanOrEqualTo(48));
-      expect(routeButtonSize.height, greaterThanOrEqualTo(52));
+      expect(
+        routeButtonSize.height,
+        greaterThanOrEqualTo(EasySubwayTouchTarget.primary),
+      );
       expect(routeButtonSize.width, greaterThan(stationButtonSize.width));
 
       await tester.scrollUntilVisible(find.text('저장한 경로가 없습니다'), 180);
@@ -4350,6 +4353,7 @@ void main() {
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
       expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
+      expect(find.text('역무원이나 현장 안내를 확인한 뒤 이동해 주세요.'), findsOneWidget);
       expect(
         find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
@@ -4368,7 +4372,8 @@ void main() {
           '경로 검색 결과, 다른 경로가 필요합니다, 휠체어, 상록수에서 없는역까지, 노선 확인 필요, 이동 점수 0점, '
           '안내 불가 이유 휠체어로 이동 가능한 엘리베이터가 없습니다., '
           '다음 행동 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요., '
-          '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요.',
+          '안전 안내 이동 전 현장 안내와 역무원 안내를 확인해 주세요., '
+          '확인 요청 역무원이나 현장 안내를 확인한 뒤 이동해 주세요.',
         ),
         findsOneWidget,
       );
