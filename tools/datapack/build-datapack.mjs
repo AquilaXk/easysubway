@@ -237,7 +237,6 @@ function buildSqlitePack(sqlitePath, schema, pack) {
   const database = new DatabaseSync(sqlitePath);
   try {
     database.exec(schema);
-    database.exec(`PRAGMA user_version = ${schemaVersionNumber(pack.schemaVersion, "pack.schemaVersion")}`);
     database.exec("BEGIN IMMEDIATE");
     try {
       insertCatalogMetadata(database, pack);
@@ -319,8 +318,8 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           requiredString(row.providerLineId, "realtimeProviderLineMappings.providerLineId"),
           requiredString(row.lineId, "realtimeProviderLineMappings.lineId"),
           requiredString(row.sourceId, "realtimeProviderLineMappings.sourceId"),
-          flag(row.supportsArrivals),
-          flag(row.supportsTrainPositions),
+          boolFlag(row.supportsArrivals, "realtimeProviderLineMappings.supportsArrivals"),
+          boolFlag(row.supportsTrainPositions, "realtimeProviderLineMappings.supportsTrainPositions"),
           row.mappingConfidence ?? "UNKNOWN",
           timestamp(row.updatedAt),
         ],
@@ -350,8 +349,8 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           requiredString(row.lineId, "realtimeProviderStationMappings.lineId"),
           requiredString(row.sourceId, "realtimeProviderStationMappings.sourceId"),
           row.queryName ?? "",
-          flag(row.supportsArrivals),
-          flag(row.supportsTrainPositions),
+          boolFlag(row.supportsArrivals, "realtimeProviderStationMappings.supportsArrivals"),
+          boolFlag(row.supportsTrainPositions, "realtimeProviderStationMappings.supportsTrainPositions"),
           row.mappingConfidence ?? "UNKNOWN",
           timestamp(row.updatedAt),
         ],
@@ -784,7 +783,13 @@ function schemaVersionNumber(value, label) {
   return version;
 }
 
-function flag(value) {
+function boolFlag(value, label) {
+  if (value === undefined) {
+    return 0;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} must be a boolean`);
+  }
   return value ? 1 : 0;
 }
 

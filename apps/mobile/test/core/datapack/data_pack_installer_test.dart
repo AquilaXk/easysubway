@@ -121,6 +121,10 @@ void main() {
     expect(result.status, DataPackInstallStatus.installed);
     expect(pointer?.path.endsWith('catalog/capital-v18.sqlite'), isTrue);
     expect(File(pointer!.path).existsSync(), isTrue);
+    expect(
+      pointer.sha256,
+      sha256.convert(await File(pointer.path).readAsBytes()).toString(),
+    );
     expect(installedRows.single.packId, 'capital');
     expect(installedRows.single.version, '18');
   });
@@ -166,6 +170,10 @@ void main() {
 
     expect(result.status, DataPackInstallStatus.installed);
     expect(result.pointer?.version, '19');
+    expect(
+      result.pointer?.sha256,
+      sha256.convert(await File(result.pointer!.path).readAsBytes()).toString(),
+    );
   });
 
   test('installer는 legacy manifest에 sizeBytes가 없으면 길이 검사를 건너뛴다', () async {
