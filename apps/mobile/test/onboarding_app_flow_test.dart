@@ -38,7 +38,7 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('어디로 가시나요?'), findsOneWidget);
+    expect(find.text('길찾기'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
     expect(
