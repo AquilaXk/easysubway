@@ -4332,12 +4332,8 @@ void main() {
       expect(nextActionNotice, findsOneWidget);
       expect(tester.getSize(nextActionNotice).height, greaterThanOrEqualTo(44));
       expect(
-        tester.getSemantics(nextActionNotice).label,
-        '다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.',
-      );
-      expect(
         find.bySemanticsLabel('다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.bySemanticsLabel(

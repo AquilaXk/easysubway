@@ -2002,48 +2002,97 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
     return Semantics(
       label: result.semanticLabel,
       liveRegion: true,
-      explicitChildNodes: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: EasySubwayAccessibleColors.mintSoft,
-                  border: Border.all(
-                    color: EasySubwayAccessibleColors.mintBorder,
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: EasySubwayAccessibleColors.mintSoft,
+                    border: Border.all(
+                      color: EasySubwayAccessibleColors.mintBorder,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: textScale >= 2
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${result.originStationName} → ${result.destinationStationName}',
-                              style: textTheme.titleMedium?.copyWith(
-                                color: EasySubwayAccessibleColors.text,
-                                fontWeight: FontWeight.w900,
-                                height: 1.25,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: textScale >= 2
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${result.originStationName} → ${result.destinationStationName}',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: EasySubwayAccessibleColors.text,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.25,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _mobilityHeaderLabel,
-                              key: const Key('routeGuidanceMobilityChip'),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: EasySubwayAccessibleColors.mutedText,
-                                height: 1.4,
+                              const SizedBox(height: 4),
+                              Text(
+                                _mobilityHeaderLabel,
+                                key: const Key('routeGuidanceMobilityChip'),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  height: 1.4,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: DecoratedBox(
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color:
+                                        EasySubwayAccessibleColors.mintBorder,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const SizedBox(
+                                    width: 39,
+                                    height: 39,
+                                    child: Icon(
+                                      Icons.edit_outlined,
+                                      color:
+                                          EasySubwayAccessibleColors.mintDark,
+                                      size: 17,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${result.originStationName} → ${result.destinationStationName}',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        color: EasySubwayAccessibleColors.text,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _mobilityHeaderLabel,
+                                      key: const Key(
+                                        'routeGuidanceMobilityChip',
+                                      ),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: EasySubwayAccessibleColors
+                                            .mutedText,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: EasySubwayAccessibleColors.mintBorder,
                                   borderRadius: BorderRadius.circular(14),
@@ -2058,269 +2107,229 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${result.originStationName} → ${result.destinationStationName}',
-                                    style: textTheme.titleMedium?.copyWith(
-                                      color: EasySubwayAccessibleColors.text,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _mobilityHeaderLabel,
-                                    key: const Key('routeGuidanceMobilityChip'),
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color:
-                                          EasySubwayAccessibleColors.mutedText,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: EasySubwayAccessibleColors.mintBorder,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const SizedBox(
-                                width: 39,
-                                height: 39,
-                                child: Icon(
-                                  Icons.edit_outlined,
-                                  color: EasySubwayAccessibleColors.mintDark,
-                                  size: 17,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              _RoutePrototypeSection(
-                title: result.isBlocked
-                    ? '안내 불가 이유'
-                    : _isRecommendedRoute
-                    ? '추천 경로 1개'
-                    : result.statusLabel,
-                subtitle: result.isBlocked
-                    ? '현재 조건에서 막힌 이유를 확인하세요'
-                    : _isRecommendedRoute
-                    ? '시설 상태와 신뢰도를 함께 계산했어요'
-                    : '이 경로는 이동 전 확인이 필요합니다',
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(
-                    color: result.isBlocked
-                        ? const Color(0xFFEFCCCC)
-                        : EasySubwayAccessibleColors.mint,
-                    width: 2,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1A0D8A6D),
-                      blurRadius: 18,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (textScale >= 2)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _isRecommendedRoute && _totalMinutes > 0
-                                  ? '$_totalMinutes분'
-                                  : result.isBlocked
-                                  ? result.guidanceLabel
-                                  : result.statusLabel,
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: EasySubwayAccessibleColors.text,
-                                fontWeight: FontWeight.w900,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _isRecommendedRoute
-                                  ? _routeMeta
-                                  : result.statusLabel,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: EasySubwayAccessibleColors.mutedText,
-                                height: 1.4,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_isRecommendedRoute)
-                              const _RoutePrototypeChip(
-                                label: '가장 추천',
-                                icon: Icons.check,
-                              ),
-                            const SizedBox(height: 5),
-                            Text(
-                              _isRecommendedRoute
-                                  ? result.scoreLabel.replaceFirst('점수 ', '편함 ')
-                                  : result.scoreLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: EasySubwayAccessibleColors.mintDark,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _isRecommendedRoute && _totalMinutes > 0
-                                        ? '$_totalMinutes분'
-                                        : result.isBlocked
-                                        ? result.guidanceLabel
-                                        : result.statusLabel,
-                                    style: textTheme.headlineSmall?.copyWith(
-                                      color: EasySubwayAccessibleColors.text,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _isRecommendedRoute
-                                        ? _routeMeta
-                                        : result.statusLabel,
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color:
-                                          EasySubwayAccessibleColors.mutedText,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (_isRecommendedRoute)
-                                  const _RoutePrototypeChip(
-                                    label: '가장 추천',
-                                    icon: Icons.check,
-                                  ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  _isRecommendedRoute
-                                      ? result.scoreLabel.replaceFirst(
-                                          '점수 ',
-                                          '편함 ',
-                                        )
-                                      : result.scoreLabel,
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: EasySubwayAccessibleColors.mintDark,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      if (_isRecommendedRoute &&
-                          result.movementSteps.isNotEmpty) ...[
-                        const SizedBox(height: 15),
-                        const _RoutePrototypeLinePath(),
-                      ],
-                      if (_isRecommendedRoute &&
-                          result.recommendationReasons.isNotEmpty) ...[
-                        const SizedBox(height: 13),
-                        _RouteRecommendationReasons(
-                          reasons: result.recommendationReasons,
-                        ),
-                      ],
-                      if (result.blockedReasons.isNotEmpty) ...[
-                        const SizedBox(height: 13),
-                        for (final reason in result.blockedReasons)
-                          _RoutePrototypeReason(text: reason, blocked: true),
-                      ],
-                      if (arrivalStep != null) ...[
-                        const SizedBox(height: 16),
-                        _RouteArrivalGuidance(step: arrivalStep),
-                      ],
-                      if (result.warnings.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        for (final warning in result.warnings)
-                          _RouteNotice(
-                            title: '주의 확인',
-                            text: warning.message,
-                            icon: Icons.warning_amber,
+                            ],
                           ),
-                      ],
-                      if (result.movementSteps.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        _RouteStepSection(steps: result.movementSteps),
-                      ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                _RoutePrototypeSection(
+                  title: result.isBlocked
+                      ? '안내 불가 이유'
+                      : _isRecommendedRoute
+                      ? '추천 경로 1개'
+                      : result.statusLabel,
+                  subtitle: result.isBlocked
+                      ? '현재 조건에서 막힌 이유를 확인하세요'
+                      : _isRecommendedRoute
+                      ? '시설 상태와 신뢰도를 함께 계산했어요'
+                      : '이 경로는 이동 전 확인이 필요합니다',
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(
+                      color: result.isBlocked
+                          ? const Color(0xFFEFCCCC)
+                          : EasySubwayAccessibleColors.mint,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A0D8A6D),
+                        blurRadius: 18,
+                        offset: Offset(0, 6),
+                      ),
                     ],
                   ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (textScale >= 2)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isRecommendedRoute && _totalMinutes > 0
+                                    ? '$_totalMinutes분'
+                                    : result.isBlocked
+                                    ? result.guidanceLabel
+                                    : result.statusLabel,
+                                style: textTheme.headlineSmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.text,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isRecommendedRoute
+                                    ? _routeMeta
+                                    : result.statusLabel,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (_isRecommendedRoute)
+                                const _RoutePrototypeChip(
+                                  label: '가장 추천',
+                                  icon: Icons.check,
+                                ),
+                              const SizedBox(height: 5),
+                              Text(
+                                _isRecommendedRoute
+                                    ? result.scoreLabel.replaceFirst(
+                                        '점수 ',
+                                        '편함 ',
+                                      )
+                                    : result.scoreLabel,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: EasySubwayAccessibleColors.mintDark,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _isRecommendedRoute && _totalMinutes > 0
+                                          ? '$_totalMinutes분'
+                                          : result.isBlocked
+                                          ? result.guidanceLabel
+                                          : result.statusLabel,
+                                      style: textTheme.headlineSmall?.copyWith(
+                                        color: EasySubwayAccessibleColors.text,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _isRecommendedRoute
+                                          ? _routeMeta
+                                          : result.statusLabel,
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: EasySubwayAccessibleColors
+                                            .mutedText,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (_isRecommendedRoute)
+                                    const _RoutePrototypeChip(
+                                      label: '가장 추천',
+                                      icon: Icons.check,
+                                    ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    _isRecommendedRoute
+                                        ? result.scoreLabel.replaceFirst(
+                                            '점수 ',
+                                            '편함 ',
+                                          )
+                                        : result.scoreLabel,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color:
+                                          EasySubwayAccessibleColors.mintDark,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        if (_isRecommendedRoute &&
+                            result.movementSteps.isNotEmpty) ...[
+                          const SizedBox(height: 15),
+                          const _RoutePrototypeLinePath(),
+                        ],
+                        if (_isRecommendedRoute &&
+                            result.recommendationReasons.isNotEmpty) ...[
+                          const SizedBox(height: 13),
+                          _RouteRecommendationReasons(
+                            reasons: result.recommendationReasons,
+                          ),
+                        ],
+                        if (result.blockedReasons.isNotEmpty) ...[
+                          const SizedBox(height: 13),
+                          for (final reason in result.blockedReasons)
+                            _RoutePrototypeReason(text: reason, blocked: true),
+                        ],
+                        if (arrivalStep != null) ...[
+                          const SizedBox(height: 16),
+                          _RouteArrivalGuidance(step: arrivalStep),
+                        ],
+                        if (result.warnings.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          for (final warning in result.warnings)
+                            _RouteNotice(
+                              title: '주의 확인',
+                              text: warning.message,
+                              icon: Icons.warning_amber,
+                            ),
+                        ],
+                        if (result.movementSteps.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          _RouteStepSection(steps: result.movementSteps),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              if (_isRecommendedRoute) ...[
-                const SizedBox(height: 12),
-                const _RoutePrototypeInfoBox(),
+                if (_isRecommendedRoute) ...[
+                  const SizedBox(height: 12),
+                  const _RoutePrototypeInfoBox(),
+                ],
               ],
-            ],
-          ),
-          if (result.isBlocked)
-            const _RouteNotice(
-              key: Key('routeBlockedNextActionNotice'),
-              title: '다음 행동',
-              text: _routeSearchFailureNextAction,
-              icon: Icons.refresh,
-              semanticsLabel: '다음 행동, $_routeSearchFailureNextAction',
             ),
-          const SizedBox(height: 12),
-          if (result.isBlocked)
-            const _RouteNotice(
-              title: '안전 안내',
-              text: _routeSafetyGuidanceNotice,
-              icon: Icons.shield_outlined,
-            )
-          else
-            const _RouteNotice(
-              key: Key('routeSafetyGuidanceNotice'),
-              title: '안전 안내',
-              text: _routeSafetyGuidanceNotice,
-              icon: Icons.shield_outlined,
-            ),
-          if (result.isBlocked) ...[
+            if (result.isBlocked)
+              const _RouteNotice(
+                key: Key('routeBlockedNextActionNotice'),
+                title: '다음 행동',
+                text: _routeSearchFailureNextAction,
+                icon: Icons.refresh,
+                semanticsLabel: '다음 행동, $_routeSearchFailureNextAction',
+              ),
             const SizedBox(height: 12),
-            const _RouteNotice(
-              title: '확인 요청',
-              text: '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.',
-              icon: Icons.support_agent,
-            ),
+            if (result.isBlocked)
+              const _RouteNotice(
+                title: '안전 안내',
+                text: _routeSafetyGuidanceNotice,
+                icon: Icons.shield_outlined,
+              )
+            else
+              const _RouteNotice(
+                key: Key('routeSafetyGuidanceNotice'),
+                title: '안전 안내',
+                text: _routeSafetyGuidanceNotice,
+                icon: Icons.shield_outlined,
+              ),
+            if (result.isBlocked) ...[
+              const SizedBox(height: 12),
+              const _RouteNotice(
+                title: '확인 요청',
+                text: '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.',
+                icon: Icons.support_agent,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
