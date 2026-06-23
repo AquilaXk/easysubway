@@ -324,6 +324,7 @@ void main() {
       expect(find.byKey(const Key('homeSecondaryActionsGroup')), findsNothing);
       expect(find.byKey(const Key('homeSettingsActionsGroup')), findsOneWidget);
       expect(find.byKey(const Key('homeMyInfoActionsGroup')), findsOneWidget);
+      expect(find.byKey(const Key('homeTripControlPanel')), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
@@ -339,7 +340,8 @@ void main() {
       expect(find.text('즐겨찾기 역'), findsNothing);
       expect(find.text('즐겨찾기 시설'), findsNothing);
       expect(find.textContaining('빠른 길보다'), findsNothing);
-      expect(find.textContaining('고령자'), findsNothing);
+      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
       expect(find.textContaining('휠체어'), findsNothing);
 
       final stationButtonSize = tester.getSize(
@@ -423,6 +425,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -700));
+    await tester.pumpAndSettle();
+
     final mobilityButton = find.byKey(const Key('mobilityProfileButton'));
     final favoritesButton = find.byKey(const Key('favoritesButton'));
 
@@ -434,6 +439,55 @@ void main() {
     expect(tester.getSize(mobilityButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
     expect(tester.getSize(mobilityButton).height, greaterThanOrEqualTo(60));
+  });
+
+  testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const Key('homeTripControlPanel'));
+    expect(panel, findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('현재 이동 조건')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('고령자')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('계단을 피하고 쉬운 환승을 우선해요')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.byKey(const Key('mobilityProfileButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: panel, matching: find.text('휠체어')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('계단 없는 길만 안내해요')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {
