@@ -3,6 +3,29 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('지도 기능 계약은 노선도와 주변 지도를 분리하고 목록 대체를 필수로 둔다', () {
+    expect(mapCapabilityContracts.map((contract) => contract.type), [
+      MapCapabilityType.offlineLineMap,
+      MapCapabilityType.nearbyGeographicMap,
+    ]);
+
+    expect(offlineLineMapContract.title, '오프라인 노선도');
+    expect(offlineLineMapContract.needsCurrentLocation, isFalse);
+    expect(offlineLineMapContract.canUseExternalMapProvider, isFalse);
+    expect(offlineLineMapContract.requiresSdkKeyForTests, isFalse);
+    expect(offlineLineMapContract.requiresListEquivalent, isTrue);
+    expect(offlineLineMapContract.allowsMapOnlyCriticalGestures, isFalse);
+    expect(offlineLineMapContract.listEquivalentLabel, '노선과 역 목록');
+
+    expect(nearbyGeographicMapContract.title, '내 주변 지도');
+    expect(nearbyGeographicMapContract.needsCurrentLocation, isTrue);
+    expect(nearbyGeographicMapContract.canUseExternalMapProvider, isTrue);
+    expect(nearbyGeographicMapContract.requiresSdkKeyForTests, isFalse);
+    expect(nearbyGeographicMapContract.requiresListEquivalent, isTrue);
+    expect(nearbyGeographicMapContract.allowsMapOnlyCriticalGestures, isFalse);
+    expect(nearbyGeographicMapContract.listEquivalentLabel, '주변 역과 시설 목록');
+  });
+
   test('지도 제공자는 네이버를 기본값으로 두고 카카오를 대체 후보로 둔다', () {
     const configuration = MapProviderConfiguration.defaults();
 

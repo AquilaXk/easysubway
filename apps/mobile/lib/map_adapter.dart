@@ -1,5 +1,56 @@
 import 'station_search.dart';
 
+enum MapCapabilityType { offlineLineMap, nearbyGeographicMap }
+
+class MapCapabilityContract {
+  const MapCapabilityContract({
+    required this.type,
+    required this.title,
+    required this.listEquivalentLabel,
+    required this.needsCurrentLocation,
+    required this.canUseExternalMapProvider,
+    required this.requiresSdkKeyForTests,
+    required this.requiresListEquivalent,
+    required this.allowsMapOnlyCriticalGestures,
+  });
+
+  final MapCapabilityType type;
+  final String title;
+  final String listEquivalentLabel;
+  final bool needsCurrentLocation;
+  final bool canUseExternalMapProvider;
+  final bool requiresSdkKeyForTests;
+  final bool requiresListEquivalent;
+  final bool allowsMapOnlyCriticalGestures;
+}
+
+const offlineLineMapContract = MapCapabilityContract(
+  type: MapCapabilityType.offlineLineMap,
+  title: '오프라인 노선도',
+  listEquivalentLabel: '노선과 역 목록',
+  needsCurrentLocation: false,
+  canUseExternalMapProvider: false,
+  requiresSdkKeyForTests: false,
+  requiresListEquivalent: true,
+  allowsMapOnlyCriticalGestures: false,
+);
+
+const nearbyGeographicMapContract = MapCapabilityContract(
+  type: MapCapabilityType.nearbyGeographicMap,
+  title: '내 주변 지도',
+  listEquivalentLabel: '주변 역과 시설 목록',
+  needsCurrentLocation: true,
+  canUseExternalMapProvider: true,
+  requiresSdkKeyForTests: false,
+  requiresListEquivalent: true,
+  allowsMapOnlyCriticalGestures: false,
+);
+
+const mapCapabilityContracts = [
+  offlineLineMapContract,
+  nearbyGeographicMapContract,
+];
+
 enum MapProviderType {
   naver,
   kakao;
