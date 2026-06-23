@@ -1474,12 +1474,13 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const kricCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("kric-"));
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "easysubway_public_subway_api_inventory.xlsx");
   assert.deepEqual(
-    candidates.candidates.map((candidate) => candidate.id).sort(),
+    kricCandidates.map((candidate) => candidate.id).sort(),
     [
       "kric-station-convenience-standard",
       "kric-station-info",
@@ -1494,7 +1495,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     ],
   );
 
-  for (const candidate of candidates.candidates) {
+  for (const candidate of kricCandidates) {
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
@@ -1508,6 +1509,40 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
     assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
     assert.ok(candidate.evidence.outputFields.length > 0);
+    assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+    assert.ok(candidate.nextAction);
+  }
+});
+
+test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분리를 고정한다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
+
+  assert.deepEqual(
+    topisCandidates.map((candidate) => candidate.id).sort(),
+    ["seoul-topis-realtime-station-arrival", "seoul-topis-realtime-train-position"],
+  );
+
+  for (const candidate of topisCandidates) {
+    assert.equal(candidate.priority, "P0");
+    assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
+    assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+    assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+    assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
+    assert.equal(candidate.mobileEmbeddingAllowed, false);
+    assert.equal(candidate.dataRetentionPolicy, "provider_does_not_offer_past_realtime_data");
+    assert.equal(productionSourceIds.has(candidate.id), false, `${candidate.id} must not be in production source inventory`);
+    assert.match(candidate.detailUrl, /^https:\/\/data\.seoul\.go\.kr\/dataList\/OA-/);
+    assert.match(candidate.requestUrl, /^http:\/\/swopenapi\.seoul\.go\.kr\/api\/subway\/\{serviceKey\}\/json\/realtime/);
+    assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
+    assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+    assert.equal(candidate.evidence.usePermissionRange, "공공누리 1유형");
+    assert.deepEqual(candidate.evidence.formats, ["JSON"]);
+    assert.match(candidate.evidence.sampleUrl, /\[서비스키값\]/);
+    assert.ok(candidate.evidence.coverageLimitations.length >= 2);
+    assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
     assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
     assert.ok(candidate.nextAction);
   }
