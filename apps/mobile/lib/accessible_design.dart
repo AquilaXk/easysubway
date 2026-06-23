@@ -4,6 +4,16 @@ class EasySubwayAccessibleColors {
   const EasySubwayAccessibleColors._();
 
   static const primary = Color(0xFF006D77);
+  static const brandDark = Color(0xFF071B2F);
+  static const brand = Color(0xFF17527C);
+  static const mint = Color(0xFF0D8A6D);
+  static const mintDark = Color(0xFF0A705A);
+  static const mintSoft = Color(0xFFF0FBF7);
+  static const mintBorder = Color(0xFFCBEADD);
+  static const amberSoft = Color(0xFFFFF0D1);
+  static const amber = Color(0xFF9A5600);
+  static const skySoft = Color(0xFFE6F5FF);
+  static const line = Color(0xFFDBE3E9);
   static const text = Color(0xFF102A2C);
   static const mutedText = Color(0xFF466467);
   static const surface = Colors.white;

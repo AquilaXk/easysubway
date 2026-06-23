@@ -825,7 +825,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final repository = widget.repository;
     final reportRepository = widget.reportRepository;
     final routeRepository = widget.routeRepository;
@@ -883,153 +882,123 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    void openStationSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            routeDraftController: _routeDraftController,
+          ),
+        ),
+      );
+    }
+
+    void openRouteSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: repository,
+            routeFeedbackRepository: routeFeedbackRepository,
+            favoriteRouteRepository: favoriteRouteRepository,
+            initialMobilityType: initialMobilityType,
+            simpleViewEnabled: simpleViewEnabled,
+          ),
+        ),
+      );
+    }
+
+    void openFavorites() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => FavoriteHomeScreen(
+            favoriteRepository: favoriteRepository,
+            favoriteFacilityRepository: favoriteFacilityRepository,
+            favoriteRouteRepository: favoriteRouteRepository,
+            stationRepository: repository,
+            reportRepository: reportRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            initialMobilityType: initialMobilityType,
+          ),
+        ),
+      );
+    }
+
+    void openReports() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              MyFacilityReportListScreen(repository: reportRepository),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('쉬운 지하철'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('쉬운 지하철'),
+            Text('갈 수 있는 길을 먼저', style: TextStyle(fontSize: 12)),
+          ],
+        ),
         actions: [
-          TextButton.icon(
+          IconButton(
             key: const Key('homeHelpActionButton'),
             onPressed: openSupportAccess,
             icon: const Icon(Icons.help_outline),
-            label: const Text('도움말'),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              minimumSize: const Size(96, 48),
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+            tooltip: '도움말',
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          key: const Key('homePrototypeList'),
+          padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
           children: [
+            _HomePrototypeHero(
+              profile: currentProfile,
+              onRouteSearch: openRouteSearch,
+              onStationSearch: openStationSearch,
+            ),
             AnimatedBuilder(
               animation: _routeDraftController,
-              builder: (context, _) {
-                return _HomeTripControlPanel(
-                  profile: currentProfile,
-                  draft: _routeDraftController.draft,
-                );
-              },
-            ),
-            const SizedBox(height: 6),
-            Semantics(
-              header: true,
-              child: Text(
-                '어디로 가시나요?',
-                style: textTheme.headlineMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w800,
-                  height: 1.25,
-                ),
+              builder: (context, _) => _HomeRouteDraftCard(
+                draft: _routeDraftController.draft,
+                onTap: openRouteSearch,
               ),
             ),
-            const SizedBox(height: 22),
-            _HomePrimaryActionButton(
-              key: const Key('stationSearchButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => StationSearchScreen(
-                      repository: repository,
-                      reportRepository: reportRepository,
-                      favoriteRepository: favoriteRepository,
-                      searchHistoryRepository: searchHistoryRepository,
-                      locationProvider: locationProvider,
-                      facilityReportDraftTargetStore:
-                          facilityReportDraftTargetStore,
-                      internalRouteRepository: internalRouteRepository,
-                      internalRouteMobilityType: initialMobilityType,
-                      routeDraftController: _routeDraftController,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.search),
-              label: '역 검색',
+            _HomePrototypeSection(
+              title: '지금 주변 상태',
+              subtitle: '마지막 확인: 오늘 09:32',
+              action: TextButton(
+                onPressed: openStationSearch,
+                child: const Text('주변 역 보기'),
+              ),
             ),
-            const SizedBox(height: 12),
-            _HomePrimaryActionButton(
-              key: const Key('routeSearchButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => RouteSearchScreen(
-                      repository: routeRepository,
-                      stationRepository: repository,
-                      routeFeedbackRepository: routeFeedbackRepository,
-                      favoriteRouteRepository: favoriteRouteRepository,
-                      initialMobilityType: initialMobilityType,
-                      simpleViewEnabled: simpleViewEnabled,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.route),
-              label: '길찾기',
+            _HomeStatusCard(onTap: openStationSearch),
+            _HomePrototypeSection(
+              title: '자주 가는 곳',
+              subtitle: '저장한 경로를 현재 상태로 다시 검색해요',
             ),
-            const SizedBox(height: 22),
-            const Divider(height: 1),
-            const SizedBox(height: 14),
-            _HomeActionSection(
-              title: '개인 설정',
-              groupKey: const Key('homeSettingsActionsGroup'),
-              children: [
-                AccessibleShortcutButton(
-                  key: const Key('appSettingsButton'),
-                  onPressed: openSettings,
-                  icon: const Icon(Icons.settings_outlined),
-                  label: '설정',
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _HomeActionSection(
-              title: '내 정보',
-              groupKey: const Key('homeMyInfoActionsGroup'),
-              children: [
-                if (hasFavorites)
-                  AccessibleShortcutButton(
-                    key: const Key('favoritesButton'),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => FavoriteHomeScreen(
-                            favoriteRepository: favoriteRepository,
-                            favoriteFacilityRepository:
-                                favoriteFacilityRepository,
-                            favoriteRouteRepository: favoriteRouteRepository,
-                            stationRepository: repository,
-                            reportRepository: reportRepository,
-                            locationProvider: locationProvider,
-                            facilityReportDraftTargetStore:
-                                facilityReportDraftTargetStore,
-                            internalRouteRepository: internalRouteRepository,
-                            initialMobilityType: initialMobilityType,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.star_outline),
-                    label: '즐겨찾기',
-                  ),
-                AccessibleShortcutButton(
-                  key: const Key('myReportsButton'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => MyFacilityReportListScreen(
-                          repository: reportRepository,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: '내 신고',
-                ),
-              ],
+            _HomeSavedRouteCard(onTap: openRouteSearch),
+            const _HomePrototypeSection(title: '바로가기'),
+            _HomeShortcutGrid(
+              hasFavorites: hasFavorites,
+              onNearby: openStationSearch,
+              onReports: openReports,
+              onFavorites: openFavorites,
+              onSettings: openSettings,
             ),
           ],
         ),
@@ -1061,6 +1030,761 @@ class _HomeScreenState extends State<HomeScreen> {
       SnackBar(content: Text('${selectedProfile.title} 조건으로 변경했습니다')),
     );
     return selectedProfile;
+  }
+}
+
+class _HomePrototypeHero extends StatelessWidget {
+  const _HomePrototypeHero({
+    required this.profile,
+    required this.onRouteSearch,
+    required this.onStationSearch,
+  });
+
+  final MobilityProfileOption profile;
+  final VoidCallback onRouteSearch;
+  final VoidCallback onStationSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label:
+          '어디로 가시나요? ${profile.title}, ${profile.summary}. 계단 없이 이동 가능한 길부터 찾아드릴게요.',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                EasySubwayAccessibleColors.brandDark,
+                EasySubwayAccessibleColors.brand,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x240B2947),
+                blurRadius: 30,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '안녕하세요, 오늘도 편안하게',
+                        style: TextStyle(
+                          color: Color(0xFFBCEBDC),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    _HomeProfilePill(profile: profile),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  '어디로 가시나요?',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    height: 1.28,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '계단 없이 이동 가능한 길부터 찾아드릴게요.',
+                  style: TextStyle(
+                    color: Color(0xFFDAE6ED),
+                    fontSize: 14,
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const Key('routeSearchButton'),
+                        onPressed: onRouteSearch,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: EasySubwayAccessibleColors.brandDark,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        icon: const Icon(Icons.route),
+                        label: const Text('길찾기 시작'),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    SizedBox(
+                      width: 55,
+                      height: 52,
+                      child: OutlinedButton(
+                        key: const Key('stationSearchButton'),
+                        onPressed: onStationSearch,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0x59FFFFFF)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Icon(Icons.search, size: 22),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeProfilePill extends StatelessWidget {
+  const _HomeProfilePill({required this.profile});
+
+  final MobilityProfileOption profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.11),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.accessibility_new, size: 16, color: Colors.white),
+            const SizedBox(width: 7),
+            Text(
+              profile.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeRouteDraftCard extends StatelessWidget {
+  const _HomeRouteDraftCard({required this.draft, required this.onTap});
+
+  final RouteDraft draft;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = '${draft.originLabel} / ${draft.destinationLabel}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Semantics(
+        key: const Key('homeRouteDraftPanel'),
+        button: true,
+        label: '길찾기 초안, $summary',
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: _PrototypeCard(
+              backgroundColor: EasySubwayAccessibleColors.skySoft,
+              borderColor: const Color(0xFFB7DDF4),
+              borderRadius: 18,
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(
+                        Icons.route_outlined,
+                        color: EasySubwayAccessibleColors.brand,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '길찾기 초안',
+                          style: TextStyle(
+                            color: EasySubwayAccessibleColors.brand,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          summary,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.text,
+                                fontWeight: FontWeight.w900,
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: EasySubwayAccessibleColors.brand,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomePrototypeSection extends StatelessWidget {
+  const _HomePrototypeSection({
+    required this.title,
+    this.subtitle,
+    this.action,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(1, 22, 1, 11),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final titleBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              if (subtitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    subtitle!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+            ],
+          );
+          if (action == null) {
+            return titleBlock;
+          }
+          if (constraints.maxWidth < 340) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                titleBlock,
+                const SizedBox(height: 6),
+                Align(alignment: Alignment.centerRight, child: action!),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: titleBlock),
+              action!,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HomeStatusCard extends StatelessWidget {
+  const _HomeStatusCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PrototypeCard(
+      backgroundColor: const Color(0xFFFFFAF0),
+      borderColor: const Color(0xFFF1D49A),
+      child: Column(
+        children: [
+          const _PrototypeInfoRow(
+            icon: Icons.elevator,
+            iconBackground: EasySubwayAccessibleColors.amberSoft,
+            iconColor: EasySubwayAccessibleColors.amber,
+            title: '상록수역 엘리베이터 2호',
+            subtitle: '3번 출구 연결 · 사용자 제보 확인 중',
+            trailing: '고장 가능',
+          ),
+          const SizedBox(height: 13),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: onTap,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('상세 상태 확인'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSavedRouteCard extends StatelessWidget {
+  const _HomeSavedRouteCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '상록수에서 서울역까지 저장한 경로, 엘리베이터 경로, 약 64분',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: _PrototypeCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '상록수 → 서울역',
+                            style: TextStyle(
+                              color: EasySubwayAccessibleColors.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              height: 1.25,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '4호선 · 환승 0회 · 최근 검색 어제',
+                            style: TextStyle(
+                              color: EasySubwayAccessibleColors.mutedText,
+                              fontSize: 13,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+                const SizedBox(height: 11),
+                const Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    _PrototypeChip(
+                      label: '엘리베이터 경로',
+                      icon: Icons.elevator,
+                      color: EasySubwayAccessibleColors.mintDark,
+                      background: Color(0xFFDEF5E7),
+                    ),
+                    _PrototypeChip(
+                      label: '약 64분',
+                      icon: Icons.schedule,
+                      color: EasySubwayAccessibleColors.brand,
+                      background: EasySubwayAccessibleColors.skySoft,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeShortcutGrid extends StatelessWidget {
+  const _HomeShortcutGrid({
+    required this.hasFavorites,
+    required this.onNearby,
+    required this.onReports,
+    required this.onFavorites,
+    required this.onSettings,
+  });
+
+  final bool hasFavorites;
+  final VoidCallback onNearby;
+  final VoidCallback onReports;
+  final VoidCallback onFavorites;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _HomeQuickCard(
+        key: const Key('nearbyStationButton'),
+        icon: Icons.location_on_outlined,
+        title: '가까운 역',
+        subtitle: '거리와 접근성을 함께 비교',
+        onTap: onNearby,
+      ),
+      _HomeQuickCard(
+        key: const Key('myReportsButton'),
+        icon: Icons.report_outlined,
+        title: '시설 제보',
+        subtitle: '고장·공사·위치 오류 알리기',
+        onTap: onReports,
+      ),
+      _HomeQuickCard(
+        key: const Key('favoritesButton'),
+        icon: Icons.bookmark_border,
+        title: hasFavorites ? '저장한 시설' : '저장',
+        subtitle: '자주 쓰는 시설 상태 확인',
+        onTap: onFavorites,
+      ),
+      _HomeQuickCard(
+        key: const Key('appSettingsButton'),
+        icon: Icons.storage_outlined,
+        title: '데이터 상태',
+        subtitle: '오프라인 정보 최신성 확인',
+        onTap: onSettings,
+      ),
+    ];
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    if (textScale >= 2) {
+      return Column(
+        children: [
+          cards[0],
+          const SizedBox(height: 10),
+          cards[1],
+          const SizedBox(height: 10),
+          cards[2],
+          const SizedBox(height: 10),
+          cards[3],
+        ],
+      );
+    }
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.18,
+      children: cards,
+    );
+  }
+}
+
+class _HomeQuickCard extends StatelessWidget {
+  const _HomeQuickCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$title, $subtitle',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: _PrototypeCard(
+            borderRadius: 18,
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: EasySubwayAccessibleColors.mintSoft,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: SizedBox(
+                    width: 39,
+                    height: 39,
+                    child: Icon(
+                      icon,
+                      color: EasySubwayAccessibleColors.mintDark,
+                      size: 21,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrototypeCard extends StatelessWidget {
+  const _PrototypeCard({
+    required this.child,
+    this.backgroundColor = Colors.white,
+    this.borderColor = EasySubwayAccessibleColors.line,
+    this.borderRadius = 20,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final Color backgroundColor;
+  final Color borderColor;
+  final double borderRadius;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A071B2F),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+class _PrototypeInfoRow extends StatelessWidget {
+  const _PrototypeInfoRow({
+    required this.icon,
+    required this.iconBackground,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final Color iconBackground;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final leading = DecoratedBox(
+      decoration: BoxDecoration(
+        color: iconBackground,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: SizedBox(
+        width: 43,
+        height: 43,
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+    );
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: EasySubwayAccessibleColors.text,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: EasySubwayAccessibleColors.mutedText,
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    if (textScale >= 2) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(child: content),
+            ],
+          ),
+          if (trailing != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 55),
+              child: Text(
+                trailing!,
+                style: const TextStyle(
+                  color: EasySubwayAccessibleColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        leading,
+        const SizedBox(width: 12),
+        Expanded(child: content),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            trailing!,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PrototypeChip extends StatelessWidget {
+  const _PrototypeChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Wrap(
+          spacing: 5,
+          runSpacing: 3,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: color),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1341,158 +2065,6 @@ class _AppSettingsInfoTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _HomeTripControlPanel extends StatelessWidget {
-  const _HomeTripControlPanel({required this.profile, required this.draft});
-
-  final MobilityProfileOption profile;
-  final RouteDraft draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Semantics(
-      key: const Key('homeTripControlPanel'),
-      container: true,
-      label:
-          '이동 조건 ${profile.title}, ${profile.summary}. 길찾기 초안 ${draft.originLabel}, ${draft.destinationLabel}',
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                '이동 조건',
-                style: textTheme.labelMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                ),
-              ),
-              Text(
-                profile.title,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              Text(
-                profile.summary,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  height: 1.2,
-                ),
-              ),
-              Text(
-                '길찾기 초안',
-                key: const Key('homeRouteDraftPanel'),
-                style: textTheme.labelMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                ),
-              ),
-              Text(
-                '${draft.originLabel} / ${draft.destinationLabel}',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomePrimaryActionButton extends StatelessWidget {
-  const _HomePrimaryActionButton({
-    required this.onPressed,
-    required this.icon,
-    required this.label,
-    super.key,
-  });
-
-  final VoidCallback onPressed;
-  final Widget icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.icon(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        alignment: Alignment.centerLeft,
-        minimumSize: const Size.fromHeight(92),
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-      ),
-      icon: IconTheme.merge(data: const IconThemeData(size: 30), child: icon),
-      label: Text(label, maxLines: 1),
-    );
-  }
-}
-
-class _HomeActionSection extends StatelessWidget {
-  const _HomeActionSection({
-    required this.title,
-    required this.groupKey,
-    required this.children,
-  });
-
-  final String title;
-  final Key groupKey;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: textTheme.titleMedium?.copyWith(
-            color: const Color(0xFF102A2C),
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 10.0;
-            final itemWidth = (constraints.maxWidth - spacing) / 2;
-            return Wrap(
-              key: groupKey,
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final child in children)
-                  SizedBox(
-                    width: itemWidth,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minHeight: EasySubwayTouchTarget.general,
-                      ),
-                      child: child,
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
     );
   }
 }
