@@ -422,7 +422,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('가까운 역'), findsOneWidget);
-      expect(find.text('시설 제보'), findsOneWidget);
+      expect(find.text('내 신고'), findsOneWidget);
       expect(find.text('저장한 곳'), findsOneWidget);
       expect(find.text('데이터 상태'), findsOneWidget);
 

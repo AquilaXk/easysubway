@@ -1688,7 +1688,7 @@ class _HomeShortcutGrid extends StatelessWidget {
       _HomeQuickCard(
         key: const Key('myReportsButton'),
         icon: Icons.report_outlined,
-        title: '시설 제보',
+        title: '내 신고',
         onTap: onReports,
       ),
       if (hasFavorites)
