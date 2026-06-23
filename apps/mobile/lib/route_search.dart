@@ -634,6 +634,13 @@ class RouteSearchResult {
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
+  String get comfortLabel {
+    if (isBlocked) {
+      return '다른 경로 필요';
+    }
+    return score >= 80 ? '이동 편함' : '조금 불편';
+  }
+
   String get guidanceLabel {
     if (isBlocked) {
       return '다른 경로가 필요합니다';
@@ -663,7 +670,7 @@ class RouteSearchResult {
       mobilityLabel,
       summaryTitle,
       lineLabel,
-      scoreLabel,
+      comfortLabel,
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
@@ -775,9 +782,8 @@ class RouteSearchStep {
   String get burdenLabel {
     final labels = <String>[
       _routeDurationLabel(estimatedMinutes),
-      _routeDistanceLabel(distanceMeters),
+      if (distanceMeters > 0) '도보 ${distanceMeters}m',
       if (includesStairs) '계단 포함',
-      if (requiresAccessibilityCheck) '접근성 확인',
     ];
     return labels.join(' · ');
   }
@@ -788,10 +794,6 @@ class RouteSearchStep {
       actionDetail.isEmpty ? description : actionDetail,
       if (reason.isNotEmpty) reason,
       burdenLabel,
-      if (hasMetricSourceMetadata) '시간 ${_routeTimeSourceLabel(timeSource)}',
-      if (hasMetricSourceMetadata)
-        '거리 ${_routeDistanceSourceLabel(distanceSource)}',
-      if (hasMetricSourceMetadata) confidenceLabel,
       if (evidenceSources.isNotEmpty) '근거 ${evidenceSources.join(', ')}',
     ];
     return labels.join(', ');
@@ -807,9 +809,8 @@ class RouteSearchStep {
       return '';
     }
     return [
-      '시간 ${_routeTimeSourceLabel(timeSource)}',
-      '거리 ${_routeDistanceSourceLabel(distanceSource)}',
-      confidenceLabel,
+      if (estimatedMinutes > 0) '약 $estimatedMinutes분',
+      if (distanceMeters > 0) '도보 ${distanceMeters}m',
     ].join(' · ');
   }
 }
@@ -834,27 +835,6 @@ String _routeDistanceLabel(int distanceMeters) {
     return '${kilometers.toStringAsFixed(0)}km';
   }
   return '${kilometers.toStringAsFixed(1)}km';
-}
-
-String _routeTimeSourceLabel(String source) {
-  // route contract: realtime ETA fallback
-  // Local route results may carry STATIC_ESTIMATE when realtime providers are
-  // unavailable. Unknown labels must stay explicit instead of implying live ETA
-  // accuracy.
-  return switch (source) {
-    'STATIC_ESTIMATE' => '정적 추정',
-    'REALTIME_ADJUSTED' => '실시간 보정',
-    'MEASURED' => '측정값',
-    _ => '확인 필요',
-  };
-}
-
-String _routeDistanceSourceLabel(String source) {
-  return switch (source) {
-    'MEASURED' => '측정값',
-    'STATIC_ESTIMATE' => '정적 추정',
-    _ => '확인 필요',
-  };
 }
 
 class RouteSearchWarning {
@@ -2131,7 +2111,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                   subtitle: result.isBlocked
                       ? '현재 조건에서 막힌 이유를 확인하세요'
                       : _isRecommendedRoute
-                      ? '시설 상태와 신뢰도를 함께 계산했어요'
+                      ? '편함·불편함과 시간·환승·걷기만 비교합니다.'
                       : '이 경로는 이동 전 확인이 필요합니다',
                 ),
                 DecoratedBox(
@@ -2191,12 +2171,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                 ),
                               const SizedBox(height: 5),
                               Text(
-                                _isRecommendedRoute
-                                    ? result.scoreLabel.replaceFirst(
-                                        '점수 ',
-                                        '편함 ',
-                                      )
-                                    : result.scoreLabel,
+                                result.comfortLabel,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.mintDark,
                                   fontWeight: FontWeight.w900,
@@ -2248,12 +2223,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                     ),
                                   const SizedBox(height: 5),
                                   Text(
-                                    _isRecommendedRoute
-                                        ? result.scoreLabel.replaceFirst(
-                                            '점수 ',
-                                            '편함 ',
-                                          )
-                                        : result.scoreLabel,
+                                    result.comfortLabel,
                                     style: textTheme.bodyMedium?.copyWith(
                                       color:
                                           EasySubwayAccessibleColors.mintDark,
@@ -2268,13 +2238,6 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                             result.movementSteps.isNotEmpty) ...[
                           const SizedBox(height: 15),
                           const _RoutePrototypeLinePath(),
-                        ],
-                        if (_isRecommendedRoute &&
-                            result.recommendationReasons.isNotEmpty) ...[
-                          const SizedBox(height: 13),
-                          _RouteRecommendationReasons(
-                            reasons: result.recommendationReasons,
-                          ),
                         ],
                         if (result.blockedReasons.isNotEmpty) ...[
                           const SizedBox(height: 13),
@@ -2302,10 +2265,6 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (_isRecommendedRoute) ...[
-                  const SizedBox(height: 12),
-                  const _RoutePrototypeInfoBox(),
-                ],
               ],
             ),
             if (result.isBlocked)
@@ -2487,112 +2446,6 @@ class _RoutePrototypeReason extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RoutePrototypeInfoBox extends StatelessWidget {
-  const _RoutePrototypeInfoBox();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.skySoft,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info_outline, color: EasySubwayAccessibleColors.brand),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '왜 가장 빠른 길이 첫 번째가 아닌가요?',
-                    style: TextStyle(
-                      color: EasySubwayAccessibleColors.brand,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      height: 1.25,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    '계단과 시설 상태, 걷는 거리를 먼저 고려했어요.',
-                    style: TextStyle(
-                      color: EasySubwayAccessibleColors.brand,
-                      fontSize: 12,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RouteRecommendationReasons extends StatelessWidget {
-  const _RouteRecommendationReasons({required this.reasons});
-
-  final List<String> reasons;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6F2F0),
-        border: Border.all(color: const Color(0xFF9FCACE)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF004A50),
-                  size: 26,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '추천 이유',
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF004A50),
-                    fontWeight: FontWeight.w900,
-                    height: 1.25,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final reason in reasons.take(3))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  reason,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF102A2C),
-                    fontWeight: FontWeight.w800,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -2820,17 +2673,6 @@ class _RouteStepTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF405A5D),
                       fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-                if (step.hasMetricSourceMetadata) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    step.metricSourceLabel,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF29484B),
-                      fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
                   ),
