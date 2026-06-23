@@ -2476,7 +2476,9 @@ class _StationRoleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: onPressed != null,
       label: semanticLabel,
+      onTap: onPressed,
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
           onPressed: onPressed,

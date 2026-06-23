@@ -1680,6 +1680,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('상록수역을 출발역으로 설정'))
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
     await tester.tap(
       find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
     );
