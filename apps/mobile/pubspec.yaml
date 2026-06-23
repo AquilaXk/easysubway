@@ -45,6 +45,7 @@ dependencies:
   crypto: ^3.0.7
   archive: ^4.0.9
   path: ^1.9.1
+  sqlite3: ^3.3.3
 
 dev_dependencies:
   flutter_test:

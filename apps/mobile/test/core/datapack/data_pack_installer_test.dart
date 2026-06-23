@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/core/database/user/user_database.dart'
 import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   test('installer는 손상 gzip이면 기존 current pointer를 유지한다', () async {
@@ -173,6 +174,39 @@ void main() {
     expect(
       result.pointer?.sha256,
       sha256.convert(await File(result.pointer!.path).readAsBytes()).toString(),
+    );
+  });
+
+  test('installer는 legacy schema v1 pack을 검증 중 변형하지 않는다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-legacy-schema-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _legacySchema1CatalogSqliteBytes(directory);
+    final sqliteHash = sha256.convert(sqliteBytes).toString();
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '20',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sqliteHash,
+        sizeBytes: compressedBytes.length,
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.sha256, sqliteHash);
+    expect(
+      sha256.convert(await File(result.pointer!.path).readAsBytes()).toString(),
+      sqliteHash,
     );
   });
 
@@ -389,6 +423,54 @@ Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
   final database = CatalogDatabase.file(file);
   await database.seedBaselineIfEmpty();
   await database.close();
+  return file.readAsBytes();
+}
+
+Future<List<int>> _legacySchema1CatalogSqliteBytes(Directory directory) async {
+  final file = File('${directory.path}/legacy-v1.sqlite');
+  final database = sqlite.sqlite3.open(file.path);
+  try {
+    database.execute('PRAGMA user_version = 1');
+    database.execute('''
+      CREATE TABLE catalog_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER
+      )
+    ''');
+    database.execute('''
+      CREATE TABLE stations (
+        id TEXT PRIMARY KEY,
+        name_ko TEXT NOT NULL,
+        name_en TEXT NOT NULL DEFAULT '',
+        latitude REAL NOT NULL DEFAULT 0,
+        longitude REAL NOT NULL DEFAULT 0,
+        region TEXT NOT NULL DEFAULT 'capital',
+        updated_at INTEGER
+      )
+    ''');
+    database.execute('''
+      CREATE TABLE station_lines (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        line_sequence INTEGER NOT NULL DEFAULT 0,
+        station_number TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (station_id, line_id)
+      )
+    ''');
+    database.execute("""
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES ('schemaVersion', '1', 1781827200)
+    """);
+    database.execute("""
+      INSERT INTO stations (id, name_ko, name_en, latitude, longitude, region, updated_at)
+      VALUES
+        ('station-sangnoksu', '상록수', 'Sangnoksu', 37.3028, 126.8664, 'capital', 1781827200),
+        ('station-sadang', '사당', 'Sadang', 37.4766, 126.9816, 'capital', 1781827200)
+    """);
+  } finally {
+    database.close();
+  }
   return file.readAsBytes();
 }
 
