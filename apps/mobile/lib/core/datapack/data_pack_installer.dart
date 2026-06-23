@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../database/catalog/catalog_database.dart';
 import '../database/user/user_database.dart' as user_db;
 import 'data_pack_manifest.dart';
 
@@ -210,45 +209,43 @@ class DataPackInstaller {
       return DataPackInstallRejectionReason.invalidSqliteHeader;
     }
 
-    final database = CatalogDatabase.file(file);
+    final database = sqlite.sqlite3.open(
+      file.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
     try {
-      final quickCheck = await database
-          .customSelect('PRAGMA quick_check')
-          .get();
-      if (quickCheck.any((row) => row.data.values.first != 'ok')) {
+      final quickCheck = database.select('PRAGMA quick_check');
+      if (quickCheck.any((row) => row.values.first != 'ok')) {
         return DataPackInstallRejectionReason.quickCheckFailed;
       }
-      final schemaVersion = await database
-          .customSelect(
-            "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
-          )
-          .getSingleOrNull();
-      if (schemaVersion?.read<String>('value') != pack.schemaVersion) {
+      final schemaVersion = database.select(
+        "SELECT value FROM catalog_metadata WHERE key = 'schemaVersion'",
+      );
+      if (schemaVersion.isEmpty ||
+          schemaVersion.first['value'] != pack.schemaVersion) {
         return DataPackInstallRejectionReason.schemaVersionMismatch;
       }
       for (final table in pack.requiredTables) {
-        final row = await database
-            .customSelect(
-              "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-              variables: [Variable<String>(table)],
-            )
-            .getSingleOrNull();
-        if (row == null) {
+        final rows = database.select(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          [table],
+        );
+        if (rows.isEmpty) {
           return DataPackInstallRejectionReason.requiredTableMissing;
         }
       }
       for (final entry in pack.minimumTableRows.entries) {
-        final rows = await database
-            .customSelect('SELECT COUNT(*) AS count FROM ${entry.key}')
-            .getSingle();
-        if (rows.read<int>('count') < entry.value) {
+        final rows = database.select(
+          'SELECT COUNT(*) AS count FROM ${_quotedSqlIdentifier(entry.key)}',
+        );
+        if ((rows.first['count'] as int) < entry.value) {
           return DataPackInstallRejectionReason.minimumRowsMissing;
         }
       }
     } on Object {
       return DataPackInstallRejectionReason.quickCheckFailed;
     } finally {
-      await database.close();
+      database.close();
     }
 
     return null;
@@ -374,6 +371,8 @@ bool _hasSqliteHeader(List<int> header) {
       String.fromCharCodes(header.take(15)) == 'SQLite format 3' &&
       header[15] == 0;
 }
+
+String _quotedSqlIdentifier(String value) => '"${value.replaceAll('"', '""')}"';
 
 Future<void> _deleteIfExists(File file) async {
   if (await file.exists()) {
