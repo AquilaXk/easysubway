@@ -408,6 +408,8 @@
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "sample_url_documented_key_required",
       "admissionStatus": "evidence_recorded_admin_review_required",
+      "productionInventoryReferenceId": "seoul-realtime-arrival-station-info",
+      "productionInventoryRelationship": "same_dataset_station_reference_is_production_live_provider_contract_remains_candidate",
       "serviceKeyHandling": "backend_secret_only",
       "mobileEmbeddingAllowed": false,
       "dataRetentionPolicy": "provider_does_not_offer_past_realtime_data",

@@ -1518,6 +1518,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const productionSourceByDatasetUrl = new Map(inventory.sources.map((source) => [source.datasetUrl, source]));
   const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
 
   assert.deepEqual(
@@ -1545,6 +1546,12 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
     assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
     assert.ok(candidate.nextAction);
+
+    const productionSource = productionSourceByDatasetUrl.get(candidate.detailUrl);
+    if (productionSource) {
+      assert.equal(candidate.productionInventoryReferenceId, productionSource.id);
+      assert.match(candidate.productionInventoryRelationship, /live_provider_contract_remains_candidate/);
+    }
   }
 });
 
