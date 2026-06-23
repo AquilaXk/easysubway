@@ -29,7 +29,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('쉬운 지하철'), findsOneWidget);
+    expect(find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.'), findsOneWidget);
+    expect(find.text('이동약자를 위한 지하철 안내'), findsNothing);
+    expect(find.text('계단과 고장 시설을 미리 확인하고'), findsNothing);
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
 
@@ -65,6 +70,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openOnboarding(tester);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('onboardingLocationButton')),
@@ -92,6 +98,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openOnboarding(tester);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('onboardingNotificationButton')),
@@ -120,6 +127,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openOnboarding(tester);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('onboardingNotificationButton')),
@@ -144,6 +152,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openOnboarding(tester);
 
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -1300));
     await tester.pumpAndSettle();
@@ -165,6 +174,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openOnboarding(tester);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('onboardingNotificationButton')),
@@ -220,9 +230,15 @@ void main() {
 
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<FormatException>());
+    await _openOnboarding(tester);
     expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
   });
+}
+
+Future<void> _openOnboarding(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('startScreenStartButton')));
+  await tester.pumpAndSettle();
 }
 
 EasySubwayApp _testApp({

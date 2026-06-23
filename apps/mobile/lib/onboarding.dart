@@ -10,6 +10,7 @@ import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
 const _onboardingNotificationFailureNextAction = '나중에 알림 설정에서 다시 켤 수 있습니다.';
+const startScreenAppIconAsset = 'assets/branding/app_icon.png';
 
 abstract class OnboardingResultStore {
   Future<OnboardingResult?> readResult();
@@ -175,6 +176,103 @@ class OnboardingState {
   final OnboardingResult? result;
 
   bool get isCompleted => result != null;
+}
+
+class StartScreen extends StatelessWidget {
+  const StartScreen({required this.onStart, super.key});
+
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF071B2F), Color(0xFF17527C)],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 48, 24, 35),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  image: true,
+                  label: '쉬운 지하철 앱 아이콘',
+                  child: ExcludeSemantics(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        startScreenAppIconAsset,
+                        width: 62,
+                        height: 62,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(flex: 5),
+                Semantics(
+                  header: true,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '빠른 길보다,\n'),
+                        TextSpan(
+                          text: '갈 수 있는 길',
+                          style: TextStyle(color: Color(0xFF84E2C5)),
+                        ),
+                        TextSpan(text: '을\n먼저 안내해요.'),
+                      ],
+                    ),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w900,
+                      height: 1.18,
+                    ),
+                  ),
+                ),
+                const Spacer(flex: 6),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const Key('startScreenStartButton'),
+                    onPressed: onStart,
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('쉬운 지하철 시작하기'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF071B2F),
+                      minimumSize: const Size.fromHeight(60),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 13),
+                const Center(
+                  child: Text(
+                    '로그인 없이도 이용할 수 있어요',
+                    style: TextStyle(
+                      color: Color(0xFFA9BFCD),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class OnboardingScreen extends StatefulWidget {

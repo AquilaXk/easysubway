@@ -368,6 +368,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   late bool _loadingOnboardingState =
       widget.onboardingStore != null &&
       !widget.initialOnboardingState.isCompleted;
+  bool _startScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
 
   @override
@@ -389,6 +390,15 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     }
 
     if (!_onboardingState.isCompleted) {
+      if (!_startScreenDismissed) {
+        return StartScreen(
+          onStart: () {
+            setState(() {
+              _startScreenDismissed = true;
+            });
+          },
+        );
+      }
       return OnboardingScreen(
         locationProvider: widget.locationProvider,
         notificationPermissionProvider: widget.notificationPermissionProvider,
@@ -453,6 +463,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     setState(() {
       _onboardingState = const OnboardingState.initial();
       _loadingOnboardingState = false;
+      _startScreenDismissed = false;
     });
   }
 
