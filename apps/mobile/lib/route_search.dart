@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
 import 'core/network/api_client.dart';
+import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
 import 'station_search.dart';

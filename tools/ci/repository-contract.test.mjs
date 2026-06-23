@@ -4570,6 +4570,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationLineBadges = read("apps/mobile/lib/features/stations/presentation/station_line_badges.dart");
+  const stationLine = read("apps/mobile/lib/features/stations/domain/station_line.dart");
   const stationApiRepository = read(
     "apps/mobile/lib/features/stations/data/station_api_repository.dart",
   );
@@ -4714,6 +4716,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
+  assert.match(stationSearch, /features\/stations\/presentation\/station_line_badges\.dart/);
+  assert.doesNotMatch(stationSearch, /class StationLineBadges|class StationLineBadge/);
+  assert.match(stationLineBadges, /class StationLineBadges extends StatelessWidget/);
+  assert.match(stationLineBadges, /class StationLineBadge extends StatelessWidget/);
+  assert.match(stationLine, /class StationSearchLine/);
+  assert.match(routeSearch, /features\/stations\/presentation\/station_line_badges\.dart/);
   assert.match(stationApiRepository, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
   assert.match(stationSearch, /final double\? latitude/);
   assert.match(stationSearch, /final double\? longitude/);
