@@ -363,7 +363,7 @@ void main() {
       expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
       expect(find.text('출발 미정 / 도착 미정'), findsOneWidget);
       expect(find.text('지금 주변 상태'), findsOneWidget);
-      expect(find.text('상록수역 엘리베이터 2호'), findsOneWidget);
+      expect(find.text('확인 가능한 주변 시설 상태가 없습니다'), findsOneWidget);
 
       expect(find.byKey(const Key('homeSecondaryActionsGroup')), findsNothing);
       expect(find.byKey(const Key('homeSettingsActionsGroup')), findsNothing);
@@ -494,6 +494,27 @@ void main() {
     expect(tester.getSize(settingsButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
     expect(tester.getSize(settingsButton).height, greaterThanOrEqualTo(60));
+  });
+
+  testWidgets('홈 자주 가는 곳은 저장한 경로가 있으면 빈 상태 대신 경로를 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(
+          favorites: [_favoriteRoute()],
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('상록수 → 사당'), 180);
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수 → 사당'), findsOneWidget);
+    expect(find.text('저장한 경로가 없습니다'), findsNothing);
   });
 
   testWidgets('설정 화면은 교통약자 사용 맥락별 섹션과 기존 설정 진입점을 제공한다', (tester) async {
@@ -1825,6 +1846,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('출발 상록수역 / 도착 사당역'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('homeRouteDraftPanel')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('경로 검색'), findsOneWidget);
+    expect(find.text('출발역 상록수'), findsOneWidget);
+    expect(find.text('도착역 사당'), findsOneWidget);
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {

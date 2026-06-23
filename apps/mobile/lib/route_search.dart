@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'accessible_design.dart';
 import 'auth_headers.dart';
 import 'core/network/api_client.dart';
+import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
@@ -983,6 +984,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.routeFeedbackRepository,
     this.favoriteRouteRepository,
     this.simpleViewEnabled = true,
+    this.initialDraft,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -991,6 +993,7 @@ class RouteSearchScreen extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final RouteDraft? initialDraft;
   final String initialMobilityType;
   final bool simpleViewEnabled;
 
@@ -1024,6 +1027,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   void initState() {
     super.initState();
     _controller = RouteSearchController(repository: widget.repository);
+    _originStation = _stationFromDraft(widget.initialDraft?.origin);
+    _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _selectedMobilityType = widget.initialMobilityType;
   }
 
@@ -1216,6 +1221,21 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     });
     _controller.reset();
   }
+}
+
+StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
+  if (station == null) {
+    return null;
+  }
+  return StationSearchResult(
+    id: station.id,
+    nameKo: station.nameKo,
+    nameEn: '',
+    region: '',
+    dataQualityLevel: '',
+    lastVerifiedAt: '',
+    lines: const [],
+  );
 }
 
 class _RouteMobilityTypeSummary extends StatelessWidget {
