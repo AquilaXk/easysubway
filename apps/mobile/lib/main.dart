@@ -991,7 +991,7 @@ class _HomeScreenState extends State<HomeScreen> {
               title: '자주 가는 곳',
               subtitle: '저장한 경로를 현재 상태로 다시 검색해요',
             ),
-            _HomeSavedRouteCard(onTap: openRouteSearch),
+            const _HomeSavedRouteEmptyCard(),
             const _HomePrototypeSection(title: '바로가기'),
             _HomeShortcutGrid(
               hasFavorites: hasFavorites,
@@ -1406,76 +1406,52 @@ class _HomeStatusCard extends StatelessWidget {
   }
 }
 
-class _HomeSavedRouteCard extends StatelessWidget {
-  const _HomeSavedRouteCard({required this.onTap});
-
-  final VoidCallback onTap;
+class _HomeSavedRouteEmptyCard extends StatelessWidget {
+  const _HomeSavedRouteEmptyCard();
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '상록수에서 서울역까지 저장한 경로, 엘리베이터 경로, 약 64분',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: _PrototypeCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return _PrototypeCard(
+      backgroundColor: EasySubwayAccessibleColors.skySoft,
+      borderColor: const Color(0xFFB7DDF4),
+      child: Semantics(
+        container: true,
+        label: '저장한 경로가 없습니다. 경로를 저장하면 여기에 보여드려요.',
+        child: const ExcludeSemantics(
+          child: Row(
+            children: [
+              Icon(
+                Icons.bookmark_add_outlined,
+                color: EasySubwayAccessibleColors.brand,
+                size: 30,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '상록수 → 서울역',
-                            style: TextStyle(
-                              color: EasySubwayAccessibleColors.text,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              height: 1.25,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            '4호선 · 환승 0회 · 최근 검색 어제',
-                            style: TextStyle(
-                              color: EasySubwayAccessibleColors.mutedText,
-                              fontSize: 13,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      '저장한 경로가 없습니다',
+                      style: TextStyle(
+                        color: EasySubwayAccessibleColors.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
                       ),
                     ),
-                    const Icon(Icons.chevron_right),
-                  ],
-                ),
-                const SizedBox(height: 11),
-                const Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _PrototypeChip(
-                      label: '엘리베이터 경로',
-                      icon: Icons.elevator,
-                      color: EasySubwayAccessibleColors.mintDark,
-                      background: Color(0xFFDEF5E7),
-                    ),
-                    _PrototypeChip(
-                      label: '약 64분',
-                      icon: Icons.schedule,
-                      color: EasySubwayAccessibleColors.brand,
-                      background: EasySubwayAccessibleColors.skySoft,
+                    SizedBox(height: 4),
+                    Text(
+                      '경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.',
+                      style: TextStyle(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1515,13 +1491,14 @@ class _HomeShortcutGrid extends StatelessWidget {
         subtitle: '고장·공사·위치 오류 알리기',
         onTap: onReports,
       ),
-      _HomeQuickCard(
-        key: const Key('favoritesButton'),
-        icon: Icons.bookmark_border,
-        title: hasFavorites ? '저장한 시설' : '저장',
-        subtitle: '자주 쓰는 시설 상태 확인',
-        onTap: onFavorites,
-      ),
+      if (hasFavorites)
+        _HomeQuickCard(
+          key: const Key('favoritesButton'),
+          icon: Icons.bookmark_border,
+          title: '저장한 시설',
+          subtitle: '자주 쓰는 시설 상태 확인',
+          onTap: onFavorites,
+        ),
       _HomeQuickCard(
         key: const Key('appSettingsButton'),
         icon: Icons.storage_outlined,
@@ -1534,13 +1511,10 @@ class _HomeShortcutGrid extends StatelessWidget {
     if (textScale >= 2) {
       return Column(
         children: [
-          cards[0],
-          const SizedBox(height: 10),
-          cards[1],
-          const SizedBox(height: 10),
-          cards[2],
-          const SizedBox(height: 10),
-          cards[3],
+          for (var index = 0; index < cards.length; index++) ...[
+            if (index > 0) const SizedBox(height: 10),
+            cards[index],
+          ],
         ],
       );
     }
@@ -1761,49 +1735,6 @@ class _PrototypeInfoRow extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _PrototypeChip extends StatelessWidget {
-  const _PrototypeChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.background,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: Wrap(
-          spacing: 5,
-          runSpacing: 3,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Icon(icon, size: 14, color: color),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

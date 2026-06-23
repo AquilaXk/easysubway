@@ -2204,8 +2204,11 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                        const SizedBox(height: 15),
-                        const _RoutePrototypeLinePath(),
+                        if (!result.isBlocked &&
+                            result.movementSteps.isNotEmpty) ...[
+                          const SizedBox(height: 15),
+                          const _RoutePrototypeLinePath(),
+                        ],
                         if (!result.isBlocked &&
                             result.recommendationReasons.isNotEmpty) ...[
                           const SizedBox(height: 13),

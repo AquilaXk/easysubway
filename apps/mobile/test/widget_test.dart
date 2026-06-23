@@ -403,9 +403,10 @@ void main() {
       expect(routeButtonSize.height, greaterThanOrEqualTo(52));
       expect(routeButtonSize.width, greaterThan(stationButtonSize.width));
 
-      await tester.scrollUntilVisible(find.text('상록수 → 서울역'), 180);
+      await tester.scrollUntilVisible(find.text('저장한 경로가 없습니다'), 180);
       await tester.pumpAndSettle();
-      expect(find.text('상록수 → 서울역'), findsOneWidget);
+      expect(find.text('저장한 경로가 없습니다'), findsOneWidget);
+      expect(find.text('경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.'), findsOneWidget);
 
       await tester.dragUntilVisible(
         find.text('바로가기'),
