@@ -12,6 +12,8 @@ class EasySubwayAccessibleColors {
   static const mintBorder = Color(0xFFCBEADD);
   static const amberSoft = Color(0xFFFFF0D1);
   static const amber = Color(0xFF9A5600);
+  static const redSoft = Color(0xFFFFE8E6);
+  static const red = Color(0xFFB42318);
   static const skySoft = Color(0xFFE6F5FF);
   static const line = Color(0xFFDBE3E9);
   static const text = Color(0xFF102A2C);
