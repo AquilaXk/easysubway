@@ -9,9 +9,13 @@ import 'accessible_design.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/domain/station_line.dart';
+import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
+
+export 'features/stations/domain/station_line.dart';
 
 const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _nearbyLocationMaxAge = Duration(minutes: 5);
@@ -779,50 +783,6 @@ class StationLayoutSummaryItem {
   final String text;
 }
 
-class StationSearchLine {
-  const StationSearchLine({
-    required this.id,
-    required this.name,
-    required this.color,
-    required this.stationCode,
-  });
-
-  factory StationSearchLine.fromJson(Map<String, Object?> json) {
-    return StationSearchLine(
-      id: _requiredString(json, 'id'),
-      name: _requiredString(json, 'name'),
-      color: _requiredString(json, 'color'),
-      stationCode: _requiredString(json, 'stationCode'),
-    );
-  }
-
-  static const _knownBadgeLabels = <String, String>{
-    '경의중앙': '경의중앙',
-    '수인분당': '수인분당',
-    '신분당': '신분당',
-    '인천1': '인천1',
-    '인천2': '인천2',
-  };
-
-  final String id;
-  final String name;
-  final String color;
-  final String stationCode;
-
-  String get badgeText => _lineBadgeText(name);
-
-  Color get badgeColor {
-    final normalized = color.trim().replaceFirst('#', '');
-    if (normalized.length == 6) {
-      final parsed = int.tryParse(normalized, radix: 16);
-      if (parsed != null) {
-        return Color(0xFF000000 | parsed);
-      }
-    }
-    return const Color(0xFF006D77);
-  }
-}
-
 class SubwayLineOption {
   const SubwayLineOption({
     required this.id,
@@ -855,44 +815,12 @@ class SubwayLineOption {
     if (lineCode.trim().isNotEmpty) {
       return lineCode.trim();
     }
-    return _lineBadgeText(name);
+    return stationLineBadgeText(name);
   }
 
   String get semanticLabel => name;
 
-  Color get badgeColor {
-    final normalized = color.trim().replaceFirst('#', '');
-    if (normalized.length == 6) {
-      final parsed = int.tryParse(normalized, radix: 16);
-      if (parsed != null) {
-        return Color(0xFF000000 | parsed);
-      }
-    }
-    return const Color(0xFF006D77);
-  }
-}
-
-String _lineBadgeText(String name) {
-  for (final entry in StationSearchLine._knownBadgeLabels.entries) {
-    if (name.contains(entry.key)) {
-      return entry.value;
-    }
-  }
-
-  final numberedLine = RegExp(r'(\d+)\s*호선').firstMatch(name);
-  if (numberedLine != null) {
-    return numberedLine.group(1) ?? name;
-  }
-
-  final compactName = name
-      .replaceAll('수도권 ', '')
-      .replaceAll('광역 ', '')
-      .replaceAll('선', '')
-      .trim();
-  if (compactName.length <= 4) {
-    return compactName;
-  }
-  return compactName.substring(0, 4);
+  Color get badgeColor => stationLineColor(color);
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
@@ -2224,7 +2152,7 @@ class _LineFilterBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = _higherContrastTextColor(color);
+    final textColor = stationLineTextColor(color);
     final fontSize = RegExp(r'^\d+$').hasMatch(text) ? 20.0 : 12.0;
 
     return Container(
@@ -3981,129 +3909,6 @@ class _StationDetailTextPill extends StatelessWidget {
       ),
     );
   }
-}
-
-class StationLineBadges extends StatelessWidget {
-  const StationLineBadges({
-    required this.lines,
-    this.size = 40,
-    this.maxBadgeCount,
-    super.key,
-  });
-
-  final List<StationSearchLine> lines;
-  final double size;
-  final int? maxBadgeCount;
-
-  @override
-  Widget build(BuildContext context) {
-    if (lines.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final maxCount = maxBadgeCount;
-    final shouldCollapse = maxCount != null && lines.length > maxCount;
-    final visibleLineCount = shouldCollapse
-        ? (maxCount - 1).clamp(1, lines.length).toInt()
-        : lines.length;
-    final hiddenLineCount = lines.length - visibleLineCount;
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final line in lines.take(visibleLineCount))
-          StationLineBadge(line: line, size: size),
-        if (hiddenLineCount > 0)
-          _StationLineOverflowBadge(count: hiddenLineCount, size: size),
-      ],
-    );
-  }
-}
-
-class StationLineBadge extends StatelessWidget {
-  const StationLineBadge({required this.line, this.size = 40, super.key});
-
-  final StationSearchLine line;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final backgroundColor = line.badgeColor;
-    final foregroundColor = _higherContrastTextColor(backgroundColor);
-    final badgeText = line.badgeText;
-    final scale = size / 40;
-    final badgeFontSize = RegExp(r'^\d+$').hasMatch(badgeText)
-        ? 25.0 * scale
-        : 15.0 * scale;
-
-    return Container(
-      key: Key('stationLineBadge-${line.id}'),
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-      child: Text(
-        badgeText,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: foregroundColor,
-          fontSize: badgeFontSize,
-          fontWeight: FontWeight.w900,
-          height: 1.05,
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLineOverflowBadge extends StatelessWidget {
-  const _StationLineOverflowBadge({required this.count, required this.size});
-
-  final int count;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('stationLineBadgeOverflow'),
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F0F1),
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFB8CACC)),
-      ),
-      child: Text(
-        '+$count',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: const Color(0xFF29484B),
-          fontSize: 13 * (size / 32),
-          fontWeight: FontWeight.w900,
-          height: 1.0,
-        ),
-      ),
-    );
-  }
-}
-
-Color _higherContrastTextColor(Color backgroundColor) {
-  const darkText = Color(0xFF102A2C);
-  final darkContrast = _contrastRatio(backgroundColor, darkText);
-  final lightContrast = _contrastRatio(backgroundColor, Colors.white);
-  return darkContrast >= lightContrast ? darkText : Colors.white;
-}
-
-double _contrastRatio(Color first, Color second) {
-  final firstLuminance = first.computeLuminance() + 0.05;
-  final secondLuminance = second.computeLuminance() + 0.05;
-  if (firstLuminance > secondLuminance) {
-    return firstLuminance / secondLuminance;
-  }
-  return secondLuminance / firstLuminance;
 }
 
 Uri defaultStationApiBaseUri() {
