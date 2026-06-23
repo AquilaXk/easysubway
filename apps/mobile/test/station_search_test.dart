@@ -369,7 +369,7 @@ void main() {
     expect(requestedUri.queryParameters['limit'], '5');
     expect(results.single.nameKo, '상록수');
     expect(results.single.distanceMeters, 230);
-    expect(results.single.distanceLabel, '230m 거리');
+    expect(results.single.distanceLabel, '현재 위치 기준 230m');
   });
 
   test('역 API 저장소는 정수가 아닌 거리 응답을 계약 위반으로 처리한다', () async {
@@ -964,7 +964,7 @@ void main() {
     expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
     expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
     expect(controller.state.status, StationSearchStatus.success);
-    expect(controller.state.results.single.distanceLabel, '230m 거리');
+    expect(controller.state.results.single.distanceLabel, '현재 위치 기준 230m');
   });
 
   test('역 검색 컨트롤러는 정확도 정보가 없는 기존 위치 응답을 주변역 검색에 쓰지 않는다', () async {
