@@ -892,6 +892,15 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    void openMyReports() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              MyFacilityReportListScreen(repository: reportRepository),
+        ),
+      );
+    }
+
     void openSettings() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -902,6 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
             notificationPermissionProvider: notificationPermissionProvider,
             onOpenMobilityProfile: _openMobilityProfile,
             onOpenSupportAccess: openSupportAccess,
+            onOpenMyReports: openMyReports,
           ),
         ),
       );
@@ -2064,6 +2074,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.notificationPermissionProvider,
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
+    required this.onOpenMyReports,
     super.key,
   });
 
@@ -2073,6 +2084,7 @@ class AppSettingsScreen extends StatefulWidget {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
+  final VoidCallback onOpenMyReports;
 
   @override
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
@@ -2182,6 +2194,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       );
                     },
                   ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-activity'),
+              title: '내 활동',
+              children: [
+                _AppSettingsActionTile(
+                  key: const Key('myReportsSettingsButton'),
+                  icon: Icons.receipt_long_outlined,
+                  title: '내 신고',
+                  subtitle: '접수한 시설 신고와 처리 상태를 확인해요',
+                  onTap: widget.onOpenMyReports,
+                ),
               ],
             ),
             _AppSettingsSection(

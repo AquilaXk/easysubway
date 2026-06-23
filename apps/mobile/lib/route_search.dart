@@ -782,8 +782,9 @@ class RouteSearchStep {
   String get burdenLabel {
     final labels = <String>[
       _routeDurationLabel(estimatedMinutes),
-      if (distanceMeters > 0) '도보 ${distanceMeters}m',
+      _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
+      if (requiresAccessibilityCheck) '접근성 확인',
     ];
     return labels.join(' · ');
   }
@@ -794,6 +795,10 @@ class RouteSearchStep {
       actionDetail.isEmpty ? description : actionDetail,
       if (reason.isNotEmpty) reason,
       burdenLabel,
+      if (hasMetricSourceMetadata) '시간 ${_routeTimeSourceLabel(timeSource)}',
+      if (hasMetricSourceMetadata)
+        '거리 ${_routeDistanceSourceLabel(distanceSource)}',
+      if (hasMetricSourceMetadata) confidenceLabel,
       if (evidenceSources.isNotEmpty) '근거 ${evidenceSources.join(', ')}',
     ];
     return labels.join(', ');
@@ -809,8 +814,9 @@ class RouteSearchStep {
       return '';
     }
     return [
-      if (estimatedMinutes > 0) '약 $estimatedMinutes분',
-      if (distanceMeters > 0) '도보 ${distanceMeters}m',
+      '시간 ${_routeTimeSourceLabel(timeSource)}',
+      '거리 ${_routeDistanceSourceLabel(distanceSource)}',
+      confidenceLabel,
     ].join(' · ');
   }
 }
@@ -835,6 +841,23 @@ String _routeDistanceLabel(int distanceMeters) {
     return '${kilometers.toStringAsFixed(0)}km';
   }
   return '${kilometers.toStringAsFixed(1)}km';
+}
+
+String _routeTimeSourceLabel(String source) {
+  return switch (source) {
+    'STATIC_ESTIMATE' => '정적 추정',
+    'REALTIME_ADJUSTED' => '실시간 보정',
+    'MEASURED' => '측정값',
+    _ => '확인 필요',
+  };
+}
+
+String _routeDistanceSourceLabel(String source) {
+  return switch (source) {
+    'MEASURED' => '측정값',
+    'STATIC_ESTIMATE' => '정적 추정',
+    _ => '확인 필요',
+  };
 }
 
 class RouteSearchWarning {

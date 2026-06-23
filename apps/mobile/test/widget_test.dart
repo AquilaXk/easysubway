@@ -77,16 +77,14 @@ Future<void> _openSettingsScreen(WidgetTester tester) async {
 }
 
 Future<void> _openMyReportsScreen(WidgetTester tester) async {
-  final homeContext = tester.element(find.byType(HomeScreen));
-  final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
-  unawaited(
-    Navigator.of(homeContext).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            MyFacilityReportListScreen(repository: home.reportRepository),
-      ),
-    ),
+  await tester.tap(find.byKey(const Key('bottomNavMore')));
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('myReportsSettingsButton')),
+    160,
   );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('myReportsSettingsButton')));
   await tester.pumpAndSettle();
 }
 
@@ -3640,7 +3638,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
-      expect(find.text('약 4분 · 도보 180m'), findsOneWidget);
+      expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(
         find.text('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
