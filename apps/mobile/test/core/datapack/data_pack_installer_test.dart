@@ -125,6 +125,49 @@ void main() {
     expect(installedRows.single.version, '18');
   });
 
+  test('installer는 schema v2 realtime mapping pack을 설치한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-schema-v2-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _validRealtimeMappingCatalogSqliteBytes(
+      directory,
+    );
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '19',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
+        schemaVersion: '2',
+        requiredTables: const [
+          'catalog_metadata',
+          'stations',
+          'station_lines',
+          'realtime_provider_line_mappings',
+          'realtime_provider_station_mappings',
+        ],
+        minimumTableRows: const {
+          'stations': 2,
+          'realtime_provider_line_mappings': 1,
+          'realtime_provider_station_mappings': 1,
+        },
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.version, '19');
+  });
+
   test('installer는 legacy manifest에 sizeBytes가 없으면 길이 검사를 건너뛴다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-legacy-size-',
@@ -283,6 +326,13 @@ DataPackManifestEntry _pack({
   required String sha256,
   required String sqliteSha256,
   required int? sizeBytes,
+  String schemaVersion = '1',
+  List<String> requiredTables = const [
+    'catalog_metadata',
+    'stations',
+    'station_lines',
+  ],
+  Map<String, int> minimumTableRows = const {'stations': 2},
 }) {
   return DataPackManifestEntry(
     id: 'capital',
@@ -320,9 +370,9 @@ DataPackManifestEntry _pack({
       algorithm: 'sha256-route-regression-v1',
       value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     ),
-    schemaVersion: '1',
-    requiredTables: const ['catalog_metadata', 'stations', 'station_lines'],
-    minimumTableRows: const {'stations': 2},
+    schemaVersion: schemaVersion,
+    requiredTables: requiredTables,
+    minimumTableRows: minimumTableRows,
   );
 }
 
@@ -330,6 +380,63 @@ Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
   final file = File('${directory.path}/fixture.sqlite');
   final database = CatalogDatabase.file(file);
   await database.seedBaselineIfEmpty();
+  await database.close();
+  return file.readAsBytes();
+}
+
+Future<List<int>> _validRealtimeMappingCatalogSqliteBytes(
+  Directory directory,
+) async {
+  final file = File('${directory.path}/fixture-v2.sqlite');
+  final database = CatalogDatabase.file(file);
+  await database.seedBaselineIfEmpty();
+  await database.customStatement(
+    "UPDATE catalog_metadata SET value = '2' WHERE key = 'schemaVersion'",
+  );
+  await database.customStatement("""
+    INSERT INTO realtime_provider_line_mappings (
+      provider_id,
+      provider_line_id,
+      line_id,
+      source_id,
+      supports_arrivals,
+      supports_train_positions,
+      mapping_confidence
+    ) VALUES (
+      'seoul-topis',
+      '1004',
+      'seoul-4',
+      'seoul-topis-realtime-station-arrival',
+      1,
+      1,
+      'OFFICIAL'
+    )
+    """);
+  await database.customStatement("""
+    INSERT INTO realtime_provider_station_mappings (
+      provider_id,
+      provider_line_id,
+      provider_station_id,
+      station_id,
+      line_id,
+      source_id,
+      query_name,
+      supports_arrivals,
+      supports_train_positions,
+      mapping_confidence
+    ) VALUES (
+      'seoul-topis',
+      '1004',
+      '1004000448',
+      'station-sangnoksu',
+      'seoul-4',
+      'seoul-topis-realtime-station-arrival',
+      '상록수',
+      1,
+      1,
+      'OFFICIAL'
+    )
+    """);
   await database.close();
   return file.readAsBytes();
 }

@@ -15,6 +15,8 @@ part 'catalog_database.g.dart';
     Stations,
     StationAliases,
     StationLines,
+    RealtimeProviderLineMappings,
+    RealtimeProviderStationMappings,
     NetworkEdges,
     StationExits,
     Facilities,
@@ -40,7 +42,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -48,6 +50,13 @@ class CatalogDatabase extends _$CatalogDatabase {
       onCreate: (migrator) async {
         await migrator.createAll();
         await _createIndexes();
+      },
+      onUpgrade: (migrator, from, to) async {
+        if (from < 2) {
+          await migrator.createTable(realtimeProviderLineMappings);
+          await migrator.createTable(realtimeProviderStationMappings);
+          await _createRealtimeProviderIndexes();
+        }
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -420,6 +429,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_station_lines_line_sequence '
       'ON station_lines(line_id, line_sequence)',
     );
+    await _createRealtimeProviderIndexes();
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_network_edges_from_node '
       'ON network_edges(from_node_id)',
@@ -431,6 +441,13 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_internal_route_edges_from '
       'ON internal_route_edges(from_node_id)',
+    );
+  }
+
+  Future<void> _createRealtimeProviderIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_realtime_provider_stations_internal '
+      'ON realtime_provider_station_mappings(station_id, line_id)',
     );
   }
 }

@@ -90,6 +90,76 @@ class StationLines extends Table {
   Set<Column> get primaryKey => {stationId, lineId};
 }
 
+class RealtimeProviderLineMappings extends Table {
+  @override
+  String get tableName => 'realtime_provider_line_mappings';
+
+  TextColumn get providerId => text().named('provider_id')();
+  TextColumn get providerLineId => text().named('provider_line_id')();
+  TextColumn get lineId => text().named('line_id')();
+  TextColumn get sourceId => text().named('source_id')();
+  BoolColumn get supportsArrivals =>
+      boolean().named('supports_arrivals').withDefault(const Constant(false))();
+  BoolColumn get supportsTrainPositions => boolean()
+      .named('supports_train_positions')
+      .withDefault(const Constant(false))();
+  TextColumn get mappingConfidence => text()
+      .named('mapping_confidence')
+      .withDefault(const Constant('UNKNOWN'))();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at').nullable()();
+
+  @override
+  Set<Column> get primaryKey => {providerId, providerLineId};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {providerId, lineId},
+    {providerId, providerLineId, lineId},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (line_id) REFERENCES lines(id)',
+  ];
+}
+
+class RealtimeProviderStationMappings extends Table {
+  @override
+  String get tableName => 'realtime_provider_station_mappings';
+
+  TextColumn get providerId => text().named('provider_id')();
+  TextColumn get providerLineId => text().named('provider_line_id')();
+  TextColumn get providerStationId => text().named('provider_station_id')();
+  TextColumn get stationId => text().named('station_id')();
+  TextColumn get lineId => text().named('line_id')();
+  TextColumn get sourceId => text().named('source_id')();
+  TextColumn get queryName =>
+      text().named('query_name').withDefault(const Constant(''))();
+  BoolColumn get supportsArrivals =>
+      boolean().named('supports_arrivals').withDefault(const Constant(false))();
+  BoolColumn get supportsTrainPositions => boolean()
+      .named('supports_train_positions')
+      .withDefault(const Constant(false))();
+  TextColumn get mappingConfidence => text()
+      .named('mapping_confidence')
+      .withDefault(const Constant('UNKNOWN'))();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at').nullable()();
+
+  @override
+  Set<Column> get primaryKey => {providerId, providerLineId, providerStationId};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {providerId, lineId, stationId},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (provider_id, provider_line_id, line_id) REFERENCES realtime_provider_line_mappings(provider_id, provider_line_id, line_id)',
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+  ];
+}
+
 class NetworkEdges extends Table {
   @override
   String get tableName => 'network_edges';
