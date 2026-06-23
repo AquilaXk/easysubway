@@ -2139,6 +2139,1282 @@ class StationLinesCompanion extends UpdateCompanion<StationLine> {
   }
 }
 
+class $RealtimeProviderLineMappingsTable extends RealtimeProviderLineMappings
+    with
+        TableInfo<
+          $RealtimeProviderLineMappingsTable,
+          RealtimeProviderLineMapping
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RealtimeProviderLineMappingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _providerIdMeta = const VerificationMeta(
+    'providerId',
+  );
+  @override
+  late final GeneratedColumn<String> providerId = GeneratedColumn<String>(
+    'provider_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerLineIdMeta = const VerificationMeta(
+    'providerLineId',
+  );
+  @override
+  late final GeneratedColumn<String> providerLineId = GeneratedColumn<String>(
+    'provider_line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _supportsArrivalsMeta = const VerificationMeta(
+    'supportsArrivals',
+  );
+  @override
+  late final GeneratedColumn<bool> supportsArrivals = GeneratedColumn<bool>(
+    'supports_arrivals',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("supports_arrivals" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _supportsTrainPositionsMeta =
+      const VerificationMeta('supportsTrainPositions');
+  @override
+  late final GeneratedColumn<bool> supportsTrainPositions =
+      GeneratedColumn<bool>(
+        'supports_train_positions',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("supports_train_positions" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _mappingConfidenceMeta = const VerificationMeta(
+    'mappingConfidence',
+  );
+  @override
+  late final GeneratedColumn<String> mappingConfidence =
+      GeneratedColumn<String>(
+        'mapping_confidence',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    providerId,
+    providerLineId,
+    lineId,
+    sourceId,
+    supportsArrivals,
+    supportsTrainPositions,
+    mappingConfidence,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'realtime_provider_line_mappings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RealtimeProviderLineMapping> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('provider_id')) {
+      context.handle(
+        _providerIdMeta,
+        providerId.isAcceptableOrUnknown(data['provider_id']!, _providerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerIdMeta);
+    }
+    if (data.containsKey('provider_line_id')) {
+      context.handle(
+        _providerLineIdMeta,
+        providerLineId.isAcceptableOrUnknown(
+          data['provider_line_id']!,
+          _providerLineIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerLineIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('supports_arrivals')) {
+      context.handle(
+        _supportsArrivalsMeta,
+        supportsArrivals.isAcceptableOrUnknown(
+          data['supports_arrivals']!,
+          _supportsArrivalsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('supports_train_positions')) {
+      context.handle(
+        _supportsTrainPositionsMeta,
+        supportsTrainPositions.isAcceptableOrUnknown(
+          data['supports_train_positions']!,
+          _supportsTrainPositionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mapping_confidence')) {
+      context.handle(
+        _mappingConfidenceMeta,
+        mappingConfidence.isAcceptableOrUnknown(
+          data['mapping_confidence']!,
+          _mappingConfidenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {providerId, providerLineId};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {providerId, lineId},
+    {providerId, providerLineId, lineId},
+  ];
+  @override
+  RealtimeProviderLineMapping map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RealtimeProviderLineMapping(
+      providerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_id'],
+      )!,
+      providerLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_line_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      supportsArrivals: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}supports_arrivals'],
+      )!,
+      supportsTrainPositions: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}supports_train_positions'],
+      )!,
+      mappingConfidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mapping_confidence'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $RealtimeProviderLineMappingsTable createAlias(String alias) {
+    return $RealtimeProviderLineMappingsTable(attachedDatabase, alias);
+  }
+}
+
+class RealtimeProviderLineMapping extends DataClass
+    implements Insertable<RealtimeProviderLineMapping> {
+  final String providerId;
+  final String providerLineId;
+  final String lineId;
+  final String sourceId;
+  final bool supportsArrivals;
+  final bool supportsTrainPositions;
+  final String mappingConfidence;
+  final DateTime? updatedAt;
+  const RealtimeProviderLineMapping({
+    required this.providerId,
+    required this.providerLineId,
+    required this.lineId,
+    required this.sourceId,
+    required this.supportsArrivals,
+    required this.supportsTrainPositions,
+    required this.mappingConfidence,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['provider_id'] = Variable<String>(providerId);
+    map['provider_line_id'] = Variable<String>(providerLineId);
+    map['line_id'] = Variable<String>(lineId);
+    map['source_id'] = Variable<String>(sourceId);
+    map['supports_arrivals'] = Variable<bool>(supportsArrivals);
+    map['supports_train_positions'] = Variable<bool>(supportsTrainPositions);
+    map['mapping_confidence'] = Variable<String>(mappingConfidence);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  RealtimeProviderLineMappingsCompanion toCompanion(bool nullToAbsent) {
+    return RealtimeProviderLineMappingsCompanion(
+      providerId: Value(providerId),
+      providerLineId: Value(providerLineId),
+      lineId: Value(lineId),
+      sourceId: Value(sourceId),
+      supportsArrivals: Value(supportsArrivals),
+      supportsTrainPositions: Value(supportsTrainPositions),
+      mappingConfidence: Value(mappingConfidence),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory RealtimeProviderLineMapping.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RealtimeProviderLineMapping(
+      providerId: serializer.fromJson<String>(json['providerId']),
+      providerLineId: serializer.fromJson<String>(json['providerLineId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      supportsArrivals: serializer.fromJson<bool>(json['supportsArrivals']),
+      supportsTrainPositions: serializer.fromJson<bool>(
+        json['supportsTrainPositions'],
+      ),
+      mappingConfidence: serializer.fromJson<String>(json['mappingConfidence']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'providerId': serializer.toJson<String>(providerId),
+      'providerLineId': serializer.toJson<String>(providerLineId),
+      'lineId': serializer.toJson<String>(lineId),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'supportsArrivals': serializer.toJson<bool>(supportsArrivals),
+      'supportsTrainPositions': serializer.toJson<bool>(supportsTrainPositions),
+      'mappingConfidence': serializer.toJson<String>(mappingConfidence),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  RealtimeProviderLineMapping copyWith({
+    String? providerId,
+    String? providerLineId,
+    String? lineId,
+    String? sourceId,
+    bool? supportsArrivals,
+    bool? supportsTrainPositions,
+    String? mappingConfidence,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => RealtimeProviderLineMapping(
+    providerId: providerId ?? this.providerId,
+    providerLineId: providerLineId ?? this.providerLineId,
+    lineId: lineId ?? this.lineId,
+    sourceId: sourceId ?? this.sourceId,
+    supportsArrivals: supportsArrivals ?? this.supportsArrivals,
+    supportsTrainPositions:
+        supportsTrainPositions ?? this.supportsTrainPositions,
+    mappingConfidence: mappingConfidence ?? this.mappingConfidence,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  RealtimeProviderLineMapping copyWithCompanion(
+    RealtimeProviderLineMappingsCompanion data,
+  ) {
+    return RealtimeProviderLineMapping(
+      providerId: data.providerId.present
+          ? data.providerId.value
+          : this.providerId,
+      providerLineId: data.providerLineId.present
+          ? data.providerLineId.value
+          : this.providerLineId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      supportsArrivals: data.supportsArrivals.present
+          ? data.supportsArrivals.value
+          : this.supportsArrivals,
+      supportsTrainPositions: data.supportsTrainPositions.present
+          ? data.supportsTrainPositions.value
+          : this.supportsTrainPositions,
+      mappingConfidence: data.mappingConfidence.present
+          ? data.mappingConfidence.value
+          : this.mappingConfidence,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RealtimeProviderLineMapping(')
+          ..write('providerId: $providerId, ')
+          ..write('providerLineId: $providerLineId, ')
+          ..write('lineId: $lineId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('supportsArrivals: $supportsArrivals, ')
+          ..write('supportsTrainPositions: $supportsTrainPositions, ')
+          ..write('mappingConfidence: $mappingConfidence, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    providerId,
+    providerLineId,
+    lineId,
+    sourceId,
+    supportsArrivals,
+    supportsTrainPositions,
+    mappingConfidence,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RealtimeProviderLineMapping &&
+          other.providerId == this.providerId &&
+          other.providerLineId == this.providerLineId &&
+          other.lineId == this.lineId &&
+          other.sourceId == this.sourceId &&
+          other.supportsArrivals == this.supportsArrivals &&
+          other.supportsTrainPositions == this.supportsTrainPositions &&
+          other.mappingConfidence == this.mappingConfidence &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RealtimeProviderLineMappingsCompanion
+    extends UpdateCompanion<RealtimeProviderLineMapping> {
+  final Value<String> providerId;
+  final Value<String> providerLineId;
+  final Value<String> lineId;
+  final Value<String> sourceId;
+  final Value<bool> supportsArrivals;
+  final Value<bool> supportsTrainPositions;
+  final Value<String> mappingConfidence;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const RealtimeProviderLineMappingsCompanion({
+    this.providerId = const Value.absent(),
+    this.providerLineId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.supportsArrivals = const Value.absent(),
+    this.supportsTrainPositions = const Value.absent(),
+    this.mappingConfidence = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RealtimeProviderLineMappingsCompanion.insert({
+    required String providerId,
+    required String providerLineId,
+    required String lineId,
+    required String sourceId,
+    this.supportsArrivals = const Value.absent(),
+    this.supportsTrainPositions = const Value.absent(),
+    this.mappingConfidence = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : providerId = Value(providerId),
+       providerLineId = Value(providerLineId),
+       lineId = Value(lineId),
+       sourceId = Value(sourceId);
+  static Insertable<RealtimeProviderLineMapping> custom({
+    Expression<String>? providerId,
+    Expression<String>? providerLineId,
+    Expression<String>? lineId,
+    Expression<String>? sourceId,
+    Expression<bool>? supportsArrivals,
+    Expression<bool>? supportsTrainPositions,
+    Expression<String>? mappingConfidence,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (providerId != null) 'provider_id': providerId,
+      if (providerLineId != null) 'provider_line_id': providerLineId,
+      if (lineId != null) 'line_id': lineId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (supportsArrivals != null) 'supports_arrivals': supportsArrivals,
+      if (supportsTrainPositions != null)
+        'supports_train_positions': supportsTrainPositions,
+      if (mappingConfidence != null) 'mapping_confidence': mappingConfidence,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RealtimeProviderLineMappingsCompanion copyWith({
+    Value<String>? providerId,
+    Value<String>? providerLineId,
+    Value<String>? lineId,
+    Value<String>? sourceId,
+    Value<bool>? supportsArrivals,
+    Value<bool>? supportsTrainPositions,
+    Value<String>? mappingConfidence,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RealtimeProviderLineMappingsCompanion(
+      providerId: providerId ?? this.providerId,
+      providerLineId: providerLineId ?? this.providerLineId,
+      lineId: lineId ?? this.lineId,
+      sourceId: sourceId ?? this.sourceId,
+      supportsArrivals: supportsArrivals ?? this.supportsArrivals,
+      supportsTrainPositions:
+          supportsTrainPositions ?? this.supportsTrainPositions,
+      mappingConfidence: mappingConfidence ?? this.mappingConfidence,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (providerId.present) {
+      map['provider_id'] = Variable<String>(providerId.value);
+    }
+    if (providerLineId.present) {
+      map['provider_line_id'] = Variable<String>(providerLineId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (supportsArrivals.present) {
+      map['supports_arrivals'] = Variable<bool>(supportsArrivals.value);
+    }
+    if (supportsTrainPositions.present) {
+      map['supports_train_positions'] = Variable<bool>(
+        supportsTrainPositions.value,
+      );
+    }
+    if (mappingConfidence.present) {
+      map['mapping_confidence'] = Variable<String>(mappingConfidence.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RealtimeProviderLineMappingsCompanion(')
+          ..write('providerId: $providerId, ')
+          ..write('providerLineId: $providerLineId, ')
+          ..write('lineId: $lineId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('supportsArrivals: $supportsArrivals, ')
+          ..write('supportsTrainPositions: $supportsTrainPositions, ')
+          ..write('mappingConfidence: $mappingConfidence, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RealtimeProviderStationMappingsTable
+    extends RealtimeProviderStationMappings
+    with
+        TableInfo<
+          $RealtimeProviderStationMappingsTable,
+          RealtimeProviderStationMapping
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RealtimeProviderStationMappingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _providerIdMeta = const VerificationMeta(
+    'providerId',
+  );
+  @override
+  late final GeneratedColumn<String> providerId = GeneratedColumn<String>(
+    'provider_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerLineIdMeta = const VerificationMeta(
+    'providerLineId',
+  );
+  @override
+  late final GeneratedColumn<String> providerLineId = GeneratedColumn<String>(
+    'provider_line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerStationIdMeta = const VerificationMeta(
+    'providerStationId',
+  );
+  @override
+  late final GeneratedColumn<String> providerStationId =
+      GeneratedColumn<String>(
+        'provider_station_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _queryNameMeta = const VerificationMeta(
+    'queryName',
+  );
+  @override
+  late final GeneratedColumn<String> queryName = GeneratedColumn<String>(
+    'query_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _supportsArrivalsMeta = const VerificationMeta(
+    'supportsArrivals',
+  );
+  @override
+  late final GeneratedColumn<bool> supportsArrivals = GeneratedColumn<bool>(
+    'supports_arrivals',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("supports_arrivals" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _supportsTrainPositionsMeta =
+      const VerificationMeta('supportsTrainPositions');
+  @override
+  late final GeneratedColumn<bool> supportsTrainPositions =
+      GeneratedColumn<bool>(
+        'supports_train_positions',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("supports_train_positions" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _mappingConfidenceMeta = const VerificationMeta(
+    'mappingConfidence',
+  );
+  @override
+  late final GeneratedColumn<String> mappingConfidence =
+      GeneratedColumn<String>(
+        'mapping_confidence',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    providerId,
+    providerLineId,
+    providerStationId,
+    stationId,
+    lineId,
+    sourceId,
+    queryName,
+    supportsArrivals,
+    supportsTrainPositions,
+    mappingConfidence,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'realtime_provider_station_mappings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RealtimeProviderStationMapping> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('provider_id')) {
+      context.handle(
+        _providerIdMeta,
+        providerId.isAcceptableOrUnknown(data['provider_id']!, _providerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerIdMeta);
+    }
+    if (data.containsKey('provider_line_id')) {
+      context.handle(
+        _providerLineIdMeta,
+        providerLineId.isAcceptableOrUnknown(
+          data['provider_line_id']!,
+          _providerLineIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerLineIdMeta);
+    }
+    if (data.containsKey('provider_station_id')) {
+      context.handle(
+        _providerStationIdMeta,
+        providerStationId.isAcceptableOrUnknown(
+          data['provider_station_id']!,
+          _providerStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerStationIdMeta);
+    }
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('query_name')) {
+      context.handle(
+        _queryNameMeta,
+        queryName.isAcceptableOrUnknown(data['query_name']!, _queryNameMeta),
+      );
+    }
+    if (data.containsKey('supports_arrivals')) {
+      context.handle(
+        _supportsArrivalsMeta,
+        supportsArrivals.isAcceptableOrUnknown(
+          data['supports_arrivals']!,
+          _supportsArrivalsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('supports_train_positions')) {
+      context.handle(
+        _supportsTrainPositionsMeta,
+        supportsTrainPositions.isAcceptableOrUnknown(
+          data['supports_train_positions']!,
+          _supportsTrainPositionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mapping_confidence')) {
+      context.handle(
+        _mappingConfidenceMeta,
+        mappingConfidence.isAcceptableOrUnknown(
+          data['mapping_confidence']!,
+          _mappingConfidenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {
+    providerId,
+    providerLineId,
+    providerStationId,
+  };
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {providerId, lineId, stationId},
+  ];
+  @override
+  RealtimeProviderStationMapping map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RealtimeProviderStationMapping(
+      providerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_id'],
+      )!,
+      providerLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_line_id'],
+      )!,
+      providerStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_station_id'],
+      )!,
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      queryName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}query_name'],
+      )!,
+      supportsArrivals: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}supports_arrivals'],
+      )!,
+      supportsTrainPositions: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}supports_train_positions'],
+      )!,
+      mappingConfidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mapping_confidence'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $RealtimeProviderStationMappingsTable createAlias(String alias) {
+    return $RealtimeProviderStationMappingsTable(attachedDatabase, alias);
+  }
+}
+
+class RealtimeProviderStationMapping extends DataClass
+    implements Insertable<RealtimeProviderStationMapping> {
+  final String providerId;
+  final String providerLineId;
+  final String providerStationId;
+  final String stationId;
+  final String lineId;
+  final String sourceId;
+  final String queryName;
+  final bool supportsArrivals;
+  final bool supportsTrainPositions;
+  final String mappingConfidence;
+  final DateTime? updatedAt;
+  const RealtimeProviderStationMapping({
+    required this.providerId,
+    required this.providerLineId,
+    required this.providerStationId,
+    required this.stationId,
+    required this.lineId,
+    required this.sourceId,
+    required this.queryName,
+    required this.supportsArrivals,
+    required this.supportsTrainPositions,
+    required this.mappingConfidence,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['provider_id'] = Variable<String>(providerId);
+    map['provider_line_id'] = Variable<String>(providerLineId);
+    map['provider_station_id'] = Variable<String>(providerStationId);
+    map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
+    map['source_id'] = Variable<String>(sourceId);
+    map['query_name'] = Variable<String>(queryName);
+    map['supports_arrivals'] = Variable<bool>(supportsArrivals);
+    map['supports_train_positions'] = Variable<bool>(supportsTrainPositions);
+    map['mapping_confidence'] = Variable<String>(mappingConfidence);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  RealtimeProviderStationMappingsCompanion toCompanion(bool nullToAbsent) {
+    return RealtimeProviderStationMappingsCompanion(
+      providerId: Value(providerId),
+      providerLineId: Value(providerLineId),
+      providerStationId: Value(providerStationId),
+      stationId: Value(stationId),
+      lineId: Value(lineId),
+      sourceId: Value(sourceId),
+      queryName: Value(queryName),
+      supportsArrivals: Value(supportsArrivals),
+      supportsTrainPositions: Value(supportsTrainPositions),
+      mappingConfidence: Value(mappingConfidence),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory RealtimeProviderStationMapping.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RealtimeProviderStationMapping(
+      providerId: serializer.fromJson<String>(json['providerId']),
+      providerLineId: serializer.fromJson<String>(json['providerLineId']),
+      providerStationId: serializer.fromJson<String>(json['providerStationId']),
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      queryName: serializer.fromJson<String>(json['queryName']),
+      supportsArrivals: serializer.fromJson<bool>(json['supportsArrivals']),
+      supportsTrainPositions: serializer.fromJson<bool>(
+        json['supportsTrainPositions'],
+      ),
+      mappingConfidence: serializer.fromJson<String>(json['mappingConfidence']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'providerId': serializer.toJson<String>(providerId),
+      'providerLineId': serializer.toJson<String>(providerLineId),
+      'providerStationId': serializer.toJson<String>(providerStationId),
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'queryName': serializer.toJson<String>(queryName),
+      'supportsArrivals': serializer.toJson<bool>(supportsArrivals),
+      'supportsTrainPositions': serializer.toJson<bool>(supportsTrainPositions),
+      'mappingConfidence': serializer.toJson<String>(mappingConfidence),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  RealtimeProviderStationMapping copyWith({
+    String? providerId,
+    String? providerLineId,
+    String? providerStationId,
+    String? stationId,
+    String? lineId,
+    String? sourceId,
+    String? queryName,
+    bool? supportsArrivals,
+    bool? supportsTrainPositions,
+    String? mappingConfidence,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => RealtimeProviderStationMapping(
+    providerId: providerId ?? this.providerId,
+    providerLineId: providerLineId ?? this.providerLineId,
+    providerStationId: providerStationId ?? this.providerStationId,
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    sourceId: sourceId ?? this.sourceId,
+    queryName: queryName ?? this.queryName,
+    supportsArrivals: supportsArrivals ?? this.supportsArrivals,
+    supportsTrainPositions:
+        supportsTrainPositions ?? this.supportsTrainPositions,
+    mappingConfidence: mappingConfidence ?? this.mappingConfidence,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  RealtimeProviderStationMapping copyWithCompanion(
+    RealtimeProviderStationMappingsCompanion data,
+  ) {
+    return RealtimeProviderStationMapping(
+      providerId: data.providerId.present
+          ? data.providerId.value
+          : this.providerId,
+      providerLineId: data.providerLineId.present
+          ? data.providerLineId.value
+          : this.providerLineId,
+      providerStationId: data.providerStationId.present
+          ? data.providerStationId.value
+          : this.providerStationId,
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      queryName: data.queryName.present ? data.queryName.value : this.queryName,
+      supportsArrivals: data.supportsArrivals.present
+          ? data.supportsArrivals.value
+          : this.supportsArrivals,
+      supportsTrainPositions: data.supportsTrainPositions.present
+          ? data.supportsTrainPositions.value
+          : this.supportsTrainPositions,
+      mappingConfidence: data.mappingConfidence.present
+          ? data.mappingConfidence.value
+          : this.mappingConfidence,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RealtimeProviderStationMapping(')
+          ..write('providerId: $providerId, ')
+          ..write('providerLineId: $providerLineId, ')
+          ..write('providerStationId: $providerStationId, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('queryName: $queryName, ')
+          ..write('supportsArrivals: $supportsArrivals, ')
+          ..write('supportsTrainPositions: $supportsTrainPositions, ')
+          ..write('mappingConfidence: $mappingConfidence, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    providerId,
+    providerLineId,
+    providerStationId,
+    stationId,
+    lineId,
+    sourceId,
+    queryName,
+    supportsArrivals,
+    supportsTrainPositions,
+    mappingConfidence,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RealtimeProviderStationMapping &&
+          other.providerId == this.providerId &&
+          other.providerLineId == this.providerLineId &&
+          other.providerStationId == this.providerStationId &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.sourceId == this.sourceId &&
+          other.queryName == this.queryName &&
+          other.supportsArrivals == this.supportsArrivals &&
+          other.supportsTrainPositions == this.supportsTrainPositions &&
+          other.mappingConfidence == this.mappingConfidence &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RealtimeProviderStationMappingsCompanion
+    extends UpdateCompanion<RealtimeProviderStationMapping> {
+  final Value<String> providerId;
+  final Value<String> providerLineId;
+  final Value<String> providerStationId;
+  final Value<String> stationId;
+  final Value<String> lineId;
+  final Value<String> sourceId;
+  final Value<String> queryName;
+  final Value<bool> supportsArrivals;
+  final Value<bool> supportsTrainPositions;
+  final Value<String> mappingConfidence;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const RealtimeProviderStationMappingsCompanion({
+    this.providerId = const Value.absent(),
+    this.providerLineId = const Value.absent(),
+    this.providerStationId = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.queryName = const Value.absent(),
+    this.supportsArrivals = const Value.absent(),
+    this.supportsTrainPositions = const Value.absent(),
+    this.mappingConfidence = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RealtimeProviderStationMappingsCompanion.insert({
+    required String providerId,
+    required String providerLineId,
+    required String providerStationId,
+    required String stationId,
+    required String lineId,
+    required String sourceId,
+    this.queryName = const Value.absent(),
+    this.supportsArrivals = const Value.absent(),
+    this.supportsTrainPositions = const Value.absent(),
+    this.mappingConfidence = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : providerId = Value(providerId),
+       providerLineId = Value(providerLineId),
+       providerStationId = Value(providerStationId),
+       stationId = Value(stationId),
+       lineId = Value(lineId),
+       sourceId = Value(sourceId);
+  static Insertable<RealtimeProviderStationMapping> custom({
+    Expression<String>? providerId,
+    Expression<String>? providerLineId,
+    Expression<String>? providerStationId,
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? sourceId,
+    Expression<String>? queryName,
+    Expression<bool>? supportsArrivals,
+    Expression<bool>? supportsTrainPositions,
+    Expression<String>? mappingConfidence,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (providerId != null) 'provider_id': providerId,
+      if (providerLineId != null) 'provider_line_id': providerLineId,
+      if (providerStationId != null) 'provider_station_id': providerStationId,
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (queryName != null) 'query_name': queryName,
+      if (supportsArrivals != null) 'supports_arrivals': supportsArrivals,
+      if (supportsTrainPositions != null)
+        'supports_train_positions': supportsTrainPositions,
+      if (mappingConfidence != null) 'mapping_confidence': mappingConfidence,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RealtimeProviderStationMappingsCompanion copyWith({
+    Value<String>? providerId,
+    Value<String>? providerLineId,
+    Value<String>? providerStationId,
+    Value<String>? stationId,
+    Value<String>? lineId,
+    Value<String>? sourceId,
+    Value<String>? queryName,
+    Value<bool>? supportsArrivals,
+    Value<bool>? supportsTrainPositions,
+    Value<String>? mappingConfidence,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RealtimeProviderStationMappingsCompanion(
+      providerId: providerId ?? this.providerId,
+      providerLineId: providerLineId ?? this.providerLineId,
+      providerStationId: providerStationId ?? this.providerStationId,
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      sourceId: sourceId ?? this.sourceId,
+      queryName: queryName ?? this.queryName,
+      supportsArrivals: supportsArrivals ?? this.supportsArrivals,
+      supportsTrainPositions:
+          supportsTrainPositions ?? this.supportsTrainPositions,
+      mappingConfidence: mappingConfidence ?? this.mappingConfidence,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (providerId.present) {
+      map['provider_id'] = Variable<String>(providerId.value);
+    }
+    if (providerLineId.present) {
+      map['provider_line_id'] = Variable<String>(providerLineId.value);
+    }
+    if (providerStationId.present) {
+      map['provider_station_id'] = Variable<String>(providerStationId.value);
+    }
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (queryName.present) {
+      map['query_name'] = Variable<String>(queryName.value);
+    }
+    if (supportsArrivals.present) {
+      map['supports_arrivals'] = Variable<bool>(supportsArrivals.value);
+    }
+    if (supportsTrainPositions.present) {
+      map['supports_train_positions'] = Variable<bool>(
+        supportsTrainPositions.value,
+      );
+    }
+    if (mappingConfidence.present) {
+      map['mapping_confidence'] = Variable<String>(mappingConfidence.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RealtimeProviderStationMappingsCompanion(')
+          ..write('providerId: $providerId, ')
+          ..write('providerLineId: $providerLineId, ')
+          ..write('providerStationId: $providerStationId, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('queryName: $queryName, ')
+          ..write('supportsArrivals: $supportsArrivals, ')
+          ..write('supportsTrainPositions: $supportsTrainPositions, ')
+          ..write('mappingConfidence: $mappingConfidence, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $NetworkEdgesTable extends NetworkEdges
     with TableInfo<$NetworkEdgesTable, NetworkEdge> {
   @override
@@ -5613,6 +6889,10 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $StationsTable stations = $StationsTable(this);
   late final $StationAliasesTable stationAliases = $StationAliasesTable(this);
   late final $StationLinesTable stationLines = $StationLinesTable(this);
+  late final $RealtimeProviderLineMappingsTable realtimeProviderLineMappings =
+      $RealtimeProviderLineMappingsTable(this);
+  late final $RealtimeProviderStationMappingsTable
+  realtimeProviderStationMappings = $RealtimeProviderStationMappingsTable(this);
   late final $NetworkEdgesTable networkEdges = $NetworkEdgesTable(this);
   late final $StationExitsTable stationExits = $StationExitsTable(this);
   late final $FacilitiesTable facilities = $FacilitiesTable(this);
@@ -5635,6 +6915,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     stations,
     stationAliases,
     stationLines,
+    realtimeProviderLineMappings,
+    realtimeProviderStationMappings,
     networkEdges,
     stationExits,
     facilities,
@@ -6845,6 +8127,637 @@ typedef $$StationLinesTableProcessedTableManager =
         BaseReferences<_$CatalogDatabase, $StationLinesTable, StationLine>,
       ),
       StationLine,
+      PrefetchHooks Function()
+    >;
+typedef $$RealtimeProviderLineMappingsTableCreateCompanionBuilder =
+    RealtimeProviderLineMappingsCompanion Function({
+      required String providerId,
+      required String providerLineId,
+      required String lineId,
+      required String sourceId,
+      Value<bool> supportsArrivals,
+      Value<bool> supportsTrainPositions,
+      Value<String> mappingConfidence,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RealtimeProviderLineMappingsTableUpdateCompanionBuilder =
+    RealtimeProviderLineMappingsCompanion Function({
+      Value<String> providerId,
+      Value<String> providerLineId,
+      Value<String> lineId,
+      Value<String> sourceId,
+      Value<bool> supportsArrivals,
+      Value<bool> supportsTrainPositions,
+      Value<String> mappingConfidence,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$RealtimeProviderLineMappingsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderLineMappingsTable> {
+  $$RealtimeProviderLineMappingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RealtimeProviderLineMappingsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderLineMappingsTable> {
+  $$RealtimeProviderLineMappingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RealtimeProviderLineMappingsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderLineMappingsTable> {
+  $$RealtimeProviderLineMappingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RealtimeProviderLineMappingsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $RealtimeProviderLineMappingsTable,
+          RealtimeProviderLineMapping,
+          $$RealtimeProviderLineMappingsTableFilterComposer,
+          $$RealtimeProviderLineMappingsTableOrderingComposer,
+          $$RealtimeProviderLineMappingsTableAnnotationComposer,
+          $$RealtimeProviderLineMappingsTableCreateCompanionBuilder,
+          $$RealtimeProviderLineMappingsTableUpdateCompanionBuilder,
+          (
+            RealtimeProviderLineMapping,
+            BaseReferences<
+              _$CatalogDatabase,
+              $RealtimeProviderLineMappingsTable,
+              RealtimeProviderLineMapping
+            >,
+          ),
+          RealtimeProviderLineMapping,
+          PrefetchHooks Function()
+        > {
+  $$RealtimeProviderLineMappingsTableTableManager(
+    _$CatalogDatabase db,
+    $RealtimeProviderLineMappingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RealtimeProviderLineMappingsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RealtimeProviderLineMappingsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RealtimeProviderLineMappingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> providerId = const Value.absent(),
+                Value<String> providerLineId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<bool> supportsArrivals = const Value.absent(),
+                Value<bool> supportsTrainPositions = const Value.absent(),
+                Value<String> mappingConfidence = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RealtimeProviderLineMappingsCompanion(
+                providerId: providerId,
+                providerLineId: providerLineId,
+                lineId: lineId,
+                sourceId: sourceId,
+                supportsArrivals: supportsArrivals,
+                supportsTrainPositions: supportsTrainPositions,
+                mappingConfidence: mappingConfidence,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String providerId,
+                required String providerLineId,
+                required String lineId,
+                required String sourceId,
+                Value<bool> supportsArrivals = const Value.absent(),
+                Value<bool> supportsTrainPositions = const Value.absent(),
+                Value<String> mappingConfidence = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RealtimeProviderLineMappingsCompanion.insert(
+                providerId: providerId,
+                providerLineId: providerLineId,
+                lineId: lineId,
+                sourceId: sourceId,
+                supportsArrivals: supportsArrivals,
+                supportsTrainPositions: supportsTrainPositions,
+                mappingConfidence: mappingConfidence,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RealtimeProviderLineMappingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $RealtimeProviderLineMappingsTable,
+      RealtimeProviderLineMapping,
+      $$RealtimeProviderLineMappingsTableFilterComposer,
+      $$RealtimeProviderLineMappingsTableOrderingComposer,
+      $$RealtimeProviderLineMappingsTableAnnotationComposer,
+      $$RealtimeProviderLineMappingsTableCreateCompanionBuilder,
+      $$RealtimeProviderLineMappingsTableUpdateCompanionBuilder,
+      (
+        RealtimeProviderLineMapping,
+        BaseReferences<
+          _$CatalogDatabase,
+          $RealtimeProviderLineMappingsTable,
+          RealtimeProviderLineMapping
+        >,
+      ),
+      RealtimeProviderLineMapping,
+      PrefetchHooks Function()
+    >;
+typedef $$RealtimeProviderStationMappingsTableCreateCompanionBuilder =
+    RealtimeProviderStationMappingsCompanion Function({
+      required String providerId,
+      required String providerLineId,
+      required String providerStationId,
+      required String stationId,
+      required String lineId,
+      required String sourceId,
+      Value<String> queryName,
+      Value<bool> supportsArrivals,
+      Value<bool> supportsTrainPositions,
+      Value<String> mappingConfidence,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RealtimeProviderStationMappingsTableUpdateCompanionBuilder =
+    RealtimeProviderStationMappingsCompanion Function({
+      Value<String> providerId,
+      Value<String> providerLineId,
+      Value<String> providerStationId,
+      Value<String> stationId,
+      Value<String> lineId,
+      Value<String> sourceId,
+      Value<String> queryName,
+      Value<bool> supportsArrivals,
+      Value<bool> supportsTrainPositions,
+      Value<String> mappingConfidence,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$RealtimeProviderStationMappingsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderStationMappingsTable> {
+  $$RealtimeProviderStationMappingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerStationId => $composableBuilder(
+    column: $table.providerStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get queryName => $composableBuilder(
+    column: $table.queryName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RealtimeProviderStationMappingsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderStationMappingsTable> {
+  $$RealtimeProviderStationMappingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerStationId => $composableBuilder(
+    column: $table.providerStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get queryName => $composableBuilder(
+    column: $table.queryName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RealtimeProviderStationMappingsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $RealtimeProviderStationMappingsTable> {
+  $$RealtimeProviderStationMappingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerLineId => $composableBuilder(
+    column: $table.providerLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerStationId => $composableBuilder(
+    column: $table.providerStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get queryName =>
+      $composableBuilder(column: $table.queryName, builder: (column) => column);
+
+  GeneratedColumn<bool> get supportsArrivals => $composableBuilder(
+    column: $table.supportsArrivals,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get supportsTrainPositions => $composableBuilder(
+    column: $table.supportsTrainPositions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mappingConfidence => $composableBuilder(
+    column: $table.mappingConfidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RealtimeProviderStationMappingsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $RealtimeProviderStationMappingsTable,
+          RealtimeProviderStationMapping,
+          $$RealtimeProviderStationMappingsTableFilterComposer,
+          $$RealtimeProviderStationMappingsTableOrderingComposer,
+          $$RealtimeProviderStationMappingsTableAnnotationComposer,
+          $$RealtimeProviderStationMappingsTableCreateCompanionBuilder,
+          $$RealtimeProviderStationMappingsTableUpdateCompanionBuilder,
+          (
+            RealtimeProviderStationMapping,
+            BaseReferences<
+              _$CatalogDatabase,
+              $RealtimeProviderStationMappingsTable,
+              RealtimeProviderStationMapping
+            >,
+          ),
+          RealtimeProviderStationMapping,
+          PrefetchHooks Function()
+        > {
+  $$RealtimeProviderStationMappingsTableTableManager(
+    _$CatalogDatabase db,
+    $RealtimeProviderStationMappingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RealtimeProviderStationMappingsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RealtimeProviderStationMappingsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RealtimeProviderStationMappingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> providerId = const Value.absent(),
+                Value<String> providerLineId = const Value.absent(),
+                Value<String> providerStationId = const Value.absent(),
+                Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> queryName = const Value.absent(),
+                Value<bool> supportsArrivals = const Value.absent(),
+                Value<bool> supportsTrainPositions = const Value.absent(),
+                Value<String> mappingConfidence = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RealtimeProviderStationMappingsCompanion(
+                providerId: providerId,
+                providerLineId: providerLineId,
+                providerStationId: providerStationId,
+                stationId: stationId,
+                lineId: lineId,
+                sourceId: sourceId,
+                queryName: queryName,
+                supportsArrivals: supportsArrivals,
+                supportsTrainPositions: supportsTrainPositions,
+                mappingConfidence: mappingConfidence,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String providerId,
+                required String providerLineId,
+                required String providerStationId,
+                required String stationId,
+                required String lineId,
+                required String sourceId,
+                Value<String> queryName = const Value.absent(),
+                Value<bool> supportsArrivals = const Value.absent(),
+                Value<bool> supportsTrainPositions = const Value.absent(),
+                Value<String> mappingConfidence = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RealtimeProviderStationMappingsCompanion.insert(
+                providerId: providerId,
+                providerLineId: providerLineId,
+                providerStationId: providerStationId,
+                stationId: stationId,
+                lineId: lineId,
+                sourceId: sourceId,
+                queryName: queryName,
+                supportsArrivals: supportsArrivals,
+                supportsTrainPositions: supportsTrainPositions,
+                mappingConfidence: mappingConfidence,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RealtimeProviderStationMappingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $RealtimeProviderStationMappingsTable,
+      RealtimeProviderStationMapping,
+      $$RealtimeProviderStationMappingsTableFilterComposer,
+      $$RealtimeProviderStationMappingsTableOrderingComposer,
+      $$RealtimeProviderStationMappingsTableAnnotationComposer,
+      $$RealtimeProviderStationMappingsTableCreateCompanionBuilder,
+      $$RealtimeProviderStationMappingsTableUpdateCompanionBuilder,
+      (
+        RealtimeProviderStationMapping,
+        BaseReferences<
+          _$CatalogDatabase,
+          $RealtimeProviderStationMappingsTable,
+          RealtimeProviderStationMapping
+        >,
+      ),
+      RealtimeProviderStationMapping,
       PrefetchHooks Function()
     >;
 typedef $$NetworkEdgesTableCreateCompanionBuilder =
@@ -8697,6 +10610,18 @@ class $CatalogDatabaseManager {
       $$StationAliasesTableTableManager(_db, _db.stationAliases);
   $$StationLinesTableTableManager get stationLines =>
       $$StationLinesTableTableManager(_db, _db.stationLines);
+  $$RealtimeProviderLineMappingsTableTableManager
+  get realtimeProviderLineMappings =>
+      $$RealtimeProviderLineMappingsTableTableManager(
+        _db,
+        _db.realtimeProviderLineMappings,
+      );
+  $$RealtimeProviderStationMappingsTableTableManager
+  get realtimeProviderStationMappings =>
+      $$RealtimeProviderStationMappingsTableTableManager(
+        _db,
+        _db.realtimeProviderStationMappings,
+      );
   $$NetworkEdgesTableTableManager get networkEdges =>
       $$NetworkEdgesTableTableManager(_db, _db.networkEdges);
   $$StationExitsTableTableManager get stationExits =>

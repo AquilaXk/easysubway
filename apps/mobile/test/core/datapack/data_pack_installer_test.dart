@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/core/database/user/user_database.dart'
 import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   test('installer는 손상 gzip이면 기존 current pointer를 유지한다', () async {
@@ -121,8 +122,92 @@ void main() {
     expect(result.status, DataPackInstallStatus.installed);
     expect(pointer?.path.endsWith('catalog/capital-v18.sqlite'), isTrue);
     expect(File(pointer!.path).existsSync(), isTrue);
+    expect(
+      pointer.sha256,
+      sha256.convert(await File(pointer.path).readAsBytes()).toString(),
+    );
     expect(installedRows.single.packId, 'capital');
     expect(installedRows.single.version, '18');
+  });
+
+  test('installer는 schema v2 realtime mapping pack을 설치한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-schema-v2-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _validRealtimeMappingCatalogSqliteBytes(
+      directory,
+    );
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '19',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
+        schemaVersion: '2',
+        requiredTables: const [
+          'catalog_metadata',
+          'stations',
+          'station_lines',
+          'realtime_provider_line_mappings',
+          'realtime_provider_station_mappings',
+        ],
+        minimumTableRows: const {
+          'stations': 2,
+          'realtime_provider_line_mappings': 1,
+          'realtime_provider_station_mappings': 1,
+        },
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.version, '19');
+    expect(
+      result.pointer?.sha256,
+      sha256.convert(await File(result.pointer!.path).readAsBytes()).toString(),
+    );
+  });
+
+  test('installer는 legacy schema v1 pack을 검증 중 변형하지 않는다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-legacy-schema-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _legacySchema1CatalogSqliteBytes(directory);
+    final sqliteHash = sha256.convert(sqliteBytes).toString();
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '20',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sqliteHash,
+        sizeBytes: compressedBytes.length,
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.sha256, sqliteHash);
+    expect(
+      sha256.convert(await File(result.pointer!.path).readAsBytes()).toString(),
+      sqliteHash,
+    );
   });
 
   test('installer는 legacy manifest에 sizeBytes가 없으면 길이 검사를 건너뛴다', () async {
@@ -283,6 +368,13 @@ DataPackManifestEntry _pack({
   required String sha256,
   required String sqliteSha256,
   required int? sizeBytes,
+  String schemaVersion = '1',
+  List<String> requiredTables = const [
+    'catalog_metadata',
+    'stations',
+    'station_lines',
+  ],
+  Map<String, int> minimumTableRows = const {'stations': 2},
 }) {
   return DataPackManifestEntry(
     id: 'capital',
@@ -320,9 +412,9 @@ DataPackManifestEntry _pack({
       algorithm: 'sha256-route-regression-v1',
       value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     ),
-    schemaVersion: '1',
-    requiredTables: const ['catalog_metadata', 'stations', 'station_lines'],
-    minimumTableRows: const {'stations': 2},
+    schemaVersion: schemaVersion,
+    requiredTables: requiredTables,
+    minimumTableRows: minimumTableRows,
   );
 }
 
@@ -330,6 +422,111 @@ Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
   final file = File('${directory.path}/fixture.sqlite');
   final database = CatalogDatabase.file(file);
   await database.seedBaselineIfEmpty();
+  await database.close();
+  return file.readAsBytes();
+}
+
+Future<List<int>> _legacySchema1CatalogSqliteBytes(Directory directory) async {
+  final file = File('${directory.path}/legacy-v1.sqlite');
+  final database = sqlite.sqlite3.open(file.path);
+  try {
+    database.execute('PRAGMA user_version = 1');
+    database.execute('''
+      CREATE TABLE catalog_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER
+      )
+    ''');
+    database.execute('''
+      CREATE TABLE stations (
+        id TEXT PRIMARY KEY,
+        name_ko TEXT NOT NULL,
+        name_en TEXT NOT NULL DEFAULT '',
+        latitude REAL NOT NULL DEFAULT 0,
+        longitude REAL NOT NULL DEFAULT 0,
+        region TEXT NOT NULL DEFAULT 'capital',
+        updated_at INTEGER
+      )
+    ''');
+    database.execute('''
+      CREATE TABLE station_lines (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        line_sequence INTEGER NOT NULL DEFAULT 0,
+        station_number TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (station_id, line_id)
+      )
+    ''');
+    database.execute("""
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES ('schemaVersion', '1', 1781827200)
+    """);
+    database.execute("""
+      INSERT INTO stations (id, name_ko, name_en, latitude, longitude, region, updated_at)
+      VALUES
+        ('station-sangnoksu', '상록수', 'Sangnoksu', 37.3028, 126.8664, 'capital', 1781827200),
+        ('station-sadang', '사당', 'Sadang', 37.4766, 126.9816, 'capital', 1781827200)
+    """);
+  } finally {
+    database.close();
+  }
+  return file.readAsBytes();
+}
+
+Future<List<int>> _validRealtimeMappingCatalogSqliteBytes(
+  Directory directory,
+) async {
+  final file = File('${directory.path}/fixture-v2.sqlite');
+  final database = CatalogDatabase.file(file);
+  await database.seedBaselineIfEmpty();
+  await database.customStatement(
+    "UPDATE catalog_metadata SET value = '2' WHERE key = 'schemaVersion'",
+  );
+  await database.customStatement("""
+    INSERT INTO realtime_provider_line_mappings (
+      provider_id,
+      provider_line_id,
+      line_id,
+      source_id,
+      supports_arrivals,
+      supports_train_positions,
+      mapping_confidence
+    ) VALUES (
+      'seoul-topis',
+      '1004',
+      'seoul-4',
+      'seoul-topis-realtime-station-arrival',
+      1,
+      1,
+      'OFFICIAL'
+    )
+    """);
+  await database.customStatement("""
+    INSERT INTO realtime_provider_station_mappings (
+      provider_id,
+      provider_line_id,
+      provider_station_id,
+      station_id,
+      line_id,
+      source_id,
+      query_name,
+      supports_arrivals,
+      supports_train_positions,
+      mapping_confidence
+    ) VALUES (
+      'seoul-topis',
+      '1004',
+      '1004000448',
+      'station-sangnoksu',
+      'seoul-4',
+      'seoul-topis-realtime-station-arrival',
+      '상록수',
+      1,
+      1,
+      'OFFICIAL'
+    )
+    """);
   await database.close();
   return file.readAsBytes();
 }
