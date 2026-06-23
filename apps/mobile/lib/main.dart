@@ -1071,76 +1071,62 @@ class _HomeTripControlPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
+    return Semantics(
       key: const Key('homeTripControlPanel'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.surface,
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 2,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            '안녕하세요',
-            style: textTheme.titleMedium?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
+      container: true,
+      label:
+          '이동 조건 ${profile.title}, ${profile.summary}. 길찾기 초안 ${draft.originLabel}, ${draft.destinationLabel}',
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '이동 조건',
+                style: textTheme.labelMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+              Text(
+                profile.title,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              Text(
+                profile.summary,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  height: 1.2,
+                ),
+              ),
+              Text(
+                '길찾기 초안',
+                key: const Key('homeRouteDraftPanel'),
+                style: textTheme.labelMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+              Text(
+                '${draft.originLabel} / ${draft.destinationLabel}',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+            ],
           ),
-          Text(
-            '현재 이동 조건',
-            style: textTheme.labelLarge?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
-          ),
-          Text(
-            profile.title,
-            style: textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
-              height: 1.2,
-            ),
-          ),
-          Text(
-            profile.summary,
-            style: textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
-              height: 1.2,
-            ),
-          ),
-          Text(
-            '길찾기 초안',
-            key: const Key('homeRouteDraftPanel'),
-            style: textTheme.labelLarge?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
-          ),
-          Text(
-            draft.originLabel,
-            style: textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
-              height: 1.2,
-            ),
-          ),
-          Text(
-            draft.destinationLabel,
-            style: textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
-              height: 1.2,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

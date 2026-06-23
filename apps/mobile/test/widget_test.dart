@@ -323,7 +323,7 @@ void main() {
         ),
       );
 
-      expect(find.text('안녕하세요'), findsOneWidget);
+      expect(find.text('안녕하세요'), findsNothing);
       expect(find.text('어디로 가시나요?'), findsOneWidget);
       expect(find.text('개인 설정'), findsOneWidget);
       expect(find.text('내 정보'), findsOneWidget);
@@ -448,6 +448,8 @@ void main() {
   });
 
   testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -465,7 +467,20 @@ void main() {
     final panel = find.byKey(const Key('homeTripControlPanel'));
     expect(panel, findsOneWidget);
     expect(
-      find.descendant(of: panel, matching: find.text('현재 이동 조건')),
+      find.ancestor(
+        of: panel,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Container && widget.decoration != null,
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('안녕하세요')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('이동 조건')),
       findsOneWidget,
     );
     expect(
@@ -474,6 +489,16 @@ void main() {
     );
     expect(
       find.descendant(of: panel, matching: find.text('계단을 피하고 쉬운 환승을 우선해요')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('출발 미정 / 도착 미정')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '이동 조건 고령자, 계단을 피하고 쉬운 환승을 우선해요. 길찾기 초안 출발 미정, 도착 미정',
+      ),
       findsOneWidget,
     );
 
@@ -494,6 +519,11 @@ void main() {
       find.descendant(of: panel, matching: find.text('계단 없는 길만 안내해요')),
       findsOneWidget,
     );
+    expect(
+      find.bySemanticsLabel('이동 조건 휠체어, 계단 없는 길만 안내해요. 길찾기 초안 출발 미정, 도착 미정'),
+      findsOneWidget,
+    );
+    semanticsHandle.dispose();
   });
 
   testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {
@@ -1661,8 +1691,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
-    expect(find.text('출발 미정'), findsOneWidget);
-    expect(find.text('도착 미정'), findsOneWidget);
+    expect(find.text('출발 미정 / 도착 미정'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
@@ -1704,8 +1733,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('출발 상록수역'), findsOneWidget);
-    expect(find.text('도착 사당역'), findsOneWidget);
+    expect(find.text('출발 상록수역 / 도착 사당역'), findsOneWidget);
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
