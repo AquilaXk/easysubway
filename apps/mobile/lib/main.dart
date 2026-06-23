@@ -409,6 +409,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
         initialMobilityType: onboardingResult?.profile.mobilityType,
+        viewPreferences: preferences,
         simpleViewEnabled: preferences.simpleViewEnabled,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         supportAccessInfo: widget.supportAccessInfo,
@@ -761,6 +762,7 @@ class HomeScreen extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
+    this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
     String? initialMobilityType,
@@ -787,6 +789,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
   final String initialMobilityType;
+  final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
@@ -860,6 +863,21 @@ class _HomeScreenState extends State<HomeScreen> {
             launcher: supportAccessLauncher,
             userDataDeletionRepository: userDataDeletionRepository,
             onUserDataDeleted: onUserDataDeleted,
+          ),
+        ),
+      );
+    }
+
+    void openSettings() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AppSettingsScreen(
+            currentProfile: currentProfile,
+            viewPreferences: widget.viewPreferences,
+            notificationRepository: notificationRepository,
+            notificationPermissionProvider: notificationPermissionProvider,
+            onOpenMobilityProfile: _openMobilityProfile,
+            onOpenSupportAccess: openSupportAccess,
           ),
         ),
       );
@@ -960,28 +978,11 @@ class _HomeScreenState extends State<HomeScreen> {
               groupKey: const Key('homeSettingsActionsGroup'),
               children: [
                 AccessibleShortcutButton(
-                  key: const Key('mobilityProfileButton'),
-                  onPressed: _openMobilityProfile,
-                  icon: const Icon(Icons.accessibility_new),
-                  label: '이동 조건',
+                  key: const Key('appSettingsButton'),
+                  onPressed: openSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  label: '설정',
                 ),
-                if (notificationRepository != null)
-                  AccessibleShortcutButton(
-                    key: const Key('notificationSettingsButton'),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => NotificationSettingsScreen(
-                            repository: notificationRepository,
-                            notificationPermissionProvider:
-                                notificationPermissionProvider,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.notifications_active_outlined),
-                    label: '알림 설정',
-                  ),
               ],
             ),
             const SizedBox(height: 18),
@@ -1036,7 +1037,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _openMobilityProfile() async {
+  Future<MobilityProfileOption?> _openMobilityProfile() async {
     final currentProfile = mobilityProfileOptions.firstWhere(
       (option) => option.mobilityType == _mobilityType,
       orElse: () => mobilityProfileOptions.first,
@@ -1047,17 +1048,298 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (!mounted || selectedProfile == null) {
-      return;
+      return null;
     }
     setState(() {
       _mobilityType = selectedProfile.mobilityType;
     });
     await widget.onMobilityProfileChanged?.call(selectedProfile);
     if (!mounted) {
-      return;
+      return null;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${selectedProfile.title} 조건으로 변경했습니다')),
+    );
+    return selectedProfile;
+  }
+}
+
+class AppSettingsScreen extends StatefulWidget {
+  const AppSettingsScreen({
+    required this.currentProfile,
+    required this.viewPreferences,
+    required this.notificationRepository,
+    required this.notificationPermissionProvider,
+    required this.onOpenMobilityProfile,
+    required this.onOpenSupportAccess,
+    super.key,
+  });
+
+  final MobilityProfileOption currentProfile;
+  final OnboardingViewPreferences viewPreferences;
+  final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
+  final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
+  final VoidCallback onOpenSupportAccess;
+
+  @override
+  State<AppSettingsScreen> createState() => _AppSettingsScreenState();
+}
+
+class _AppSettingsScreenState extends State<AppSettingsScreen> {
+  late MobilityProfileOption _profile = widget.currentProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('설정')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          children: [
+            _AppSettingsSection(
+              key: const Key('settingsSection-mobility'),
+              title: '내 이동 조건',
+              children: [
+                _AppSettingsActionTile(
+                  key: const Key('mobilityProfileButton'),
+                  icon: Icons.accessibility_new,
+                  title: _profile.title,
+                  subtitle: _profile.summary,
+                  onTap: () async {
+                    final selected = await widget.onOpenMobilityProfile();
+                    if (!mounted || selected == null) {
+                      return;
+                    }
+                    setState(() {
+                      _profile = selected;
+                    });
+                  },
+                ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-reading'),
+              title: '화면과 읽기',
+              children: [
+                _AppSettingsInfoTile(
+                  icon: Icons.text_fields,
+                  title: widget.viewPreferences.largeTextEnabled
+                      ? '큰 글자 켜짐'
+                      : '기본 글자 크기',
+                  subtitle: widget.viewPreferences.highContrastEnabled
+                      ? '고대비 표시를 사용해요'
+                      : '기본 대비로 표시해요',
+                ),
+                _AppSettingsInfoTile(
+                  icon: Icons.visibility_outlined,
+                  title: widget.viewPreferences.simpleViewEnabled
+                      ? '간편 보기 켜짐'
+                      : '전체 보기 켜짐',
+                  subtitle: '핵심 행동을 먼저 보여줘요',
+                ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-route'),
+              title: '경로 찾기',
+              children: [
+                _AppSettingsInfoTile(
+                  icon: Icons.route,
+                  title: '${_profile.title} 조건 적용 중',
+                  subtitle: _profile.summary,
+                ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-region-data'),
+              title: '지역과 데이터',
+              children: const [
+                _AppSettingsInfoTile(
+                  icon: Icons.public,
+                  title: '수도권 우선',
+                  subtitle: '오프라인 데이터팩과 검증된 출처를 먼저 사용해요',
+                ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-notification'),
+              title: '알림',
+              children: [
+                if (widget.notificationRepository == null)
+                  const _AppSettingsInfoTile(
+                    icon: Icons.notifications_off_outlined,
+                    title: '알림 설정 대기 중',
+                    subtitle: '실기기 QA 전에는 푸시 알림을 켜지 않아요',
+                  )
+                else
+                  _AppSettingsActionTile(
+                    key: const Key('notificationSettingsButton'),
+                    icon: Icons.notifications_active_outlined,
+                    title: '알림 설정',
+                    subtitle: '시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => NotificationSettingsScreen(
+                            repository: widget.notificationRepository!,
+                            notificationPermissionProvider:
+                                widget.notificationPermissionProvider,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            _AppSettingsSection(
+              key: const Key('settingsSection-help-privacy'),
+              title: '도움말과 개인정보',
+              children: [
+                _AppSettingsActionTile(
+                  key: const Key('settingsSupportPrivacyButton'),
+                  icon: Icons.privacy_tip_outlined,
+                  title: '도움말과 개인정보',
+                  subtitle: '지원, 개인정보 처리방침, 데이터 삭제 안내를 확인해요',
+                  onTap: widget.onOpenSupportAccess,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppSettingsSection extends StatelessWidget {
+  const _AppSettingsSection({
+    required this.title,
+    required this.children,
+    super.key,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: textTheme.titleMedium?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w900,
+                height: 1.25,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _AppSettingsActionTile extends StatelessWidget {
+  const _AppSettingsActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$title, $subtitle',
+      child: ExcludeSemantics(
+        child: ListTile(
+          onTap: onTap,
+          minVerticalPadding: 12,
+          minLeadingWidth: 32,
+          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          title: Text(
+            title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.3,
+            ),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          shape: Border(
+            bottom: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppSettingsInfoTile extends StatelessWidget {
+  const _AppSettingsInfoTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return MergeSemantics(
+      child: ListTile(
+        minVerticalPadding: 12,
+        minLeadingWidth: 32,
+        leading: Icon(icon, color: EasySubwayAccessibleColors.mutedText),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w800,
+            height: 1.25,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: EasySubwayAccessibleColors.mutedText,
+            height: 1.3,
+          ),
+        ),
+        shape: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
     );
   }
 }
