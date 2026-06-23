@@ -423,7 +423,7 @@ void main() {
 
       expect(find.text('가까운 역'), findsOneWidget);
       expect(find.text('시설 제보'), findsOneWidget);
-      expect(find.text('저장한 시설'), findsOneWidget);
+      expect(find.text('저장한 곳'), findsOneWidget);
       expect(find.text('데이터 상태'), findsOneWidget);
 
       final settingsButtonSize = tester.getSize(
@@ -3452,28 +3452,9 @@ void main() {
       expect(routeRepository.requests.single.mobilityType, 'SENIOR');
       expect(find.text('추천 경로 1개'), findsOneWidget);
       expect(find.text('시설 상태와 신뢰도를 함께 계산했어요'), findsOneWidget);
-      expect(find.text('이동 편한 순'), findsOneWidget);
-      expect(find.text('짧은 시간 순'), findsOneWidget);
-      expect(find.text('환승 적은 순'), findsOneWidget);
-      await tester.drag(find.byType(ListView), const Offset(0, -160));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('짧은 시간 순'))
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-      await tester.tap(find.bySemanticsLabel('짧은 시간 순'));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('짧은 시간 순'))
-            .getSemanticsData()
-            .flagsCollection
-            .isSelected,
-        Tristate.isTrue,
-      );
+      expect(find.text('이동 편한 순'), findsNothing);
+      expect(find.text('짧은 시간 순'), findsNothing);
+      expect(find.text('환승 적은 순'), findsNothing);
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('고령자 · 계단 회피 · 쉬운 환승'), findsOneWidget);
       expect(find.text('7분'), findsOneWidget);
@@ -3503,6 +3484,8 @@ void main() {
       );
       expect(find.text('왜 가장 빠른 길이 첫 번째가 아닌가요?'), findsOneWidget);
       expect(find.text('계단과 시설 상태, 걷는 거리를 먼저 고려했어요.'), findsOneWidget);
+      expect(find.text('안전 안내'), findsOneWidget);
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '

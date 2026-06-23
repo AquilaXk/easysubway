@@ -1695,7 +1695,7 @@ class _HomeShortcutGrid extends StatelessWidget {
         _HomeQuickCard(
           key: const Key('favoritesButton'),
           icon: Icons.bookmark_border,
-          title: '저장한 시설',
+          title: '저장한 곳',
           onTap: onFavorites,
         ),
       _HomeQuickCard(

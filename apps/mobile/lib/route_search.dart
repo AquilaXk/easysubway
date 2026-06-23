@@ -2107,8 +2107,6 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 12),
-              const _RoutePrototypeSegment(),
               const SizedBox(height: 22),
               _RoutePrototypeSection(
                 title: result.isBlocked
@@ -2300,124 +2298,29 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
               icon: Icons.refresh,
               semanticsLabel: '다음 행동, $_routeSearchFailureNextAction',
             ),
-          if (result.isBlocked) ...[
-            const SizedBox(height: 12),
+          const SizedBox(height: 12),
+          if (result.isBlocked)
             const _RouteNotice(
               title: '안전 안내',
               text: _routeSafetyGuidanceNotice,
               icon: Icons.shield_outlined,
+            )
+          else
+            const _RouteNotice(
+              key: Key('routeSafetyGuidanceNotice'),
+              title: '안전 안내',
+              text: _routeSafetyGuidanceNotice,
+              icon: Icons.shield_outlined,
+            ),
+          if (result.isBlocked) ...[
+            const SizedBox(height: 12),
+            const _RouteNotice(
+              title: '확인 요청',
+              text: '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.',
+              icon: Icons.support_agent,
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _RoutePrototypeSegment extends StatefulWidget {
-  const _RoutePrototypeSegment();
-
-  @override
-  State<_RoutePrototypeSegment> createState() => _RoutePrototypeSegmentState();
-}
-
-class _RoutePrototypeSegmentState extends State<_RoutePrototypeSegment> {
-  var _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final buttons = [
-      for (final entry in ['이동 편한 순', '짧은 시간 순', '환승 적은 순'].indexed)
-        _RoutePrototypeSegmentButton(
-          label: entry.$2,
-          active: _selectedIndex == entry.$1,
-          onTap: () => setState(() => _selectedIndex = entry.$1),
-        ),
-    ];
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF3F6),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: textScale >= 2
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  buttons[0],
-                  const SizedBox(height: 4),
-                  buttons[1],
-                  const SizedBox(height: 4),
-                  buttons[2],
-                ],
-              )
-            : Row(
-                children: [
-                  Expanded(child: buttons[0]),
-                  Expanded(child: buttons[1]),
-                  Expanded(child: buttons[2]),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-class _RoutePrototypeSegmentButton extends StatelessWidget {
-  const _RoutePrototypeSegmentButton({
-    required this.label,
-    required this.onTap,
-    this.active = false,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: active,
-      label: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: active
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x17071B2F),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Center(
-              child: ExcludeSemantics(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: active
-                        ? EasySubwayAccessibleColors.text
-                        : EasySubwayAccessibleColors.mutedText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
