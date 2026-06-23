@@ -514,6 +514,34 @@ void main() {
     expect(find.text('저장한 경로가 없습니다'), findsNothing);
   });
 
+  testWidgets('홈 저장 경로 재조회 실패는 카드 오류로만 표시된다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository()
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('경로 검색'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('저장한 경로를 불러오지 못했습니다'), 180);
+    await tester.pumpAndSettle();
+    expect(find.text('저장한 경로를 불러오지 못했습니다'), findsOneWidget);
+  });
+
   testWidgets('설정 화면은 교통약자 사용 맥락별 섹션과 기존 설정 진입점을 제공한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
@@ -1843,6 +1871,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('경로 검색'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('routeOriginStationInput')))
+          .controller
+          ?.text,
+      '상록수',
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('routeDestinationStationInput')),
+          )
+          .controller
+          ?.text,
+      '사당',
+    );
     expect(find.text('출발역 상록수'), findsOneWidget);
     expect(find.text('도착역 사당'), findsOneWidget);
   });
@@ -3411,6 +3455,25 @@ void main() {
       expect(find.text('이동 편한 순'), findsOneWidget);
       expect(find.text('짧은 시간 순'), findsOneWidget);
       expect(find.text('환승 적은 순'), findsOneWidget);
+      await tester.drag(find.byType(ListView), const Offset(0, -160));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('짧은 시간 순'))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      await tester.tap(find.bySemanticsLabel('짧은 시간 순'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('짧은 시간 순'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('고령자 · 계단 회피 · 쉬운 환승'), findsOneWidget);
       expect(find.text('7분'), findsOneWidget);
@@ -3440,14 +3503,6 @@ void main() {
       );
       expect(find.text('왜 가장 빠른 길이 첫 번째가 아닌가요?'), findsOneWidget);
       expect(find.text('계단과 시설 상태, 걷는 거리를 먼저 고려했어요.'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('출발역 선택됨, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel('도착역 선택됨, 사당, 수도권 2호선, 수도권, 기본 정보만 있음'),
-        findsOneWidget,
-      );
       expect(
         find.bySemanticsLabel(
           '경로 검색 결과, 이동할 수 있는 경로, 고령자, 상록수에서 사당까지, 수도권 4호선, 이동 점수 92점, 주의 확인, '

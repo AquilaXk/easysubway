@@ -930,7 +930,11 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _favoriteRoutesFuture = routesFuture;
       });
-      await routesFuture;
+      try {
+        await routesFuture;
+      } catch (_) {
+        // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
+      }
     }
 
     Future<void> openRouteSearch() async {
@@ -999,6 +1003,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
+          key: const Key('homeRefreshIndicator'),
           onRefresh: refreshHomeState,
           child: ListView(
             key: const Key('homePrototypeList'),
