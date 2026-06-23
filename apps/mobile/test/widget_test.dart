@@ -2083,10 +2083,10 @@ void main() {
       expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수역'), findsOneWidget);
-      expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
+      expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '상록수역, 230m 거리, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일',
+          '상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일',
         ),
         findsOneWidget,
       );
@@ -2235,7 +2235,7 @@ void main() {
 
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('상록수역'), findsOneWidget);
-    expect(find.text('230m 거리 · 수도권 2호선'), findsOneWidget);
+    expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
   });
 
   testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {

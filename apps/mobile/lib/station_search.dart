@@ -458,9 +458,9 @@ class StationSearchResult {
       return '';
     }
     if (distance < 1000) {
-      return '${distance}m 거리';
+      return '현재 위치 기준 ${distance}m';
     }
-    return '${(distance / 1000).toStringAsFixed(1)}km 거리';
+    return '현재 위치 기준 ${(distance / 1000).toStringAsFixed(1)}km';
   }
 
   String get semanticLabel {
