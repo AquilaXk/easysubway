@@ -45,6 +45,8 @@ OnboardingState _completedOnboardingStateWithPreferences({
 }
 
 Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
+  await tester.ensureVisible(find.byKey(const Key('favoritesButton')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('favoritesButton')));
   await tester.pumpAndSettle();
   if (tabKey != null) {
@@ -81,6 +83,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('myReportsButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('myReportsButton')));
     await tester.pumpAndSettle();
 
@@ -123,6 +127,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('myReportsButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('myReportsButton')));
     await tester.pumpAndSettle();
     final reportSemantics = tester.getSemantics(
@@ -508,6 +514,8 @@ void main() {
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
 
+    await tester.ensureVisible(find.byKey(const Key('favoritesButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('favoritesButton')));
     await tester.pumpAndSettle();
 
@@ -1632,6 +1640,65 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 검색 결과에서 출발 도착 역할을 지정하면 홈 초안이 갱신된다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
+    expect(find.text('출발 미정'), findsOneWidget);
+    expect(find.text('도착 미정'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationRoleDestination-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('출발 상록수역'), findsOneWidget);
+    expect(find.text('도착 사당역'), findsOneWidget);
   });
 
   testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {

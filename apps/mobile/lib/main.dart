@@ -10,6 +10,8 @@ import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'facility_report.dart';
 import 'favorite_facility.dart';
+import 'features/route_draft/application/route_draft_controller.dart';
+import 'features/route_draft/domain/route_draft.dart';
 import 'internal_route.dart';
 import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
@@ -794,11 +796,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late String _mobilityType;
+  late final RouteDraftController _routeDraftController;
 
   @override
   void initState() {
     super.initState();
     _mobilityType = widget.initialMobilityType;
+    _routeDraftController = RouteDraftController();
+  }
+
+  @override
+  void dispose() {
+    _routeDraftController.dispose();
+    super.dispose();
   }
 
   @override
@@ -877,7 +887,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            _HomeTripControlPanel(profile: currentProfile),
+            AnimatedBuilder(
+              animation: _routeDraftController,
+              builder: (context, _) {
+                return _HomeTripControlPanel(
+                  profile: currentProfile,
+                  draft: _routeDraftController.draft,
+                );
+              },
+            ),
             const SizedBox(height: 6),
             Semantics(
               header: true,
@@ -906,6 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           facilityReportDraftTargetStore,
                       internalRouteRepository: internalRouteRepository,
                       internalRouteMobilityType: initialMobilityType,
+                      routeDraftController: _routeDraftController,
                     ),
                   ),
                 );
@@ -1044,9 +1063,10 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeTripControlPanel extends StatelessWidget {
-  const _HomeTripControlPanel({required this.profile});
+  const _HomeTripControlPanel({required this.profile, required this.draft});
 
   final MobilityProfileOption profile;
+  final RouteDraft draft;
 
   @override
   Widget build(BuildContext context) {
@@ -1092,6 +1112,31 @@ class _HomeTripControlPanel extends StatelessWidget {
             profile.summary,
             style: textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.mutedText,
+              height: 1.2,
+            ),
+          ),
+          Text(
+            '길찾기 초안',
+            key: const Key('homeRouteDraftPanel'),
+            style: textTheme.labelLarge?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
+          ),
+          Text(
+            draft.originLabel,
+            style: textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+          Text(
+            draft.destinationLabel,
+            style: textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w900,
               height: 1.2,
             ),
           ),

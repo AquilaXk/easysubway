@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'accessible_design.dart';
 import 'facility_report.dart';
+import 'features/route_draft/application/route_draft_controller.dart';
+import 'features/route_draft/domain/route_draft.dart';
 import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
@@ -1656,6 +1659,7 @@ class StationSearchScreen extends StatefulWidget {
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
+    this.routeDraftController,
     super.key,
   });
 
@@ -1667,6 +1671,7 @@ class StationSearchScreen extends StatefulWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
+  final RouteDraftController? routeDraftController;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -1792,6 +1797,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 return _StationSearchBody(
                   state: _controller.state,
                   onResultTap: _openStationDetail,
+                  onSetOrigin: widget.routeDraftController == null
+                      ? null
+                      : _setRouteOrigin,
+                  onSetDestination: widget.routeDraftController == null
+                      ? null
+                      : _setRouteDestination,
                   isOpeningLocationSettings: _isOpeningLocationSettings,
                   onOpenLocationSettings: _openLocationSettings,
                 );
@@ -1820,6 +1831,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   void _selectLine(SubwayLineOption? line) {
     setState(() => _selectedLine = line);
+  }
+
+  void _setRouteOrigin(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController?.setOrigin(station);
+    _showRouteDraftSnack('${station.displayName}을 출발역으로 설정했습니다');
+  }
+
+  void _setRouteDestination(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController?.setDestination(station);
+    _showRouteDraftSnack('${station.displayName}을 도착역으로 설정했습니다');
+  }
+
+  void _showRouteDraftSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _searchNearby() async {
@@ -2110,12 +2139,16 @@ class _StationSearchBody extends StatelessWidget {
     required this.onResultTap,
     required this.isOpeningLocationSettings,
     required this.onOpenLocationSettings,
+    this.onSetOrigin,
+    this.onSetDestination,
   });
 
   final StationSearchState state;
   final ValueChanged<StationSearchResult> onResultTap;
   final bool isOpeningLocationSettings;
   final VoidCallback onOpenLocationSettings;
+  final ValueChanged<StationSearchResult>? onSetOrigin;
+  final ValueChanged<StationSearchResult>? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -2149,6 +2182,12 @@ class _StationSearchBody extends StatelessWidget {
             _StationSearchResultTile(
               result: result,
               onTap: () => onResultTap(result),
+              onSetOrigin: onSetOrigin == null
+                  ? null
+                  : () => onSetOrigin!(result),
+              onSetDestination: onSetDestination == null
+                  ? null
+                  : () => onSetDestination!(result),
             ),
         ],
       ),
@@ -2248,108 +2287,206 @@ class _StationSearchMessage extends StatelessWidget {
 }
 
 class _StationSearchResultTile extends StatelessWidget {
-  const _StationSearchResultTile({required this.result, required this.onTap});
+  const _StationSearchResultTile({
+    required this.result,
+    required this.onTap,
+    this.onSetOrigin,
+    this.onSetDestination,
+  });
 
   final StationSearchResult result;
   final VoidCallback onTap;
+  final VoidCallback? onSetOrigin;
+  final VoidCallback? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final stationName = _stationResultDisplayName(result.nameKo);
     final semanticLabel = _stationResultSemanticLabel(result);
+    final hasRoleActions = onSetOrigin != null || onSetDestination != null;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: semanticLabel,
-        button: true,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
-            child: InkWell(
-              key: Key('stationSearchResult-${result.id}'),
-              borderRadius: BorderRadius.circular(8),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFD5E2E4)),
+      ),
+      child: Column(
+        children: [
+          MergeSemantics(
+            child: Semantics(
+              label: semanticLabel,
+              button: true,
               onTap: onTap,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 88),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 72),
-                        child: StationLineBadges(
-                          lines: result.lines,
-                          size: 32,
-                          maxBadgeCount: 2,
-                        ),
+              child: ExcludeSemantics(
+                child: InkWell(
+                  key: Key('stationSearchResult-${result.id}'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onTap,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 88),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              stationName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: const Color(0xFF102A2C),
-                                fontWeight: FontWeight.w900,
-                                height: 1.15,
-                              ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 72),
+                            child: StationLineBadges(
+                              lines: result.lines,
+                              size: 32,
+                              maxBadgeCount: 2,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              result.distanceLabel.isEmpty
-                                  ? result.lineLabel
-                                  : '${result.distanceLabel} · ${result.lineLabel}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodyLarge?.copyWith(
-                                color: const Color(0xFF29484B),
-                                fontWeight: FontWeight.w700,
-                                height: 1.25,
-                              ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  stationName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.headlineSmall?.copyWith(
+                                    color: const Color(0xFF102A2C),
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.15,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  result.distanceLabel.isEmpty
+                                      ? result.lineLabel
+                                      : '${result.distanceLabel} · ${result.lineLabel}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    color: const Color(0xFF29484B),
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${result.dataQualityLabel} · ${result.dataSourceLabel}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: const Color(0xFF405A5D),
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${result.dataQualityLabel} · ${result.dataSourceLabel}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF405A5D),
-                                fontWeight: FontWeight.w800,
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF405A5D),
+                            size: 30,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF405A5D),
-                        size: 30,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          if (hasRoleActions)
+            _StationRoleActionBar(
+              stationId: result.id,
+              stationName: stationName,
+              onSetOrigin: onSetOrigin,
+              onSetDestination: onSetDestination,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StationRoleActionBar extends StatelessWidget {
+  const _StationRoleActionBar({
+    required this.stationId,
+    required this.stationName,
+    this.onSetOrigin,
+    this.onSetDestination,
+  });
+
+  final String stationId;
+  final String stationName;
+  final VoidCallback? onSetOrigin;
+  final VoidCallback? onSetDestination;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: _StationRoleButton(
+              key: Key('stationRoleOrigin-$stationId'),
+              icon: Icons.trip_origin,
+              label: '출발',
+              semanticLabel: '$stationName을 출발역으로 설정',
+              onPressed: onSetOrigin,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StationRoleButton(
+              key: Key('stationRoleDestination-$stationId'),
+              icon: Icons.flag_outlined,
+              label: '도착',
+              semanticLabel: '$stationName을 도착역으로 설정',
+              onPressed: onSetDestination,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StationRoleButton extends StatelessWidget {
+  const _StationRoleButton({
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: OutlinedButton.icon(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.iconOnly),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          icon: Icon(icon, size: 20),
+          label: Text(label, textAlign: TextAlign.center),
         ),
       ),
     );
