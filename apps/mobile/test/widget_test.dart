@@ -3391,7 +3391,7 @@ void main() {
       expect(find.text('짧은 시간 순'), findsOneWidget);
       expect(find.text('환승 적은 순'), findsOneWidget);
       expect(find.text('상록수 → 사당'), findsOneWidget);
-      expect(find.text('고령자 · 엘리베이터 우선'), findsOneWidget);
+      expect(find.text('고령자 · 계단 회피 · 쉬운 환승'), findsOneWidget);
       expect(find.text('7분'), findsOneWidget);
       expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
       expect(find.text('가장 추천'), findsOneWidget);
@@ -3987,7 +3987,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('routeGuidanceMobilityChip')), findsOneWidget);
-    expect(find.text('이동 조건 확인 필요 · 엘리베이터 우선'), findsOneWidget);
+    expect(find.text('이동 조건 확인 필요'), findsOneWidget);
   });
 
   testWidgets('경로 검색은 입력만 하고 선택하지 않은 역을 쉬운 문구로 안내한다', (tester) async {

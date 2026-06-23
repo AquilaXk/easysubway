@@ -1879,13 +1879,85 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
     return result.steps.fold<int>(0, (sum, step) => sum + step.distanceMeters);
   }
 
+  int get _transferCount {
+    final explicitTransferSteps = result.movementSteps
+        .where(_isTransferStep)
+        .length;
+    if (explicitTransferSteps > 0) {
+      return explicitTransferSteps;
+    }
+
+    var previousLine = '';
+    var lineChanges = 0;
+    for (final step in result.movementSteps) {
+      final lineKey = step.lineId.isNotEmpty ? step.lineId : step.lineName;
+      if (lineKey.isEmpty) {
+        continue;
+      }
+      if (previousLine.isNotEmpty && previousLine != lineKey) {
+        lineChanges += 1;
+      }
+      previousLine = lineKey;
+    }
+    return lineChanges;
+  }
+
+  String get _transferLabel {
+    final transferCount = _transferCount;
+    return transferCount == 0 ? '환승 없음' : '환승 $transferCount회';
+  }
+
+  String get _walkingDistanceLabel {
+    if (_totalDistanceMeters <= 0) {
+      return '확인 필요';
+    }
+    return _routeDistanceLabel(_totalDistanceMeters);
+  }
+
+  String get _routeMeta => '$_transferLabel · 걷기 $_walkingDistanceLabel';
+
+  String get _mobilityHeaderLabel {
+    final mobilityLabel = result.mobilityLabel;
+    if (mobilityLabel == '이동 조건 확인 필요') {
+      return mobilityLabel;
+    }
+
+    final option = _mobilityOptionFor(result.mobilityType);
+    final priority = _mobilityPriorityLabel(option);
+    return priority.isEmpty ? mobilityLabel : '$mobilityLabel · $priority';
+  }
+
+  static bool _isTransferStep(RouteSearchStep step) {
+    return step.title.contains('환승') ||
+        step.actionTitle.contains('환승') ||
+        step.description.contains('환승') ||
+        step.actionDetail.contains('환승');
+  }
+
+  static String _mobilityPriorityLabel(MobilityProfileOption option) {
+    if (option.requireElevator) {
+      return '엘리베이터 필수';
+    }
+    if (option.avoidStairs && option.minimizeTransfers) {
+      return '계단 회피 · 쉬운 환승';
+    }
+    if (option.avoidStairs && option.avoidLongWalks) {
+      return '계단 회피 · 짧은 보행';
+    }
+    if (option.avoidStairs) {
+      return '계단 회피';
+    }
+    if (option.minimizeTransfers) {
+      return '환승 적게';
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final arrivalStep = result.arrivalGuidanceStep;
-    final routeMeta =
-        '환승 없음 · 걷기 ${_totalDistanceMeters == 0 ? '확인 필요' : '${_totalDistanceMeters}m'}';
 
     return Semantics(
       label: result.semanticLabel,
@@ -1922,7 +1994,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${result.mobilityLabel} · 엘리베이터 우선',
+                                _mobilityHeaderLabel,
                                 key: const Key('routeGuidanceMobilityChip'),
                                 style: textTheme.bodySmall?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,
@@ -1968,7 +2040,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${result.mobilityLabel} · 엘리베이터 우선',
+                                      _mobilityHeaderLabel,
                                       key: const Key(
                                         'routeGuidanceMobilityChip',
                                       ),
@@ -2052,7 +2124,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               Text(
                                 result.isBlocked
                                     ? result.statusLabel
-                                    : routeMeta,
+                                    : _routeMeta,
                                 style: textTheme.bodySmall?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,
                                   height: 1.4,
@@ -2098,7 +2170,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                     Text(
                                       result.isBlocked
                                           ? result.statusLabel
-                                          : routeMeta,
+                                          : _routeMeta,
                                       style: textTheme.bodySmall?.copyWith(
                                         color: EasySubwayAccessibleColors
                                             .mutedText,

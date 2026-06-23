@@ -1048,36 +1048,37 @@ class _HomePrototypeHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
+      explicitChildNodes: true,
       label:
           '어디로 가시나요? ${profile.title}, ${profile.summary}. 계단 없이 이동 가능한 길부터 찾아드릴게요.',
-      child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                EasySubwayAccessibleColors.brandDark,
-                EasySubwayAccessibleColors.brand,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(25),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x240B2947),
-                blurRadius: 30,
-                offset: Offset(0, 16),
-              ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              EasySubwayAccessibleColors.brandDark,
+              EasySubwayAccessibleColors.brand,
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x240B2947),
+              blurRadius: 30,
+              offset: Offset(0, 16),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(
+                child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         '안녕하세요, 오늘도 편안하게',
                         style: TextStyle(
@@ -1091,8 +1092,10 @@ class _HomePrototypeHero extends StatelessWidget {
                     _HomeProfilePill(profile: profile),
                   ],
                 ),
-                const SizedBox(height: 7),
-                Text(
+              ),
+              const SizedBox(height: 7),
+              ExcludeSemantics(
+                child: Text(
                   '어디로 가시나요?',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
@@ -1100,8 +1103,10 @@ class _HomePrototypeHero extends StatelessWidget {
                     height: 1.28,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
+              ),
+              const SizedBox(height: 8),
+              const ExcludeSemantics(
+                child: Text(
                   '계단 없이 이동 가능한 길부터 찾아드릴게요.',
                   style: TextStyle(
                     color: Color(0xFFDAE6ED),
@@ -1109,51 +1114,66 @@ class _HomePrototypeHero extends StatelessWidget {
                     height: 1.55,
                   ),
                 ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        key: const Key('routeSearchButton'),
-                        onPressed: onRouteSearch,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: EasySubwayAccessibleColors.brandDark,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      key: const Key('routeSearchButton'),
+                      button: true,
+                      label: '길찾기',
+                      onTap: onRouteSearch,
+                      child: ExcludeSemantics(
+                        child: FilledButton.icon(
+                          onPressed: onRouteSearch,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor:
+                                EasySubwayAccessibleColors.brandDark,
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          icon: const Icon(Icons.route),
+                          label: const Text('길찾기 시작'),
                         ),
-                        icon: const Icon(Icons.route),
-                        label: const Text('길찾기 시작'),
                       ),
                     ),
-                    const SizedBox(width: 9),
-                    SizedBox(
-                      width: 55,
-                      height: 52,
-                      child: OutlinedButton(
-                        key: const Key('stationSearchButton'),
-                        onPressed: onStationSearch,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0x59FFFFFF)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                  ),
+                  const SizedBox(width: 9),
+                  SizedBox(
+                    width: 55,
+                    height: 52,
+                    child: Semantics(
+                      key: const Key('stationSearchButton'),
+                      button: true,
+                      label: '역 검색',
+                      onTap: onStationSearch,
+                      child: ExcludeSemantics(
+                        child: OutlinedButton(
+                          onPressed: onStationSearch,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0x59FFFFFF)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            padding: EdgeInsets.zero,
                           ),
-                          padding: EdgeInsets.zero,
+                          child: const Icon(Icons.search, size: 22),
                         ),
-                        child: const Icon(Icons.search, size: 22),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
