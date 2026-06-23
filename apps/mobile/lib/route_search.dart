@@ -1561,9 +1561,13 @@ class _RouteSelectedStationSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasLineMetadata = station.lines.isNotEmpty;
+    final semanticsLabel = hasLineMetadata
+        ? '$labelText 선택됨, ${station.semanticLabel}'
+        : '$labelText 선택됨, ${station.nameKo}';
     return MergeSemantics(
       child: Semantics(
-        label: '$labelText 선택됨, ${station.semanticLabel}',
+        label: semanticsLabel,
         liveRegion: true,
         child: ExcludeSemantics(
           child: DecoratedBox(
@@ -1592,18 +1596,20 @@ class _RouteSelectedStationSummary extends StatelessWidget {
                                 height: 1.3,
                               ),
                         ),
-                        const SizedBox(height: 6),
-                        StationLineBadges(lines: station.lines),
-                        const SizedBox(height: 6),
-                        Text(
-                          station.lineLabel,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: const Color(0xFF29484B),
-                                fontWeight: FontWeight.w700,
-                                height: 1.3,
-                              ),
-                        ),
+                        if (hasLineMetadata) ...[
+                          const SizedBox(height: 6),
+                          StationLineBadges(lines: station.lines),
+                          const SizedBox(height: 6),
+                          Text(
+                            station.lineLabel,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF29484B),
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

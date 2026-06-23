@@ -1705,8 +1705,8 @@ class _HomeShortcutGrid extends StatelessWidget {
         ),
       _HomeQuickCard(
         key: const Key('appSettingsButton'),
-        icon: Icons.storage_outlined,
-        title: '데이터 상태',
+        icon: Icons.settings_outlined,
+        title: '설정',
         onTap: onSettings,
       ),
     ];

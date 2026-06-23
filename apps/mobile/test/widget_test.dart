@@ -426,7 +426,7 @@ void main() {
       expect(find.text('바로가기'), findsOneWidget);
 
       await tester.dragUntilVisible(
-        find.text('데이터 상태'),
+        find.text('설정'),
         find.byKey(const Key('homePrototypeList')),
         const Offset(0, -180),
       );
@@ -435,7 +435,7 @@ void main() {
       expect(find.text('가까운 역'), findsOneWidget);
       expect(find.text('내 신고'), findsOneWidget);
       expect(find.text('저장한 곳'), findsOneWidget);
-      expect(find.text('데이터 상태'), findsOneWidget);
+      expect(find.text('설정'), findsOneWidget);
 
       final settingsButtonSize = tester.getSize(
         find.byKey(const Key('appSettingsButton')),
@@ -497,7 +497,7 @@ void main() {
     expect(EasySubwayTouchTarget.iconOnly, 48);
     expect(EasySubwayTouchTarget.general, 56);
     expect(EasySubwayTouchTarget.primary, 60);
-    expect(find.text('데이터 상태'), findsOneWidget);
+    expect(find.text('설정'), findsOneWidget);
     expect(favoritesButton, findsOneWidget);
     expect(tester.getSize(settingsButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
@@ -1910,6 +1910,14 @@ void main() {
     );
     expect(find.text('출발역 상록수'), findsOneWidget);
     expect(find.text('도착역 사당'), findsOneWidget);
+    expect(find.text('노선 정보 없음'), findsNothing);
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      expect(find.bySemanticsLabel('출발역 선택됨, 상록수'), findsOneWidget);
+      expect(find.bySemanticsLabel('도착역 선택됨, 사당'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
