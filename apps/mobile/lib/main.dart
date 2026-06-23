@@ -1530,7 +1530,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '저장한 경로, ${route.summaryTitle}, ${route.lineLabel}, ${route.scoreLabel}',
+          '저장한 경로, ${route.summaryTitle}, ${route.lineLabel}, ${route.mobilityLabel}, ${route.scoreLabel}',
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(

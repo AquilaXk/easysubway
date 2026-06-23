@@ -505,24 +505,34 @@ void main() {
   });
 
   testWidgets('홈 자주 가는 곳은 저장한 경로가 있으면 빈 상태 대신 경로를 보여준다', (tester) async {
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(
-          favorites: [_favoriteRoute()],
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(
+            favorites: [_favoriteRoute()],
+          ),
+          initialOnboardingState: _completedOnboardingState(),
         ),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('상록수 → 사당'), 180);
-    await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('상록수 → 사당'), 180);
+      await tester.pumpAndSettle();
 
-    expect(find.text('상록수 → 사당'), findsOneWidget);
-    expect(find.text('저장한 경로가 없습니다'), findsNothing);
+      expect(find.text('상록수 → 사당'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('저장한 경로, 상록수에서 사당까지, 수도권 4호선, 고령자, 이동 점수 92점'),
+        findsOneWidget,
+      );
+      expect(find.text('저장한 경로가 없습니다'), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('홈 저장 경로 재조회 실패는 카드 오류로만 표시된다', (tester) async {
