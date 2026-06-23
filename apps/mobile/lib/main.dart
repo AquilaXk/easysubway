@@ -1268,6 +1268,7 @@ class _AppSettingsActionTile extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$title, $subtitle',
+      onTap: onTap,
       child: ExcludeSemantics(
         child: ListTile(
           onTap: onTap,

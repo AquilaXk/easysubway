@@ -484,6 +484,14 @@ void main() {
 
       await _openSettingsScreen(tester);
 
+      settingsActionSemantics(String label) {
+        return tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.label == label,
+          ),
+        );
+      }
+
       expect(find.text('설정'), findsOneWidget);
       expect(find.text('내 이동 조건'), findsOneWidget);
       expect(find.text('화면과 읽기'), findsOneWidget);
@@ -495,6 +503,12 @@ void main() {
       expect(find.text('고대비 표시를 사용해요'), findsOneWidget);
       expect(find.text('전체 보기 켜짐'), findsOneWidget);
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
+      expect(
+        settingsActionSemantics(
+          '고령자, 계단을 피하고 쉬운 환승을 우선해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
       await tester.tap(find.byKey(const Key('mobilityProfileButton')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
@@ -523,6 +537,18 @@ void main() {
       expect(
         find.byKey(const Key('settingsSupportPrivacyButton')),
         findsOneWidget,
+      );
+      expect(
+        settingsActionSemantics(
+          '알림 설정, 시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '도움말과 개인정보, 지원, 개인정보 처리방침, 데이터 삭제 안내를 확인해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
       );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
