@@ -240,6 +240,17 @@ void main() {
 
     expect(reportedErrors, isEmpty);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.text('바로가기'),
+      find.byKey(const Key('homePrototypeList')),
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('자주 가는 곳'), findsNothing);
+    expect(find.byKey(const Key('homeSavedRouteSection')), findsNothing);
+    expect(find.text('저장한 경로가 없습니다'), findsNothing);
   });
 
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {

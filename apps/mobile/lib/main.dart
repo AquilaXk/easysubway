@@ -875,6 +875,7 @@ class _HomeScreenState extends State<HomeScreen> {
         favoriteRepository != null ||
         favoriteFacilityRepository != null ||
         favoriteRouteRepository != null;
+    final hasFavoriteRoutes = favoriteRouteRepository != null;
     void openSupportAccess() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -1036,11 +1037,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               _HomeStatusUnavailableCard(onTap: openStationSearch),
-              _HomePrototypeSection(title: '자주 가는 곳'),
-              _HomeSavedRouteSection(
-                routesFuture: _favoriteRoutesFuture,
-                onOpenFavorites: openFavorites,
-              ),
+              if (hasFavoriteRoutes) ...[
+                _HomePrototypeSection(title: '자주 가는 곳'),
+                _HomeSavedRouteSection(
+                  key: const Key('homeSavedRouteSection'),
+                  routesFuture: _favoriteRoutesFuture,
+                  onOpenFavorites: openFavorites,
+                ),
+              ],
               const _HomePrototypeSection(title: '바로가기'),
               _HomeShortcutGrid(
                 hasFavorites: hasFavorites,
@@ -1422,6 +1426,7 @@ class _HomeStatusUnavailableCard extends StatelessWidget {
 
 class _HomeSavedRouteSection extends StatelessWidget {
   const _HomeSavedRouteSection({
+    super.key,
     required this.routesFuture,
     required this.onOpenFavorites,
   });
