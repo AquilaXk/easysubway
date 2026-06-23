@@ -3422,7 +3422,7 @@ void main() {
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('고령자 · 계단 회피 · 쉬운 환승'), findsOneWidget);
       expect(find.text('7분'), findsOneWidget);
-      expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
+      expect(find.text('환승 없음 · 이동 300m'), findsOneWidget);
       expect(find.text('가장 추천'), findsOneWidget);
       expect(find.text('이동 편함 92점'), findsOneWidget);
       expect(find.text('추천 이유'), findsOneWidget);

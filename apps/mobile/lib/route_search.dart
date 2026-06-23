@@ -1934,7 +1934,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
     return _routeDistanceLabel(_totalDistanceMeters);
   }
 
-  String get _routeMeta => '$_transferLabel · 걷기 $_walkingDistanceLabel';
+  String get _routeMeta => '$_transferLabel · 이동 $_walkingDistanceLabel';
 
   String get _mobilityHeaderLabel {
     final mobilityLabel = result.mobilityLabel;
@@ -2306,15 +2306,25 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
   }
 }
 
-class _RoutePrototypeSegment extends StatelessWidget {
+class _RoutePrototypeSegment extends StatefulWidget {
   const _RoutePrototypeSegment();
+
+  @override
+  State<_RoutePrototypeSegment> createState() => _RoutePrototypeSegmentState();
+}
+
+class _RoutePrototypeSegmentState extends State<_RoutePrototypeSegment> {
+  var _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final buttons = [
-      const _RoutePrototypeSegmentButton(label: '이동 편한 순', active: true),
-      const _RoutePrototypeSegmentButton(label: '짧은 시간 순'),
-      const _RoutePrototypeSegmentButton(label: '환승 적은 순'),
+      for (final entry in ['이동 편한 순', '짧은 시간 순', '환승 적은 순'].indexed)
+        _RoutePrototypeSegmentButton(
+          label: entry.$2,
+          active: _selectedIndex == entry.$1,
+          onTap: () => setState(() => _selectedIndex = entry.$1),
+        ),
     ];
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     return DecoratedBox(
@@ -2350,39 +2360,49 @@ class _RoutePrototypeSegment extends StatelessWidget {
 class _RoutePrototypeSegmentButton extends StatelessWidget {
   const _RoutePrototypeSegmentButton({
     required this.label,
+    required this.onTap,
     this.active = false,
   });
 
   final String label;
+  final VoidCallback onTap;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: active ? Colors.white : Colors.transparent,
+    return Semantics(
+      button: true,
+      selected: active,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: active
-            ? const [
-                BoxShadow(
-                  color: Color(0x17071B2F),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: active
-                ? EasySubwayAccessibleColors.text
-                : EasySubwayAccessibleColors.mutedText,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: active
+                ? const [
+                    BoxShadow(
+                      color: Color(0x17071B2F),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: active
+                    ? EasySubwayAccessibleColors.text
+                    : EasySubwayAccessibleColors.mutedText,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ),
       ),
