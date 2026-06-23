@@ -158,6 +158,7 @@ class EasySubwayApp extends StatelessWidget {
     return MaterialApp(
       title: 'EasySubway',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const EasySubwayScrollBehavior(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF006D77)),
         scaffoldBackgroundColor: const Color(0xFFF6F8F9),
@@ -220,6 +221,19 @@ class EasySubwayApp extends StatelessWidget {
         userDataDeletionRepository: userDataDeletionRepository,
       ),
     );
+  }
+}
+
+class EasySubwayScrollBehavior extends MaterialScrollBehavior {
+  const EasySubwayScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }
 
@@ -907,14 +921,16 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    void reloadFavoriteRoutes() {
+    Future<void> refreshHomeState() async {
       final repository = widget.favoriteRouteRepository;
       if (repository == null) {
         return;
       }
+      final routesFuture = repository.listFavoriteRoutes();
       setState(() {
-        _favoriteRoutesFuture = repository.listFavoriteRoutes();
+        _favoriteRoutesFuture = routesFuture;
       });
+      await routesFuture;
     }
 
     Future<void> openRouteSearch() async {
@@ -934,7 +950,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!context.mounted) {
         return;
       }
-      reloadFavoriteRoutes();
+      await refreshHomeState();
     }
 
     Future<void> openFavorites() async {
@@ -956,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!context.mounted) {
         return;
       }
-      reloadFavoriteRoutes();
+      await refreshHomeState();
     }
 
     void openReports() {
@@ -970,13 +986,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('쉬운 지하철'),
-            Text('갈 수 있는 길을 먼저', style: TextStyle(fontSize: 12)),
-          ],
-        ),
+        title: const Text('쉬운 지하철'),
         actions: [
           IconButton(
             key: const Key('homeHelpActionButton'),
@@ -988,48 +998,54 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          key: const Key('homePrototypeList'),
-          padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
-          children: [
-            _HomePrototypeHero(
-              profile: currentProfile,
-              onRouteSearch: openRouteSearch,
-              onStationSearch: openStationSearch,
-            ),
-            AnimatedBuilder(
-              animation: _routeDraftController,
-              builder: (context, _) => _HomeRouteDraftCard(
-                draft: _routeDraftController.draft,
-                onTap: openRouteSearch,
+        child: RefreshIndicator(
+          onRefresh: refreshHomeState,
+          child: ListView(
+            key: const Key('homePrototypeList'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+            children: [
+              _HomePrototypeHero(
+                profile: currentProfile,
+                onRouteSearch: openRouteSearch,
+                onStationSearch: openStationSearch,
               ),
-            ),
-            _HomePrototypeSection(
-              title: '지금 주변 상태',
-              subtitle: '확인 가능한 주변 시설 상태만 보여드려요',
-              action: TextButton(
-                onPressed: openStationSearch,
-                child: const Text('주변 역 보기'),
+              AnimatedBuilder(
+                animation: _routeDraftController,
+                builder: (context, _) {
+                  final draft = _routeDraftController.draft;
+                  if (draft.origin == null && draft.destination == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return _HomeRouteDraftCard(
+                    draft: draft,
+                    onTap: openRouteSearch,
+                  );
+                },
               ),
-            ),
-            _HomeStatusUnavailableCard(onTap: openStationSearch),
-            _HomePrototypeSection(
-              title: '자주 가는 곳',
-              subtitle: '저장한 경로를 현재 상태로 다시 검색해요',
-            ),
-            _HomeSavedRouteSection(
-              routesFuture: _favoriteRoutesFuture,
-              onOpenFavorites: openFavorites,
-            ),
-            const _HomePrototypeSection(title: '바로가기'),
-            _HomeShortcutGrid(
-              hasFavorites: hasFavorites,
-              onNearby: openStationSearch,
-              onReports: openReports,
-              onFavorites: openFavorites,
-              onSettings: openSettings,
-            ),
-          ],
+              _HomePrototypeSection(
+                title: '지금 주변 상태',
+                action: TextButton(
+                  onPressed: openStationSearch,
+                  child: const Text('주변 역 보기'),
+                ),
+              ),
+              _HomeStatusUnavailableCard(onTap: openStationSearch),
+              _HomePrototypeSection(title: '자주 가는 곳'),
+              _HomeSavedRouteSection(
+                routesFuture: _favoriteRoutesFuture,
+                onOpenFavorites: openFavorites,
+              ),
+              const _HomePrototypeSection(title: '바로가기'),
+              _HomeShortcutGrid(
+                hasFavorites: hasFavorites,
+                onNearby: openStationSearch,
+                onReports: openReports,
+                onFavorites: openFavorites,
+                onSettings: openSettings,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1078,8 +1094,7 @@ class _HomePrototypeHero extends StatelessWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label:
-          '어디로 가시나요? ${profile.title}, ${profile.summary}. 계단 없이 이동 가능한 길부터 찾아드릴게요.',
+      label: '길찾기 시작, 현재 이동 조건 ${profile.title}',
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -1104,45 +1119,23 @@ class _HomePrototypeHero extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ExcludeSemantics(
-                child: Row(
-                  children: [
-                    Expanded(
+              Row(
+                children: [
+                  Expanded(
+                    child: ExcludeSemantics(
                       child: Text(
-                        '안녕하세요, 오늘도 편안하게',
-                        style: TextStyle(
-                          color: Color(0xFFBCEBDC),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          height: 1.2,
-                        ),
+                        '길찾기',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              height: 1.28,
+                            ),
                       ),
                     ),
-                    _HomeProfilePill(profile: profile),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 7),
-              ExcludeSemantics(
-                child: Text(
-                  '어디로 가시나요?',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    height: 1.28,
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const ExcludeSemantics(
-                child: Text(
-                  '계단 없이 이동 가능한 길부터 찾아드릴게요.',
-                  style: TextStyle(
-                    color: Color(0xFFDAE6ED),
-                    fontSize: 14,
-                    height: 1.55,
-                  ),
-                ),
+                  _HomeProfilePill(profile: profile),
+                ],
               ),
               const SizedBox(height: 18),
               Row(
@@ -1228,7 +1221,7 @@ class _HomeProfilePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.accessibility_new, size: 16, color: Colors.white),
+            const Icon(Icons.directions_walk, size: 16, color: Colors.white),
             const SizedBox(width: 7),
             Text(
               profile.title,
@@ -1253,13 +1246,17 @@ class _HomeRouteDraftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final summary = '${draft.originLabel} / ${draft.destinationLabel}';
+    final hasOrigin = draft.origin != null;
+    final hasDestination = draft.destination != null;
+    final summary = hasOrigin || hasDestination
+        ? '${draft.originLabel} → ${draft.destinationLabel}'
+        : '출발역과 도착역을 선택해 주세요';
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Semantics(
         key: const Key('homeRouteDraftPanel'),
         button: true,
-        label: '길찾기 초안, $summary',
+        label: '출발 도착 정하기, $summary',
         onTap: onTap,
         child: ExcludeSemantics(
           child: InkWell(
@@ -1292,7 +1289,7 @@ class _HomeRouteDraftCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '길찾기 초안',
+                          '출발·도착 정하기',
                           style: TextStyle(
                             color: EasySubwayAccessibleColors.brand,
                             fontSize: 13,
@@ -1329,14 +1326,9 @@ class _HomeRouteDraftCard extends StatelessWidget {
 }
 
 class _HomePrototypeSection extends StatelessWidget {
-  const _HomePrototypeSection({
-    required this.title,
-    this.subtitle,
-    this.action,
-  });
+  const _HomePrototypeSection({required this.title, this.action});
 
   final String title;
-  final String? subtitle;
   final Widget? action;
 
   @override
@@ -1356,17 +1348,6 @@ class _HomePrototypeSection extends StatelessWidget {
                   height: 1.2,
                 ),
               ),
-              if (subtitle != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    subtitle!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
             ],
           );
           if (action == null) {
@@ -1411,8 +1392,7 @@ class _HomeStatusUnavailableCard extends StatelessWidget {
             icon: Icons.info_outline,
             iconBackground: EasySubwayAccessibleColors.amberSoft,
             iconColor: EasySubwayAccessibleColors.amber,
-            title: '확인 가능한 주변 시설 상태가 없습니다',
-            subtitle: '가까운 역을 선택하면 시설 상태를 확인할 수 있어요',
+            title: '주변 시설 상태 없음',
             trailing: '확인 필요',
           ),
           const SizedBox(height: 13),
@@ -1426,7 +1406,7 @@ class _HomeStatusUnavailableCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('상세 상태 확인'),
+              child: const Text('주변 역 보기'),
             ),
           ),
         ],
@@ -1642,7 +1622,7 @@ class _HomeSavedRouteEmptyCard extends StatelessWidget {
       borderColor: const Color(0xFFB7DDF4),
       child: Semantics(
         container: true,
-        label: '저장한 경로가 없습니다. 경로를 저장하면 여기에 보여드려요.',
+        label: '저장한 경로가 없습니다.',
         child: const ExcludeSemantics(
           child: Row(
             children: [
@@ -1663,15 +1643,6 @@ class _HomeSavedRouteEmptyCard extends StatelessWidget {
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                         height: 1.25,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.',
-                      style: TextStyle(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontSize: 13,
-                        height: 1.45,
                       ),
                     ),
                   ],
@@ -1707,14 +1678,12 @@ class _HomeShortcutGrid extends StatelessWidget {
         key: const Key('nearbyStationButton'),
         icon: Icons.location_on_outlined,
         title: '가까운 역',
-        subtitle: '거리와 접근성을 함께 비교',
         onTap: onNearby,
       ),
       _HomeQuickCard(
         key: const Key('myReportsButton'),
         icon: Icons.report_outlined,
         title: '시설 제보',
-        subtitle: '고장·공사·위치 오류 알리기',
         onTap: onReports,
       ),
       if (hasFavorites)
@@ -1722,14 +1691,12 @@ class _HomeShortcutGrid extends StatelessWidget {
           key: const Key('favoritesButton'),
           icon: Icons.bookmark_border,
           title: '저장한 시설',
-          subtitle: '자주 쓰는 시설 상태 확인',
           onTap: onFavorites,
         ),
       _HomeQuickCard(
         key: const Key('appSettingsButton'),
         icon: Icons.storage_outlined,
         title: '데이터 상태',
-        subtitle: '오프라인 정보 최신성 확인',
         onTap: onSettings,
       ),
     ];
@@ -1760,21 +1727,19 @@ class _HomeQuickCard extends StatelessWidget {
   const _HomeQuickCard({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '$title, $subtitle',
+      label: title,
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
@@ -1809,15 +1774,6 @@ class _HomeQuickCard extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontSize: 12,
-                    height: 1.35,
                   ),
                 ),
               ],
@@ -1870,7 +1826,7 @@ class _PrototypeInfoRow extends StatelessWidget {
     required this.iconBackground,
     required this.iconColor,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.trailing,
   });
 
@@ -1878,11 +1834,12 @@ class _PrototypeInfoRow extends StatelessWidget {
   final Color iconBackground;
   final Color iconColor;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final String? trailing;
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = this.subtitle;
     final leading = DecoratedBox(
       decoration: BoxDecoration(
         color: iconBackground,
@@ -1906,15 +1863,17 @@ class _PrototypeInfoRow extends StatelessWidget {
             height: 1.25,
           ),
         ),
-        const SizedBox(height: 3),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontSize: 12,
-            height: 1.4,
+        if (subtitle != null && subtitle.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.mutedText,
+              fontSize: 12,
+              height: 1.4,
+            ),
           ),
-        ),
+        ],
       ],
     );
     final textScale = MediaQuery.textScalerOf(context).scale(1);
@@ -2004,7 +1963,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               children: [
                 _AppSettingsActionTile(
                   key: const Key('mobilityProfileButton'),
-                  icon: Icons.accessibility_new,
+                  icon: Icons.directions_walk,
                   title: _profile.title,
                   subtitle: _profile.summary,
                   onTap: () async {

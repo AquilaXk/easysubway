@@ -357,13 +357,13 @@ void main() {
       );
 
       expect(find.text('안녕하세요'), findsNothing);
-      expect(find.text('어디로 가시나요?'), findsOneWidget);
-      expect(find.text('안녕하세요, 오늘도 편안하게'), findsOneWidget);
+      expect(find.text('어디로 가시나요?'), findsNothing);
+      expect(find.text('안녕하세요, 오늘도 편안하게'), findsNothing);
+      expect(find.text('길찾기'), findsOneWidget);
       expect(find.text('길찾기 시작'), findsOneWidget);
-      expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
-      expect(find.text('출발 미정 / 도착 미정'), findsOneWidget);
+      expect(find.byKey(const Key('homeRouteDraftPanel')), findsNothing);
       expect(find.text('지금 주변 상태'), findsOneWidget);
-      expect(find.text('확인 가능한 주변 시설 상태가 없습니다'), findsOneWidget);
+      expect(find.text('주변 시설 상태 없음'), findsOneWidget);
 
       expect(find.byKey(const Key('homeSecondaryActionsGroup')), findsNothing);
       expect(find.byKey(const Key('homeSettingsActionsGroup')), findsNothing);
@@ -386,10 +386,7 @@ void main() {
       expect(find.text('즐겨찾기 시설'), findsNothing);
       expect(find.textContaining('빠른 길보다'), findsNothing);
       expect(find.text('고령자'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel(RegExp(r'어디로 가시나요\?.*고령자.*계단을 피하고 쉬운 환승을 우선해요')),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('길찾기 시작, 현재 이동 조건 고령자'), findsOneWidget);
       expect(find.textContaining('휠체어'), findsNothing);
 
       final stationButtonSize = tester.getSize(
@@ -406,7 +403,7 @@ void main() {
       await tester.scrollUntilVisible(find.text('저장한 경로가 없습니다'), 180);
       await tester.pumpAndSettle();
       expect(find.text('저장한 경로가 없습니다'), findsOneWidget);
-      expect(find.text('경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.'), findsOneWidget);
+      expect(find.text('경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.'), findsNothing);
 
       await tester.dragUntilVisible(
         find.text('바로가기'),
@@ -634,10 +631,7 @@ void main() {
 
     expect(find.byKey(const Key('homeTripControlPanel')), findsNothing);
     expect(find.text('고령자'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(RegExp(r'어디로 가시나요\?.*고령자.*계단을 피하고 쉬운 환승을 우선해요')),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel('길찾기 시작, 현재 이동 조건 고령자'), findsOneWidget);
 
     await _openMobilityProfileFromSettings(tester);
     await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
@@ -647,17 +641,14 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.dragUntilVisible(
-      find.text('어디로 가시나요?'),
+      find.text('길찾기'),
       find.byKey(const Key('homePrototypeList')),
       const Offset(0, 180),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('휠체어'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(RegExp(r'어디로 가시나요\?.*휠체어.*계단 없는 길만 안내해요')),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel('길찾기 시작, 현재 이동 조건 휠체어'), findsOneWidget);
     semanticsHandle.dispose();
   });
 
@@ -1784,7 +1775,7 @@ void main() {
     }
   });
 
-  testWidgets('역 검색 결과에서 출발 도착 역할을 지정하면 홈 초안이 갱신된다', (tester) async {
+  testWidgets('역 검색 결과에서 출발 도착 역할을 지정하면 홈 이어하기가 표시된다', (tester) async {
     final repository = FakeStationSearchRepository(
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -1802,8 +1793,7 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
-    expect(find.text('출발 미정 / 도착 미정'), findsOneWidget);
+    expect(find.byKey(const Key('homeRouteDraftPanel')), findsNothing);
 
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
@@ -1845,7 +1835,9 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('출발 상록수역 / 도착 사당역'), findsOneWidget);
+    expect(find.byKey(const Key('homeRouteDraftPanel')), findsOneWidget);
+    expect(find.text('출발·도착 정하기'), findsOneWidget);
+    expect(find.text('출발 상록수역 → 도착 사당역'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('homeRouteDraftPanel')));
     await tester.pumpAndSettle();
