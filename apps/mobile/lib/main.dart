@@ -1410,7 +1410,9 @@ class _HomeStatusUnavailableCard extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(40),
+                minimumSize: const Size.fromHeight(
+                  EasySubwayTouchTarget.general,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1505,7 +1507,9 @@ class _HomeSavedRouteErrorCard extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(40),
+                minimumSize: const Size.fromHeight(
+                  EasySubwayTouchTarget.general,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1713,6 +1717,7 @@ class _HomeShortcutGrid extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     if (textScale >= 2) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var index = 0; index < cards.length; index++) ...[
             if (index > 0) const SizedBox(height: 10),

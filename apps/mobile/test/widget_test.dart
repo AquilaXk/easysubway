@@ -375,6 +375,10 @@ void main() {
       expect(find.byKey(const Key('homeRouteDraftPanel')), findsNothing);
       expect(find.text('지금 주변 상태'), findsOneWidget);
       expect(find.text('주변 시설 상태 없음'), findsOneWidget);
+      expect(
+        tester.getSize(find.widgetWithText(OutlinedButton, '주변 역 보기')).height,
+        greaterThanOrEqualTo(EasySubwayTouchTarget.general),
+      );
 
       expect(find.byKey(const Key('homeSecondaryActionsGroup')), findsNothing);
       expect(find.byKey(const Key('homeSettingsActionsGroup')), findsNothing);
@@ -501,6 +505,8 @@ void main() {
     expect(favoritesButton, findsOneWidget);
     expect(tester.getSize(settingsButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
+    expect(tester.getSize(settingsButton).width, greaterThan(280));
+    expect(tester.getSize(favoritesButton).width, greaterThan(280));
     expect(tester.getSize(settingsButton).height, greaterThanOrEqualTo(60));
   });
 
@@ -561,6 +567,10 @@ void main() {
     await tester.scrollUntilVisible(find.text('저장한 경로를 불러오지 못했습니다'), 180);
     await tester.pumpAndSettle();
     expect(find.text('저장한 경로를 불러오지 못했습니다'), findsOneWidget);
+    expect(
+      tester.getSize(find.widgetWithText(OutlinedButton, '저장한 경로 보기')).height,
+      greaterThanOrEqualTo(EasySubwayTouchTarget.general),
+    );
   });
 
   testWidgets('설정 화면은 교통약자 사용 맥락별 섹션과 기존 설정 진입점을 제공한다', (tester) async {
