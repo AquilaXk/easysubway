@@ -1708,6 +1708,73 @@ void main() {
     expect(find.text('도착 사당역'), findsOneWidget);
   });
 
+  testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+    final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          searchHistoryRepository: searchHistoryRepository,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('stationRecentSearchSection')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationRecentSearchQuery-상록수')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('최근 검색어 상록수 검색'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색'))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      await tester.tap(find.byKey(const Key('stationRecentSearchQuery-상록수')));
+      await tester.pumpAndSettle();
+
+      final searchInput = tester.widget<TextField>(
+        find.byKey(const Key('stationSearchInput')),
+      );
+      expect(searchInput.controller?.text, '상록수');
+      expect(repository.requestedQueries, ['상록수']);
+      expect(searchHistoryRepository.recordedQueries, ['상록수']);
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
+        findsOneWidget,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {
     final repository = FakeStationSearchRepository(
       nextResults: [
@@ -5768,6 +5835,32 @@ class FakeStationSearchRepository
   ) async {
     requestedFacilityStationIds.add(stationId);
     return stationFacilities;
+  }
+}
+
+class FakeSearchHistoryRepository implements SearchHistoryRepository {
+  FakeSearchHistoryRepository(List<String> queries) : queries = [...queries];
+
+  final List<String> queries;
+  final recordedQueries = <String>[];
+  int listRequestCount = 0;
+
+  @override
+  Future<void> recordSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    recordedQueries.add(trimmed);
+    queries
+      ..remove(trimmed)
+      ..insert(0, trimmed);
+  }
+
+  @override
+  Future<List<String>> listRecentQueries() async {
+    listRequestCount++;
+    return [...queries];
   }
 }
 

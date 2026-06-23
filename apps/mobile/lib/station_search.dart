@@ -1681,6 +1681,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
   Future<List<SubwayLineOption>>? _lineOptionsFuture;
+  List<String> _recentQueries = const [];
   SubwayLineOption? _selectedLine;
   bool _isNearbySearchRunning = false;
   bool _isOpeningLocationSettings = false;
@@ -1697,6 +1698,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (lineRepository != null) {
       _lineOptionsFuture = lineRepository.listLines();
     }
+    unawaited(_loadRecentQueries());
   }
 
   @override
@@ -1771,6 +1773,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               builder: (context, _) {
                 final isSearching =
                     _controller.state.status == StationSearchStatus.loading;
+                if (_hasSearchQuery || _recentQueries.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _StationRecentSearchSection(
+                    queries: _recentQueries,
+                    enabled: !isSearching && !_isNearbySearchRunning,
+                    onQuerySelected: _searchRecentQuery,
+                  ),
+                );
+              },
+            ),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final isSearching =
+                    _controller.state.status == StationSearchStatus.loading;
                 final isNearbyDisabled = isSearching || _isNearbySearchRunning;
                 if (_hasSearchQuery) {
                   return FilledButton.icon(
@@ -1818,7 +1838,36 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (_controller.state.status == StationSearchStatus.loading) {
       return;
     }
-    _controller.search(query, lineId: _selectedLine?.id);
+    unawaited(_runSearch(query));
+  }
+
+  Future<void> _runSearch(String query) async {
+    await _controller.search(query, lineId: _selectedLine?.id);
+    await _loadRecentQueries();
+  }
+
+  void _searchRecentQuery(String query) {
+    _queryController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    _submit(query);
+  }
+
+  Future<void> _loadRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final queries = await repository.listRecentQueries();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _recentQueries = queries);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
+    }
   }
 
   StationLineFilterRepository? get _lineFilterRepository {
@@ -1944,6 +1993,71 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           internalRouteMobilityType: widget.internalRouteMobilityType,
         ),
       ),
+    );
+  }
+}
+
+class _StationRecentSearchSection extends StatelessWidget {
+  const _StationRecentSearchSection({
+    required this.queries,
+    required this.enabled,
+    required this.onQuerySelected,
+  });
+
+  final List<String> queries;
+  final bool enabled;
+  final ValueChanged<String> onQuerySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('stationRecentSearchSection'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '최근 검색',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final query in queries)
+              Semantics(
+                label: '최근 검색어 $query 검색',
+                button: true,
+                enabled: enabled,
+                onTap: enabled ? () => onQuerySelected(query) : null,
+                child: ExcludeSemantics(
+                  child: OutlinedButton.icon(
+                    key: Key('stationRecentSearchQuery-$query'),
+                    onPressed: enabled ? () => onQuerySelected(query) : null,
+                    icon: const Icon(Icons.history),
+                    label: Text(query),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(
+                        EasySubwayTouchTarget.general,
+                        EasySubwayTouchTarget.general,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
