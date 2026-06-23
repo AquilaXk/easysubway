@@ -431,35 +431,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -700));
+    await tester.pumpAndSettle();
+
     final mobilityButton = find.byKey(const Key('mobilityProfileButton'));
     final favoritesButton = find.byKey(const Key('favoritesButton'));
-    await tester.scrollUntilVisible(
-      mobilityButton,
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.pumpAndSettle();
 
     expect(EasySubwayTouchTarget.iconOnly, 48);
     expect(EasySubwayTouchTarget.general, 56);
     expect(EasySubwayTouchTarget.primary, 60);
     expect(find.text('이동 조건'), findsOneWidget);
-    expect(tester.getSize(mobilityButton).height, greaterThan(56));
-    expect(tester.getSize(mobilityButton).height, greaterThanOrEqualTo(60));
-    await tester.scrollUntilVisible(
-      favoritesButton,
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.pumpAndSettle();
-
     expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(tester.getSize(mobilityButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
+    expect(tester.getSize(mobilityButton).height, greaterThanOrEqualTo(60));
   });
 
   testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -488,18 +476,6 @@ void main() {
       find.descendant(of: panel, matching: find.text('계단을 피하고 쉬운 환승을 우선해요')),
       findsOneWidget,
     );
-    expect(
-      find.descendant(of: panel, matching: find.text('오프라인 노선도')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: panel, matching: find.text('노선과 역 목록')),
-      findsOneWidget,
-    );
-    expect(
-      find.bySemanticsLabel('오프라인 노선도, 노선과 역 목록, 현재 위치와 지도 키 없이 이용'),
-      findsOneWidget,
-    );
 
     await tester.ensureVisible(find.byKey(const Key('mobilityProfileButton')));
     await tester.pumpAndSettle();
@@ -518,7 +494,6 @@ void main() {
       find.descendant(of: panel, matching: find.text('계단 없는 길만 안내해요')),
       findsOneWidget,
     );
-    semanticsHandle.dispose();
   });
 
   testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {

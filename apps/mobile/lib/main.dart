@@ -14,7 +14,6 @@ import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'internal_route.dart';
 import 'legacy_credential_cleanup.dart';
-import 'map_adapter.dart';
 import 'mobility_profile.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
@@ -1072,7 +1071,6 @@ class _HomeTripControlPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    const lineMapContract = offlineLineMapContract;
     return Container(
       key: const Key('homeTripControlPanel'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1140,38 +1138,6 @@ class _HomeTripControlPanel extends StatelessWidget {
               color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w900,
               height: 1.2,
-            ),
-          ),
-          Semantics(
-            container: true,
-            label:
-                '${lineMapContract.title}, ${lineMapContract.listEquivalentLabel}, 현재 위치와 지도 키 없이 이용',
-            child: ExcludeSemantics(
-              child: Wrap(
-                key: const Key('homeOfflineLineMapPlaceholder'),
-                spacing: 4,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Icon(Icons.map_outlined, size: 18),
-                  Text(
-                    lineMapContract.title,
-                    style: textTheme.labelLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
-                  ),
-                  Text(
-                    lineMapContract.listEquivalentLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
