@@ -1051,57 +1051,51 @@ class _HomeTripControlPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Semantics(
-      container: true,
-      label: '현재 이동 조건, ${profile.title}, ${profile.summary}',
-      child: Container(
-        key: const Key('homeTripControlPanel'),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: EasySubwayAccessibleColors.surface,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
+    return Container(
+      key: const Key('homeTripControlPanel'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            '안녕하세요',
+            style: textTheme.titleMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
           ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 2,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              '안녕하세요',
-              style: textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                fontWeight: FontWeight.w800,
-                height: 1.2,
-              ),
+          Text(
+            '현재 이동 조건',
+            style: textTheme.labelLarge?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
             ),
-            Text(
-              '현재 이동 조건',
-              style: textTheme.labelLarge?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                fontWeight: FontWeight.w800,
-                height: 1.2,
-              ),
+          ),
+          Text(
+            profile.title,
+            style: textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
             ),
-            Text(
-              profile.title,
-              style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
-                height: 1.2,
-              ),
+          ),
+          Text(
+            profile.summary,
+            style: textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.2,
             ),
-            Text(
-              profile.summary,
-              style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                height: 1.2,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
