@@ -55,6 +55,30 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
   }
 }
 
+Future<void> _openSettingsScreen(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('appSettingsButton')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('appSettingsButton')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openMobilityProfileFromSettings(WidgetTester tester) async {
+  await _openSettingsScreen(tester);
+  await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openNotificationSettings(WidgetTester tester) async {
+  await _openSettingsScreen(tester);
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('notificationSettingsButton')),
+    160,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('notificationSettingsButton')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('홈에서 내 신고 화면으로 이동한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository(
@@ -333,10 +357,11 @@ void main() {
       expect(find.byKey(const Key('homeTripControlPanel')), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '역 검색'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '설정'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '이동 조건'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '즐겨찾기'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '내 신고'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '알림 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '도움말'), findsNothing);
       expect(find.byKey(const Key('homeHelpActionButton')), findsOneWidget);
       expect(find.widgetWithText(TextButton, '도움말'), findsOneWidget);
@@ -356,35 +381,24 @@ void main() {
       final routeButtonSize = tester.getSize(
         find.byKey(const Key('routeSearchButton')),
       );
-      final profileButtonSize = tester.getSize(
-        find.byKey(const Key('mobilityProfileButton')),
+      final settingsButtonSize = tester.getSize(
+        find.byKey(const Key('appSettingsButton')),
       );
       final myReportsButtonSize = tester.getSize(
         find.byKey(const Key('myReportsButton')),
       );
-      final notificationButtonSize = tester.getSize(
-        find.byKey(const Key('notificationSettingsButton')),
-      );
 
       expect(stationButtonSize.height, greaterThanOrEqualTo(88));
       expect(routeButtonSize.height, greaterThanOrEqualTo(88));
-      expect(profileButtonSize.height, lessThanOrEqualTo(58));
+      expect(settingsButtonSize.height, lessThanOrEqualTo(58));
       expect(myReportsButtonSize.height, lessThanOrEqualTo(58));
-      expect(notificationButtonSize.height, lessThanOrEqualTo(58));
-      expect(profileButtonSize.height, lessThan(stationButtonSize.height));
+      expect(settingsButtonSize.height, lessThan(stationButtonSize.height));
       expect(myReportsButtonSize.height, lessThan(stationButtonSize.height));
-      expect(notificationButtonSize.height, lessThan(stationButtonSize.height));
 
       final settingsTop = tester.getTopLeft(find.text('개인 설정')).dy;
       final myInfoTop = tester.getTopLeft(find.text('내 정보')).dy;
       expect(
-        tester.getTopLeft(find.byKey(const Key('mobilityProfileButton'))).dy,
-        greaterThan(settingsTop),
-      );
-      expect(
-        tester
-            .getTopLeft(find.byKey(const Key('notificationSettingsButton')))
-            .dy,
+        tester.getTopLeft(find.byKey(const Key('appSettingsButton'))).dy,
         greaterThan(settingsTop),
       );
       expect(
@@ -434,17 +448,115 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
 
-    final mobilityButton = find.byKey(const Key('mobilityProfileButton'));
+    final settingsButton = find.byKey(const Key('appSettingsButton'));
     final favoritesButton = find.byKey(const Key('favoritesButton'));
 
     expect(EasySubwayTouchTarget.iconOnly, 48);
     expect(EasySubwayTouchTarget.general, 56);
     expect(EasySubwayTouchTarget.primary, 60);
-    expect(find.text('이동 조건'), findsOneWidget);
+    expect(find.text('설정'), findsOneWidget);
     expect(find.text('즐겨찾기'), findsOneWidget);
-    expect(tester.getSize(mobilityButton).height, greaterThan(56));
+    expect(tester.getSize(settingsButton).height, greaterThan(56));
     expect(tester.getSize(favoritesButton).height, greaterThan(56));
-    expect(tester.getSize(mobilityButton).height, greaterThanOrEqualTo(60));
+    expect(tester.getSize(settingsButton).height, greaterThanOrEqualTo(60));
+  });
+
+  testWidgets('설정 화면은 교통약자 사용 맥락별 섹션과 기존 설정 진입점을 제공한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: true,
+              simpleViewEnabled: false,
+            ),
+          ),
+        ),
+      );
+
+      await _openSettingsScreen(tester);
+
+      settingsActionSemantics(String label) {
+        return tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.label == label,
+          ),
+        );
+      }
+
+      expect(find.text('설정'), findsOneWidget);
+      expect(find.text('내 이동 조건'), findsOneWidget);
+      expect(find.text('화면과 읽기'), findsOneWidget);
+      expect(find.text('경로 찾기'), findsOneWidget);
+      expect(find.text('지역과 데이터'), findsOneWidget);
+      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsNWidgets(2));
+      expect(find.text('큰 글자 켜짐'), findsOneWidget);
+      expect(find.text('고대비 표시를 사용해요'), findsOneWidget);
+      expect(find.text('전체 보기 켜짐'), findsOneWidget);
+      expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
+      expect(
+        settingsActionSemantics(
+          '고령자, 계단을 피하고 쉬운 환승을 우선해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('휠체어'), findsOneWidget);
+      expect(find.text('계단 없는 길만 안내해요'), findsNWidgets(2));
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('notificationSettingsButton')),
+        160,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림'), findsOneWidget);
+      expect(
+        find.byKey(const Key('settingsSection-help-privacy')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('notificationSettingsButton')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('settingsSupportPrivacyButton')),
+        findsOneWidget,
+      );
+      expect(
+        settingsActionSemantics(
+          '알림 설정, 시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '도움말과 개인정보, 지원, 개인정보 처리방침, 데이터 삭제 안내를 확인해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {
@@ -502,13 +614,12 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.ensureVisible(find.byKey(const Key('mobilityProfileButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileButton')));
-    await tester.pumpAndSettle();
+    await _openMobilityProfileFromSettings(tester);
     await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
     expect(
@@ -1115,13 +1226,7 @@ void main() {
         ),
       );
 
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('notificationSettingsButton')),
-        120,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('notificationSettingsButton')));
-      await tester.pumpAndSettle();
+      await _openNotificationSettings(tester);
 
       expect(find.text('알림 설정'), findsOneWidget);
       expect(find.text('역 시설 알림'), findsOneWidget);
@@ -1177,13 +1282,7 @@ void main() {
       ),
     );
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('notificationSettingsButton')),
-      120,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('notificationSettingsButton')));
-    await tester.pumpAndSettle();
+    await _openNotificationSettings(tester);
 
     await tester.tap(find.byKey(const Key('notificationPermissionButton')));
     await tester.pumpAndSettle();
@@ -1222,13 +1321,7 @@ void main() {
       ),
     );
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('notificationSettingsButton')),
-      120,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('notificationSettingsButton')));
-    await tester.pumpAndSettle();
+    await _openNotificationSettings(tester);
     await tester.tap(find.byKey(const Key('notificationPermissionButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('켜기'));
@@ -1260,13 +1353,7 @@ void main() {
         ),
       );
 
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('notificationSettingsButton')),
-        120,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('notificationSettingsButton')));
-      await tester.pumpAndSettle();
+      await _openNotificationSettings(tester);
       await tester.tap(find.byKey(const Key('notificationPermissionButton')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('켜기'));
@@ -3059,8 +3146,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('mobilityProfileButton')));
-      await tester.pumpAndSettle();
+      await _openMobilityProfileFromSettings(tester);
 
       expect(find.text('이동 조건'), findsOneWidget);
       expect(find.text('고령자'), findsOneWidget);
@@ -3119,8 +3205,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('mobilityProfileButton')));
-      await tester.pumpAndSettle();
+      await _openMobilityProfileFromSettings(tester);
 
       expect(find.bySemanticsLabel('휠체어 선택됨, 계단 없는 길만 안내해요'), findsOneWidget);
       expect(find.text('휠체어 조건을 선택했습니다'), findsOneWidget);
@@ -3152,8 +3237,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('mobilityProfileButton')));
-    await tester.pumpAndSettle();
+    await _openMobilityProfileFromSettings(tester);
     await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
