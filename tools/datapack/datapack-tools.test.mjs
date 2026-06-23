@@ -982,6 +982,49 @@ test("데이터팩 생성기는 내부 station-line 없는 실시간 provider st
   );
 });
 
+test("데이터팩 생성기는 provider line과 station mapping line 불일치를 거부한다", async () => {
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-realtime-mapping-line-mismatch-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  fixture.manifest.activePack.version = "2";
+  const pack = fixture.packs[0];
+  pack.version = "2";
+  pack.schemaVersion = "2";
+  pack.url = "catalog/capital-v2.sqlite.gz";
+  pack.realtimeProviderLineMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      lineId: "seoul-4",
+      sourceId: "seoul-topis-realtime-station-arrival",
+    },
+  ];
+  pack.realtimeProviderStationMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      providerStationId: "2000222",
+      stationId: "station-sadang",
+      lineId: "seoul-2",
+      sourceId: "seoul-topis-realtime-station-arrival",
+    },
+  ];
+
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    ),
+    /FOREIGN KEY constraint failed/,
+  );
+});
+
 test("데이터팩 생성기는 대표 route regression 문자열을 앱 서명 기준으로 정규화한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-route-canonical-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");

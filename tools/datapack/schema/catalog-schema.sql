@@ -64,6 +64,7 @@ CREATE TABLE realtime_provider_line_mappings (
   updated_at INTEGER,
   PRIMARY KEY (provider_id, provider_line_id),
   UNIQUE (provider_id, line_id),
+  UNIQUE (provider_id, provider_line_id, line_id),
   FOREIGN KEY (line_id) REFERENCES lines(id)
 );
 
@@ -81,7 +82,7 @@ CREATE TABLE realtime_provider_station_mappings (
   updated_at INTEGER,
   PRIMARY KEY (provider_id, provider_line_id, provider_station_id),
   UNIQUE (provider_id, line_id, station_id),
-  FOREIGN KEY (provider_id, provider_line_id) REFERENCES realtime_provider_line_mappings(provider_id, provider_line_id),
+  FOREIGN KEY (provider_id, provider_line_id, line_id) REFERENCES realtime_provider_line_mappings(provider_id, provider_line_id, line_id),
   FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)
 );
 
