@@ -907,8 +907,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    void openRouteSearch() {
-      Navigator.of(context).push(
+    void reloadFavoriteRoutes() {
+      final repository = widget.favoriteRouteRepository;
+      if (repository == null) {
+        return;
+      }
+      setState(() {
+        _favoriteRoutesFuture = repository.listFavoriteRoutes();
+      });
+    }
+
+    Future<void> openRouteSearch() async {
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => RouteSearchScreen(
             repository: routeRepository,
@@ -921,10 +931,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
+      if (!context.mounted) {
+        return;
+      }
+      reloadFavoriteRoutes();
     }
 
-    void openFavorites() {
-      Navigator.of(context).push(
+    Future<void> openFavorites() async {
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => FavoriteHomeScreen(
             favoriteRepository: favoriteRepository,
@@ -939,6 +953,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
+      if (!context.mounted) {
+        return;
+      }
+      reloadFavoriteRoutes();
     }
 
     void openReports() {

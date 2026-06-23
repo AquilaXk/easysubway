@@ -1947,6 +1947,8 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
     return priority.isEmpty ? mobilityLabel : '$mobilityLabel · $priority';
   }
 
+  bool get _isRecommendedRoute => result.status == 'FOUND' && !result.isBlocked;
+
   static bool _isTransferStep(RouteSearchStep step) {
     return step.title.contains('환승') ||
         step.actionTitle.contains('환승') ||
@@ -2096,10 +2098,16 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                 const _RoutePrototypeSegment(),
                 const SizedBox(height: 22),
                 _RoutePrototypeSection(
-                  title: result.isBlocked ? '안내 불가 이유' : '추천 경로 1개',
+                  title: result.isBlocked
+                      ? '안내 불가 이유'
+                      : _isRecommendedRoute
+                      ? '추천 경로 1개'
+                      : result.statusLabel,
                   subtitle: result.isBlocked
                       ? '현재 조건에서 막힌 이유를 확인하세요'
-                      : '시설 상태와 신뢰도를 함께 계산했어요',
+                      : _isRecommendedRoute
+                      ? '시설 상태와 신뢰도를 함께 계산했어요'
+                      : '이 경로는 이동 전 확인이 필요합니다',
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -2129,11 +2137,11 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                result.isBlocked
+                                _isRecommendedRoute && _totalMinutes > 0
+                                    ? '$_totalMinutes분'
+                                    : result.isBlocked
                                     ? result.guidanceLabel
-                                    : _totalMinutes == 0
-                                    ? result.statusLabel
-                                    : '$_totalMinutes분',
+                                    : result.statusLabel,
                                 style: textTheme.headlineSmall?.copyWith(
                                   color: EasySubwayAccessibleColors.text,
                                   fontWeight: FontWeight.w900,
@@ -2142,23 +2150,28 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                result.isBlocked
-                                    ? result.statusLabel
-                                    : _routeMeta,
+                                _isRecommendedRoute
+                                    ? _routeMeta
+                                    : result.statusLabel,
                                 style: textTheme.bodySmall?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,
                                   height: 1.4,
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              if (!result.isBlocked)
+                              if (_isRecommendedRoute)
                                 const _RoutePrototypeChip(
                                   label: '가장 추천',
                                   icon: Icons.check,
                                 ),
                               const SizedBox(height: 5),
                               Text(
-                                result.scoreLabel.replaceFirst('점수 ', '편함 '),
+                                _isRecommendedRoute
+                                    ? result.scoreLabel.replaceFirst(
+                                        '점수 ',
+                                        '편함 ',
+                                      )
+                                    : result.scoreLabel,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.mintDark,
                                   fontWeight: FontWeight.w900,
@@ -2175,11 +2188,11 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      result.isBlocked
+                                      _isRecommendedRoute && _totalMinutes > 0
+                                          ? '$_totalMinutes분'
+                                          : result.isBlocked
                                           ? result.guidanceLabel
-                                          : _totalMinutes == 0
-                                          ? result.statusLabel
-                                          : '$_totalMinutes분',
+                                          : result.statusLabel,
                                       style: textTheme.headlineSmall?.copyWith(
                                         color: EasySubwayAccessibleColors.text,
                                         fontWeight: FontWeight.w900,
@@ -2188,9 +2201,9 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      result.isBlocked
-                                          ? result.statusLabel
-                                          : _routeMeta,
+                                      _isRecommendedRoute
+                                          ? _routeMeta
+                                          : result.statusLabel,
                                       style: textTheme.bodySmall?.copyWith(
                                         color: EasySubwayAccessibleColors
                                             .mutedText,
@@ -2203,17 +2216,19 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  if (!result.isBlocked)
+                                  if (_isRecommendedRoute)
                                     const _RoutePrototypeChip(
                                       label: '가장 추천',
                                       icon: Icons.check,
                                     ),
                                   const SizedBox(height: 5),
                                   Text(
-                                    result.scoreLabel.replaceFirst(
-                                      '점수 ',
-                                      '편함 ',
-                                    ),
+                                    _isRecommendedRoute
+                                        ? result.scoreLabel.replaceFirst(
+                                            '점수 ',
+                                            '편함 ',
+                                          )
+                                        : result.scoreLabel,
                                     style: textTheme.bodyMedium?.copyWith(
                                       color:
                                           EasySubwayAccessibleColors.mintDark,
@@ -2224,12 +2239,12 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                        if (!result.isBlocked &&
+                        if (_isRecommendedRoute &&
                             result.movementSteps.isNotEmpty) ...[
                           const SizedBox(height: 15),
                           const _RoutePrototypeLinePath(),
                         ],
-                        if (!result.isBlocked &&
+                        if (_isRecommendedRoute &&
                             result.recommendationReasons.isNotEmpty) ...[
                           const SizedBox(height: 13),
                           _RouteRecommendationReasons(
@@ -2262,7 +2277,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!result.isBlocked) ...[
+                if (_isRecommendedRoute) ...[
                   const SizedBox(height: 12),
                   const _RoutePrototypeInfoBox(),
                 ],
