@@ -237,6 +237,7 @@ function buildSqlitePack(sqlitePath, schema, pack) {
   const database = new DatabaseSync(sqlitePath);
   try {
     database.exec(schema);
+    database.exec(`PRAGMA user_version = ${schemaVersionNumber(pack.schemaVersion, "pack.schemaVersion")}`);
     database.exec("BEGIN IMMEDIATE");
     try {
       insertCatalogMetadata(database, pack);
@@ -297,6 +298,62 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           row.stationCode ?? "",
           requiredInteger(row.lineSequence, "stationLines.lineSequence"),
           row.platformInfo ?? "",
+        ],
+      );
+      insertRows(
+        database,
+        "realtime_provider_line_mappings",
+        [
+          "provider_id",
+          "provider_line_id",
+          "line_id",
+          "source_id",
+          "supports_arrivals",
+          "supports_train_positions",
+          "mapping_confidence",
+          "updated_at",
+        ],
+        pack.realtimeProviderLineMappings ?? [],
+        (row) => [
+          requiredString(row.providerId, "realtimeProviderLineMappings.providerId"),
+          requiredString(row.providerLineId, "realtimeProviderLineMappings.providerLineId"),
+          requiredString(row.lineId, "realtimeProviderLineMappings.lineId"),
+          requiredString(row.sourceId, "realtimeProviderLineMappings.sourceId"),
+          flag(row.supportsArrivals),
+          flag(row.supportsTrainPositions),
+          row.mappingConfidence ?? "UNKNOWN",
+          timestamp(row.updatedAt),
+        ],
+      );
+      insertRows(
+        database,
+        "realtime_provider_station_mappings",
+        [
+          "provider_id",
+          "provider_line_id",
+          "provider_station_id",
+          "station_id",
+          "line_id",
+          "source_id",
+          "query_name",
+          "supports_arrivals",
+          "supports_train_positions",
+          "mapping_confidence",
+          "updated_at",
+        ],
+        pack.realtimeProviderStationMappings ?? [],
+        (row) => [
+          requiredString(row.providerId, "realtimeProviderStationMappings.providerId"),
+          requiredString(row.providerLineId, "realtimeProviderStationMappings.providerLineId"),
+          requiredString(row.providerStationId, "realtimeProviderStationMappings.providerStationId"),
+          requiredString(row.stationId, "realtimeProviderStationMappings.stationId"),
+          requiredString(row.lineId, "realtimeProviderStationMappings.lineId"),
+          requiredString(row.sourceId, "realtimeProviderStationMappings.sourceId"),
+          row.queryName ?? "",
+          flag(row.supportsArrivals),
+          flag(row.supportsTrainPositions),
+          row.mappingConfidence ?? "UNKNOWN",
+          timestamp(row.updatedAt),
         ],
       );
       insertRows(
@@ -499,7 +556,7 @@ function validateFixture(fixture) {
     if (artifactKind !== "fixture" && artifactKind !== "production") {
       throw new Error("pack.artifactKind must be fixture or production");
     }
-    requiredString(pack.schemaVersion, "pack.schemaVersion");
+    schemaVersionNumber(pack.schemaVersion, "pack.schemaVersion");
     validatePackUrl(pack.url ?? stagedPackPath(pack), "pack.url");
     validatePackUrlMatchesStagedPath(pack.url ?? stagedPackPath(pack), pack, "pack.url");
     if (artifactKind === "production" && !isAbsoluteHttpsWithHost(pack.url)) {
@@ -717,6 +774,18 @@ function requiredInteger(value, label) {
     throw new Error(`${label} must be an integer`);
   }
   return value;
+}
+
+function schemaVersionNumber(value, label) {
+  const version = Number(requiredString(value, label));
+  if (!Number.isInteger(version) || version <= 0) {
+    throw new Error(`${label} must be a positive integer string`);
+  }
+  return version;
+}
+
+function flag(value) {
+  return value ? 1 : 0;
 }
 
 function timestamp(value) {

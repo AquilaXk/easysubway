@@ -822,6 +822,166 @@ test("데이터팩 remote publish env exporter는 허용된 workflow에서 inval
   assert.match(await readFile(githubOutputFile, "utf8"), /^invalid=true$/m);
 });
 
+test("데이터팩 생성기는 schema v2 실시간 provider mapping을 SQLite에 보존한다", async () => {
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-realtime-mapping-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  fixture.manifest.activePack.version = "2";
+  const pack = fixture.packs[0];
+  pack.version = "2";
+  pack.schemaVersion = "2";
+  pack.url = "catalog/capital-v2.sqlite.gz";
+  pack.requiredTables = [
+    ...pack.requiredTables,
+    "realtime_provider_line_mappings",
+    "realtime_provider_station_mappings",
+  ];
+  pack.minimumTableRows = {
+    ...pack.minimumTableRows,
+    realtime_provider_line_mappings: 1,
+    realtime_provider_station_mappings: 1,
+  };
+  pack.realtimeProviderLineMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      lineId: "seoul-4",
+      sourceId: "seoul-topis-realtime-station-arrival",
+      supportsArrivals: true,
+      supportsTrainPositions: true,
+      mappingConfidence: "OFFICIAL",
+      updatedAt: "2026-06-23T00:00:00.000Z",
+    },
+  ];
+  pack.realtimeProviderStationMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      providerStationId: "1004000448",
+      stationId: "station-sangnoksu",
+      lineId: "seoul-4",
+      sourceId: "seoul-topis-realtime-station-arrival",
+      queryName: "상록수",
+      supportsArrivals: true,
+      supportsTrainPositions: true,
+      mappingConfidence: "OFFICIAL",
+      updatedAt: "2026-06-23T00:00:00.000Z",
+    },
+  ];
+
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+    { cwd: root, env: productionEnv },
+  );
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest",
+      path.join(outputDir, "current.json"),
+      "--root",
+      outputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const database = new DatabaseSync(path.join(outputDir, "catalog", "capital-v2.sqlite"), { readOnly: true });
+  try {
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 2);
+    assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            `
+              SELECT provider_id, provider_line_id, line_id, supports_arrivals, supports_train_positions, mapping_confidence
+              FROM realtime_provider_line_mappings
+            `,
+          )
+          .get(),
+      },
+      {
+        provider_id: "seoul-topis",
+        provider_line_id: "1004",
+        line_id: "seoul-4",
+        supports_arrivals: 1,
+        supports_train_positions: 1,
+        mapping_confidence: "OFFICIAL",
+      },
+    );
+    assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            `
+              SELECT provider_id, provider_line_id, provider_station_id, station_id, line_id, query_name
+              FROM realtime_provider_station_mappings
+            `,
+          )
+          .get(),
+      },
+      {
+        provider_id: "seoul-topis",
+        provider_line_id: "1004",
+        provider_station_id: "1004000448",
+        station_id: "station-sangnoksu",
+        line_id: "seoul-4",
+        query_name: "상록수",
+      },
+    );
+  } finally {
+    database.close();
+  }
+});
+
+test("데이터팩 생성기는 내부 station-line 없는 실시간 provider station mapping을 거부한다", async () => {
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-realtime-mapping-invalid-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  fixture.manifest.activePack.version = "2";
+  const pack = fixture.packs[0];
+  pack.version = "2";
+  pack.schemaVersion = "2";
+  pack.url = "catalog/capital-v2.sqlite.gz";
+  pack.realtimeProviderLineMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      lineId: "seoul-4",
+      sourceId: "seoul-topis-realtime-station-arrival",
+    },
+  ];
+  pack.realtimeProviderStationMappings = [
+    {
+      providerId: "seoul-topis",
+      providerLineId: "1004",
+      providerStationId: "missing",
+      stationId: "station-sangnoksu",
+      lineId: "seoul-2",
+      sourceId: "seoul-topis-realtime-station-arrival",
+    },
+  ];
+
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    ),
+    /FOREIGN KEY constraint failed/,
+  );
+});
+
 test("데이터팩 생성기는 대표 route regression 문자열을 앱 서명 기준으로 정규화한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-route-canonical-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
