@@ -933,7 +933,8 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       try {
         await routesFuture;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
       }
     }
