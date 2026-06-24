@@ -1039,6 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
+  late Future<bool> _hasNotificationItemsFuture;
 
   @override
   void initState() {
@@ -1046,8 +1047,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
     _recentRoutesFuture = _loadRecentRoutes();
-    _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
+    final facilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
+    _favoriteFacilitiesFuture = facilitiesFuture;
+    _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
   }
 
   @override
@@ -1069,8 +1072,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
-      _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
+      final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
+      _favoriteFacilitiesFuture = facilitiesFuture;
+      _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
+    }
+    if (widget.reportRepository != oldWidget.reportRepository ||
+        widget.notificationRepository != oldWidget.notificationRepository) {
+      _hasNotificationItemsFuture = _loadHasNotificationItems(
+        _favoriteFacilitiesFuture,
+      );
     }
   }
 
@@ -1153,79 +1164,53 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    void openStationSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-          ),
-        ),
-      );
-    }
-
-    void openRecentSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-            entryMode: StationSearchEntryMode.recent,
-          ),
-        ),
-      );
-    }
-
-    void openNearbyStations() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-            entryMode: StationSearchEntryMode.nearby,
-          ),
-        ),
-      );
-    }
-
     Future<void> refreshHomeState() async {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
       final routesFuture = _loadRecentRoutes();
+      final hasNotificationItemsFuture = _loadHasNotificationItems(
+        facilitiesFuture,
+      );
       setState(() {
         _favoriteFacilitiesFuture = facilitiesFuture;
         _recentRoutesFuture = routesFuture;
+        _hasNotificationItemsFuture = hasNotificationItemsFuture;
       });
       try {
         await Future.wait<void>([
           if (facilitiesFuture != null) facilitiesFuture.then((_) {}),
           if (routesFuture != null) routesFuture.then((_) {}),
+          hasNotificationItemsFuture.then((_) {}),
         ]);
       } catch (error, stackTrace) {
         (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
       }
+    }
+
+    Future<void> openStationSearch([
+      StationSearchEntryMode entryMode = StationSearchEntryMode.search,
+    ]) async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            routeDraftController: _routeDraftController,
+            entryMode: entryMode,
+          ),
+        ),
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await refreshHomeState();
     }
 
     Future<void> openRouteSearch() async {
@@ -1287,7 +1272,7 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: networkMapRepository,
             routeDraftController: _routeDraftController,
             onOpenRouteSearch: openRouteSearch,
-            onOpenStationSearch: openStationSearch,
+            onOpenStationSearch: () => unawaited(openStationSearch()),
             onOpenSaved: openSavedItems,
             onOpenSettings: openSettings,
           ),
@@ -1299,11 +1284,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
         actions: [
-          _HomeNotificationButton(
-            key: const Key('homeNotificationActionButton'),
-            onPressed: notificationRepository == null
-                ? openSettings
-                : openNotificationInbox,
+          FutureBuilder<bool>(
+            future: _hasNotificationItemsFuture,
+            builder: (context, snapshot) {
+              return _HomeNotificationButton(
+                key: const Key('homeNotificationActionButton'),
+                hasNotificationItems: snapshot.data ?? false,
+                onPressed: notificationRepository == null
+                    ? openSettings
+                    : openNotificationInbox,
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],
@@ -1320,12 +1311,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _HomePrototypeHero(
                 profile: currentProfile,
                 onRouteSearch: openRouteSearch,
-                onStationSearch: openStationSearch,
+                onStationSearch: () => unawaited(openStationSearch()),
                 onProfileTap: openSettings,
-              ),
-              _HomeStationActionRow(
-                onRecentSearch: openRecentSearch,
-                onNearbyStations: openNearbyStations,
               ),
               AnimatedBuilder(
                 animation: _routeDraftController,
@@ -1339,6 +1326,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: openRouteSearch,
                   );
                 },
+              ),
+              _HomeStationActionRow(
+                onRecentSearch: () =>
+                    unawaited(openStationSearch(StationSearchEntryMode.recent)),
+                onNearbyStations: () =>
+                    unawaited(openStationSearch(StationSearchEntryMode.nearby)),
               ),
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
@@ -1416,6 +1409,41 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.favoriteRouteRepository?.listFavoriteRoutes();
   }
 
+  Future<bool> _loadHasNotificationItems(
+    Future<List<FavoriteFacility>>? facilitiesFuture,
+  ) async {
+    if (widget.notificationRepository == null) {
+      return false;
+    }
+
+    if (facilitiesFuture != null) {
+      try {
+        final facilities = await facilitiesFuture;
+        if (facilities.any(_isFacilityAlert)) {
+          return true;
+        }
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '홈 알림 시설 상태를 불러오는 중 예외가 발생했습니다.',
+        );
+      }
+    }
+
+    try {
+      final reports = await widget.reportRepository.listMyReports();
+      return reports.isNotEmpty;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '홈 알림 제보 상태를 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+    return false;
+  }
+
   Future<MobilityProfileOption?> _openMobilityProfile() async {
     final currentProfile = mobilityProfileOptions.firstWhere(
       (option) => option.mobilityType == _mobilityType,
@@ -1444,20 +1472,26 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeNotificationButton extends StatelessWidget {
-  const _HomeNotificationButton({required this.onPressed, super.key});
+  const _HomeNotificationButton({
+    required this.hasNotificationItems,
+    required this.onPressed,
+    super.key,
+  });
 
+  final bool hasNotificationItems;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '알림',
+      label: hasNotificationItems ? '알림, 확인할 알림 있음' : '알림, 새 알림 없음',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Tooltip(
           message: '알림',
           child: Badge(
+            isLabelVisible: hasNotificationItems,
             smallSize: 10,
             backgroundColor: EasySubwayAccessibleColors.red,
             offset: const Offset(-10, 10),
@@ -1777,111 +1811,103 @@ class _HomePrototypeHero extends StatelessWidget {
   final VoidCallback onStationSearch;
   final VoidCallback onProfileTap;
 
+  static const double _cardRadius = 18;
+  static const double _buttonRadius = 12;
+  static const FontWeight _heroTitleWeight = FontWeight.w800;
+  static const FontWeight _primaryActionWeight = FontWeight.w800;
+  static const FontWeight _secondaryActionWeight = FontWeight.w700;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: '길찾기와 역검색, 현재 이동 조건 ${profile.title}',
+      label: '길찾기와 역 검색, 현재 이동 조건 ${profile.title}',
       child: Material(
         key: const Key('homeHeroCard'),
         color: EasySubwayAccessibleColors.brand,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_cardRadius),
+        ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: ExcludeSemantics(
-                      child: Text(
-                        '어디로 가시나요?',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              height: 1.28,
-                            ),
-                      ),
-                    ),
+              ExcludeSemantics(
+                child: Text(
+                  '어디로 가시나요?',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: _heroTitleWeight,
+                    height: 1.28,
                   ),
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: _HomeProfilePill(
-                      profile: profile,
-                      onTap: onProfileTap,
-                    ),
-                  ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _HomeProfilePill(profile: profile, onTap: onProfileTap),
               ),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      key: const Key('routeSearchButton'),
-                      button: true,
-                      label: '길찾기',
-                      onTap: onRouteSearch,
-                      child: ExcludeSemantics(
-                        child: FilledButton.icon(
-                          onPressed: onRouteSearch,
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                EasySubwayAccessibleColors.brandDark,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(104),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          icon: const Icon(Icons.route),
-                          label: const Text('길찾기'),
-                        ),
+              Semantics(
+                key: const Key('routeSearchButton'),
+                button: true,
+                label: '길찾기',
+                onTap: onRouteSearch,
+                child: ExcludeSemantics(
+                  child: FilledButton.icon(
+                    onPressed: onRouteSearch,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: EasySubwayAccessibleColors.brandDark,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(104),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(_buttonRadius),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: _primaryActionWeight,
                       ),
                     ),
+                    icon: const Icon(Icons.route),
+                    label: const Text('길찾기'),
                   ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: KeyedSubtree(
-                      key: const Key('heroStationSearchButton'),
-                      child: Semantics(
-                        key: const Key('stationSearchButton'),
-                        button: true,
-                        label: '역 검색',
-                        onTap: onStationSearch,
-                        child: ExcludeSemantics(
-                          child: FilledButton.icon(
-                            onPressed: onStationSearch,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor:
-                                  EasySubwayAccessibleColors.brandDark,
-                              minimumSize: const Size.fromHeight(104),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            icon: const Icon(Icons.search),
-                            label: const Text('역검색'),
-                          ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              KeyedSubtree(
+                key: const Key('heroStationSearchButton'),
+                child: Semantics(
+                  key: const Key('stationSearchButton'),
+                  button: true,
+                  label: '역 검색',
+                  onTap: onStationSearch,
+                  child: ExcludeSemantics(
+                    child: OutlinedButton.icon(
+                      onPressed: onStationSearch,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: EasySubwayAccessibleColors.brandDark,
+                        side: const BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                        minimumSize: const Size.fromHeight(68),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(_buttonRadius),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: _secondaryActionWeight,
                         ),
                       ),
+                      icon: const Icon(Icons.search),
+                      label: const Text('역 검색'),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1953,7 +1979,7 @@ class _HomeStationActionButton extends StatelessWidget {
         foregroundColor: EasySubwayAccessibleColors.brandDark,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         minimumSize: const Size.fromHeight(72),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
       ),
       icon: Icon(icon, size: 28),
@@ -1972,7 +1998,7 @@ class _HomeProfilePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '현재 이동 조건 ${profile.title}',
+      label: '이동 조건: ${profile.title}, 변경',
       onTap: onTap,
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
@@ -1992,7 +2018,7 @@ class _HomeProfilePill extends StatelessWidget {
           ),
           icon: Icon(profile.icon, size: 16),
           label: Text(
-            profile.title,
+            '이동 조건: ${profile.title} 〉',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -2018,12 +2044,12 @@ class _HomeRouteDraftCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Semantics(
-        key: const Key('homeRouteDraftPanel'),
         button: true,
         label: '출발 도착 정하기, $summary',
         onTap: onTap,
         child: ExcludeSemantics(
           child: InkWell(
+            key: const Key('homeRouteDraftPanel'),
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
             child: _PrototypeCard(
