@@ -543,8 +543,11 @@ void main() {
       expect(find.text('즐겨찾기 역'), findsNothing);
       expect(find.text('즐겨찾기 시설'), findsNothing);
       expect(find.textContaining('빠른 길보다'), findsNothing);
-      expect(find.text('고령자'), findsOneWidget);
-      expect(find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 고령자'), findsOneWidget);
+      expect(find.text('천천히 이동'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 천천히 이동'),
+        findsOneWidget,
+      );
       expect(find.textContaining('휠체어'), findsNothing);
 
       final heroStationButtonSize = tester.getSize(
@@ -663,6 +666,8 @@ void main() {
     expect(find.byKey(const Key('networkMapLocateButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapListButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
+    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(find.text('저장'), findsNothing);
     expect(find.text('테스트권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
     final viewer = tester.widget<InteractiveViewer>(
@@ -1321,7 +1326,7 @@ void main() {
       expect(find.text('화면 및 접근성'), findsOneWidget);
       expect(find.text('경로 찾기'), findsNothing);
       expect(find.text('기본 지역과 데이터'), findsOneWidget);
-      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
       expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
       expect(find.text('큰 글자'), findsOneWidget);
       expect(find.text('고대비'), findsOneWidget);
@@ -1331,7 +1336,7 @@ void main() {
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
-          '고령자, 계단을 피하고 쉬운 환승을 우선해요',
+          '계단 피하기 · 환승 줄이기 적용 중, 계단을 피하고 쉬운 환승을 우선해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -1360,7 +1365,7 @@ void main() {
       await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('휠체어'), findsOneWidget);
+      expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
       expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
 
       await tester.scrollUntilVisible(
@@ -1427,8 +1432,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('homeTripControlPanel')), findsNothing);
-    expect(find.text('고령자'), findsOneWidget);
-    expect(find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 고령자'), findsOneWidget);
+    expect(find.text('천천히 이동'), findsOneWidget);
+    expect(find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 천천히 이동'), findsOneWidget);
 
     await _openMobilityProfileFromSettings(tester);
     await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
@@ -1444,8 +1449,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('휠체어'), findsOneWidget);
-    expect(find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 휠체어'), findsOneWidget);
+    expect(find.text('휠체어 이용'), findsOneWidget);
+    expect(find.bySemanticsLabel('길찾기와 역검색, 현재 이동 조건 휠체어 이용'), findsOneWidget);
     semanticsHandle.dispose();
   });
 
@@ -2339,10 +2344,12 @@ void main() {
       expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('이동 점수 92점'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 고령자, 이동 점수 92점'),
+        find.bySemanticsLabel(
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 이동 점수 92점',
+        ),
         findsOneWidget,
       );
       expect(find.bySemanticsLabel('상록수에서 사당까지 삭제'), findsOneWidget);
@@ -2746,7 +2753,7 @@ void main() {
       );
       expect(find.bySemanticsLabel('출발 도착 바꾸기'), findsOneWidget);
       expect(find.text('이동 조건'), findsOneWidget);
-      expect(find.text('계단 피하기 · 엘리베이터 이동'), findsWidgets);
+      expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
 
       await tester.drag(find.byType(ListView), const Offset(0, -260));
@@ -4285,20 +4292,22 @@ void main() {
       await _openMobilityProfileFromSettings(tester);
 
       expect(find.text('이동 조건'), findsOneWidget);
-      expect(find.text('고령자'), findsOneWidget);
-      expect(find.text('유모차'), findsOneWidget);
-      expect(find.text('휠체어'), findsOneWidget);
-      expect(find.text('임산부'), findsOneWidget);
-      expect(find.text('일시 부상'), findsOneWidget);
-      expect(find.text('큰 짐'), findsOneWidget);
+      expect(find.text('천천히 이동'), findsOneWidget);
+      expect(find.text('유모차 이용'), findsOneWidget);
+      expect(find.text('휠체어 이용'), findsOneWidget);
+      expect(find.text('임신 중'), findsOneWidget);
+      expect(find.text('부상·회복 중'), findsOneWidget);
+      expect(find.text('큰 짐이 있음'), findsOneWidget);
       expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
       expect(find.text('엘리베이터와 넓은 길을 우선해요'), findsOneWidget);
       expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
 
       expect(
-        tester.getSemantics(find.bySemanticsLabel('휠체어 선택 가능, 계단 없는 길만 안내해요')),
+        tester.getSemantics(
+          find.bySemanticsLabel('휠체어 이용 선택 가능, 계단 없는 길만 안내해요'),
+        ),
         isSemantics(
-          label: '휠체어 선택 가능, 계단 없는 길만 안내해요',
+          label: '휠체어 이용 선택 가능, 계단 없는 길만 안내해요',
           isButton: true,
           hasTapAction: true,
         ),
@@ -4317,8 +4326,11 @@ void main() {
       await tester.tap(wheelchairCard);
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('휠체어 선택됨, 계단 없는 길만 안내해요'), findsOneWidget);
-      expect(find.text('휠체어 조건을 선택했습니다'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
+        findsOneWidget,
+      );
+      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
       expect(find.bySemanticsLabel('선택 완료'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
@@ -4343,8 +4355,11 @@ void main() {
 
       await _openMobilityProfileFromSettings(tester);
 
-      expect(find.bySemanticsLabel('휠체어 선택됨, 계단 없는 길만 안내해요'), findsOneWidget);
-      expect(find.text('휠체어 조건을 선택했습니다'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
+        findsOneWidget,
+      );
+      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -4396,7 +4411,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('routeSearchButton')));
     await tester.pumpAndSettle();
-    expect(find.text('휠체어'), findsOneWidget);
+    expect(find.text('휠체어 이용'), findsOneWidget);
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
       find.byKey(const Key('routeOriginStationInput')),
@@ -4463,7 +4478,7 @@ void main() {
       expect(find.text('출발역 ID'), findsNothing);
       expect(find.text('도착역 ID'), findsNothing);
       expect(find.text('적용 중인 조건'), findsOneWidget);
-      expect(find.text('고령자'), findsOneWidget);
+      expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.byType(DropdownButton<String>), findsNothing);
 
       await _openRouteOriginStationInput(tester);
@@ -4526,7 +4541,7 @@ void main() {
       expect(find.text('빠른 순'), findsOneWidget);
       expect(find.text('환승 적은 순'), findsOneWidget);
       expect(find.text('상록수 → 사당'), findsOneWidget);
-      expect(find.text('계단 피하기 · 엘리베이터 이동'), findsWidgets);
+      expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
       expect(find.text('7분'), findsOneWidget);
       expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
       expect(find.text('추천'), findsOneWidget);
@@ -4628,7 +4643,7 @@ void main() {
 
     await tester.tap(find.byType(DropdownButton<String>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('휠체어').last);
+    await tester.tap(find.text('휠체어 이용').last);
     await tester.pumpAndSettle();
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
@@ -4686,14 +4701,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DropdownButton<String>), findsNothing);
-    expect(find.text('고령자'), findsOneWidget);
+    expect(find.text('천천히 이동'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('routeSimpleMobilityTypeButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeMobilityOption-WHEELCHAIR')));
     await tester.pumpAndSettle();
 
-    expect(find.text('휠체어'), findsOneWidget);
+    expect(find.text('휠체어 이용'), findsOneWidget);
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
       find.byKey(const Key('routeOriginStationInput')),
@@ -4745,9 +4760,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 고령자')),
+        tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
-          label: '이동 조건 바꾸기, 현재 고령자',
+          label: '이동 조건 바꾸기, 현재 천천히 이동',
           isButton: true,
           hasTapAction: true,
         ),
