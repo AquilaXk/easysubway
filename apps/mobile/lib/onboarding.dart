@@ -1347,19 +1347,27 @@ class _OnboardingConditionRow extends StatelessWidget {
                       : const Color(0xFFEEF3F6),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: SizedBox(
-                  width: 72,
-                  height: 36,
-                  child: Center(
-                    child: Text(
-                      state,
-                      style: TextStyle(
-                        color: enabled
-                            ? const Color(0xFF0D8A6D)
-                            : const Color(0xFF647686),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 72,
+                    minHeight: 36,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    child: Center(
+                      child: Text(
+                        state,
+                        style: TextStyle(
+                          color: enabled
+                              ? const Color(0xFF0D8A6D)
+                              : const Color(0xFF647686),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
                       ),
                     ),
                   ),

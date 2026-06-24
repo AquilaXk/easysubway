@@ -319,6 +319,27 @@ void main() {
     expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
   });
 
+  testWidgets('온보딩 조건 배지는 큰 글씨에서도 잘리지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: OnboardingScreen(onCompleted: (_) {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
+    expect(find.text('우선 적용'), findsWidgets);
+    expect(find.text('기본 적용'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
