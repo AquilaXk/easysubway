@@ -76,13 +76,14 @@ void main() {
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('원하는 조건을 고르세요'), findsOneWidget);
+      expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
       expect(find.text('계단 피하기'), findsOneWidget);
       expect(find.text('엘리베이터 이용'), findsOneWidget);
+      expect(find.text('우선 적용'), findsWidgets);
       expect(find.text('보기 설정'), findsOneWidget);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('계단 피하기 우선, 계단 없는 길')),
-        isSemantics(label: '계단 피하기 우선, 계단 없는 길'),
+        tester.getSemantics(find.bySemanticsLabel('계단 피하기 우선 적용, 계단 없는 길')),
+        isSemantics(label: '계단 피하기 우선 적용, 계단 없는 길'),
       );
       await tester.scrollUntilVisible(
         find.byKey(const Key('onboardingPreference-highContrast')),
@@ -108,9 +109,11 @@ void main() {
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('권한을 선택하세요'), findsOneWidget);
+      expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
       expect(find.text('현재 위치'), findsOneWidget);
       expect(find.text('알림'), findsOneWidget);
+      expect(find.bySemanticsLabel('현재 위치 꺼짐'), findsOneWidget);
+      expect(find.bySemanticsLabel('알림 꺼짐'), findsOneWidget);
       await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
       await tester.pumpAndSettle();
 
@@ -128,41 +131,7 @@ void main() {
     }
   });
 
-  testWidgets('온보딩 권한 단계는 선택을 끄고 건너뛰면 수동 설정 방법을 안내한다', (tester) async {
-    OnboardingResult? completedResult;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingScreen(
-          onCompleted: (result) => completedResult = result,
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('권한을 선택하세요'), findsOneWidget);
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('수동 설정 방법'), findsOneWidget);
-    expect(find.textContaining('휴대폰 설정에서 쉬운 지하철'), findsOneWidget);
-
-    await tester.tap(find.text('확인'));
-    await tester.pumpAndSettle();
-
-    expect(completedResult, isNotNull);
-    expect(completedResult?.profile.id, 'elderly');
-  });
-
-  testWidgets('온보딩 권한 단계는 선택된 권한 provider를 호출한 뒤 완료한다', (tester) async {
+  testWidgets('온보딩 권한 단계는 나중에 설정을 누르면 권한 요청 없이 완료한다', (tester) async {
     final locationProvider = _FakeCurrentLocationProvider();
     final notificationPermissionProvider =
         _FakeNotificationPermissionProvider();
@@ -185,7 +154,43 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+    await tester.pumpAndSettle();
+
+    expect(completedResult, isNotNull);
+    expect(completedResult?.profile.id, 'elderly');
+    expect(locationProvider.requestCount, 0);
+    expect(notificationPermissionProvider.requestCount, 0);
+  });
+
+  testWidgets('온보딩 권한 단계는 켠 권한 provider를 호출한 뒤 완료한다', (tester) async {
+    final locationProvider = _FakeCurrentLocationProvider();
+    final notificationPermissionProvider =
+        _FakeNotificationPermissionProvider();
+    OnboardingResult? completedResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (result) => completedResult = result,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Switch).first);
+    await tester.tap(find.byType(Switch).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionAllowButton')));
     await tester.pumpAndSettle();
 
     expect(locationProvider.requestCount, 1);
@@ -193,36 +198,7 @@ void main() {
     expect(completedResult?.profile.id, 'elderly');
   });
 
-  testWidgets('온보딩 권한 단계는 위치만 끄면 알림 provider는 호출한다', (tester) async {
-    final locationProvider = _FakeCurrentLocationProvider();
-    final notificationPermissionProvider =
-        _FakeNotificationPermissionProvider();
-    OnboardingResult? completedResult;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingScreen(
-          locationProvider: locationProvider,
-          notificationPermissionProvider: notificationPermissionProvider,
-          onCompleted: (result) => completedResult = result,
-        ),
-      ),
-    );
-
-    await _moveToPermissionStep(tester);
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('확인'));
-    await tester.pumpAndSettle();
-
-    expect(locationProvider.requestCount, 0);
-    expect(notificationPermissionProvider.requestCount, 1);
-    expect(completedResult?.profile.id, 'elderly');
-  });
-
-  testWidgets('온보딩 권한 단계는 알림만 끄면 위치 provider는 호출한다', (tester) async {
+  testWidgets('온보딩 권한 단계는 알림만 켜면 알림 provider만 호출한다', (tester) async {
     final locationProvider = _FakeCurrentLocationProvider();
     final notificationPermissionProvider =
         _FakeNotificationPermissionProvider();
@@ -241,9 +217,34 @@ void main() {
     await _moveToPermissionStep(tester);
     await tester.tap(find.byType(Switch).last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+    await tester.tap(find.byKey(const Key('onboardingPermissionAllowButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('확인'));
+
+    expect(locationProvider.requestCount, 0);
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(completedResult?.profile.id, 'elderly');
+  });
+
+  testWidgets('온보딩 권한 단계는 위치만 켜면 위치 provider만 호출한다', (tester) async {
+    final locationProvider = _FakeCurrentLocationProvider();
+    final notificationPermissionProvider =
+        _FakeNotificationPermissionProvider();
+    OnboardingResult? completedResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (result) => completedResult = result,
+        ),
+      ),
+    );
+
+    await _moveToPermissionStep(tester);
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionAllowButton')));
     await tester.pumpAndSettle();
 
     expect(locationProvider.requestCount, 1);
@@ -269,7 +270,11 @@ void main() {
       );
 
       await _moveToPermissionStep(tester);
-      await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+      await tester.tap(find.byType(Switch).last);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('onboardingPermissionAllowButton')),
+      );
       await tester.pumpAndSettle();
     });
 
@@ -284,6 +289,55 @@ void main() {
       find.byKey(const Key('onboardingNotificationFailureNextAction')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('온보딩 2·3단계는 이전 단계로 돌아갈 수 있다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
+    expect(find.text('우선 적용'), findsWidgets);
+    expect(find.text('기본 적용'), findsWidgets);
+    await tester.tap(find.byTooltip('이전 단계'));
+    await tester.pumpAndSettle();
+    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+    await tester.tap(find.byTooltip('이전 단계'));
+    await tester.pumpAndSettle();
+    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
+  });
+
+  testWidgets('온보딩 조건 배지는 큰 글씨에서도 잘리지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: OnboardingScreen(onCompleted: (_) {}),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
+    expect(find.text('우선 적용'), findsWidgets);
+    expect(find.text('기본 적용'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
