@@ -1238,7 +1238,7 @@ void main() {
     await controller.load();
 
     expect(controller.state.status, FavoriteStationListStatus.empty);
-    expect(controller.state.message, '저장한 역이 없습니다.');
+    expect(controller.state.message, '즐겨찾기한 역이 없습니다.');
 
     repository.error = const FavoriteStationException('즐겨찾기를 불러오지 못했습니다.');
     await controller.load();
