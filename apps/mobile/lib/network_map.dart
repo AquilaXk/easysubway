@@ -387,86 +387,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }
 }
 
-class _RouteStrip extends StatelessWidget {
-  const _RouteStrip({
-    required this.routeDraftController,
-    required this.onOpenRouteSearch,
-  });
-
-  final RouteDraftController routeDraftController;
-  final Future<void> Function() onOpenRouteSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      key: const Key('mapRouteStrip'),
-      animation: routeDraftController,
-      builder: (context, _) {
-        final draft = routeDraftController.draft;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: _RouteChip(
-                  label: draft.origin?.displayName ?? '출발',
-                  icon: Icons.trip_origin,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _RouteChip(
-                  label: draft.destination?.displayName ?? '도착',
-                  icon: Icons.flag_outlined,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: '길찾기',
-                onPressed: onOpenRouteSearch,
-                icon: const Icon(Icons.route),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RouteChip extends StatelessWidget {
-  const _RouteChip({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFD7E1E3)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: EasySubwayAccessibleColors.brandDark),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RegionTabs extends StatelessWidget {
   const _RegionTabs({
     required this.regions,
@@ -543,54 +463,6 @@ class _RegionMenuButton extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _LineTabs extends StatelessWidget {
-  const _LineTabs({
-    required this.lines,
-    required this.selectedLineId,
-    required this.onSelected,
-  });
-
-  final List<NetworkMapLine> lines;
-  final String? selectedLineId;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      key: const Key('mapLineTabs'),
-      height: 52,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return FilterChip(
-              label: const Text('전체'),
-              selected: selectedLineId == null,
-              onSelected: (_) => onSelected(null),
-            );
-          }
-          final line = lines[index - 1];
-          return FilterChip(
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _LineCircleBadge(line: line, size: 24),
-                const SizedBox(width: 6),
-                Text(line.shortName),
-              ],
-            ),
-            selected: selectedLineId == line.id,
-            onSelected: (_) => onSelected(line.id),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemCount: lines.length + 1,
       ),
     );
   }
@@ -856,8 +728,8 @@ Matrix4 _initialMapTransform(
       (viewportHeight - bounds.height * initialScale) / 2 -
       bounds.top * initialScale;
   return Matrix4.identity()
-    ..translate(dx, dy)
-    ..scale(initialScale);
+    ..translateByDouble(dx, dy, 0, 1)
+    ..scaleByDouble(initialScale, initialScale, 1, 1);
 }
 
 class _NetworkMapPainter extends CustomPainter {
@@ -1159,34 +1031,6 @@ Offset _labelDrawOffset(Offset center, Offset labelOffset, Size textSize) {
 String _mapStationKey(NetworkMapStation station) =>
     '${station.id}:${station.lineId}';
 
-class _StationMarker extends StatelessWidget {
-  const _StationMarker({
-    required this.station,
-    required this.line,
-    required this.isTransfer,
-    required this.onTap,
-    super.key,
-  });
-
-  final NetworkMapStation station;
-  final NetworkMapLine? line;
-  final bool isTransfer;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: station.displayName,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: SizedBox(width: 48, height: 48, child: const SizedBox.shrink()),
-      ),
-    );
-  }
-}
-
 class _StationHitTarget extends StatelessWidget {
   const _StationHitTarget({
     required this.station,
@@ -1405,7 +1249,7 @@ List<Map<String, Object?>> _objectList(Object? value) {
     return const [];
   }
   return value
-      .whereType<Map>()
+      .whereType<Map<Object?, Object?>>()
       .map((item) => item.cast<String, Object?>())
       .toList(growable: false);
 }

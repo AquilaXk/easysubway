@@ -107,7 +107,7 @@ class AppDependencies {
         injectedNetworkMapRepository ??
         (catalogDatabase != null
             ? DriftStationRepository(database: catalogDatabase)
-            : _missingLocalNetworkMapRepository());
+            : const _UnavailableNetworkMapRepository());
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -210,8 +210,27 @@ class AppDependencies {
   final UserDataDeletionRepository? userDataDeletionRepository;
 }
 
-Never _missingLocalNetworkMapRepository() {
-  throw StateError('Network map requires the local catalog data pack.');
+class _UnavailableNetworkMapRepository implements NetworkMapRepository {
+  const _UnavailableNetworkMapRepository();
+
+  @override
+  Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
+    final selectedRegion = region ?? '수도권';
+    return NetworkMapData(
+      regions: const [
+        NetworkMapRegion(name: '수도권'),
+        NetworkMapRegion(name: '부산권'),
+        NetworkMapRegion(name: '광주권'),
+        NetworkMapRegion(name: '대구권'),
+        NetworkMapRegion(name: '대전권'),
+      ],
+      selectedRegion: selectedRegion,
+      lines: const [],
+      stations: const [],
+      edges: const [],
+      positionSources: const [],
+    );
+  }
 }
 
 FacilityReportRepository _defaultFacilityReportRepository({

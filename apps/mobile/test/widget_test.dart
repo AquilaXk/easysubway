@@ -554,35 +554,12 @@ void main() {
     for (final map in maps) {
       final offline = map['offline'] as Map<String, Object?>;
       final path = offline['path'] as String;
+      expect(map['source_url'], isA<String>());
+      expect(map['source_url'] as String, startsWith('https://'));
       expect(offline['included'], isTrue);
       expect(File(path).existsSync(), isTrue, reason: path);
-      for (final sourceAsset
-          in (map['source_assets'] as List? ?? const <Object?>[])) {
-        final sourcePath =
-            (sourceAsset as Map<String, Object?>)['path'] as String;
-        expect(File(sourcePath).existsSync(), isTrue, reason: sourcePath);
-      }
+      expect(path, startsWith('assets/datapacks/maps/'));
     }
-    expect(
-      maps.where((map) => map['app_region'] == '수도권').single['source_assets'],
-      isNotEmpty,
-    );
-    expect(
-      maps.where((map) => map['app_region'] == '부산권').single['source_assets'],
-      isNotEmpty,
-    );
-    expect(
-      maps.where((map) => map['app_region'] == '대구권').single['source_assets'],
-      isNotEmpty,
-    );
-    expect(
-      maps.where((map) => map['app_region'] == '광주권').single['source_assets'],
-      isNotEmpty,
-    );
-    expect(
-      maps.where((map) => map['app_region'] == '대전권').single['source_assets'],
-      isNotEmpty,
-    );
   });
 
   testWidgets('노선도는 카드가 아니라 공식 지도처럼 전면 캔버스로 보인다', (tester) async {
@@ -656,9 +633,8 @@ void main() {
             ),
           ],
         ),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(
-          favorites: [_favoriteRoute()],
-        ),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        recentRoutesFuture: Future.value([_favoriteRoute()]),
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
@@ -698,7 +674,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('최근 경로'), findsOneWidget);
     await tester.dragUntilVisible(
-      find.byKey(const Key('homeSavedRouteCard')),
+      find.byKey(const Key('homeRecentRouteCard')),
       find.byKey(const Key('homePrototypeList')),
       const Offset(0, -120),
     );
@@ -812,7 +788,7 @@ void main() {
     );
   });
 
-  testWidgets('홈 자주 가는 곳은 저장한 경로가 있으면 빈 상태 대신 경로를 보여준다', (tester) async {
+  testWidgets('홈은 저장한 경로가 있어도 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -829,17 +805,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.dragUntilVisible(
-        find.text('상록수역 → 사당역'),
-        find.byKey(const Key('homePrototypeList')),
-        const Offset(0, -180),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('상록수역 → 사당역'), findsOneWidget);
+      expect(find.text('상록수역 → 사당역'), findsNothing);
       expect(
         find.bySemanticsLabel(RegExp('최근 경로, 상록수역에서 사당역까지')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.text('저장한 경로가 없습니다'), findsNothing);
     } finally {
