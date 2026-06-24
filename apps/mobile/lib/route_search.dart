@@ -3042,7 +3042,7 @@ class FavoriteRouteListController extends ChangeNotifier {
             ? const FavoriteRouteListState(
                 status: FavoriteRouteListStatus.empty,
                 favorites: [],
-                message: '저장한 경로가 없습니다.',
+                message: '즐겨찾기한 경로가 없습니다.',
               )
             : FavoriteRouteListState(
                 status: FavoriteRouteListStatus.success,
@@ -3085,7 +3085,7 @@ class FavoriteRouteListController extends ChangeNotifier {
             ? FavoriteRouteListState(
                 status: FavoriteRouteListStatus.empty,
                 favorites: const [],
-                message: '저장한 경로가 없습니다.',
+                message: '즐겨찾기한 경로가 없습니다.',
                 removingIds: nextRemovingIds,
               )
             : FavoriteRouteListState(

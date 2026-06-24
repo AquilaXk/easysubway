@@ -320,7 +320,7 @@ class FavoriteFacilityListController extends ChangeNotifier {
           const FavoriteFacilityListState(
             status: FavoriteFacilityListStatus.empty,
             favorites: [],
-            message: '저장한 시설이 없습니다.',
+            message: '즐겨찾기한 시설이 없습니다.',
           ),
         );
         return;

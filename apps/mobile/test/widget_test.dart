@@ -66,9 +66,21 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
   );
   await tester.pumpAndSettle();
   if (tabKey != null) {
-    await tester.tap(find.byKey(tabKey));
+    final targetKey = switch (tabKey) {
+      const Key('favoriteStationsTabButton') => const Key(
+        'favoriteHomeStationsButton',
+      ),
+      const Key('favoriteFacilitiesTabButton') => const Key(
+        'favoriteHomeFacilitiesButton',
+      ),
+      _ => const Key('favoriteHomeRoutesButton'),
+    };
+    await tester.tap(find.byKey(targetKey));
     await tester.pumpAndSettle();
+    return;
   }
+  await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _openSettingsScreen(WidgetTester tester) async {
@@ -466,7 +478,7 @@ void main() {
     }
   });
 
-  testWidgets('홈 우측 상단 알림 버튼은 알림 설정으로 이동한다', (tester) async {
+  testWidgets('홈 우측 상단 알림 버튼은 알림함으로 이동한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -482,7 +494,8 @@ void main() {
     await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('알림 설정'), findsOneWidget);
+    expect(find.text('알림'), findsOneWidget);
+    expect(find.text('새 알림이 없습니다'), findsOneWidget);
   });
 
   testWidgets('홈 화면은 v3 기준 큰 행동과 짧은 상태 카드로 구성된다', (tester) async {
@@ -701,11 +714,11 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('저장한 경로를 불러오지 못했습니다'), 180);
+    await tester.scrollUntilVisible(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), 180);
     await tester.pumpAndSettle();
-    expect(find.text('저장한 경로를 불러오지 못했습니다'), findsOneWidget);
+    expect(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), findsOneWidget);
     expect(
-      tester.getSize(find.widgetWithText(OutlinedButton, '저장한 경로 보기')).height,
+      tester.getSize(find.widgetWithText(OutlinedButton, '즐겨찾기 경로 보기')).height,
       greaterThanOrEqualTo(EasySubwayTouchTarget.general),
     );
   });
@@ -741,7 +754,7 @@ void main() {
         );
       }
 
-      expect(find.text('설정'), findsOneWidget);
+      expect(find.text('화면·접근성 설정'), findsOneWidget);
       expect(find.text('내 이동 조건'), findsOneWidget);
       expect(find.text('화면과 읽기'), findsOneWidget);
       expect(find.text('경로 찾기'), findsOneWidget);
@@ -795,7 +808,7 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '도움말과 개인정보, 지원, 개인정보 처리방침, 데이터 삭제 안내를 확인해요',
+          '도움말·문의, 사용법, 개인정보, 문의 경로를 확인해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -848,15 +861,25 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('즐겨찾기 화면은 탭 목록을 바로 보여준다', (tester) async {
+  testWidgets('즐겨찾기 홈은 실제 목록 개수로 역·시설·경로를 보여준다', (tester) async {
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+    final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
+      favorites: [_favoriteFacility()],
+    );
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute()],
+    );
+
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        favoriteRepository: favoriteRepository,
+        favoriteFacilityRepository: favoriteFacilityRepository,
+        favoriteRouteRepository: favoriteRouteRepository,
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -866,15 +889,22 @@ void main() {
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
 
-    await _openFavoriteList(tester);
+    await tester.tap(find.byKey(const Key('bottomNavSaved')));
+    await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기'), findsOneWidget);
-    expect(find.byKey(const Key('favoriteRoutesTabButton')), findsOneWidget);
-    expect(find.byKey(const Key('favoriteStationsTabButton')), findsOneWidget);
+    expect(find.byKey(const Key('favoriteHomeStationsButton')), findsOneWidget);
     expect(
-      find.byKey(const Key('favoriteFacilitiesTabButton')),
+      find.byKey(const Key('favoriteHomeFacilitiesButton')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('favoriteHomeRoutesButton')), findsOneWidget);
+    expect(find.text('역 1개'), findsOneWidget);
+    expect(find.text('시설 1개'), findsOneWidget);
+    expect(find.text('경로 1개'), findsOneWidget);
+    expect(favoriteRepository.listCount, greaterThanOrEqualTo(1));
+    expect(favoriteFacilityRepository.listCount, greaterThanOrEqualTo(1));
+    expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
     expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
@@ -901,7 +931,7 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('도움말'), findsOneWidget);
+      expect(find.text('도움말·문의'), findsOneWidget);
       expect(find.text('개인정보처리방침'), findsOneWidget);
       expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
       expect(find.text('고객지원'), findsOneWidget);
@@ -1231,6 +1261,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(deletionRepository.deleteCount, 1);
+    expect(find.text('삭제 완료'), findsOneWidget);
+    expect(find.text('내 데이터가 삭제됐어요'), findsOneWidget);
+    expect(find.text('즐겨찾기한 역'), findsOneWidget);
+    expect(find.text('1개 삭제'), findsWidgets);
+    expect(find.text('제보 연결 정보'), findsOneWidget);
+    expect(find.text('1건 익명화'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
+    await tester.pumpAndSettle();
+
     expect(
       legacyCredentialStorage.deletedKeys,
       contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey),
@@ -1601,7 +1641,7 @@ void main() {
         tabKey: const Key('favoriteStationsTabButton'),
       );
 
-      expect(find.text('역'), findsOneWidget);
+      expect(find.text('즐겨찾기한 역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('기본 정보만 있음'), findsOneWidget);
@@ -1652,7 +1692,7 @@ void main() {
         tabKey: const Key('favoriteFacilitiesTabButton'),
       );
 
-      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('즐겨찾기한 시설'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
@@ -1708,7 +1748,7 @@ void main() {
 
       await _openFavoriteList(tester);
 
-      expect(find.text('경로'), findsOneWidget);
+      expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('고령자'), findsOneWidget);
@@ -1723,7 +1763,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
-      expect(find.text('저장한 경로가 없습니다.'), findsOneWidget);
+      expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -1771,7 +1811,7 @@ void main() {
     removeCompleter.complete();
     await tester.pumpAndSettle();
 
-    expect(find.text('저장한 경로가 없습니다.'), findsOneWidget);
+    expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
   });
 
   testWidgets('즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
@@ -3319,7 +3359,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('저장한 역이 없습니다.'), findsOneWidget);
+    expect(find.text('즐겨찾기한 역이 없습니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
       findsNothing,
@@ -6430,12 +6470,14 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
   FakeFavoriteStationRepository({this.favorites = const []});
 
   List<FavoriteStation> favorites;
+  int listCount = 0;
   final savedStationIds = <String>[];
   final removedStationIds = <String>[];
   Object? error;
 
   @override
   Future<List<FavoriteStation>> listFavoriteStations() async {
+    listCount++;
     final currentError = error;
     if (currentError != null) {
       throw currentError;
@@ -6527,10 +6569,12 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
   FakeFavoriteFacilityRepository({this.favorites = const []});
 
   List<FavoriteFacility> favorites;
+  int listCount = 0;
   Object? error;
 
   @override
   Future<List<FavoriteFacility>> listFavoriteFacilities() async {
+    listCount++;
     final currentError = error;
     if (currentError != null) {
       throw currentError;
@@ -6569,12 +6613,14 @@ class FakeFavoriteRouteRepository implements FavoriteRouteRepository {
 
   List<FavoriteRoute> favorites;
   final Completer<void>? removeCompleter;
+  int listCount = 0;
   final savedRouteSearchIds = <String>[];
   final removedFavoriteRouteIds = <String>[];
   Object? error;
 
   @override
   Future<List<FavoriteRoute>> listFavoriteRoutes() async {
+    listCount++;
     final currentError = error;
     if (currentError != null) {
       throw currentError;

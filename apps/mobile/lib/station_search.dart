@@ -1368,7 +1368,7 @@ class FavoriteStationListController extends ChangeNotifier {
         _emitState(
           const FavoriteStationListState(
             status: FavoriteStationListStatus.empty,
-            message: '저장한 역이 없습니다.',
+            message: '즐겨찾기한 역이 없습니다.',
           ),
         );
       } else {

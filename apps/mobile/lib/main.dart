@@ -371,6 +371,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _startScreenDismissed = false;
   bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
+  UserDataDeletionResult? _dataDeletionResult;
 
   @override
   void initState() {
@@ -387,6 +388,18 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     if (_loadingOnboardingState) {
       return const Scaffold(
         body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
+    }
+
+    final dataDeletionResult = _dataDeletionResult;
+    if (dataDeletionResult != null) {
+      return UserDataDeletionResultScreen(
+        result: dataDeletionResult,
+        onRestart: () {
+          setState(() {
+            _dataDeletionResult = null;
+          });
+        },
       );
     }
 
@@ -469,7 +482,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     );
   }
 
-  Future<void> _handleUserDataDeleted() async {
+  Future<void> _handleUserDataDeleted(UserDataDeletionResult result) async {
     try {
       await widget.legacyCredentialCleaner.clear();
     } catch (error, stackTrace) {
@@ -489,6 +502,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _loadingOnboardingState = false;
       _startScreenDismissed = false;
       _introScreenDismissed = false;
+      _dataDeletionResult = result;
     });
   }
 
@@ -835,7 +849,7 @@ class HomeScreen extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final Future<void> Function()? onUserDataDeleted;
+  final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
   final String initialMobilityType;
@@ -953,15 +967,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    void openNotificationSettings() {
-      final repository = notificationRepository;
-      if (repository == null) {
-        return;
-      }
+    void openNotificationInbox() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => NotificationSettingsScreen(
-            repository: repository,
+          builder: (_) => NotificationInboxScreen(
+            favoriteFacilityRepository: favoriteFacilityRepository,
+            reportRepository: reportRepository,
+            notificationRepository: notificationRepository,
             notificationPermissionProvider: notificationPermissionProvider,
           ),
         ),
@@ -1069,7 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> {
             key: const Key('homeNotificationActionButton'),
             onPressed: notificationRepository == null
                 ? openSettings
-                : openNotificationSettings,
+                : openNotificationInbox,
           ),
           const SizedBox(width: 8),
         ],
@@ -1160,7 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> {
             key: Key('bottomNavSaved'),
             icon: Icon(Icons.bookmark_border),
             selectedIcon: Icon(Icons.bookmark),
-            label: '저장',
+            label: '즐겨찾기',
           ),
           NavigationDestination(
             key: Key('bottomNavMore'),
@@ -1255,6 +1267,262 @@ class _HomeNotificationButton extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class NotificationInboxScreen extends StatefulWidget {
+  const NotificationInboxScreen({
+    required this.favoriteFacilityRepository,
+    required this.reportRepository,
+    required this.notificationRepository,
+    required this.notificationPermissionProvider,
+    super.key,
+  });
+
+  final FavoriteFacilityRepository? favoriteFacilityRepository;
+  final FacilityReportRepository reportRepository;
+  final NotificationSettingsRepository? notificationRepository;
+  final NotificationPermissionProvider? notificationPermissionProvider;
+
+  @override
+  State<NotificationInboxScreen> createState() =>
+      _NotificationInboxScreenState();
+}
+
+class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
+  late Future<List<_NotificationInboxItem>> _itemsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemsFuture = _loadItems();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('알림'),
+        actions: [
+          if (widget.notificationRepository != null)
+            IconButton(
+              tooltip: '알림 설정',
+              onPressed: _openSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: FutureBuilder<List<_NotificationInboxItem>>(
+          future: _itemsFuture,
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? const <_NotificationInboxItem>[];
+            return RefreshIndicator(
+              onRefresh: () async {
+                final next = _loadItems();
+                setState(() {
+                  _itemsFuture = next;
+                });
+                await next;
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                children: [
+                  if (snapshot.connectionState != ConnectionState.done)
+                    const LinearProgressIndicator(minHeight: 3),
+                  if (items.isEmpty)
+                    const _PrototypeCard(
+                      child: _PrototypeInfoRow(
+                        icon: Icons.notifications_none,
+                        iconBackground: EasySubwayAccessibleColors.mintSoft,
+                        iconColor: EasySubwayAccessibleColors.mintDark,
+                        title: '새 알림이 없습니다',
+                        subtitle: '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
+                      ),
+                    )
+                  else ...[
+                    _NotificationInboxChips(items: items),
+                    const SizedBox(height: 12),
+                    for (final item in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _NotificationInboxCard(item: item),
+                      ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<List<_NotificationInboxItem>> _loadItems() async {
+    final items = <_NotificationInboxItem>[];
+    final favoriteFacilityRepository = widget.favoriteFacilityRepository;
+    if (favoriteFacilityRepository != null) {
+      try {
+        final facilities = await favoriteFacilityRepository
+            .listFavoriteFacilities();
+        for (final facility in facilities.where(_isFacilityAlert)) {
+          items.add(_NotificationInboxItem.facility(facility));
+        }
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '알림함 즐겨찾기 시설 상태를 불러오는 중 예외가 발생했습니다.',
+        );
+      }
+    }
+
+    try {
+      final reports = await widget.reportRepository.listMyReports();
+      for (final report in reports) {
+        items.add(_NotificationInboxItem.report(report));
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '알림함 제보 상태를 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+    return items;
+  }
+
+  void _openSettings() {
+    final repository = widget.notificationRepository;
+    if (repository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationSettingsScreen(
+          repository: repository,
+          notificationPermissionProvider: widget.notificationPermissionProvider,
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationInboxItem {
+  const _NotificationInboxItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.kind,
+    this.report,
+    this.warning = false,
+  });
+
+  factory _NotificationInboxItem.facility(FavoriteFacility facility) {
+    final name = facility.name.trim().isEmpty
+        ? facility.typeLabel
+        : facility.name;
+    return _NotificationInboxItem(
+      icon: _facilityIcon(facility.type),
+      title: '${facility.stationLabel} $name',
+      subtitle: '${facility.typeLabel} ${facility.statusLabel}',
+      kind: '시설',
+      warning: true,
+    );
+  }
+
+  factory _NotificationInboxItem.report(FacilityReportResult report) {
+    return _NotificationInboxItem(
+      icon: Icons.report_outlined,
+      title: '제보 ${report.statusLabel}',
+      subtitle: '접수번호 ${report.id}',
+      kind: '제보',
+      report: report,
+    );
+  }
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String kind;
+  final FacilityReportResult? report;
+  final bool warning;
+}
+
+class _NotificationInboxChips extends StatelessWidget {
+  const _NotificationInboxChips({required this.items});
+
+  final List<_NotificationInboxItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final facilityCount = items.where((item) => item.kind == '시설').length;
+    final reportCount = items.length - facilityCount;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _HomeMiniBadge('전체 ${items.length}'),
+        if (facilityCount > 0) _HomeMiniBadge('시설 $facilityCount'),
+        if (reportCount > 0) _HomeMiniBadge('제보 $reportCount'),
+      ],
+    );
+  }
+}
+
+class _NotificationInboxCard extends StatelessWidget {
+  const _NotificationInboxCard({required this.item});
+
+  final _NotificationInboxItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    void open() {
+      final report = item.report;
+      if (report == null) {
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MyFacilityReportDetailScreen(report: report),
+        ),
+      );
+    }
+
+    final card = _PrototypeCard(
+      backgroundColor: item.warning
+          ? EasySubwayAccessibleColors.amberSoft
+          : Colors.white,
+      borderColor: item.warning
+          ? const Color(0xFFF1D49A)
+          : EasySubwayAccessibleColors.line,
+      child: _PrototypeInfoRow(
+        icon: item.icon,
+        iconBackground: Colors.white,
+        iconColor: item.warning
+            ? EasySubwayAccessibleColors.amber
+            : EasySubwayAccessibleColors.mintDark,
+        title: item.title,
+        subtitle: item.subtitle,
+        trailing: item.kind,
+      ),
+    );
+    if (item.report == null) {
+      return card;
+    }
+    return Semantics(
+      button: true,
+      label: '${item.title}, ${item.subtitle}',
+      onTap: open,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: open,
+          borderRadius: BorderRadius.circular(20),
+          child: card,
         ),
       ),
     );
@@ -1820,7 +2088,7 @@ class _HomeSavedRouteErrorCard extends StatelessWidget {
             icon: Icons.bookmark_border,
             iconBackground: EasySubwayAccessibleColors.amberSoft,
             iconColor: EasySubwayAccessibleColors.amber,
-            title: '저장한 경로를 불러오지 못했습니다',
+            title: '즐겨찾기한 경로를 불러오지 못했습니다',
             subtitle: '즐겨찾기 화면에서 다시 확인해 주세요',
             trailing: '확인 필요',
           ),
@@ -1837,7 +2105,7 @@ class _HomeSavedRouteErrorCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('저장한 경로 보기'),
+              child: const Text('즐겨찾기 경로 보기'),
             ),
           ),
         ],
@@ -2132,7 +2400,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
+      appBar: AppBar(title: const Text('화면·접근성 설정')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -2247,13 +2515,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             ),
             _AppSettingsSection(
               key: const Key('settingsSection-help-privacy'),
-              title: '도움말과 개인정보',
+              title: '도움말·문의',
               children: [
                 _AppSettingsActionTile(
+                  key: const Key('offlineDataSettingsButton'),
+                  icon: Icons.offline_pin_outlined,
+                  title: '인터넷 없이 이용',
+                  subtitle: '노선도와 역 정보 사용 범위를 확인해요',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const OfflineDataScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _AppSettingsActionTile(
                   key: const Key('settingsSupportPrivacyButton'),
-                  icon: Icons.privacy_tip_outlined,
-                  title: '도움말과 개인정보',
-                  subtitle: '지원, 개인정보 처리방침, 데이터 삭제 안내를 확인해요',
+                  icon: Icons.help_outline,
+                  title: '도움말·문의',
+                  subtitle: '사용법, 개인정보, 문의 경로를 확인해요',
                   onTap: widget.onOpenSupportAccess,
                 ),
               ],
@@ -2398,7 +2679,7 @@ class _AppSettingsInfoTile extends StatelessWidget {
   }
 }
 
-class FavoriteHomeScreen extends StatelessWidget {
+class FavoriteHomeScreen extends StatefulWidget {
   const FavoriteHomeScreen({
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
@@ -2423,72 +2704,396 @@ class FavoriteHomeScreen extends StatelessWidget {
   final String initialMobilityType;
 
   @override
+  State<FavoriteHomeScreen> createState() => _FavoriteHomeScreenState();
+}
+
+class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
+  late Future<_FavoriteHomeData> _dataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dataFuture = _loadData();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sections = _favoriteSections(context);
-    return DefaultTabController(
-      length: sections.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('즐겨찾기'),
-          bottom: TabBar(tabs: [for (final section in sections) section.tab]),
-        ),
-        body: TabBarView(
-          children: [for (final section in sections) section.content],
+    return Scaffold(
+      appBar: AppBar(title: const Text('즐겨찾기')),
+      body: SafeArea(
+        child: FutureBuilder<_FavoriteHomeData>(
+          future: _dataFuture,
+          builder: (context, snapshot) {
+            final data = snapshot.data ?? const _FavoriteHomeData();
+            return RefreshIndicator(
+              onRefresh: () async {
+                final next = _loadData();
+                setState(() {
+                  _dataFuture = next;
+                });
+                await next;
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                children: [
+                  if (snapshot.connectionState != ConnectionState.done)
+                    const LinearProgressIndicator(minHeight: 3),
+                  const _HomePrototypeSection(title: '즐겨찾기한 항목'),
+                  _FavoriteHomeQuickGrid(
+                    stationCount: data.stations.length,
+                    facilityCount: data.facilities.length,
+                    routeCount: data.routes.length,
+                    onStations: widget.favoriteRepository == null
+                        ? null
+                        : _openFavoriteStations,
+                    onFacilities: widget.favoriteFacilityRepository == null
+                        ? null
+                        : _openFavoriteFacilities,
+                    onRoutes: widget.favoriteRouteRepository == null
+                        ? null
+                        : _openFavoriteRoutes,
+                  ),
+                  if (_firstFacilityAlert(data.facilities)
+                      case final alert?) ...[
+                    const _HomePrototypeSection(title: '확인 필요'),
+                    _HomeFacilityAlertCard(facility: alert),
+                  ],
+                  if (data.routes.isNotEmpty) ...[
+                    const _HomePrototypeSection(title: '최근 경로'),
+                    _HomeSavedRouteCard(
+                      route: data.routes.first,
+                      onTap: _openFavoriteRoutes,
+                    ),
+                  ],
+                  if (data.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: _PrototypeCard(
+                        child: _PrototypeInfoRow(
+                          icon: Icons.bookmark_border,
+                          iconBackground: EasySubwayAccessibleColors.mintSoft,
+                          iconColor: EasySubwayAccessibleColors.mintDark,
+                          title: '즐겨찾기한 항목이 없습니다',
+                          subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  List<_FavoriteSection> _favoriteSections(BuildContext context) {
-    final sections = <_FavoriteSection>[];
-    final favoriteRouteRepository = this.favoriteRouteRepository;
-    final favoriteRepository = this.favoriteRepository;
-    final favoriteFacilityRepository = this.favoriteFacilityRepository;
-    if (favoriteRouteRepository != null) {
-      sections.add(
-        _FavoriteSection(
-          tab: const Tab(key: Key('favoriteRoutesTabButton'), text: '경로'),
-          content: FavoriteRouteListContent(
-            repository: favoriteRouteRepository,
+  Future<_FavoriteHomeData> _loadData() async {
+    final stations = await _loadFavoriteList(
+      widget.favoriteRepository?.listFavoriteStations,
+    );
+    final facilities = await _loadFavoriteList(
+      widget.favoriteFacilityRepository?.listFavoriteFacilities,
+    );
+    final routes = await _loadFavoriteList(
+      widget.favoriteRouteRepository?.listFavoriteRoutes,
+    );
+    return _FavoriteHomeData(
+      stations: stations,
+      facilities: facilities,
+      routes: routes,
+    );
+  }
+
+  Future<List<T>> _loadFavoriteList<T>(Future<List<T>> Function()? load) async {
+    if (load == null) {
+      return const [];
+    }
+    try {
+      return await load();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  void _openFavoriteRoutes() {
+    final repository = widget.favoriteRouteRepository;
+    if (repository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FavoriteListScreen(
+          title: '즐겨찾기한 경로',
+          child: FavoriteRouteListContent(repository: repository),
+        ),
+      ),
+    );
+  }
+
+  void _openFavoriteStations() {
+    final repository = widget.favoriteRepository;
+    if (repository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FavoriteListScreen(
+          title: '즐겨찾기한 역',
+          child: FavoriteStationListContent(
+            repository: repository,
+            stationRepository: widget.stationRepository,
+            reportRepository: widget.reportRepository,
+            locationProvider: widget.locationProvider,
+            facilityReportDraftTargetStore:
+                widget.facilityReportDraftTargetStore,
+            internalRouteRepository: widget.internalRouteRepository,
+            internalRouteMobilityType: widget.initialMobilityType,
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  void _openFavoriteFacilities() {
+    final repository = widget.favoriteFacilityRepository;
+    if (repository == null) {
+      return;
     }
-    if (favoriteRepository != null) {
-      sections.add(
-        _FavoriteSection(
-          tab: const Tab(key: Key('favoriteStationsTabButton'), text: '역'),
-          content: FavoriteStationListContent(
-            repository: favoriteRepository,
-            stationRepository: stationRepository,
-            reportRepository: reportRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FavoriteListScreen(
+          title: '즐겨찾기한 시설',
+          child: FavoriteFacilityListContent(repository: repository),
         ),
-      );
-    }
-    if (favoriteFacilityRepository != null) {
-      sections.add(
-        _FavoriteSection(
-          tab: const Tab(key: Key('favoriteFacilitiesTabButton'), text: '시설'),
-          content: FavoriteFacilityListContent(
-            repository: favoriteFacilityRepository,
-          ),
-        ),
-      );
-    }
-    return sections;
+      ),
+    );
   }
 }
 
-class _FavoriteSection {
-  const _FavoriteSection({required this.tab, required this.content});
+class _FavoriteHomeData {
+  const _FavoriteHomeData({
+    this.stations = const [],
+    this.facilities = const [],
+    this.routes = const [],
+  });
 
-  final Tab tab;
-  final Widget content;
+  final List<FavoriteStation> stations;
+  final List<FavoriteFacility> facilities;
+  final List<FavoriteRoute> routes;
+
+  bool get isEmpty => stations.isEmpty && facilities.isEmpty && routes.isEmpty;
+}
+
+class _FavoriteHomeQuickGrid extends StatelessWidget {
+  const _FavoriteHomeQuickGrid({
+    required this.stationCount,
+    required this.facilityCount,
+    required this.routeCount,
+    required this.onStations,
+    required this.onFacilities,
+    required this.onRoutes,
+  });
+
+  final int stationCount;
+  final int facilityCount;
+  final int routeCount;
+  final VoidCallback? onStations;
+  final VoidCallback? onFacilities;
+  final VoidCallback? onRoutes;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.45,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _FavoriteHomeQuickCard(
+          key: const Key('favoriteHomeStationsButton'),
+          icon: Icons.train_outlined,
+          label: '역 ${_countLabel(stationCount)}',
+          onTap: onStations,
+        ),
+        _FavoriteHomeQuickCard(
+          key: const Key('favoriteHomeFacilitiesButton'),
+          icon: Icons.elevator_outlined,
+          label: '시설 ${_countLabel(facilityCount)}',
+          onTap: onFacilities,
+        ),
+        _FavoriteHomeQuickCard(
+          key: const Key('favoriteHomeRoutesButton'),
+          icon: Icons.route_outlined,
+          label: '경로 ${_countLabel(routeCount)}',
+          onTap: onRoutes,
+        ),
+      ],
+    );
+  }
+}
+
+class _FavoriteHomeQuickCard extends StatelessWidget {
+  const _FavoriteHomeQuickCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: _PrototypeCard(
+            backgroundColor: Colors.white,
+            borderRadius: 18,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: EasySubwayAccessibleColors.mintSoft,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Icon(
+                      icon,
+                      color: EasySubwayAccessibleColors.mintDark,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _countLabel(int count) => '$count개';
+
+class _FavoriteListScreen extends StatelessWidget {
+  const _FavoriteListScreen({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: SafeArea(child: child),
+    );
+  }
+}
+
+class OfflineDataScreen extends StatelessWidget {
+  const OfflineDataScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('인터넷 없이 이용')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: const [
+            _PrototypeCard(
+              backgroundColor: EasySubwayAccessibleColors.mintSoft,
+              borderColor: EasySubwayAccessibleColors.mintBorder,
+              child: _PrototypeInfoRow(
+                icon: Icons.check_circle_outline,
+                iconBackground: Colors.white,
+                iconColor: EasySubwayAccessibleColors.mintDark,
+                title: '인터넷 없이도 이용할 수 있어요',
+                subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
+              ),
+            ),
+            _HomePrototypeSection(title: '이용 가능'),
+            _PrototypeCard(
+              child: Column(
+                children: [
+                  _PrototypeInfoRow(
+                    icon: Icons.map_outlined,
+                    iconBackground: EasySubwayAccessibleColors.mintSoft,
+                    iconColor: EasySubwayAccessibleColors.mintDark,
+                    title: '노선도',
+                    subtitle: '지역·노선·역 보기',
+                    trailing: '가능',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.train_outlined,
+                    iconBackground: EasySubwayAccessibleColors.mintSoft,
+                    iconColor: EasySubwayAccessibleColors.mintDark,
+                    title: '역·시설 정보',
+                    subtitle: '출구와 엘리베이터 보기',
+                    trailing: '가능',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.bookmark_border,
+                    iconBackground: EasySubwayAccessibleColors.mintSoft,
+                    iconColor: EasySubwayAccessibleColors.mintDark,
+                    title: '즐겨찾기한 항목',
+                    subtitle: '역·시설·경로 보기',
+                    trailing: '가능',
+                  ),
+                ],
+              ),
+            ),
+            _HomePrototypeSection(title: '인터넷 연결 필요'),
+            _PrototypeCard(
+              child: Column(
+                children: [
+                  _PrototypeInfoRow(
+                    icon: Icons.report_outlined,
+                    iconBackground: EasySubwayAccessibleColors.amberSoft,
+                    iconColor: EasySubwayAccessibleColors.amber,
+                    title: '시설 제보',
+                    subtitle: '사진과 제보 보내기',
+                    trailing: '연결 필요',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.refresh,
+                    iconBackground: EasySubwayAccessibleColors.amberSoft,
+                    iconColor: EasySubwayAccessibleColors.amber,
+                    title: '시설 상태 새로 확인',
+                    subtitle: '최신 고장·복구 확인',
+                    trailing: '연결 필요',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class SupportAccessScreen extends StatelessWidget {
@@ -2503,12 +3108,12 @@ class SupportAccessScreen extends StatelessWidget {
   final SupportAccessInfo accessInfo;
   final SupportAccessLauncher launcher;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final Future<void> Function()? onUserDataDeleted;
+  final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('도움말')),
+      appBar: AppBar(title: const Text('도움말·문의')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -2577,7 +3182,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
   });
 
   final UserDataDeletionRepository repository;
-  final Future<void> Function()? onDeleted;
+  final Future<void> Function(UserDataDeletionResult result)? onDeleted;
 
   @override
   Widget build(BuildContext context) {
@@ -2664,7 +3269,7 @@ class UserDataDeletionScreen extends StatefulWidget {
   });
 
   final UserDataDeletionRepository repository;
-  final Future<void> Function()? onDeleted;
+  final Future<void> Function(UserDataDeletionResult result)? onDeleted;
 
   @override
   State<UserDataDeletionScreen> createState() => _UserDataDeletionScreenState();
@@ -2769,8 +3374,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       _isDeleting = true;
     });
     try {
-      await widget.repository.deleteCurrentUserData();
-      await widget.onDeleted?.call();
+      final result = await widget.repository.deleteCurrentUserData();
+      await widget.onDeleted?.call(result);
       if (!mounted) {
         return;
       }
@@ -2830,6 +3435,144 @@ class _DataDeletionNoticeLine extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class UserDataDeletionResultScreen extends StatelessWidget {
+  const UserDataDeletionResultScreen({
+    required this.result,
+    required this.onRestart,
+    super.key,
+  });
+
+  final UserDataDeletionResult result;
+  final VoidCallback onRestart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('삭제 완료'),
+        automaticallyImplyLeading: false,
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: FilledButton.icon(
+          key: const Key('dataDeletionResultStartButton'),
+          onPressed: onRestart,
+          icon: const Icon(Icons.restart_alt),
+          label: const Text('처음부터 시작'),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            _PrototypeCard(
+              backgroundColor: EasySubwayAccessibleColors.mintSoft,
+              borderColor: EasySubwayAccessibleColors.mintBorder,
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: EasySubwayAccessibleColors.mintDark,
+                    size: 56,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '내 데이터가 삭제됐어요',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '앱이 처음 사용하는 상태로 돌아갑니다.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const _HomePrototypeSection(title: '처리 결과'),
+            _PrototypeCard(
+              child: Column(
+                children: [
+                  _DataDeletionResultRow(
+                    icon: Icons.train_outlined,
+                    title: '즐겨찾기한 역',
+                    value: '${result.deletedFavoriteStationCount}개 삭제',
+                  ),
+                  _DataDeletionResultRow(
+                    icon: Icons.elevator_outlined,
+                    title: '즐겨찾기한 시설',
+                    value: '${result.deletedFavoriteFacilityCount}개 삭제',
+                  ),
+                  _DataDeletionResultRow(
+                    icon: Icons.route_outlined,
+                    title: '즐겨찾기한 경로',
+                    value: '${result.deletedFavoriteRouteCount}개 삭제',
+                  ),
+                  _DataDeletionResultRow(
+                    icon: Icons.notifications_none,
+                    title: '알림 설정',
+                    value: result.notificationSettingsDeleted
+                        ? '삭제'
+                        : '삭제할 항목 없음',
+                  ),
+                  _DataDeletionResultRow(
+                    icon: Icons.report_outlined,
+                    title: '제보 연결 정보',
+                    value: '${result.anonymizedReportCount}건 익명화',
+                  ),
+                  _DataDeletionResultRow(
+                    icon: Icons.rate_review_outlined,
+                    title: '경로 의견 연결 정보',
+                    value: '${result.anonymizedRouteFeedbackCount}건 익명화',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const _PrototypeCard(
+              backgroundColor: EasySubwayAccessibleColors.skySoft,
+              borderColor: Color(0xFFB7DDF4),
+              child: _PrototypeInfoRow(
+                icon: Icons.map_outlined,
+                iconBackground: Colors.white,
+                iconColor: EasySubwayAccessibleColors.brand,
+                title: '노선도와 역 정보는 계속 이용할 수 있어요',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DataDeletionResultRow extends StatelessWidget {
+  const _DataDeletionResultRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PrototypeInfoRow(
+      icon: icon,
+      iconBackground: EasySubwayAccessibleColors.mintSoft,
+      iconColor: EasySubwayAccessibleColors.mintDark,
+      title: title,
+      subtitle: value,
+      trailing: '완료',
     );
   }
 }

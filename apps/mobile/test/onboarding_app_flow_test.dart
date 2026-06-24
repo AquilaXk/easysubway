@@ -29,7 +29,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.'), findsOneWidget);
+    expect(
+      find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.text('이동약자를 위한 지하철 안내'), findsNothing);
     expect(find.text('계단과 고장 시설을 미리 확인하고'), findsNothing);
     expect(find.text('로그인 없이도 이용할 수 있어요'), findsNothing);
