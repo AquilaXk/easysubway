@@ -2301,15 +2301,23 @@ class _StationSearchBody extends StatelessWidget {
             child: const SizedBox(width: 1, height: 1),
           ),
           if (state.source == StationSearchResultSource.nearby) ...[
-            _NearbyStationOverview(result: state.results.first),
-            const SizedBox(height: 18),
-            const _StationDetailSectionTitle(title: '주변 역 목록'),
-            const SizedBox(height: 12),
+            _NearbyStationOverview(
+              result: state.results.first,
+              onTap: () => onResultTap(state.results.first),
+            ),
+            if (state.results.length > 1) ...[
+              const SizedBox(height: 18),
+              const _StationDetailSectionTitle(title: '다른 주변 역'),
+              const SizedBox(height: 12),
+            ],
           ] else ...[
             const _StationDetailSectionTitle(title: '검색 결과'),
             const SizedBox(height: 12),
           ],
-          for (final result in state.results)
+          for (final result
+              in state.source == StationSearchResultSource.nearby
+                  ? state.results.skip(1)
+                  : state.results)
             _StationSearchResultTile(
               result: result,
               onTap: () => onResultTap(result),
@@ -2327,120 +2335,89 @@ class _StationSearchBody extends StatelessWidget {
 }
 
 class _NearbyStationOverview extends StatelessWidget {
-  const _NearbyStationOverview({required this.result});
+  const _NearbyStationOverview({required this.result, required this.onTap});
 
   final StationSearchResult result;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final stationName = _stationResultDisplayName(result.nameKo);
     return Semantics(
       container: true,
+      button: true,
       label: '가장 가까운 역, $stationName, ${result.distanceLabel}',
+      onTap: onTap,
       child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'map', label: Text('지도')),
-                ButtonSegment(value: 'list', label: Text('목록')),
-              ],
-              selected: const {'map'},
-              onSelectionChanged: (_) {},
-            ),
-            const SizedBox(height: 12),
-            Card(
-              margin: EdgeInsets.zero,
-              color: const Color(0xFFEAF3F5),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: EasySubwayAccessibleColors.line),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: EasySubwayAccessibleColors.skySoft,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: EasySubwayAccessibleColors.line),
+          ),
+          child: InkWell(
+            key: const Key('nearbyStationPrimaryCard'),
+            borderRadius: BorderRadius.circular(18),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const CircleAvatar(
-                          radius: 9,
-                          backgroundColor: EasySubwayAccessibleColors.red,
-                        ),
-                        const SizedBox(width: 8),
                         Text(
-                          '지도와 목록으로 주변 역을 확인합니다',
+                          '가장 가까운 역',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: EasySubwayAccessibleColors.mutedText,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
+                                height: 1.25,
                               ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          stationName,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.text,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          result.distanceLabel.isEmpty
+                              ? result.lineLabel
+                              : '${result.distanceLabel} · ${result.lineLabel}',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w700,
+                                height: 1.3,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        _StationDetailTextPill(
+                          text:
+                              '${result.dataQualityLabel} · ${result.dataSourceLabel}',
                         ),
                       ],
                     ),
-                    const SizedBox(height: 34),
-                    Card(
-                      margin: EdgeInsets.zero,
-                      color: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(
-                          color: EasySubwayAccessibleColors.line,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '가장 가까운 역',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          color:
-                                              EasySubwayAccessibleColors.text,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    result.distanceLabel.isEmpty
-                                        ? '가까운 역 후보'
-                                        : '가까운 역 후보 · ${result.distanceLabel}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: EasySubwayAccessibleColors
-                                              .mutedText,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            StationLineBadges(
-                              lines: result.lines,
-                              size: 34,
-                              maxBadgeCount: 1,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  StationLineBadges(
+                    lines: result.lines,
+                    size: 38,
+                    maxBadgeCount: 1,
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -3265,7 +3242,7 @@ class _StationDetailContent extends StatelessWidget {
           const SizedBox(height: 24),
         ],
         if (internalRouteState != null) ...[
-          const _StationDetailSectionTitle(title: '내부 이동 안내'),
+          const _StationDetailSectionTitle(title: '역 안 이동 순서'),
           const SizedBox(height: 12),
           _StationInternalRouteGuidance(state: internalRouteState!),
           const SizedBox(height: 24),
@@ -3287,21 +3264,13 @@ class _StationDetailContent extends StatelessWidget {
         const SizedBox(height: 12),
         if (facilities.isEmpty)
           const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
-        else ...[
-          if (facilityAttentionSummary.isNotEmpty) ...[
-            _StationFacilityStatusSummary(
-              text: facilityAttentionSummary,
-              semanticLabel: facilityAttentionSemanticLabel,
-            ),
-            const SizedBox(height: 12),
-          ],
+        else
           for (final facility in facilities)
             _StationFacilityCard(
               facility: facility,
               station: detail,
               onReportTap: () => _openFacilityReport(context, facility),
             ),
-        ],
       ],
     );
   }
@@ -3864,11 +3833,11 @@ class _StationInternalRouteGuidance extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (state.status) {
       InternalRouteViewStatus.loading => Semantics(
-        label: '내부 이동 안내 불러오는 중',
+        label: '역 안 이동 순서 불러오는 중',
         liveRegion: true,
         child: const _StationDetailInfoRow(
           icon: Icons.sync,
-          text: '내부 이동 안내를 불러오는 중입니다.',
+          text: '역 안 이동 순서를 불러오는 중입니다.',
         ),
       ),
       InternalRouteViewStatus.failure => Semantics(
@@ -4449,12 +4418,12 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   final from = facility.floorFrom.trim();
   final to = facility.floorTo.trim();
   if (from.isEmpty && to.isEmpty) {
-    return '연결 층 확인 필요';
+    return '연결 위치 확인 필요';
   }
   if (from.isEmpty || to.isEmpty) {
-    return '연결 층 ${from.isEmpty ? to : from}';
+    return '연결 위치 ${from.isEmpty ? to : from}';
   }
-  return '연결 층 $from ↔ $to';
+  return '연결 위치 $from ↔ $to';
 }
 
 String _facilityStatusTitle(StationFacilityInfo facility) {

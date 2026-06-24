@@ -2876,10 +2876,9 @@ void main() {
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
+      expect(find.byKey(const Key('nearbyStationPrimaryCard')), findsOneWidget);
       expect(
-        find.bySemanticsLabel(
-          '상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일',
-        ),
+        find.bySemanticsLabel('가장 가까운 역, 상록수역, 현재 위치 기준 230m'),
         findsOneWidget,
       );
 
@@ -3329,8 +3328,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
-      expect(find.text('확인 필요 1개'), findsOneWidget);
-      expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsOneWidget);
+      expect(find.text('확인 필요 1개'), findsNothing);
+      expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsNothing);
       expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('엘리베이터'), findsWidgets);
       expect(find.text('고장'), findsOneWidget);
@@ -3439,7 +3438,7 @@ void main() {
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('현재 이용이 어려울 수 있어요'), findsOneWidget);
     expect(find.text('고장'), findsOneWidget);
-    expect(find.text('연결 층 B1 ↔ 1F'), findsOneWidget);
+    expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
     expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
     expect(find.text('정보 신뢰도 높음 · 출처 공식 파일'), findsOneWidget);
@@ -3614,7 +3613,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.requests, hasLength(1));
-    expect(find.text('내부 이동 안내'), findsOneWidget);
+    expect(find.text('역 안 이동 순서'), findsOneWidget);
     expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
@@ -3673,7 +3672,7 @@ void main() {
       'node-sangnoksu-faregate',
     );
     expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
-    expect(find.text('내부 이동 안내'), findsOneWidget);
+    expect(find.text('역 안 이동 순서'), findsOneWidget);
     expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
   });
 
