@@ -1172,8 +1172,11 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '확인 필요 3개');
-    expect(state.facilityAttentionSemanticLabel, '확인이 필요한 시설 3개');
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 점검·제보 1개 · 정보 확인 필요 1개');
+    expect(
+      state.facilityAttentionSemanticLabel,
+      '확인이 필요한 시설, 고장·폐쇄 1개, 점검·제보 1개, 정보 확인 필요 1개',
+    );
   });
 
   test('역 상세 상태는 쉬운 이동 구조 요약을 만든다', () {
@@ -1298,13 +1301,16 @@ void main() {
 
     expect(ramp.typeLabel, '경사로');
     expect(ramp.statusLabel, '공사 중');
+    expect(ramp.severityLabel, '점검·제보');
+    expect(ramp.nextActionLabel, '역무원 도움 요청');
     expect(ramp.confidenceLabel, '정보 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 공사 중, 1F-B1, 최근 확인 2026-06-13, 현장 검증 전, 정보 확인 필요, 출처 확인 필요',
+      '1번 출구 경사로, 경사로, 공사 중, 점검·제보, 1F-B1, 최근 확인 2026-06-13, 현장 검증 전, 정보 확인 필요, 출처 확인 필요, 다음 행동 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
+    expect(customerCenter.severityLabel, '정상');
     expect(customerCenter.fieldValidationLabel, '현장 검증됨');
     expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
     expect(customerCenter.semanticLabel, contains('현장 검증됨'));

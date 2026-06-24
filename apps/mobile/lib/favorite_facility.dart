@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
+import 'facility_status.dart';
 import 'mobile_error_reporter.dart';
 
 const _favoriteFacilityTimeout = Duration(seconds: 8);
@@ -262,6 +263,21 @@ class FavoriteFacility {
     };
   }
 
+  FacilityStatusPresentation get statusPresentation =>
+      facilityStatusPresentation(status);
+
+  String get severityLabel => statusPresentation.severityLabel;
+
+  String get statusTitle => statusPresentation.statusTitle;
+
+  String get nextActionLabel => statusPresentation.nextActionLabel;
+
+  String get nextActionDescription => statusPresentation.nextActionDescription;
+
+  bool get needsAttention => statusPresentation.needsAttention;
+
+  int get statusPriority => statusPresentation.priority;
+
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
@@ -276,8 +292,14 @@ class FavoriteFacility {
     return '위치 확인 필요';
   }
 
+  String get updatedLabel => '최근 확인 $lastUpdatedAt';
+
   String get semanticLabel {
-    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusLabel, $locationLabel, $confidenceLabel, $dataSourceLabel';
+    final statusSemanticLabel = facilityStatusSemanticLabel(
+      statusLabel: statusLabel,
+      severityLabel: severityLabel,
+    );
+    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
   }
 }
 
@@ -541,7 +563,24 @@ class _FavoriteFacilityTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
+                    '${favorite.severityLabel} · 다음 행동 ${favorite.nextActionLabel}',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
                     favorite.locationLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    favorite.updatedLabel,
                     style: textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF405A5D),
                       height: 1.3,
