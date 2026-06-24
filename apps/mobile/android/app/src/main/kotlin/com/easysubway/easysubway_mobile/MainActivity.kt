@@ -14,6 +14,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
@@ -48,6 +49,10 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "com.easysubway.easysubway_mobile/original_route_map_asset",
+            OriginalRouteMapAssetViewFactory(StandardMessageCodec.INSTANCE),
+        )
     }
 
     private fun openLocationSettings(result: MethodChannel.Result) {

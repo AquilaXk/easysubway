@@ -1,15 +1,21 @@
 seoul_page=https://www.seoulmetro.co.kr/kr/cyberStation.do
 seoul_pdf=https://www.seoulmetro.co.kr/download/map_korea.pdf
+seoul_wikimedia_page=https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg
+seoul_wikimedia_svg=https://upload.wikimedia.org/wikipedia/commons/8/85/Seoul_subway_linemap_ko.svg
+seoul_wikimedia_license=Public domain
+seoul_wikimedia_author=IRTC1015
 busan_page=https://www2.humetro.busan.kr/homepage/cyberstation/map.do
 busan_integrated_zip=https://www2.humetro.busan.kr/upload/default/integrate.zip
-busan_image=https://www2.humetro.busan.kr/upload/cyber-station/routemap_kor_2020.jpg
+busan_svg=qa-provided-route-map-svg
 gwangju_page=https://www.grtc.co.kr/cyber/simple
 gwangju_cc_by_sa_svg=user-provided-route-map-svg
+gwangju_license=https://creativecommons.org/licenses/by-sa/2.0/kr/
+gwangju_source_page=https://namu.wiki/w/%ED%8C%8C%EC%9D%BC:%EA%B4%91%EC%A3%BC%20%EB%8F%84%EC%8B%9C%EC%B2%A0%EB%8F%84%201%ED%98%B8%EC%84%A0%20%EB%85%B8%EC%84%A0%EB%8F%84.svg
 daegu_page=https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do
 daegu_route_map_page=https://www.dtro.or.kr/cmsh/dtro.or.kr/html/nosundo.html
 daegu_route_map_zip=https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip
-daegu_route_map_image=https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.png
+daegu_svg=qa-provided-route-map-svg
 daejeon_page=https://www.djtc.kr/kor/cyberStation.do?menuIdx=28
 daejeon_route_map_page=https://www.djtc.kr/kor/page.do?menuIdx=39
 daejeon_route_map_zip=https://www.djtc.kr/kor/resources/routemap/korean.zip
-daejeon_image=https://www.djtc.kr/kor/resources/images/content/routemap.jpg
+daejeon_svg=qa-provided-route-map-svg

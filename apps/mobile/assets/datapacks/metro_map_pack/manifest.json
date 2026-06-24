@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "pack_id": "kr-official-metro-map-pack",
-  "pack_version": "2026.06.23",
-  "generated_at_utc": "2026-06-23T15:01:20+00:00",
+  "pack_version": "2026.06.24",
+  "generated_at_utc": "2026-06-24T06:37:00+00:00",
   "default_display_mode": "offline",
   "requirements": {
     "live_mode_requires_network": false,
@@ -14,77 +14,90 @@
       "id": "seoul",
       "name_ko": "수도권",
       "app_region": "수도권",
-      "operator": "서울교통공사",
-      "source_url": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+      "operator": "Wikimedia Commons",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
       "offline": {
         "included": true,
-        "type": "image",
-        "path": "assets/datapacks/maps/seoul-official-cyberstation-map.png",
-        "width": 1525,
-        "height": 1000,
-        "mime_type": "image/png"
+        "type": "svg",
+        "path": "assets/datapacks/maps/seoul-official-route-map.svg",
+        "official_asset_url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Seoul_subway_linemap_ko.svg",
+        "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "Public domain",
+        "spdx": "Public-Domain",
+        "url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
+        "source": "Seoul subway linemap ko.svg",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
+        "date": "2007-12-26",
+        "authors": ["IRTC1015"],
+        "changes": "File stored unchanged as a bundled offline route-map asset. Station coordinate data was regenerated from embedded SVG text positions for app hit testing."
       }
     },
     {
       "id": "busan",
       "name_ko": "부산",
-      "app_region": "부산권",
+      "app_region": "부산",
       "operator": "부산교통공사",
       "source_url": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
       "offline": {
         "included": true,
-        "type": "image",
-        "path": "assets/datapacks/maps/busan-official-route-map.jpg",
-        "official_asset_url": "https://www2.humetro.busan.kr/upload/cyber-station/routemap_kor_2020.jpg",
-        "width": 1302,
-        "height": 817,
-        "mime_type": "image/jpeg"
+        "type": "svg",
+        "path": "assets/datapacks/maps/busan-official-route-map.svg",
+        "official_asset_url": "https://www2.humetro.busan.kr/upload/default/integrate.zip",
+        "mime_type": "image/svg+xml"
       }
     },
     {
       "id": "gwangju",
       "name_ko": "광주",
-      "app_region": "광주권",
+      "app_region": "광주",
       "operator": "광주교통공사",
       "source_url": "https://www.grtc.co.kr/cyber/simple",
       "offline": {
         "included": true,
-        "type": "image",
-        "path": "assets/datapacks/maps/gwangju-official-cyberstation-map.png",
-        "width": 2172,
-        "height": 554,
-        "mime_type": "image/png"
+        "type": "svg",
+        "path": "assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg",
+        "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "Creative Commons Attribution-ShareAlike 2.0 Korea",
+        "spdx": "CC-BY-SA-2.0-KR",
+        "url": "https://creativecommons.org/licenses/by-sa/2.0/kr/",
+        "source": "파일:광주 도시철도 1호선 노선도.svg",
+        "source_page": "https://namu.wiki/w/%ED%8C%8C%EC%9D%BC:%EA%B4%91%EC%A3%BC%20%EB%8F%84%EC%8B%9C%EC%B2%A0%EB%8F%84%201%ED%98%B8%EC%84%A0%20%EB%85%B8%EC%84%A0%EB%8F%84.svg",
+        "based_on": "파일:서울 지하철 7호선 노선도(2021_05).svg",
+        "date": "210712",
+        "authors": ["kiwitree", "grafiker"],
+        "changes": "File stored unchanged as a bundled offline route-map asset."
       }
     },
     {
       "id": "daegu",
       "name_ko": "대구",
-      "app_region": "대구권",
+      "app_region": "대구",
       "operator": "대구교통공사",
       "source_url": "https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do",
       "offline": {
         "included": true,
-        "type": "image",
-        "path": "assets/datapacks/maps/daegu-official-route-map.png",
-        "width": 1264,
-        "height": 1205,
-        "mime_type": "image/png"
+        "type": "svg",
+        "path": "assets/datapacks/maps/daegu-official-route-map.svg",
+        "official_asset_url": "https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip",
+        "mime_type": "image/svg+xml"
       }
     },
     {
       "id": "daejeon",
       "name_ko": "대전",
-      "app_region": "대전권",
+      "app_region": "대전",
       "operator": "대전교통공사",
       "source_url": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
       "offline": {
         "included": true,
-        "type": "image",
-        "path": "assets/datapacks/maps/daejeon-official-cyberstation-map.jpg",
-        "official_asset_url": "https://www.djtc.kr/kor/resources/images/content/routemap.jpg",
-        "width": 975,
-        "height": 447,
-        "mime_type": "image/jpeg"
+        "type": "svg",
+        "path": "assets/datapacks/maps/daejeon-official-route-map.svg",
+        "official_asset_url": "https://www.djtc.kr/kor/resources/routemap/korean.zip",
+        "mime_type": "image/svg+xml"
       }
     }
   ]
