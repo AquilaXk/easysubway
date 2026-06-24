@@ -4391,6 +4391,8 @@ class _FavoriteRouteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final menuButtonKey =
+        GlobalKey<PopupMenuButtonState<_FavoriteRouteMenuAction>>();
     final moreSemanticLabel =
         '${favorite.summaryTitle} 더 보기${isRemoving ? ', 삭제 중' : ''}';
 
@@ -4417,13 +4419,17 @@ class _FavoriteRouteTile extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             Semantics(
+              key: Key('favoriteRouteMore-${favorite.favoriteRouteId}'),
               container: true,
               label: moreSemanticLabel,
               button: true,
               enabled: !isRemoving,
+              onTap: isRemoving
+                  ? null
+                  : () => menuButtonKey.currentState?.showButtonMenu(),
               child: ExcludeSemantics(
                 child: PopupMenuButton<_FavoriteRouteMenuAction>(
-                  key: Key('favoriteRouteMore-${favorite.favoriteRouteId}'),
+                  key: menuButtonKey,
                   enabled: !isRemoving,
                   tooltip: '경로 더 보기',
                   onSelected: (action) {
