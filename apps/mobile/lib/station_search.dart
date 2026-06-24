@@ -1673,8 +1673,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   Widget build(BuildContext context) {
     final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
-    final showSearchControls =
+    final showSearchInput =
         (!isRecentEntry && !isNearbyEntry) || _hasSearchQuery;
+    final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (widget.entryMode) {
@@ -1695,7 +1696,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            if (showSearchControls) ...[
+            if (showSearchInput) ...[
               TextField(
                 key: const Key('stationSearchInput'),
                 controller: _queryController,
@@ -1739,7 +1740,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            if (showSearchControls && _lineOptionsFuture != null) ...[
+            if (showSearchInput && _lineOptionsFuture != null) ...[
               AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
@@ -1775,7 +1776,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 );
               },
             ),
-            if (showSearchControls) ...[
+            if (showSearchInput || showNearbyRetryButton) ...[
               AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
@@ -1783,6 +1784,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                       _controller.state.status == StationSearchStatus.loading;
                   final isNearbyDisabled =
                       isSearching || _isNearbySearchRunning;
+                  if (showNearbyRetryButton) {
+                    return OutlinedButton.icon(
+                      key: const Key('nearbyStationSearchButton'),
+                      onPressed: isNearbyDisabled ? null : _searchNearby,
+                      icon: const Icon(Icons.my_location),
+                      label: const Text('내 주변 역 다시 찾기'),
+                    );
+                  }
                   if (_hasSearchQuery) {
                     return FilledButton.icon(
                       key: const Key('stationSearchSubmitButton'),
