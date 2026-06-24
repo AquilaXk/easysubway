@@ -1294,6 +1294,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final homeListBottomPadding =
+        96.0 + MediaQuery.viewPaddingOf(context).bottom;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
@@ -1314,7 +1317,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             key: const Key('homePrototypeList'),
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+            padding: EdgeInsets.fromLTRB(17, 18, 17, homeListBottomPadding),
             children: [
               _HomePrototypeHero(
                 profile: currentProfile,
