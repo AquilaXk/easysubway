@@ -9,7 +9,6 @@ import 'secure_key_value_storage.dart';
 import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
-const _onboardingNotificationFailureNextAction = '나중에 알림 설정에서 다시 켤 수 있습니다.';
 
 abstract class OnboardingResultStore {
   Future<OnboardingResult?> readResult();
@@ -177,6 +176,538 @@ class OnboardingState {
   bool get isCompleted => result != null;
 }
 
+class StartScreen extends StatelessWidget {
+  const StartScreen({required this.onStart, super.key});
+
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0D8A6D), Color(0xFF17527C)],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final topGap = (constraints.maxHeight * 0.34).clamp(84.0, 212.0);
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 48, 24, 35),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: topGap),
+                          Semantics(
+                            header: true,
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(text: '빠른 길보다,\n'),
+                                  TextSpan(
+                                    text: '갈 수 있는 길',
+                                    style: TextStyle(color: Color(0xFFB8F4DF)),
+                                  ),
+                                  TextSpan(text: '을\n먼저 안내해요.'),
+                                ],
+                              ),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 44,
+                                fontWeight: FontWeight.w900,
+                                height: 1.12,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              key: const Key('startScreenStartButton'),
+                              onPressed: onStart,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF0B3B42),
+                                minimumSize: const Size.fromHeight(60),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('쉬운 지하철 시작하기'),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.arrow_forward),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class OnboardingIntroScreen extends StatelessWidget {
+  const OnboardingIntroScreen({
+    required this.onConfigure,
+    required this.onSkip,
+    super.key,
+  });
+
+  final VoidCallback onConfigure;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('쉬운 지하철')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            const _IntroVisual(),
+            const SizedBox(height: 25),
+            Semantics(
+              header: true,
+              child: Text(
+                '계단 없는 길을\n먼저 찾습니다',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const _IntroInfoCard(),
+            const SizedBox(height: 20),
+            FilledButton(
+              key: const Key('onboardingIntroConfigureButton'),
+              onPressed: onConfigure,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('이동 조건 설정'),
+            ),
+            const SizedBox(height: 9),
+            OutlinedButton(
+              key: const Key('onboardingIntroSkipButton'),
+              onPressed: onSkip,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('바로 시작'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroVisual extends StatelessWidget {
+  const _IntroVisual();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 230,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE4F7F0), Color(0xFFEAF5FF)],
+          ),
+          border: Border.all(color: const Color(0xFFC8D3DC)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Stack(
+          children: [
+            Positioned(
+              left: 28,
+              top: 38,
+              child: _IntroIcon(
+                icon: Icons.accessible_forward,
+                color: Color(0xFF0A705A),
+              ),
+            ),
+            Positioned(
+              right: 30,
+              top: 80,
+              child: _IntroIcon(
+                icon: Icons.elevator_outlined,
+                color: Color(0xFF17527C),
+              ),
+            ),
+            Positioned(
+              left: 117,
+              bottom: 26,
+              child: _IntroIcon(
+                icon: Icons.route,
+                color: Colors.white,
+                backgroundColor: Color(0xFF071B2F),
+                size: 94,
+                iconSize: 44,
+                radius: 29,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroIcon extends StatelessWidget {
+  const _IntroIcon({
+    required this.icon,
+    required this.color,
+    this.backgroundColor = Colors.white,
+    this.size = 86,
+    this.iconSize = 43,
+    this.radius = 27,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color backgroundColor;
+  final double size;
+  final double iconSize;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x16071B2F),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Icon(icon, color: color, size: iconSize),
+      ),
+    );
+  }
+}
+
+class _IntroInfoCard extends StatelessWidget {
+  const _IntroInfoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _IntroCard(
+      child: Column(
+        children: [
+          _IntroInfoRow(
+            icon: Icons.elevator_outlined,
+            title: '엘리베이터 확인',
+            subtitle: '고장 시설을 피해 안내',
+          ),
+          _IntroDivider(),
+          _IntroInfoRow(
+            icon: Icons.route_outlined,
+            title: '걷기와 환승 줄이기',
+            subtitle: '내 이동 조건에 맞춰 안내',
+          ),
+          _IntroDivider(),
+          _IntroInfoRow(
+            icon: Icons.map_outlined,
+            title: '인터넷 없이 이용',
+            subtitle: '노선도와 역 정보 확인',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntroCard extends StatelessWidget {
+  const _IntroCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFD5E2E4)),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
+class _IntroInfoRow extends StatelessWidget {
+  const _IntroInfoRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFDFF7EF),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: SizedBox(
+            width: 43,
+            height: 43,
+            child: Icon(icon, color: const Color(0xFF0A705A), size: 22),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF647686),
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntroDivider extends StatelessWidget {
+  const _IntroDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 13),
+      child: Divider(height: 1, color: Color(0xFFE0E7EC)),
+    );
+  }
+}
+
+class _OnboardingStepIndicator extends StatelessWidget {
+  const _OnboardingStepIndicator({
+    required this.currentStep,
+    required this.totalSteps,
+  });
+
+  final int currentStep;
+  final int totalSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            for (var step = 1; step <= totalSteps; step++) ...[
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: step <= currentStep
+                        ? const Color(0xFF0D8A6D)
+                        : const Color(0xFFDBE3E9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const SizedBox(height: 5),
+                ),
+              ),
+              if (step != totalSteps) const SizedBox(width: 4),
+            ],
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '$currentStep / $totalSteps',
+          textAlign: TextAlign.right,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF647686),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PermissionInfoCard extends StatelessWidget {
+  const _PermissionInfoCard({
+    required this.locationSelected,
+    required this.notificationSelected,
+    required this.onLocationChanged,
+    required this.onNotificationChanged,
+  });
+
+  final bool locationSelected;
+  final bool notificationSelected;
+  final ValueChanged<bool> onLocationChanged;
+  final ValueChanged<bool> onNotificationChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _IntroCard(
+      child: Column(
+        children: [
+          _PermissionInfoRow(
+            icon: Icons.location_on_outlined,
+            title: '현재 위치',
+            subtitle: '가까운 역 찾기',
+            mint: true,
+            value: locationSelected,
+            onChanged: onLocationChanged,
+          ),
+          const _IntroDivider(),
+          _PermissionInfoRow(
+            icon: Icons.notifications_none,
+            title: '알림',
+            subtitle: '시설 고장·복구 알림',
+            value: notificationSelected,
+            onChanged: onNotificationChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionInfoRow extends StatelessWidget {
+  const _PermissionInfoRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.mint = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool mint;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = mint ? const Color(0xFF0A705A) : const Color(0xFF17527C);
+    final iconBackground = mint
+        ? const Color(0xFFDFF7EF)
+        : const Color(0xFFEEF3F6);
+
+    return Row(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: iconBackground,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: SizedBox(
+            width: 43,
+            height: 43,
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF647686),
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Semantics(
+          label: '$title ${value ? '켜짐' : '꺼짐'}',
+          toggled: value,
+          onTap: () => onChanged(!value),
+          child: ExcludeSemantics(
+            child: Switch(
+              value: value,
+              onChanged: onChanged,
+              activeThumbColor: Colors.white,
+              activeTrackColor: const Color(0xFF0D8A6D),
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: const Color(0xFFC8D3DC),
+              materialTapTargetSize: MaterialTapTargetSize.padded,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     required this.onCompleted,
@@ -197,494 +728,330 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   MobilityProfileOption? _selectedProfile;
   OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
-  String _locationMessage = '';
-  bool _isLocationFailure = false;
-  bool _isCheckingLocation = false;
-  bool _isOpeningLocationSettings = false;
-  String _notificationMessage = '';
-  bool _isNotificationFailure = false;
-  bool _isRequestingNotificationPermission = false;
+  int _currentStep = 0;
+  bool _locationPermissionSelected = true;
+  bool _notificationPermissionSelected = true;
 
   @override
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
+    final profileOptions = [
+      mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
+      mobilityProfileOptions.firstWhere(
+        (profile) => profile.id == 'wheelchair',
+      ),
+      mobilityProfileOptions.firstWhere((profile) => profile.id == 'stroller'),
+      mobilityProfileOptions.firstWhere((profile) => profile.id == 'pregnant'),
+      mobilityProfileOptions.firstWhere((profile) => profile.id == 'injured'),
+      mobilityProfileOptions.firstWhere((profile) => profile.id == 'luggage'),
+    ];
+
+    final onNext = selectedProfile == null
+        ? null
+        : () {
+            if (_currentStep == 0) {
+              setState(() => _currentStep = 1);
+              return;
+            }
+            if (_currentStep == 1) {
+              setState(() => _currentStep = 2);
+              return;
+            }
+            _completeOnboarding();
+          };
 
     return Scaffold(
       appBar: AppBar(title: const Text('쉬운 지하철')),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: FilledButton.icon(
-          key: const Key('onboardingDoneButton'),
-          onPressed: selectedProfile == null
-              ? null
-              : () {
-                  widget.onCompleted(
-                    OnboardingResult(
-                      profile: selectedProfile,
-                      preferences: _preferences,
-                    ),
-                  );
-                },
-          icon: const Icon(Icons.check),
-          label: const Text('시작하기'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      bottomNavigationBar: _currentStep == 2
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: FilledButton(
+                key: const Key('onboardingDoneButton'),
+                onPressed: onNext,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(60),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('다음'),
+              ),
             ),
-          ),
-        ),
-      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          children: [
-            Semantics(
-              header: true,
-              child: Text(
-                '먼저 이동 조건을 골라 주세요',
-                style: textTheme.headlineSmall?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w900,
-                  height: 1.25,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              '이동 조건',
-              style: textTheme.titleLarge?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (final profile in mobilityProfileOptions)
-              _OnboardingProfileCard(
-                profile: profile,
-                selected: profile.id == selectedProfile?.id,
-                onTap: () {
-                  setState(() {
-                    _selectedProfile = profile;
-                  });
-                },
-              ),
-            if (widget.locationProvider != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                '현재 위치',
-                style: textTheme.titleLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _OnboardingLocationSection(
-                message: _locationMessage,
-                isFailure: _isLocationFailure,
-                isChecking: _isCheckingLocation,
-                isOpeningSettings: _isOpeningLocationSettings,
-                isBlocked: _isRequestingNotificationPermission,
-                onPrepareLocation: _prepareLocation,
-                onOpenSettings: _openLocationSettings,
-              ),
-            ],
-            if (widget.notificationPermissionProvider != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                '알림',
-                style: textTheme.titleLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _OnboardingNotificationSection(
-                message: _notificationMessage,
-                isFailure: _isNotificationFailure,
-                isRequesting: _isRequestingNotificationPermission,
-                isBlocked: _isCheckingLocation || _isOpeningLocationSettings,
-                onPrepareNotification: _prepareNotification,
-              ),
-            ],
-            const SizedBox(height: 12),
-            Text(
-              '보기 설정',
-              style: textTheme.titleLarge?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _OnboardingPreferenceSwitch(
-              key: const Key('onboardingPreference-largeText'),
-              title: '큰 글씨',
-              value: _preferences.largeTextEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _preferences = _preferences.copyWith(largeTextEnabled: value);
-                });
-              },
-            ),
-            _OnboardingPreferenceSwitch(
-              key: const Key('onboardingPreference-highContrast'),
-              title: '고대비',
-              value: _preferences.highContrastEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _preferences = _preferences.copyWith(
-                    highContrastEnabled: value,
-                  );
-                });
-              },
-            ),
-            _OnboardingPreferenceSwitch(
-              key: const Key('onboardingPreference-simpleView'),
-              title: '단순 보기',
-              value: _preferences.simpleViewEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _preferences = _preferences.copyWith(
-                    simpleViewEnabled: value,
-                  );
-                });
-              },
-            ),
-          ],
+          children: _currentStep == 0
+              ? [
+                  const _OnboardingStepIndicator(currentStep: 1, totalSteps: 3),
+                  const SizedBox(height: 15),
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      '어떤 도움이 필요한가요?',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  for (final profile in profileOptions)
+                    _OnboardingProfileCard(
+                      profile: profile,
+                      selected: profile.id == selectedProfile?.id,
+                      onTap: () {
+                        setState(() {
+                          _selectedProfile = profile;
+                        });
+                      },
+                    ),
+                ]
+              : _currentStep == 1
+              ? [
+                  const _OnboardingStepIndicator(currentStep: 2, totalSteps: 3),
+                  const SizedBox(height: 15),
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      '원하는 조건을 고르세요',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _OnboardingPreferenceCard(
+                    children: [
+                      _OnboardingConditionRow(
+                        key: const Key('onboardingRoutePreference-avoidStairs'),
+                        title: '계단 피하기',
+                        subtitle: '계단 없는 길',
+                        enabled: selectedProfile?.avoidStairs ?? true,
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingConditionRow(
+                        key: const Key(
+                          'onboardingRoutePreference-requireElevator',
+                        ),
+                        title: '엘리베이터 이용',
+                        subtitle: '엘리베이터 연결',
+                        enabled: selectedProfile?.requireElevator ?? true,
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingConditionRow(
+                        key: const Key(
+                          'onboardingRoutePreference-minimizeTransfers',
+                        ),
+                        title: '환승 줄이기',
+                        subtitle: '갈아타는 횟수 줄이기',
+                        enabled: selectedProfile?.minimizeTransfers ?? true,
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingConditionRow(
+                        key: const Key(
+                          'onboardingRoutePreference-avoidLongWalks',
+                        ),
+                        title: '걷는 거리 줄이기',
+                        subtitle: '오래 걷는 길 피하기',
+                        enabled: selectedProfile?.avoidLongWalks ?? true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    '보기 설정',
+                    style: textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _OnboardingPreferenceCard(
+                    children: [
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-largeText'),
+                        title: '큰 글씨',
+                        subtitle: '글자를 더 크게 표시',
+                        value: _preferences.largeTextEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              largeTextEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-highContrast'),
+                        title: '고대비',
+                        subtitle: '글자와 배경 대비 강화',
+                        value: _preferences.highContrastEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              highContrastEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-simpleView'),
+                        title: '쉬운 보기',
+                        subtitle: '중요한 정보만 먼저 표시',
+                        value: _preferences.simpleViewEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              simpleViewEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ]
+              : [
+                  const _OnboardingStepIndicator(currentStep: 3, totalSteps: 3),
+                  const SizedBox(height: 15),
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      '권한을 선택하세요',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _PermissionInfoCard(
+                    locationSelected: _locationPermissionSelected,
+                    notificationSelected: _notificationPermissionSelected,
+                    onLocationChanged: (value) =>
+                        setState(() => _locationPermissionSelected = value),
+                    onNotificationChanged: (value) =>
+                        setState(() => _notificationPermissionSelected = value),
+                  ),
+                  const SizedBox(height: 22),
+                  OutlinedButton(
+                    key: const Key('onboardingPermissionSkipButton'),
+                    onPressed: _handlePermissionSkip,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(60),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('건너뛰기'),
+                  ),
+                ],
         ),
       ),
     );
   }
 
-  Future<void> _prepareLocation() async {
-    final locationProvider = widget.locationProvider;
-    if (locationProvider == null ||
-        _isCheckingLocation ||
-        _isOpeningLocationSettings ||
-        _isRequestingNotificationPermission) {
+  void _completeOnboarding() {
+    final selectedProfile = _selectedProfile;
+    if (selectedProfile == null) {
       return;
     }
-    setState(() {
-      _isCheckingLocation = true;
-      _locationMessage = '';
-      _isLocationFailure = false;
-    });
-    try {
-      // 온보딩에서는 좌표를 저장하지 않고, 이후 주변 역 찾기에서 바로 쓸 권한과 GPS 상태만 준비한다.
-      await locationProvider.currentLocation();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _locationMessage = '위치 준비 완료';
-        _isLocationFailure = false;
-      });
-    } on CurrentLocationException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _locationMessage = error.message;
-        _isLocationFailure = true;
-      });
-    } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '온보딩 현재 위치 준비 중 예외가 발생했습니다.',
+    widget.onCompleted(
+      OnboardingResult(profile: selectedProfile, preferences: _preferences),
+    );
+  }
+
+  Future<void> _handlePermissionSkip() async {
+    if (!_locationPermissionSelected || !_notificationPermissionSelected) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('수동 설정 방법'),
+          content: const Text(
+            '나중에 휴대폰 설정에서 쉬운 지하철을 선택한 뒤 위치와 알림 권한을 켤 수 있습니다. '
+            '권한을 끄면 가까운 역 찾기와 시설 고장 알림은 제한됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
       );
       if (!mounted) {
         return;
       }
-      setState(() {
-        _locationMessage = '현재 위치를 확인하지 못했습니다.';
-        _isLocationFailure = true;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isCheckingLocation = false);
-      }
     }
-  }
-
-  Future<void> _openLocationSettings() async {
-    final locationProvider = widget.locationProvider;
-    if (locationProvider == null ||
-        _isOpeningLocationSettings ||
-        _isCheckingLocation ||
-        _isRequestingNotificationPermission) {
+    await _prepareSelectedPermissions();
+    if (!mounted) {
       return;
     }
-    setState(() => _isOpeningLocationSettings = true);
-    try {
-      await locationProvider.openLocationSettings();
-    } finally {
-      if (mounted) {
-        setState(() => _isOpeningLocationSettings = false);
-      }
+    _completeOnboarding();
+  }
+
+  Future<void> _prepareSelectedPermissions() async {
+    if (_locationPermissionSelected) {
+      await _prepareLocationPermission();
+    }
+    if (!mounted) {
+      return;
+    }
+    if (_notificationPermissionSelected) {
+      await _prepareNotificationPermission();
     }
   }
 
-  Future<void> _prepareNotification() async {
+  Future<void> _prepareLocationPermission() async {
+    final locationProvider = widget.locationProvider;
+    if (locationProvider == null) {
+      return;
+    }
+    try {
+      await locationProvider.currentLocation();
+    } on CurrentLocationException catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 현재 위치 권한 준비 중 예외가 발생했습니다.',
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 현재 위치 권한 준비 중 알 수 없는 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _prepareNotificationPermission() async {
     final notificationPermissionProvider =
         widget.notificationPermissionProvider;
-    if (notificationPermissionProvider == null ||
-        _isRequestingNotificationPermission ||
-        _isCheckingLocation ||
-        _isOpeningLocationSettings) {
+    if (notificationPermissionProvider == null) {
       return;
     }
-    setState(() {
-      _isRequestingNotificationPermission = true;
-      _notificationMessage = '';
-      _isNotificationFailure = false;
-    });
     try {
-      // 온보딩에서는 토큰을 등록하지 않고, 이후 알림 설정에서 쓸 기기 권한만 준비한다.
-      final status = await notificationPermissionProvider
-          .requestNotificationPermission();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _notificationMessage = status == NotificationPermissionStatus.granted
-            ? '알림 준비 완료'
-            : '설정에서 알림 권한을 켜 주세요.';
-        _isNotificationFailure = status != NotificationPermissionStatus.granted;
-      });
-    } on NotificationSettingsException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _notificationMessage = error.message;
-        _isNotificationFailure = true;
-      });
-    } catch (error, stackTrace) {
+      await notificationPermissionProvider.requestNotificationPermission();
+    } on NotificationSettingsException catch (error, stackTrace) {
       reportMobileError(
         error,
         stackTrace,
         context: '온보딩 알림 권한 준비 중 예외가 발생했습니다.',
       );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _notificationMessage = '알림 권한을 확인하지 못했습니다.';
-        _isNotificationFailure = true;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isRequestingNotificationPermission = false);
-      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 알림 권한 준비 중 알 수 없는 예외가 발생했습니다.',
+      );
     }
-  }
-}
-
-class _OnboardingLocationSection extends StatelessWidget {
-  const _OnboardingLocationSection({
-    required this.message,
-    required this.isFailure,
-    required this.isChecking,
-    required this.isOpeningSettings,
-    required this.isBlocked,
-    required this.onPrepareLocation,
-    required this.onOpenSettings,
-  });
-
-  final String message;
-  final bool isFailure;
-  final bool isChecking;
-  final bool isOpeningSettings;
-  final bool isBlocked;
-  final VoidCallback onPrepareLocation;
-  final VoidCallback onOpenSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '가까운 역을 자동으로 찾으려면 GPS가 필요합니다.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: const Color(0xFF29484B),
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          key: const Key('onboardingLocationButton'),
-          onPressed: isChecking || isOpeningSettings || isBlocked
-              ? null
-              : onPrepareLocation,
-          icon: isChecking
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                )
-              : const Icon(Icons.my_location),
-          label: const Text('위치 켜기'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        if (message.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _OnboardingStatusMessage(message: message, isFailure: isFailure),
-        ],
-        if (isFailure) ...[
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            key: const Key('onboardingOpenLocationSettingsButton'),
-            onPressed: isOpeningSettings || isChecking || isBlocked
-                ? null
-                : onOpenSettings,
-            icon: isOpeningSettings
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Icon(Icons.settings),
-            label: const Text('위치 설정 열기'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(60),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _OnboardingNotificationSection extends StatelessWidget {
-  const _OnboardingNotificationSection({
-    required this.message,
-    required this.isFailure,
-    required this.isRequesting,
-    required this.isBlocked,
-    required this.onPrepareNotification,
-  });
-
-  final String message;
-  final bool isFailure;
-  final bool isRequesting;
-  final bool isBlocked;
-  final VoidCallback onPrepareNotification;
-
-  @override
-  Widget build(BuildContext context) {
-    final showNextAction = _shouldShowOnboardingNotificationFailureNextAction(
-      message,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '시설 고장, 신고 결과, 공사 안내를 알려드려요.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: const Color(0xFF29484B),
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          key: const Key('onboardingNotificationButton'),
-          onPressed: isRequesting || isBlocked ? null : onPrepareNotification,
-          icon: isRequesting
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                )
-              : const Icon(Icons.notifications_active_outlined),
-          label: const Text('알림 켜기'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        if (message.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _OnboardingStatusMessage(message: message, isFailure: isFailure),
-        ],
-        if (showNextAction) ...[
-          const SizedBox(height: 6),
-          Semantics(
-            key: const Key('onboardingNotificationFailureNextAction'),
-            container: true,
-            excludeSemantics: true,
-            liveRegion: true,
-            label: '다음 행동, $_onboardingNotificationFailureNextAction',
-            child: Text(
-              _onboardingNotificationFailureNextAction,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF29484B),
-                fontWeight: FontWeight.w800,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-bool _shouldShowOnboardingNotificationFailureNextAction(String message) {
-  return message == '알림 권한을 확인하지 못했습니다.';
-}
-
-class _OnboardingStatusMessage extends StatelessWidget {
-  const _OnboardingStatusMessage({
-    required this.message,
-    required this.isFailure,
-  });
-
-  final String message;
-  final bool isFailure;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isFailure ? const Color(0xFF8A4B00) : const Color(0xFF006D77);
-    final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
-
-    return Semantics(
-      label: message,
-      liveRegion: true,
-      child: ExcludeSemantics(
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w800,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -701,14 +1068,12 @@ class _OnboardingProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final borderColor = selected
-        ? colorScheme.primary
-        : const Color(0xFFD5E2E4);
-    final backgroundColor = selected ? const Color(0xFFE6F2F0) : Colors.white;
+    const primaryColor = Color(0xFF0D8A6D);
+    final borderColor = selected ? primaryColor : const Color(0xFFDBE3E9);
+    final backgroundColor = selected ? const Color(0xFFEAF8F3) : Colors.white;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 9),
       child: Semantics(
         label: profile.semanticsLabel(selected),
         selected: selected,
@@ -718,28 +1083,49 @@ class _OnboardingProfileCard extends StatelessWidget {
           child: Material(
             color: backgroundColor,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(17),
               side: BorderSide(color: borderColor, width: selected ? 2 : 1),
             ),
             child: InkWell(
               key: Key('onboardingProfileCard-${profile.id}'),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(17),
               onTap: onTap,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 76),
+                constraints: const BoxConstraints(minHeight: 78),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
                   child: Row(
                     children: [
-                      Icon(profile.icon, color: colorScheme.primary, size: 34),
-                      const SizedBox(width: 16),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFDFF7EF)
+                              : const Color(0xFFEEF3F6),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: SizedBox(
+                          width: 46,
+                          height: 46,
+                          child: Icon(
+                            profile.icon,
+                            color: selected
+                                ? primaryColor
+                                : const Color(0xFF17527C),
+                            size: 23,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              profile.title,
+                              _profileDisplayTitle(profile),
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     color: const Color(0xFF102A2C),
@@ -749,10 +1135,10 @@ class _OnboardingProfileCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              profile.summary,
+                              _profileDisplaySummary(profile),
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
-                                    color: const Color(0xFF29484B),
+                                    color: const Color(0xFF647686),
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -760,8 +1146,7 @@ class _OnboardingProfileCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (selected)
-                        Icon(Icons.check_circle, color: colorScheme.primary),
+                      _ProfileRadio(selected: selected),
                     ],
                   ),
                 ),
@@ -772,50 +1157,236 @@ class _OnboardingProfileCard extends StatelessWidget {
       ),
     );
   }
+
+  String _profileDisplayTitle(MobilityProfileOption profile) {
+    return switch (profile.id) {
+      'elderly' => '천천히 이동',
+      'wheelchair' => '휠체어 이용',
+      'stroller' => '유모차 이용',
+      'pregnant' => '임신 중',
+      'injured' => '몸이 불편함',
+      'luggage' => '큰 짐이 있음',
+      _ => profile.title,
+    };
+  }
+
+  String _profileDisplaySummary(MobilityProfileOption profile) {
+    return switch (profile.id) {
+      'elderly' => '걷기와 환승 줄이기',
+      'wheelchair' => '계단 없는 길',
+      'stroller' => '엘리베이터 우선',
+      'pregnant' => '걷는 거리 줄이기',
+      'injured' => '계단 피하기',
+      'luggage' => '넓은 길 우선',
+      _ => profile.summary,
+    };
+  }
 }
 
-class _OnboardingPreferenceSwitch extends StatelessWidget {
-  const _OnboardingPreferenceSwitch({
+class _ProfileRadio extends StatelessWidget {
+  const _ProfileRadio({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? const Color(0xFF0D8A6D) : const Color(0xFFC8D3DC),
+          width: 2,
+        ),
+      ),
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: selected
+            ? const Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color(0xFF0D8A6D),
+                    shape: BoxShape.circle,
+                  ),
+                  child: SizedBox(width: 10, height: 10),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+class _OnboardingPreferenceCard extends StatelessWidget {
+  const _OnboardingPreferenceCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFDBE3E9)),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+class _OnboardingConditionRow extends StatelessWidget {
+  const _OnboardingConditionRow({
     required super.key,
     required this.title,
+    required this.subtitle,
+    required this.enabled,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = enabled ? '우선' : '기본';
+
+    return Semantics(
+      container: true,
+      label: '$title $state, $subtitle',
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 68),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF647686),
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? const Color(0xFFDFF7EF)
+                      : const Color(0xFFEEF3F6),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: SizedBox(
+                  width: 54,
+                  height: 36,
+                  child: Center(
+                    child: Icon(
+                      enabled ? Icons.check : Icons.remove,
+                      color: enabled
+                          ? const Color(0xFF0D8A6D)
+                          : const Color(0xFF647686),
+                      size: 21,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingViewPreferenceSwitch extends StatelessWidget {
+  const _OnboardingViewPreferenceSwitch({
+    required super.key,
+    required this.title,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
   final String title;
+  final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final state = value ? '켜짐' : '꺼짐';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Semantics(
-        label: '$title $state',
-        toggled: value,
-        onTap: () => onChanged(!value),
-        child: ExcludeSemantics(
-          child: SwitchListTile(
-            value: value,
-            onChanged: onChanged,
-            title: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w800,
+    return Semantics(
+      container: true,
+      label: '$title ${value ? '켜짐' : '꺼짐'}, $subtitle',
+      toggled: value,
+      onTap: () => onChanged(!value),
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 68),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF647686),
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            tileColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
+              Switch(
+                value: value,
+                onChanged: onChanged,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF0D8A6D),
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: const Color(0xFFC8D3DC),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _OnboardingPreferenceDivider extends StatelessWidget {
+  const _OnboardingPreferenceDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, color: Color(0xFFDBE3E9));
   }
 }
