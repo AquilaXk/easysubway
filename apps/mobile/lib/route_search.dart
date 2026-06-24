@@ -2436,25 +2436,42 @@ class _RouteResultsListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: result.semanticLabel,
-      liveRegion: true,
-      child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _RouteWorkflowSummary(result: result),
-            const SizedBox(height: 12),
-            const _RouteSegmentedLabels(labels: ['편한 순', '빠른 순', '환승 적은 순']),
-            const SizedBox(height: 18),
-            _RouteSectionHeader(title: '추천 경로 목록'),
-            const SizedBox(height: 8),
-            _RouteResultListButton(result: result, onPressed: onOpenDetail),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: result.semanticLabel,
+          liveRegion: true,
+          child: ExcludeSemantics(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _RouteWorkflowSummary(result: result),
+                const SizedBox(height: 12),
+                const _RouteSegmentedLabels(
+                  labels: ['편한 순', '빠른 순', '환승 적은 순'],
+                ),
+                const SizedBox(height: 18),
+                _RouteSectionHeader(title: '추천 경로 목록'),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         ),
-      ),
+        _RouteResultListButton(result: result, onPressed: onOpenDetail),
+      ],
     );
   }
+}
+
+bool _routeStepIsExplicitTransfer(RouteSearchStep step) {
+  return step.actionTitle.contains('환승') ||
+      step.title.contains('환승') ||
+      step.description.contains('환승');
+}
+
+int _routeExplicitTransferCount(List<RouteSearchStep> steps) {
+  return steps.where(_routeStepIsExplicitTransfer).length;
 }
 
 class _RouteDetailWorkflowView extends StatelessWidget {
@@ -3015,6 +3032,10 @@ int _routeTotalDistanceMeters(RouteSearchResult result) {
 
 String _routeTransferLabel(RouteSearchResult result) {
   final movementSteps = result.movementSteps;
+  final explicitTransfers = _routeExplicitTransferCount(movementSteps);
+  if (explicitTransfers > 0) {
+    return '환승 $explicitTransfers회';
+  }
   var previousLine = '';
   var changes = 0;
   for (final step in movementSteps) {

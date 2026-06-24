@@ -4313,6 +4313,105 @@ void main() {
     );
   });
 
+  testWidgets('추천 경로 항목은 스크린리더에서 상세 진입 버튼으로 남는다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            initialMobilityType: 'SENIOR',
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 23),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.byKey(const Key('routeResultListItem')))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('같은 노선의 명시적 환승 단계는 환승 횟수에 포함된다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              steps: const [
+                RouteSearchStep(
+                  sequence: 1,
+                  title: '상록수역에서 대기',
+                  description: '승강장에서 다음 열차를 기다립니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-sangnoksu',
+                  estimatedMinutes: 2,
+                  distanceMeters: 0,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: false,
+                  actionTitle: '환승',
+                ),
+                RouteSearchStep(
+                  sequence: 2,
+                  title: '사당역까지 이동',
+                  description: '같은 4호선 열차로 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 20,
+                  distanceMeters: 0,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: false,
+                  actionTitle: '열차 이동',
+                ),
+              ],
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 23),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('환승 1회'), findsWidgets);
+  });
+
   testWidgets('길이 막혔어요는 성공 경로를 blocked 화면으로 바꾸지 않는다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -7139,6 +7238,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String routeSearchId = 'route-1',
   String status = 'FOUND',
   String mobilityType = 'SENIOR',
+  List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
     '계단 없는 출구를 확인했어요',
@@ -7156,41 +7256,43 @@ RouteSearchResult _sampleRouteSearchResult({
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
     score: 92,
-    steps: const [
-      RouteSearchStep(
-        sequence: 1,
-        title: '상록수역에서 4호선 승강장으로 이동',
-        description: '엘리베이터를 이용해 승강장으로 이동합니다.',
-        lineId: 'seoul-4',
-        lineName: '수도권 4호선',
-        fromStationId: 'station-sangnoksu',
-        toStationId: 'station-sadang',
-        estimatedMinutes: 4,
-        distanceMeters: 180,
-        includesStairs: false,
-        requiresAccessibilityCheck: true,
-        actionTitle: '열차 이동',
-        actionDetail: '엘리베이터를 이용해 승강장으로 이동합니다.',
-        reason: '선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.',
-        evidenceSources: ['edge:edge-sangnoksu-sadang'],
-        timeSource: 'STATIC_ESTIMATE',
-        distanceSource: 'MEASURED',
-        confidenceLabel: '높은 신뢰도',
-      ),
-      RouteSearchStep(
-        sequence: 2,
-        title: '사당역에서 출구 접근성 정보를 확인',
-        description: '2번 출구의 엘리베이터를 먼저 확인하세요.',
-        lineId: 'seoul-4',
-        lineName: '수도권 4호선',
-        fromStationId: 'station-sadang',
-        toStationId: 'station-sadang',
-        estimatedMinutes: 3,
-        distanceMeters: 120,
-        includesStairs: false,
-        requiresAccessibilityCheck: true,
-      ),
-    ],
+    steps:
+        steps ??
+        const [
+          RouteSearchStep(
+            sequence: 1,
+            title: '상록수역에서 4호선 승강장으로 이동',
+            description: '엘리베이터를 이용해 승강장으로 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 4,
+            distanceMeters: 180,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            actionTitle: '열차 이동',
+            actionDetail: '엘리베이터를 이용해 승강장으로 이동합니다.',
+            reason: '선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.',
+            evidenceSources: ['edge:edge-sangnoksu-sadang'],
+            timeSource: 'STATIC_ESTIMATE',
+            distanceSource: 'MEASURED',
+            confidenceLabel: '높은 신뢰도',
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            title: '사당역에서 출구 접근성 정보를 확인',
+            description: '2번 출구의 엘리베이터를 먼저 확인하세요.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sadang',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 3,
+            distanceMeters: 120,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+          ),
+        ],
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
