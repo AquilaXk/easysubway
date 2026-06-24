@@ -1312,20 +1312,44 @@ void main() {
         );
       }
 
-      expect(find.text('화면·접근성 설정'), findsOneWidget);
-      expect(find.text('내 이동 조건'), findsOneWidget);
-      expect(find.text('화면과 읽기'), findsOneWidget);
-      expect(find.text('경로 찾기'), findsOneWidget);
-      expect(find.text('지역과 데이터'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('설정')),
+        findsOneWidget,
+      );
+      expect(find.text('화면·접근성 설정'), findsNothing);
+      expect(find.text('이동 조건'), findsOneWidget);
+      expect(find.text('화면 및 접근성'), findsOneWidget);
+      expect(find.text('경로 찾기'), findsNothing);
+      expect(find.text('기본 지역과 데이터'), findsOneWidget);
       expect(find.text('고령자'), findsOneWidget);
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsNWidgets(2));
-      expect(find.text('큰 글자 켜짐'), findsOneWidget);
-      expect(find.text('고대비 표시를 사용해요'), findsOneWidget);
-      expect(find.text('전체 보기 켜짐'), findsOneWidget);
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
+      expect(find.text('큰 글자'), findsOneWidget);
+      expect(find.text('고대비'), findsOneWidget);
+      expect(find.text('간편 보기'), findsOneWidget);
+      expect(find.text('켜짐'), findsNWidgets(2));
+      expect(find.text('꺼짐'), findsOneWidget);
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
           '고령자, 계단을 피하고 쉬운 환승을 우선해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '큰 글자, 켜짐, 처음 설정에서 변경할 수 있어요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '간편 보기, 꺼짐, 처음 설정에서 변경할 수 있어요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '고대비, 켜짐, 처음 설정에서 변경할 수 있어요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -1337,7 +1361,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('휠체어'), findsOneWidget);
-      expect(find.text('계단 없는 길만 안내해요'), findsNWidgets(2));
+      expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('notificationSettingsButton')),
@@ -1346,12 +1370,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('알림'), findsOneWidget);
+      expect(find.text('내 활동'), findsOneWidget);
+      expect(find.text('개인정보 및 도움말'), findsOneWidget);
       expect(
         find.byKey(const Key('settingsSection-help-privacy')),
         findsOneWidget,
       );
       expect(
         find.byKey(const Key('notificationSettingsButton')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('offlineDataSettingsButton')),
         findsOneWidget,
       );
       expect(

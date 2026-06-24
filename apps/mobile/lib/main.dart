@@ -2766,14 +2766,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('화면·접근성 설정')),
+      appBar: AppBar(title: const Text('설정')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
             _AppSettingsSection(
               key: const Key('settingsSection-mobility'),
-              title: '내 이동 조건',
+              title: '이동 조건',
               children: [
                 _AppSettingsActionTile(
                   key: const Key('mobilityProfileButton'),
@@ -2794,45 +2794,52 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             ),
             _AppSettingsSection(
               key: const Key('settingsSection-reading'),
-              title: '화면과 읽기',
+              title: '화면 및 접근성',
               children: [
-                _AppSettingsInfoTile(
+                _AppSettingsPreferenceTile(
+                  key: const Key('largeTextSettingsButton'),
                   icon: Icons.text_fields,
-                  title: widget.viewPreferences.largeTextEnabled
-                      ? '큰 글자 켜짐'
-                      : '기본 글자 크기',
-                  subtitle: widget.viewPreferences.highContrastEnabled
-                      ? '고대비 표시를 사용해요'
-                      : '기본 대비로 표시해요',
+                  title: '큰 글자',
+                  enabled: widget.viewPreferences.largeTextEnabled,
+                  onTap: _showViewPreferenceGuide,
                 ),
-                _AppSettingsInfoTile(
+                _AppSettingsPreferenceTile(
+                  key: const Key('simpleViewSettingsButton'),
                   icon: Icons.visibility_outlined,
-                  title: widget.viewPreferences.simpleViewEnabled
-                      ? '간편 보기 켜짐'
-                      : '전체 보기 켜짐',
-                  subtitle: '핵심 행동을 먼저 보여줘요',
+                  title: '간편 보기',
+                  enabled: widget.viewPreferences.simpleViewEnabled,
+                  onTap: _showViewPreferenceGuide,
                 ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-route'),
-              title: '경로 찾기',
-              children: [
-                _AppSettingsInfoTile(
-                  icon: Icons.route,
-                  title: '${_profile.title} 조건 적용 중',
-                  subtitle: _profile.summary,
+                _AppSettingsPreferenceTile(
+                  key: const Key('highContrastSettingsButton'),
+                  icon: Icons.contrast,
+                  title: '고대비',
+                  enabled: widget.viewPreferences.highContrastEnabled,
+                  onTap: _showViewPreferenceGuide,
                 ),
               ],
             ),
             _AppSettingsSection(
               key: const Key('settingsSection-region-data'),
-              title: '지역과 데이터',
-              children: const [
-                _AppSettingsInfoTile(
+              title: '기본 지역과 데이터',
+              children: [
+                const _AppSettingsInfoTile(
                   icon: Icons.public,
                   title: '수도권 우선',
                   subtitle: '오프라인 데이터팩과 검증된 출처를 먼저 사용해요',
+                ),
+                _AppSettingsActionTile(
+                  key: const Key('offlineDataSettingsButton'),
+                  icon: Icons.offline_pin_outlined,
+                  title: '인터넷 없이 이용',
+                  subtitle: '노선도와 역 정보 사용 범위를 확인해요',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const OfflineDataScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -2881,21 +2888,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             ),
             _AppSettingsSection(
               key: const Key('settingsSection-help-privacy'),
-              title: '도움말·문의',
+              title: '개인정보 및 도움말',
               children: [
-                _AppSettingsActionTile(
-                  key: const Key('offlineDataSettingsButton'),
-                  icon: Icons.offline_pin_outlined,
-                  title: '인터넷 없이 이용',
-                  subtitle: '노선도와 역 정보 사용 범위를 확인해요',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const OfflineDataScreen(),
-                      ),
-                    );
-                  },
-                ),
                 _AppSettingsActionTile(
                   key: const Key('settingsSupportPrivacyButton'),
                   icon: Icons.help_outline,
@@ -2909,6 +2903,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         ),
       ),
     );
+  }
+
+  void _showViewPreferenceGuide() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('보기 설정은 처음 설정에서 변경할 수 있어요.')));
   }
 }
 
@@ -3038,6 +3038,73 @@ class _AppSettingsInfoTile extends StatelessWidget {
         shape: Border(
           bottom: BorderSide(
             color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppSettingsPreferenceTile extends StatelessWidget {
+  const _AppSettingsPreferenceTile({
+    required this.icon,
+    required this.title,
+    required this.enabled,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = enabled ? '켜짐' : '꺼짐';
+    return Semantics(
+      button: true,
+      label: '$title, $value, 처음 설정에서 변경할 수 있어요',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: ListTile(
+          onTap: onTap,
+          minVerticalPadding: 12,
+          minLeadingWidth: 32,
+          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          title: Text(
+            title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+            ),
+          ),
+          subtitle: Text(
+            '처음 설정에서 변경할 수 있어요',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.3,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          shape: Border(
+            bottom: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
         ),
       ),
