@@ -1323,10 +1323,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onStationSearch: openStationSearch,
                 onProfileTap: openSettings,
               ),
-              _HomeStationActionRow(
-                onRecentSearch: openRecentSearch,
-                onNearbyStations: openNearbyStations,
-              ),
               AnimatedBuilder(
                 animation: _routeDraftController,
                 builder: (context, _) {
@@ -1339,6 +1335,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: openRouteSearch,
                   );
                 },
+              ),
+              _HomeStationActionRow(
+                onRecentSearch: openRecentSearch,
+                onNearbyStations: openNearbyStations,
               ),
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
@@ -1452,7 +1452,7 @@ class _HomeNotificationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '알림',
+      label: '알림, 확인하지 않은 알림 있음',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Tooltip(
@@ -1777,111 +1777,103 @@ class _HomePrototypeHero extends StatelessWidget {
   final VoidCallback onStationSearch;
   final VoidCallback onProfileTap;
 
+  static const double _cardRadius = 18;
+  static const double _buttonRadius = 12;
+  static const FontWeight _heroTitleWeight = FontWeight.w800;
+  static const FontWeight _primaryActionWeight = FontWeight.w800;
+  static const FontWeight _secondaryActionWeight = FontWeight.w700;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: '길찾기와 역검색, 현재 이동 조건 ${profile.title}',
+      label: '길찾기와 역 검색, 현재 이동 조건 ${profile.title}',
       child: Material(
         key: const Key('homeHeroCard'),
         color: EasySubwayAccessibleColors.brand,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_cardRadius),
+        ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: ExcludeSemantics(
-                      child: Text(
-                        '어디로 가시나요?',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              height: 1.28,
-                            ),
-                      ),
-                    ),
+              ExcludeSemantics(
+                child: Text(
+                  '어디로 가시나요?',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: _heroTitleWeight,
+                    height: 1.28,
                   ),
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: _HomeProfilePill(
-                      profile: profile,
-                      onTap: onProfileTap,
-                    ),
-                  ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _HomeProfilePill(profile: profile, onTap: onProfileTap),
               ),
               const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      key: const Key('routeSearchButton'),
-                      button: true,
-                      label: '길찾기',
-                      onTap: onRouteSearch,
-                      child: ExcludeSemantics(
-                        child: FilledButton.icon(
-                          onPressed: onRouteSearch,
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                EasySubwayAccessibleColors.brandDark,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(104),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          icon: const Icon(Icons.route),
-                          label: const Text('길찾기'),
-                        ),
+              Semantics(
+                key: const Key('routeSearchButton'),
+                button: true,
+                label: '길찾기',
+                onTap: onRouteSearch,
+                child: ExcludeSemantics(
+                  child: FilledButton.icon(
+                    onPressed: onRouteSearch,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: EasySubwayAccessibleColors.brandDark,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(104),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(_buttonRadius),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: _primaryActionWeight,
                       ),
                     ),
+                    icon: const Icon(Icons.route),
+                    label: const Text('길찾기'),
                   ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: KeyedSubtree(
-                      key: const Key('heroStationSearchButton'),
-                      child: Semantics(
-                        key: const Key('stationSearchButton'),
-                        button: true,
-                        label: '역 검색',
-                        onTap: onStationSearch,
-                        child: ExcludeSemantics(
-                          child: FilledButton.icon(
-                            onPressed: onStationSearch,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor:
-                                  EasySubwayAccessibleColors.brandDark,
-                              minimumSize: const Size.fromHeight(104),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            icon: const Icon(Icons.search),
-                            label: const Text('역검색'),
-                          ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              KeyedSubtree(
+                key: const Key('heroStationSearchButton'),
+                child: Semantics(
+                  key: const Key('stationSearchButton'),
+                  button: true,
+                  label: '역 검색',
+                  onTap: onStationSearch,
+                  child: ExcludeSemantics(
+                    child: OutlinedButton.icon(
+                      onPressed: onStationSearch,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: EasySubwayAccessibleColors.brandDark,
+                        side: const BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                        minimumSize: const Size.fromHeight(68),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(_buttonRadius),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: _secondaryActionWeight,
                         ),
                       ),
+                      icon: const Icon(Icons.search),
+                      label: const Text('역 검색'),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1953,7 +1945,7 @@ class _HomeStationActionButton extends StatelessWidget {
         foregroundColor: EasySubwayAccessibleColors.brandDark,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         minimumSize: const Size.fromHeight(72),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
       ),
       icon: Icon(icon, size: 28),
@@ -1972,7 +1964,7 @@ class _HomeProfilePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '현재 이동 조건 ${profile.title}',
+      label: '이동 조건: ${profile.title}, 변경',
       onTap: onTap,
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
@@ -1992,7 +1984,7 @@ class _HomeProfilePill extends StatelessWidget {
           ),
           icon: Icon(profile.icon, size: 16),
           label: Text(
-            profile.title,
+            '이동 조건: ${profile.title} 〉',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -2018,12 +2010,12 @@ class _HomeRouteDraftCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Semantics(
-        key: const Key('homeRouteDraftPanel'),
         button: true,
         label: '출발 도착 정하기, $summary',
         onTap: onTap,
         child: ExcludeSemantics(
           child: InkWell(
+            key: const Key('homeRouteDraftPanel'),
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
             child: _PrototypeCard(
