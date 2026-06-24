@@ -323,7 +323,17 @@ class OnboardingIntroScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('바로 시작'),
+              child: const Text('기본 설정으로 시작'),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              '천천히 이동 · 큰 글씨 · 단순 보기 적용',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF647686),
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
             ),
           ],
         ),
@@ -731,8 +741,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
   int _currentStep = 0;
-  bool _locationPermissionSelected = true;
-  bool _notificationPermissionSelected = true;
+  bool _locationPermissionSelected = false;
+  bool _notificationPermissionSelected = false;
   bool _showNotificationPermissionFailureNextAction = false;
 
   @override
@@ -765,7 +775,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('쉬운 지하철')),
+      appBar: AppBar(
+        title: const Text('쉬운 지하철'),
+        leading: _currentStep == 0
+            ? null
+            : IconButton(
+                tooltip: '이전 단계',
+                onPressed: _goBack,
+                icon: const Icon(Icons.arrow_back),
+              ),
+      ),
       bottomNavigationBar: _currentStep == 2
           ? null
           : SafeArea(
@@ -819,7 +838,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Semantics(
                     header: true,
                     child: Text(
-                      '원하는 조건을 고르세요',
+                      '적용할 조건을 확인하세요',
                       style: textTheme.headlineSmall?.copyWith(
                         color: const Color(0xFF102A2C),
                         fontWeight: FontWeight.w900,
@@ -926,7 +945,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Semantics(
                     header: true,
                     child: Text(
-                      '권한을 선택하세요',
+                      '필요한 권한을 나중에 켤 수 있어요',
                       style: textTheme.headlineSmall?.copyWith(
                         color: const Color(0xFF102A2C),
                         fontWeight: FontWeight.w900,
@@ -962,21 +981,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ],
                   const SizedBox(height: 22),
+                  FilledButton(
+                    key: const Key('onboardingPermissionAllowButton'),
+                    onPressed:
+                        _locationPermissionSelected ||
+                            _notificationPermissionSelected
+                        ? _handlePermissionAllow
+                        : null,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(60),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('선택한 권한 허용하고 시작'),
+                  ),
+                  const SizedBox(height: 9),
                   OutlinedButton(
                     key: const Key('onboardingPermissionSkipButton'),
-                    onPressed: _handlePermissionSkip,
+                    onPressed: _completeOnboarding,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(60),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('건너뛰기'),
+                    child: const Text('나중에 설정'),
                   ),
                 ],
         ),
       ),
     );
+  }
+
+  void _goBack() {
+    if (_currentStep == 0) {
+      return;
+    }
+    setState(() => _currentStep -= 1);
   }
 
   void _completeOnboarding() {
@@ -989,28 +1031,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Future<void> _handlePermissionSkip() async {
-    if (!_locationPermissionSelected || !_notificationPermissionSelected) {
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('수동 설정 방법'),
-          content: const Text(
-            '나중에 휴대폰 설정에서 쉬운 지하철을 선택한 뒤 위치와 알림 권한을 켤 수 있습니다. '
-            '권한을 끄면 가까운 역 찾기와 시설 고장 알림은 제한됩니다.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
+  Future<void> _handlePermissionAllow() async {
     final permissionsReady = await _prepareSelectedPermissions();
     if (!mounted) {
       return;
@@ -1285,7 +1306,7 @@ class _OnboardingConditionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = enabled ? '우선' : '기본';
+    final state = enabled ? '우선 적용' : '기본 적용';
 
     return Semantics(
       container: true,
@@ -1326,16 +1347,28 @@ class _OnboardingConditionRow extends StatelessWidget {
                       : const Color(0xFFEEF3F6),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: SizedBox(
-                  width: 54,
-                  height: 36,
-                  child: Center(
-                    child: Icon(
-                      enabled ? Icons.check : Icons.remove,
-                      color: enabled
-                          ? const Color(0xFF0D8A6D)
-                          : const Color(0xFF647686),
-                      size: 21,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 72,
+                    minHeight: 36,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    child: Center(
+                      child: Text(
+                        state,
+                        style: TextStyle(
+                          color: enabled
+                              ? const Color(0xFF0D8A6D)
+                              : const Color(0xFF647686),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
                     ),
                   ),
                 ),

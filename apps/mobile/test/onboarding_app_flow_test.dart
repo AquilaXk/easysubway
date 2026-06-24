@@ -56,10 +56,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
-    expect(find.text('원하는 조건을 고르세요'), findsOneWidget);
+    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
-    expect(find.text('권한을 선택하세요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
@@ -78,7 +78,7 @@ void main() {
     expect(onboardingStore.saveCount, 1);
   });
 
-  testWidgets('첫 실행 앱은 권한 선택을 끄고 건너뛰면 수동 설정 방법을 안내한다', (tester) async {
+  testWidgets('첫 실행 앱은 권한을 나중에 설정하고 홈으로 이동한다', (tester) async {
     await tester.pumpWidget(
       _testApp(onboardingStore: MemoryOnboardingResultStore()),
     );
@@ -86,15 +86,11 @@ void main() {
     await _openOnboarding(tester);
     await _continueFromProfileToPermission(tester);
 
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('현재 위치 꺼짐'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림 꺼짐'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('수동 설정 방법'), findsOneWidget);
-    expect(find.textContaining('가까운 역 찾기와 시설 고장 알림은 제한됩니다'), findsOneWidget);
-    await tester.tap(find.text('확인'));
-    await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
@@ -109,11 +105,15 @@ void main() {
     await _openOnboarding(tester);
     await _continueFromProfileToPermission(tester);
 
-    expect(find.text('권한을 선택하세요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
     expect(find.text('현재 위치'), findsOneWidget);
     expect(find.text('알림'), findsOneWidget);
     expect(
       find.byKey(const Key('onboardingPermissionSkipButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('onboardingPermissionAllowButton')),
       findsOneWidget,
     );
   });
