@@ -611,6 +611,34 @@ void main() {
     expect(find.text('새 알림이 없습니다'), findsOneWidget);
   });
 
+  testWidgets('알림함 시설 상태는 심각도와 다음 행동을 함께 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(
+          favorites: [_favoriteFacility(status: 'USER_REPORTED')],
+        ),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
+    expect(find.text('점검·제보 · 엘리베이터 제보됨'), findsOneWidget);
+    expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*출처 공식 파일, 권장 행동 역무원 도움 요청')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('홈 노선도 버튼은 v3 노선도 화면을 연다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -788,9 +816,9 @@ void main() {
     expect(find.byKey(const Key('homeHeroCard')), findsOneWidget);
     expect(find.text('시설 알림'), findsOneWidget);
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('엘리베이터 확인 필요'), findsOneWidget);
+    expect(find.text('정보 확인 필요 · 엘리베이터 확인 필요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
-    expect(find.text('다른 출구 또는 역무원 안내를 확인하세요.'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '대체 길 보기'), findsNothing);
     final routeButtonSize = tester.getSize(
@@ -821,6 +849,45 @@ void main() {
     expect(find.textContaining('이동 점수'), findsNothing);
     expect(find.textContaining('정보 신뢰도'), findsNothing);
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
+  });
+
+  testWidgets('홈 시설 알림은 더 높은 심각도 시설과 다음 행동을 먼저 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(
+          favorites: [
+            _favoriteFacility(
+              status: 'NEEDS_CHECK',
+              name: '3번 출구 엘리베이터',
+              exitId: 'exit-sangnoksu-3',
+              description: '3번 출구 앞',
+            ),
+            _favoriteFacility(
+              status: 'CLOSED',
+              name: '2번 출구 엘리베이터',
+              exitId: 'exit-sangnoksu-2',
+              description: '2번 출구 앞',
+            ),
+          ],
+        ),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수역 2번 출구 엘리베이터'), findsOneWidget);
+    expect(find.text('고장·폐쇄 · 엘리베이터 폐쇄'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*출처 공식 파일, 다음 행동 대체 출구 보기')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('홈 시설 알림은 주의 상태 시설이 없으면 섹션을 숨긴다', (tester) async {
@@ -2093,7 +2160,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 1번 출구 앞, 정보 신뢰도 높음, 출처 공식 파일',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
@@ -3435,7 +3502,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -3476,12 +3543,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('정상'), findsOneWidget);
+      expect(find.text('정상'), findsWidgets);
       expect(find.text('1번 출구 앞'), findsOneWidget);
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
@@ -3570,8 +3637,9 @@ void main() {
     );
     expect(find.text('상록수역'), findsOneWidget);
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('현재 이용이 어려울 수 있어요'), findsOneWidget);
-    expect(find.text('고장'), findsOneWidget);
+    expect(find.text('이용 불가 확인'), findsOneWidget);
+    expect(find.text('고장·폐쇄 · 고장'), findsOneWidget);
+    expect(find.text('현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.'), findsOneWidget);
     expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
     expect(find.text('최근 확인 2026-06-14'), findsOneWidget);

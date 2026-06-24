@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
+import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -740,17 +741,20 @@ class StationFacilityInfo {
     };
   }
 
-  bool get needsAttention => statusPriority < 40;
+  FacilityStatusPresentation get statusPresentation =>
+      facilityStatusPresentation(status);
 
-  int get statusPriority {
-    return switch (status) {
-      'BROKEN' || 'CLOSED' => 10,
-      'UNDER_CONSTRUCTION' || 'CONSTRUCTION' => 20,
-      'USER_REPORTED' || 'UNKNOWN' || 'NEEDS_REPORT' || 'NEEDS_CHECK' => 30,
-      'NORMAL' || 'ADMIN_VERIFIED' => 40,
-      _ => 30,
-    };
-  }
+  String get severityLabel => statusPresentation.severityLabel;
+
+  String get statusTitle => statusPresentation.statusTitle;
+
+  String get nextActionLabel => statusPresentation.nextActionLabel;
+
+  String get nextActionDescription => statusPresentation.nextActionDescription;
+
+  bool get needsAttention => statusPresentation.needsAttention;
+
+  int get statusPriority => statusPresentation.priority;
 
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
@@ -772,7 +776,11 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel';
+    final statusSemanticLabel = facilityStatusSemanticLabel(
+      statusLabel: statusLabel,
+      severityLabel: severityLabel,
+    );
+    return '$name, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
   }
 }
 
@@ -1200,7 +1208,9 @@ class StationDetailState {
     if (count == 0) {
       return '';
     }
-    return '확인 필요 $count개';
+    return buildFacilityAttentionSummary(
+      facilities.map((facility) => facility.status),
+    );
   }
 
   String get facilityAttentionSemanticLabel {
@@ -1208,7 +1218,9 @@ class StationDetailState {
     if (count == 0) {
       return '확인이 필요한 시설 없음';
     }
-    return '확인이 필요한 시설 $count개';
+    return buildFacilityAttentionSemanticLabel(
+      facilities.map((facility) => facility.status),
+    );
   }
 
   List<StationLayoutSummaryItem> get layoutSummaryItems {
@@ -4226,6 +4238,8 @@ class _StationFacilityCard extends StatelessWidget {
                   children: [
                     _StationDetailTextPill(text: facility.typeLabel),
                     _StationDetailTextPill(text: facility.statusLabel),
+                    if (facility.severityLabel != facility.statusLabel)
+                      _StationDetailTextPill(text: facility.severityLabel),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -4311,7 +4325,15 @@ class FacilityDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isProblem = facility.needsAttention;
+    final statusBackgroundColor = _facilityStatusNoticeBackgroundColor(
+      facility.statusPresentation.severity,
+    );
+    final statusIconColor = _facilityStatusNoticeIconColor(
+      facility.statusPresentation.severity,
+    );
+    final statusIcon = _facilityStatusNoticeIcon(
+      facility.statusPresentation.severity,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('시설 상세')),
       body: SafeArea(
@@ -4372,9 +4394,7 @@ class FacilityDetailScreen extends StatelessWidget {
             Card(
               key: Key('facilityDetailStatusNotice-${facility.id}'),
               margin: EdgeInsets.zero,
-              color: isProblem
-                  ? EasySubwayAccessibleColors.redSoft
-                  : EasySubwayAccessibleColors.mintSoft,
+              color: statusBackgroundColor,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -4383,13 +4403,7 @@ class FacilityDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(
-                      isProblem ? Icons.warning_amber : Icons.check_circle,
-                      color: isProblem
-                          ? EasySubwayAccessibleColors.red
-                          : EasySubwayAccessibleColors.mint,
-                      size: 28,
-                    ),
+                    Icon(statusIcon, color: statusIconColor, size: 28),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -4399,16 +4413,27 @@ class FacilityDetailScreen extends StatelessWidget {
                             _facilityStatusTitle(facility),
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  color: isProblem
-                                      ? EasySubwayAccessibleColors.red
-                                      : EasySubwayAccessibleColors.text,
+                                  color: statusIconColor,
                                   fontWeight: FontWeight.w800,
                                   height: 1.25,
                                 ),
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            facility.statusLabel,
+                            facilityStatusDisplayLabel(
+                              statusLabel: facility.statusLabel,
+                              severityLabel: facility.severityLabel,
+                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _facilityDetailStatusDescription(facility),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,
@@ -4491,8 +4516,42 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   return '연결 위치 $from ↔ $to';
 }
 
+String _facilityDetailStatusDescription(StationFacilityInfo facility) {
+  if (facility.needsAttention) {
+    return '현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.';
+  }
+  return '시설 상태가 다르면 상태 제보로 알려 주세요.';
+}
+
 String _facilityStatusTitle(StationFacilityInfo facility) {
-  return facility.needsAttention ? '현재 이용이 어려울 수 있어요' : '이용 가능해요';
+  return facility.statusTitle;
+}
+
+Color _facilityStatusNoticeBackgroundColor(FacilityStatusSeverity severity) {
+  return switch (severity) {
+    FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.redSoft,
+    FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amberSoft,
+    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.skySoft,
+    FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mintSoft,
+  };
+}
+
+Color _facilityStatusNoticeIconColor(FacilityStatusSeverity severity) {
+  return switch (severity) {
+    FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.red,
+    FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amber,
+    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.brand,
+    FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mint,
+  };
+}
+
+IconData _facilityStatusNoticeIcon(FacilityStatusSeverity severity) {
+  return switch (severity) {
+    FacilityStatusSeverity.blocked => Icons.warning_amber,
+    FacilityStatusSeverity.caution => Icons.report_problem_outlined,
+    FacilityStatusSeverity.needsInfo => Icons.info_outline,
+    FacilityStatusSeverity.normal => Icons.check_circle,
+  };
 }
 
 class _StationDetailStatusPill extends StatelessWidget {

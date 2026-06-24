@@ -9,6 +9,7 @@ import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'facility_report.dart';
+import 'facility_status.dart';
 import 'favorite_facility.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -1341,6 +1342,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
+                onOpenFacilities: openSavedItems,
               ),
               _HomeRecentRouteSection(
                 key: const Key('homeRecentRouteSection'),
@@ -1627,9 +1629,11 @@ class _NotificationInboxItem {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.semanticLabel,
     required this.kind,
     this.report,
-    this.warning = false,
+    this.severity = FacilityStatusSeverity.normal,
+    this.actionLabel = '',
   });
 
   factory _NotificationInboxItem.facility(FavoriteFacility facility) {
@@ -1639,9 +1643,13 @@ class _NotificationInboxItem {
     return _NotificationInboxItem(
       icon: _facilityIcon(facility.type),
       title: '${facility.stationLabel} $name',
-      subtitle: '${facility.typeLabel} ${facility.statusLabel}',
+      subtitle:
+          '${facility.severityLabel} · ${facility.typeLabel} ${facility.statusLabel}',
+      semanticLabel:
+          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 권장 행동 ${facility.nextActionLabel}',
       kind: '시설',
-      warning: true,
+      severity: facility.statusPresentation.severity,
+      actionLabel: facility.nextActionLabel,
     );
   }
 
@@ -1650,6 +1658,7 @@ class _NotificationInboxItem {
       icon: Icons.report_outlined,
       title: '제보 ${report.statusLabel}',
       subtitle: '접수번호 ${report.id}',
+      semanticLabel: '제보 ${report.statusLabel}, 접수번호 ${report.id}',
       kind: '제보',
       report: report,
     );
@@ -1658,9 +1667,11 @@ class _NotificationInboxItem {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String semanticLabel;
   final String kind;
   final FacilityReportResult? report;
-  final bool warning;
+  final FacilityStatusSeverity severity;
+  final String actionLabel;
 }
 
 class _NotificationInboxChips extends StatelessWidget {
@@ -1703,30 +1714,44 @@ class _NotificationInboxCard extends StatelessWidget {
       );
     }
 
+    final accent = _facilitySeverityAccent(item.severity);
     final card = _PrototypeCard(
-      backgroundColor: item.warning
-          ? EasySubwayAccessibleColors.amberSoft
-          : Colors.white,
-      borderColor: item.warning
-          ? const Color(0xFFF1D49A)
-          : EasySubwayAccessibleColors.line,
-      child: _PrototypeInfoRow(
-        icon: item.icon,
-        iconBackground: Colors.white,
-        iconColor: item.warning
-            ? EasySubwayAccessibleColors.amber
-            : EasySubwayAccessibleColors.mintDark,
-        title: item.title,
-        subtitle: item.subtitle,
-        trailing: item.kind,
+      backgroundColor: accent.backgroundColor,
+      borderColor: accent.borderColor,
+      showBorder: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PrototypeInfoRow(
+            icon: item.icon,
+            iconBackground: Colors.white,
+            iconColor: accent.iconColor,
+            title: item.title,
+            subtitle: item.subtitle,
+            subtitleColor: accent.iconColor,
+            trailing: item.kind,
+          ),
+          if (item.actionLabel.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              '권장 행동 ${item.actionLabel}',
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
       ),
     );
     if (item.report == null) {
-      return card;
+      return Semantics(label: item.semanticLabel, child: card);
     }
     return Semantics(
       button: true,
-      label: '${item.title}, ${item.subtitle}',
+      label: item.semanticLabel,
       onTap: open,
       child: ExcludeSemantics(
         child: InkWell(
@@ -2074,9 +2099,13 @@ class _HomePrototypeSection extends StatelessWidget {
 }
 
 class _HomeFacilityAlertSection extends StatelessWidget {
-  const _HomeFacilityAlertSection({required this.facilitiesFuture});
+  const _HomeFacilityAlertSection({
+    required this.facilitiesFuture,
+    required this.onOpenFacilities,
+  });
 
   final Future<List<FavoriteFacility>>? facilitiesFuture;
+  final VoidCallback onOpenFacilities;
 
   @override
   Widget build(BuildContext context) {
@@ -2101,7 +2130,10 @@ class _HomeFacilityAlertSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _HomePrototypeSection(title: '시설 알림'),
-            _HomeFacilityAlertCard(facility: alert),
+            _HomeFacilityAlertCard(
+              facility: alert,
+              onOpenFacilities: onOpenFacilities,
+            ),
           ],
         );
       },
@@ -2110,76 +2142,144 @@ class _HomeFacilityAlertSection extends StatelessWidget {
 }
 
 class _HomeFacilityAlertCard extends StatelessWidget {
-  const _HomeFacilityAlertCard({required this.facility});
+  const _HomeFacilityAlertCard({
+    required this.facility,
+    required this.onOpenFacilities,
+  });
 
   final FavoriteFacility facility;
+  final VoidCallback onOpenFacilities;
 
   @override
   Widget build(BuildContext context) {
     final facilityName = facility.name.trim().isEmpty
         ? facility.typeLabel
         : facility.name;
-    return _PrototypeCard(
-      backgroundColor: EasySubwayAccessibleColors.redSoft,
-      borderColor: EasySubwayAccessibleColors.red,
-      child: Column(
-        children: [
-          _PrototypeInfoRow(
-            icon: _facilityIcon(facility.type),
-            iconBackground: Colors.white,
-            iconColor: EasySubwayAccessibleColors.red,
-            title: '${facility.stationLabel} $facilityName',
-            subtitle: '${facility.typeLabel} ${facility.statusLabel}',
-            subtitleColor: EasySubwayAccessibleColors.red,
-            iconBoxSize: 56,
-            iconSize: 30,
-          ),
-          const SizedBox(height: 13),
-          _HomeFacilityNoticeMessage(facility: facility),
-        ],
+    final accent = _facilitySeverityAccent(
+      facility.statusPresentation.severity,
+    );
+    final semanticLabel =
+        '${facility.stationLabel} $facilityName, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 다음 행동 ${facility.nextActionLabel}';
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: semanticLabel,
+      child: _PrototypeCard(
+        backgroundColor: accent.backgroundColor,
+        borderColor: accent.borderColor,
+        showBorder: true,
+        child: Column(
+          children: [
+            _PrototypeInfoRow(
+              icon: _facilityIcon(facility.type),
+              iconBackground: Colors.white,
+              iconColor: accent.iconColor,
+              title: '${facility.stationLabel} $facilityName',
+              subtitle:
+                  '${facility.severityLabel} · ${facility.typeLabel} ${facility.statusLabel}',
+              subtitleColor: accent.iconColor,
+              iconBoxSize: 56,
+              iconSize: 30,
+            ),
+            const SizedBox(height: 13),
+            _HomeFacilityNoticeMessage(
+              facility: facility,
+              onOpenFacilities: onOpenFacilities,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
+class _FacilitySeverityAccent {
+  const _FacilitySeverityAccent({
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.iconColor,
+  });
+
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color iconColor;
+}
+
+_FacilitySeverityAccent _facilitySeverityAccent(
+  FacilityStatusSeverity severity,
+) {
+  return switch (severity) {
+    FacilityStatusSeverity.blocked => const _FacilitySeverityAccent(
+      backgroundColor: EasySubwayAccessibleColors.redSoft,
+      borderColor: EasySubwayAccessibleColors.red,
+      iconColor: EasySubwayAccessibleColors.red,
+    ),
+    FacilityStatusSeverity.caution => const _FacilitySeverityAccent(
+      backgroundColor: EasySubwayAccessibleColors.amberSoft,
+      borderColor: Color(0xFFF1D49A),
+      iconColor: EasySubwayAccessibleColors.amber,
+    ),
+    FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
+      backgroundColor: EasySubwayAccessibleColors.skySoft,
+      borderColor: Color(0xFFC8E6F8),
+      iconColor: EasySubwayAccessibleColors.brand,
+    ),
+    FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
+      backgroundColor: Colors.white,
+      borderColor: EasySubwayAccessibleColors.line,
+      iconColor: EasySubwayAccessibleColors.mintDark,
+    ),
+  };
+}
+
 class _HomeFacilityNoticeMessage extends StatelessWidget {
-  const _HomeFacilityNoticeMessage({required this.facility});
+  const _HomeFacilityNoticeMessage({
+    required this.facility,
+    required this.onOpenFacilities,
+  });
 
   final FavoriteFacility facility;
+  final VoidCallback onOpenFacilities;
 
   @override
   Widget build(BuildContext context) {
-    const notice = '다른 출구 또는 역무원 안내를 확인하세요.';
-    return Semantics(
-      container: true,
-      label: notice,
-      child: ExcludeSemantics(
-        child: Card(
-          color: Colors.white,
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    notice,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              facility.nextActionDescription,
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.text,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+              ),
             ),
-          ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('homeFacilityActionButton'),
+              onPressed: onOpenFacilities,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('저장한 시설 보기'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${facility.updatedLabel} · ${facility.dataSourceLabel}',
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2187,26 +2287,22 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
 }
 
 bool _isFacilityAlert(FavoriteFacility facility) {
-  return switch (facility.status) {
-    'BROKEN' ||
-    'UNDER_CONSTRUCTION' ||
-    'CONSTRUCTION' ||
-    'CLOSED' ||
-    'UNKNOWN' ||
-    'USER_REPORTED' ||
-    'NEEDS_REPORT' ||
-    'NEEDS_CHECK' => true,
-    _ => false,
-  };
+  return facility.needsAttention;
 }
 
 FavoriteFacility? _firstFacilityAlert(List<FavoriteFacility> facilities) {
-  for (final facility in facilities) {
-    if (_isFacilityAlert(facility)) {
-      return facility;
-    }
+  final alerts = facilities.where(_isFacilityAlert).toList(growable: false);
+  if (alerts.isEmpty) {
+    return null;
   }
-  return null;
+  alerts.sort((left, right) {
+    final priority = left.statusPriority.compareTo(right.statusPriority);
+    if (priority != 0) {
+      return priority;
+    }
+    return left.name.compareTo(right.name);
+  });
+  return alerts.first;
 }
 
 IconData _facilityIcon(String type) {
@@ -3027,7 +3123,10 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                   if (_firstFacilityAlert(data.facilities)
                       case final alert?) ...[
                     const _HomePrototypeSection(title: '확인 필요'),
-                    _HomeFacilityAlertCard(facility: alert),
+                    _HomeFacilityAlertCard(
+                      facility: alert,
+                      onOpenFacilities: _openFavoriteFacilities,
+                    ),
                   ],
                   if (data.routes.isNotEmpty) ...[
                     const _HomePrototypeSection(title: '최근 경로'),
