@@ -62,6 +62,18 @@ void main() {
     expect(assetCount, badgeCases.length);
   });
 
+  test('제공되지 않은 번호 노선은 PNG asset 경로를 만들지 않는다', () {
+    expect(
+      stationLineBadgeAssetNameFor(id: 'seoul-10', name: '수도권 10호선'),
+      isNull,
+    );
+    expect(stationLineBadgeAssetNameFor(id: 'busan-5', name: '부산 5호선'), isNull);
+    expect(
+      stationLineBadgeAssetNameFor(id: 'daejeon-2', name: '대전 2호선'),
+      isNull,
+    );
+  });
+
   testWidgets('노선 심볼 위젯은 제공 PNG를 그대로 렌더링한다', (tester) async {
     final lines = [
       for (final (id, name, _) in badgeCases)

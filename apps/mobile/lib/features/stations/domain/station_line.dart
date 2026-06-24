@@ -50,18 +50,22 @@ String? stationLineBadgeAssetNameFor({
     return null;
   }
   if (_isBusanLine(id: id, name: name)) {
-    return 'busan_${number}_compact_256.png';
+    return _bundledStationLineBadgeAssetName('busan_${number}_compact_256.png');
   }
   if (source.contains('daegu') || name.contains('대구')) {
-    return 'daegu_${number}_compact_256.png';
+    return _bundledStationLineBadgeAssetName('daegu_${number}_compact_256.png');
   }
   if (source.contains('daejeon') || name.contains('대전')) {
-    return 'daejeon_${number}_compact_256.png';
+    return _bundledStationLineBadgeAssetName(
+      'daejeon_${number}_compact_256.png',
+    );
   }
   if (source.contains('gwangju') || name.contains('광주')) {
-    return 'gwangju_${number}_compact_256.png';
+    return _bundledStationLineBadgeAssetName(
+      'gwangju_${number}_compact_256.png',
+    );
   }
-  return 'seoul_${number}_compact_256.png';
+  return _bundledStationLineBadgeAssetName('seoul_${number}_compact_256.png');
 }
 
 const _stationLineBadgeAssetNames = <String, String>{
@@ -105,6 +109,30 @@ const _stationLineBadgeAssetNames = <String, String>{
   '대경': 'daegyeong_compact_256.png',
   'daegyeong': 'daegyeong_compact_256.png',
 };
+
+const _numberedStationLineBadgeAssetNames = <String>{
+  'busan_1_compact_256.png',
+  'busan_2_compact_256.png',
+  'busan_3_compact_256.png',
+  'busan_4_compact_256.png',
+  'daegu_1_compact_256.png',
+  'daegu_2_compact_256.png',
+  'daegu_3_compact_256.png',
+  'daejeon_1_compact_256.png',
+  'gwangju_1_compact_256.png',
+  'seoul_1_compact_256.png',
+  'seoul_2_compact_256.png',
+  'seoul_3_compact_256.png',
+  'seoul_4_compact_256.png',
+  'seoul_5_compact_256.png',
+  'seoul_6_compact_256.png',
+  'seoul_7_compact_256.png',
+  'seoul_8_compact_256.png',
+  'seoul_9_compact_256.png',
+};
+
+String? _bundledStationLineBadgeAssetName(String assetName) =>
+    _numberedStationLineBadgeAssetNames.contains(assetName) ? assetName : null;
 
 bool stationLineBadgeNeedsRoundedCorners(String assetPath) =>
     assetPath.contains('/busan_') || assetPath.contains('/donghae_');
