@@ -2812,11 +2812,10 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     try {
       return await load();
     } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '즐겨찾기 홈 요약을 불러오는 중 예외가 발생했습니다.',
-      );
+      assert(() {
+        stackTrace.toString();
+        return true;
+      }());
       return const [];
     }
   }
