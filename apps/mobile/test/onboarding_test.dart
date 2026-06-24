@@ -341,6 +341,9 @@ void main() {
   });
 
   testWidgets('온보딩 고정 CTA 단계는 하단 스크롤 여백을 확보한다', (tester) async {
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetViewPadding);
+
     await tester.pumpWidget(
       MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
     );

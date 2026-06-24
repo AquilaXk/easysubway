@@ -749,9 +749,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
-    final listBottomPadding = _currentStep == 2
-        ? 32.0
-        : 104.0 + MediaQuery.viewPaddingOf(context).bottom;
+    final listBottomPadding = _currentStep == 2 ? 32.0 : 104.0;
     final profileOptions = [
       mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
       mobilityProfileOptions.firstWhere(
