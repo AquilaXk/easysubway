@@ -1765,6 +1765,12 @@ void main() {
       expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
       expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
 
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('경로 0개'), findsOneWidget);
+      expect(find.text('최근 경로'), findsNothing);
+
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));

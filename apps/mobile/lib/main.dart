@@ -2821,12 +2821,10 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     if (repository == null) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FavoriteListScreen(
-          title: '즐겨찾기한 경로',
-          child: FavoriteRouteListContent(repository: repository),
-        ),
+    unawaited(
+      _openFavoriteListScreen(
+        title: '즐겨찾기한 경로',
+        child: FavoriteRouteListContent(repository: repository),
       ),
     );
   }
@@ -2836,20 +2834,17 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     if (repository == null) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FavoriteListScreen(
-          title: '즐겨찾기한 역',
-          child: FavoriteStationListContent(
-            repository: repository,
-            stationRepository: widget.stationRepository,
-            reportRepository: widget.reportRepository,
-            locationProvider: widget.locationProvider,
-            facilityReportDraftTargetStore:
-                widget.facilityReportDraftTargetStore,
-            internalRouteRepository: widget.internalRouteRepository,
-            internalRouteMobilityType: widget.initialMobilityType,
-          ),
+    unawaited(
+      _openFavoriteListScreen(
+        title: '즐겨찾기한 역',
+        child: FavoriteStationListContent(
+          repository: repository,
+          stationRepository: widget.stationRepository,
+          reportRepository: widget.reportRepository,
+          locationProvider: widget.locationProvider,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.initialMobilityType,
         ),
       ),
     );
@@ -2860,14 +2855,31 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     if (repository == null) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FavoriteListScreen(
-          title: '즐겨찾기한 시설',
-          child: FavoriteFacilityListContent(repository: repository),
-        ),
+    unawaited(
+      _openFavoriteListScreen(
+        title: '즐겨찾기한 시설',
+        child: FavoriteFacilityListContent(repository: repository),
       ),
     );
+  }
+
+  Future<void> _openFavoriteListScreen({
+    required String title,
+    required Widget child,
+  }) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FavoriteListScreen(title: title, child: child),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    final next = _loadData();
+    setState(() {
+      _dataFuture = next;
+    });
+    await next;
   }
 }
 
