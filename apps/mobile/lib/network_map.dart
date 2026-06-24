@@ -397,7 +397,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           NavigationDestination(icon: Icon(Icons.home_outlined), label: '홈'),
           NavigationDestination(icon: Icon(Icons.map), label: '노선도'),
           NavigationDestination(icon: Icon(Icons.route_outlined), label: '길찾기'),
-          NavigationDestination(icon: Icon(Icons.bookmark_border), label: '저장'),
+          NavigationDestination(icon: Icon(Icons.star_border), label: '즐겨찾기'),
           NavigationDestination(icon: Icon(Icons.more_horiz), label: '더보기'),
         ],
       ),
