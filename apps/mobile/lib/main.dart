@@ -1161,62 +1161,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    void openStationSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-          ),
-        ),
-      );
-    }
-
-    void openRecentSearch() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-            entryMode: StationSearchEntryMode.recent,
-          ),
-        ),
-      );
-    }
-
-    void openNearbyStations() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => StationSearchScreen(
-            repository: repository,
-            reportRepository: reportRepository,
-            favoriteRepository: favoriteRepository,
-            searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
-            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-            internalRouteRepository: internalRouteRepository,
-            internalRouteMobilityType: initialMobilityType,
-            routeDraftController: _routeDraftController,
-            entryMode: StationSearchEntryMode.nearby,
-          ),
-        ),
-      );
-    }
-
     Future<void> refreshHomeState() async {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
@@ -1237,6 +1181,31 @@ class _HomeScreenState extends State<HomeScreen> {
         (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
       }
+    }
+
+    Future<void> openStationSearch([
+      StationSearchEntryMode entryMode = StationSearchEntryMode.search,
+    ]) async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            routeDraftController: _routeDraftController,
+            entryMode: entryMode,
+          ),
+        ),
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await refreshHomeState();
     }
 
     Future<void> openRouteSearch() async {
@@ -1298,7 +1267,7 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: networkMapRepository,
             routeDraftController: _routeDraftController,
             onOpenRouteSearch: openRouteSearch,
-            onOpenStationSearch: openStationSearch,
+            onOpenStationSearch: () => unawaited(openStationSearch()),
             onOpenSaved: openSavedItems,
             onOpenSettings: openSettings,
           ),
@@ -1315,7 +1284,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context, snapshot) {
               return _HomeNotificationButton(
                 key: const Key('homeNotificationActionButton'),
-                hasUnread: snapshot.data ?? false,
+                hasNotificationItems: snapshot.data ?? false,
                 onPressed: notificationRepository == null
                     ? openSettings
                     : openNotificationInbox,
@@ -1337,7 +1306,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _HomePrototypeHero(
                 profile: currentProfile,
                 onRouteSearch: openRouteSearch,
-                onStationSearch: openStationSearch,
+                onStationSearch: () => unawaited(openStationSearch()),
                 onProfileTap: openSettings,
               ),
               AnimatedBuilder(
@@ -1354,8 +1323,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               _HomeStationActionRow(
-                onRecentSearch: openRecentSearch,
-                onNearbyStations: openNearbyStations,
+                onRecentSearch: () =>
+                    unawaited(openStationSearch(StationSearchEntryMode.recent)),
+                onNearbyStations: () =>
+                    unawaited(openStationSearch(StationSearchEntryMode.nearby)),
               ),
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
@@ -1497,25 +1468,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _HomeNotificationButton extends StatelessWidget {
   const _HomeNotificationButton({
-    required this.hasUnread,
+    required this.hasNotificationItems,
     required this.onPressed,
     super.key,
   });
 
-  final bool hasUnread;
+  final bool hasNotificationItems;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: hasUnread ? '알림, 확인하지 않은 알림 있음' : '알림, 새 알림 없음',
+      label: hasNotificationItems ? '알림, 확인할 알림 있음' : '알림, 새 알림 없음',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Tooltip(
           message: '알림',
           child: Badge(
-            isLabelVisible: hasUnread,
+            isLabelVisible: hasNotificationItems,
             smallSize: 10,
             backgroundColor: EasySubwayAccessibleColors.red,
             offset: const Offset(-10, 10),

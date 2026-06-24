@@ -619,7 +619,7 @@ void main() {
     expect(notificationButtonSide?.width, 1.5);
     expect(notificationBadge.isLabelVisible, isFalse);
     expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsOneWidget);
-    expect(find.bySemanticsLabel('알림, 확인하지 않은 알림 있음'), findsNothing);
+    expect(find.bySemanticsLabel('알림, 확인할 알림 있음'), findsNothing);
 
     await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
     await tester.pumpAndSettle();
@@ -651,8 +651,33 @@ void main() {
       ),
     );
     expect(notificationBadge.isLabelVisible, isTrue);
-    expect(find.bySemanticsLabel('알림, 확인하지 않은 알림 있음'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림, 확인할 알림 있음'), findsOneWidget);
     expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsNothing);
+  });
+
+  testWidgets('홈은 역 검색에서 돌아오면 알림 상태를 다시 불러온다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.listMyReportsCount, 1);
+
+    await tester.tap(find.byKey(const Key('heroStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.listMyReportsCount, greaterThanOrEqualTo(2));
   });
 
   testWidgets('알림함 시설 상태는 심각도와 다음 행동을 함께 보여준다', (tester) async {
