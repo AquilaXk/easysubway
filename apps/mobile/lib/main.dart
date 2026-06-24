@@ -15,6 +15,7 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'internal_route.dart';
 import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
+import 'network_map.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
 import 'route_search.dart';
@@ -26,11 +27,27 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
   'EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS',
   defaultValue: false,
 );
+const defaultDemoHomeDataEnabled = bool.fromEnvironment(
+  'EASYSUBWAY_DEMO_HOME_DATA',
+  defaultValue: false,
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final bootstrap = await AppBootstrap.initialize(
     enablePushNotifications: defaultPushNotificationsEnabled,
+    favoriteRepository: defaultDemoHomeDataEnabled
+        ? const _DemoFavoriteStationRepository()
+        : null,
+    favoriteFacilityRepository: defaultDemoHomeDataEnabled
+        ? const _DemoFavoriteFacilityRepository()
+        : null,
+    favoriteRouteRepository: defaultDemoHomeDataEnabled
+        ? const _DemoFavoriteRouteRepository()
+        : null,
+    searchHistoryRepository: defaultDemoHomeDataEnabled
+        ? _DemoSearchHistoryRepository()
+        : null,
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
@@ -48,6 +65,136 @@ Future<void> main() async {
   );
 }
 
+class _DemoFavoriteStationRepository implements FavoriteStationRepository {
+  const _DemoFavoriteStationRepository();
+
+  static const _station = FavoriteStation(
+    userId: 'demo-user',
+    stationId: 'station-sangnoksu',
+    nameKo: '상록수',
+    nameEn: 'Sangnoksu',
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    dataSourceType: 'OFFICIAL_FILE',
+    lastVerifiedAt: '2026-06-13',
+    lines: [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '448',
+      ),
+    ],
+    addedAt: '2026-06-13T10:00:00',
+  );
+
+  @override
+  Future<List<FavoriteStation>> listFavoriteStations() async {
+    return const [_station];
+  }
+
+  @override
+  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+    return _station;
+  }
+
+  @override
+  Future<void> removeFavoriteStation(String stationId) async {}
+}
+
+class _DemoFavoriteFacilityRepository implements FavoriteFacilityRepository {
+  const _DemoFavoriteFacilityRepository();
+
+  static const _facility = FavoriteFacility(
+    userId: 'demo-user',
+    facilityId: 'facility-sangnoksu-elevator-3',
+    stationId: 'station-sangnoksu',
+    stationNameKo: '상록수',
+    stationNameEn: 'Sangnoksu',
+    exitId: 'exit-sangnoksu-3',
+    type: 'ELEVATOR',
+    name: '3번 출구 엘리베이터',
+    floorFrom: '1F',
+    floorTo: 'B1',
+    description: '3번 출구 앞',
+    status: 'NEEDS_CHECK',
+    dataConfidence: 'HIGH',
+    dataSourceType: 'OFFICIAL_FILE',
+    lastUpdatedAt: '2026-06-12',
+    addedAt: '2026-06-14T10:00:00',
+  );
+
+  @override
+  Future<List<FavoriteFacility>> listFavoriteFacilities() async {
+    return const [_facility];
+  }
+
+  @override
+  Future<FavoriteFacility> saveFavoriteFacility(String facilityId) async {
+    return _facility;
+  }
+
+  @override
+  Future<void> removeFavoriteFacility(String facilityId) async {}
+}
+
+class _DemoFavoriteRouteRepository implements FavoriteRouteRepository {
+  const _DemoFavoriteRouteRepository();
+
+  static const _route = FavoriteRoute(
+    userId: 'demo-user',
+    favoriteRouteId: 'route-1',
+    routeSearchId: 'route-1',
+    originStationId: 'station-sangnoksu',
+    originStationName: '상록수',
+    destinationStationId: 'station-sadang',
+    destinationStationName: '사당',
+    mobilityType: 'SENIOR',
+    status: 'FOUND',
+    lineId: 'seoul-4',
+    lineName: '수도권 4호선',
+    score: 92,
+    routeCreatedAt: '2026-06-13T09:00:00',
+    addedAt: '2026-06-14T10:00:00',
+  );
+
+  @override
+  Future<List<FavoriteRoute>> listFavoriteRoutes() async {
+    return const [_route];
+  }
+
+  @override
+  Future<FavoriteRoute> saveFavoriteRoute(
+    String routeSearchId, {
+    RouteSearchResult? result,
+  }) async {
+    return _route;
+  }
+
+  @override
+  Future<void> removeFavoriteRoute(String favoriteRouteId) async {}
+}
+
+class _DemoSearchHistoryRepository implements SearchHistoryRepository {
+  final _queries = <String>['상록수', '사당'];
+
+  @override
+  Future<void> recordSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _queries
+      ..remove(trimmed)
+      ..insert(0, trimmed);
+  }
+
+  @override
+  Future<List<String>> listRecentQueries() async {
+    return List.unmodifiable(_queries);
+  }
+}
+
 class EasySubwayApp extends StatelessWidget {
   EasySubwayApp({
     AppDependencies? dependencies,
@@ -58,8 +205,10 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
+    Future<List<FavoriteRoute>>? recentRoutesFuture,
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
+    NetworkMapRepository? networkMapRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
@@ -89,6 +238,7 @@ class EasySubwayApp extends StatelessWidget {
                favoriteRouteRepository: favoriteRouteRepository,
                searchHistoryRepository: searchHistoryRepository,
                internalRouteRepository: internalRouteRepository,
+               networkMapRepository: networkMapRepository,
                notificationRepository: notificationRepository,
                notificationPermissionProvider: notificationPermissionProvider,
                locationProvider: locationProvider,
@@ -104,6 +254,11 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
+         recentRoutesFuture:
+             recentRoutesFuture ??
+             (defaultDemoHomeDataEnabled
+                 ? const _DemoFavoriteRouteRepository().listFavoriteRoutes()
+                 : null),
          key: key,
        );
 
@@ -116,6 +271,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -126,6 +282,7 @@ class EasySubwayApp extends StatelessWidget {
        favoriteRouteRepository = dependencies.favoriteRouteRepository,
        searchHistoryRepository = dependencies.searchHistoryRepository,
        internalRouteRepository = dependencies.internalRouteRepository,
+       networkMapRepository = dependencies.networkMapRepository,
        notificationRepository = dependencies.notificationRepository,
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
@@ -141,6 +298,7 @@ class EasySubwayApp extends StatelessWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
+  final NetworkMapRepository networkMapRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -152,6 +310,7 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +345,7 @@ class EasySubwayApp extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(60),
-            side: const BorderSide(color: Color(0xFF006D77), width: 1.5),
+            side: const BorderSide(color: Color(0xFF006D77), width: 2),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -208,6 +367,7 @@ class EasySubwayApp extends StatelessWidget {
         favoriteRouteRepository: favoriteRouteRepository,
         searchHistoryRepository: searchHistoryRepository,
         internalRouteRepository: internalRouteRepository,
+        networkMapRepository: networkMapRepository,
         notificationRepository: notificationRepository,
         notificationPermissionProvider: notificationPermissionProvider,
         locationProvider: locationProvider,
@@ -219,6 +379,7 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
+        recentRoutesFuture: recentRoutesFuture,
       ),
     );
   }
@@ -324,6 +485,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.favoriteRouteRepository,
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
+    required this.networkMapRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -335,6 +497,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    required this.recentRoutesFuture,
   });
 
   final StationSearchRepository repository;
@@ -346,6 +509,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
+  final NetworkMapRepository networkMapRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -357,6 +521,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -466,6 +631,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         favoriteRouteRepository: widget.favoriteRouteRepository,
         searchHistoryRepository: widget.searchHistoryRepository,
         internalRouteRepository: widget.internalRouteRepository,
+        networkMapRepository: widget.networkMapRepository,
         notificationRepository: widget.notificationRepository,
         notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
@@ -476,6 +642,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessInfo: widget.supportAccessInfo,
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
+        recentRoutesFuture: widget.recentRoutesFuture,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
       ),
@@ -818,6 +985,7 @@ class HomeScreen extends StatefulWidget {
     required this.favoriteRouteRepository,
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
+    required this.networkMapRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -826,6 +994,7 @@ class HomeScreen extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
+    required this.recentRoutesFuture,
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
@@ -843,6 +1012,7 @@ class HomeScreen extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
+  final NetworkMapRepository networkMapRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -852,6 +1022,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
@@ -864,7 +1035,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late String _mobilityType;
   late final RouteDraftController _routeDraftController;
-  Future<List<FavoriteRoute>>? _favoriteRoutesFuture;
+  Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
 
   @override
@@ -872,8 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
-    _favoriteRoutesFuture = widget.favoriteRouteRepository
-        ?.listFavoriteRoutes();
+    _recentRoutesFuture = widget.recentRoutesFuture;
     _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
   }
@@ -891,9 +1061,8 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.initialMobilityType != oldWidget.initialMobilityType) {
       _mobilityType = widget.initialMobilityType;
     }
-    if (widget.favoriteRouteRepository != oldWidget.favoriteRouteRepository) {
-      _favoriteRoutesFuture = widget.favoriteRouteRepository
-          ?.listFavoriteRoutes();
+    if (widget.recentRoutesFuture != oldWidget.recentRoutesFuture) {
+      _recentRoutesFuture = widget.recentRoutesFuture;
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
@@ -912,6 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final favoriteRouteRepository = widget.favoriteRouteRepository;
     final searchHistoryRepository = widget.searchHistoryRepository;
     final internalRouteRepository = widget.internalRouteRepository;
+    final networkMapRepository = widget.networkMapRepository;
     final routeFeedbackRepository = widget.routeFeedbackRepository;
     final notificationRepository = widget.notificationRepository;
     final notificationPermissionProvider =
@@ -998,23 +1168,36 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    void openRecentSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            routeDraftController: _routeDraftController,
+            entryMode: StationSearchEntryMode.recent,
+          ),
+        ),
+      );
+    }
+
     Future<void> refreshHomeState() async {
-      final routeRepository = widget.favoriteRouteRepository;
       final facilityRepository = widget.favoriteFacilityRepository;
-      if (routeRepository == null && facilityRepository == null) {
+      if (facilityRepository == null) {
         return;
       }
-      final routesFuture = routeRepository?.listFavoriteRoutes();
-      final facilitiesFuture = facilityRepository?.listFavoriteFacilities();
+      final facilitiesFuture = facilityRepository.listFavoriteFacilities();
       setState(() {
-        _favoriteRoutesFuture = routesFuture;
         _favoriteFacilitiesFuture = facilitiesFuture;
       });
       try {
-        await Future.wait<void>([
-          if (routesFuture != null) routesFuture.then((_) {}),
-          if (facilitiesFuture != null) facilitiesFuture.then((_) {}),
-        ]);
+        await facilitiesFuture;
       } catch (error, stackTrace) {
         (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
@@ -1073,6 +1256,21 @@ class _HomeScreenState extends State<HomeScreen> {
       unawaited(openFavorites());
     }
 
+    void openNetworkMap() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => NetworkMapScreen(
+            repository: networkMapRepository,
+            routeDraftController: _routeDraftController,
+            onOpenRouteSearch: openRouteSearch,
+            onOpenStationSearch: openStationSearch,
+            onOpenSaved: openSavedItems,
+            onOpenSettings: openSettings,
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
@@ -1099,8 +1297,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 profile: currentProfile,
                 onRouteSearch: openRouteSearch,
                 onStationSearch: openStationSearch,
-                onNetworkMap: openStationSearch,
                 onProfileTap: openSettings,
+              ),
+              _HomeStationActionRow(
+                onRecentSearch: openRecentSearch,
+                onStationSearch: openStationSearch,
               ),
               AnimatedBuilder(
                 animation: _routeDraftController,
@@ -1118,10 +1319,10 @@ class _HomeScreenState extends State<HomeScreen> {
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
               ),
-              _HomeSavedRouteSection(
-                key: const Key('homeSavedRouteSection'),
-                routesFuture: _favoriteRoutesFuture,
-                onOpenFavorites: openFavorites,
+              _HomeRecentRouteSection(
+                key: const Key('homeRecentRouteSection'),
+                routesFuture: _recentRoutesFuture,
+                onTap: openRouteSearch,
               ),
             ],
           ),
@@ -1136,7 +1337,7 @@ class _HomeScreenState extends State<HomeScreen> {
             case 0:
               break;
             case 1:
-              openStationSearch();
+              openNetworkMap();
               break;
             case 2:
               unawaited(openRouteSearch());
@@ -1170,8 +1371,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           NavigationDestination(
             key: Key('bottomNavSaved'),
-            icon: Icon(Icons.bookmark_border),
-            selectedIcon: Icon(Icons.bookmark),
+            icon: Icon(Icons.star_border),
+            selectedIcon: Icon(Icons.star),
             label: '즐겨찾기',
           ),
           NavigationDestination(
@@ -1226,45 +1427,22 @@ class _HomeNotificationButton extends StatelessWidget {
       child: ExcludeSemantics(
         child: Tooltip(
           message: '알림',
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: EasySubwayAccessibleColors.mintBorder,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const SizedBox(width: 44, height: 44),
-                  ),
-                  const Icon(
-                    Icons.notifications_none,
-                    color: EasySubwayAccessibleColors.mintDark,
-                    size: 26,
-                  ),
-                  Positioned(
-                    top: 9,
-                    right: 9,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: EasySubwayAccessibleColors.red,
-                        border: Border.all(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const SizedBox(width: 10, height: 10),
-                    ),
-                  ),
-                ],
+          child: Badge(
+            smallSize: 10,
+            backgroundColor: EasySubwayAccessibleColors.red,
+            offset: const Offset(-10, 10),
+            child: IconButton.filledTonal(
+              onPressed: onPressed,
+              iconSize: 26,
+              style: IconButton.styleFrom(
+                minimumSize: const Size.square(48),
+                backgroundColor: Colors.white,
+                foregroundColor: EasySubwayAccessibleColors.mintDark,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
+              icon: const Icon(Icons.notifications_none),
             ),
           ),
         ),
@@ -1534,14 +1712,12 @@ class _HomePrototypeHero extends StatelessWidget {
     required this.profile,
     required this.onRouteSearch,
     required this.onStationSearch,
-    required this.onNetworkMap,
     required this.onProfileTap,
   });
 
   final MobilityProfileOption profile;
   final VoidCallback onRouteSearch;
   final VoidCallback onStationSearch;
-  final VoidCallback onNetworkMap;
   final VoidCallback onProfileTap;
 
   @override
@@ -1549,28 +1725,15 @@ class _HomePrototypeHero extends StatelessWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: '길찾기와 노선도, 현재 이동 조건 ${profile.title}',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              EasySubwayAccessibleColors.brandDark,
-              EasySubwayAccessibleColors.brand,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x240B2947),
-              blurRadius: 30,
-              offset: Offset(0, 16),
-            ),
-          ],
-        ),
+      label: '길찾기와 역검색, 현재 이동 조건 ${profile.title}',
+      child: Material(
+        key: const Key('homeHeroCard'),
+        color: EasySubwayAccessibleColors.brand,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1583,7 +1746,7 @@ class _HomePrototypeHero extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               color: Colors.white,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               height: 1.28,
                             ),
                       ),
@@ -1605,15 +1768,16 @@ class _HomePrototypeHero extends StatelessWidget {
                         child: FilledButton.icon(
                           onPressed: onRouteSearch,
                           style: FilledButton.styleFrom(
-                            backgroundColor: EasySubwayAccessibleColors.mint,
+                            backgroundColor:
+                                EasySubwayAccessibleColors.brandDark,
                             foregroundColor: Colors.white,
                             minimumSize: const Size.fromHeight(104),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),
                             textStyle: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           icon: const Icon(Icons.route),
@@ -1624,74 +1788,34 @@ class _HomePrototypeHero extends StatelessWidget {
                   ),
                   const SizedBox(width: 9),
                   Expanded(
-                    child: Semantics(
-                      key: const Key('networkMapButton'),
-                      button: true,
-                      label: '노선도',
-                      onTap: onNetworkMap,
-                      child: ExcludeSemantics(
-                        child: FilledButton.icon(
-                          onPressed: onNetworkMap,
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor:
-                                EasySubwayAccessibleColors.brandDark,
-                            minimumSize: const Size.fromHeight(104),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
+                    child: KeyedSubtree(
+                      key: const Key('heroStationSearchButton'),
+                      child: Semantics(
+                        key: const Key('stationSearchButton'),
+                        button: true,
+                        label: '역 검색',
+                        onTap: onStationSearch,
+                        child: ExcludeSemantics(
+                          child: FilledButton.icon(
+                            onPressed: onStationSearch,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor:
+                                  EasySubwayAccessibleColors.brandDark,
+                              minimumSize: const Size.fromHeight(104),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
+                            icon: const Icon(Icons.search),
+                            label: const Text('역검색'),
                           ),
-                          icon: const Icon(Icons.map_outlined),
-                          label: const Text('노선도'),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('stationSearchButton'),
-                      onPressed: onStationSearch,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: EasySubwayAccessibleColors.brandDark,
-                        side: BorderSide.none,
-                        minimumSize: const Size.fromHeight(
-                          EasySubwayTouchTarget.general,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                      ),
-                      icon: const Icon(Icons.search),
-                      label: const Text('역 검색'),
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onStationSearch,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: EasySubwayAccessibleColors.brandDark,
-                        side: BorderSide.none,
-                        minimumSize: const Size.fromHeight(
-                          EasySubwayTouchTarget.general,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                      ),
-                      icon: const Icon(Icons.location_on_outlined),
-                      label: const Text('가까운 역'),
                     ),
                   ),
                 ],
@@ -1700,6 +1824,77 @@ class _HomePrototypeHero extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HomeStationActionRow extends StatelessWidget {
+  const _HomeStationActionRow({
+    required this.onRecentSearch,
+    required this.onStationSearch,
+  });
+
+  final VoidCallback onRecentSearch;
+  final VoidCallback onStationSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: _HomeStationActionButton(
+              key: const Key('recentSearchButton'),
+              icon: Icons.search,
+              label: '최근 검색',
+              onPressed: onRecentSearch,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: KeyedSubtree(
+              key: const Key('nearbyStationHomeButton'),
+              child: _HomeStationActionButton(
+                key: const Key('nearbyStationButton'),
+                icon: Icons.location_on_outlined,
+                label: '가까운 역',
+                onPressed: onStationSearch,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeStationActionButton extends StatelessWidget {
+  const _HomeStationActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: EasySubwayAccessibleColors.brandDark,
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
+        minimumSize: const Size.fromHeight(72),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        textStyle: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+      ),
+      icon: Icon(icon, size: 28),
+      label: Text(label),
     );
   }
 }
@@ -1717,41 +1912,23 @@ class _HomeProfilePill extends StatelessWidget {
       label: '현재 이동 조건 ${profile.title}',
       onTap: onTap,
       child: ExcludeSemantics(
-        child: InkWell(
+        child: OutlinedButton.icon(
           key: const Key('homeProfilePill'),
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.11),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(profile.icon, size: 16, color: Colors.white),
-                    const SizedBox(width: 7),
-                    Text(
-                      profile.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            backgroundColor: Colors.white.withValues(alpha: 0.11),
+            foregroundColor: Colors.white,
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.26)),
+            shape: const StadiumBorder(),
+            textStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          icon: Icon(profile.icon, size: 16),
+          label: Text(profile.title),
         ),
       ),
     );
@@ -1789,18 +1966,16 @@ class _HomeRouteDraftCard extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  DecoratedBox(
+                  Container(
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(13),
                     ),
-                    child: const SizedBox(
-                      width: 42,
-                      height: 42,
-                      child: Icon(
-                        Icons.route_outlined,
-                        color: EasySubwayAccessibleColors.brand,
-                      ),
+                    child: const Icon(
+                      Icons.route_outlined,
+                      color: EasySubwayAccessibleColors.brand,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1942,18 +2117,16 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final facilityName = facility.name.trim().isEmpty
-        ? facility.typeLabel
-        : facility.name;
-    final notice =
-        '$facilityName 상태가 ${facility.statusLabel}입니다. 다른 출구 또는 역무원 안내를 확인하세요.';
+    const notice = '다른 출구 또는 역무원 안내를 확인하세요.';
     return Semantics(
       container: true,
-      label: '주의, $notice',
+      label: notice,
       child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
+        child: Card(
+          color: Colors.white,
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           child: Padding(
@@ -1961,16 +2134,6 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '주의',
-                  style: TextStyle(
-                    color: EasySubwayAccessibleColors.red,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     notice,
@@ -2025,15 +2188,15 @@ IconData _facilityIcon(String type) {
   };
 }
 
-class _HomeSavedRouteSection extends StatelessWidget {
-  const _HomeSavedRouteSection({
+class _HomeRecentRouteSection extends StatelessWidget {
+  const _HomeRecentRouteSection({
     super.key,
     required this.routesFuture,
-    required this.onOpenFavorites,
+    required this.onTap,
   });
 
   final Future<List<FavoriteRoute>>? routesFuture;
-  final VoidCallback onOpenFavorites;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -2044,17 +2207,9 @@ class _HomeSavedRouteSection extends StatelessWidget {
     return FutureBuilder<List<FavoriteRoute>>(
       future: routesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            snapshot.hasError) {
           return const SizedBox.shrink();
-        }
-        if (snapshot.hasError) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _HomePrototypeSection(title: '최근 경로'),
-              _HomeSavedRouteErrorCard(onTap: onOpenFavorites),
-            ],
-          );
         }
         final routes = snapshot.data ?? const <FavoriteRoute>[];
         if (routes.isEmpty) {
@@ -2064,7 +2219,7 @@ class _HomeSavedRouteSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _HomePrototypeSection(title: '최근 경로'),
-            _HomeSavedRouteCard(route: routes.first, onTap: onOpenFavorites),
+            _HomeRecentRouteCard(route: routes.first, onTap: onTap),
           ],
         );
       },
@@ -2072,44 +2227,94 @@ class _HomeSavedRouteSection extends StatelessWidget {
   }
 }
 
-class _HomeSavedRouteErrorCard extends StatelessWidget {
-  const _HomeSavedRouteErrorCard({required this.onTap});
+class _HomeRecentRouteCard extends StatelessWidget {
+  const _HomeRecentRouteCard({required this.route, required this.onTap});
 
-  final VoidCallback onTap;
+  final FavoriteRoute route;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
-    return _PrototypeCard(
-      backgroundColor: const Color(0xFFFFFAF0),
-      borderColor: const Color(0xFFF1D49A),
-      child: Column(
-        children: [
-          const _PrototypeInfoRow(
-            icon: Icons.bookmark_border,
-            iconBackground: EasySubwayAccessibleColors.amberSoft,
-            iconColor: EasySubwayAccessibleColors.amber,
-            title: '즐겨찾기한 경로를 불러오지 못했습니다',
-            subtitle: '즐겨찾기 화면에서 다시 확인해 주세요',
-            trailing: '확인 필요',
-          ),
-          const SizedBox(height: 13),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(
-                  EasySubwayTouchTarget.general,
+    final originName = _stationNameWithSuffix(route.originStationName);
+    final destinationName = _stationNameWithSuffix(
+      route.destinationStationName,
+    );
+    return Semantics(
+      button: true,
+      label: '최근 경로, $originName에서 $destinationName까지, ${route.lineLabel}',
+      onTap: () => unawaited(onTap()),
+      child: ExcludeSemantics(
+        child: InkWell(
+          key: const Key('homeRecentRouteCard'),
+          onTap: () => unawaited(onTap()),
+          borderRadius: BorderRadius.circular(26),
+          child: _PrototypeCard(
+            borderRadius: 26,
+            showBorder: true,
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _HomeRouteStationLabel(
+                    stationName: originName,
+                    route: route,
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    size: 20,
+                    color: EasySubwayAccessibleColors.text,
+                  ),
                 ),
-              ),
-              child: const Text('즐겨찾기 경로 보기'),
+                Expanded(
+                  child: _HomeRouteStationLabel(
+                    stationName: destinationName,
+                    route: route,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _HomeRouteStationLabel extends StatelessWidget {
+  const _HomeRouteStationLabel({
+    required this.stationName,
+    required this.route,
+  });
+
+  final String stationName;
+  final FavoriteRoute route;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _HomeLineSymbol(route: route),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            stationName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2129,27 +2334,22 @@ class _HomeSavedRouteCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '최근 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
+          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           child: _PrototypeCard(
+            showBorder: true,
             child: Row(
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: EasySubwayAccessibleColors.mintSoft,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: Icon(
-                      Icons.route_outlined,
-                      color: EasySubwayAccessibleColors.mintDark,
-                    ),
+                CircleAvatar(
+                  radius: 21,
+                  backgroundColor: EasySubwayAccessibleColors.mintSoft,
+                  child: const Icon(
+                    Icons.route_outlined,
+                    color: EasySubwayAccessibleColors.mintDark,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2192,6 +2392,48 @@ class _HomeSavedRouteCard extends StatelessWidget {
   }
 }
 
+class _HomeLineSymbol extends StatelessWidget {
+  const _HomeLineSymbol({required this.route});
+
+  final FavoriteRoute route;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = stationLineColor(_lineColorForRoute(route));
+    return CircleAvatar(
+      radius: 10,
+      backgroundColor: color,
+      child: Text(
+        stationLineBadgeText(route.lineLabel),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
+String _lineColorForRoute(FavoriteRoute route) {
+  final lineId = route.lineId.toLowerCase();
+  final lineName = route.lineName;
+  if (lineId.contains('4') || lineName.contains('4호선')) {
+    return '#00A5DE';
+  }
+  if (lineId.contains('1') || lineName.contains('1호선')) {
+    return '#0052A4';
+  }
+  if (lineId.contains('2') || lineName.contains('2호선')) {
+    return '#00A84D';
+  }
+  if (lineId.contains('3') || lineName.contains('3호선')) {
+    return '#EF7C1C';
+  }
+  return '#006D77';
+}
+
 String _stationNameWithSuffix(String name) {
   return name.endsWith('역') ? name : '$name역';
 }
@@ -2203,23 +2445,19 @@ class _HomeMiniBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: BorderRadius.circular(999),
+    return Chip(
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: EasySubwayAccessibleColors.mintSoft,
+      side: BorderSide.none,
+      shape: const StadiumBorder(),
+      labelStyle: const TextStyle(
+        color: EasySubwayAccessibleColors.mintDark,
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        height: 1.2,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: EasySubwayAccessibleColors.mintDark,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            height: 1.2,
-          ),
-        ),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
     );
   }
 }
@@ -2231,6 +2469,7 @@ class _PrototypeCard extends StatelessWidget {
     this.borderColor = EasySubwayAccessibleColors.line,
     this.borderRadius = 20,
     this.padding = const EdgeInsets.all(16),
+    this.showBorder = false,
   });
 
   final Widget child;
@@ -2238,22 +2477,20 @@ class _PrototypeCard extends StatelessWidget {
   final Color borderColor;
   final double borderRadius;
   final EdgeInsetsGeometry padding;
+  final bool showBorder;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border.all(color: borderColor),
+    return Card(
+      margin: EdgeInsets.zero,
+      color: backgroundColor,
+      elevation: 2,
+      shadowColor: const Color(0x0A071B2F),
+      shape: RoundedRectangleBorder(
+        side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A071B2F),
-            blurRadius: 12,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Padding(padding: padding, child: child),
     );
   }
@@ -2285,16 +2522,14 @@ class _PrototypeInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = this.subtitle;
-    final leading = DecoratedBox(
+    final leading = Container(
+      width: iconBoxSize,
+      height: iconBoxSize,
       decoration: BoxDecoration(
         color: iconBackground,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: SizedBox(
-        width: iconBoxSize,
-        height: iconBoxSize,
-        child: Icon(icon, color: iconColor, size: iconSize),
-      ),
+      child: Icon(icon, color: iconColor, size: iconSize),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3608,7 +3843,7 @@ class _SecurityContactNotice extends StatelessWidget {
       container: true,
       label: '$_title, $_contactNotice $_scopeNotice',
       child: ExcludeSemantics(
-        child: DecoratedBox(
+        child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFFF0F2FF),
             border: Border.all(color: const Color(0xFFC3C9E8)),
@@ -3700,7 +3935,7 @@ class _SafetyDataNotice extends StatelessWidget {
       container: true,
       label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
       child: ExcludeSemantics(
-        child: DecoratedBox(
+        child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFFFFF7E8),
             border: Border.all(color: const Color(0xFFE3C37D)),
@@ -3796,7 +4031,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
       label:
           '$_title, $_locationPurpose $_appDataPurpose $_deletionScope $_retentionNotice',
       child: ExcludeSemantics(
-        child: DecoratedBox(
+        child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFFEAF5F4),
             border: Border.all(color: const Color(0xFFB7D7D3)),

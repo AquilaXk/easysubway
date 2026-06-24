@@ -10,6 +10,7 @@ import '../features/search_history/data/drift_search_history_repository.dart';
 import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
 import '../internal_route.dart';
+import '../network_map.dart';
 import '../notification_settings.dart';
 import '../route_search.dart';
 import '../station_search.dart';
@@ -29,6 +30,7 @@ class AppDependencies {
     required this.favoriteRouteRepository,
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
+    required this.networkMapRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -45,6 +47,7 @@ class AppDependencies {
     FavoriteRouteRepository? favoriteRouteRepository,
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
+    NetworkMapRepository? networkMapRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
@@ -91,12 +94,23 @@ class AppDependencies {
         ? notificationPermissionProvider
         : null;
 
+    final StationSearchRepository resolvedStationRepository =
+        repository ??
+        (catalogDatabase != null
+            ? DriftStationRepository(database: catalogDatabase)
+            : StationSearchApiRepository(baseUri: requireBaseUri()));
+    final injectedNetworkMapRepository = repository is NetworkMapRepository
+        ? repository as NetworkMapRepository
+        : null;
+    final resolvedNetworkMapRepository =
+        networkMapRepository ??
+        injectedNetworkMapRepository ??
+        (catalogDatabase != null
+            ? DriftStationRepository(database: catalogDatabase)
+            : const _UnavailableNetworkMapRepository());
+
     return AppDependencies(
-      repository:
-          repository ??
-          (catalogDatabase != null
-              ? DriftStationRepository(database: catalogDatabase)
-              : StationSearchApiRepository(baseUri: requireBaseUri())),
+      repository: resolvedStationRepository,
       reportRepository:
           reportRepository ??
           _defaultFacilityReportRepository(
@@ -165,6 +179,7 @@ class AppDependencies {
                     catalogDatabase: catalogDatabase,
                   ),
                 )),
+      networkMapRepository: resolvedNetworkMapRepository,
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
@@ -188,10 +203,34 @@ class AppDependencies {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
+  final NetworkMapRepository networkMapRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
+}
+
+class _UnavailableNetworkMapRepository implements NetworkMapRepository {
+  const _UnavailableNetworkMapRepository();
+
+  @override
+  Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
+    final selectedRegion = region ?? '수도권';
+    return NetworkMapData(
+      regions: const [
+        NetworkMapRegion(name: '수도권'),
+        NetworkMapRegion(name: '부산권'),
+        NetworkMapRegion(name: '광주권'),
+        NetworkMapRegion(name: '대구권'),
+        NetworkMapRegion(name: '대전권'),
+      ],
+      selectedRegion: selectedRegion,
+      lines: const [],
+      stations: const [],
+      edges: const [],
+      positionSources: const [],
+    );
+  }
 }
 
 FacilityReportRepository _defaultFacilityReportRepository({

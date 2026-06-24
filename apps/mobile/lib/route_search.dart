@@ -457,7 +457,13 @@ class FavoriteRoute {
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get semanticLabel {
-    return '즐겨찾기 경로, $summaryTitle, $lineLabel, $mobilityLabel, $scoreLabel';
+    return [
+      '즐겨찾기 경로',
+      summaryTitle,
+      lineLabel,
+      mobilityLabel,
+      scoreLabel,
+    ].join(', ');
   }
 }
 
@@ -2560,8 +2566,9 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
     final steps = result.movementSteps;
-    final currentStep = steps.isEmpty ? null : steps.first;
     final nextStep = steps.length > 1 ? steps[1] : result.arrivalGuidanceStep;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2580,31 +2587,257 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '1 / ${steps.isEmpty ? 1 : steps.length}',
-                  style: const TextStyle(color: Color(0xFFD7F5EB)),
-                ),
-                const SizedBox(height: 18),
-                const Icon(Icons.arrow_forward, color: Colors.white, size: 38),
-                const SizedBox(height: 14),
-                Text(
-                  currentStep?.title ?? result.guidanceLabel,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    height: 1.25,
+                Container(
+                  decoration: BoxDecoration(
+                    color: EasySubwayAccessibleColors.mintSoft,
+                    border: Border.all(
+                      color: EasySubwayAccessibleColors.mintBorder,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: textScale >= 2
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${result.originStationName} → ${result.destinationStationName}',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: EasySubwayAccessibleColors.text,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _routeGuidanceMobilityHeaderLabel(result),
+                                key: const Key('routeGuidanceMobilityChip'),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Container(
+                                  width: 39,
+                                  height: 39,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        EasySubwayAccessibleColors.mintBorder,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: EasySubwayAccessibleColors.mintDark,
+                                    size: 17,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${result.originStationName} → ${result.destinationStationName}',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        color: EasySubwayAccessibleColors.text,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _routeGuidanceMobilityHeaderLabel(result),
+                                      key: const Key(
+                                        'routeGuidanceMobilityChip',
+                                      ),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: EasySubwayAccessibleColors
+                                            .mutedText,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                width: 39,
+                                height: 39,
+                                decoration: BoxDecoration(
+                                  color: EasySubwayAccessibleColors.mintBorder,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.edit_outlined,
+                                  color: EasySubwayAccessibleColors.mintDark,
+                                  size: 17,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
-                if (currentStep != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    currentStep.description,
-                    style: const TextStyle(
-                      color: Color(0xFFC7D8E3),
-                      height: 1.4,
+                const SizedBox(height: 22),
+                _RoutePrototypeSection(
+                  title: result.isBlocked
+                      ? '안내 불가 이유'
+                      : _isRecommendedRoute(result)
+                      ? '추천 경로 1개'
+                      : result.statusLabel,
+                  subtitle: result.isBlocked
+                      ? '현재 조건에서 막힌 이유를 확인하세요'
+                      : _isRecommendedRoute(result)
+                      ? '편함·불편함과 시간·환승·걷기만 비교합니다.'
+                      : '이 경로는 이동 전 확인이 필요합니다',
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(
+                      color: result.isBlocked
+                          ? const Color(0xFFEFCCCC)
+                          : EasySubwayAccessibleColors.mint,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A0D8A6D),
+                        blurRadius: 18,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (textScale >= 2)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _routeWorkflowSummaryTitle(result),
+                                style: textTheme.headlineSmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.text,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _routeWorkflowSummarySubtitle(result),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (_isRecommendedRoute(result))
+                                const _RoutePrototypeChip(
+                                  label: '가장 추천',
+                                  icon: Icons.check,
+                                ),
+                              const SizedBox(height: 5),
+                              Text(
+                                result.comfortLabel,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: EasySubwayAccessibleColors.mintDark,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _routeWorkflowSummaryTitle(result),
+                                      style: textTheme.headlineSmall?.copyWith(
+                                        color: EasySubwayAccessibleColors.text,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _routeWorkflowSummarySubtitle(result),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: EasySubwayAccessibleColors
+                                            .mutedText,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (_isRecommendedRoute(result))
+                                    const _RoutePrototypeChip(
+                                      label: '가장 추천',
+                                      icon: Icons.check,
+                                    ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    result.comfortLabel,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color:
+                                          EasySubwayAccessibleColors.mintDark,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        if (_isRecommendedRoute(result) &&
+                            result.movementSteps.isNotEmpty) ...[
+                          const SizedBox(height: 15),
+                          const _RoutePrototypeLinePath(),
+                        ],
+                        if (result.blockedReasons.isNotEmpty) ...[
+                          const SizedBox(height: 13),
+                          for (final reason in result.blockedReasons)
+                            _RoutePrototypeReason(text: reason, blocked: true),
+                        ],
+                        if (result.arrivalGuidanceStep != null) ...[
+                          const SizedBox(height: 16),
+                          _RouteArrivalGuidance(
+                            step: result.arrivalGuidanceStep!,
+                          ),
+                        ],
+                        if (result.warnings.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          for (final warning in result.warnings)
+                            _RouteNotice(
+                              title: '주의 확인',
+                              text: warning.message,
+                              icon: Icons.warning_amber,
+                            ),
+                        ],
+                        if (result.movementSteps.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          _RouteStepSection(steps: result.movementSteps),
+                        ],
+                      ],
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -3059,8 +3292,73 @@ String _routeMetaLabel(RouteSearchResult result) {
   return '${_routeTransferLabel(result)} · 걷기 ${_routeWalkingDistanceLabel(result)}';
 }
 
+String _routeGuidanceMobilityHeaderLabel(RouteSearchResult result) {
+  final mobilityLabel = result.mobilityLabel;
+  if (mobilityLabel == '이동 조건 확인 필요') {
+    return mobilityLabel;
+  }
+  final condition = _routeMobilityConditionLabel(
+    _mobilityOptionFor(result.mobilityType),
+  );
+  return condition.isEmpty ? mobilityLabel : '$mobilityLabel · $condition';
+}
+
+bool _isRecommendedRoute(RouteSearchResult result) {
+  return result.status == 'FOUND' && !result.isBlocked;
+}
+
+String _routeWorkflowSummaryTitle(RouteSearchResult result) {
+  final totalMinutes = _routeTotalMinutes(result);
+  // route contract: realtime ETA fallback
+  if (_isRecommendedRoute(result) && totalMinutes > 0) {
+    return '$totalMinutes분';
+  }
+  return result.isBlocked ? result.guidanceLabel : result.statusLabel;
+}
+
+String _routeWorkflowSummarySubtitle(RouteSearchResult result) {
+  return _isRecommendedRoute(result)
+      ? _routeMetaLabel(result)
+      : result.statusLabel;
+}
+
 bool _routeHasNoStairs(RouteSearchResult result) {
   return result.steps.every((step) => !step.includesStairs);
+}
+
+class _RoutePrototypeSection extends StatelessWidget {
+  const _RoutePrototypeSection({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(1, 0, 1, 11),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RoutePrototypeChip extends StatelessWidget {
@@ -3075,29 +3373,27 @@ class _RoutePrototypeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFDEF5E7),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: Wrap(
-          spacing: 5,
-          runSpacing: 3,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
-            Text(
-              label,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.mintDark,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      child: Wrap(
+        spacing: 5,
+        runSpacing: 3,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
+          Text(
+            label,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.mintDark,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -3186,7 +3482,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         border: Border.all(color: const Color(0xFF9FCACE)),
@@ -3248,7 +3544,7 @@ class _RouteNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final notice = Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
+      child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFFFF7E0),
           border: Border.all(color: const Color(0xFFE6C875)),
