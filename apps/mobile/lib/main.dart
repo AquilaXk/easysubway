@@ -205,6 +205,7 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
+    Future<List<FavoriteRoute>>? recentRoutesFuture,
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NetworkMapRepository? networkMapRepository,
@@ -253,6 +254,11 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
+         recentRoutesFuture:
+             recentRoutesFuture ??
+             (defaultDemoHomeDataEnabled
+                 ? const _DemoFavoriteRouteRepository().listFavoriteRoutes()
+                 : null),
          key: key,
        );
 
@@ -265,6 +271,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -303,6 +310,7 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -371,6 +379,7 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
+        recentRoutesFuture: recentRoutesFuture,
       ),
     );
   }
@@ -488,6 +497,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    required this.recentRoutesFuture,
   });
 
   final StationSearchRepository repository;
@@ -511,6 +521,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -584,6 +595,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessInfo: widget.supportAccessInfo,
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
+        recentRoutesFuture: widget.recentRoutesFuture,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
       ),
@@ -932,6 +944,7 @@ class HomeScreen extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
+    required this.recentRoutesFuture,
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
@@ -959,6 +972,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
+  final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
@@ -971,7 +985,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late String _mobilityType;
   late final RouteDraftController _routeDraftController;
-  Future<List<FavoriteRoute>>? _favoriteRoutesFuture;
+  Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
 
   @override
@@ -979,8 +993,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
-    _favoriteRoutesFuture = widget.favoriteRouteRepository
-        ?.listFavoriteRoutes();
+    _recentRoutesFuture = widget.recentRoutesFuture;
     _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
   }
@@ -998,9 +1011,8 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.initialMobilityType != oldWidget.initialMobilityType) {
       _mobilityType = widget.initialMobilityType;
     }
-    if (widget.favoriteRouteRepository != oldWidget.favoriteRouteRepository) {
-      _favoriteRoutesFuture = widget.favoriteRouteRepository
-          ?.listFavoriteRoutes();
+    if (widget.recentRoutesFuture != oldWidget.recentRoutesFuture) {
+      _recentRoutesFuture = widget.recentRoutesFuture;
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
@@ -1128,22 +1140,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     Future<void> refreshHomeState() async {
-      final routeRepository = widget.favoriteRouteRepository;
       final facilityRepository = widget.favoriteFacilityRepository;
-      if (routeRepository == null && facilityRepository == null) {
+      if (facilityRepository == null) {
         return;
       }
-      final routesFuture = routeRepository?.listFavoriteRoutes();
-      final facilitiesFuture = facilityRepository?.listFavoriteFacilities();
+      final facilitiesFuture = facilityRepository.listFavoriteFacilities();
       setState(() {
-        _favoriteRoutesFuture = routesFuture;
         _favoriteFacilitiesFuture = facilitiesFuture;
       });
       try {
-        await Future.wait<void>([
-          if (routesFuture != null) routesFuture.then((_) {}),
-          if (facilitiesFuture != null) facilitiesFuture.then((_) {}),
-        ]);
+        await facilitiesFuture;
       } catch (error, stackTrace) {
         (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
@@ -1265,10 +1271,10 @@ class _HomeScreenState extends State<HomeScreen> {
               _HomeFacilityAlertSection(
                 facilitiesFuture: _favoriteFacilitiesFuture,
               ),
-              _HomeSavedRouteSection(
-                key: const Key('homeSavedRouteSection'),
-                routesFuture: _favoriteRoutesFuture,
-                onOpenFavorites: openFavorites,
+              _HomeRecentRouteSection(
+                key: const Key('homeRecentRouteSection'),
+                routesFuture: _recentRoutesFuture,
+                onTap: openRouteSearch,
               ),
             ],
           ),
@@ -1478,29 +1484,32 @@ class _HomePrototypeHero extends StatelessWidget {
                   ),
                   const SizedBox(width: 9),
                   Expanded(
-                    child: Semantics(
+                    child: KeyedSubtree(
                       key: const Key('heroStationSearchButton'),
-                      button: true,
-                      label: '역검색',
-                      onTap: onStationSearch,
-                      child: ExcludeSemantics(
-                        child: FilledButton.icon(
-                          onPressed: onStationSearch,
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor:
-                                EasySubwayAccessibleColors.brandDark,
-                            minimumSize: const Size.fromHeight(104),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
+                      child: Semantics(
+                        key: const Key('stationSearchButton'),
+                        button: true,
+                        label: '역 검색',
+                        onTap: onStationSearch,
+                        child: ExcludeSemantics(
+                          child: FilledButton.icon(
+                            onPressed: onStationSearch,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor:
+                                  EasySubwayAccessibleColors.brandDark,
+                              minimumSize: const Size.fromHeight(104),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            icon: const Icon(Icons.search),
+                            label: const Text('역검색'),
                           ),
-                          icon: const Icon(Icons.search),
-                          label: const Text('역검색'),
                         ),
                       ),
                     ),
@@ -1543,7 +1552,7 @@ class _HomeStationActionRow extends StatelessWidget {
             child: KeyedSubtree(
               key: const Key('nearbyStationHomeButton'),
               child: _HomeStationActionButton(
-                key: const Key('stationSearchButton'),
+                key: const Key('nearbyStationButton'),
                 icon: Icons.location_on_outlined,
                 label: '가까운 역',
                 onPressed: onStationSearch,
@@ -1875,15 +1884,15 @@ IconData _facilityIcon(String type) {
   };
 }
 
-class _HomeSavedRouteSection extends StatelessWidget {
-  const _HomeSavedRouteSection({
+class _HomeRecentRouteSection extends StatelessWidget {
+  const _HomeRecentRouteSection({
     super.key,
     required this.routesFuture,
-    required this.onOpenFavorites,
+    required this.onTap,
   });
 
   final Future<List<FavoriteRoute>>? routesFuture;
-  final VoidCallback onOpenFavorites;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1894,17 +1903,9 @@ class _HomeSavedRouteSection extends StatelessWidget {
     return FutureBuilder<List<FavoriteRoute>>(
       future: routesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            snapshot.hasError) {
           return const SizedBox.shrink();
-        }
-        if (snapshot.hasError) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _HomePrototypeSection(title: '최근 경로'),
-              _HomeSavedRouteErrorCard(onTap: onOpenFavorites),
-            ],
-          );
         }
         final routes = snapshot.data ?? const <FavoriteRoute>[];
         if (routes.isEmpty) {
@@ -1914,7 +1915,7 @@ class _HomeSavedRouteSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _HomePrototypeSection(title: '최근 경로'),
-            _HomeSavedRouteCard(route: routes.first, onTap: onOpenFavorites),
+            _HomeRecentRouteCard(route: routes.first, onTap: onTap),
           ],
         );
       },
@@ -1922,53 +1923,11 @@ class _HomeSavedRouteSection extends StatelessWidget {
   }
 }
 
-class _HomeSavedRouteErrorCard extends StatelessWidget {
-  const _HomeSavedRouteErrorCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _PrototypeCard(
-      backgroundColor: const Color(0xFFFFFAF0),
-      borderColor: const Color(0xFFF1D49A),
-      child: Column(
-        children: [
-          const _PrototypeInfoRow(
-            icon: Icons.bookmark_border,
-            iconBackground: EasySubwayAccessibleColors.amberSoft,
-            iconColor: EasySubwayAccessibleColors.amber,
-            title: '저장한 경로를 불러오지 못했습니다',
-            subtitle: '즐겨찾기 화면에서 다시 확인해 주세요',
-            trailing: '확인 필요',
-          ),
-          const SizedBox(height: 13),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(
-                  EasySubwayTouchTarget.general,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('저장한 경로 보기'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeSavedRouteCard extends StatelessWidget {
-  const _HomeSavedRouteCard({required this.route, required this.onTap});
+class _HomeRecentRouteCard extends StatelessWidget {
+  const _HomeRecentRouteCard({required this.route, required this.onTap});
 
   final FavoriteRoute route;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1979,43 +1938,37 @@ class _HomeSavedRouteCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: '최근 경로, $originName에서 $destinationName까지, ${route.lineLabel}',
-      onTap: onTap,
+      onTap: () => unawaited(onTap()),
       child: ExcludeSemantics(
         child: InkWell(
-          key: const Key('homeSavedRouteCard'),
-          onTap: onTap,
+          key: const Key('homeRecentRouteCard'),
+          onTap: () => unawaited(onTap()),
           borderRadius: BorderRadius.circular(26),
           child: _PrototypeCard(
             borderRadius: 26,
             showBorder: true,
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _HomeRouteStationLabel(
-                        stationName: originName,
-                        route: route,
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Icon(
-                          Icons.arrow_forward,
-                          size: 20,
-                          color: EasySubwayAccessibleColors.text,
-                        ),
-                      ),
-                      Flexible(
-                        child: _HomeRouteStationLabel(
-                          stationName: destinationName,
-                          route: route,
-                        ),
-                      ),
-                    ],
+                  child: _HomeRouteStationLabel(
+                    stationName: originName,
+                    route: route,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    size: 20,
+                    color: EasySubwayAccessibleColors.text,
+                  ),
+                ),
+                Expanded(
+                  child: _HomeRouteStationLabel(
+                    stationName: destinationName,
+                    route: route,
                   ),
                 ),
               ],
@@ -2152,7 +2105,6 @@ class _PrototypeInfoRow extends StatelessWidget {
     this.subtitleColor = EasySubwayAccessibleColors.mutedText,
     this.iconBoxSize = 43,
     this.iconSize = 22,
-    this.trailing,
   });
 
   final IconData icon;
@@ -2163,7 +2115,6 @@ class _PrototypeInfoRow extends StatelessWidget {
   final Color subtitleColor;
   final double iconBoxSize;
   final double iconSize;
-  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -2215,18 +2166,6 @@ class _PrototypeInfoRow extends StatelessWidget {
               Expanded(child: content),
             ],
           ),
-          if (trailing != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, left: 55),
-              child: Text(
-                trailing!,
-                style: const TextStyle(
-                  color: EasySubwayAccessibleColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
         ],
       );
     }
@@ -2235,17 +2174,6 @@ class _PrototypeInfoRow extends StatelessWidget {
         leading,
         const SizedBox(width: 12),
         Expanded(child: content),
-        if (trailing != null) ...[
-          const SizedBox(width: 8),
-          Text(
-            trailing!,
-            style: const TextStyle(
-              color: EasySubwayAccessibleColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
       ],
     );
   }
