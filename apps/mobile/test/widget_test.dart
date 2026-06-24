@@ -679,6 +679,24 @@ void main() {
       viewer.transformationController!.value.getMaxScaleOnAxis(),
       lessThan(initialScale),
     );
+
+    for (var index = 0; index < 30; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomInButton')));
+      await tester.pump();
+    }
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      lessThanOrEqualTo(4.8),
+    );
+
+    for (var index = 0; index < 80; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomOutButton')));
+      await tester.pump();
+    }
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      greaterThanOrEqualTo(0.08),
+    );
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -7454,6 +7472,23 @@ class FakeStationSearchRepository
         ),
       ),
     ];
+    final filteredStations = [
+      for (final station in stations)
+        if (lineId == null || station.lineId == lineId) station,
+    ];
+    final filteredStationKeys = {
+      for (final station in filteredStations) '${station.id}:${station.lineId}',
+    };
+    const edges = [
+      NetworkMapEdge(
+        id: 'map-edge-seoul-4-station-sadang-station-sangnoksu',
+        lineId: 'seoul-4',
+        fromStationId: 'station-sadang:seoul-4',
+        toStationId: 'station-sangnoksu:seoul-4',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+    ];
     return NetworkMapData(
       regions: [
         for (final regionName in networkMapRegionNames)
@@ -7461,19 +7496,12 @@ class FakeStationSearchRepository
       ],
       selectedRegion: selectedRegion,
       lines: lines,
-      stations: [
-        for (final station in stations)
-          if (lineId == null || station.lineId == lineId) station,
-      ],
-      edges: const [
-        NetworkMapEdge(
-          id: 'map-edge-seoul-4-station-sadang-station-sangnoksu',
-          lineId: 'seoul-4',
-          fromStationId: 'station-sadang',
-          toStationId: 'station-sangnoksu',
-          accessibilityStatus: 'AVAILABLE',
-          reliabilityScore: 100,
-        ),
+      stations: filteredStations,
+      edges: [
+        for (final edge in edges)
+          if (filteredStationKeys.contains(edge.fromStationId) &&
+              filteredStationKeys.contains(edge.toStationId))
+            edge,
       ],
       positionSources: const [
         NetworkMapPositionSource(

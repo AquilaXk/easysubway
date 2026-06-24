@@ -731,6 +731,9 @@ class _NetworkMapCanvas extends StatefulWidget {
 }
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
+  static const _minScale = 0.08;
+  static const _maxScale = 4.8;
+
   final TransformationController _controller = TransformationController();
   String? _layoutKey;
 
@@ -774,8 +777,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                   key: const Key('networkMapInteractiveViewer'),
                   transformationController: _controller,
                   constrained: false,
-                  minScale: 0.08,
-                  maxScale: 4.8,
+                  minScale: _minScale,
+                  maxScale: _maxScale,
                   boundaryMargin: const EdgeInsets.all(220),
                   child: SizedBox(
                     width: geometry.width,
@@ -850,8 +853,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
   }
 
   void _scaleMap(double factor) {
+    final currentScale = _controller.value.getMaxScaleOnAxis();
+    if (currentScale <= 0) {
+      return;
+    }
+    final targetScale = (currentScale * factor)
+        .clamp(_minScale, _maxScale)
+        .toDouble();
+    final adjustedFactor = targetScale / currentScale;
     _controller.value = Matrix4.copy(_controller.value)
-      ..scaleByDouble(factor, factor, 1, 1);
+      ..scaleByDouble(adjustedFactor, adjustedFactor, 1, 1);
   }
 }
 
