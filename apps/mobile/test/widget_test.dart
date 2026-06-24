@@ -240,7 +240,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('먼저 이동 조건을 골라 주세요'), findsNothing);
+    expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
   });
 
   testWidgets('기본 앱은 사진 복구 저장소가 없어도 플랫폼 오류 없이 홈을 보여준다', (tester) async {
@@ -1241,7 +1241,7 @@ void main() {
     );
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
-    expect(find.text('먼저 이동 조건을 골라 주세요'), findsOneWidget);
+    expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
   });
 
   testWidgets('데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다', (tester) async {

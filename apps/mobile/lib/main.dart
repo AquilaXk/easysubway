@@ -369,6 +369,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       widget.onboardingStore != null &&
       !widget.initialOnboardingState.isCompleted;
   bool _startScreenDismissed = false;
+  bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
 
   @override
@@ -395,6 +396,28 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
           onStart: () {
             setState(() {
               _startScreenDismissed = true;
+            });
+          },
+        );
+      }
+      if (!_introScreenDismissed) {
+        return OnboardingIntroScreen(
+          onConfigure: () {
+            setState(() {
+              _introScreenDismissed = true;
+            });
+          },
+          onSkip: () async {
+            final result = OnboardingResult(
+              profile: mobilityProfileOptions.first,
+              preferences: const OnboardingViewPreferences.defaults(),
+            );
+            await _saveOnboardingResult(result);
+            if (!mounted) {
+              return;
+            }
+            setState(() {
+              _onboardingState = OnboardingState.completed(result: result);
             });
           },
         );
@@ -464,6 +487,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _onboardingState = const OnboardingState.initial();
       _loadingOnboardingState = false;
       _startScreenDismissed = false;
+      _introScreenDismissed = false;
     });
   }
 

@@ -73,7 +73,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/branding/app_icon.png
     - assets/datapacks/index.json
     - assets/datapacks/core.sqlite.gz
     - assets/datapacks/capital.sqlite.gz
