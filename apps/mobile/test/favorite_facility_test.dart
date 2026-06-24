@@ -195,7 +195,7 @@ void main() {
     await controller.load();
 
     expect(controller.state.status, FavoriteFacilityListStatus.empty);
-    expect(controller.state.message, '저장한 시설이 없습니다.');
+    expect(controller.state.message, '즐겨찾기한 시설이 없습니다.');
 
     repository.error = const FavoriteFacilityException('즐겨찾기 시설을 불러오지 못했습니다.');
     await controller.load();
