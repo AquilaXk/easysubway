@@ -1043,7 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
-    _recentRoutesFuture = widget.recentRoutesFuture;
+    _recentRoutesFuture = _loadRecentRoutes();
     _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
   }
@@ -1061,8 +1061,9 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.initialMobilityType != oldWidget.initialMobilityType) {
       _mobilityType = widget.initialMobilityType;
     }
-    if (widget.recentRoutesFuture != oldWidget.recentRoutesFuture) {
-      _recentRoutesFuture = widget.recentRoutesFuture;
+    if (widget.recentRoutesFuture != oldWidget.recentRoutesFuture ||
+        widget.favoriteRouteRepository != oldWidget.favoriteRouteRepository) {
+      _recentRoutesFuture = _loadRecentRoutes();
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
@@ -1187,17 +1188,38 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    void openNearbyStations() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            routeDraftController: _routeDraftController,
+            entryMode: StationSearchEntryMode.nearby,
+          ),
+        ),
+      );
+    }
+
     Future<void> refreshHomeState() async {
-      final facilityRepository = widget.favoriteFacilityRepository;
-      if (facilityRepository == null) {
-        return;
-      }
-      final facilitiesFuture = facilityRepository.listFavoriteFacilities();
+      final facilitiesFuture = widget.favoriteFacilityRepository
+          ?.listFavoriteFacilities();
+      final routesFuture = _loadRecentRoutes();
       setState(() {
         _favoriteFacilitiesFuture = facilitiesFuture;
+        _recentRoutesFuture = routesFuture;
       });
       try {
-        await facilitiesFuture;
+        await Future.wait<void>([
+          if (facilitiesFuture != null) facilitiesFuture.then((_) {}),
+          if (routesFuture != null) routesFuture.then((_) {}),
+        ]);
       } catch (error, stackTrace) {
         (error, stackTrace);
         // FutureBuilder가 오류 상태를 표시하므로 refresh callback은 정상 종료한다.
@@ -1301,7 +1323,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               _HomeStationActionRow(
                 onRecentSearch: openRecentSearch,
-                onStationSearch: openStationSearch,
+                onNearbyStations: openNearbyStations,
               ),
               AnimatedBuilder(
                 animation: _routeDraftController,
@@ -1384,6 +1406,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<List<FavoriteRoute>>? _loadRecentRoutes() {
+    return widget.recentRoutesFuture ??
+        widget.favoriteRouteRepository?.listFavoriteRoutes();
   }
 
   Future<MobilityProfileOption?> _openMobilityProfile() async {
@@ -1831,11 +1858,11 @@ class _HomePrototypeHero extends StatelessWidget {
 class _HomeStationActionRow extends StatelessWidget {
   const _HomeStationActionRow({
     required this.onRecentSearch,
-    required this.onStationSearch,
+    required this.onNearbyStations,
   });
 
   final VoidCallback onRecentSearch;
-  final VoidCallback onStationSearch;
+  final VoidCallback onNearbyStations;
 
   @override
   Widget build(BuildContext context) {
@@ -1859,7 +1886,7 @@ class _HomeStationActionRow extends StatelessWidget {
                 key: const Key('nearbyStationButton'),
                 icon: Icons.location_on_outlined,
                 label: '가까운 역',
-                onPressed: onStationSearch,
+                onPressed: onNearbyStations,
               ),
             ),
           ),
