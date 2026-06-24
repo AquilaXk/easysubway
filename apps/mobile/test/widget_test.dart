@@ -319,14 +319,16 @@ void main() {
   });
 
   testWidgets('홈 최근 경로는 저장소 데이터가 있으면 표시된다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute()],
+    );
+
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(
-          favorites: [_favoriteRoute()],
-        ),
+        favoriteRouteRepository: favoriteRouteRepository,
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
@@ -344,6 +346,7 @@ void main() {
     expect(find.byKey(const Key('homeRecentRouteCard')), findsOneWidget);
     expect(find.text('상록수역'), findsOneWidget);
     expect(find.text('사당역'), findsOneWidget);
+    expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
   });
 
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
@@ -819,10 +822,50 @@ void main() {
     );
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
+    final requested = repository.requestedNearbyLocations.single;
+    expect(requested.latitude, closeTo(37.3028, 0.0001));
+    expect(requested.longitude, closeTo(126.8665, 0.0001));
     expect(find.text('가장 가까운 역'), findsOneWidget);
     expect(find.text('상록수역'), findsOneWidget);
     expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+  });
+
+  testWidgets('가까운 역 화면은 위치 권한 안내 취소 후 재시도 버튼을 유지한다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: true,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '취소'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('가까운 역')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
+    expect(find.text('내 주변 역 다시 찾기'), findsOneWidget);
+    expect(locationProvider.requestCount, 0);
   });
 
   testWidgets('홈 이동 조건 pill은 모든 이동 유형에 맞는 아이콘을 보여준다', (tester) async {
