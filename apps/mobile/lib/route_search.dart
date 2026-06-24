@@ -457,7 +457,13 @@ class FavoriteRoute {
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get semanticLabel {
-    return '즐겨찾기 경로, $summaryTitle, $lineLabel, $mobilityLabel, $scoreLabel';
+    return [
+      '즐겨찾기 경로',
+      summaryTitle,
+      lineLabel,
+      mobilityLabel,
+      scoreLabel,
+    ].join(', ');
   }
 }
 
@@ -1577,7 +1583,7 @@ class _RouteSelectedStationSummary extends StatelessWidget {
         label: semanticsLabel,
         liveRegion: true,
         child: ExcludeSemantics(
-          child: DecoratedBox(
+          child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFFE9F5F6),
               border: Border.all(color: const Color(0xFFB9D4D8)),
@@ -2022,7 +2028,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DecoratedBox(
+                Container(
                   decoration: BoxDecoration(
                     color: EasySubwayAccessibleColors.mintSoft,
                     border: Border.all(
@@ -2056,21 +2062,18 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                               const SizedBox(height: 8),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: DecoratedBox(
+                                child: Container(
+                                  width: 39,
+                                  height: 39,
                                   decoration: BoxDecoration(
                                     color:
                                         EasySubwayAccessibleColors.mintBorder,
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  child: const SizedBox(
-                                    width: 39,
-                                    height: 39,
-                                    child: Icon(
-                                      Icons.edit_outlined,
-                                      color:
-                                          EasySubwayAccessibleColors.mintDark,
-                                      size: 17,
-                                    ),
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: EasySubwayAccessibleColors.mintDark,
+                                    size: 17,
                                   ),
                                 ),
                               ),
@@ -2105,19 +2108,17 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              DecoratedBox(
+                              Container(
+                                width: 39,
+                                height: 39,
                                 decoration: BoxDecoration(
                                   color: EasySubwayAccessibleColors.mintBorder,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                child: const SizedBox(
-                                  width: 39,
-                                  height: 39,
-                                  child: Icon(
-                                    Icons.edit_outlined,
-                                    color: EasySubwayAccessibleColors.mintDark,
-                                    size: 17,
-                                  ),
+                                child: const Icon(
+                                  Icons.edit_outlined,
+                                  color: EasySubwayAccessibleColors.mintDark,
+                                  size: 17,
                                 ),
                               ),
                             ],
@@ -2137,7 +2138,7 @@ class _RouteSearchResultSummaryCard extends StatelessWidget {
                       ? '편함·불편함과 시간·환승·걷기만 비교합니다.'
                       : '이 경로는 이동 전 확인이 필요합니다',
                 ),
-                DecoratedBox(
+                Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     border: Border.all(
@@ -2370,29 +2371,27 @@ class _RoutePrototypeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFDEF5E7),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: Wrap(
-          spacing: 5,
-          runSpacing: 3,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
-            Text(
-              label,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.mintDark,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      child: Wrap(
+        spacing: 5,
+        runSpacing: 3,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
+          Text(
+            label,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.mintDark,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -2481,7 +2480,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         border: Border.all(color: const Color(0xFF9FCACE)),
@@ -2543,7 +2542,7 @@ class _RouteNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final notice = Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
+      child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFFFF7E0),
           border: Border.all(color: const Color(0xFFE6C875)),

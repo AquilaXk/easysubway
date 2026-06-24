@@ -46,7 +46,6 @@ dependencies:
   archive: ^4.0.9
   path: ^1.9.1
   sqlite3: ^3.3.3
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,6 +75,14 @@ flutter:
     - assets/datapacks/index.json
     - assets/datapacks/core.sqlite.gz
     - assets/datapacks/capital.sqlite.gz
+    - assets/datapacks/metro_map_pack/manifest.json
+    - assets/datapacks/metro_map_pack/SOURCE_URLS.txt
+    - assets/datapacks/metro_map_pack/SHA256SUMS.txt
+    - assets/datapacks/maps/seoul-official-cyberstation-map.png
+    - assets/datapacks/maps/busan-official-route-map.jpg
+    - assets/datapacks/maps/gwangju-official-cyberstation-map.png
+    - assets/datapacks/maps/daegu-official-route-map.png
+    - assets/datapacks/maps/daejeon-official-cyberstation-map.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
