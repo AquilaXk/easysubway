@@ -12,6 +12,7 @@ import 'facility_report.dart';
 import 'favorite_facility.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
@@ -2321,16 +2322,23 @@ class _HomeRouteStationLabel extends StatelessWidget {
     required this.route,
   });
 
+  static const double _stationFontSize = 17;
+  static const double _stationLineHeight = 1.2;
+  static const double _lineSymbolSize = _stationFontSize * _stationLineHeight;
+
   final String stationName;
   final FavoriteRoute route;
 
   @override
   Widget build(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    final lineSymbolSize = textScaler.scale(_lineSymbolSize);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _HomeLineSymbol(route: route),
+        _HomeLineSymbol(route: route, size: lineSymbolSize),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
@@ -2339,9 +2347,9 @@ class _HomeRouteStationLabel extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: EasySubwayAccessibleColors.text,
-              fontSize: 18,
+              fontSize: _stationFontSize,
               fontWeight: FontWeight.w600,
-              height: 1.2,
+              height: _stationLineHeight,
             ),
           ),
         ),
@@ -2424,25 +2432,21 @@ class _HomeSavedRouteCard extends StatelessWidget {
 }
 
 class _HomeLineSymbol extends StatelessWidget {
-  const _HomeLineSymbol({required this.route});
+  const _HomeLineSymbol({required this.route, required this.size});
 
   final FavoriteRoute route;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    final color = stationLineColor(_lineColorForRoute(route));
-    return CircleAvatar(
-      radius: 10,
-      backgroundColor: color,
-      child: Text(
-        stationLineBadgeText(route.lineLabel),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          height: 1,
-        ),
+    return StationLineBadge(
+      line: StationSearchLine(
+        id: route.lineId,
+        name: route.lineName,
+        color: _lineColorForRoute(route),
+        stationCode: '',
       ),
+      size: size,
     );
   }
 }

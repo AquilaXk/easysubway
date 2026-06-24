@@ -346,6 +346,20 @@ void main() {
     expect(find.byKey(const Key('homeRecentRouteCard')), findsOneWidget);
     expect(find.text('상록수역'), findsOneWidget);
     expect(find.text('사당역'), findsOneWidget);
+    final recentRouteCard = find.byKey(const Key('homeRecentRouteCard'));
+    final lineBadges = find.descendant(
+      of: recentRouteCard,
+      matching: find.byKey(const Key('stationLineBadge-seoul-4')),
+    );
+    final originText = find.descendant(
+      of: recentRouteCard,
+      matching: find.text('상록수역'),
+    );
+    expect(lineBadges, findsNWidgets(2));
+    expect(
+      tester.getSize(lineBadges.first).height,
+      closeTo(tester.getSize(originText).height, 0.5),
+    );
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
   });
 
@@ -2293,12 +2307,10 @@ void main() {
 
       expect(repository.requestedQueries, ['상록수']);
       expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
-      expect(find.text('4'), findsOneWidget);
       expect(
         find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
         findsOneWidget,
       );
-      expect(find.text('경의중앙'), findsOneWidget);
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
       expect(find.text('수도권'), findsNothing);
       expect(find.text('기본 정보만 있음'), findsNothing);
@@ -2331,12 +2343,16 @@ void main() {
       expect(lineBadgeSize.width, 32);
       expect(lineBadgeSize.height, 32);
 
-      final lineNumber = tester.widget<Text>(find.text('4'));
-      expect(lineNumber.style?.fontSize, 20);
-      expect(lineNumber.style?.color, const Color(0xFF102A2C));
-
-      final namedLine = tester.widget<Text>(find.text('경의중앙'));
-      expect(namedLine.style?.fontSize, 12);
+      final lineBadgeImage = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('stationLineBadge-seoul-4')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (lineBadgeImage.image as AssetImage).assetName,
+        'assets/metro_symbols/line_badges/seoul_4_compact_256.png',
+      );
 
       await tester.enterText(find.byKey(const Key('stationSearchInput')), '');
       await tester.pumpAndSettle();
@@ -2650,7 +2666,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('4'), findsOneWidget);
+    expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
     expect(find.text('+3'), findsOneWidget);
     expect(find.text('경의중앙'), findsNothing);
 
@@ -2735,7 +2751,16 @@ void main() {
         findsNothing,
       );
       expect(find.text('운행 중지 노선'), findsNothing);
-      expect(find.text('4'), findsOneWidget);
+      final lineFilterImage = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('stationLineFilter-seoul-4')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (lineFilterImage.image as AssetImage).assetName,
+        'assets/metro_symbols/line_badges/seoul_4_compact_256.png',
+      );
       expect(find.bySemanticsLabel('수도권 4호선 선택 안 됨'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));

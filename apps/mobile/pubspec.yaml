@@ -83,6 +83,7 @@ flutter:
     - assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg
     - assets/datapacks/maps/daegu-official-route-map.svg
     - assets/datapacks/maps/daejeon-official-route-map.svg
+    - assets/metro_symbols/line_badges/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
