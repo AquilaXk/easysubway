@@ -557,6 +557,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final notificationButton = tester.widget<IconButton>(
+      find.descendant(
+        of: find.byKey(const Key('homeNotificationActionButton')),
+        matching: find.byType(IconButton),
+      ),
+    );
+    final notificationButtonSide = notificationButton.style?.side?.resolve(
+      <WidgetState>{},
+    );
+    expect(notificationButtonSide?.color, EasySubwayAccessibleColors.line);
+    expect(notificationButtonSide?.width, 1.5);
+
     await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
     await tester.pumpAndSettle();
 
@@ -588,7 +600,7 @@ void main() {
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
     final repository = FakeStationSearchRepository(
-      networkMapRegionNames: const ['테스트권', '부산권'],
+      networkMapRegionNames: const ['테스트권', '부산'],
     );
     await tester.pumpWidget(
       EasySubwayApp(
@@ -605,11 +617,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('테스트권'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('부산권'));
+    await tester.tap(find.text('부산'));
     await tester.pumpAndSettle();
 
-    expect(repository.requestedNetworkMapRegions, contains('부산권'));
-    expect(find.text('부산권'), findsOneWidget);
+    expect(repository.requestedNetworkMapRegions, contains('부산'));
+    expect(find.text('부산'), findsOneWidget);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
@@ -624,7 +636,7 @@ void main() {
     expect(requirements['live_mode_requires_network'], isFalse);
     expect(
       maps.map((map) => map['app_region']),
-      containsAll(['수도권', '부산권', '광주권', '대구권', '대전권']),
+      containsAll(['수도권', '부산', '광주', '대구', '대전']),
     );
     for (final map in maps) {
       final offline = map['offline'] as Map<String, Object?>;
@@ -634,13 +646,24 @@ void main() {
       expect(offline['included'], isTrue);
       expect(File(path).existsSync(), isTrue, reason: path);
       expect(path, startsWith('assets/datapacks/maps/'));
+      expect(path.endsWith('.png') || path.endsWith('.jpg'), isFalse);
+      expect(['pdf', 'svg'], contains(offline['type']));
     }
+    final gwangju = maps.singleWhere((map) => map['id'] == 'gwangju');
+    final license = gwangju['license'] as Map<String, Object?>;
+    expect(license['spdx'], 'CC-BY-SA-2.0-KR');
+    expect(
+      license['url'],
+      'https://creativecommons.org/licenses/by-sa/2.0/kr/',
+    );
   });
 
   testWidgets('노선도는 카드가 아니라 공식 지도처럼 전면 캔버스로 보인다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
-        repository: FakeStationSearchRepository(),
+        repository: FakeStationSearchRepository(
+          networkMapRegionNames: const ['수도권'],
+        ),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
@@ -659,6 +682,8 @@ void main() {
     expect(decoration.color, Colors.white);
     expect(decoration.border, isNull);
     expect(decoration.borderRadius, isNull);
+    expect(find.byKey(const Key('originalRouteMapView')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
   testWidgets('노선도 역을 누르면 출발 도착 설정 sheet를 보여준다', (tester) async {
@@ -680,7 +705,7 @@ void main() {
       const Offset(0, 180),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapStation-sadang')));
+    await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-4')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
