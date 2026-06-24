@@ -1314,7 +1314,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             key: const Key('homePrototypeList'),
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+            padding: const EdgeInsets.fromLTRB(17, 18, 17, 96),
             children: [
               _HomePrototypeHero(
                 profile: currentProfile,

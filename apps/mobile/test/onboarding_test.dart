@@ -340,6 +340,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('온보딩 고정 CTA 단계는 하단 스크롤 여백을 확보한다', (tester) async {
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+
+    final firstStepList = tester.widget<ListView>(find.byType(ListView));
+    expect(firstStepList.padding?.resolve(TextDirection.ltr).bottom, 104);
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    final secondStepList = tester.widget<ListView>(find.byType(ListView));
+    expect(secondStepList.padding?.resolve(TextDirection.ltr).bottom, 104);
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
