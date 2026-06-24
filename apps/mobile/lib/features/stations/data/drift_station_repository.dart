@@ -369,7 +369,7 @@ class DriftStationRepository
   Future<String> _selectedNetworkMapRegion(String? requestedRegion) async {
     final trimmedRegion = requestedRegion?.trim();
     if (trimmedRegion != null && trimmedRegion.isNotEmpty) {
-      return trimmedRegion;
+      return _storedNetworkMapRegion(trimmedRegion);
     }
     final rows = await database.customSelect('''
       SELECT DISTINCT region
@@ -710,4 +710,14 @@ int _distanceMeters({
 
 double _degreesToRadians(double degrees) {
   return degrees * math.pi / 180;
+}
+
+String _storedNetworkMapRegion(String region) {
+  return switch (region) {
+    '부산' => '부산권',
+    '광주' => '광주권',
+    '대구' => '대구권',
+    '대전' => '대전권',
+    _ => region,
+  };
 }

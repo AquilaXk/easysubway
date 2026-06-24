@@ -219,10 +219,10 @@ class _UnavailableNetworkMapRepository implements NetworkMapRepository {
     return NetworkMapData(
       regions: const [
         NetworkMapRegion(name: '수도권'),
-        NetworkMapRegion(name: '부산권'),
-        NetworkMapRegion(name: '광주권'),
-        NetworkMapRegion(name: '대구권'),
-        NetworkMapRegion(name: '대전권'),
+        NetworkMapRegion(name: '부산'),
+        NetworkMapRegion(name: '광주'),
+        NetworkMapRegion(name: '대구'),
+        NetworkMapRegion(name: '대전'),
       ],
       selectedRegion: selectedRegion,
       lines: const [],

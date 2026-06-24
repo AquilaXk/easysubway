@@ -2,6 +2,7 @@ import CoreLocation
 import Flutter
 import UIKit
 import UserNotifications
+import WebKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, CLLocationManagerDelegate {
@@ -56,6 +57,11 @@ import UserNotifications
       }
       self?.requestNotificationPermission(result)
     }
+
+    engineBridge.applicationRegistrar.register(
+      OriginalRouteMapAssetViewFactory(),
+      withId: "com.easysubway.easysubway_mobile/original_route_map_asset"
+    )
   }
 
   private func handleCurrentLocation(_ result: @escaping FlutterResult) {
@@ -197,5 +203,77 @@ import UserNotifications
       return
     }
     result(value)
+  }
+}
+
+private final class OriginalRouteMapAssetViewFactory: NSObject, FlutterPlatformViewFactory {
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    FlutterStandardMessageCodec.sharedInstance()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    let params = args as? [String: Any] ?? [:]
+    return OriginalRouteMapAssetPlatformView(
+      frame: frame,
+      assetPath: params["assetPath"] as? String ?? "",
+      mimeType: params["mimeType"] as? String ?? ""
+    )
+  }
+}
+
+private final class OriginalRouteMapAssetPlatformView: NSObject, FlutterPlatformView {
+  private let webView: WKWebView
+
+  init(frame: CGRect, assetPath: String, mimeType: String) {
+    webView = WKWebView(frame: frame, configuration: WKWebViewConfiguration())
+    super.init()
+    webView.backgroundColor = .white
+    webView.isOpaque = false
+    webView.scrollView.isScrollEnabled = false
+    webView.scrollView.bounces = false
+    webView.scrollView.showsHorizontalScrollIndicator = false
+    webView.scrollView.showsVerticalScrollIndicator = false
+
+    guard mimeType == "image/svg+xml" else {
+      return
+    }
+    let lookupKey = FlutterDartProject.lookupKey(forAsset: assetPath)
+    guard let assetURL = Bundle.main.url(forResource: lookupKey, withExtension: nil) else {
+      return
+    }
+    let html = """
+      <!doctype html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #ffffff;
+          }
+          img {
+            display: block;
+            width: 100%;
+            height: 100%;
+          }
+        </style>
+      </head>
+      <body>
+        <img src="\(assetURL.lastPathComponent)" alt="">
+      </body>
+      </html>
+      """
+    webView.loadHTMLString(html, baseURL: assetURL.deletingLastPathComponent())
+  }
+
+  func view() -> UIView {
+    webView
   }
 }

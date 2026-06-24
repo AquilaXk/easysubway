@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -53,6 +55,7 @@ class NetworkMapRegion {
   const NetworkMapRegion({required this.name});
 
   final String name;
+  String get displayName => _displayRegionName(name);
 
   factory NetworkMapRegion.fromJson(Map<String, Object?> json) {
     return NetworkMapRegion(name: json['name'] as String? ?? '');
@@ -417,9 +420,12 @@ class _RegionTabs extends StatelessWidget {
         onSelected: onSelected,
         itemBuilder: (context) => [
           for (final region in visibleRegions)
-            PopupMenuItem<String>(value: region.name, child: Text(region.name)),
+            PopupMenuItem<String>(
+              value: region.name,
+              child: Text(region.displayName),
+            ),
         ],
-        child: _RegionMenuButton(label: selected),
+        child: _RegionMenuButton(label: _displayRegionName(selected)),
       ),
     );
   }
@@ -537,58 +543,65 @@ class _LineCircleBadge extends StatelessWidget {
   }
 }
 
-class _OfficialRouteMapAsset {
-  const _OfficialRouteMapAsset({
+class _RouteMapAsset {
+  const _RouteMapAsset({
     required this.path,
+    required this.mimeType,
     required this.width,
     required this.height,
-    this.sourceWidth,
-    this.sourceHeight,
+    required this.coordinateWidth,
+    required this.coordinateHeight,
   });
 
   final String path;
+  final String mimeType;
   final double width;
   final double height;
-  final double? sourceWidth;
-  final double? sourceHeight;
+  final double coordinateWidth;
+  final double coordinateHeight;
 }
 
-_OfficialRouteMapAsset? _officialRouteMapAsset(String region) {
-  return switch (region) {
-    '수도권' => const _OfficialRouteMapAsset(
-      path: 'assets/datapacks/maps/seoul-official-cyberstation-map.png',
-      width: 1525,
-      height: 1000,
-      sourceWidth: 1525,
-      sourceHeight: 1000,
+_RouteMapAsset? _routeMapAssetForRegion(String region) {
+  return switch (_displayRegionName(region)) {
+    '수도권' => const _RouteMapAsset(
+      path: 'assets/datapacks/maps/seoul-official-route-map.svg',
+      mimeType: 'image/svg+xml',
+      width: 5724,
+      height: 6516,
+      coordinateWidth: 5724,
+      coordinateHeight: 6516,
     ),
-    '부산권' => const _OfficialRouteMapAsset(
-      path: 'assets/datapacks/maps/busan-official-route-map.jpg',
-      width: 1302,
-      height: 817,
-      sourceWidth: 1680,
-      sourceHeight: 980,
+    '부산' => const _RouteMapAsset(
+      path: 'assets/datapacks/maps/busan-official-route-map.svg',
+      mimeType: 'image/svg+xml',
+      width: 3704,
+      height: 1134,
+      coordinateWidth: 3703.9,
+      coordinateHeight: 1133.9,
     ),
-    '광주권' => const _OfficialRouteMapAsset(
-      path: 'assets/datapacks/maps/gwangju-official-cyberstation-map.png',
-      width: 2172,
-      height: 554,
-      sourceWidth: 2172,
-      sourceHeight: 554,
+    '광주' => const _RouteMapAsset(
+      path: 'assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg',
+      mimeType: 'image/svg+xml',
+      width: 720,
+      height: 600,
+      coordinateWidth: 190.50001,
+      coordinateHeight: 158.75,
     ),
-    '대구권' => const _OfficialRouteMapAsset(
-      path: 'assets/datapacks/maps/daegu-official-route-map.png',
-      width: 1264,
-      height: 1205,
-      sourceWidth: 1264,
-      sourceHeight: 1205,
+    '대구' => const _RouteMapAsset(
+      path: 'assets/datapacks/maps/daegu-official-route-map.svg',
+      mimeType: 'image/svg+xml',
+      width: 5348,
+      height: 862,
+      coordinateWidth: 5348,
+      coordinateHeight: 861.73,
     ),
-    '대전권' => const _OfficialRouteMapAsset(
-      path: 'assets/datapacks/maps/daejeon-official-cyberstation-map.jpg',
-      width: 975,
-      height: 447,
-      sourceWidth: 975,
-      sourceHeight: 447,
+    '대전' => const _RouteMapAsset(
+      path: 'assets/datapacks/maps/daejeon-official-route-map.svg',
+      mimeType: 'image/svg+xml',
+      width: 853,
+      height: 813,
+      coordinateWidth: 853.33,
+      coordinateHeight: 813.33,
     ),
     _ => null,
   };
@@ -629,16 +642,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
       }
       stationLinesById.putIfAbsent(station.id, () => []).add(line);
     }
-    final mapAsset = _officialRouteMapAsset(widget.data.selectedRegion);
-    final geometry = mapAsset == null
-        ? _MapGeometry.fromStations(widget.data.stations)
-        : _MapGeometry.fromOfficialAsset(widget.data.stations, mapAsset);
-
+    final mapAsset = _routeMapAssetForRegion(widget.data.selectedRegion);
     return Container(
       key: const Key('networkMapSurface'),
       decoration: const BoxDecoration(color: Colors.white),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final geometry = mapAsset == null
+              ? _MapGeometry.fromStations(widget.data.stations)
+              : _MapGeometry.fromOriginalAsset(
+                  mapAsset,
+                  View.of(context).devicePixelRatio,
+                );
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
@@ -658,35 +673,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                 children: [
                   Positioned.fill(
                     child: mapAsset == null
-                        ? CustomPaint(
-                            key: const Key('networkMapPainter'),
-                            painter: _NetworkMapPainter(
-                              edges: widget.data.edges,
-                              stationsById: stationsById,
-                              linesById: linesById,
-                              transferStationIds: {
-                                for (final entry in stationLinesById.entries)
-                                  if (entry.value.length > 1) entry.key,
-                              },
-                              origin: geometry.origin,
-                            ),
-                          )
-                        : Image.asset(
-                            mapAsset.path,
-                            key: const Key('officialRouteMapImage'),
-                            width: mapAsset.width,
-                            height: mapAsset.height,
-                            fit: BoxFit.fill,
-                            filterQuality: FilterQuality.high,
-                          ),
+                        ? const _OriginalRouteMapUnavailable()
+                        : _OriginalRouteMapView(asset: mapAsset),
                   ),
                   for (final station in widget.data.stations)
-                    Positioned(
-                      left: geometry.x(station) - 22,
-                      top: geometry.y(station) - 22,
+                    Positioned.fromRect(
+                      rect: _stationHitRect(station, geometry),
                       child: _StationHitTarget(
                         key: Key(
-                          'networkMapStation-${station.id.replaceFirst('station-', '')}',
+                          'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
                         ),
                         station: station,
                         onTap: () => widget.onStationTap(
@@ -703,6 +698,92 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
       ),
     );
   }
+}
+
+class _OriginalRouteMapView extends StatelessWidget {
+  const _OriginalRouteMapView({required this.asset});
+
+  static const _viewType =
+      'com.easysubway.easysubway_mobile/original_route_map_asset';
+
+  final _RouteMapAsset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isWidgetTest) {
+      return ColoredBox(
+        key: const Key('originalRouteMapView'),
+        color: Colors.white,
+        child: Semantics(
+          label: '원본 노선도',
+          image: true,
+          child: const SizedBox.expand(),
+        ),
+      );
+    }
+    final platformViewKey = ValueKey('originalRouteMapView-${asset.path}');
+    final creationParams = <String, Object?>{
+      'assetPath': asset.path,
+      'mimeType': asset.mimeType,
+    };
+    final nativeView = switch (defaultTargetPlatform) {
+      TargetPlatform.android => AndroidView(
+        key: platformViewKey,
+        viewType: _viewType,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+      ),
+      TargetPlatform.iOS => UiKitView(
+        key: platformViewKey,
+        viewType: _viewType,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+      ),
+      _ => const ColoredBox(color: Colors.white),
+    };
+    return KeyedSubtree(
+      key: const Key('originalRouteMapView'),
+      child: IgnorePointer(child: nativeView),
+    );
+  }
+}
+
+class _OriginalRouteMapUnavailable extends StatelessWidget {
+  const _OriginalRouteMapUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.white,
+      child: Center(
+        child: Text(
+          '원본 노선도를 불러올 수 없습니다.',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+bool get _isWidgetTest {
+  var isTest = false;
+  assert(() {
+    isTest = WidgetsBinding.instance.runtimeType.toString().contains(
+      'AutomatedTest',
+    );
+    return true;
+  }());
+  return isTest;
+}
+
+String _displayRegionName(String region) {
+  return switch (region) {
+    '부산권' => '부산',
+    '광주권' => '광주',
+    '대구권' => '대구',
+    '대전권' => '대전',
+    _ => region,
+  };
 }
 
 Matrix4 _initialMapTransform(
@@ -732,109 +813,6 @@ Matrix4 _initialMapTransform(
     ..scaleByDouble(initialScale, initialScale, 1, 1);
 }
 
-class _NetworkMapPainter extends CustomPainter {
-  const _NetworkMapPainter({
-    required this.edges,
-    required this.stationsById,
-    required this.linesById,
-    required this.transferStationIds,
-    required this.origin,
-  });
-
-  final List<NetworkMapEdge> edges;
-  final Map<String, NetworkMapStation> stationsById;
-  final Map<String, NetworkMapLine> linesById;
-  final Set<String> transferStationIds;
-  final Offset origin;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.translate(-origin.dx, -origin.dy);
-    final paintedPaths = <String>{};
-    for (final station in stationsById.values) {
-      final line = linesById[station.lineId];
-      final paint = Paint()
-        ..color = _colorFromHex(line?.color ?? '#006D77')
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = _isSeoulMetroCyberStationSource(station) ? 3 : 8
-        ..strokeCap = StrokeCap.round;
-      for (final pathData in [
-        station.position.upPath,
-        station.position.downPath,
-      ]) {
-        if (pathData.isEmpty ||
-            !paintedPaths.add('${station.lineId}:$pathData')) {
-          continue;
-        }
-        canvas.drawPath(_pathFromSvg(pathData), paint);
-      }
-    }
-    final paintedStations = <String>{};
-    for (final station in stationsById.values) {
-      if (!paintedStations.add(station.id)) {
-        continue;
-      }
-      _drawStation(canvas, station);
-    }
-    canvas.restore();
-  }
-
-  void _drawStation(Canvas canvas, NetworkMapStation station) {
-    final center = Offset(
-      station.position.x.toDouble(),
-      station.position.y.toDouble(),
-    );
-    final line = linesById[station.lineId];
-    final color = _colorFromHex(line?.color ?? '#006D77');
-    final transfer = transferStationIds.contains(station.id);
-    final fill = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final stroke = Paint()
-      ..color = transfer ? const Color(0xFF1C2F33) : color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _isSeoulMetroCyberStationSource(station)
-          ? 1.2
-          : (transfer ? 3.2 : 2.6);
-    final radius = _isSeoulMetroCyberStationSource(station)
-        ? 3.4
-        : (transfer ? 8.5 : 6.2);
-    canvas.drawCircle(center, radius, fill);
-    canvas.drawCircle(center, radius, stroke);
-
-    final labelOffset = _labelOffsetFor(station);
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: station.nameKo,
-        style: TextStyle(
-          color: const Color(0xFF102A2C),
-          fontSize: _isSeoulMetroCyberStationSource(station)
-              ? 5.6
-              : (transfer ? 8.6 : 8),
-          fontWeight: _isSeoulMetroCyberStationSource(station)
-              ? FontWeight.w600
-              : (transfer ? FontWeight.w800 : FontWeight.w700),
-          height: 1,
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: _isSeoulMetroCyberStationSource(station) ? 52 : 58);
-    final drawOffset = _labelDrawOffset(center, labelOffset, textPainter.size);
-    textPainter.paint(canvas, drawOffset);
-  }
-
-  @override
-  bool shouldRepaint(covariant _NetworkMapPainter oldDelegate) {
-    return oldDelegate.edges != edges ||
-        oldDelegate.stationsById != stationsById ||
-        oldDelegate.linesById != linesById ||
-        oldDelegate.transferStationIds != transferStationIds ||
-        oldDelegate.origin != origin;
-  }
-}
-
 class _MapGeometry {
   _MapGeometry({
     required this.origin,
@@ -853,6 +831,31 @@ class _MapGeometry {
   final Rect initialBounds;
   final double scaleX;
   final double scaleY;
+
+  static const _maxAndroidViewSurfaceExtent = 12000.0;
+
+  factory _MapGeometry.fromOriginalAsset(
+    _RouteMapAsset asset,
+    double devicePixelRatio,
+  ) {
+    final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
+    final maxLogicalExtent =
+        _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
+    final displayScale = math.min(
+      1.0,
+      maxLogicalExtent / math.max(asset.width, asset.height),
+    );
+    final displayWidth = asset.width * displayScale;
+    final displayHeight = asset.height * displayScale;
+    return _MapGeometry(
+      origin: Offset.zero,
+      focus: Offset(displayWidth / 2, displayHeight / 2),
+      width: displayWidth,
+      height: displayHeight,
+      scaleX: displayWidth / asset.coordinateWidth,
+      scaleY: displayHeight / asset.coordinateHeight,
+    );
+  }
 
   factory _MapGeometry.fromStations(List<NetworkMapStation> stations) {
     var minX = double.infinity;
@@ -910,74 +913,30 @@ class _MapGeometry {
     );
   }
 
-  factory _MapGeometry.fromOfficialAsset(
-    List<NetworkMapStation> stations,
-    _OfficialRouteMapAsset asset,
-  ) {
-    if (asset.sourceWidth != null && asset.sourceHeight != null) {
-      final scaleX = asset.width / asset.sourceWidth!;
-      final scaleY = asset.height / asset.sourceHeight!;
-      var minX = double.infinity;
-      var minY = double.infinity;
-      var maxX = 0.0;
-      var maxY = 0.0;
-      for (final station in stations) {
-        final x = station.position.x * scaleX;
-        final y = station.position.y * scaleY;
-        minX = math.min(minX, x);
-        minY = math.min(minY, y);
-        maxX = math.max(maxX, x);
-        maxY = math.max(maxY, y);
-      }
-      return _MapGeometry(
-        origin: Offset.zero,
-        focus: Offset(asset.width / 2, asset.height / 2),
-        width: asset.width,
-        height: asset.height,
-        initialBounds:
-            minX.isFinite && minY.isFinite && maxX > minX && maxY > minY
-            ? Rect.fromLTRB(minX, minY, maxX, maxY)
-            : null,
-        scaleX: scaleX,
-        scaleY: scaleY,
-      );
-    }
-    var minX = double.infinity;
-    var minY = double.infinity;
-    var maxX = 0.0;
-    var maxY = 0.0;
-    for (final station in stations) {
-      minX = math.min(minX, station.position.x.toDouble());
-      minY = math.min(minY, station.position.y.toDouble());
-      maxX = math.max(maxX, station.position.x.toDouble());
-      maxY = math.max(maxY, station.position.y.toDouble());
-    }
-    if (!minX.isFinite || !minY.isFinite || maxX <= minX || maxY <= minY) {
-      return _MapGeometry(
-        origin: Offset.zero,
-        focus: Offset(asset.width / 2, asset.height / 2),
-        width: asset.width,
-        height: asset.height,
-      );
-    }
-    const sourceMargin = 24.0;
-    final sourceWidth = maxX - minX + sourceMargin * 2;
-    final sourceHeight = maxY - minY + sourceMargin * 2;
-    return _MapGeometry(
-      origin: Offset(minX - sourceMargin, minY - sourceMargin),
-      focus: Offset(asset.width / 2, asset.height / 2),
-      width: asset.width,
-      height: asset.height,
-      scaleX: asset.width / sourceWidth,
-      scaleY: asset.height / sourceHeight,
-    );
-  }
-
   double x(NetworkMapStation station) =>
       (station.position.x - origin.dx) * scaleX;
 
   double y(NetworkMapStation station) =>
       (station.position.y - origin.dy) * scaleY;
+}
+
+Rect _stationHitRect(NetworkMapStation station, _MapGeometry geometry) {
+  final node = Rect.fromCenter(
+    center: Offset(geometry.x(station), geometry.y(station)),
+    width: 48,
+    height: 48,
+  );
+  final labelOffset = _labelOffsetFor(station);
+  final labelCenter = Offset(
+    geometry.x(station) + labelOffset.dx * geometry.scaleX,
+    geometry.y(station) + labelOffset.dy * geometry.scaleY,
+  );
+  final label = Rect.fromCenter(
+    center: labelCenter,
+    width: math.max(64, station.nameKo.characters.length * 18 + 32),
+    height: 40,
+  );
+  return node.expandToInclude(label);
 }
 
 double _median(List<double> values) {
@@ -988,12 +947,9 @@ double _median(List<double> values) {
   return values[values.length ~/ 2];
 }
 
-bool _isSeoulMetroCyberStationSource(NetworkMapStation station) {
-  return station.position.sourceId == 'seoulmetro-cyberstation';
-}
-
 bool _usesOfficialRouteMapSource(NetworkMapStation station) {
-  return station.position.sourceId.endsWith('-cyberstation');
+  return station.position.sourceId.endsWith('-cyberstation') ||
+      station.position.sourceId == 'qa-wikimedia-seoul-svg-coordinate';
 }
 
 Offset _labelOffsetFor(NetworkMapStation station) {
@@ -1019,15 +975,6 @@ Offset _labelOffsetFor(NetworkMapStation station) {
   return const Offset(8, -8);
 }
 
-Offset _labelDrawOffset(Offset center, Offset labelOffset, Size textSize) {
-  final x = labelOffset.dx < 0
-      ? center.dx + labelOffset.dx - textSize.width
-      : labelOffset.dx == 0
-      ? center.dx - textSize.width / 2
-      : center.dx + labelOffset.dx;
-  return Offset(x, center.dy + labelOffset.dy - textSize.height / 2);
-}
-
 String _mapStationKey(NetworkMapStation station) =>
     '${station.id}:${station.lineId}';
 
@@ -1049,7 +996,7 @@ class _StationHitTarget extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: const SizedBox(width: 48, height: 48),
+        child: const SizedBox.expand(),
       ),
     );
   }

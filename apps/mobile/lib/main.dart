@@ -1465,6 +1465,10 @@ class _HomeNotificationButton extends StatelessWidget {
                 minimumSize: const Size.square(48),
                 backgroundColor: Colors.white,
                 foregroundColor: EasySubwayAccessibleColors.mintDark,
+                side: const BorderSide(
+                  color: EasySubwayAccessibleColors.line,
+                  width: 1.5,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
