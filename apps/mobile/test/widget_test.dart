@@ -656,9 +656,47 @@ void main() {
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('mapRegionTabs')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapLineFilter')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapZoomInButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapZoomOutButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapOverviewButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapLocateButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapListButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
     expect(find.text('테스트권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
+    final viewer = tester.widget<InteractiveViewer>(
+      find.byKey(const Key('networkMapInteractiveViewer')),
+    );
+    final initialScale = viewer.transformationController!.value
+        .getMaxScaleOnAxis();
+    expect(initialScale, greaterThan(1));
+
+    await tester.tap(find.byKey(const Key('networkMapOverviewButton')));
+    await tester.pump();
+
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      lessThan(initialScale),
+    );
+
+    for (var index = 0; index < 30; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomInButton')));
+      await tester.pump();
+    }
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      lessThanOrEqualTo(4.8),
+    );
+
+    for (var index = 0; index < 80; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomOutButton')));
+      await tester.pump();
+    }
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      greaterThanOrEqualTo(0.08),
+    );
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -685,6 +723,72 @@ void main() {
 
     expect(repository.requestedNetworkMapRegions, contains('부산'));
     expect(find.text('부산'), findsOneWidget);
+  });
+
+  testWidgets('노선도 노선 필터는 선택한 노선으로 다시 불러온다', (tester) async {
+    final repository = FakeStationSearchRepository();
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapLineFilter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('4호선'));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapLineIds, contains('seoul-4'));
+    expect(
+      find.byKey(const Key('networkMapSelectedLineOverlay')),
+      findsOneWidget,
+    );
+    expect(find.text('4호선'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-4')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
+    expect(find.text('2호선'), findsOneWidget);
+    expect(find.text('4호선'), findsWidgets);
+  });
+
+  testWidgets('노선도 목록 대체 화면에서 역을 선택할 수 있다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapListButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
+    expect(find.text('노선과 역 목록'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('networkMapListStation-station-sadang-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
+    expect(find.text('2호선'), findsOneWidget);
+    expect(find.text('4호선'), findsOneWidget);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
@@ -7231,6 +7335,7 @@ class FakeStationSearchRepository
   final requestedExitStationIds = <String>[];
   final requestedFacilityStationIds = <String>[];
   final requestedNetworkMapRegions = <String?>[];
+  final requestedNetworkMapLineIds = <String?>[];
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -7295,8 +7400,15 @@ class FakeStationSearchRepository
   @override
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
     requestedNetworkMapRegions.add(region);
+    requestedNetworkMapLineIds.add(lineId);
     final selectedRegion = region ?? networkMapRegionNames.first;
     const lines = [
+      NetworkMapLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        region: '테스트권',
+      ),
       NetworkMapLine(
         id: 'seoul-4',
         name: '수도권 4호선',
@@ -7305,6 +7417,24 @@ class FakeStationSearchRepository
       ),
     ];
     const stations = [
+      NetworkMapStation(
+        id: 'station-sadang',
+        nameKo: '사당',
+        nameEn: 'Sadang',
+        region: '테스트권',
+        lineId: 'seoul-2',
+        stationCode: '226',
+        sequence: 33,
+        position: NetworkMapPosition(
+          x: 390,
+          y: 320,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-route-map-source-capital-review',
+        ),
+      ),
       NetworkMapStation(
         id: 'station-sadang',
         nameKo: '사당',
@@ -7342,6 +7472,23 @@ class FakeStationSearchRepository
         ),
       ),
     ];
+    final filteredStations = [
+      for (final station in stations)
+        if (lineId == null || station.lineId == lineId) station,
+    ];
+    final filteredStationKeys = {
+      for (final station in filteredStations) '${station.id}:${station.lineId}',
+    };
+    const edges = [
+      NetworkMapEdge(
+        id: 'map-edge-seoul-4-station-sadang-station-sangnoksu',
+        lineId: 'seoul-4',
+        fromStationId: 'station-sadang:seoul-4',
+        toStationId: 'station-sangnoksu:seoul-4',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+    ];
     return NetworkMapData(
       regions: [
         for (final regionName in networkMapRegionNames)
@@ -7349,22 +7496,32 @@ class FakeStationSearchRepository
       ],
       selectedRegion: selectedRegion,
       lines: lines,
-      stations: lineId == null || lineId == 'seoul-4' ? stations : const [],
-      edges: const [
-        NetworkMapEdge(
-          id: 'map-edge-seoul-4-station-sadang-station-sangnoksu',
-          lineId: 'seoul-4',
-          fromStationId: 'station-sadang',
-          toStationId: 'station-sangnoksu',
-          accessibilityStatus: 'AVAILABLE',
-          reliabilityScore: 100,
-        ),
+      stations: filteredStations,
+      edges: [
+        for (final edge in edges)
+          if (filteredStationKeys.contains(edge.fromStationId) &&
+              filteredStationKeys.contains(edge.toStationId))
+            edge,
       ],
       positionSources: const [
         NetworkMapPositionSource(
           id: 'fixture-route-map-source-capital-review',
           name: '수도권 노선도 fixture 좌표 검수',
           licenseStatus: 'fixture-only',
+        ),
+      ],
+      stationLineMemberships: const [
+        NetworkMapStationLineMembership(
+          stationId: 'station-sadang',
+          lineId: 'seoul-2',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-sadang',
+          lineId: 'seoul-4',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-sangnoksu',
+          lineId: 'seoul-4',
         ),
       ],
     );
