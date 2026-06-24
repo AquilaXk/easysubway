@@ -1214,15 +1214,7 @@ class _OnboardingProfileCard extends StatelessWidget {
   }
 
   String _profileDisplayTitle(MobilityProfileOption profile) {
-    return switch (profile.id) {
-      'elderly' => '천천히 이동',
-      'wheelchair' => '휠체어 이용',
-      'stroller' => '유모차 이용',
-      'pregnant' => '임신 중',
-      'injured' => '몸이 불편함',
-      'luggage' => '큰 짐이 있음',
-      _ => profile.title,
-    };
+    return profile.title;
   }
 
   String _profileDisplaySummary(MobilityProfileOption profile) {

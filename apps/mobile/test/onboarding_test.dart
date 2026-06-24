@@ -71,7 +71,10 @@ void main() {
         find.byKey(const Key('onboardingProfileCard-wheelchair')),
       );
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('휠체어 선택됨, 계단 없는 길만 안내해요'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
@@ -372,7 +375,7 @@ void main() {
       ),
     );
 
-    expect(result.profile.title, '임산부');
+    expect(result.profile.title, '임신 중');
     expect(result.preferences.largeTextEnabled, isFalse);
     expect(result.preferences.highContrastEnabled, isTrue);
     expect(result.preferences.simpleViewEnabled, isFalse);

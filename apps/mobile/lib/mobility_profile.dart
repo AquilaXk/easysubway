@@ -25,6 +25,25 @@ class MobilityProfileOption {
   final bool minimizeTransfers;
   final bool avoidLongWalks;
 
+  String get conditionSummary {
+    final conditions = <String>[];
+    if (avoidStairs) {
+      conditions.add('계단 피하기');
+    }
+    if (requireElevator) {
+      conditions.add('엘리베이터 이동');
+    }
+    if (minimizeTransfers) {
+      conditions.add('환승 줄이기');
+    }
+    if (avoidLongWalks && !minimizeTransfers) {
+      conditions.add('긴 보행 줄이기');
+    }
+    return conditions.take(2).join(' · ');
+  }
+
+  String get appliedConditionLabel => '$conditionSummary 적용 중';
+
   String semanticsLabel(bool isSelected) {
     final state = isSelected ? '선택됨' : '선택 가능';
     return '$title $state, $summary';
@@ -35,7 +54,7 @@ class MobilityProfileOption {
 const mobilityProfileOptions = <MobilityProfileOption>[
   MobilityProfileOption(
     id: 'elderly',
-    title: '고령자',
+    title: '천천히 이동',
     summary: '계단을 피하고 쉬운 환승을 우선해요',
     icon: Icons.elderly,
     mobilityType: 'SENIOR',
@@ -47,7 +66,7 @@ const mobilityProfileOptions = <MobilityProfileOption>[
   ),
   MobilityProfileOption(
     id: 'stroller',
-    title: '유모차',
+    title: '유모차 이용',
     summary: '엘리베이터와 넓은 길을 우선해요',
     icon: Icons.child_friendly,
     mobilityType: 'STROLLER',
@@ -59,7 +78,7 @@ const mobilityProfileOptions = <MobilityProfileOption>[
   ),
   MobilityProfileOption(
     id: 'wheelchair',
-    title: '휠체어',
+    title: '휠체어 이용',
     summary: '계단 없는 길만 안내해요',
     icon: Icons.accessible_forward,
     mobilityType: 'WHEELCHAIR',
@@ -71,7 +90,7 @@ const mobilityProfileOptions = <MobilityProfileOption>[
   ),
   MobilityProfileOption(
     id: 'pregnant',
-    title: '임산부',
+    title: '임신 중',
     summary: '짧게 걷고 적게 갈아타요',
     icon: Icons.pregnant_woman,
     mobilityType: 'PREGNANT',
@@ -83,7 +102,7 @@ const mobilityProfileOptions = <MobilityProfileOption>[
   ),
   MobilityProfileOption(
     id: 'injured',
-    title: '일시 부상',
+    title: '부상·회복 중',
     summary: '계단과 긴 보행을 줄여요',
     icon: Icons.healing,
     mobilityType: 'TEMPORARY_INJURY',
@@ -95,7 +114,7 @@ const mobilityProfileOptions = <MobilityProfileOption>[
   ),
   MobilityProfileOption(
     id: 'luggage',
-    title: '큰 짐',
+    title: '큰 짐이 있음',
     summary: '짐을 들고 이동하기 쉬운 길을 우선해요',
     icon: Icons.luggage,
     mobilityType: 'LUGGAGE',

@@ -480,7 +480,7 @@ void main() {
     expect(requestedAuthorizations, everyElement(startsWith('Basic ')));
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
-    expect(saved.mobilityLabel, '고령자');
+    expect(saved.mobilityLabel, '천천히 이동');
     expect(saved.scoreLabel, '이동 점수 92점');
   });
 
