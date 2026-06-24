@@ -2344,6 +2344,33 @@ void main() {
     }
   });
 
+  testWidgets('즐겨찾기 역 목록은 경로 draft controller가 없으면 경로 설정 버튼을 숨긴다', (
+    tester,
+  ) async {
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FavoriteStationListContent(
+            repository: favoriteRepository,
+            stationRepository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '시설 상태 확인'), findsOneWidget);
+  });
+
   testWidgets('홈 즐겨찾기 시설은 저장한 시설을 큰 목록으로 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
@@ -2403,6 +2430,40 @@ void main() {
     }
   });
 
+  testWidgets('홈 즐겨찾기 시설 제보는 위치 권한 확인 흐름을 유지한다', (tester) async {
+    final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
+      favorites: [_favoriteFacility()],
+    );
+    final locationProvider = FakeCurrentLocationProvider(
+      needsPermissionRequest: true,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: favoriteFacilityRepository,
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openFavoriteList(
+      tester,
+      tabKey: const Key('favoriteFacilitiesTabButton'),
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, '상태 제보'));
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.permissionCheckCount, 1);
+    expect(locationProvider.requestCount, 0);
+    expect(find.text('현재 위치 사용'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+  });
+
   testWidgets('홈 즐겨찾기 경로는 저장한 경로를 큰 목록으로 보여주고 삭제한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteRouteRepository = FakeFavoriteRouteRepository(
@@ -2443,6 +2504,14 @@ void main() {
         findsOneWidget,
       );
       expect(find.bySemanticsLabel('상록수에서 사당까지 더 보기'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('상록수에서 사당까지 더 보기')),
+        isSemantics(
+          label: '상록수에서 사당까지 더 보기',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
 
       await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
       await tester.pumpAndSettle();

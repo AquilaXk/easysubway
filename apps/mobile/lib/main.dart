@@ -3341,6 +3341,12 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
         child: FavoriteFacilityListContent(
           repository: repository,
           reportRepository: widget.reportRepository,
+          locationLoader: _facilityReportLocationLoader(
+            widget.locationProvider,
+          ),
+          needsLocationPermissionRequest:
+              widget.locationProvider.needsLocationPermissionRequest,
+          openLocationSettings: widget.locationProvider.openLocationSettings,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         ),
       ),

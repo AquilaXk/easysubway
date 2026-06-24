@@ -3221,8 +3221,12 @@ class _FavoriteStationListContentState
             onRetry: _controller.load,
             onFavoriteTap: _openStationDetail,
             onFacilityStatusTap: _openStationDetail,
-            onSetOrigin: _setRouteOrigin,
-            onSetDestination: _setRouteDestination,
+            onSetOrigin: widget.routeDraftController == null
+                ? null
+                : _setRouteOrigin,
+            onSetDestination: widget.routeDraftController == null
+                ? null
+                : _setRouteDestination,
             onRemove: _controller.remove,
           );
         },
@@ -3255,20 +3259,28 @@ class _FavoriteStationListContentState
   }
 
   void _setRouteOrigin(FavoriteStation favorite) {
+    final routeDraftController = widget.routeDraftController;
+    if (routeDraftController == null) {
+      return;
+    }
     final station = RouteDraftStation(
       id: favorite.stationId,
       nameKo: favorite.nameKo,
     );
-    widget.routeDraftController?.setOrigin(station);
+    routeDraftController.setOrigin(station);
     _showRouteDraftSnack('${station.displayName}을 출발역으로 설정했습니다');
   }
 
   void _setRouteDestination(FavoriteStation favorite) {
+    final routeDraftController = widget.routeDraftController;
+    if (routeDraftController == null) {
+      return;
+    }
     final station = RouteDraftStation(
       id: favorite.stationId,
       nameKo: favorite.nameKo,
     );
-    widget.routeDraftController?.setDestination(station);
+    routeDraftController.setDestination(station);
     _showRouteDraftSnack('${station.displayName}을 도착역으로 설정했습니다');
   }
 
@@ -3294,8 +3306,8 @@ class _FavoriteStationListBody extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<FavoriteStation> onFavoriteTap;
   final ValueChanged<FavoriteStation> onFacilityStatusTap;
-  final ValueChanged<FavoriteStation> onSetOrigin;
-  final ValueChanged<FavoriteStation> onSetDestination;
+  final ValueChanged<FavoriteStation>? onSetOrigin;
+  final ValueChanged<FavoriteStation>? onSetDestination;
   final ValueChanged<FavoriteStation> onRemove;
 
   @override
@@ -3340,8 +3352,12 @@ class _FavoriteStationListBody extends StatelessWidget {
               isRemoving: state.removingIds.contains(favorite.stationId),
               onOpenDetail: () => onFavoriteTap(favorite),
               onOpenFacilityStatus: () => onFacilityStatusTap(favorite),
-              onSetOrigin: () => onSetOrigin(favorite),
-              onSetDestination: () => onSetDestination(favorite),
+              onSetOrigin: onSetOrigin == null
+                  ? null
+                  : () => onSetOrigin!(favorite),
+              onSetDestination: onSetDestination == null
+                  ? null
+                  : () => onSetDestination!(favorite),
               onRemove: () => onRemove(favorite),
             ),
         ],
@@ -3365,8 +3381,8 @@ class _FavoriteStationTile extends StatelessWidget {
   final bool isRemoving;
   final VoidCallback onOpenDetail;
   final VoidCallback onOpenFacilityStatus;
-  final VoidCallback onSetOrigin;
-  final VoidCallback onSetDestination;
+  final VoidCallback? onSetOrigin;
+  final VoidCallback? onSetDestination;
   final VoidCallback onRemove;
 
   @override
@@ -3455,16 +3471,18 @@ class _FavoriteStationTile extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  onPressed: onSetOrigin,
-                  icon: const Icon(Icons.trip_origin),
-                  label: const Text('출발지로 설정'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: onSetDestination,
-                  icon: const Icon(Icons.flag_outlined),
-                  label: const Text('도착지로 설정'),
-                ),
+                if (onSetOrigin != null)
+                  OutlinedButton.icon(
+                    onPressed: onSetOrigin,
+                    icon: const Icon(Icons.trip_origin),
+                    label: const Text('출발지로 설정'),
+                  ),
+                if (onSetDestination != null)
+                  OutlinedButton.icon(
+                    onPressed: onSetDestination,
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('도착지로 설정'),
+                  ),
                 OutlinedButton.icon(
                   onPressed: onOpenDetail,
                   icon: const Icon(Icons.info_outline),

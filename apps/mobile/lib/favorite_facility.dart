@@ -397,12 +397,19 @@ class FavoriteFacilityListScreen extends StatefulWidget {
   const FavoriteFacilityListScreen({
     required this.repository,
     this.reportRepository,
+    this.locationLoader,
+    this.needsLocationPermissionRequest,
+    this.openLocationSettings,
     this.facilityReportDraftTargetStore,
     super.key,
   });
 
   final FavoriteFacilityRepository repository;
   final FacilityReportRepository? reportRepository;
+  final FacilityReportLocationLoader? locationLoader;
+  final FacilityReportLocationPermissionRequestChecker?
+  needsLocationPermissionRequest;
+  final FacilityReportLocationSettingsOpener? openLocationSettings;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
@@ -419,6 +426,9 @@ class _FavoriteFacilityListScreenState
       body: FavoriteFacilityListContent(
         repository: widget.repository,
         reportRepository: widget.reportRepository,
+        locationLoader: widget.locationLoader,
+        needsLocationPermissionRequest: widget.needsLocationPermissionRequest,
+        openLocationSettings: widget.openLocationSettings,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
       ),
     );
@@ -429,12 +439,19 @@ class FavoriteFacilityListContent extends StatefulWidget {
   const FavoriteFacilityListContent({
     required this.repository,
     this.reportRepository,
+    this.locationLoader,
+    this.needsLocationPermissionRequest,
+    this.openLocationSettings,
     this.facilityReportDraftTargetStore,
     super.key,
   });
 
   final FavoriteFacilityRepository repository;
   final FacilityReportRepository? reportRepository;
+  final FacilityReportLocationLoader? locationLoader;
+  final FacilityReportLocationPermissionRequestChecker?
+  needsLocationPermissionRequest;
+  final FacilityReportLocationSettingsOpener? openLocationSettings;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
@@ -486,6 +503,9 @@ class _FavoriteFacilityListContentState
       MaterialPageRoute<void>(
         builder: (_) => FacilityReportScreen(
           repository: reportRepository,
+          locationLoader: widget.locationLoader,
+          needsLocationPermissionRequest: widget.needsLocationPermissionRequest,
+          openLocationSettings: widget.openLocationSettings,
           draftTargetStore: widget.facilityReportDraftTargetStore,
           target: FacilityReportTarget(
             stationId: favorite.stationId,
