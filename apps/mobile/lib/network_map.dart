@@ -817,7 +817,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                       contain: true,
                     );
                   },
-                  onLocate: () {
+                  onCenter: () {
                     _controller.value = _mapTransformForBounds(
                       _readableBoundsFor(geometry),
                       constraints,
@@ -912,13 +912,13 @@ class _MapControls extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onOverview,
-    required this.onLocate,
+    required this.onCenter,
   });
 
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
   final VoidCallback onOverview;
-  final VoidCallback onLocate;
+  final VoidCallback onCenter;
 
   @override
   Widget build(BuildContext context) {
@@ -947,9 +947,9 @@ class _MapControls extends StatelessWidget {
         const SizedBox(height: 8),
         _MapControlButton(
           key: const Key('networkMapLocateButton'),
-          tooltip: '내 위치',
-          icon: Icons.my_location,
-          onPressed: onLocate,
+          tooltip: '중심 보기',
+          icon: Icons.center_focus_strong,
+          onPressed: onCenter,
         ),
       ],
     );
