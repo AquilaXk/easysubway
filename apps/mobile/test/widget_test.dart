@@ -629,15 +629,17 @@ void main() {
   });
 
   testWidgets('홈 알림 버튼은 확인할 알림이 있으면 배지와 상태를 알려준다', (tester) async {
+    final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
+      favorites: [_favoriteFacility(status: 'USER_REPORTED')],
+    );
+
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(
-          favorites: [_favoriteFacility(status: 'USER_REPORTED')],
-        ),
+        favoriteFacilityRepository: favoriteFacilityRepository,
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingState(),
       ),
@@ -653,6 +655,7 @@ void main() {
     expect(notificationBadge.isLabelVisible, isTrue);
     expect(find.bySemanticsLabel('알림, 확인할 알림 있음'), findsOneWidget);
     expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsNothing);
+    expect(favoriteFacilityRepository.listCount, 1);
   });
 
   testWidgets('홈은 역 검색에서 돌아오면 알림 상태를 다시 불러온다', (tester) async {

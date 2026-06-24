@@ -1047,9 +1047,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
     _recentRoutesFuture = _loadRecentRoutes();
-    _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
+    final facilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
-    _hasNotificationItemsFuture = _loadHasNotificationItems();
+    _favoriteFacilitiesFuture = facilitiesFuture;
+    _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
   }
 
   @override
@@ -1071,14 +1072,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
-      _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
+      final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
+      _favoriteFacilitiesFuture = facilitiesFuture;
+      _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
     }
-    if (widget.favoriteFacilityRepository !=
-            oldWidget.favoriteFacilityRepository ||
-        widget.reportRepository != oldWidget.reportRepository ||
+    if (widget.reportRepository != oldWidget.reportRepository ||
         widget.notificationRepository != oldWidget.notificationRepository) {
-      _hasNotificationItemsFuture = _loadHasNotificationItems();
+      _hasNotificationItemsFuture = _loadHasNotificationItems(
+        _favoriteFacilitiesFuture,
+      );
     }
   }
 
@@ -1165,7 +1168,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
       final routesFuture = _loadRecentRoutes();
-      final hasNotificationItemsFuture = _loadHasNotificationItems();
+      final hasNotificationItemsFuture = _loadHasNotificationItems(
+        facilitiesFuture,
+      );
       setState(() {
         _favoriteFacilitiesFuture = facilitiesFuture;
         _recentRoutesFuture = routesFuture;
@@ -1404,16 +1409,16 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.favoriteRouteRepository?.listFavoriteRoutes();
   }
 
-  Future<bool> _loadHasNotificationItems() async {
+  Future<bool> _loadHasNotificationItems(
+    Future<List<FavoriteFacility>>? facilitiesFuture,
+  ) async {
     if (widget.notificationRepository == null) {
       return false;
     }
 
-    final favoriteFacilityRepository = widget.favoriteFacilityRepository;
-    if (favoriteFacilityRepository != null) {
+    if (facilitiesFuture != null) {
       try {
-        final facilities = await favoriteFacilityRepository
-            .listFavoriteFacilities();
+        final facilities = await facilitiesFuture;
         if (facilities.any(_isFacilityAlert)) {
           return true;
         }
