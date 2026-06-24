@@ -2304,6 +2304,12 @@ class _StationSearchBody extends StatelessWidget {
             _NearbyStationOverview(
               result: state.results.first,
               onTap: () => onResultTap(state.results.first),
+              onSetOrigin: onSetOrigin == null
+                  ? null
+                  : () => onSetOrigin!(state.results.first),
+              onSetDestination: onSetDestination == null
+                  ? null
+                  : () => onSetDestination!(state.results.first),
             ),
             if (state.results.length > 1) ...[
               const SizedBox(height: 18),
@@ -2335,90 +2341,108 @@ class _StationSearchBody extends StatelessWidget {
 }
 
 class _NearbyStationOverview extends StatelessWidget {
-  const _NearbyStationOverview({required this.result, required this.onTap});
+  const _NearbyStationOverview({
+    required this.result,
+    required this.onTap,
+    this.onSetOrigin,
+    this.onSetDestination,
+  });
 
   final StationSearchResult result;
   final VoidCallback onTap;
+  final VoidCallback? onSetOrigin;
+  final VoidCallback? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
     final stationName = _stationResultDisplayName(result.nameKo);
-    return Semantics(
-      container: true,
-      button: true,
-      label: '가장 가까운 역, $stationName, ${result.distanceLabel}',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: EasySubwayAccessibleColors.skySoft,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: const BorderSide(color: EasySubwayAccessibleColors.line),
-          ),
-          child: InkWell(
-            key: const Key('nearbyStationPrimaryCard'),
-            borderRadius: BorderRadius.circular(18),
+    return Card(
+      margin: EdgeInsets.zero,
+      color: EasySubwayAccessibleColors.skySoft,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
+      ),
+      child: Column(
+        children: [
+          Semantics(
+            container: true,
+            button: true,
+            label: '가장 가까운 역, $stationName, ${result.distanceLabel}',
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '가장 가까운 역',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: EasySubwayAccessibleColors.mutedText,
-                                fontWeight: FontWeight.w800,
-                                height: 1.25,
-                              ),
+            child: ExcludeSemantics(
+              child: InkWell(
+                key: const Key('nearbyStationPrimaryCard'),
+                borderRadius: BorderRadius.circular(18),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '가장 가까운 역',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: EasySubwayAccessibleColors.mutedText,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.25,
+                                  ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              stationName,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: EasySubwayAccessibleColors.text,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              result.distanceLabel.isEmpty
+                                  ? result.lineLabel
+                                  : '${result.distanceLabel} · ${result.lineLabel}',
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: EasySubwayAccessibleColors.mutedText,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.3,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            _StationDetailTextPill(
+                              text:
+                                  '${result.dataQualityLabel} · ${result.dataSourceLabel}',
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          stationName,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: EasySubwayAccessibleColors.text,
-                                fontWeight: FontWeight.w800,
-                                height: 1.2,
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          result.distanceLabel.isEmpty
-                              ? result.lineLabel
-                              : '${result.distanceLabel} · ${result.lineLabel}',
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: EasySubwayAccessibleColors.mutedText,
-                                fontWeight: FontWeight.w700,
-                                height: 1.3,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        _StationDetailTextPill(
-                          text:
-                              '${result.dataQualityLabel} · ${result.dataSourceLabel}',
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      StationLineBadges(
+                        lines: result.lines,
+                        size: 38,
+                        maxBadgeCount: 1,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  StationLineBadges(
-                    lines: result.lines,
-                    size: 38,
-                    maxBadgeCount: 1,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          if (onSetOrigin != null || onSetDestination != null)
+            _StationRoleActionBar(
+              stationId: result.id,
+              stationName: stationName,
+              onSetOrigin: onSetOrigin,
+              onSetDestination: onSetDestination,
+            ),
+        ],
       ),
     );
   }
