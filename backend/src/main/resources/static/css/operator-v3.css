@@ -318,7 +318,8 @@ input:focus-visible {
 	color: var(--amber-700);
 }
 
-.alert-banner.good {
+.alert-banner.good,
+.alert-banner.ok {
 	background: var(--green-100);
 	color: var(--green-700);
 }
