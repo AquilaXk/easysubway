@@ -304,16 +304,42 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 Positioned.fill(
                   child: _NetworkMapCanvas(
                     data: data,
+                    selectedLineId: _selectedLineId,
                     onStationTap: _showStationSheet,
                   ),
                 ),
                 Positioned(
                   left: 14,
                   top: 12,
-                  child: _RegionTabs(
-                    regions: data.regions,
-                    selectedRegion: data.selectedRegion,
-                    onSelected: (region) => _reload(region: region),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _RegionTabs(
+                        regions: data.regions,
+                        selectedRegion: data.selectedRegion,
+                        onSelected: (region) => _reload(region: region),
+                      ),
+                      const SizedBox(height: 8),
+                      _LineFilterMenu(
+                        lines: data.lines,
+                        selectedLineId: _selectedLineId,
+                        onSelected: (lineId) => _reload(lineId: lineId),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 14,
+                  bottom: 14,
+                  child: SizedBox(
+                    width: 180,
+                    height: 48,
+                    child: FilledButton.icon(
+                      key: const Key('networkMapListButton'),
+                      onPressed: () => _showMapList(data),
+                      icon: const Icon(Icons.list_alt),
+                      label: const Text('노선 목록으로 보기'),
+                    ),
                   ),
                 ),
               ],
@@ -356,6 +382,23 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
+  void _showMapList(NetworkMapData data) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _NetworkMapListSheet(
+          data: data,
+          onStationTap: (station, lines) {
+            Navigator.of(context).pop();
+            _showStationSheet(station, lines);
+          },
+        );
+      },
+    );
+  }
+
   void _showStationSheet(
     NetworkMapStation station,
     List<NetworkMapLine> lines,
@@ -386,6 +429,46 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _LineFilterMenu extends StatelessWidget {
+  const _LineFilterMenu({
+    required this.lines,
+    required this.selectedLineId,
+    required this.onSelected,
+  });
+
+  final List<NetworkMapLine> lines;
+  final String? selectedLineId;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    NetworkMapLine? selectedLine;
+    for (final line in lines) {
+      if (line.id == selectedLineId) {
+        selectedLine = line;
+        break;
+      }
+    }
+    final label = selectedLine?.shortName ?? '노선 선택';
+    return SizedBox(
+      key: const Key('networkMapLineFilter'),
+      width: 142,
+      height: 40,
+      child: PopupMenuButton<String>(
+        padding: EdgeInsets.zero,
+        initialValue: selectedLineId ?? '',
+        onSelected: (lineId) => onSelected(lineId.isEmpty ? null : lineId),
+        itemBuilder: (context) => [
+          const PopupMenuItem<String>(value: '', child: Text('전체 노선')),
+          for (final line in lines)
+            PopupMenuItem<String>(value: line.id, child: Text(line.shortName)),
+        ],
+        child: _RegionMenuButton(label: label),
+      ),
     );
   }
 }
@@ -441,33 +524,35 @@ class _RegionMenuButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.only(left: 10, right: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFD7E1E3)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF102A2C),
+      child: ExcludeSemantics(
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.only(left: 10, right: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFD7E1E3)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF102A2C),
+                  ),
                 ),
               ),
-            ),
-            const Icon(
-              Icons.arrow_drop_down,
-              size: 22,
-              color: Color(0xFF4C5759),
-            ),
-          ],
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 22,
+                color: Color(0xFF4C5759),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -608,9 +693,14 @@ _RouteMapAsset? _routeMapAssetForRegion(String region) {
 }
 
 class _NetworkMapCanvas extends StatefulWidget {
-  const _NetworkMapCanvas({required this.data, required this.onStationTap});
+  const _NetworkMapCanvas({
+    required this.data,
+    required this.selectedLineId,
+    required this.onStationTap,
+  });
 
   final NetworkMapData data;
+  final String? selectedLineId;
   final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
   onStationTap;
 
@@ -660,41 +750,233 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
             _layoutKey = layoutKey;
             _controller.value = _initialMapTransform(geometry, constraints);
           }
-          return InteractiveViewer(
-            transformationController: _controller,
-            constrained: false,
-            minScale: 0.08,
-            maxScale: 4.8,
-            boundaryMargin: const EdgeInsets.all(220),
-            child: SizedBox(
-              width: geometry.width,
-              height: geometry.height,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: mapAsset == null
-                        ? const _OriginalRouteMapUnavailable()
-                        : _OriginalRouteMapView(asset: mapAsset),
-                  ),
-                  for (final station in widget.data.stations)
-                    Positioned.fromRect(
-                      rect: _stationHitRect(station, geometry),
-                      child: _StationHitTarget(
-                        key: Key(
-                          'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  key: const Key('networkMapInteractiveViewer'),
+                  transformationController: _controller,
+                  constrained: false,
+                  minScale: 0.08,
+                  maxScale: 4.8,
+                  boundaryMargin: const EdgeInsets.all(220),
+                  child: SizedBox(
+                    width: geometry.width,
+                    height: geometry.height,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: mapAsset == null
+                              ? const _OriginalRouteMapUnavailable()
+                              : _OriginalRouteMapView(asset: mapAsset),
                         ),
-                        station: station,
-                        onTap: () => widget.onStationTap(
-                          station,
-                          stationLinesById[station.id] ?? const [],
-                        ),
-                      ),
+                        if (widget.selectedLineId != null)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: CustomPaint(
+                                key: const Key('networkMapSelectedLineOverlay'),
+                                painter: _SelectedLineOverlayPainter(
+                                  lineId: widget.selectedLineId!,
+                                  linesById: linesById,
+                                  stationsById: stationsById,
+                                  edges: widget.data.edges,
+                                  geometry: geometry,
+                                ),
+                              ),
+                            ),
+                          ),
+                        for (final station in widget.data.stations)
+                          Positioned.fromRect(
+                            rect: _stationHitRect(station, geometry),
+                            child: _StationHitTarget(
+                              key: Key(
+                                'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+                              ),
+                              station: station,
+                              onTap: () => widget.onStationTap(
+                                station,
+                                stationLinesById[station.id] ?? const [],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                right: 14,
+                top: 12,
+                child: _MapControls(
+                  onZoomIn: () => _scaleMap(1.25),
+                  onZoomOut: () => _scaleMap(0.8),
+                  onOverview: () {
+                    _controller.value = _mapTransformForBounds(
+                      Rect.fromLTWH(0, 0, geometry.width, geometry.height),
+                      constraints,
+                    );
+                  },
+                  onLocate: () {
+                    _controller.value = _mapTransformForBounds(
+                      _readableBoundsFor(geometry),
+                      constraints,
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  void _scaleMap(double factor) {
+    _controller.value = Matrix4.copy(_controller.value)
+      ..scaleByDouble(factor, factor, 1, 1);
+  }
+}
+
+class _SelectedLineOverlayPainter extends CustomPainter {
+  const _SelectedLineOverlayPainter({
+    required this.lineId,
+    required this.linesById,
+    required this.stationsById,
+    required this.edges,
+    required this.geometry,
+  });
+
+  final String lineId;
+  final Map<String, NetworkMapLine> linesById;
+  final Map<String, NetworkMapStation> stationsById;
+  final List<NetworkMapEdge> edges;
+  final _MapGeometry geometry;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = linesById[lineId];
+    if (line == null) {
+      return;
+    }
+    final lineColor = _colorFromHex(line.color);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = Colors.white.withValues(alpha: 0.58),
+    );
+    final pathPaint = Paint()
+      ..color = lineColor
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 14
+      ..style = PaintingStyle.stroke;
+    for (final edge in edges) {
+      if (edge.lineId != lineId) {
+        continue;
+      }
+      final from = stationsById[edge.fromStationId];
+      final to = stationsById[edge.toStationId];
+      if (from == null || to == null) {
+        continue;
+      }
+      canvas.drawLine(
+        Offset(geometry.x(from), geometry.y(from)),
+        Offset(geometry.x(to), geometry.y(to)),
+        pathPaint,
+      );
+    }
+    final stationBorderPaint = Paint()..color = lineColor;
+    final stationFillPaint = Paint()..color = Colors.white;
+    for (final station in stationsById.values.toSet()) {
+      if (station.lineId != lineId) {
+        continue;
+      }
+      final center = Offset(geometry.x(station), geometry.y(station));
+      canvas.drawCircle(center, 13, stationBorderPaint);
+      canvas.drawCircle(center, 7, stationFillPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SelectedLineOverlayPainter oldDelegate) {
+    return oldDelegate.lineId != lineId ||
+        oldDelegate.linesById != linesById ||
+        oldDelegate.stationsById != stationsById ||
+        oldDelegate.edges != edges ||
+        oldDelegate.geometry != geometry;
+  }
+}
+
+class _MapControls extends StatelessWidget {
+  const _MapControls({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onOverview,
+    required this.onLocate,
+  });
+
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onOverview;
+  final VoidCallback onLocate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _MapControlButton(
+          key: const Key('networkMapZoomInButton'),
+          tooltip: '확대',
+          icon: Icons.add,
+          onPressed: onZoomIn,
+        ),
+        const SizedBox(height: 8),
+        _MapControlButton(
+          key: const Key('networkMapZoomOutButton'),
+          tooltip: '축소',
+          icon: Icons.remove,
+          onPressed: onZoomOut,
+        ),
+        const SizedBox(height: 8),
+        _MapControlButton(
+          key: const Key('networkMapOverviewButton'),
+          tooltip: '전체 보기',
+          icon: Icons.fit_screen,
+          onPressed: onOverview,
+        ),
+        const SizedBox(height: 8),
+        _MapControlButton(
+          key: const Key('networkMapLocateButton'),
+          tooltip: '내 위치',
+          icon: Icons.my_location,
+          onPressed: onLocate,
+        ),
+      ],
+    );
+  }
+}
+
+class _MapControlButton extends StatelessWidget {
+  const _MapControlButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 2,
+      borderRadius: BorderRadius.circular(8),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon),
       ),
     );
   }
@@ -790,6 +1072,10 @@ Matrix4 _initialMapTransform(
   _MapGeometry geometry,
   BoxConstraints constraints,
 ) {
+  return _mapTransformForBounds(geometry.initialBounds, constraints);
+}
+
+Matrix4 _mapTransformForBounds(Rect bounds, BoxConstraints constraints) {
   final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
   final viewportHeight = constraints.hasBoundedHeight
       ? constraints.maxHeight
@@ -797,7 +1083,6 @@ Matrix4 _initialMapTransform(
   if (viewportWidth <= 0 || viewportHeight <= 0) {
     return Matrix4.identity();
   }
-  final bounds = geometry.initialBounds;
   final initialScale = math.max(
     viewportWidth / bounds.width,
     viewportHeight / bounds.height,
@@ -811,6 +1096,22 @@ Matrix4 _initialMapTransform(
   return Matrix4.identity()
     ..translateByDouble(dx, dy, 0, 1)
     ..scaleByDouble(initialScale, initialScale, 1, 1);
+}
+
+Rect _readableBoundsFor(_MapGeometry geometry) {
+  final width = math.min(
+    geometry.width,
+    math.max(320.0, geometry.width * 0.38),
+  );
+  final height = math.min(
+    geometry.height,
+    math.max(320.0, geometry.height * 0.38),
+  );
+  final maxLeft = math.max(0.0, geometry.width - width);
+  final maxTop = math.max(0.0, geometry.height - height);
+  final left = (geometry.focus.dx - width / 2).clamp(0.0, maxLeft).toDouble();
+  final top = (geometry.focus.dy - height / 2).clamp(0.0, maxTop).toDouble();
+  return Rect.fromLTWH(left, top, width, height);
 }
 
 class _MapGeometry {
@@ -852,6 +1153,14 @@ class _MapGeometry {
       focus: Offset(displayWidth / 2, displayHeight / 2),
       width: displayWidth,
       height: displayHeight,
+      initialBounds: _readableBoundsFor(
+        _MapGeometry(
+          origin: Offset.zero,
+          focus: Offset(displayWidth / 2, displayHeight / 2),
+          width: displayWidth,
+          height: displayHeight,
+        ),
+      ),
       scaleX: displayWidth / asset.coordinateWidth,
       scaleY: displayHeight / asset.coordinateHeight,
     );
@@ -902,7 +1211,7 @@ class _MapGeometry {
     }
     const margin = 54.0;
     final origin = Offset(minX - margin, minY - margin);
-    return _MapGeometry(
+    final geometry = _MapGeometry(
       origin: origin,
       focus: Offset(
         _median(stationXs) - origin.dx,
@@ -910,6 +1219,13 @@ class _MapGeometry {
       ),
       width: math.max(860, maxX - minX + margin * 2),
       height: math.max(560, maxY - minY + margin * 2),
+    );
+    return _MapGeometry(
+      origin: geometry.origin,
+      focus: geometry.focus,
+      width: geometry.width,
+      height: geometry.height,
+      initialBounds: _readableBoundsFor(geometry),
     );
   }
 
@@ -997,6 +1313,70 @@ class _StationHitTarget extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _NetworkMapListSheet extends StatelessWidget {
+  const _NetworkMapListSheet({required this.data, required this.onStationTap});
+
+  final NetworkMapData data;
+  final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
+  onStationTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final linesById = {for (final line in data.lines) line.id: line};
+    final stationsByLine = <String, List<NetworkMapStation>>{};
+    for (final station in data.stations) {
+      stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
+    }
+    return SafeArea(
+      key: const Key('networkMapListSheet'),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+        children: [
+          const Text(
+            '노선과 역 목록',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '지도 조작이 어려울 때 목록에서 역을 선택하세요.',
+            style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
+          ),
+          const SizedBox(height: 14),
+          if (data.stations.isEmpty)
+            const Text(
+              '선택한 노선에 표시할 역이 없습니다.',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            )
+          else
+            for (final line in data.lines)
+              if (stationsByLine[line.id]?.isNotEmpty ?? false)
+                ExpansionTile(
+                  key: Key('networkMapListLine-${line.id}'),
+                  initiallyExpanded: true,
+                  leading: _LineCircleBadge(line: line, size: 34),
+                  title: Text(
+                    line.shortName,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  children: [
+                    for (final station in stationsByLine[line.id]!)
+                      ListTile(
+                        key: Key('networkMapListStation-${station.id}'),
+                        title: Text(station.displayName),
+                        subtitle: Text(line.shortName),
+                        onTap: () => onStationTap(station, [
+                          if (linesById[station.lineId] != null)
+                            linesById[station.lineId]!,
+                        ]),
+                      ),
+                  ],
+                ),
+        ],
       ),
     );
   }

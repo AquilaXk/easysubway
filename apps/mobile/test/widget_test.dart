@@ -656,9 +656,22 @@ void main() {
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('mapRegionTabs')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapLineFilter')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapZoomInButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapZoomOutButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapOverviewButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapLocateButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapListButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
     expect(find.text('테스트권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
+    final viewer = tester.widget<InteractiveViewer>(
+      find.byKey(const Key('networkMapInteractiveViewer')),
+    );
+    expect(
+      viewer.transformationController!.value.getMaxScaleOnAxis(),
+      greaterThan(1),
+    );
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -685,6 +698,62 @@ void main() {
 
     expect(repository.requestedNetworkMapRegions, contains('부산'));
     expect(find.text('부산'), findsOneWidget);
+  });
+
+  testWidgets('노선도 노선 필터는 선택한 노선으로 다시 불러온다', (tester) async {
+    final repository = FakeStationSearchRepository();
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapLineFilter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('4호선'));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapLineIds, contains('seoul-4'));
+    expect(
+      find.byKey(const Key('networkMapSelectedLineOverlay')),
+      findsOneWidget,
+    );
+    expect(find.text('4호선'), findsOneWidget);
+  });
+
+  testWidgets('노선도 목록 대체 화면에서 역을 선택할 수 있다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapListButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
+    expect(find.text('노선과 역 목록'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('networkMapListStation-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
@@ -7231,6 +7300,7 @@ class FakeStationSearchRepository
   final requestedExitStationIds = <String>[];
   final requestedFacilityStationIds = <String>[];
   final requestedNetworkMapRegions = <String?>[];
+  final requestedNetworkMapLineIds = <String?>[];
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -7295,6 +7365,7 @@ class FakeStationSearchRepository
   @override
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
     requestedNetworkMapRegions.add(region);
+    requestedNetworkMapLineIds.add(lineId);
     final selectedRegion = region ?? networkMapRegionNames.first;
     const lines = [
       NetworkMapLine(
