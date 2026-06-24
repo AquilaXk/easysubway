@@ -356,6 +356,14 @@ class DriftStationRepository
           ),
         )
         .toList(growable: false);
+    final stationLineMemberships = stationRows
+        .map(
+          (row) => NetworkMapStationLineMembership(
+            stationId: row.read<String>('id'),
+            lineId: row.read<String>('line_id'),
+          ),
+        )
+        .toList(growable: false);
     return NetworkMapData(
       regions: await _networkMapRegions(),
       selectedRegion: selectedRegion,
@@ -363,6 +371,7 @@ class DriftStationRepository
       stations: stations,
       edges: _networkMapEdges(stations),
       positionSources: await _networkMapPositionSources(selectedRegion),
+      stationLineMemberships: stationLineMemberships,
     );
   }
 
