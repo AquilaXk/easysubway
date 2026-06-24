@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
+import 'facility_report.dart';
 import 'facility_status.dart';
 import 'mobile_error_reporter.dart';
 
@@ -393,9 +394,16 @@ class FavoriteFacilityListController extends ChangeNotifier {
 }
 
 class FavoriteFacilityListScreen extends StatefulWidget {
-  const FavoriteFacilityListScreen({required this.repository, super.key});
+  const FavoriteFacilityListScreen({
+    required this.repository,
+    this.reportRepository,
+    this.facilityReportDraftTargetStore,
+    super.key,
+  });
 
   final FavoriteFacilityRepository repository;
+  final FacilityReportRepository? reportRepository;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   State<FavoriteFacilityListScreen> createState() =>
@@ -408,15 +416,26 @@ class _FavoriteFacilityListScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('즐겨찾기 시설')),
-      body: FavoriteFacilityListContent(repository: widget.repository),
+      body: FavoriteFacilityListContent(
+        repository: widget.repository,
+        reportRepository: widget.reportRepository,
+        facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+      ),
     );
   }
 }
 
 class FavoriteFacilityListContent extends StatefulWidget {
-  const FavoriteFacilityListContent({required this.repository, super.key});
+  const FavoriteFacilityListContent({
+    required this.repository,
+    this.reportRepository,
+    this.facilityReportDraftTargetStore,
+    super.key,
+  });
 
   final FavoriteFacilityRepository repository;
+  final FacilityReportRepository? reportRepository;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
   State<FavoriteFacilityListContent> createState() =>
@@ -449,18 +468,49 @@ class _FavoriteFacilityListContentState
           return _FavoriteFacilityListBody(
             state: _controller.state,
             onRetry: _controller.load,
+            onReportTap: widget.reportRepository == null
+                ? null
+                : _openFacilityReport,
           );
         },
+      ),
+    );
+  }
+
+  void _openFacilityReport(FavoriteFacility favorite) {
+    final reportRepository = widget.reportRepository;
+    if (reportRepository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FacilityReportScreen(
+          repository: reportRepository,
+          draftTargetStore: widget.facilityReportDraftTargetStore,
+          target: FacilityReportTarget(
+            stationId: favorite.stationId,
+            stationName: favorite.stationNameKo,
+            facilityId: favorite.facilityId,
+            facilityName: favorite.name,
+            facilityTypeLabel: favorite.typeLabel,
+            facilityStatusLabel: favorite.statusLabel,
+          ),
+        ),
       ),
     );
   }
 }
 
 class _FavoriteFacilityListBody extends StatelessWidget {
-  const _FavoriteFacilityListBody({required this.state, required this.onRetry});
+  const _FavoriteFacilityListBody({
+    required this.state,
+    required this.onRetry,
+    required this.onReportTap,
+  });
 
   final FavoriteFacilityListState state;
   final VoidCallback onRetry;
+  final ValueChanged<FavoriteFacility>? onReportTap;
 
   @override
   Widget build(BuildContext context) {
@@ -502,7 +552,12 @@ class _FavoriteFacilityListBody extends StatelessWidget {
             child: const SizedBox.shrink(),
           ),
           for (final favorite in state.favorites)
-            _FavoriteFacilityTile(favorite: favorite),
+            _FavoriteFacilityTile(
+              favorite: favorite,
+              onReportTap: onReportTap == null
+                  ? null
+                  : () => onReportTap!(favorite),
+            ),
         ],
       ),
     };
@@ -510,102 +565,120 @@ class _FavoriteFacilityListBody extends StatelessWidget {
 }
 
 class _FavoriteFacilityTile extends StatelessWidget {
-  const _FavoriteFacilityTile({required this.favorite});
+  const _FavoriteFacilityTile({
+    required this.favorite,
+    required this.onReportTap,
+  });
 
   final FavoriteFacility favorite;
+  final VoidCallback? onReportTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: favorite.semanticLabel,
-        child: ExcludeSemantics(
-          child: Card(
-            key: Key('favoriteFacilityTile-${favorite.facilityId}'),
-            margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    favorite.name,
-                    style: textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w900,
-                      height: 1.25,
-                    ),
+    return Card(
+      key: Key('favoriteFacilityTile-${favorite.facilityId}'),
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFD5E2E4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MergeSemantics(
+              child: Semantics(
+                label: favorite.semanticLabel,
+                child: ExcludeSemantics(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        favorite.name,
+                        style: textTheme.titleLarge?.copyWith(
+                          color: const Color(0xFF102A2C),
+                          fontWeight: FontWeight.w900,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        favorite.stationLabel,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: const Color(0xFF29484B),
+                          fontWeight: FontWeight.w800,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        favorite.statusLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${favorite.severityLabel} · 다음 행동 ${favorite.nextActionLabel}',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        favorite.locationLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        favorite.updatedLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        favorite.confidenceLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        favorite.dataSourceLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF405A5D),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    favorite.stationLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.statusLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${favorite.severityLabel} · 다음 행동 ${favorite.nextActionLabel}',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.locationLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.updatedLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.confidenceLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.dataSourceLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      height: 1.3,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            if (onReportTap != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: Key('favoriteFacilityReport-${favorite.facilityId}'),
+                onPressed: onReportTap,
+                icon: const Icon(Icons.report_outlined),
+                label: const Text('상태 제보'),
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
+import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
@@ -63,6 +64,7 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
           locationProvider: home.locationProvider,
           facilityReportDraftTargetStore: home.facilityReportDraftTargetStore,
           internalRouteRepository: home.internalRouteRepository,
+          routeDraftController: RouteDraftController(),
           initialMobilityType: home.initialMobilityType,
         ),
       ),
@@ -2314,6 +2316,11 @@ void main() {
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '시설 상태 확인'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
       expect(
         find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
         findsOneWidget,
@@ -2367,6 +2374,7 @@ void main() {
       expect(find.text('정상'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '상태 제보'), findsOneWidget);
       expect(
         find.byKey(
           const Key('favoriteFacilityTile-facility-sangnoksu-elevator-1'),
@@ -2421,16 +2429,29 @@ void main() {
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
-      expect(find.text('이동 점수 92점'), findsOneWidget);
+      expect(find.text('이동 편의도 92점'), findsOneWidget);
+      expect(
+        find.text('기준: 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13'),
+        findsOneWidget,
+      );
+      expect(find.text('예상 시간 확인 필요 · 환승 확인 필요 · 도보 확인 필요'), findsOneWidget);
+      expect(find.text('계단 정보 확인 필요 · 엘리베이터 연결 확인 필요'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 이동 점수 92점',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 이동 편의도 92점, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('상록수에서 사당까지 삭제'), findsOneWidget);
+      expect(find.bySemanticsLabel('상록수에서 사당까지 더 보기'), findsOneWidget);
 
+      await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('즐겨찾기 경로 삭제'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('favoriteRouteRemoveConfirm-route-1')),
+      );
       await tester.pumpAndSettle();
 
       expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
@@ -2472,15 +2493,20 @@ void main() {
 
     await _openFavoriteList(tester);
 
-    final removeButton = find.byKey(const Key('favoriteRouteRemove-route-1'));
-    await tester.tap(removeButton);
+    await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('favoriteRouteRemoveConfirm-route-1')),
+    );
     await tester.pump();
 
     expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
     expect(find.text('삭제 중'), findsOneWidget);
-    expect(find.bySemanticsLabel('상록수에서 사당까지 삭제 중'), findsOneWidget);
+    expect(find.bySemanticsLabel('상록수에서 사당까지 더 보기, 삭제 중'), findsOneWidget);
 
-    await tester.tap(removeButton);
+    await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
     await tester.pump();
 
     expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
