@@ -4967,7 +4967,7 @@ void main() {
 
     expect(find.byKey(const Key('routeMobilityApplyButton')), findsOneWidget);
     expect(
-      find.bySemanticsLabel('휠체어 이용 현재 선택, 계단 없는 길만 안내해요'),
+      find.bySemanticsLabel('휠체어 이용 현재 선택, 계단 없는 길만 안내해요, 계단 피하기 · 엘리베이터 이동'),
       findsOneWidget,
     );
 

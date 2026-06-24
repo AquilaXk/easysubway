@@ -1978,7 +1978,7 @@ class _RouteMobilityTypeOptionButton extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
         label: selected
-            ? '${option.title} 현재 선택, ${option.summary}'
+            ? '${option.title} 현재 선택, ${option.summary}, ${_routeMobilityConditionLabel(option)}'
             : option.semanticsLabel(false),
         button: true,
         selected: selected,
