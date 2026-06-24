@@ -868,6 +868,49 @@ void main() {
     expect(locationProvider.requestCount, 0);
   });
 
+  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException('현재 위치를 확인하지 못했습니다.'),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('현재 위치를 확인하지 못했습니다.'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, contains('상록수'));
+    expect(find.text('상록수역'), findsOneWidget);
+  });
+
   testWidgets('홈 이동 조건 pill은 모든 이동 유형에 맞는 아이콘을 보여준다', (tester) async {
     for (final option in mobilityProfileOptions) {
       await tester.pumpWidget(

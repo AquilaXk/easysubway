@@ -1632,6 +1632,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       repository: widget.repository,
       searchHistoryRepository: widget.searchHistoryRepository,
     );
+    _controller.addListener(_handleControllerChanged);
     _queryController.addListener(_handleQueryChanged);
     final lineRepository = _lineFilterRepository;
     if (lineRepository != null) {
@@ -1649,10 +1650,18 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller
+      ..removeListener(_handleControllerChanged)
+      ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _handleQueryChanged() {
@@ -1669,12 +1678,22 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
+  bool get _shouldShowNearbyFallbackSearch {
+    return widget.entryMode == StationSearchEntryMode.nearby &&
+        switch (_controller.state.status) {
+          StationSearchStatus.empty || StationSearchStatus.failure => true,
+          _ => false,
+        };
+  }
+
   @override
   Widget build(BuildContext context) {
     final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
     final showSearchInput =
-        (!isRecentEntry && !isNearbyEntry) || _hasSearchQuery;
+        (!isRecentEntry && !isNearbyEntry) ||
+        _hasSearchQuery ||
+        _shouldShowNearbyFallbackSearch;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     return Scaffold(
       appBar: AppBar(
