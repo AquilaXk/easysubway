@@ -1614,7 +1614,7 @@ class StationSearchScreen extends StatefulWidget {
   State<StationSearchScreen> createState() => _StationSearchScreenState();
 }
 
-enum StationSearchEntryMode { search, recent }
+enum StationSearchEntryMode { search, recent, nearby }
 
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
@@ -1632,20 +1632,36 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       repository: widget.repository,
       searchHistoryRepository: widget.searchHistoryRepository,
     );
+    _controller.addListener(_handleControllerChanged);
     _queryController.addListener(_handleQueryChanged);
     final lineRepository = _lineFilterRepository;
     if (lineRepository != null) {
       _lineOptionsFuture = lineRepository.listLines();
     }
     unawaited(_loadRecentQueries());
+    if (widget.entryMode == StationSearchEntryMode.nearby) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_searchNearby());
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller
+      ..removeListener(_handleControllerChanged)
+      ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _handleQueryChanged() {
@@ -1662,15 +1678,32 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
+  bool get _shouldShowNearbyFallbackSearch {
+    return widget.entryMode == StationSearchEntryMode.nearby &&
+        switch (_controller.state.status) {
+          StationSearchStatus.empty || StationSearchStatus.failure => true,
+          _ => false,
+        };
+  }
+
   @override
   Widget build(BuildContext context) {
     final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
-    final showSearchControls = !isRecentEntry || _hasSearchQuery;
+    final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
+    final showSearchInput =
+        (!isRecentEntry && !isNearbyEntry) ||
+        _hasSearchQuery ||
+        _shouldShowNearbyFallbackSearch;
+    final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isRecentEntry ? '최근 검색' : '역 검색'),
+        title: Text(switch (widget.entryMode) {
+          StationSearchEntryMode.recent => '최근 검색',
+          StationSearchEntryMode.nearby => '가까운 역',
+          StationSearchEntryMode.search => '역 검색',
+        }),
         actions: [
-          if (!isRecentEntry)
+          if (!isRecentEntry && !isNearbyEntry)
             IconButton(
               tooltip: '가까운 역',
               onPressed: _isNearbySearchRunning ? null : _searchNearby,
@@ -1682,7 +1715,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            if (showSearchControls) ...[
+            if (showSearchInput) ...[
               TextField(
                 key: const Key('stationSearchInput'),
                 controller: _queryController,
@@ -1726,7 +1759,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            if (showSearchControls && _lineOptionsFuture != null) ...[
+            if (showSearchInput && _lineOptionsFuture != null) ...[
               AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
@@ -1747,7 +1780,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               builder: (context, _) {
                 final isSearching =
                     _controller.state.status == StationSearchStatus.loading;
-                if (_hasSearchQuery || _recentQueries.isEmpty) {
+                if (isNearbyEntry ||
+                    _hasSearchQuery ||
+                    _recentQueries.isEmpty) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
@@ -1760,7 +1795,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 );
               },
             ),
-            if (showSearchControls) ...[
+            if (showSearchInput || showNearbyRetryButton) ...[
               AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
@@ -1768,6 +1803,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                       _controller.state.status == StationSearchStatus.loading;
                   final isNearbyDisabled =
                       isSearching || _isNearbySearchRunning;
+                  if (showNearbyRetryButton) {
+                    return OutlinedButton.icon(
+                      key: const Key('nearbyStationSearchButton'),
+                      onPressed: isNearbyDisabled ? null : _searchNearby,
+                      icon: const Icon(Icons.my_location),
+                      label: const Text('내 주변 역 다시 찾기'),
+                    );
+                  }
                   if (_hasSearchQuery) {
                     return FilledButton.icon(
                       key: const Key('stationSearchSubmitButton'),
@@ -4293,6 +4336,7 @@ class FacilityDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Card(
+              key: Key('facilityDetailStatusNotice-${facility.id}'),
               margin: EdgeInsets.zero,
               color: isProblem
                   ? EasySubwayAccessibleColors.redSoft
@@ -4302,10 +4346,46 @@ class FacilityDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: _StationDetailInfoRow(
-                  icon: isProblem ? Icons.warning_amber : Icons.check_circle,
-                  text: facility.statusLabel,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      isProblem ? Icons.warning_amber : Icons.check_circle,
+                      color: isProblem
+                          ? EasySubwayAccessibleColors.red
+                          : EasySubwayAccessibleColors.mint,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _facilityStatusTitle(facility),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: isProblem
+                                      ? EasySubwayAccessibleColors.red
+                                      : EasySubwayAccessibleColors.text,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.25,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            facility.statusLabel,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: EasySubwayAccessibleColors.mutedText,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -4375,6 +4455,10 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
     return '연결 층 ${from.isEmpty ? to : from}';
   }
   return '연결 층 $from ↔ $to';
+}
+
+String _facilityStatusTitle(StationFacilityInfo facility) {
+  return facility.needsAttention ? '현재 이용이 어려울 수 있어요' : '이용 가능해요';
 }
 
 class _StationDetailStatusPill extends StatelessWidget {

@@ -318,6 +318,37 @@ void main() {
     expect(find.text('저장한 경로가 없습니다'), findsNothing);
   });
 
+  testWidgets('홈 최근 경로는 저장소 데이터가 있으면 표시된다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute()],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('최근 경로'),
+      find.byKey(const Key('homePrototypeList')),
+      const Offset(0, -160),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('최근 경로'), findsOneWidget);
+    expect(find.byKey(const Key('homeRecentRouteCard')), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
+    expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
+  });
+
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -752,6 +783,134 @@ void main() {
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
   });
 
+  testWidgets('홈 가까운 역은 실제 주변 역 검색 화면으로 바로 연결된다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('가까운 역')),
+      findsOneWidget,
+    );
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, hasLength(1));
+    final requested = repository.requestedNearbyLocations.single;
+    expect(requested.latitude, closeTo(37.3028, 0.0001));
+    expect(requested.longitude, closeTo(126.8665, 0.0001));
+    expect(find.text('가장 가까운 역'), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+  });
+
+  testWidgets('가까운 역 화면은 위치 권한 안내 취소 후 재시도 버튼을 유지한다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: true,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '취소'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('가까운 역')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
+    expect(find.text('내 주변 역 다시 찾기'), findsOneWidget);
+    expect(locationProvider.requestCount, 0);
+  });
+
+  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      error: const CurrentLocationException('현재 위치를 확인하지 못했습니다.'),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('현재 위치를 확인하지 못했습니다.'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, contains('상록수'));
+    expect(find.text('상록수역'), findsOneWidget);
+  });
+
   testWidgets('홈 이동 조건 pill은 모든 이동 유형에 맞는 아이콘을 보여준다', (tester) async {
     for (final option in mobilityProfileOptions) {
       await tester.pumpWidget(
@@ -832,7 +991,7 @@ void main() {
     );
   });
 
-  testWidgets('홈은 저장한 경로가 있어도 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
+  testWidgets('홈은 저장한 경로를 최근 경로로 보여주되 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -852,7 +1011,7 @@ void main() {
       expect(find.text('상록수역 → 사당역'), findsNothing);
       expect(
         find.bySemanticsLabel(RegExp('최근 경로, 상록수역에서 사당역까지')),
-        findsNothing,
+        findsOneWidget,
       );
       expect(find.text('저장한 경로가 없습니다'), findsNothing);
     } finally {
@@ -3207,6 +3366,93 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('시설 상세는 실제 시설 데이터로 위치 상태 제보 진입을 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-2',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-2',
+          type: 'ELEVATOR',
+          name: '2번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '2번 출구 앞',
+          status: 'BROKEN',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-14',
+          fieldValidationStatus: 'VERIFIED',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: reportRepository,
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(
+        const Key('stationFacilityCard-facility-sangnoksu-elevator-2'),
+      ),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const Key('stationFacilityCard-facility-sangnoksu-elevator-2'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('시설 상세')),
+      findsOneWidget,
+    );
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
+    expect(find.text('현재 이용이 어려울 수 있어요'), findsOneWidget);
+    expect(find.text('고장'), findsOneWidget);
+    expect(find.text('연결 층 B1 ↔ 1F'), findsOneWidget);
+    expect(find.text('2번 출구 앞'), findsOneWidget);
+    expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
+    expect(find.text('정보 신뢰도 높음 · 출처 공식 파일'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(
+        const Key('facilityDetailReportButton-facility-sangnoksu-elevator-2'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
   });
 
   testWidgets('역 상세에서 연 시설 신고는 앱에 주입한 사진 복구 대상을 저장한다', (tester) async {
