@@ -196,9 +196,26 @@ EasySubwayApp _testApp({
     notificationRepository: notificationRepository,
     notificationPermissionProvider: notificationPermissionProvider,
     onboardingStore: onboardingStore,
-    locationProvider: locationProvider,
+    locationProvider: locationProvider ?? _DefaultCurrentLocationProvider(),
     legacyCredentialCleaner: legacyCredentialCleaner,
   );
+}
+
+class _DefaultCurrentLocationProvider implements CurrentLocationProvider {
+  @override
+  Future<bool> needsLocationPermissionRequest() async {
+    return false;
+  }
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    return const CurrentLocation(latitude: 37.5665, longitude: 126.9780);
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    return true;
+  }
 }
 
 class FakeStationSearchRepository implements StationSearchRepository {

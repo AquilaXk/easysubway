@@ -714,7 +714,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   MobilityProfileOption? _selectedProfile;
-  final OnboardingViewPreferences _preferences =
+  OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
   int _currentStep = 0;
   bool _locationPermissionSelected = true;
@@ -850,6 +850,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  Text(
+                    '보기 설정',
+                    style: textTheme.titleLarge?.copyWith(
+                      color: const Color(0xFF102A2C),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _OnboardingPreferenceCard(
+                    children: [
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-largeText'),
+                        title: '큰 글씨',
+                        subtitle: '글자를 더 크게 표시',
+                        value: _preferences.largeTextEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              largeTextEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-highContrast'),
+                        title: '고대비',
+                        subtitle: '글자와 배경 대비 강화',
+                        value: _preferences.highContrastEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              highContrastEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                      const _OnboardingPreferenceDivider(),
+                      _OnboardingViewPreferenceSwitch(
+                        key: const Key('onboardingPreference-simpleView'),
+                        title: '쉬운 보기',
+                        subtitle: '중요한 정보만 먼저 표시',
+                        value: _preferences.simpleViewEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(
+                              simpleViewEnabled: value,
+                            );
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ]
               : [
                   const _OnboardingStepIndicator(currentStep: 3, totalSteps: 3),
@@ -923,8 +977,70 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (!mounted) {
         return;
       }
+    } else {
+      await _prepareSelectedPermissions();
+      if (!mounted) {
+        return;
+      }
     }
     _completeOnboarding();
+  }
+
+  Future<void> _prepareSelectedPermissions() async {
+    if (_locationPermissionSelected) {
+      await _prepareLocationPermission();
+    }
+    if (!mounted) {
+      return;
+    }
+    if (_notificationPermissionSelected) {
+      await _prepareNotificationPermission();
+    }
+  }
+
+  Future<void> _prepareLocationPermission() async {
+    final locationProvider = widget.locationProvider;
+    if (locationProvider == null) {
+      return;
+    }
+    try {
+      await locationProvider.currentLocation();
+    } on CurrentLocationException catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 현재 위치 권한 준비 중 예외가 발생했습니다.',
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 현재 위치 권한 준비 중 알 수 없는 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _prepareNotificationPermission() async {
+    final notificationPermissionProvider =
+        widget.notificationPermissionProvider;
+    if (notificationPermissionProvider == null) {
+      return;
+    }
+    try {
+      await notificationPermissionProvider.requestNotificationPermission();
+    } on NotificationSettingsException catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 알림 권한 준비 중 예외가 발생했습니다.',
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '온보딩 알림 권한 준비 중 알 수 없는 예외가 발생했습니다.',
+      );
+    }
   }
 }
 
@@ -1179,6 +1295,72 @@ class _OnboardingConditionRow extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingViewPreferenceSwitch extends StatelessWidget {
+  const _OnboardingViewPreferenceSwitch({
+    required super.key,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: '$title ${value ? '켜짐' : '꺼짐'}, $subtitle',
+      toggled: value,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 68),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF102A2C),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF647686),
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: value,
+                onChanged: onChanged,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF0D8A6D),
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: const Color(0xFFC8D3DC),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
             ],
           ),

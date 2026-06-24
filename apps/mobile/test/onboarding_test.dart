@@ -1,5 +1,7 @@
 import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
+import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,10 +78,25 @@ void main() {
       expect(find.text('원하는 조건을 고르세요'), findsOneWidget);
       expect(find.text('계단 피하기'), findsOneWidget);
       expect(find.text('엘리베이터 이용'), findsOneWidget);
+      expect(find.text('보기 설정'), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel('계단 피하기 우선, 계단 없는 길')),
         isSemantics(label: '계단 피하기 우선, 계단 없는 길'),
       );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('onboardingPreference-highContrast')),
+        150,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -140));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('onboardingPreference-highContrast')),
+          matching: find.byType(Switch),
+        ),
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
@@ -93,7 +110,7 @@ void main() {
       expect(completedResult?.profile.id, 'wheelchair');
       expect(completedResult?.profile.mobilityType, 'WHEELCHAIR');
       expect(completedResult?.preferences.largeTextEnabled, isTrue);
-      expect(completedResult?.preferences.highContrastEnabled, isFalse);
+      expect(completedResult?.preferences.highContrastEnabled, isTrue);
       expect(completedResult?.preferences.simpleViewEnabled, isTrue);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -135,6 +152,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(completedResult, isNotNull);
+    expect(completedResult?.profile.id, 'elderly');
+  });
+
+  testWidgets('온보딩 권한 단계는 선택된 권한 provider를 호출한 뒤 완료한다', (tester) async {
+    final locationProvider = _FakeCurrentLocationProvider();
+    final notificationPermissionProvider =
+        _FakeNotificationPermissionProvider();
+    OnboardingResult? completedResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (result) => completedResult = result,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 1);
+    expect(notificationPermissionProvider.requestCount, 1);
     expect(completedResult?.profile.id, 'elderly');
   });
 
@@ -199,4 +247,37 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+}
+
+class _FakeCurrentLocationProvider implements CurrentLocationProvider {
+  int requestCount = 0;
+  int openSettingsCount = 0;
+
+  @override
+  Future<bool> needsLocationPermissionRequest() async {
+    return false;
+  }
+
+  @override
+  Future<CurrentLocation> currentLocation() async {
+    requestCount++;
+    return const CurrentLocation(latitude: 37.5665, longitude: 126.9780);
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    openSettingsCount++;
+    return true;
+  }
+}
+
+class _FakeNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  int requestCount = 0;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    requestCount++;
+    return NotificationPermissionStatus.granted;
+  }
 }
