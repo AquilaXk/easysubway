@@ -2732,6 +2732,43 @@ void main() {
     }
   });
 
+  testWidgets('경로 검색은 출발 도착 선택 전 CTA 사유와 입력창 검색 아이콘을 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialMobilityType: 'SENIOR',
+          ),
+        ),
+      );
+
+      final submitButton = tester.widget<FilledButton>(
+        find.byKey(const Key('routeSearchSubmitButton')),
+      );
+      expect(submitButton.onPressed, isNull);
+      expect(
+        find.bySemanticsLabel('길찾기, 출발역과 도착역을 먼저 선택해 주세요'),
+        findsOneWidget,
+      );
+
+      await _openRouteOriginStationInput(tester);
+      final originInput = tester.widget<TextField>(
+        find.byKey(const Key('routeOriginStationInput')),
+      );
+      expect(originInput.decoration?.suffixIcon, isNotNull);
+      expect(
+        find.byKey(const Key('routeOriginStationSearchButton')),
+        findsOneWidget,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
@@ -5408,7 +5445,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests, isEmpty);
-    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsOneWidget);
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+    expect(submitButton.onPressed, isNull);
+    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsNothing);
     expect(find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'), findsNothing);
   });
 
@@ -5416,6 +5457,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
+        '상록': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
         '사당': [_stationResult(id: 'station-sadang', name: '사당')],
       },
@@ -5551,18 +5593,16 @@ void main() {
       find.byKey(const Key('routeOriginStationInput')),
       '상록',
     );
+    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    final submitButton = tester.widget<FilledButton>(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    submitButton.onPressed!();
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -240));
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests, hasLength(1));
-    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsOneWidget);
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+    expect(submitButton.onPressed, isNull);
+    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsNothing);
 
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
