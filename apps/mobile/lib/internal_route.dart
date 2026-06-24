@@ -322,7 +322,7 @@ class InternalRouteResult {
 
   String get semanticLabel {
     final parts = <String>[
-      '내부 이동 안내',
+      '역 안 이동 순서',
       statusLabel,
       summaryLabel,
       totalBurdenLabel,
