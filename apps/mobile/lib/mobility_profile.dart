@@ -30,11 +30,11 @@ class MobilityProfileOption {
     if (avoidStairs) {
       conditions.add('계단 피하기');
     }
-    if (minimizeTransfers) {
-      conditions.add('환승 줄이기');
-    }
     if (requireElevator) {
       conditions.add('엘리베이터 이동');
+    }
+    if (minimizeTransfers) {
+      conditions.add('환승 줄이기');
     }
     if (avoidLongWalks && !minimizeTransfers) {
       conditions.add('긴 보행 줄이기');

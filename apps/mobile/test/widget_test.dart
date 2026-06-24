@@ -1365,7 +1365,7 @@ void main() {
       await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
+      expect(find.text('계단 피하기 · 엘리베이터 이동 적용 중'), findsOneWidget);
       expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
 
       await tester.scrollUntilVisible(
@@ -4709,6 +4709,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('휠체어 이용'), findsOneWidget);
+    expect(find.text('계단 피하기 · 엘리베이터 이동'), findsOneWidget);
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
       find.byKey(const Key('routeOriginStationInput')),
