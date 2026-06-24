@@ -48,6 +48,28 @@ class StationLineBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final assetPath = line.badgeAssetPath;
+    if (assetPath != null) {
+      final image = Image.asset(
+        assetPath,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+      );
+      return SizedBox(
+        key: Key('stationLineBadge-${line.id}'),
+        width: size,
+        height: size,
+        child: stationLineBadgeNeedsRoundedCorners(assetPath)
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(size * 0.16),
+                child: image,
+              )
+            : image,
+      );
+    }
+
     final backgroundColor = line.badgeColor;
     final foregroundColor = stationLineTextColor(backgroundColor);
     final badgeText = line.badgeText;

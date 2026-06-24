@@ -821,6 +821,13 @@ class SubwayLineOption {
   String get semanticLabel => name;
 
   Color get badgeColor => stationLineColor(color);
+
+  String? get badgeAssetPath {
+    final assetName = stationLineBadgeAssetNameFor(id: id, name: name);
+    return assetName == null
+        ? null
+        : 'assets/metro_symbols/line_badges/$assetName';
+  }
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
@@ -2148,6 +2155,7 @@ class _StationLineFilterSection extends StatelessWidget {
                 selected: selectedLine?.id == line.id,
                 badgeText: line.shortLabel,
                 badgeColor: line.badgeColor,
+                badgeAssetPath: line.badgeAssetPath,
                 onPressed: enabled ? () => onLineSelected(line) : null,
               ),
           ],
@@ -2165,6 +2173,7 @@ class _StationLineFilterButton extends StatelessWidget {
     required this.onPressed,
     this.badgeText,
     this.badgeColor,
+    this.badgeAssetPath,
     super.key,
   });
 
@@ -2174,6 +2183,7 @@ class _StationLineFilterButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String? badgeText;
   final Color? badgeColor;
+  final String? badgeAssetPath;
 
   @override
   Widget build(BuildContext context) {
@@ -2211,7 +2221,11 @@ class _StationLineFilterButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (badgeText != null && badgeColor != null) ...[
-                _LineFilterBadge(text: badgeText!, color: badgeColor!),
+                _LineFilterBadge(
+                  text: badgeText!,
+                  color: badgeColor!,
+                  assetPath: badgeAssetPath,
+                ),
                 const SizedBox(width: 8),
               ],
               Text(label),
@@ -2224,13 +2238,32 @@ class _StationLineFilterButton extends StatelessWidget {
 }
 
 class _LineFilterBadge extends StatelessWidget {
-  const _LineFilterBadge({required this.text, required this.color});
+  const _LineFilterBadge({
+    required this.text,
+    required this.color,
+    this.assetPath,
+  });
 
   final String text;
   final Color color;
+  final String? assetPath;
 
   @override
   Widget build(BuildContext context) {
+    final path = assetPath;
+    if (path != null) {
+      final image = Image.asset(
+        path,
+        width: 26,
+        height: 26,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+      );
+      return stationLineBadgeNeedsRoundedCorners(path)
+          ? ClipRRect(borderRadius: BorderRadius.circular(4), child: image)
+          : image;
+    }
+
     final textColor = stationLineTextColor(color);
     final fontSize = RegExp(r'^\d+$').hasMatch(text) ? 20.0 : 12.0;
 
