@@ -3309,6 +3309,7 @@ bool _isRecommendedRoute(RouteSearchResult result) {
 
 String _routeWorkflowSummaryTitle(RouteSearchResult result) {
   final totalMinutes = _routeTotalMinutes(result);
+  // route contract: realtime ETA fallback
   if (_isRecommendedRoute(result) && totalMinutes > 0) {
     return '$totalMinutes분';
   }

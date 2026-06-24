@@ -1033,7 +1033,7 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('즐겨찾기 홈은 실제 목록 개수로 역·시설·경로를 보여준다', (tester) async {
+  testWidgets('홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다', (tester) async {
     final favoriteRepository = FakeFavoriteStationRepository(
       favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
     );

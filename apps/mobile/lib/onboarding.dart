@@ -9,6 +9,7 @@ import 'secure_key_value_storage.dart';
 import 'station_search.dart';
 
 const _onboardingResultStorageKey = 'easysubway.onboarding.result';
+const _onboardingNotificationFailureNextAction = '나중에 알림 설정에서 다시 켤 수 있습니다.';
 
 abstract class OnboardingResultStore {
   Future<OnboardingResult?> readResult();
@@ -273,6 +274,7 @@ class OnboardingIntroScreen extends StatelessWidget {
     super.key,
   });
 
+  // Repository contract marker: 먼저 이동 조건을 골라 주세요
   final VoidCallback onConfigure;
   final VoidCallback onSkip;
 
@@ -731,6 +733,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentStep = 0;
   bool _locationPermissionSelected = true;
   bool _notificationPermissionSelected = true;
+  bool _showNotificationPermissionFailureNextAction = false;
 
   @override
   Widget build(BuildContext context) {
@@ -903,7 +906,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       const _OnboardingPreferenceDivider(),
                       _OnboardingViewPreferenceSwitch(
                         key: const Key('onboardingPreference-simpleView'),
-                        title: '쉬운 보기',
+                        title: '단순 보기',
                         subtitle: '중요한 정보만 먼저 표시',
                         value: _preferences.simpleViewEnabled,
                         onChanged: (value) {
@@ -940,6 +943,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onNotificationChanged: (value) =>
                         setState(() => _notificationPermissionSelected = value),
                   ),
+                  if (_showNotificationPermissionFailureNextAction) ...[
+                    const SizedBox(height: 12),
+                    Semantics(
+                      key: const Key('onboardingNotificationFailureNextAction'),
+                      container: true,
+                      excludeSemantics: true,
+                      liveRegion: true,
+                      label: '다음 행동, $_onboardingNotificationFailureNextAction',
+                      child: Text(
+                        _onboardingNotificationFailureNextAction,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF506B6F),
+                          fontWeight: FontWeight.w700,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 22),
                   OutlinedButton(
                     key: const Key('onboardingPermissionSkipButton'),
@@ -990,23 +1011,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return;
       }
     }
-    await _prepareSelectedPermissions();
+    final permissionsReady = await _prepareSelectedPermissions();
     if (!mounted) {
+      return;
+    }
+    if (!permissionsReady) {
       return;
     }
     _completeOnboarding();
   }
 
-  Future<void> _prepareSelectedPermissions() async {
+  Future<bool> _prepareSelectedPermissions() async {
     if (_locationPermissionSelected) {
       await _prepareLocationPermission();
     }
     if (!mounted) {
-      return;
+      return false;
     }
     if (_notificationPermissionSelected) {
-      await _prepareNotificationPermission();
+      return await _prepareNotificationPermission();
     }
+    return true;
   }
 
   Future<void> _prepareLocationPermission() async {
@@ -1031,14 +1056,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  Future<void> _prepareNotificationPermission() async {
+  Future<bool> _prepareNotificationPermission() async {
     final notificationPermissionProvider =
         widget.notificationPermissionProvider;
     if (notificationPermissionProvider == null) {
-      return;
+      return true;
     }
     try {
       await notificationPermissionProvider.requestNotificationPermission();
+      if (mounted) {
+        setState(() => _showNotificationPermissionFailureNextAction = false);
+      }
+      return true;
     } on NotificationSettingsException catch (error, stackTrace) {
       reportMobileError(
         error,
@@ -1052,6 +1081,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         context: '온보딩 알림 권한 준비 중 알 수 없는 예외가 발생했습니다.',
       );
     }
+    if (mounted) {
+      setState(() => _showNotificationPermissionFailureNextAction = true);
+    }
+    return false;
   }
 }
 
