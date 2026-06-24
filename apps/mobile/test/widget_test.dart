@@ -1605,6 +1605,47 @@ void main() {
       expect(find.text('도움말·문의'), findsOneWidget);
       expect(find.text('개인정보처리방침'), findsOneWidget);
       expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
+      final privacyButtonSize = tester.getSize(
+        find.byKey(const Key('privacyPolicyAccessItem')),
+      );
+      expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
+      final privacySemantics = tester
+          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
+          .getSemanticsData();
+      expect(
+        privacySemantics.label,
+        '개인정보처리방침, https://easysubway.example/privacy',
+      );
+      expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('dataDeletionAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('데이터 삭제 요청'), findsOneWidget);
+
+      final deletionButtonSize = tester.getSize(
+        find.byKey(const Key('dataDeletionAccessItem')),
+      );
+
+      expect(deletionButtonSize.height, greaterThanOrEqualTo(60));
+      final deletionSemantics = tester
+          .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
+          .getSemanticsData();
+      expect(
+        deletionSemantics.label,
+        '데이터 삭제 요청, privacy@easysubway.example, 삭제 범위와 복구 불가 여부를 먼저 확인해요',
+      );
+      expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('supportAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('고객지원'), findsOneWidget);
       expect(find.text('support@easysubway.example'), findsOneWidget);
       await tester.scrollUntilVisible(
@@ -1614,37 +1655,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('보안 문의'), findsOneWidget);
-      expect(find.text('준비 중입니다.'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('dataDeletionAccessItem')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('데이터 삭제 요청'), findsOneWidget);
-
-      final privacyButtonSize = tester.getSize(
-        find.byKey(const Key('privacyPolicyAccessItem')),
-      );
-      final deletionButtonSize = tester.getSize(
-        find.byKey(const Key('dataDeletionAccessItem')),
-      );
-
-      expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
-      expect(deletionButtonSize.height, greaterThanOrEqualTo(60));
-      final privacySemantics = tester
-          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
-          .getSemanticsData();
-      expect(
-        privacySemantics.label,
-        '개인정보처리방침, https://easysubway.example/privacy',
-      );
-      expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
-      final deletionSemantics = tester
-          .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
-          .getSemanticsData();
-      expect(deletionSemantics.label, '데이터 삭제 요청, privacy@easysubway.example');
-      expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(find.text('현재 이용할 수 없음 · 준비 중'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -1726,7 +1737,7 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('안전과 데이터 안내'), findsOneWidget);
+      expect(find.text('안전 안내'), findsWidgets);
       expect(find.text('경로와 시설 정보는 이동을 돕는 참고 정보입니다.'), findsOneWidget);
       expect(
         find.text('실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.'),
@@ -1744,7 +1755,7 @@ void main() {
           .getSemanticsData();
       expect(
         noticeSemantics.label,
-        '안전과 데이터 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
+        '안전 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
       );
     } finally {
       semanticsHandle.dispose();
@@ -1922,6 +1933,7 @@ void main() {
 
     expect(find.byKey(const Key('dataDeletionStartButton')), findsOneWidget);
     expect(find.textContaining('즐겨찾기, 이동 조건, 신고 접수 기록'), findsOneWidget);
+    expect(find.text('삭제한 데이터는 앱에서 복구할 수 없습니다.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
     await tester.pumpAndSettle();
@@ -2041,10 +2053,24 @@ void main() {
           .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
           .getSemanticsData()
           .label,
-      '개인정보처리방침, 준비 중입니다.',
+      '개인정보처리방침, 현재 이용할 수 없음 · 준비 중',
     );
 
     await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('dataDeletionAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
+          .getSemanticsData()
+          .label,
+      '데이터 삭제 요청, 현재 이용할 수 없음 · 준비 중, 삭제 범위와 복구 불가 여부를 먼저 확인해요',
+    );
+    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.scrollUntilVisible(
       find.byKey(const Key('supportAccessItem')),
       120,
@@ -2056,7 +2082,7 @@ void main() {
           .getSemantics(find.byKey(const Key('supportAccessItem')))
           .getSemanticsData()
           .label,
-      '고객지원, 준비 중입니다.',
+      '고객지원, 현재 이용할 수 없음 · 준비 중',
     );
     await tester.tap(find.byKey(const Key('supportAccessItem')));
     await tester.scrollUntilVisible(
@@ -2070,23 +2096,9 @@ void main() {
           .getSemantics(find.byKey(const Key('securityContactAccessItem')))
           .getSemanticsData()
           .label,
-      '보안 문의, 준비 중입니다.',
+      '보안 문의, 현재 이용할 수 없음 · 준비 중',
     );
     await tester.tap(find.byKey(const Key('securityContactAccessItem')));
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('dataDeletionAccessItem')),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
-          .getSemanticsData()
-          .label,
-      '데이터 삭제 요청, 준비 중입니다.',
-    );
-    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.pumpAndSettle();
 
     expect(launcher.openedUris, isEmpty);
@@ -3001,20 +3013,22 @@ void main() {
       await tester.tap(find.byKey(const Key('recentSearchButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('최근 검색'), findsWidgets);
+      expect(find.text('최근 검색'), findsOneWidget);
       expect(find.byKey(const Key('stationSearchInput')), findsNothing);
       expect(
         find.byKey(const Key('stationRecentSearchSection')),
         findsOneWidget,
       );
+      expect(find.text('최근 사용 순서 · 2개'), findsOneWidget);
+      expect(find.text('최근 사용 1번째'), findsOneWidget);
       expect(
         find.byKey(const Key('stationRecentSearchQuery-상록수')),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('최근 검색어 상록수 검색'), findsOneWidget);
+      expect(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'), findsOneWidget);
       expect(
         tester
-            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색'))
+            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'))
             .getSemanticsData()
             .hasAction(SemanticsAction.tap),
         isTrue,
@@ -3044,6 +3058,51 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 검색 최근 검색은 개별 삭제와 전체 삭제 및 빈 상태 CTA를 제공한다', (tester) async {
+    final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        searchHistoryRepository: searchHistoryRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('recentSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationRecentSearchRemove-상록수')));
+    await tester.pumpAndSettle();
+
+    expect(searchHistoryRepository.removedQueries, ['상록수']);
+    expect(find.byKey(const Key('stationRecentSearchQuery-상록수')), findsNothing);
+    expect(find.text('최근 사용 순서 · 1개'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const Key('stationRecentSearchClearAllButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(searchHistoryRepository.clearCount, 1);
+    expect(
+      find.byKey(const Key('stationRecentSearchEmptyState')),
+      findsOneWidget,
+    );
+    expect(find.text('최근 검색한 역이 없습니다.'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '역 검색하기'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const Key('stationRecentSearchEmptySearchButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
   });
 
   testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {
@@ -7984,6 +8043,8 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
 
   final List<String> queries;
   final recordedQueries = <String>[];
+  final removedQueries = <String>[];
+  int clearCount = 0;
   int listRequestCount = 0;
 
   @override
@@ -8002,6 +8063,19 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
   Future<List<String>> listRecentQueries() async {
     listRequestCount++;
     return [...queries];
+  }
+
+  @override
+  Future<void> removeSearch(String query) async {
+    final trimmed = query.trim();
+    removedQueries.add(trimmed);
+    queries.remove(trimmed);
+  }
+
+  @override
+  Future<void> clearSearches() async {
+    clearCount++;
+    queries.clear();
   }
 }
 
