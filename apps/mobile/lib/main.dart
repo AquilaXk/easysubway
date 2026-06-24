@@ -1245,6 +1245,7 @@ class _HomeScreenState extends State<HomeScreen> {
             locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
+            routeDraftController: _routeDraftController,
             initialMobilityType: initialMobilityType,
           ),
         ),
@@ -3158,6 +3159,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.locationProvider,
     required this.facilityReportDraftTargetStore,
     required this.internalRouteRepository,
+    required this.routeDraftController,
     required this.initialMobilityType,
     super.key,
   });
@@ -3170,6 +3172,7 @@ class FavoriteHomeScreen extends StatefulWidget {
   final CurrentLocationProvider locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository internalRouteRepository;
+  final RouteDraftController routeDraftController;
   final String initialMobilityType;
 
   @override
@@ -3320,6 +3323,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
           locationProvider: widget.locationProvider,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
+          routeDraftController: widget.routeDraftController,
           internalRouteMobilityType: widget.initialMobilityType,
         ),
       ),
@@ -3334,7 +3338,17 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     unawaited(
       _openFavoriteListScreen(
         title: '즐겨찾기한 시설',
-        child: FavoriteFacilityListContent(repository: repository),
+        child: FavoriteFacilityListContent(
+          repository: repository,
+          reportRepository: widget.reportRepository,
+          locationLoader: _facilityReportLocationLoader(
+            widget.locationProvider,
+          ),
+          needsLocationPermissionRequest:
+              widget.locationProvider.needsLocationPermissionRequest,
+          openLocationSettings: widget.locationProvider.openLocationSettings,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+        ),
       ),
     );
   }
@@ -3392,30 +3406,33 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.45,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeStationsButton'),
           icon: Icons.train_outlined,
-          label: '역 ${_countLabel(stationCount)}',
+          label: '역',
+          countLabel: _countLabel(stationCount),
+          subtitle: '출발지·도착지 설정과 시설 상태를 확인해요',
           onTap: onStations,
         ),
+        const SizedBox(height: 10),
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeFacilitiesButton'),
           icon: Icons.elevator_outlined,
-          label: '시설 ${_countLabel(facilityCount)}',
+          label: '시설',
+          countLabel: _countLabel(facilityCount),
+          subtitle: '고장·공사 상태와 최근 확인 시각을 봐요',
           onTap: onFacilities,
         ),
+        const SizedBox(height: 10),
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeRoutesButton'),
           icon: Icons.route_outlined,
-          label: '경로 ${_countLabel(routeCount)}',
+          label: '경로',
+          countLabel: _countLabel(routeCount),
+          subtitle: '이동 편의도와 저장한 경로를 다시 확인해요',
           onTap: onRoutes,
         ),
       ],
@@ -3427,35 +3444,42 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
   const _FavoriteHomeQuickCard({
     required this.icon,
     required this.label,
+    required this.countLabel,
+    required this.subtitle,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String label;
+  final String countLabel;
+  final String subtitle;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final semanticLabel = '$label $countLabel, $subtitle';
     return Semantics(
       button: true,
       enabled: onTap != null,
-      label: label,
+      label: semanticLabel,
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(8),
           child: _PrototypeCard(
             backgroundColor: Colors.white,
-            borderRadius: 18,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            borderRadius: 8,
+            showBorder: true,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: EasySubwayAccessibleColors.mintSoft,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: SizedBox(
                     width: 44,
@@ -3466,14 +3490,37 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 9),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$label $countLabel',
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.mutedText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.brand,
                 ),
               ],
             ),
