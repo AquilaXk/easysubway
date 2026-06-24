@@ -4433,7 +4433,7 @@ class FacilityDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            facility.nextActionDescription,
+                            _facilityDetailStatusDescription(facility),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,
@@ -4514,6 +4514,13 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
     return '연결 위치 ${from.isEmpty ? to : from}';
   }
   return '연결 위치 $from ↔ $to';
+}
+
+String _facilityDetailStatusDescription(StationFacilityInfo facility) {
+  if (facility.needsAttention) {
+    return '현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.';
+  }
+  return '시설 상태가 다르면 상태 제보로 알려 주세요.';
 }
 
 String _facilityStatusTitle(StationFacilityInfo facility) {

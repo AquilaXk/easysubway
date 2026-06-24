@@ -3639,6 +3639,7 @@ void main() {
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('이용 불가 확인'), findsOneWidget);
     expect(find.text('고장·폐쇄 · 고장'), findsOneWidget);
+    expect(find.text('현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.'), findsOneWidget);
     expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
     expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
