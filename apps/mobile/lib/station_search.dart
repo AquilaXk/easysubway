@@ -940,21 +940,26 @@ String _dataSourceLabel(String dataSourceType) {
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
 
+enum StationSearchResultSource { search, nearby }
+
 class StationSearchState {
   const StationSearchState({
     required this.status,
     required this.results,
     this.message = '',
+    this.source = StationSearchResultSource.search,
   });
 
   const StationSearchState.idle()
     : status = StationSearchStatus.idle,
       results = const [],
-      message = '';
+      message = '',
+      source = StationSearchResultSource.search;
 
   final StationSearchStatus status;
   final List<StationSearchResult> results;
   final String message;
+  final StationSearchResultSource source;
 }
 
 class StationSearchController extends ChangeNotifier {
@@ -1010,6 +1015,7 @@ class StationSearchController extends ChangeNotifier {
         _state = StationSearchState(
           status: StationSearchStatus.success,
           results: results,
+          source: StationSearchResultSource.search,
         );
       }
     } on StationSearchException catch (error) {
@@ -1084,6 +1090,7 @@ class StationSearchController extends ChangeNotifier {
         _state = StationSearchState(
           status: StationSearchStatus.success,
           results: results,
+          source: StationSearchResultSource.nearby,
         );
       }
     } on CurrentLocationException catch (error) {
@@ -1184,7 +1191,7 @@ class StationDetailState {
   String get facilityAttentionSummary {
     final count = attentionFacilityCount;
     if (count == 0) {
-      return '확인 필요 없음';
+      return '';
     }
     return '확인 필요 $count개';
   }
@@ -1588,6 +1595,7 @@ class StationSearchScreen extends StatefulWidget {
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
+    this.entryMode = StationSearchEntryMode.search,
     super.key,
   });
 
@@ -1600,10 +1608,13 @@ class StationSearchScreen extends StatefulWidget {
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
+  final StationSearchEntryMode entryMode;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
 }
+
+enum StationSearchEntryMode { search, recent }
 
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
@@ -1653,13 +1664,69 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
+    final showSearchControls = !isRecentEntry || _hasSearchQuery;
     return Scaffold(
-      appBar: AppBar(title: const Text('역 검색')),
+      appBar: AppBar(
+        title: Text(isRecentEntry ? '최근 검색' : '역 검색'),
+        actions: [
+          if (!isRecentEntry)
+            IconButton(
+              tooltip: '가까운 역',
+              onPressed: _isNearbySearchRunning ? null : _searchNearby,
+              icon: const Icon(Icons.my_location),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            if (_lineOptionsFuture != null) ...[
+            if (showSearchControls) ...[
+              TextField(
+                key: const Key('stationSearchInput'),
+                controller: _queryController,
+                minLines: 1,
+                textInputAction: TextInputAction.search,
+                style: const TextStyle(fontSize: 20, height: 1.35),
+                decoration: InputDecoration(
+                  hintText: '역 이름을 입력해 주세요',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _hasSearchQuery
+                      ? IconButton(
+                          tooltip: '검색어 지우기',
+                          onPressed: _queryController.clear,
+                          icon: const Icon(Icons.close),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(
+                      color: EasySubwayAccessibleColors.line,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(
+                      color: EasySubwayAccessibleColors.line,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(
+                      color: EasySubwayAccessibleColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onSubmitted: _submit,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (showSearchControls && _lineOptionsFuture != null) ...[
               AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
@@ -1675,27 +1742,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               ),
               const SizedBox(height: 16),
             ],
-            Semantics(
-              label: '역 이름을 입력해 주세요',
-              textField: true,
-              child: TextField(
-                key: const Key('stationSearchInput'),
-                controller: _queryController,
-                minLines: 1,
-                textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 20, height: 1.35),
-                decoration: const InputDecoration(
-                  labelText: '역 이름',
-                  hintText: '역 이름을 입력해 주세요',
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                  ),
-                ),
-                onSubmitted: _submit,
-              ),
-            ),
-            const SizedBox(height: 12),
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
@@ -1714,31 +1760,34 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 );
               },
             ),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final isSearching =
-                    _controller.state.status == StationSearchStatus.loading;
-                final isNearbyDisabled = isSearching || _isNearbySearchRunning;
-                if (_hasSearchQuery) {
-                  return FilledButton.icon(
-                    key: const Key('stationSearchSubmitButton'),
-                    onPressed: isSearching
-                        ? null
-                        : () => _submit(_queryController.text),
-                    icon: const Icon(Icons.search),
-                    label: const Text('검색'),
+            if (showSearchControls) ...[
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final isSearching =
+                      _controller.state.status == StationSearchStatus.loading;
+                  final isNearbyDisabled =
+                      isSearching || _isNearbySearchRunning;
+                  if (_hasSearchQuery) {
+                    return FilledButton.icon(
+                      key: const Key('stationSearchSubmitButton'),
+                      onPressed: isSearching
+                          ? null
+                          : () => _submit(_queryController.text),
+                      icon: const Icon(Icons.search),
+                      label: const Text('검색'),
+                    );
+                  }
+                  return OutlinedButton.icon(
+                    key: const Key('nearbyStationSearchButton'),
+                    onPressed: isNearbyDisabled ? null : _searchNearby,
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('내 주변 역 찾기'),
                   );
-                }
-                return OutlinedButton.icon(
-                  key: const Key('nearbyStationSearchButton'),
-                  onPressed: isNearbyDisabled ? null : _searchNearby,
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('내 주변 역 찾기'),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
@@ -1919,6 +1968,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
           internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
         ),
       ),
     );
@@ -2036,41 +2086,27 @@ class _StationLineFilterSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Text(
-              '노선',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w900,
-                height: 1.25,
+            _StationLineFilterButton(
+              key: const Key('stationLineFilter-all'),
+              label: '전체 노선',
+              semanticLabel: '전체 노선',
+              selected: selectedLine == null,
+              onPressed: enabled ? () => onLineSelected(null) : null,
+            ),
+            for (final line in lines)
+              _StationLineFilterButton(
+                key: Key('stationLineFilter-${line.id}'),
+                label: line.name,
+                semanticLabel: line.semanticLabel,
+                selected: selectedLine?.id == line.id,
+                badgeText: line.shortLabel,
+                badgeColor: line.badgeColor,
+                onPressed: enabled ? () => onLineSelected(line) : null,
               ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _StationLineFilterButton(
-                  key: const Key('stationLineFilter-all'),
-                  label: '전체',
-                  semanticLabel: '전체 노선',
-                  selected: selectedLine == null,
-                  onPressed: enabled ? () => onLineSelected(null) : null,
-                ),
-                for (final line in lines)
-                  _StationLineFilterButton(
-                    key: Key('stationLineFilter-${line.id}'),
-                    label: line.name,
-                    semanticLabel: line.semanticLabel,
-                    selected: selectedLine?.id == line.id,
-                    badgeText: line.shortLabel,
-                    badgeColor: line.badgeColor,
-                    onPressed: enabled ? () => onLineSelected(line) : null,
-                  ),
-              ],
-            ),
           ],
         );
       },
@@ -2114,17 +2150,17 @@ class _StationLineFilterButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(96, 56),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            minimumSize: const Size(74, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             backgroundColor: backgroundColor,
             foregroundColor: foregroundColor,
             side: BorderSide(color: borderColor, width: selected ? 2 : 1.5),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(14),
             ),
             textStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
               height: 1.2,
             ),
           ),
@@ -2155,19 +2191,17 @@ class _LineFilterBadge extends StatelessWidget {
     final textColor = stationLineTextColor(color);
     final fontSize = RegExp(r'^\d+$').hasMatch(text) ? 20.0 : 12.0;
 
-    return Container(
-      width: 32,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return CircleAvatar(
+      radius: 13,
+      backgroundColor: color,
       child: Text(
         text,
         maxLines: 2,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: textColor,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w900,
+          fontSize: fontSize * 0.8,
+          fontWeight: FontWeight.w700,
           height: 1.0,
         ),
       ),
@@ -2216,10 +2250,22 @@ class _StationSearchBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Semantics(
-            label: '검색 결과 ${state.results.length}개',
+            container: true,
+            label: state.source == StationSearchResultSource.nearby
+                ? '주변 역 ${state.results.length}개'
+                : '검색 결과 ${state.results.length}개',
             liveRegion: true,
-            child: const SizedBox.shrink(),
+            child: const SizedBox(width: 1, height: 1),
           ),
+          if (state.source == StationSearchResultSource.nearby) ...[
+            _NearbyStationOverview(result: state.results.first),
+            const SizedBox(height: 18),
+            const _StationDetailSectionTitle(title: '주변 역 목록'),
+            const SizedBox(height: 12),
+          ] else ...[
+            const _StationDetailSectionTitle(title: '검색 결과'),
+            const SizedBox(height: 12),
+          ],
           for (final result in state.results)
             _StationSearchResultTile(
               result: result,
@@ -2234,6 +2280,127 @@ class _StationSearchBody extends StatelessWidget {
         ],
       ),
     };
+  }
+}
+
+class _NearbyStationOverview extends StatelessWidget {
+  const _NearbyStationOverview({required this.result});
+
+  final StationSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final stationName = _stationResultDisplayName(result.nameKo);
+    return Semantics(
+      container: true,
+      label: '가장 가까운 역, $stationName, ${result.distanceLabel}',
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'map', label: Text('지도')),
+                ButtonSegment(value: 'list', label: Text('목록')),
+              ],
+              selected: const {'map'},
+              onSelectionChanged: (_) {},
+            ),
+            const SizedBox(height: 12),
+            Card(
+              margin: EdgeInsets.zero,
+              color: const Color(0xFFEAF3F5),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: const BorderSide(color: EasySubwayAccessibleColors.line),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 9,
+                          backgroundColor: EasySubwayAccessibleColors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '지도와 목록으로 주변 역을 확인합니다',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 34),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      color: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '가장 가까운 역',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color:
+                                              EasySubwayAccessibleColors.text,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    result.distanceLabel.isEmpty
+                                        ? '가까운 역 후보'
+                                        : '가까운 역 후보 · ${result.distanceLabel}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            StationLineBadges(
+                              lines: result.lines,
+                              size: 34,
+                              maxBadgeCount: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2349,11 +2516,11 @@ class _StationSearchResultTile extends StatelessWidget {
     final hasRoleActions = onSetOrigin != null || onSetDestination != null;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         side: const BorderSide(color: Color(0xFFD5E2E4)),
       ),
       child: Column(
@@ -2369,11 +2536,11 @@ class _StationSearchResultTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   onTap: onTap,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 88),
+                    constraints: const BoxConstraints(minHeight: 78),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2396,10 +2563,10 @@ class _StationSearchResultTile extends StatelessWidget {
                                   stationName,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: textTheme.headlineSmall?.copyWith(
+                                  style: textTheme.titleLarge?.copyWith(
                                     color: const Color(0xFF102A2C),
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.15,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -2411,7 +2578,7 @@ class _StationSearchResultTile extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyLarge?.copyWith(
                                     color: const Color(0xFF29484B),
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                     height: 1.25,
                                   ),
                                 ),
@@ -2422,7 +2589,7 @@ class _StationSearchResultTile extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyMedium?.copyWith(
                                     color: const Color(0xFF405A5D),
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                     height: 1.25,
                                   ),
                                 ),
@@ -2837,6 +3004,7 @@ class StationDetailScreen extends StatefulWidget {
     this.internalRouteRepository,
     this.internalRouteRequest,
     this.internalRouteMobilityType = 'SENIOR',
+    this.routeDraftController,
     super.key,
   });
 
@@ -2850,6 +3018,7 @@ class StationDetailScreen extends StatefulWidget {
   final InternalRouteRepository? internalRouteRepository;
   final InternalRouteRequest? internalRouteRequest;
   final String internalRouteMobilityType;
+  final RouteDraftController? routeDraftController;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -2916,6 +3085,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
               internalRouteState: _internalRouteController?.state,
               reportRepository: widget.reportRepository,
               favoriteController: _favoriteController,
+              routeDraftController: widget.routeDraftController,
               locationProvider: widget.locationProvider,
               facilityReportDraftTargetStore:
                   widget.facilityReportDraftTargetStore,
@@ -2933,6 +3103,7 @@ class _StationDetailBody extends StatelessWidget {
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
+    required this.routeDraftController,
     required this.locationProvider,
     required this.facilityReportDraftTargetStore,
   });
@@ -2941,6 +3112,7 @@ class _StationDetailBody extends StatelessWidget {
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
@@ -2967,6 +3139,7 @@ class _StationDetailBody extends StatelessWidget {
         internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
+        routeDraftController: routeDraftController,
         locationProvider: locationProvider,
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
       ),
@@ -2986,6 +3159,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
+    required this.routeDraftController,
     required this.locationProvider,
     required this.facilityReportDraftTargetStore,
   });
@@ -3000,6 +3174,7 @@ class _StationDetailContent extends StatelessWidget {
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
@@ -3015,6 +3190,18 @@ class _StationDetailContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _StationDetailHeader(detail: detail),
+        const SizedBox(height: 12),
+        if (facilityAttentionSummary.isNotEmpty) ...[
+          _StationFacilityStatusSummary(
+            text: facilityAttentionSummary,
+            semanticLabel: facilityAttentionSemanticLabel,
+          ),
+          const SizedBox(height: 12),
+        ],
+        _StationDetailRouteActions(
+          detail: detail,
+          routeDraftController: routeDraftController,
+        ),
         const SizedBox(height: 12),
         const _StationSafetyGuidanceNotice(),
         if (favoriteController != null) ...[
@@ -3058,14 +3245,17 @@ class _StationDetailContent extends StatelessWidget {
         if (facilities.isEmpty)
           const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
         else ...[
-          _StationFacilityStatusSummary(
-            text: facilityAttentionSummary,
-            semanticLabel: facilityAttentionSemanticLabel,
-          ),
-          const SizedBox(height: 12),
+          if (facilityAttentionSummary.isNotEmpty) ...[
+            _StationFacilityStatusSummary(
+              text: facilityAttentionSummary,
+              semanticLabel: facilityAttentionSemanticLabel,
+            ),
+            const SizedBox(height: 12),
+          ],
           for (final facility in facilities)
             _StationFacilityCard(
               facility: facility,
+              station: detail,
               onReportTap: () => _openFacilityReport(context, facility),
             ),
         ],
@@ -3161,6 +3351,101 @@ class _StationMapTextFallback extends StatelessWidget {
         for (final marker in markers)
           _StationMapTextFallbackItem(marker: marker),
       ],
+    );
+  }
+}
+
+class _StationDetailRouteActions extends StatelessWidget {
+  const _StationDetailRouteActions({
+    required this.detail,
+    required this.routeDraftController,
+  });
+
+  final StationDetail detail;
+  final RouteDraftController? routeDraftController;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = routeDraftController;
+    if (controller == null) {
+      return const SizedBox.shrink();
+    }
+    final station = RouteDraftStation(id: detail.id, nameKo: detail.nameKo);
+    return Row(
+      children: [
+        Expanded(
+          child: _StationPointButton(
+            key: const Key('stationDetailSetOriginButton'),
+            symbol: '출',
+            label: '출발로 설정',
+            selectedColor: EasySubwayAccessibleColors.mint,
+            onPressed: () {
+              controller.setOrigin(station);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StationPointButton(
+            key: const Key('stationDetailSetDestinationButton'),
+            symbol: '도',
+            label: '도착으로 설정',
+            selectedColor: EasySubwayAccessibleColors.brand,
+            onPressed: () {
+              controller.setDestination(station);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StationPointButton extends StatelessWidget {
+  const _StationPointButton({
+    required this.symbol,
+    required this.label,
+    required this.selectedColor,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String symbol;
+  final String label;
+  final Color selectedColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(62),
+        backgroundColor: Colors.white,
+        foregroundColor: EasySubwayAccessibleColors.text,
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      icon: CircleAvatar(
+        radius: 16,
+        backgroundColor: selectedColor,
+        child: Text(
+          symbol,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      label: Text(label),
     );
   }
 }
@@ -3309,7 +3594,37 @@ class _StationFacilityStatusSummary extends StatelessWidget {
     return Semantics(
       label: semanticLabel,
       child: ExcludeSemantics(
-        child: _StationDetailInfoRow(icon: Icons.priority_high, text: text),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: EasySubwayAccessibleColors.redSoft,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber,
+                  color: EasySubwayAccessibleColors.red,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: EasySubwayAccessibleColors.red,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -3328,44 +3643,74 @@ class _StationDetailHeader extends StatelessWidget {
       label: detail.semanticLabel,
       header: true,
       child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${detail.nameKo}역',
-              style: textTheme.headlineSmall?.copyWith(
-                color: const Color(0xFF102A2C),
-                fontWeight: FontWeight.w900,
-                height: 1.2,
-              ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: EasySubwayAccessibleColors.brandDark,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StationLineBadges(lines: detail.lines, size: 34),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${detail.nameKo}역',
+                        style: textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        detail.lineLabel,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: const Color(0xFFC8D9E2),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        detail.dataQualityLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFFC8D9E2),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        detail.dataSourceLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFFC8D9E2),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '마지막 확인 ${detail.lastVerifiedAt}',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFFC8D9E2),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            StationLineBadges(lines: detail.lines),
-            const SizedBox(height: 10),
-            Text(
-              detail.lineLabel,
-              style: textTheme.titleMedium?.copyWith(
-                color: const Color(0xFF29484B),
-                fontWeight: FontWeight.w800,
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _StationDetailInfoRow(
-              icon: Icons.verified_outlined,
-              text: detail.dataQualityLabel,
-            ),
-            const SizedBox(height: 6),
-            _StationDetailInfoRow(
-              icon: Icons.source_outlined,
-              text: detail.dataSourceLabel,
-            ),
-            const SizedBox(height: 6),
-            _StationDetailInfoRow(
-              icon: Icons.event_available,
-              text: '마지막 확인 ${detail.lastVerifiedAt}',
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -3754,10 +4099,12 @@ class _StationExitCard extends StatelessWidget {
 class _StationFacilityCard extends StatelessWidget {
   const _StationFacilityCard({
     required this.facility,
+    required this.station,
     required this.onReportTap,
   });
 
   final StationFacilityInfo facility;
+  final StationDetail station;
   final VoidCallback onReportTap;
 
   @override
@@ -3768,85 +4115,266 @@ class _StationFacilityCard extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: facility.semanticLabel,
+      button: true,
+      onTap: () => _openFacilityDetail(context),
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFD5E2E4)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                facility.name,
-                style: textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w900,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _StationDetailTextPill(text: facility.typeLabel),
-                  _StationDetailTextPill(text: facility.statusLabel),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _StationDetailInfoRow(
-                icon: Icons.place_outlined,
-                text: facility.locationLabel,
-              ),
-              const SizedBox(height: 6),
-              _StationDetailInfoRow(
-                icon: Icons.event_available,
-                text: facility.updatedLabel,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                facility.confidenceLabel,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF405A5D),
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                facility.dataSourceLabel,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF405A5D),
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Semantics(
-                container: true,
-                label: '${facility.name} 상태 신고',
-                button: true,
-                onTap: onReportTap,
-                child: ExcludeSemantics(
-                  child: OutlinedButton.icon(
-                    key: Key('facilityReportButton-${facility.id}'),
-                    onPressed: onReportTap,
-                    icon: const Icon(Icons.report_outlined),
-                    label: const Text('상태 신고'),
+        child: InkWell(
+          key: Key('stationFacilityCard-${facility.id}'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openFacilityDetail(context),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  facility.name,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: const Color(0xFF102A2C),
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _StationDetailTextPill(text: facility.typeLabel),
+                    _StationDetailTextPill(text: facility.statusLabel),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _StationDetailInfoRow(
+                  icon: Icons.place_outlined,
+                  text: facility.locationLabel,
+                ),
+                const SizedBox(height: 6),
+                _StationDetailInfoRow(
+                  icon: Icons.event_available,
+                  text: facility.updatedLabel,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${facility.confidenceLabel} · ${facility.dataSourceLabel}',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF405A5D),
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        container: true,
+                        label: '${facility.name} 상태 신고',
+                        button: true,
+                        onTap: onReportTap,
+                        child: ExcludeSemantics(
+                          child: OutlinedButton.icon(
+                            key: Key('facilityReportButton-${facility.id}'),
+                            onPressed: onReportTap,
+                            icon: const Icon(Icons.report_outlined),
+                            label: const Text('상태 제보'),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '상세 보기',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  void _openFacilityDetail(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FacilityDetailScreen(
+          station: station,
+          facility: facility,
+          onReportTap: onReportTap,
+        ),
+      ),
+    );
+  }
+}
+
+class FacilityDetailScreen extends StatelessWidget {
+  const FacilityDetailScreen({
+    required this.station,
+    required this.facility,
+    required this.onReportTap,
+    super.key,
+  });
+
+  final StationDetail station;
+  final StationFacilityInfo facility;
+  final VoidCallback onReportTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isProblem = facility.needsAttention;
+    return Scaffold(
+      appBar: AppBar(title: const Text('시설 상세')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: [
+            Card(
+              margin: EdgeInsets.zero,
+              color: EasySubwayAccessibleColors.brandDark,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 27,
+                      backgroundColor: EasySubwayAccessibleColors.mintSoft,
+                      child: Icon(
+                        facility.layoutSummaryIcon,
+                        color: EasySubwayAccessibleColors.mint,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${station.nameKo}역',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: const Color(0xFFAFC6D4),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            facility.name,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.2,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              margin: EdgeInsets.zero,
+              color: isProblem
+                  ? EasySubwayAccessibleColors.redSoft
+                  : EasySubwayAccessibleColors.mintSoft,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: _StationDetailInfoRow(
+                  icon: isProblem ? Icons.warning_amber : Icons.check_circle,
+                  text: facility.statusLabel,
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const _StationDetailSectionTitle(title: '위치'),
+            const SizedBox(height: 12),
+            Card(
+              margin: EdgeInsets.zero,
+              color: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: EasySubwayAccessibleColors.line),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _StationDetailInfoRow(
+                      icon: Icons.stairs_outlined,
+                      text: _facilityFloorLabel(facility),
+                    ),
+                    const SizedBox(height: 10),
+                    _StationDetailInfoRow(
+                      icon: Icons.place_outlined,
+                      text: facility.locationLabel,
+                    ),
+                    const SizedBox(height: 10),
+                    _StationDetailInfoRow(
+                      icon: Icons.event_available,
+                      text: facility.updatedLabel,
+                    ),
+                    const SizedBox(height: 10),
+                    _StationDetailInfoRow(
+                      icon: Icons.verified_outlined,
+                      text:
+                          '${facility.confidenceLabel} · ${facility.dataSourceLabel}',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: Key('facilityDetailReportButton-${facility.id}'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onReportTap();
+              },
+              icon: const Icon(Icons.report_outlined),
+              label: const Text('상태 제보'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _facilityFloorLabel(StationFacilityInfo facility) {
+  final from = facility.floorFrom.trim();
+  final to = facility.floorTo.trim();
+  if (from.isEmpty && to.isEmpty) {
+    return '연결 층 확인 필요';
+  }
+  if (from.isEmpty || to.isEmpty) {
+    return '연결 층 ${from.isEmpty ? to : from}';
+  }
+  return '연결 층 $from ↔ $to';
 }
 
 class _StationDetailStatusPill extends StatelessWidget {
@@ -3890,7 +4418,7 @@ class _StationDetailTextPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         borderRadius: BorderRadius.circular(8),

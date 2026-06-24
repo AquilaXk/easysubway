@@ -1,9 +1,9 @@
 import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
@@ -92,13 +92,10 @@ void main() {
       await tester.drag(find.byType(Scrollable).last, const Offset(0, -140));
       await tester.pumpAndSettle();
       expect(
-        tester
-            .getSemantics(
-              find.byKey(const Key('onboardingPreference-highContrast')),
-            )
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
+        tester.getSemantics(
+          find.byKey(const Key('onboardingPreference-highContrast')),
+        ),
+        isSemantics(hasTapAction: true),
       );
       await tester.tap(
         find.descendant(
@@ -254,6 +251,41 @@ void main() {
     expect(completedResult?.profile.id, 'elderly');
   });
 
+  testWidgets('온보딩은 알림 권한 요청 실패 다음 행동을 안내한다', (tester) async {
+    final notificationPermissionProvider = _FakeNotificationPermissionProvider(
+      error: const NotificationSettingsException('알림 권한을 확인하지 못했습니다.'),
+    );
+    OnboardingResult? completedResult;
+
+    final reportedErrors = <FlutterErrorDetails>[];
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OnboardingScreen(
+            notificationPermissionProvider: notificationPermissionProvider,
+            onCompleted: (result) => completedResult = result,
+          ),
+        ),
+      );
+
+      await _moveToPermissionStep(tester);
+      await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+      await tester.pumpAndSettle();
+    });
+
+    expect(reportedErrors, hasLength(1));
+    expect(completedResult, isNull);
+    expect(find.text('나중에 알림 설정에서 다시 켤 수 있습니다.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('다음 행동, 나중에 알림 설정에서 다시 켤 수 있습니다.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('onboardingNotificationFailureNextAction')),
+      findsOneWidget,
+    );
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
@@ -350,11 +382,18 @@ class _FakeCurrentLocationProvider implements CurrentLocationProvider {
 
 class _FakeNotificationPermissionProvider
     implements NotificationPermissionProvider {
+  _FakeNotificationPermissionProvider({this.error});
+
+  final NotificationSettingsException? error;
   int requestCount = 0;
 
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     requestCount++;
+    final error = this.error;
+    if (error != null) {
+      throw error;
+    }
     return NotificationPermissionStatus.granted;
   }
 }
