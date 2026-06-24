@@ -58,12 +58,23 @@ const _normalPresentation = FacilityStatusPresentation(
 
 FacilityStatusPresentation facilityStatusPresentation(String status) {
   return switch (status.trim().toUpperCase()) {
-    'BROKEN' || 'CLOSED' => _blockedPresentation,
+    'BROKEN' ||
+    'CLOSED' ||
+    'OUT_OF_SERVICE' ||
+    'UNAVAILABLE' => _blockedPresentation,
     'UNDER_CONSTRUCTION' ||
     'CONSTRUCTION' ||
     'USER_REPORTED' => _cautionPresentation,
-    'UNKNOWN' || 'NEEDS_REPORT' || 'NEEDS_CHECK' => _needsInfoPresentation,
-    'NORMAL' || 'ADMIN_VERIFIED' => _normalPresentation,
+    'UNKNOWN' ||
+    'NEEDS_REPORT' ||
+    'NEEDS_CHECK' ||
+    'CHECK_REQUIRED' => _needsInfoPresentation,
+    'NORMAL' ||
+    'ADMIN_VERIFIED' ||
+    'AVAILABLE' ||
+    'IN_SERVICE' ||
+    'OPERATING' ||
+    'OPEN' => _normalPresentation,
     _ => _needsInfoPresentation,
   };
 }

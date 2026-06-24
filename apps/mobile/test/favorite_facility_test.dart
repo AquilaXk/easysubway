@@ -79,16 +79,22 @@ void main() {
 
   test('즐겨찾기 시설 상태는 심각도와 다음 행동을 구분한다', () {
     final closed = _favoriteFacility(status: 'CLOSED');
+    final unavailable = _favoriteFacility(status: 'OUT_OF_SERVICE');
     final reported = _favoriteFacility(status: 'USER_REPORTED');
     final unknown = _favoriteFacility(status: 'NEEDS_CHECK');
+    final available = _favoriteFacility(status: 'AVAILABLE');
 
     expect(closed.severityLabel, '고장·폐쇄');
     expect(closed.nextActionLabel, '대체 출구 보기');
     expect(closed.needsAttention, isTrue);
+    expect(unavailable.severityLabel, '고장·폐쇄');
+    expect(unavailable.nextActionLabel, '대체 출구 보기');
     expect(reported.severityLabel, '점검·제보');
     expect(reported.nextActionLabel, '역무원 도움 요청');
     expect(unknown.severityLabel, '정보 확인 필요');
     expect(unknown.nextActionLabel, '시설 상세 보기');
+    expect(available.severityLabel, '정상');
+    expect(available.needsAttention, isFalse);
   });
 
   test('즐겨찾기 시설 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
