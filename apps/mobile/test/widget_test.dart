@@ -3020,6 +3020,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('최근 사용 순서 · 2개'), findsOneWidget);
+      expect(find.bySemanticsLabel('최근 사용 순서로 2개 표시'), findsOneWidget);
       expect(find.text('최근 사용 1번째'), findsOneWidget);
       expect(
         find.byKey(const Key('stationRecentSearchQuery-상록수')),

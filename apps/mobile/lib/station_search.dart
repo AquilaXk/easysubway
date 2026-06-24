@@ -2258,6 +2258,7 @@ class _StationRecentSearchSection extends StatelessWidget {
           children: [
             Expanded(
               child: Semantics(
+                excludeSemantics: true,
                 label: '최근 사용 순서로 ${queries.length}개 표시',
                 child: Text(
                   '최근 사용 순서 · ${queries.length}개',
