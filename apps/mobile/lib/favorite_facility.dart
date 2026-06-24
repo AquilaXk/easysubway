@@ -295,7 +295,11 @@ class FavoriteFacility {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusLabel, $severityLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
+    final statusSemanticLabel = facilityStatusSemanticLabel(
+      statusLabel: statusLabel,
+      severityLabel: severityLabel,
+    );
+    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
   }
 }
 

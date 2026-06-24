@@ -100,6 +100,26 @@ String buildFacilityAttentionSemanticLabel(Iterable<String> statuses) {
   return '확인이 필요한 시설, $summary';
 }
 
+String facilityStatusDisplayLabel({
+  required String statusLabel,
+  required String severityLabel,
+}) {
+  if (statusLabel == severityLabel) {
+    return statusLabel;
+  }
+  return '$severityLabel · $statusLabel';
+}
+
+String facilityStatusSemanticLabel({
+  required String statusLabel,
+  required String severityLabel,
+}) {
+  if (statusLabel == severityLabel) {
+    return statusLabel;
+  }
+  return '$statusLabel, $severityLabel';
+}
+
 Map<FacilityStatusPresentation, int> _attentionCounts(
   Iterable<String> statuses,
 ) {

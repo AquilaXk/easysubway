@@ -632,9 +632,9 @@ void main() {
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('점검·제보 · 엘리베이터 제보됨'), findsOneWidget);
-    expect(find.text('역무원 도움 요청'), findsOneWidget);
+    expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*출처 공식 파일, 다음 행동 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*출처 공식 파일, 권장 행동 역무원 도움 요청')),
       findsOneWidget,
     );
   });
@@ -2160,7 +2160,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
@@ -3502,7 +3502,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -3548,7 +3548,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 정상, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
+          '1번 출구 엘리베이터, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 현장 검증됨, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );

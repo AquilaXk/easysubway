@@ -776,7 +776,11 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusLabel, $severityLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
+    final statusSemanticLabel = facilityStatusSemanticLabel(
+      statusLabel: statusLabel,
+      severityLabel: severityLabel,
+    );
+    return '$name, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
   }
 }
 
@@ -4234,7 +4238,8 @@ class _StationFacilityCard extends StatelessWidget {
                   children: [
                     _StationDetailTextPill(text: facility.typeLabel),
                     _StationDetailTextPill(text: facility.statusLabel),
-                    _StationDetailTextPill(text: facility.severityLabel),
+                    if (facility.severityLabel != facility.statusLabel)
+                      _StationDetailTextPill(text: facility.severityLabel),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -4415,7 +4420,10 @@ class FacilityDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${facility.severityLabel} · ${facility.statusLabel}',
+                            facilityStatusDisplayLabel(
+                              statusLabel: facility.statusLabel,
+                              severityLabel: facility.severityLabel,
+                            ),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: EasySubwayAccessibleColors.mutedText,

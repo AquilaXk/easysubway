@@ -1646,7 +1646,7 @@ class _NotificationInboxItem {
       subtitle:
           '${facility.severityLabel} · ${facility.typeLabel} ${facility.statusLabel}',
       semanticLabel:
-          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 다음 행동 ${facility.nextActionLabel}',
+          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 권장 행동 ${facility.nextActionLabel}',
       kind: '시설',
       severity: facility.statusPresentation.severity,
       actionLabel: facility.nextActionLabel,
@@ -1734,7 +1734,7 @@ class _NotificationInboxCard extends StatelessWidget {
           if (item.actionLabel.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              item.actionLabel,
+              '권장 행동 ${item.actionLabel}',
               style: const TextStyle(
                 color: EasySubwayAccessibleColors.text,
                 fontSize: 13,
