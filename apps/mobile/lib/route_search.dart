@@ -1063,16 +1063,30 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
           builder: (context, _) {
             final isLoading =
                 _controller.state.status == RouteSearchViewStatus.loading;
-            return FilledButton(
-              key: const Key('routeSearchSubmitButton'),
-              onPressed: isLoading ? null : _submit,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(60),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            final canSubmit =
+                _originStation != null && _destinationStation != null;
+            final submitLabel = isLoading
+                ? '경로 검색 중'
+                : canSubmit
+                ? '길찾기'
+                : '길찾기, 출발역과 도착역을 먼저 선택해 주세요';
+            return Semantics(
+              button: true,
+              enabled: canSubmit && !isLoading,
+              label: submitLabel,
+              child: ExcludeSemantics(
+                child: FilledButton(
+                  key: const Key('routeSearchSubmitButton'),
+                  onPressed: canSubmit && !isLoading ? _submit : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(60),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(isLoading ? '경로 검색 중' : '길찾기'),
                 ),
               ),
-              child: Text(isLoading ? '경로 검색 중' : '길찾기'),
             );
           },
         ),
@@ -1117,6 +1131,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               ),
             ],
             const SizedBox(height: 18),
+            _RouteRecentDestinationList(
+              repository: widget.favoriteRouteRepository,
+              onSelected: _updateDestinationStation,
+            ),
             if (_validationMessage.isNotEmpty) ...[
               _RouteSearchMessage(
                 message: _validationMessage,
@@ -1171,11 +1189,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   ),
                 ),
               ),
-            const SizedBox(height: 18),
-            _RouteRecentDestinationList(
-              repository: widget.favoriteRouteRepository,
-              onSelected: _updateDestinationStation,
-            ),
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) => _RouteSearchBody(
@@ -1982,57 +1995,42 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Semantics(
-                label: selectedStation == null
-                    ? '${widget.labelText} 입력'
-                    : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
-                textField: true,
-                liveRegion: selectedStation != null,
-                child: TextField(
-                  key: widget.inputKey,
-                  controller: _textController,
-                  minLines: 1,
-                  textInputAction: TextInputAction.search,
-                  style: const TextStyle(fontSize: 20, height: 1.35),
-                  decoration: InputDecoration(
-                    labelText: labelText,
-                    hintText: '역 이름을 입력해 주세요',
-                    floatingLabelBehavior: FloatingLabelBehavior.always,
-                    border: const OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(8)),
-                    ),
-                  ),
-                  onSubmitted: (_) => _search(),
-                ),
+        Semantics(
+          label: selectedStation == null
+              ? '${widget.labelText} 입력'
+              : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
+          textField: true,
+          liveRegion: selectedStation != null,
+          child: TextField(
+            key: widget.inputKey,
+            controller: _textController,
+            minLines: 1,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 20, height: 1.35),
+            decoration: InputDecoration(
+              labelText: labelText,
+              hintText: '역 이름을 입력해 주세요',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              suffixIcon: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final isLoading =
+                      _controller.state.status == StationSearchStatus.loading;
+                  return IconButton(
+                    key: widget.searchButtonKey,
+                    tooltip: '${widget.labelText} 검색',
+                    onPressed: isLoading ? null : _search,
+                    icon: const Icon(Icons.search),
+                  );
+                },
               ),
             ),
-            const SizedBox(width: 8),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final isLoading =
-                    _controller.state.status == StationSearchStatus.loading;
-                return IconButton.outlined(
-                  key: widget.searchButtonKey,
-                  tooltip: '${widget.labelText} 검색',
-                  onPressed: isLoading ? null : _search,
-                  icon: const Icon(Icons.search),
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(56, 56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
+            onSubmitted: (_) => _search(),
+          ),
         ),
-        const SizedBox(height: 8),
         const SizedBox(height: 8),
         AnimatedBuilder(
           animation: _controller,
