@@ -743,7 +743,7 @@ class _OriginalRouteMapView extends StatelessWidget {
     };
     return KeyedSubtree(
       key: const Key('originalRouteMapView'),
-      child: nativeView,
+      child: IgnorePointer(child: nativeView),
     );
   }
 }

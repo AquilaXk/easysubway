@@ -27,15 +27,17 @@ private class OriginalRouteMapAssetPlatformView(
     mimeType: String,
 ) : PlatformView {
     private val container = FrameLayout(context)
+    private var webView: WebView? = null
 
     init {
         container.setBackgroundColor(Color.WHITE)
         val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(assetPath)
         if (mimeType == "image/svg+xml") {
-            val webView = WebView(context)
-            webView.setBackgroundColor(Color.WHITE)
-            webView.isHorizontalScrollBarEnabled = false
-            webView.isVerticalScrollBarEnabled = false
+            val svgWebView = WebView(context)
+            webView = svgWebView
+            svgWebView.setBackgroundColor(Color.WHITE)
+            svgWebView.isHorizontalScrollBarEnabled = false
+            svgWebView.isVerticalScrollBarEnabled = false
             val html = """
                 <!doctype html>
                 <html>
@@ -61,7 +63,7 @@ private class OriginalRouteMapAssetPlatformView(
                 </body>
                 </html>
             """.trimIndent()
-            webView.loadDataWithBaseURL(
+            svgWebView.loadDataWithBaseURL(
                 "file:///android_asset/",
                 html,
                 "text/html",
@@ -69,7 +71,7 @@ private class OriginalRouteMapAssetPlatformView(
                 null,
             )
             container.addView(
-                webView,
+                svgWebView,
                 FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -80,5 +82,14 @@ private class OriginalRouteMapAssetPlatformView(
 
     override fun getView(): View = container
 
-    override fun dispose() = Unit
+    override fun dispose() {
+        webView?.let { view ->
+            view.stopLoading()
+            view.loadUrl("about:blank")
+            view.removeAllViews()
+            view.destroy()
+        }
+        webView = null
+        container.removeAllViews()
+    }
 }

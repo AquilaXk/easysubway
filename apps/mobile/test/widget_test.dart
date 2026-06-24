@@ -646,8 +646,9 @@ void main() {
       expect(offline['included'], isTrue);
       expect(File(path).existsSync(), isTrue, reason: path);
       expect(path, startsWith('assets/datapacks/maps/'));
-      expect(path.endsWith('.png') || path.endsWith('.jpg'), isFalse);
-      expect(['pdf', 'svg'], contains(offline['type']));
+      final extension = path.split('.').last.toLowerCase();
+      expect(extension, anyOf('pdf', 'svg'));
+      expect(offline['type'], extension);
     }
     final gwangju = maps.singleWhere((map) => map['id'] == 'gwangju');
     final license = gwangju['license'] as Map<String, Object?>;

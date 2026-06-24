@@ -1,1 +1,1 @@
-apps/mobile/assets/datapacks/maps/seoul-official-route-map.svg -diff -text
+apps/mobile/assets/datapacks/maps/*.svg -diff -text
