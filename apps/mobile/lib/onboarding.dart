@@ -977,11 +977,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (!mounted) {
         return;
       }
-    } else {
-      await _prepareSelectedPermissions();
-      if (!mounted) {
-        return;
-      }
+    }
+    await _prepareSelectedPermissions();
+    if (!mounted) {
+      return;
     }
     _completeOnboarding();
   }
@@ -1324,6 +1323,7 @@ class _OnboardingViewPreferenceSwitch extends StatelessWidget {
       container: true,
       label: '$title ${value ? '켜짐' : '꺼짐'}, $subtitle',
       toggled: value,
+      onTap: () => onChanged(!value),
       child: ExcludeSemantics(
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 68),

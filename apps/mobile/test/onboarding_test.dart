@@ -3,6 +3,7 @@ import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
@@ -90,6 +91,15 @@ void main() {
       );
       await tester.drag(find.byType(Scrollable).last, const Offset(0, -140));
       await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(
+              find.byKey(const Key('onboardingPreference-highContrast')),
+            )
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
       await tester.tap(
         find.descendant(
           of: find.byKey(const Key('onboardingPreference-highContrast')),
@@ -186,6 +196,64 @@ void main() {
     expect(completedResult?.profile.id, 'elderly');
   });
 
+  testWidgets('온보딩 권한 단계는 위치만 끄면 알림 provider는 호출한다', (tester) async {
+    final locationProvider = _FakeCurrentLocationProvider();
+    final notificationPermissionProvider =
+        _FakeNotificationPermissionProvider();
+    OnboardingResult? completedResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (result) => completedResult = result,
+        ),
+      ),
+    );
+
+    await _moveToPermissionStep(tester);
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 0);
+    expect(notificationPermissionProvider.requestCount, 1);
+    expect(completedResult?.profile.id, 'elderly');
+  });
+
+  testWidgets('온보딩 권한 단계는 알림만 끄면 위치 provider는 호출한다', (tester) async {
+    final locationProvider = _FakeCurrentLocationProvider();
+    final notificationPermissionProvider =
+        _FakeNotificationPermissionProvider();
+    OnboardingResult? completedResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          locationProvider: locationProvider,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onCompleted: (result) => completedResult = result,
+        ),
+      ),
+    );
+
+    await _moveToPermissionStep(tester);
+    await tester.tap(find.byType(Switch).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+
+    expect(locationProvider.requestCount, 1);
+    expect(notificationPermissionProvider.requestCount, 0);
+    expect(completedResult?.profile.id, 'elderly');
+  });
+
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
       profile: mobilityProfileOptions.firstWhere(
@@ -247,6 +315,15 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+}
+
+Future<void> _moveToPermissionStep(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+  await tester.pumpAndSettle();
 }
 
 class _FakeCurrentLocationProvider implements CurrentLocationProvider {
