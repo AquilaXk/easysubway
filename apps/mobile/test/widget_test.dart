@@ -4192,6 +4192,193 @@ void main() {
     expect(helpfulButton.onPressed, isNull);
   });
 
+  testWidgets('선택한 출발역을 수정해도 역 검색 입력은 닫히지 않는다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '사': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: stationRepository,
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 23),
+          ),
+        ),
+      ),
+    );
+
+    await _openRouteOriginStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '사',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('routeOriginStationInput')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('routeOriginStationOption-station-sadang')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('로컬 경로 결과는 서버 피드백 행동을 숨긴다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        routeSearchId: 'local-station-sangnoksu-station-sadang',
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: routeRepository,
+        routeFeedbackRepository: FakeRouteFeedbackRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+    await _openRouteOriginStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await _openRouteDestinationStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    await _openFirstRouteResultDetail(tester);
+
+    expect(find.byKey(const Key('routeOpenFeedbackButton')), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStartGuidanceButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('routeGuidanceFeedbackButton')), findsNothing);
+    expect(find.byKey(const Key('routeOpenBlockedButton')), findsNothing);
+    expect(
+      find.byKey(const Key('routeOpenInternalRouteButton')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('길이 막혔어요는 성공 경로를 blocked 화면으로 바꾸지 않는다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        routeFeedbackRepository: FakeRouteFeedbackRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+    await _openRouteOriginStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await _openRouteDestinationStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    await _openFirstRouteResultDetail(tester);
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStartGuidanceButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeOpenBlockedButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('방금 안내가\n실제 이동에 도움이 됐나요?'), findsOneWidget);
+    expect(find.text('계단 없는 경로가 없습니다'), findsNothing);
+  });
+
   testWidgets('경로 피드백 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
@@ -6949,6 +7136,7 @@ StationDetail _stationDetail({
 }
 
 RouteSearchResult _sampleRouteSearchResult({
+  String routeSearchId = 'route-1',
   String status = 'FOUND',
   String mobilityType = 'SENIOR',
   List<String> recommendationReasons = const [
@@ -6958,7 +7146,7 @@ RouteSearchResult _sampleRouteSearchResult({
   ],
 }) {
   return RouteSearchResult(
-    routeSearchId: 'route-1',
+    routeSearchId: routeSearchId,
     originStationId: 'station-sangnoksu',
     originStationName: '상록수',
     destinationStationId: 'station-sadang',

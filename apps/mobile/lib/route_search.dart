@@ -1212,7 +1212,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   void _updateOriginStation(StationSearchResult? station) {
     setState(() {
       _originStation = station;
-      _activeStationPicker = null;
+      if (station != null) {
+        _activeStationPicker = null;
+      }
       _validationMessage = '';
     });
     _controller.reset();
@@ -1221,7 +1223,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   void _updateDestinationStation(StationSearchResult? station) {
     setState(() {
       _destinationStation = station;
-      _activeStationPicker = null;
+      if (station != null) {
+        _activeStationPicker = null;
+      }
       _validationMessage = '';
     });
     _controller.reset();
@@ -2372,6 +2376,8 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         canUseApiActions &&
         widget.favoriteRouteRepository != null &&
         !result.isBlocked;
+    final canOpenFeedback =
+        canUseApiActions && widget.routeFeedbackRepository != null;
 
     return switch (_view) {
       _RouteWorkflowView.list => _RouteResultsListView(
@@ -2383,7 +2389,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         onBack: () => setState(() => _view = _RouteWorkflowView.list),
         onStartGuidance: () =>
             setState(() => _view = _RouteWorkflowView.guidance),
-        onOpenFeedback: widget.routeFeedbackRepository == null
+        onOpenFeedback: !canOpenFeedback
             ? null
             : () => setState(() => _view = _RouteWorkflowView.feedback),
         favoriteSaveButton: canSaveRoute
@@ -2398,8 +2404,10 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         onBack: () => setState(() => _view = _RouteWorkflowView.detail),
         onOpenInternalRoute: () =>
             setState(() => _view = _RouteWorkflowView.internalRoute),
-        onOpenBlocked: () => setState(() => _view = _RouteWorkflowView.blocked),
-        onOpenFeedback: widget.routeFeedbackRepository == null
+        onOpenBlocked: !canOpenFeedback
+            ? null
+            : () => setState(() => _view = _RouteWorkflowView.feedback),
+        onOpenFeedback: !canOpenFeedback
             ? null
             : () => setState(() => _view = _RouteWorkflowView.feedback),
       ),
@@ -2530,7 +2538,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
   final RouteSearchResult result;
   final VoidCallback onBack;
   final VoidCallback onOpenInternalRoute;
-  final VoidCallback onOpenBlocked;
+  final VoidCallback? onOpenBlocked;
   final VoidCallback? onOpenFeedback;
 
   @override
@@ -2591,25 +2599,35 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
             text: nextStep.title,
             icon: Icons.near_me_outlined,
           ),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('routeOpenInternalRouteButton'),
-                onPressed: onOpenInternalRoute,
-                child: const Text('전체 순서'),
+        if (onOpenBlocked case final openBlocked?)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('routeOpenInternalRouteButton'),
+                  onPressed: onOpenInternalRoute,
+                  child: const Text('전체 순서'),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('routeOpenBlockedButton'),
-                onPressed: onOpenBlocked,
-                child: const Text('길이 막혔어요'),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('routeOpenBlockedButton'),
+                  onPressed: openBlocked,
+                  child: const Text('길이 막혔어요'),
+                ),
               ),
+            ],
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              key: const Key('routeOpenInternalRouteButton'),
+              onPressed: onOpenInternalRoute,
+              child: const Text('전체 순서'),
             ),
-          ],
-        ),
+          ),
         if (onOpenFeedback != null) ...[
           const SizedBox(height: 8),
           TextButton(
