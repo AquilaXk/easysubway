@@ -39,6 +39,7 @@ const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안�
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했습니다.';
 const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했습니다.';
+const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했습니다.';
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -60,6 +61,10 @@ abstract class SearchHistoryRepository {
   Future<void> recordSearch(String query);
 
   Future<List<String>> listRecentQueries();
+
+  Future<void> removeSearch(String query);
+
+  Future<void> clearSearches();
 }
 
 abstract class StationLineFilterRepository {
@@ -1858,17 +1863,28 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               builder: (context, _) {
                 final isSearching =
                     _controller.state.status == StationSearchStatus.loading;
-                if (isNearbyEntry ||
-                    _hasSearchQuery ||
-                    _recentQueries.isEmpty) {
+                if (isNearbyEntry || _hasSearchQuery) {
                   return const SizedBox.shrink();
+                }
+                if (_recentQueries.isEmpty) {
+                  return isRecentEntry
+                      ? Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _StationRecentSearchEmptyState(
+                            onSearchTap: _openStationSearch,
+                          ),
+                        )
+                      : const SizedBox.shrink();
                 }
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _StationRecentSearchSection(
                     queries: _recentQueries,
+                    showTitle: !isRecentEntry,
                     enabled: !isSearching && !_isNearbySearchRunning,
                     onQuerySelected: _searchRecentQuery,
+                    onQueryRemoved: _removeRecentQuery,
+                    onClearAll: _clearRecentQueries,
                   ),
                 );
               },
@@ -1986,6 +2002,64 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       selection: TextSelection.collapsed(offset: query.length),
     );
     _submit(query);
+  }
+
+  void _openStationSearch() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => StationSearchScreen(
+          repository: widget.repository,
+          locationProvider: widget.locationProvider,
+          reportRepository: widget.reportRepository,
+          favoriteRepository: widget.favoriteRepository,
+          searchHistoryRepository: widget.searchHistoryRepository,
+          routeDraftController: widget.routeDraftController,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _removeRecentQuery(String query) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.removeSearch(query);
+      await _loadRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(_searchHistoryChangeErrorMessage)),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.clearSearches();
+      await _loadRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(_searchHistoryChangeErrorMessage)),
+        );
+      }
+    }
   }
 
   Future<void> _loadRecentQueries() async {
@@ -2149,13 +2223,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 class _StationRecentSearchSection extends StatelessWidget {
   const _StationRecentSearchSection({
     required this.queries,
+    required this.showTitle,
     required this.enabled,
     required this.onQuerySelected,
+    required this.onQueryRemoved,
+    required this.onClearAll,
   });
 
   final List<String> queries;
+  final bool showTitle;
   final bool enabled;
   final ValueChanged<String> onQuerySelected;
+  final ValueChanged<String> onQueryRemoved;
+  final VoidCallback onClearAll;
 
   @override
   Widget build(BuildContext context) {
@@ -2163,48 +2243,182 @@ class _StationRecentSearchSection extends StatelessWidget {
       key: const Key('stationRecentSearchSection'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '최근 검색',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
-            height: 1.25,
+        if (showTitle) ...[
+          Text(
+            '최근 검색',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w900,
+              height: 1.25,
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          const SizedBox(height: 8),
+        ],
+        Row(
           children: [
-            for (final query in queries)
-              Semantics(
-                label: '최근 검색어 $query 검색',
-                button: true,
+            Expanded(
+              child: Semantics(
+                excludeSemantics: true,
+                label: '최근 사용 순서로 ${queries.length}개 표시',
+                child: Text(
+                  '최근 사용 순서 · ${queries.length}개',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ),
+            TextButton.icon(
+              key: const Key('stationRecentSearchClearAllButton'),
+              onPressed: enabled ? onClearAll : null,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('전체 삭제'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Column(
+          children: [
+            for (final entry in queries.indexed)
+              _StationRecentSearchItem(
+                query: entry.$2,
+                order: entry.$1 + 1,
                 enabled: enabled,
-                onTap: enabled ? () => onQuerySelected(query) : null,
-                child: ExcludeSemantics(
-                  child: OutlinedButton.icon(
-                    key: Key('stationRecentSearchQuery-$query'),
-                    onPressed: enabled ? () => onQuerySelected(query) : null,
-                    icon: const Icon(Icons.history),
-                    label: Text(query),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(
-                        EasySubwayTouchTarget.general,
-                        EasySubwayTouchTarget.general,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                onQuerySelected: onQuerySelected,
+                onQueryRemoved: onQueryRemoved,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StationRecentSearchItem extends StatelessWidget {
+  const _StationRecentSearchItem({
+    required this.query,
+    required this.order,
+    required this.enabled,
+    required this.onQuerySelected,
+    required this.onQueryRemoved,
+  });
+
+  final String query;
+  final int order;
+  final bool enabled;
+  final ValueChanged<String> onQuerySelected;
+  final ValueChanged<String> onQueryRemoved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  label: '최근 검색어 $query 검색, 최근 사용 $order번째',
+                  button: true,
+                  enabled: enabled,
+                  onTap: enabled ? () => onQuerySelected(query) : null,
+                  child: ExcludeSemantics(
+                    child: InkWell(
+                      key: Key('stationRecentSearchQuery-$query'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: enabled ? () => onQuerySelected(query) : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.history,
+                              color: EasySubwayAccessibleColors.brand,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    query,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color:
+                                              EasySubwayAccessibleColors.text,
+                                          fontWeight: FontWeight.w800,
+                                          height: 1.25,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '최근 사용 $order번째',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
+              IconButton(
+                key: Key('stationRecentSearchRemove-$query'),
+                tooltip: '$query 최근 검색 삭제',
+                onPressed: enabled ? () => onQueryRemoved(query) : null,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationRecentSearchEmptyState extends StatelessWidget {
+  const _StationRecentSearchEmptyState({required this.onSearchTap});
+
+  final VoidCallback onSearchTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('stationRecentSearchEmptyState'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _StationSearchMessage(
+          message: '최근 검색한 역이 없습니다.',
+          liveRegion: false,
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const Key('stationRecentSearchEmptySearchButton'),
+          onPressed: onSearchTap,
+          icon: const Icon(Icons.search),
+          label: const Text('역 검색하기'),
         ),
       ],
     );

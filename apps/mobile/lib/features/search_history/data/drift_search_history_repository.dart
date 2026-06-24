@@ -63,4 +63,21 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
         .get();
     return rows.map((row) => row.read<String>('query')).toList(growable: false);
   }
+
+  @override
+  Future<void> removeSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    await userDatabase.customStatement(
+      'DELETE FROM search_history WHERE query = ?',
+      [trimmed],
+    );
+  }
+
+  @override
+  Future<void> clearSearches() async {
+    await userDatabase.delete(userDatabase.searchHistory).go();
+  }
 }
