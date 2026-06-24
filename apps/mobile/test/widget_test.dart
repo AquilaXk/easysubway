@@ -4962,6 +4962,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('휠체어 이용 선택 가능, 계단 없는 길만 안내해요, 계단 피하기 · 엘리베이터 이동'),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('routeMobilityOption-WHEELCHAIR')));
     await tester.pumpAndSettle();
 

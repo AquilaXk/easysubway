@@ -1977,9 +1977,7 @@ class _RouteMobilityTypeOptionButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
-        label: selected
-            ? '${option.title} 현재 선택, ${option.summary}, ${_routeMobilityConditionLabel(option)}'
-            : option.semanticsLabel(false),
+        label: _routeMobilityOptionSemanticsLabel(option, selected),
         button: true,
         selected: selected,
         child: selected
@@ -1999,6 +1997,14 @@ MobilityProfileOption _mobilityOptionFor(String mobilityType) {
 
 String _routeMobilityConditionLabel(MobilityProfileOption option) {
   return option.conditionSummary;
+}
+
+String _routeMobilityOptionSemanticsLabel(
+  MobilityProfileOption option,
+  bool selected,
+) {
+  final state = selected ? '현재 선택' : '선택 가능';
+  return '${option.title} $state, ${option.summary}, ${_routeMobilityConditionLabel(option)}';
 }
 
 class _RouteStationPicker extends StatefulWidget {
