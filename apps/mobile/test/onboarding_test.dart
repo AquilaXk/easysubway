@@ -77,12 +77,8 @@ void main() {
       expect(find.text('계단 피하기'), findsOneWidget);
       expect(find.text('엘리베이터 이용'), findsOneWidget);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('계단 피하기 켜짐, 계단 없는 길')),
-        isSemantics(
-          label: '계단 피하기 켜짐, 계단 없는 길',
-          hasTapAction: true,
-          isToggled: true,
-        ),
+        tester.getSemantics(find.bySemanticsLabel('계단 피하기 우선, 계단 없는 길')),
+        isSemantics(label: '계단 피하기 우선, 계단 없는 길'),
       );
 
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
@@ -134,14 +130,8 @@ void main() {
 
     expect(find.text('수동 설정 방법'), findsOneWidget);
     expect(find.textContaining('휴대폰 설정에서 쉬운 지하철'), findsOneWidget);
-    expect(completedResult, isNull);
 
     await tester.tap(find.text('확인'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
     expect(completedResult, isNotNull);

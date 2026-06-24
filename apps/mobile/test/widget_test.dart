@@ -5111,6 +5111,66 @@ void main() {
     );
   });
 
+  testWidgets('앱은 서비스 소개에서 바로 시작해도 저장된 시설 신고 사진을 복구한다', (tester) async {
+    final draftTargetStore = MemoryFacilityReportDraftTargetStore(
+      const FacilityReportTarget(
+        stationId: 'station-sangnoksu',
+        stationName: '상록수',
+        facilityId: 'facility-sangnoksu-toilet-1',
+        facilityName: '장애인 화장실',
+        facilityTypeLabel: '장애인 화장실',
+        facilityStatusLabel: '확인 필요',
+      ),
+    );
+    var restoreCount = 0;
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: const CurrentLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
+          ),
+          needsPermissionRequest: false,
+        ),
+        onboardingStore: MemoryOnboardingResultStore(),
+        facilityReportDraftTargetStore: draftTargetStore,
+        facilityReportLostPhotoRestorer: () async {
+          restoreCount++;
+          return const FacilityReportPhotoAttachment(
+            fileName: 'restored-toilet.webp',
+            contentType: 'image/webp',
+            dataBase64: 'cmVzdG9yZWQ=',
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('onboardingIntroSkipButton')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('onboardingIntroSkipButton')));
+    await tester.pumpAndSettle();
+
+    expect(restoreCount, 1);
+    expect(draftTargetStore.clearCount, 1);
+    expect(find.text('시설 신고'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('앱은 사진 복구 대상 정리에 실패해도 복구 화면을 연다', (tester) async {
     final reportedErrors = <FlutterErrorDetails>[];
     final draftTargetStore = MemoryFacilityReportDraftTargetStore(

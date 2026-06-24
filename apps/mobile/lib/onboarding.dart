@@ -717,10 +717,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
   int _currentStep = 0;
-  bool _avoidStairs = true;
-  bool _requireElevator = true;
-  bool _minimizeTransfers = true;
-  bool _avoidLongWalks = true;
   bool _locationPermissionSelected = true;
   bool _notificationPermissionSelected = true;
 
@@ -819,46 +815,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const SizedBox(height: 18),
                   _OnboardingPreferenceCard(
                     children: [
-                      _OnboardingPreferenceSwitch(
+                      _OnboardingConditionRow(
                         key: const Key('onboardingRoutePreference-avoidStairs'),
                         title: '계단 피하기',
                         subtitle: '계단 없는 길',
-                        value: _avoidStairs,
-                        onChanged: (value) =>
-                            setState(() => _avoidStairs = value),
+                        enabled: selectedProfile?.avoidStairs ?? true,
                       ),
                       const _OnboardingPreferenceDivider(),
-                      _OnboardingPreferenceSwitch(
+                      _OnboardingConditionRow(
                         key: const Key(
                           'onboardingRoutePreference-requireElevator',
                         ),
                         title: '엘리베이터 이용',
                         subtitle: '엘리베이터 연결',
-                        value: _requireElevator,
-                        onChanged: (value) =>
-                            setState(() => _requireElevator = value),
+                        enabled: selectedProfile?.requireElevator ?? true,
                       ),
                       const _OnboardingPreferenceDivider(),
-                      _OnboardingPreferenceSwitch(
+                      _OnboardingConditionRow(
                         key: const Key(
                           'onboardingRoutePreference-minimizeTransfers',
                         ),
                         title: '환승 줄이기',
                         subtitle: '갈아타는 횟수 줄이기',
-                        value: _minimizeTransfers,
-                        onChanged: (value) =>
-                            setState(() => _minimizeTransfers = value),
+                        enabled: selectedProfile?.minimizeTransfers ?? true,
                       ),
                       const _OnboardingPreferenceDivider(),
-                      _OnboardingPreferenceSwitch(
+                      _OnboardingConditionRow(
                         key: const Key(
                           'onboardingRoutePreference-avoidLongWalks',
                         ),
                         title: '걷는 거리 줄이기',
                         subtitle: '오래 걷는 길 피하기',
-                        value: _avoidLongWalks,
-                        onChanged: (value) =>
-                            setState(() => _avoidLongWalks = value),
+                        enabled: selectedProfile?.avoidLongWalks ?? true,
                       ),
                     ],
                   ),
@@ -932,7 +920,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
       );
-      return;
+      if (!mounted) {
+        return;
+      }
     }
     _completeOnboarding();
   }
@@ -1121,28 +1111,25 @@ class _OnboardingPreferenceCard extends StatelessWidget {
   }
 }
 
-class _OnboardingPreferenceSwitch extends StatelessWidget {
-  const _OnboardingPreferenceSwitch({
+class _OnboardingConditionRow extends StatelessWidget {
+  const _OnboardingConditionRow({
     required super.key,
     required this.title,
     required this.subtitle,
-    required this.value,
-    required this.onChanged,
+    required this.enabled,
   });
 
   final String title;
   final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    final state = value ? '켜짐' : '꺼짐';
+    final state = enabled ? '우선' : '기본';
 
     return Semantics(
+      container: true,
       label: '$title $state, $subtitle',
-      toggled: value,
-      onTap: () => onChanged(!value),
       child: ExcludeSemantics(
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 68),
@@ -1172,14 +1159,26 @@ class _OnboardingPreferenceSwitch extends StatelessWidget {
                   ],
                 ),
               ),
-              Switch(
-                value: value,
-                onChanged: onChanged,
-                activeThumbColor: Colors.white,
-                activeTrackColor: const Color(0xFF0D8A6D),
-                inactiveThumbColor: Colors.white,
-                inactiveTrackColor: const Color(0xFFC8D3DC),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? const Color(0xFFDFF7EF)
+                      : const Color(0xFFEEF3F6),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: SizedBox(
+                  width: 54,
+                  height: 36,
+                  child: Center(
+                    child: Icon(
+                      enabled ? Icons.check : Icons.remove,
+                      color: enabled
+                          ? const Color(0xFF0D8A6D)
+                          : const Color(0xFF647686),
+                      size: 21,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

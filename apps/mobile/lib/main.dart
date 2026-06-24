@@ -419,6 +419,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
             setState(() {
               _onboardingState = OnboardingState.completed(result: result);
             });
+            _schedulePendingFacilityReportPhotoRecovery();
           },
         );
       }

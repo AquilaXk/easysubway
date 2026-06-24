@@ -83,6 +83,9 @@ void main() {
 
     expect(find.text('수동 설정 방법'), findsOneWidget);
     expect(find.textContaining('가까운 역 찾기와 시설 고장 알림은 제한됩니다'), findsOneWidget);
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeScreen), findsOneWidget);
   });
 
   testWidgets('첫 실행 앱은 알림 설정 저장소가 없어도 권한 선택 화면을 유지한다', (tester) async {
