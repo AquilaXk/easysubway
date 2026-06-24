@@ -814,6 +814,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                     _controller.value = _mapTransformForBounds(
                       Rect.fromLTWH(0, 0, geometry.width, geometry.height),
                       constraints,
+                      contain: true,
                     );
                   },
                   onLocate: () {
@@ -1075,7 +1076,11 @@ Matrix4 _initialMapTransform(
   return _mapTransformForBounds(geometry.initialBounds, constraints);
 }
 
-Matrix4 _mapTransformForBounds(Rect bounds, BoxConstraints constraints) {
+Matrix4 _mapTransformForBounds(
+  Rect bounds,
+  BoxConstraints constraints, {
+  bool contain = false,
+}) {
   final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
   final viewportHeight = constraints.hasBoundedHeight
       ? constraints.maxHeight
@@ -1083,10 +1088,11 @@ Matrix4 _mapTransformForBounds(Rect bounds, BoxConstraints constraints) {
   if (viewportWidth <= 0 || viewportHeight <= 0) {
     return Matrix4.identity();
   }
-  final initialScale = math.max(
-    viewportWidth / bounds.width,
-    viewportHeight / bounds.height,
-  );
+  final widthScale = viewportWidth / bounds.width;
+  final heightScale = viewportHeight / bounds.height;
+  final initialScale = contain
+      ? math.min(widthScale, heightScale)
+      : math.max(widthScale, heightScale);
   final dx =
       (viewportWidth - bounds.width * initialScale) / 2 -
       bounds.left * initialScale;
@@ -1329,8 +1335,13 @@ class _NetworkMapListSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final linesById = {for (final line in data.lines) line.id: line};
     final stationsByLine = <String, List<NetworkMapStation>>{};
+    final stationLinesById = <String, List<NetworkMapLine>>{};
     for (final station in data.stations) {
       stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
+      final line = linesById[station.lineId];
+      if (line != null) {
+        stationLinesById.putIfAbsent(station.id, () => []).add(line);
+      }
     }
     return SafeArea(
       key: const Key('networkMapListSheet'),
@@ -1366,13 +1377,15 @@ class _NetworkMapListSheet extends StatelessWidget {
                   children: [
                     for (final station in stationsByLine[line.id]!)
                       ListTile(
-                        key: Key('networkMapListStation-${station.id}'),
+                        key: Key(
+                          'networkMapListStation-${station.id}-${station.lineId}',
+                        ),
                         title: Text(station.displayName),
                         subtitle: Text(line.shortName),
-                        onTap: () => onStationTap(station, [
-                          if (linesById[station.lineId] != null)
-                            linesById[station.lineId]!,
-                        ]),
+                        onTap: () => onStationTap(
+                          station,
+                          stationLinesById[station.id] ?? const [],
+                        ),
                       ),
                   ],
                 ),

@@ -668,9 +668,16 @@ void main() {
     final viewer = tester.widget<InteractiveViewer>(
       find.byKey(const Key('networkMapInteractiveViewer')),
     );
+    final initialScale = viewer.transformationController!.value
+        .getMaxScaleOnAxis();
+    expect(initialScale, greaterThan(1));
+
+    await tester.tap(find.byKey(const Key('networkMapOverviewButton')));
+    await tester.pump();
+
     expect(
       viewer.transformationController!.value.getMaxScaleOnAxis(),
-      greaterThan(1),
+      lessThan(initialScale),
     );
   });
 
@@ -748,12 +755,14 @@ void main() {
     expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
     expect(find.text('노선과 역 목록'), findsOneWidget);
     await tester.tap(
-      find.byKey(const Key('networkMapListStation-station-sadang')),
+      find.byKey(const Key('networkMapListStation-station-sadang-seoul-4')),
     );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.text('사당역'), findsOneWidget);
+    expect(find.text('2호선'), findsOneWidget);
+    expect(find.text('4호선'), findsOneWidget);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
@@ -7369,6 +7378,12 @@ class FakeStationSearchRepository
     final selectedRegion = region ?? networkMapRegionNames.first;
     const lines = [
       NetworkMapLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        region: '테스트권',
+      ),
+      NetworkMapLine(
         id: 'seoul-4',
         name: '수도권 4호선',
         color: '#00A5DE',
@@ -7376,6 +7391,24 @@ class FakeStationSearchRepository
       ),
     ];
     const stations = [
+      NetworkMapStation(
+        id: 'station-sadang',
+        nameKo: '사당',
+        nameEn: 'Sadang',
+        region: '테스트권',
+        lineId: 'seoul-2',
+        stationCode: '226',
+        sequence: 33,
+        position: NetworkMapPosition(
+          x: 390,
+          y: 320,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-route-map-source-capital-review',
+        ),
+      ),
       NetworkMapStation(
         id: 'station-sadang',
         nameKo: '사당',
@@ -7420,7 +7453,10 @@ class FakeStationSearchRepository
       ],
       selectedRegion: selectedRegion,
       lines: lines,
-      stations: lineId == null || lineId == 'seoul-4' ? stations : const [],
+      stations: [
+        for (final station in stations)
+          if (lineId == null || station.lineId == lineId) station,
+      ],
       edges: const [
         NetworkMapEdge(
           id: 'map-edge-seoul-4-station-sadang-station-sangnoksu',
