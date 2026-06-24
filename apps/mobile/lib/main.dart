@@ -195,6 +195,16 @@ class _DemoSearchHistoryRepository implements SearchHistoryRepository {
   Future<List<String>> listRecentQueries() async {
     return List.unmodifiable(_queries);
   }
+
+  @override
+  Future<void> removeSearch(String query) async {
+    _queries.remove(query.trim());
+  }
+
+  @override
+  Future<void> clearSearches() async {
+    _queries.clear();
+  }
 }
 
 class EasySubwayApp extends StatelessWidget {
@@ -3653,9 +3663,8 @@ class SupportAccessScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            const _SupportSectionTitle(title: '개인정보 및 데이터'),
             const _PrivacyDataUseSummary(),
-            const SizedBox(height: 12),
-            const _SafetyDataNotice(),
             const SizedBox(height: 12),
             _SupportAccessItem(
               key: const Key('privacyPolicyAccessItem'),
@@ -3666,6 +3675,29 @@ class SupportAccessScreen extends StatelessWidget {
               launcher: launcher,
             ),
             const SizedBox(height: 12),
+            if (userDataDeletionRepository == null)
+              _SupportAccessItem(
+                key: const Key('dataDeletionAccessItem'),
+                icon: Icons.delete_outline,
+                title: '데이터 삭제 요청',
+                value: accessInfo.dataDeletionEmail,
+                helperText: '삭제 범위와 복구 불가 여부를 먼저 확인해요',
+                uri: _mailtoUri(
+                  accessInfo.dataDeletionEmail,
+                  '쉬운 지하철 데이터 삭제 요청',
+                ),
+                launcher: launcher,
+              )
+            else
+              _UserDataDeletionAccessItem(
+                repository: userDataDeletionRepository!,
+                onDeleted: onUserDataDeleted,
+              ),
+            const SizedBox(height: 20),
+            const _SupportSectionTitle(title: '안전 안내'),
+            const _SafetyDataNotice(),
+            const SizedBox(height: 20),
+            const _SupportSectionTitle(title: '문의'),
             _SupportAccessItem(
               key: const Key('supportAccessItem'),
               icon: Icons.support_agent,
@@ -3685,25 +3717,31 @@ class SupportAccessScreen extends StatelessWidget {
               uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
               launcher: launcher,
             ),
-            const SizedBox(height: 12),
-            if (userDataDeletionRepository == null)
-              _SupportAccessItem(
-                key: const Key('dataDeletionAccessItem'),
-                icon: Icons.delete_outline,
-                title: '데이터 삭제 요청',
-                value: accessInfo.dataDeletionEmail,
-                uri: _mailtoUri(
-                  accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 데이터 삭제 요청',
-                ),
-                launcher: launcher,
-              )
-            else
-              _UserDataDeletionAccessItem(
-                repository: userDataDeletionRepository!,
-                onDeleted: onUserDataDeleted,
-              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportSectionTitle extends StatelessWidget {
+  const _SupportSectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Semantics(
+        header: true,
+        child: Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+          ),
         ),
       ),
     );
@@ -3735,7 +3773,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
-      label: '데이터 삭제 요청, 앱 안에서 삭제를 진행합니다.',
+      label: '데이터 삭제 요청, 삭제 범위와 복구 불가 여부를 확인하고 앱 안에서 삭제를 진행합니다.',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
         child: Material(
@@ -3774,7 +3812,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          '앱 안에서 삭제 대상을 확인하고 직접 요청합니다.',
+                          '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
                           style: TextStyle(
                             color: Color(0xFF466467),
                             fontSize: 15,
@@ -3864,6 +3902,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             const _DataDeletionNoticeLine(
               text: '삭제가 끝나면 현재 로그인 정보는 지워지고 처음 설정 화면으로 돌아갑니다.',
             ),
+            const _DataDeletionNoticeLine(text: '삭제한 데이터는 앱에서 복구할 수 없습니다.'),
             const _DataDeletionNoticeLine(
               text: '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
             ),
@@ -4206,7 +4245,7 @@ class _SecurityContactNoticeLine extends StatelessWidget {
 class _SafetyDataNotice extends StatelessWidget {
   const _SafetyDataNotice();
 
-  static const _title = '안전과 데이터 안내';
+  static const _title = '안전 안내';
   static const _referenceNotice = '경로와 시설 정보는 이동을 돕는 참고 정보입니다.';
   static const _fieldNotice = '실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.';
   static const _limitationNotice = '실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.';
@@ -4387,6 +4426,7 @@ class _SupportAccessItem extends StatelessWidget {
     required this.value,
     required this.uri,
     required this.launcher,
+    this.helperText,
     super.key,
   });
 
@@ -4395,15 +4435,23 @@ class _SupportAccessItem extends StatelessWidget {
   final String value;
   final Uri? uri;
   final SupportAccessLauncher launcher;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
-    final displayValue = value.trim().isEmpty ? '준비 중입니다.' : value.trim();
     final targetUri = uri;
+    final displayValue = targetUri == null
+        ? '현재 이용할 수 없음 · 준비 중'
+        : value.trim();
+    final secondaryText = helperText;
+    final semanticLabelParts = [title, displayValue];
+    if (secondaryText != null) {
+      semanticLabelParts.add(secondaryText);
+    }
     return Semantics(
       button: true,
       enabled: targetUri != null,
-      label: '$title, $displayValue',
+      label: semanticLabelParts.join(', '),
       onTap: targetUri == null
           ? null
           : () => unawaited(_openTarget(context, targetUri)),
@@ -4430,6 +4478,17 @@ class _SupportAccessItem extends StatelessWidget {
                       height: 1.25,
                     ),
                   ),
+                  if (secondaryText != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      secondaryText,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF466467),
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

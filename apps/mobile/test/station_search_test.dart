@@ -1587,6 +1587,16 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
   Future<List<String>> listRecentQueries() async {
     return recordedQueries.reversed.toList(growable: false);
   }
+
+  @override
+  Future<void> removeSearch(String query) async {
+    recordedQueries.remove(query.trim());
+  }
+
+  @override
+  Future<void> clearSearches() async {
+    recordedQueries.clear();
+  }
 }
 
 class ControlledNearbyStationSearchRepository
