@@ -764,11 +764,22 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                   mapAsset,
                   View.of(context).devicePixelRatio,
                 );
+          final fullBounds = Rect.fromLTWH(
+            0,
+            0,
+            geometry.width,
+            geometry.height,
+          );
+          final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
-            _controller.value = _initialMapTransform(geometry, constraints);
+            _controller.value = _initialMapTransform(
+              geometry,
+              constraints,
+              minScale: minScale,
+            );
           }
           return Stack(
             children: [
@@ -777,7 +788,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                   key: const Key('networkMapInteractiveViewer'),
                   transformationController: _controller,
                   constrained: false,
-                  minScale: _minMapScale,
+                  minScale: minScale,
                   maxScale: _maxMapScale,
                   boundaryMargin: const EdgeInsets.all(220),
                   child: SizedBox(
@@ -828,19 +839,21 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                 right: 14,
                 top: 12,
                 child: _MapControls(
-                  onZoomIn: () => _scaleMap(1.25),
-                  onZoomOut: () => _scaleMap(0.8),
+                  onZoomIn: () => _scaleMap(1.25, minScale),
+                  onZoomOut: () => _scaleMap(0.8, minScale),
                   onOverview: () {
                     _controller.value = _mapTransformForBounds(
-                      Rect.fromLTWH(0, 0, geometry.width, geometry.height),
+                      fullBounds,
                       constraints,
                       contain: true,
+                      minScale: minScale,
                     );
                   },
                   onCenter: () {
                     _controller.value = _mapTransformForBounds(
                       _readableBoundsFor(geometry),
                       constraints,
+                      minScale: minScale,
                     );
                   },
                 ),
@@ -852,13 +865,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
     );
   }
 
-  void _scaleMap(double factor) {
+  void _scaleMap(double factor, double minScale) {
     final currentScale = _controller.value.getMaxScaleOnAxis();
     if (currentScale <= 0) {
       return;
     }
     final targetScale = (currentScale * factor)
-        .clamp(_minMapScale, _maxMapScale)
+        .clamp(minScale, _maxMapScale)
         .toDouble();
     final adjustedFactor = targetScale / currentScale;
     _controller.value = Matrix4.copy(_controller.value)
@@ -1153,15 +1166,21 @@ String _displayRegionName(String region) {
 
 Matrix4 _initialMapTransform(
   _MapGeometry geometry,
-  BoxConstraints constraints,
-) {
-  return _mapTransformForBounds(geometry.initialBounds, constraints);
+  BoxConstraints constraints, {
+  required double minScale,
+}) {
+  return _mapTransformForBounds(
+    geometry.initialBounds,
+    constraints,
+    minScale: minScale,
+  );
 }
 
 Matrix4 _mapTransformForBounds(
   Rect bounds,
   BoxConstraints constraints, {
   bool contain = false,
+  double minScale = _minMapScale,
 }) {
   final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
   final viewportHeight = constraints.hasBoundedHeight
@@ -1175,9 +1194,7 @@ Matrix4 _mapTransformForBounds(
   final computedScale = contain
       ? math.min(widthScale, heightScale)
       : math.max(widthScale, heightScale);
-  final initialScale = computedScale
-      .clamp(_minMapScale, _maxMapScale)
-      .toDouble();
+  final initialScale = computedScale.clamp(minScale, _maxMapScale).toDouble();
   final dx =
       (viewportWidth - bounds.width * initialScale) / 2 -
       bounds.left * initialScale;
@@ -1187,6 +1204,27 @@ Matrix4 _mapTransformForBounds(
   return Matrix4.identity()
     ..translateByDouble(dx, dy, 0, 1)
     ..scaleByDouble(initialScale, initialScale, 1, 1);
+}
+
+double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
+  final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
+  final viewportHeight = constraints.hasBoundedHeight
+      ? constraints.maxHeight
+      : 0;
+  if (viewportWidth <= 0 ||
+      viewportHeight <= 0 ||
+      bounds.width <= 0 ||
+      bounds.height <= 0) {
+    return _minMapScale;
+  }
+  final fitScale = math.min(
+    viewportWidth / bounds.width,
+    viewportHeight / bounds.height,
+  );
+  if (!fitScale.isFinite || fitScale <= 0) {
+    return _minMapScale;
+  }
+  return math.min(_minMapScale, fitScale);
 }
 
 Rect _readableBoundsFor(_MapGeometry geometry) {
