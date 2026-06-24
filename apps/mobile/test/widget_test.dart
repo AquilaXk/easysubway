@@ -2899,6 +2899,64 @@ void main() {
     }
   });
 
+  testWidgets('주변 역은 첫 결과를 대표 카드로 분리하고 나머지만 목록에 보여준다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+        _stationResult(id: 'station-sadang', name: '사당', distanceMeters: 520),
+        _stationResult(id: 'station-gangnam', name: '강남', distanceMeters: 790),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.pumpAndSettle();
+
+    final primaryCard = find.byKey(const Key('nearbyStationPrimaryCard'));
+    expect(primaryCard, findsOneWidget);
+    expect(
+      find.descendant(of: primaryCard, matching: find.text('상록수역')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: primaryCard, matching: find.text('사당역')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      findsNothing,
+    );
+    expect(find.text('다른 주변 역'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationSearchResult-station-sadang')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationSearchResult-station-gangnam')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
@@ -3625,7 +3683,7 @@ void main() {
     expect(find.text('약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        '내부 이동 안내, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요, 엘리베이터에서 개찰구까지 이동합니다.',
+        '역 안 이동 순서, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요, 엘리베이터에서 개찰구까지 이동합니다.',
       ),
       findsOneWidget,
     );

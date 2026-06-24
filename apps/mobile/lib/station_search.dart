@@ -2301,20 +2301,28 @@ class _StationSearchBody extends StatelessWidget {
             child: const SizedBox(width: 1, height: 1),
           ),
           if (state.source == StationSearchResultSource.nearby) ...[
-            _NearbyStationOverview(
-              result: state.results.first,
-              onTap: () => onResultTap(state.results.first),
-              onSetOrigin: onSetOrigin == null
-                  ? null
-                  : () => onSetOrigin!(state.results.first),
-              onSetDestination: onSetDestination == null
-                  ? null
-                  : () => onSetDestination!(state.results.first),
-            ),
-            if (state.results.length > 1) ...[
-              const SizedBox(height: 18),
-              const _StationDetailSectionTitle(title: '다른 주변 역'),
-              const SizedBox(height: 12),
+            if (state.results.isEmpty)
+              _StationSearchFailureMessage(
+                message: '주변 역을 찾지 못했습니다.',
+                isOpeningLocationSettings: isOpeningLocationSettings,
+                onOpenLocationSettings: onOpenLocationSettings,
+              )
+            else ...[
+              _NearbyStationOverview(
+                result: state.results.first,
+                onTap: () => onResultTap(state.results.first),
+                onSetOrigin: onSetOrigin == null
+                    ? null
+                    : () => onSetOrigin!(state.results.first),
+                onSetDestination: onSetDestination == null
+                    ? null
+                    : () => onSetDestination!(state.results.first),
+              ),
+              if (state.results.length > 1) ...[
+                const SizedBox(height: 18),
+                const _StationDetailSectionTitle(title: '다른 주변 역'),
+                const SizedBox(height: 12),
+              ],
             ],
           ] else ...[
             const _StationDetailSectionTitle(title: '검색 결과'),
