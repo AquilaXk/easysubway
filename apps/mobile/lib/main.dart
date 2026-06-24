@@ -2267,7 +2267,7 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
               key: const Key('homeFacilityActionButton'),
               onPressed: onOpenFacilities,
               icon: const Icon(Icons.open_in_new),
-              label: Text(facility.nextActionLabel),
+              label: const Text('저장한 시설 보기'),
             ),
             const SizedBox(height: 8),
             Text(

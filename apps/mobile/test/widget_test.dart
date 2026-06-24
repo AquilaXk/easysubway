@@ -818,7 +818,7 @@ void main() {
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('정보 확인 필요 · 엘리베이터 확인 필요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '시설 상세 보기'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '대체 길 보기'), findsNothing);
     final routeButtonSize = tester.getSize(
@@ -883,7 +883,7 @@ void main() {
 
     expect(find.text('상록수역 2번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('고장·폐쇄 · 엘리베이터 폐쇄'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '대체 출구 보기'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(
       find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*출처 공식 파일, 다음 행동 대체 출구 보기')),
       findsOneWidget,
