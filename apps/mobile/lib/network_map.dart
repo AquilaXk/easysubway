@@ -710,7 +710,7 @@ class _OriginalRouteMapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (defaultTargetPlatform != TargetPlatform.android || _isWidgetTest) {
+    if (_isWidgetTest) {
       return ColoredBox(
         key: const Key('originalRouteMapView'),
         color: Colors.white,
@@ -721,14 +721,29 @@ class _OriginalRouteMapView extends StatelessWidget {
         ),
       );
     }
-    return AndroidView(
+    final platformViewKey = ValueKey('originalRouteMapView-${asset.path}');
+    final creationParams = <String, Object?>{
+      'assetPath': asset.path,
+      'mimeType': asset.mimeType,
+    };
+    final nativeView = switch (defaultTargetPlatform) {
+      TargetPlatform.android => AndroidView(
+        key: platformViewKey,
+        viewType: _viewType,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+      ),
+      TargetPlatform.iOS => UiKitView(
+        key: platformViewKey,
+        viewType: _viewType,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+      ),
+      _ => const ColoredBox(color: Colors.white),
+    };
+    return KeyedSubtree(
       key: const Key('originalRouteMapView'),
-      viewType: _viewType,
-      creationParams: <String, Object?>{
-        'assetPath': asset.path,
-        'mimeType': asset.mimeType,
-      },
-      creationParamsCodec: const StandardMessageCodec(),
+      child: nativeView,
     );
   }
 }
