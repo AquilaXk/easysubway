@@ -3,10 +3,14 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../network_map.dart';
 import '../../../station_search.dart';
 
 class DriftStationRepository
-    implements StationSearchRepository, StationLineFilterRepository {
+    implements
+        StationSearchRepository,
+        StationLineFilterRepository,
+        NetworkMapRepository {
   DriftStationRepository({required this.database});
 
   final CatalogDatabase database;
@@ -266,6 +270,185 @@ class DriftStationRepository
         .toList(growable: false);
   }
 
+  @override
+  Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
+    final selectedRegion = await _selectedNetworkMapRegion(region);
+    final lineRows = await database
+        .customSelect(
+          '''
+          SELECT DISTINCT l.id, l.name_ko, l.color, COALESCE(rmp.region, s.region, '') AS region
+          FROM lines l
+          JOIN station_lines sl ON sl.line_id = l.id
+          JOIN stations s ON s.id = sl.station_id
+          JOIN route_map_positions rmp
+            ON rmp.station_id = sl.station_id
+           AND rmp.line_id = sl.line_id
+          WHERE COALESCE(rmp.region, s.region, '') = ?
+          ORDER BY l.name_ko
+          ''',
+          variables: [Variable.withString(selectedRegion)],
+        )
+        .get();
+    final lines = lineRows
+        .map(
+          (row) => NetworkMapLine(
+            id: row.read<String>('id'),
+            name: row.read<String>('name_ko'),
+            color: row.read<String>('color'),
+            region: row.read<String>('region'),
+          ),
+        )
+        .toList(growable: false);
+    final selectedLineIds = {
+      for (final line in lines)
+        if (lineId == null || lineId.trim().isEmpty || line.id == lineId.trim())
+          line.id,
+    };
+    final stationRows = await database
+        .customSelect(
+          '''
+          SELECT
+            s.id,
+            s.name_ko,
+            s.name_en,
+            s.region,
+            sl.line_id,
+            sl.station_code,
+            sl.line_sequence,
+            rmp.x,
+            rmp.y,
+            rmp.label_dx,
+            rmp.label_dy,
+            rmp.up_path,
+            rmp.down_path,
+            rmp.source_id
+          FROM route_map_positions rmp
+          JOIN station_lines sl
+            ON sl.station_id = rmp.station_id
+           AND sl.line_id = rmp.line_id
+          JOIN stations s ON s.id = rmp.station_id
+          WHERE rmp.region = ?
+          ORDER BY sl.line_id, sl.line_sequence
+          ''',
+          variables: [Variable.withString(selectedRegion)],
+        )
+        .get();
+    final stations = stationRows
+        .where((row) => selectedLineIds.contains(row.read<String>('line_id')))
+        .map(
+          (row) => NetworkMapStation(
+            id: row.read<String>('id'),
+            nameKo: row.read<String>('name_ko'),
+            nameEn: row.read<String>('name_en'),
+            region: row.read<String>('region'),
+            lineId: row.read<String>('line_id'),
+            stationCode: row.read<String>('station_code'),
+            sequence: row.read<int>('line_sequence'),
+            position: NetworkMapPosition(
+              x: row.read<int>('x'),
+              y: row.read<int>('y'),
+              labelDx: row.read<int>('label_dx'),
+              labelDy: row.read<int>('label_dy'),
+              upPath: row.read<String>('up_path'),
+              downPath: row.read<String>('down_path'),
+              sourceId: row.read<String>('source_id'),
+            ),
+          ),
+        )
+        .toList(growable: false);
+    return NetworkMapData(
+      regions: await _networkMapRegions(),
+      selectedRegion: selectedRegion,
+      lines: lines,
+      stations: stations,
+      edges: _networkMapEdges(stations),
+      positionSources: await _networkMapPositionSources(selectedRegion),
+    );
+  }
+
+  Future<String> _selectedNetworkMapRegion(String? requestedRegion) async {
+    final trimmedRegion = requestedRegion?.trim();
+    if (trimmedRegion != null && trimmedRegion.isNotEmpty) {
+      return trimmedRegion;
+    }
+    final rows = await database.customSelect('''
+      SELECT DISTINCT region
+      FROM route_map_positions
+      WHERE region <> ''
+      ORDER BY CASE region WHEN '전국' THEN 0 WHEN '수도권' THEN 1 ELSE 2 END, region
+      LIMIT 1
+      ''').get();
+    if (rows.isEmpty) {
+      return '수도권';
+    }
+    return rows.single.read<String>('region');
+  }
+
+  Future<List<NetworkMapRegion>> _networkMapRegions() async {
+    final rows = await database.customSelect('''
+      SELECT DISTINCT region
+      FROM route_map_positions
+      WHERE region <> ''
+      ORDER BY CASE region WHEN '전국' THEN 0 WHEN '수도권' THEN 1 ELSE 2 END, region
+      ''').get();
+    return rows
+        .map((row) => NetworkMapRegion(name: row.read<String>('region')))
+        .toList(growable: false);
+  }
+
+  Future<List<NetworkMapPositionSource>> _networkMapPositionSources(
+    String region,
+  ) async {
+    final rows = await database
+        .customSelect(
+          '''
+          SELECT source_id, source_name, license_status
+          FROM route_map_positions
+          WHERE region = ?
+          GROUP BY source_id, source_name, license_status
+          ORDER BY source_id
+          ''',
+          variables: [Variable.withString(region)],
+        )
+        .get();
+    return rows
+        .map(
+          (row) => NetworkMapPositionSource(
+            id: row.read<String>('source_id'),
+            name: row.read<String>('source_name'),
+            licenseStatus: row.read<String>('license_status'),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  List<NetworkMapEdge> _networkMapEdges(List<NetworkMapStation> stations) {
+    final byLine = <String, List<NetworkMapStation>>{};
+    for (final station in stations) {
+      byLine.putIfAbsent(station.lineId, () => []).add(station);
+    }
+    final edges = <NetworkMapEdge>[];
+    for (final entry in byLine.entries) {
+      final sortedStations = [...entry.value]
+        ..sort((a, b) => a.sequence.compareTo(b.sequence));
+      for (var index = 0; index < sortedStations.length - 1; index += 1) {
+        final from = sortedStations[index];
+        final to = sortedStations[index + 1];
+        edges.add(
+          NetworkMapEdge(
+            id: 'map-edge-${entry.key}-${from.id}-${to.id}',
+            lineId: entry.key,
+            fromStationId: _mapStationKey(from),
+            toStationId: _mapStationKey(to),
+            accessibilityStatus: 'AVAILABLE',
+            reliabilityScore: 100,
+          ),
+        );
+      }
+    }
+    return edges;
+  }
+
   Future<_LocalStationSummary?> _getStationSummary(String stationId) async {
     final summaries = await _listStationSummaries(stationId: stationId);
     return summaries.isEmpty ? null : summaries.single;
@@ -373,6 +556,9 @@ class DriftStationRepository
     return summaries.values.toList(growable: false);
   }
 }
+
+String _mapStationKey(NetworkMapStation station) =>
+    '${station.id}:${station.lineId}';
 
 class _LocalStationSummary {
   _LocalStationSummary({

@@ -1,0 +1,15 @@
+seoul_page=https://www.seoulmetro.co.kr/kr/cyberStation.do
+seoul_pdf=https://www.seoulmetro.co.kr/download/map_korea.pdf
+busan_page=https://www2.humetro.busan.kr/homepage/cyberstation/map.do
+busan_integrated_zip=https://www2.humetro.busan.kr/upload/default/integrate.zip
+busan_image=https://www2.humetro.busan.kr/upload/cyber-station/routemap_kor_2020.jpg
+gwangju_page=https://www.grtc.co.kr/cyber/simple
+gwangju_cc_by_sa_svg=user-provided-route-map-svg
+daegu_page=https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do
+daegu_route_map_page=https://www.dtro.or.kr/cmsh/dtro.or.kr/html/nosundo.html
+daegu_route_map_zip=https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip
+daegu_route_map_image=https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.png
+daejeon_page=https://www.djtc.kr/kor/cyberStation.do?menuIdx=28
+daejeon_route_map_page=https://www.djtc.kr/kor/page.do?menuIdx=39
+daejeon_route_map_zip=https://www.djtc.kr/kor/resources/routemap/korean.zip
+daejeon_image=https://www.djtc.kr/kor/resources/images/content/routemap.jpg

@@ -1471,7 +1471,7 @@ class _MyReportDetailStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: DecoratedBox(
+      child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFE6F2F0),
           borderRadius: BorderRadius.circular(8),
@@ -1533,7 +1533,7 @@ class _MyReportStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         borderRadius: BorderRadius.circular(8),
@@ -2167,7 +2167,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         borderRadius: BorderRadius.circular(8),

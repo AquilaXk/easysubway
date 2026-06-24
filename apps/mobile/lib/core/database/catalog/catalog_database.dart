@@ -42,13 +42,14 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (migrator) async {
         await migrator.createAll();
+        await _createRouteMapPositionsTable();
         await _createIndexes();
       },
       onUpgrade: (migrator, from, to) async {
@@ -56,6 +57,12 @@ class CatalogDatabase extends _$CatalogDatabase {
           await migrator.createTable(realtimeProviderLineMappings);
           await migrator.createTable(realtimeProviderStationMappings);
           await _createRealtimeProviderIndexes();
+        }
+        if (from < 3) {
+          await _createRouteMapPositionsTable();
+        }
+        if (from < 4) {
+          await _addRouteMapPathColumns();
         }
       },
       beforeOpen: (_) async {
@@ -70,6 +77,7 @@ class CatalogDatabase extends _$CatalogDatabase {
     ).getSingleOrNull();
     if (existing != null) {
       await _backfillBaselineAccessEdges();
+      await _backfillBaselineRouteMapPositions();
       return;
     }
 
@@ -284,7 +292,52 @@ class CatalogDatabase extends _$CatalogDatabase {
           ),
         ]);
       });
+      await _seedBaselineRouteMapPositions();
     });
+  }
+
+  Future<void> _backfillBaselineRouteMapPositions() async {
+    if (!await _isBaselineFixtureCatalog()) {
+      return;
+    }
+    await transaction(_seedBaselineRouteMapPositions);
+  }
+
+  Future<void> _seedBaselineRouteMapPositions() async {
+    final updatedAt = DateTime.utc(2026, 6, 19).millisecondsSinceEpoch ~/ 1000;
+    final rows = [
+      ['station-sangnoksu', 'seoul-4', '수도권', 156, 250],
+      ['station-sadang', 'seoul-4', '수도권', 390, 320],
+      ['station-sadang', 'seoul-2', '수도권', 390, 320],
+    ];
+    for (final row in rows) {
+      await customStatement(
+        '''
+        INSERT OR IGNORE INTO route_map_positions (
+          station_id, line_id, region, x, y, source_id, source_name,
+          source_url, license, license_status, commercial_use_allowed,
+          attribution_required, reviewed_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          row[0],
+          row[1],
+          row[2],
+          row[3],
+          row[4],
+          'fixture-route-map-source-capital-review',
+          '수도권 노선도 fixture 좌표 검수',
+          'https://easysubway.local/fixtures/catalog-fixture.json',
+          'fixture-only',
+          'fixture-only',
+          0,
+          1,
+          updatedAt,
+          updatedAt,
+        ],
+      );
+    }
   }
 
   Future<void> _backfillBaselineAccessEdges() async {
@@ -435,6 +488,10 @@ class CatalogDatabase extends _$CatalogDatabase {
       'ON network_edges(from_node_id)',
     );
     await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_route_map_positions_region_line '
+      'ON route_map_positions(region, line_id)',
+    );
+    await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_facilities_station '
       'ON facilities(station_id)',
     );
@@ -448,6 +505,59 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_realtime_provider_stations_internal '
       'ON realtime_provider_station_mappings(station_id, line_id)',
+    );
+  }
+
+  Future<void> _createRouteMapPositionsTable() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS route_map_positions (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        region TEXT NOT NULL DEFAULT '',
+        x INTEGER NOT NULL CHECK (x >= 0),
+        y INTEGER NOT NULL CHECK (y >= 0),
+        label_dx INTEGER NOT NULL DEFAULT 0,
+        label_dy INTEGER NOT NULL DEFAULT 0,
+        up_path TEXT NOT NULL DEFAULT '',
+        down_path TEXT NOT NULL DEFAULT '',
+        source_id TEXT NOT NULL,
+        source_name TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        license TEXT NOT NULL,
+        license_status TEXT NOT NULL,
+        commercial_use_allowed INTEGER NOT NULL DEFAULT 0 CHECK (commercial_use_allowed IN (0, 1)),
+        attribution_required INTEGER NOT NULL DEFAULT 1 CHECK (attribution_required IN (0, 1)),
+        reviewed_at INTEGER,
+        updated_at INTEGER,
+        PRIMARY KEY (station_id, line_id, region)
+      )
+      ''');
+  }
+
+  Future<void> _addRouteMapPathColumns() async {
+    await _addColumnIfMissing(
+      'route_map_positions',
+      'up_path',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'route_map_positions',
+      'down_path',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  Future<void> _addColumnIfMissing(
+    String tableName,
+    String columnName,
+    String definition,
+  ) async {
+    final existing = await customSelect('PRAGMA table_info($tableName)').get();
+    if (existing.any((row) => row.read<String>('name') == columnName)) {
+      return;
+    }
+    await customStatement(
+      'ALTER TABLE $tableName ADD COLUMN $columnName $definition',
     );
   }
 }
