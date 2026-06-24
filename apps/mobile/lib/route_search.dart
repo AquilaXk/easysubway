@@ -1925,15 +1925,7 @@ MobilityProfileOption _mobilityOptionFor(String mobilityType) {
 }
 
 String _routeMobilityConditionLabel(MobilityProfileOption option) {
-  final conditions = <String>[];
-  if (option.avoidStairs) {
-    conditions.add('계단 피하기');
-  }
-  conditions.add('엘리베이터 이동');
-  if (option.minimizeTransfers) {
-    conditions.add('환승 줄이기');
-  }
-  return conditions.take(2).join(' · ');
+  return option.conditionSummary;
 }
 
 class _RouteStationPicker extends StatefulWidget {

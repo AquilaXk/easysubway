@@ -1809,7 +1809,13 @@ class _HomePrototypeHero extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _HomeProfilePill(profile: profile, onTap: onProfileTap),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: _HomeProfilePill(
+                      profile: profile,
+                      onTap: onProfileTap,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -1985,7 +1991,11 @@ class _HomeProfilePill extends StatelessWidget {
             ),
           ),
           icon: Icon(profile.icon, size: 16),
-          label: Text(profile.title),
+          label: Text(
+            profile.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ),
     );
@@ -2778,7 +2788,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 _AppSettingsActionTile(
                   key: const Key('mobilityProfileButton'),
                   icon: Icons.directions_walk,
-                  title: _profile.title,
+                  title: _profile.appliedConditionLabel,
                   subtitle: _profile.summary,
                   onTap: () async {
                     final selected = await widget.onOpenMobilityProfile();
