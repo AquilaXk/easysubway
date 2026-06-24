@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
+import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
+import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/station_api_repository.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/station_search.dart';
@@ -309,6 +312,35 @@ void main() {
     expect(requestedUri.path, '/api/v1/lines');
     expect(lines.map((line) => line.shortLabel), ['4', '경의중앙']);
     expect(lines.first.semanticLabel, '수도권 4호선');
+  });
+
+  test('로컬 역 저장소는 노선명에서 지역 필터 값을 만든다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.batch((batch) {
+      batch.insertAll(database.lines, [
+        LinesCompanion.insert(
+          id: 'busan-1',
+          operatorId: 'humetro',
+          nameKo: '부산 1호선',
+          color: const Value('#F06A00'),
+        ),
+        LinesCompanion.insert(
+          id: 'seoul-4',
+          operatorId: 'seoul-metro',
+          nameKo: '수도권 4호선',
+          color: const Value('#00A5DE'),
+        ),
+      ]);
+    });
+    final repository = DriftStationRepository(database: database);
+
+    final lines = await repository.listLines();
+
+    expect(lines.map((line) => '${line.id}:${line.region}'), [
+      'busan-1:부산',
+      'seoul-4:수도권',
+    ]);
   });
 
   test('역 API 저장소는 현재 위치 기준 가까운 역을 요청하고 거리를 파싱한다', () async {

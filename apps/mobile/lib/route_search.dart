@@ -1273,29 +1273,79 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       context: context,
       showDragHandle: true,
       builder: (context) {
+        var pendingMobilityType = _selectedMobilityType;
         return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            children: [
-              Text(
-                '이동 조건',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
-                  fontWeight: FontWeight.w900,
-                  height: 1.25,
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return FractionallySizedBox(
+                heightFactor: 0.78,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '이동 조건',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: const Color(0xFF102A2C),
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.25,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '상황에 맞는 이동 조건을 고른 뒤 적용해 주세요.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF50656F),
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.35,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView(
+                        key: const Key('routeMobilityOptionsList'),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        children: [
+                          for (final option in mobilityProfileOptions)
+                            _RouteMobilityTypeOptionButton(
+                              key: Key(
+                                'routeMobilityOption-${option.mobilityType}',
+                              ),
+                              option: option,
+                              selected:
+                                  option.mobilityType == pendingMobilityType,
+                              onSelected: () {
+                                setSheetState(() {
+                                  pendingMobilityType = option.mobilityType;
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      child: FilledButton.icon(
+                        key: const Key('routeMobilityApplyButton'),
+                        onPressed: () =>
+                            Navigator.of(context).pop(pendingMobilityType),
+                        icon: const Icon(Icons.check),
+                        label: const Text('적용'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              for (final option in mobilityProfileOptions)
-                _RouteMobilityTypeOptionButton(
-                  key: Key('routeMobilityOption-${option.mobilityType}'),
-                  option: option,
-                  selected: option.mobilityType == _selectedMobilityType,
-                  onSelected: () =>
-                      Navigator.of(context).pop(option.mobilityType),
-                ),
-            ],
+              );
+            },
           ),
         );
       },
@@ -1890,9 +1940,30 @@ class _RouteMobilityTypeOptionButton extends StatelessWidget {
         Icon(option.icon),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            option.title,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                option.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                option.summary,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _routeMobilityConditionLabel(option),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+            ],
           ),
         ),
         if (selected)
@@ -1906,7 +1977,9 @@ class _RouteMobilityTypeOptionButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
-        label: option.semanticsLabel(selected),
+        label: selected
+            ? '${option.title} 현재 선택, ${option.summary}'
+            : option.semanticsLabel(false),
         button: true,
         selected: selected,
         child: selected

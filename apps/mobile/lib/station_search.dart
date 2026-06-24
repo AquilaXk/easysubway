@@ -1641,6 +1641,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   Future<List<SubwayLineOption>>? _lineOptionsFuture;
   List<String> _recentQueries = const [];
   SubwayLineOption? _selectedLine;
+  String? _selectedLineRegion;
+  bool _isLineFilterExpanded = true;
   bool _isNearbySearchRunning = false;
   bool _isOpeningLocationSettings = false;
 
@@ -1723,10 +1725,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         }),
         actions: [
           if (!isRecentEntry && !isNearbyEntry)
-            IconButton(
-              tooltip: '가까운 역',
+            TextButton.icon(
+              key: const Key('nearbyStationAppBarButton'),
               onPressed: _isNearbySearchRunning ? null : _searchNearby,
               icon: const Icon(Icons.my_location),
+              label: const Text('가까운 역'),
             ),
         ],
       ),
@@ -1777,22 +1780,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 onSubmitted: _submit,
               ),
               const SizedBox(height: 12),
-            ],
-            if (showSearchInput && _lineOptionsFuture != null) ...[
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  final isSearching =
-                      _controller.state.status == StationSearchStatus.loading;
-                  return _StationLineFilterSection(
-                    linesFuture: _lineOptionsFuture!,
-                    selectedLine: _selectedLine,
-                    enabled: !isSearching && !_isNearbySearchRunning,
-                    onLineSelected: _selectLine,
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
             ],
             AnimatedBuilder(
               animation: _controller,
@@ -1867,6 +1854,37 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 );
               },
             ),
+            if (showSearchInput && _lineOptionsFuture != null) ...[
+              const SizedBox(height: 16),
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final isSearching =
+                      _controller.state.status == StationSearchStatus.loading;
+                  final hasSearchResults =
+                      _controller.state.status == StationSearchStatus.success &&
+                      _controller.state.source ==
+                          StationSearchResultSource.search;
+                  return _StationLineFilterPanel(
+                    expanded: !hasSearchResults || _isLineFilterExpanded,
+                    collapsible: hasSearchResults,
+                    onToggleExpanded: () {
+                      setState(() {
+                        _isLineFilterExpanded = !_isLineFilterExpanded;
+                      });
+                    },
+                    child: _StationLineFilterSection(
+                      linesFuture: _lineOptionsFuture!,
+                      selectedLine: _selectedLine,
+                      selectedRegion: _selectedLineRegion,
+                      enabled: !isSearching && !_isNearbySearchRunning,
+                      onRegionSelected: _selectLineRegion,
+                      onLineSelected: _selectLine,
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -1883,6 +1901,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   Future<void> _runSearch(String query) async {
     await _controller.search(query, lineId: _selectedLine?.id);
     await _loadRecentQueries();
+    if (mounted &&
+        _controller.state.status == StationSearchStatus.success &&
+        _controller.state.source == StationSearchResultSource.search) {
+      setState(() => _isLineFilterExpanded = false);
+    }
   }
 
   void _searchRecentQuery(String query) {
@@ -1918,7 +1941,21 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _selectLine(SubwayLineOption? line) {
-    setState(() => _selectedLine = line);
+    setState(() {
+      _selectedLine = line;
+      if (line != null) {
+        _selectedLineRegion = line.region;
+      }
+    });
+  }
+
+  void _selectLineRegion(String region) {
+    setState(() {
+      _selectedLineRegion = region;
+      if (_selectedLine?.region != region) {
+        _selectedLine = null;
+      }
+    });
   }
 
   void _setRouteOrigin(StationSearchResult result) {
@@ -2102,17 +2139,55 @@ class _StationRecentSearchSection extends StatelessWidget {
   }
 }
 
+class _StationLineFilterPanel extends StatelessWidget {
+  const _StationLineFilterPanel({
+    required this.expanded,
+    required this.collapsible,
+    required this.onToggleExpanded,
+    required this.child,
+  });
+
+  final bool expanded;
+  final bool collapsible;
+  final VoidCallback onToggleExpanded;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('stationLineFilterPanel'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (collapsible) ...[
+          OutlinedButton.icon(
+            key: const Key('stationLineFilterToggle'),
+            onPressed: onToggleExpanded,
+            icon: Icon(expanded ? Icons.expand_less : Icons.tune),
+            label: Text(expanded ? '노선 필터 접기' : '노선 필터 펼치기'),
+          ),
+          if (expanded) const SizedBox(height: 12),
+        ],
+        if (expanded) child,
+      ],
+    );
+  }
+}
+
 class _StationLineFilterSection extends StatelessWidget {
   const _StationLineFilterSection({
     required this.linesFuture,
     required this.selectedLine,
+    required this.selectedRegion,
     required this.enabled,
+    required this.onRegionSelected,
     required this.onLineSelected,
   });
 
   final Future<List<SubwayLineOption>> linesFuture;
   final SubwayLineOption? selectedLine;
+  final String? selectedRegion;
   final bool enabled;
+  final ValueChanged<String> onRegionSelected;
   final ValueChanged<SubwayLineOption?> onLineSelected;
 
   @override
@@ -2148,33 +2223,187 @@ class _StationLineFilterSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        final seenRegions = <String>{};
+        final regions = <String>[
+          for (final line in lines)
+            if (seenRegions.add(line.region)) line.region,
+        ]..sort(_compareStationLineRegions);
+        final currentRegion =
+            selectedRegion ?? selectedLine?.region ?? regions.first;
+        final visibleLines = lines
+            .where((line) => line.region == currentRegion)
+            .toList(growable: false);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StationLineFilterButton(
-              key: const Key('stationLineFilter-all'),
-              label: '전체 노선',
-              semanticLabel: '전체 노선',
-              selected: selectedLine == null,
-              onPressed: enabled ? () => onLineSelected(null) : null,
-            ),
-            for (final line in lines)
-              _StationLineFilterButton(
-                key: Key('stationLineFilter-${line.id}'),
-                label: line.name,
-                semanticLabel: line.semanticLabel,
-                selected: selectedLine?.id == line.id,
-                badgeText: line.shortLabel,
-                badgeColor: line.badgeColor,
-                badgeAssetPath: line.badgeAssetPath,
-                onPressed: enabled ? () => onLineSelected(line) : null,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final region in regions) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _StationLineRegionButton(
+                        key: Key('stationLineRegion-$region'),
+                        label: region,
+                        selected: region == currentRegion,
+                        onPressed: enabled
+                            ? () => onRegionSelected(region)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ],
               ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _StationLineFilterButton(
+                  key: const Key('stationLineFilter-all'),
+                  label: '전체 노선',
+                  semanticLabel: '전체 노선',
+                  selected: selectedLine == null,
+                  onPressed: enabled ? () => onLineSelected(null) : null,
+                ),
+                for (final line in visibleLines)
+                  _StationLineFilterButton(
+                    key: Key('stationLineFilter-${line.id}'),
+                    label: line.name,
+                    semanticLabel: line.semanticLabel,
+                    selected: selectedLine?.id == line.id,
+                    badgeText: line.shortLabel,
+                    badgeColor: line.badgeColor,
+                    badgeAssetPath: line.badgeAssetPath,
+                    onPressed: enabled ? () => onLineSelected(line) : null,
+                  ),
+                OutlinedButton.icon(
+                  key: const Key('stationLineFilterMoreButton'),
+                  onPressed: enabled
+                      ? () => _showAllLineSheet(context, lines)
+                      : null,
+                  icon: const Icon(Icons.list_alt),
+                  label: const Text('전체 노선 보기'),
+                ),
+              ],
+            ),
           ],
         );
       },
     );
   }
+
+  Future<void> _showAllLineSheet(
+    BuildContext context,
+    List<SubwayLineOption> lines,
+  ) async {
+    final selected = await showModalBottomSheet<Object?>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            key: const Key('stationLineAllSheet'),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            children: [
+              Text(
+                '전체 노선 보기',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: const Color(0xFF102A2C),
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _StationLineFilterButton(
+                key: const Key('stationLineFilter-all'),
+                label: '전체 노선',
+                semanticLabel: '전체 노선',
+                selected: selectedLine == null,
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(height: 8),
+              for (final line in lines) ...[
+                _StationLineFilterButton(
+                  key: Key('stationLineFilter-${line.id}'),
+                  label: line.name,
+                  semanticLabel: line.semanticLabel,
+                  selected: selectedLine?.id == line.id,
+                  badgeText: line.shortLabel,
+                  badgeColor: line.badgeColor,
+                  badgeAssetPath: line.badgeAssetPath,
+                  onPressed: () => Navigator.of(context).pop(line),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+    if (selected is SubwayLineOption) {
+      onLineSelected(selected);
+    } else if (selected == false) {
+      onLineSelected(null);
+    }
+  }
+}
+
+class _StationLineRegionButton extends StatelessWidget {
+  const _StationLineRegionButton({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$label 지역 ${selected ? '선택됨' : '선택 안 됨'}',
+      button: true,
+      selected: selected,
+      enabled: onPressed != null,
+      onTap: onPressed,
+      child: ExcludeSemantics(
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: onPressed == null ? null : (_) => onPressed?.call(),
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF102A2C),
+            fontWeight: FontWeight.w800,
+          ),
+          selectedColor: const Color(0xFF007A80),
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xFF93C7C2)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+}
+
+int _compareStationLineRegions(String left, String right) {
+  final leftRank = _stationLineRegionRank(left);
+  final rightRank = _stationLineRegionRank(right);
+  if (leftRank != rightRank) {
+    return leftRank.compareTo(rightRank);
+  }
+  return left.compareTo(right);
+}
+
+int _stationLineRegionRank(String region) {
+  const preferredRegions = ['수도권', '부산', '대구', '광주', '대전'];
+  final index = preferredRegions.indexOf(region);
+  return index == -1 ? preferredRegions.length : index;
 }
 
 class _StationLineFilterButton extends StatelessWidget {
