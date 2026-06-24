@@ -2878,7 +2878,9 @@ void main() {
       expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
       expect(find.byKey(const Key('nearbyStationPrimaryCard')), findsOneWidget);
       expect(
-        find.bySemanticsLabel('가장 가까운 역, 상록수역, 현재 위치 기준 230m'),
+        find.bySemanticsLabel(
+          '가장 가까운 역, 상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 기본 정보만 있음, 출처 공식 파일',
+        ),
         findsOneWidget,
       );
       expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsOneWidget);

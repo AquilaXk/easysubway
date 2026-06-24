@@ -2369,7 +2369,7 @@ class _NearbyStationOverview extends StatelessWidget {
           Semantics(
             container: true,
             button: true,
-            label: '가장 가까운 역, $stationName, ${result.distanceLabel}',
+            label: '가장 가까운 역, ${_stationResultSemanticLabel(result)}',
             onTap: onTap,
             child: ExcludeSemantics(
               child: InkWell(
