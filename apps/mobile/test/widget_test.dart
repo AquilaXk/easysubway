@@ -733,6 +733,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('4호선'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-4')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
+    expect(find.text('2호선'), findsOneWidget);
+    expect(find.text('4호선'), findsWidgets);
   });
 
   testWidgets('노선도 목록 대체 화면에서 역을 선택할 수 있다', (tester) async {
@@ -7472,6 +7480,20 @@ class FakeStationSearchRepository
           id: 'fixture-route-map-source-capital-review',
           name: '수도권 노선도 fixture 좌표 검수',
           licenseStatus: 'fixture-only',
+        ),
+      ],
+      stationLineMemberships: const [
+        NetworkMapStationLineMembership(
+          stationId: 'station-sadang',
+          lineId: 'seoul-2',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-sadang',
+          lineId: 'seoul-4',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-sangnoksu',
+          lineId: 'seoul-4',
         ),
       ],
     );

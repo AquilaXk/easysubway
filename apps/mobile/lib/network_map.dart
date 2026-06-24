@@ -20,6 +20,7 @@ class NetworkMapData {
     required this.stations,
     required this.edges,
     required this.positionSources,
+    this.stationLineMemberships = const [],
   });
 
   final List<NetworkMapRegion> regions;
@@ -28,6 +29,7 @@ class NetworkMapData {
   final List<NetworkMapStation> stations;
   final List<NetworkMapEdge> edges;
   final List<NetworkMapPositionSource> positionSources;
+  final List<NetworkMapStationLineMembership> stationLineMemberships;
 
   factory NetworkMapData.fromJson(Map<String, Object?> json) {
     return NetworkMapData(
@@ -47,6 +49,26 @@ class NetworkMapData {
       positionSources: _objectList(
         json['positionSources'],
       ).map(NetworkMapPositionSource.fromJson).toList(growable: false),
+      stationLineMemberships: _objectList(
+        json['stationLineMemberships'],
+      ).map(NetworkMapStationLineMembership.fromJson).toList(growable: false),
+    );
+  }
+}
+
+class NetworkMapStationLineMembership {
+  const NetworkMapStationLineMembership({
+    required this.stationId,
+    required this.lineId,
+  });
+
+  final String stationId;
+  final String lineId;
+
+  factory NetworkMapStationLineMembership.fromJson(Map<String, Object?> json) {
+    return NetworkMapStationLineMembership(
+      stationId: json['stationId'] as String? ?? '',
+      lineId: json['lineId'] as String? ?? '',
     );
   }
 }
@@ -722,16 +744,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
   Widget build(BuildContext context) {
     final linesById = {for (final line in widget.data.lines) line.id: line};
     final stationsById = <String, NetworkMapStation>{};
-    final stationLinesById = <String, List<NetworkMapLine>>{};
     for (final station in widget.data.stations) {
       stationsById[_mapStationKey(station)] = station;
       stationsById.putIfAbsent(station.id, () => station);
-      final line = linesById[station.lineId];
-      if (line == null) {
-        continue;
-      }
-      stationLinesById.putIfAbsent(station.id, () => []).add(line);
     }
+    final stationLinesById = _stationLinesById(widget.data);
     final mapAsset = _routeMapAssetForRegion(widget.data.selectedRegion);
     return Container(
       key: const Key('networkMapSurface'),
@@ -879,11 +896,16 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       if (from == null || to == null) {
         continue;
       }
-      canvas.drawLine(
-        Offset(geometry.x(from), geometry.y(from)),
-        Offset(geometry.x(to), geometry.y(to)),
-        pathPaint,
-      );
+      final segmentPath = _segmentPath(from, to);
+      if (segmentPath == null) {
+        canvas.drawLine(
+          Offset(geometry.x(from), geometry.y(from)),
+          Offset(geometry.x(to), geometry.y(to)),
+          pathPaint,
+        );
+      } else {
+        _drawScaledPath(canvas, segmentPath, pathPaint, geometry);
+      }
     }
     final stationBorderPaint = Paint()..color = lineColor;
     final stationFillPaint = Paint()..color = Colors.white;
@@ -905,6 +927,55 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.edges != edges ||
         oldDelegate.geometry != geometry;
   }
+}
+
+Path? _segmentPath(NetworkMapStation from, NetworkMapStation to) {
+  for (final pathData in [
+    from.position.downPath,
+    to.position.upPath,
+    from.position.upPath,
+    to.position.downPath,
+  ]) {
+    if (pathData.trim().isEmpty) {
+      continue;
+    }
+    final path = _pathFromSvg(pathData);
+    final bounds = path.getBounds().inflate(2);
+    final fromPoint = Offset(
+      from.position.x.toDouble(),
+      from.position.y.toDouble(),
+    );
+    final toPoint = Offset(to.position.x.toDouble(), to.position.y.toDouble());
+    if (bounds.contains(fromPoint) && bounds.contains(toPoint)) {
+      return path;
+    }
+  }
+  return null;
+}
+
+void _drawScaledPath(
+  Canvas canvas,
+  Path path,
+  Paint paint,
+  _MapGeometry geometry,
+) {
+  canvas
+    ..save()
+    ..scale(geometry.scaleX, geometry.scaleY)
+    ..translate(-geometry.origin.dx, -geometry.origin.dy);
+  final strokeScale = math.max(geometry.scaleX, geometry.scaleY);
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = paint.color
+      ..strokeCap = paint.strokeCap
+      ..strokeJoin = paint.strokeJoin
+      ..strokeWidth = strokeScale <= 0
+          ? paint.strokeWidth
+          : paint.strokeWidth / strokeScale
+      ..style = paint.style,
+  );
+  canvas.restore();
 }
 
 class _MapControls extends StatelessWidget {
@@ -1333,16 +1404,11 @@ class _NetworkMapListSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final linesById = {for (final line in data.lines) line.id: line};
     final stationsByLine = <String, List<NetworkMapStation>>{};
-    final stationLinesById = <String, List<NetworkMapLine>>{};
     for (final station in data.stations) {
       stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
-      final line = linesById[station.lineId];
-      if (line != null) {
-        stationLinesById.putIfAbsent(station.id, () => []).add(line);
-      }
     }
+    final stationLinesById = _stationLinesById(data);
     return SafeArea(
       key: const Key('networkMapListSheet'),
       child: ListView(
@@ -1393,6 +1459,33 @@ class _NetworkMapListSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+Map<String, List<NetworkMapLine>> _stationLinesById(NetworkMapData data) {
+  final linesById = {for (final line in data.lines) line.id: line};
+  final stationLinesById = <String, List<NetworkMapLine>>{};
+
+  void addLine(String stationId, String lineId) {
+    final line = linesById[lineId];
+    if (line == null) {
+      return;
+    }
+    final stationLines = stationLinesById.putIfAbsent(stationId, () => []);
+    if (!stationLines.any((existing) => existing.id == line.id)) {
+      stationLines.add(line);
+    }
+  }
+
+  if (data.stationLineMemberships.isNotEmpty) {
+    for (final membership in data.stationLineMemberships) {
+      addLine(membership.stationId, membership.lineId);
+    }
+  } else {
+    for (final station in data.stations) {
+      addLine(station.id, station.lineId);
+    }
+  }
+  return stationLinesById;
 }
 
 Path _pathFromSvg(String data) {
