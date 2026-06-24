@@ -34,7 +34,40 @@ private class OriginalRouteMapAssetPlatformView(
         if (mimeType == "image/svg+xml") {
             val webView = WebView(context)
             webView.setBackgroundColor(Color.WHITE)
-            webView.loadUrl("file:///android_asset/$lookupKey")
+            webView.isHorizontalScrollBarEnabled = false
+            webView.isVerticalScrollBarEnabled = false
+            val html = """
+                <!doctype html>
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                    <style>
+                        html, body {
+                            margin: 0;
+                            width: 100%;
+                            height: 100%;
+                            overflow: hidden;
+                            background: #ffffff;
+                        }
+                        img {
+                            display: block;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <img src="file:///android_asset/$lookupKey" alt="">
+                </body>
+                </html>
+            """.trimIndent()
+            webView.loadDataWithBaseURL(
+                "file:///android_asset/",
+                html,
+                "text/html",
+                "UTF-8",
+                null,
+            )
             container.addView(
                 webView,
                 FrameLayout.LayoutParams(

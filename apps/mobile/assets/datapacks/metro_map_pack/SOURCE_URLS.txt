@@ -1,6 +1,9 @@
 seoul_page=https://www.seoulmetro.co.kr/kr/cyberStation.do
 seoul_pdf=https://www.seoulmetro.co.kr/download/map_korea.pdf
-seoul_svg=qa-provided-route-map-svg
+seoul_wikimedia_page=https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg
+seoul_wikimedia_svg=https://upload.wikimedia.org/wikipedia/commons/8/85/Seoul_subway_linemap_ko.svg
+seoul_wikimedia_license=Public domain
+seoul_wikimedia_author=IRTC1015
 busan_page=https://www2.humetro.busan.kr/homepage/cyberstation/map.do
 busan_integrated_zip=https://www2.humetro.busan.kr/upload/default/integrate.zip
 busan_svg=qa-provided-route-map-svg

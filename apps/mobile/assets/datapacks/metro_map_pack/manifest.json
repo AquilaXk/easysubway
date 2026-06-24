@@ -14,14 +14,24 @@
       "id": "seoul",
       "name_ko": "수도권",
       "app_region": "수도권",
-      "operator": "서울교통공사",
-      "source_url": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+      "operator": "Wikimedia Commons",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
       "offline": {
         "included": true,
         "type": "svg",
         "path": "assets/datapacks/maps/seoul-official-route-map.svg",
-        "official_asset_url": "https://www.seoulmetro.co.kr/download/map_korea.pdf",
+        "official_asset_url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Seoul_subway_linemap_ko.svg",
         "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "Public domain",
+        "spdx": "Public-Domain",
+        "url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
+        "source": "Seoul subway linemap ko.svg",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
+        "date": "2007-12-26",
+        "authors": ["IRTC1015"],
+        "changes": "File stored unchanged as a bundled offline route-map asset. Station coordinate data was regenerated from embedded SVG text positions for app hit testing."
       }
     },
     {

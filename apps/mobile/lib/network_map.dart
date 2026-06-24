@@ -566,42 +566,42 @@ _RouteMapAsset? _routeMapAssetForRegion(String region) {
     '수도권' => const _RouteMapAsset(
       path: 'assets/datapacks/maps/seoul-official-route-map.svg',
       mimeType: 'image/svg+xml',
-      width: 3402,
-      height: 3402,
-      coordinateWidth: 1525,
-      coordinateHeight: 1000,
+      width: 5724,
+      height: 6516,
+      coordinateWidth: 5724,
+      coordinateHeight: 6516,
     ),
     '부산' => const _RouteMapAsset(
       path: 'assets/datapacks/maps/busan-official-route-map.svg',
       mimeType: 'image/svg+xml',
       width: 3704,
       height: 1134,
-      coordinateWidth: 1680,
-      coordinateHeight: 980,
+      coordinateWidth: 3703.9,
+      coordinateHeight: 1133.9,
     ),
     '광주' => const _RouteMapAsset(
       path: 'assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg',
       mimeType: 'image/svg+xml',
       width: 720,
       height: 600,
-      coordinateWidth: 2172,
-      coordinateHeight: 554,
+      coordinateWidth: 190.50001,
+      coordinateHeight: 158.75,
     ),
     '대구' => const _RouteMapAsset(
       path: 'assets/datapacks/maps/daegu-official-route-map.svg',
       mimeType: 'image/svg+xml',
       width: 5348,
       height: 862,
-      coordinateWidth: 1264,
-      coordinateHeight: 1205,
+      coordinateWidth: 5348,
+      coordinateHeight: 861.73,
     ),
     '대전' => const _RouteMapAsset(
       path: 'assets/datapacks/maps/daejeon-official-route-map.svg',
       mimeType: 'image/svg+xml',
       width: 853,
       height: 813,
-      coordinateWidth: 975,
-      coordinateHeight: 447,
+      coordinateWidth: 853.33,
+      coordinateHeight: 813.33,
     ),
     _ => null,
   };
@@ -643,15 +643,17 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
       stationLinesById.putIfAbsent(station.id, () => []).add(line);
     }
     final mapAsset = _routeMapAssetForRegion(widget.data.selectedRegion);
-    final geometry = mapAsset == null
-        ? _MapGeometry.fromStations(widget.data.stations)
-        : _MapGeometry.fromOriginalAsset(mapAsset);
-
     return Container(
       key: const Key('networkMapSurface'),
       decoration: const BoxDecoration(color: Colors.white),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final geometry = mapAsset == null
+              ? _MapGeometry.fromStations(widget.data.stations)
+              : _MapGeometry.fromOriginalAsset(
+                  mapAsset,
+                  View.of(context).devicePixelRatio,
+                );
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
@@ -815,14 +817,28 @@ class _MapGeometry {
   final double scaleX;
   final double scaleY;
 
-  factory _MapGeometry.fromOriginalAsset(_RouteMapAsset asset) {
+  static const _maxAndroidViewSurfaceExtent = 12000.0;
+
+  factory _MapGeometry.fromOriginalAsset(
+    _RouteMapAsset asset,
+    double devicePixelRatio,
+  ) {
+    final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
+    final maxLogicalExtent =
+        _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
+    final displayScale = math.min(
+      1.0,
+      maxLogicalExtent / math.max(asset.width, asset.height),
+    );
+    final displayWidth = asset.width * displayScale;
+    final displayHeight = asset.height * displayScale;
     return _MapGeometry(
       origin: Offset.zero,
-      focus: Offset(asset.width / 2, asset.height / 2),
-      width: asset.width,
-      height: asset.height,
-      scaleX: asset.width / asset.coordinateWidth,
-      scaleY: asset.height / asset.coordinateHeight,
+      focus: Offset(displayWidth / 2, displayHeight / 2),
+      width: displayWidth,
+      height: displayHeight,
+      scaleX: displayWidth / asset.coordinateWidth,
+      scaleY: displayHeight / asset.coordinateHeight,
     );
   }
 
@@ -917,7 +933,8 @@ double _median(List<double> values) {
 }
 
 bool _usesOfficialRouteMapSource(NetworkMapStation station) {
-  return station.position.sourceId.endsWith('-cyberstation');
+  return station.position.sourceId.endsWith('-cyberstation') ||
+      station.position.sourceId == 'qa-wikimedia-seoul-svg-coordinate';
 }
 
 Offset _labelOffsetFor(NetworkMapStation station) {
