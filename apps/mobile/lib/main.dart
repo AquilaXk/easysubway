@@ -1301,6 +1301,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           _HomeNotificationButton(
             key: const Key('homeNotificationActionButton'),
+            hasUnread: false,
             onPressed: notificationRepository == null
                 ? openSettings
                 : openNotificationInbox,
@@ -1444,20 +1445,26 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeNotificationButton extends StatelessWidget {
-  const _HomeNotificationButton({required this.onPressed, super.key});
+  const _HomeNotificationButton({
+    required this.hasUnread,
+    required this.onPressed,
+    super.key,
+  });
 
+  final bool hasUnread;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '알림, 확인하지 않은 알림 있음',
+      label: hasUnread ? '알림, 확인하지 않은 알림 있음' : '알림, 새 알림 없음',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Tooltip(
           message: '알림',
           child: Badge(
+            isLabelVisible: hasUnread,
             smallSize: 10,
             backgroundColor: EasySubwayAccessibleColors.red,
             offset: const Offset(-10, 10),

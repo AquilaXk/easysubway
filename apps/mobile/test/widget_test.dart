@@ -609,9 +609,17 @@ void main() {
     final notificationButtonSide = notificationButton.style?.side?.resolve(
       <WidgetState>{},
     );
+    final notificationBadge = tester.widget<Badge>(
+      find.descendant(
+        of: find.byKey(const Key('homeNotificationActionButton')),
+        matching: find.byType(Badge),
+      ),
+    );
     expect(notificationButtonSide?.color, EasySubwayAccessibleColors.line);
     expect(notificationButtonSide?.width, 1.5);
-    expect(find.bySemanticsLabel('알림, 확인하지 않은 알림 있음'), findsOneWidget);
+    expect(notificationBadge.isLabelVisible, isFalse);
+    expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림, 확인하지 않은 알림 있음'), findsNothing);
 
     await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
     await tester.pumpAndSettle();
