@@ -363,6 +363,27 @@ void main() {
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
   });
 
+  testWidgets('홈 스크롤은 하단 내비게이션 높이만큼 여백을 둔다', (tester) async {
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final homeList = tester.widget<ListView>(
+      find.byKey(const Key('homePrototypeList')),
+    );
+    expect(homeList.padding?.resolve(TextDirection.ltr).bottom, 96);
+  });
+
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       queryResults: {

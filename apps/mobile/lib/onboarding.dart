@@ -749,6 +749,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
+    final listBottomPadding = _currentStep == 2 ? 32.0 : 104.0;
     final profileOptions = [
       mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
       mobilityProfileOptions.firstWhere(
@@ -803,7 +804,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, listBottomPadding),
           children: _currentStep == 0
               ? [
                   const _OnboardingStepIndicator(currentStep: 1, totalSteps: 3),
