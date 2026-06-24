@@ -201,7 +201,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(reportRepository.listMyReportsCount, 1);
+    expect(reportRepository.listMyReportsCount, greaterThanOrEqualTo(1));
   });
 
   testWidgets('내 신고 항목을 누르면 상세 상태 화면으로 이동한다', (tester) async {
@@ -626,6 +626,33 @@ void main() {
 
     expect(find.text('알림'), findsOneWidget);
     expect(find.text('새 알림이 없습니다'), findsOneWidget);
+  });
+
+  testWidgets('홈 알림 버튼은 확인할 알림이 있으면 배지와 상태를 알려준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(
+          favorites: [_favoriteFacility(status: 'USER_REPORTED')],
+        ),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final notificationBadge = tester.widget<Badge>(
+      find.descendant(
+        of: find.byKey(const Key('homeNotificationActionButton')),
+        matching: find.byType(Badge),
+      ),
+    );
+    expect(notificationBadge.isLabelVisible, isTrue);
+    expect(find.bySemanticsLabel('알림, 확인하지 않은 알림 있음'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsNothing);
   });
 
   testWidgets('알림함 시설 상태는 심각도와 다음 행동을 함께 보여준다', (tester) async {

@@ -1039,6 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
+  late Future<bool> _hasNotificationItemsFuture;
 
   @override
   void initState() {
@@ -1048,6 +1049,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _recentRoutesFuture = _loadRecentRoutes();
     _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
         ?.listFavoriteFacilities();
+    _hasNotificationItemsFuture = _loadHasNotificationItems();
   }
 
   @override
@@ -1071,6 +1073,12 @@ class _HomeScreenState extends State<HomeScreen> {
         oldWidget.favoriteFacilityRepository) {
       _favoriteFacilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
+    }
+    if (widget.favoriteFacilityRepository !=
+            oldWidget.favoriteFacilityRepository ||
+        widget.reportRepository != oldWidget.reportRepository ||
+        widget.notificationRepository != oldWidget.notificationRepository) {
+      _hasNotificationItemsFuture = _loadHasNotificationItems();
     }
   }
 
@@ -1213,14 +1221,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
       final routesFuture = _loadRecentRoutes();
+      final hasNotificationItemsFuture = _loadHasNotificationItems();
       setState(() {
         _favoriteFacilitiesFuture = facilitiesFuture;
         _recentRoutesFuture = routesFuture;
+        _hasNotificationItemsFuture = hasNotificationItemsFuture;
       });
       try {
         await Future.wait<void>([
           if (facilitiesFuture != null) facilitiesFuture.then((_) {}),
           if (routesFuture != null) routesFuture.then((_) {}),
+          hasNotificationItemsFuture.then((_) {}),
         ]);
       } catch (error, stackTrace) {
         (error, stackTrace);
@@ -1299,12 +1310,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
         actions: [
-          _HomeNotificationButton(
-            key: const Key('homeNotificationActionButton'),
-            hasUnread: false,
-            onPressed: notificationRepository == null
-                ? openSettings
-                : openNotificationInbox,
+          FutureBuilder<bool>(
+            future: _hasNotificationItemsFuture,
+            builder: (context, snapshot) {
+              return _HomeNotificationButton(
+                key: const Key('homeNotificationActionButton'),
+                hasUnread: snapshot.data ?? false,
+                onPressed: notificationRepository == null
+                    ? openSettings
+                    : openNotificationInbox,
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],
@@ -1415,6 +1431,41 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<FavoriteRoute>>? _loadRecentRoutes() {
     return widget.recentRoutesFuture ??
         widget.favoriteRouteRepository?.listFavoriteRoutes();
+  }
+
+  Future<bool> _loadHasNotificationItems() async {
+    if (widget.notificationRepository == null) {
+      return false;
+    }
+
+    final favoriteFacilityRepository = widget.favoriteFacilityRepository;
+    if (favoriteFacilityRepository != null) {
+      try {
+        final facilities = await favoriteFacilityRepository
+            .listFavoriteFacilities();
+        if (facilities.any(_isFacilityAlert)) {
+          return true;
+        }
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '홈 알림 시설 상태를 불러오는 중 예외가 발생했습니다.',
+        );
+      }
+    }
+
+    try {
+      final reports = await widget.reportRepository.listMyReports();
+      return reports.isNotEmpty;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '홈 알림 제보 상태를 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+    return false;
   }
 
   Future<MobilityProfileOption?> _openMobilityProfile() async {
