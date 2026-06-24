@@ -1363,16 +1363,33 @@ class FavoriteStationListState {
     required this.status,
     this.favorites = const [],
     this.message = '',
+    this.removingIds = const {},
   });
 
   const FavoriteStationListState.loading()
     : status = FavoriteStationListStatus.loading,
       favorites = const [],
-      message = '';
+      message = '',
+      removingIds = const {};
 
   final FavoriteStationListStatus status;
   final List<FavoriteStation> favorites;
   final String message;
+  final Set<String> removingIds;
+
+  FavoriteStationListState copyWith({
+    FavoriteStationListStatus? status,
+    List<FavoriteStation>? favorites,
+    String? message,
+    Set<String>? removingIds,
+  }) {
+    return FavoriteStationListState(
+      status: status ?? this.status,
+      favorites: favorites ?? this.favorites,
+      message: message ?? this.message,
+      removingIds: removingIds ?? this.removingIds,
+    );
+  }
 }
 
 class FavoriteStationListController extends ChangeNotifier {
@@ -1425,6 +1442,61 @@ class FavoriteStationListController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  Future<void> remove(FavoriteStation favorite) async {
+    final stationId = favorite.stationId;
+    if (_state.removingIds.contains(stationId)) {
+      return;
+    }
+
+    _emitState(
+      _state.copyWith(removingIds: {..._state.removingIds, stationId}),
+    );
+
+    try {
+      await repository.removeFavoriteStation(stationId);
+      final nextFavorites = _state.favorites
+          .where((item) => item.stationId != stationId)
+          .toList(growable: false);
+      final nextRemovingIds = {..._state.removingIds}..remove(stationId);
+      _emitState(
+        nextFavorites.isEmpty
+            ? FavoriteStationListState(
+                status: FavoriteStationListStatus.empty,
+                message: '즐겨찾기한 역이 없습니다.',
+                removingIds: nextRemovingIds,
+              )
+            : FavoriteStationListState(
+                status: FavoriteStationListStatus.success,
+                favorites: nextFavorites,
+                removingIds: nextRemovingIds,
+              ),
+      );
+    } on FavoriteStationException catch (error) {
+      _emitFailure(error.message, removingIdToClear: stationId);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '즐겨찾기 역 해제 중 예외가 발생했습니다.');
+      _emitFailure(
+        _favoriteStationChangeErrorMessage,
+        removingIdToClear: stationId,
+      );
+    }
+  }
+
+  void _emitFailure(String message, {String? removingIdToClear}) {
+    final nextRemovingIds = {..._state.removingIds};
+    if (removingIdToClear != null) {
+      nextRemovingIds.remove(removingIdToClear);
+    }
+    _emitState(
+      FavoriteStationListState(
+        status: FavoriteStationListStatus.failure,
+        favorites: _state.favorites,
+        message: message,
+        removingIds: nextRemovingIds,
+      ),
+    );
   }
 
   void _emitState(FavoriteStationListState nextState) {
@@ -3057,6 +3129,7 @@ class FavoriteStationListScreen extends StatefulWidget {
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
+    this.routeDraftController,
     super.key,
   });
 
@@ -3067,6 +3140,7 @@ class FavoriteStationListScreen extends StatefulWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
+  final RouteDraftController? routeDraftController;
 
   @override
   State<FavoriteStationListScreen> createState() =>
@@ -3086,6 +3160,7 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         internalRouteRepository: widget.internalRouteRepository,
         internalRouteMobilityType: widget.internalRouteMobilityType,
+        routeDraftController: widget.routeDraftController,
       ),
     );
   }
@@ -3100,6 +3175,7 @@ class FavoriteStationListContent extends StatefulWidget {
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
+    this.routeDraftController,
     super.key,
   });
 
@@ -3110,6 +3186,7 @@ class FavoriteStationListContent extends StatefulWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
+  final RouteDraftController? routeDraftController;
 
   @override
   State<FavoriteStationListContent> createState() =>
@@ -3143,6 +3220,14 @@ class _FavoriteStationListContentState
             state: _controller.state,
             onRetry: _controller.load,
             onFavoriteTap: _openStationDetail,
+            onFacilityStatusTap: _openStationDetail,
+            onSetOrigin: widget.routeDraftController == null
+                ? null
+                : _setRouteOrigin,
+            onSetDestination: widget.routeDraftController == null
+                ? null
+                : _setRouteDestination,
+            onRemove: _controller.remove,
           );
         },
       ),
@@ -3161,6 +3246,7 @@ class _FavoriteStationListContentState
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
           internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
           // 목록에서 들어온 역은 이미 저장된 상태로 보여 해제 동작을 바로 할 수 있게 한다.
           initiallyFavorite: true,
         ),
@@ -3171,6 +3257,38 @@ class _FavoriteStationListContentState
     }
     unawaited(_controller.load());
   }
+
+  void _setRouteOrigin(FavoriteStation favorite) {
+    final routeDraftController = widget.routeDraftController;
+    if (routeDraftController == null) {
+      return;
+    }
+    final station = RouteDraftStation(
+      id: favorite.stationId,
+      nameKo: favorite.nameKo,
+    );
+    routeDraftController.setOrigin(station);
+    _showRouteDraftSnack('${station.displayName}을 출발역으로 설정했습니다');
+  }
+
+  void _setRouteDestination(FavoriteStation favorite) {
+    final routeDraftController = widget.routeDraftController;
+    if (routeDraftController == null) {
+      return;
+    }
+    final station = RouteDraftStation(
+      id: favorite.stationId,
+      nameKo: favorite.nameKo,
+    );
+    routeDraftController.setDestination(station);
+    _showRouteDraftSnack('${station.displayName}을 도착역으로 설정했습니다');
+  }
+
+  void _showRouteDraftSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
 
 class _FavoriteStationListBody extends StatelessWidget {
@@ -3178,11 +3296,19 @@ class _FavoriteStationListBody extends StatelessWidget {
     required this.state,
     required this.onRetry,
     required this.onFavoriteTap,
+    required this.onFacilityStatusTap,
+    required this.onSetOrigin,
+    required this.onSetDestination,
+    required this.onRemove,
   });
 
   final FavoriteStationListState state;
   final VoidCallback onRetry;
   final ValueChanged<FavoriteStation> onFavoriteTap;
+  final ValueChanged<FavoriteStation> onFacilityStatusTap;
+  final ValueChanged<FavoriteStation>? onSetOrigin;
+  final ValueChanged<FavoriteStation>? onSetDestination;
+  final ValueChanged<FavoriteStation> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -3223,7 +3349,16 @@ class _FavoriteStationListBody extends StatelessWidget {
           for (final favorite in state.favorites)
             _FavoriteStationTile(
               favorite: favorite,
-              onTap: () => onFavoriteTap(favorite),
+              isRemoving: state.removingIds.contains(favorite.stationId),
+              onOpenDetail: () => onFavoriteTap(favorite),
+              onOpenFacilityStatus: () => onFacilityStatusTap(favorite),
+              onSetOrigin: onSetOrigin == null
+                  ? null
+                  : () => onSetOrigin!(favorite),
+              onSetDestination: onSetDestination == null
+                  ? null
+                  : () => onSetDestination!(favorite),
+              onRemove: () => onRemove(favorite),
             ),
         ],
       ),
@@ -3232,86 +3367,145 @@ class _FavoriteStationListBody extends StatelessWidget {
 }
 
 class _FavoriteStationTile extends StatelessWidget {
-  const _FavoriteStationTile({required this.favorite, required this.onTap});
+  const _FavoriteStationTile({
+    required this.favorite,
+    required this.isRemoving,
+    required this.onOpenDetail,
+    required this.onOpenFacilityStatus,
+    required this.onSetOrigin,
+    required this.onSetDestination,
+    required this.onRemove,
+  });
 
   final FavoriteStation favorite;
-  final VoidCallback onTap;
+  final bool isRemoving;
+  final VoidCallback onOpenDetail;
+  final VoidCallback onOpenFacilityStatus;
+  final VoidCallback? onSetOrigin;
+  final VoidCallback? onSetDestination;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: favorite.semanticLabel,
-        button: true,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
-            ),
-            child: InkWell(
-              key: Key('favoriteStationTile-${favorite.stationId}'),
-              borderRadius: BorderRadius.circular(8),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      favorite.nameKo,
-                      style: textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF102A2C),
-                        fontWeight: FontWeight.w900,
-                        height: 1.25,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFD5E2E4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MergeSemantics(
+              child: Semantics(
+                label: favorite.semanticLabel,
+                button: true,
+                onTap: onOpenDetail,
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    key: Key('favoriteStationTile-${favorite.stationId}'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onOpenDetail,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            favorite.nameKo,
+                            style: textTheme.titleLarge?.copyWith(
+                              color: const Color(0xFF102A2C),
+                              fontWeight: FontWeight.w900,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          StationLineBadges(lines: favorite.lines),
+                          const SizedBox(height: 8),
+                          Text(
+                            favorite.lineLabel,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: const Color(0xFF29484B),
+                              fontWeight: FontWeight.w800,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            favorite.region,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF405A5D),
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            favorite.dataQualityLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF405A5D),
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            favorite.dataSourceLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF405A5D),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    StationLineBadges(lines: favorite.lines),
-                    const SizedBox(height: 8),
-                    Text(
-                      favorite.lineLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF29484B),
-                        fontWeight: FontWeight.w800,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      favorite.region,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF405A5D),
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      favorite.dataQualityLabel,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF405A5D),
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      favorite.dataSourceLabel,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF405A5D),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (onSetOrigin != null)
+                  OutlinedButton.icon(
+                    onPressed: onSetOrigin,
+                    icon: const Icon(Icons.trip_origin),
+                    label: const Text('출발지로 설정'),
+                  ),
+                if (onSetDestination != null)
+                  OutlinedButton.icon(
+                    onPressed: onSetDestination,
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('도착지로 설정'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: onOpenDetail,
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('역 상세 보기'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onOpenFacilityStatus,
+                  icon: const Icon(Icons.elevator_outlined),
+                  label: const Text('시설 상태 확인'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isRemoving ? null : onRemove,
+                  icon: isRemoving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.bookmark_remove_outlined),
+                  label: Text(isRemoving ? '해제 중' : '즐겨찾기 해제'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

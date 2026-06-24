@@ -35,6 +35,14 @@ String _mobilityLabelFor(String mobilityType) {
   return '이동 조건 확인 필요';
 }
 
+String _routeDateLabel(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length >= 10) {
+    return trimmed.substring(0, 10);
+  }
+  return '확인 필요';
+}
+
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
 }
@@ -452,9 +460,19 @@ class FavoriteRoute {
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
-  String get scoreLabel => '이동 점수 $score점';
+  String get scoreLabel => '이동 편의도 $score점';
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
+
+  String get scoreBasisText =>
+      '기준: $mobilityLabel, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+
+  String get scoreBasisSemanticLabel =>
+      '기준 $mobilityLabel, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+
+  String get movementMetricLabel => '예상 시간 확인 필요 · 환승 확인 필요 · 도보 확인 필요';
+
+  String get accessibilityMetricLabel => '계단 정보 확인 필요 · 엘리베이터 연결 확인 필요';
 
   String get semanticLabel {
     return [
@@ -463,6 +481,12 @@ class FavoriteRoute {
       lineLabel,
       mobilityLabel,
       scoreLabel,
+      scoreBasisSemanticLabel,
+      '예상 시간 확인 필요',
+      '환승 확인 필요',
+      '도보 확인 필요',
+      '계단 정보 확인 필요',
+      '엘리베이터 연결 확인 필요',
     ].join(', ');
   }
 }
@@ -609,7 +633,7 @@ class RouteSearchResult {
     };
   }
 
-  String get scoreLabel => '이동 점수 $score점';
+  String get scoreLabel => '이동 편의도 $score점';
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
@@ -4367,39 +4391,103 @@ class _FavoriteRouteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final removeSemanticLabel =
-        '${favorite.summaryTitle} ${isRemoving ? '삭제 중' : '삭제'}';
+    final menuButtonKey =
+        GlobalKey<PopupMenuButtonState<_FavoriteRouteMenuAction>>();
+    final moreSemanticLabel =
+        '${favorite.summaryTitle} 더 보기${isRemoving ? ', 삭제 중' : ''}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _FavoriteRouteSummaryCard(favorite: favorite),
-        const SizedBox(height: 12),
-        Semantics(
-          container: true,
-          label: removeSemanticLabel,
-          button: true,
-          enabled: !isRemoving,
-          onTap: isRemoving ? null : () => onRemove(favorite),
-          child: ExcludeSemantics(
-            child: OutlinedButton.icon(
-              key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
-              onPressed: isRemoving ? null : () => onRemove(favorite),
-              icon: isRemoving
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.delete_outline),
-              label: Text(isRemoving ? '삭제 중' : '삭제'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (isRemoving) ...[
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '삭제 중',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF405A5D),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Semantics(
+              key: Key('favoriteRouteMore-${favorite.favoriteRouteId}'),
+              container: true,
+              label: moreSemanticLabel,
+              button: true,
+              enabled: !isRemoving,
+              onTap: isRemoving
+                  ? null
+                  : () => menuButtonKey.currentState?.showButtonMenu(),
+              child: ExcludeSemantics(
+                child: PopupMenuButton<_FavoriteRouteMenuAction>(
+                  key: menuButtonKey,
+                  enabled: !isRemoving,
+                  tooltip: '경로 더 보기',
+                  onSelected: (action) {
+                    switch (action) {
+                      case _FavoriteRouteMenuAction.remove:
+                        unawaited(_confirmRemove(context));
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<_FavoriteRouteMenuAction>(
+                      key: Key(
+                        'favoriteRouteRemove-${favorite.favoriteRouteId}',
+                      ),
+                      value: _FavoriteRouteMenuAction.remove,
+                      child: const Text('삭제'),
+                    ),
+                  ],
+                  icon: const Icon(Icons.more_vert),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         const SizedBox(height: 12),
       ],
     );
   }
+
+  Future<void> _confirmRemove(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('즐겨찾기 경로 삭제'),
+          content: Text('${favorite.summaryTitle} 경로를 즐겨찾기에서 삭제할까요?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              key: Key(
+                'favoriteRouteRemoveConfirm-${favorite.favoriteRouteId}',
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && context.mounted) {
+      onRemove(favorite);
+    }
+  }
 }
+
+enum _FavoriteRouteMenuAction { remove }
 
 class _FavoriteRouteSummaryCard extends StatelessWidget {
   const _FavoriteRouteSummaryCard({required this.favorite});
@@ -4459,6 +4547,31 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                     style: textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF29484B),
                       fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    favorite.scoreBasisText,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    favorite.movementMetricLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    favorite.accessibilityMetricLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF405A5D),
                       height: 1.3,
                     ),
                   ),
