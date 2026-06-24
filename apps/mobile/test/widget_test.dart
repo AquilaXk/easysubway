@@ -860,7 +860,7 @@ void main() {
     }
   });
 
-  testWidgets('홈 저장 경로 재조회 실패는 카드 오류로만 표시된다', (tester) async {
+  testWidgets('홈은 저장 경로 재조회 실패를 즐겨찾기 카드로 표시하지 않는다', (tester) async {
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
       ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
 
@@ -886,13 +886,8 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), 180);
-    await tester.pumpAndSettle();
-    expect(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), findsOneWidget);
-    expect(
-      tester.getSize(find.widgetWithText(OutlinedButton, '즐겨찾기 경로 보기')).height,
-      greaterThanOrEqualTo(EasySubwayTouchTarget.general),
-    );
+    expect(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '즐겨찾기 경로 보기'), findsNothing);
   });
 
   testWidgets('설정 화면은 교통약자 사용 맥락별 섹션과 기존 설정 진입점을 제공한다', (tester) async {
@@ -3964,6 +3959,10 @@ void main() {
         findsOneWidget,
       );
 
+      await tester.ensureVisible(
+        find.byKey(const Key('routeOpenInternalRouteButton')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('routeOpenInternalRouteButton')));
       await tester.pumpAndSettle();
 
@@ -4657,6 +4656,8 @@ void main() {
     await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('routeOpenBlockedButton')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeOpenBlockedButton')));
     await tester.pumpAndSettle();
 
