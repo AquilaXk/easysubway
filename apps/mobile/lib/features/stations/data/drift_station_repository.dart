@@ -61,7 +61,7 @@ class DriftStationRepository
             id: row.read<String>('id'),
             name: row.read<String>('name_ko'),
             color: row.read<String>('color'),
-            region: '수도권',
+            region: _lineRegion(row.read<String>('name_ko')),
             lineCode: _lineCode(row.read<String>('name_ko')),
             active: true,
           ),
@@ -647,6 +647,15 @@ String _lineCode(String lineName) {
     return numberedLine.group(1) ?? '';
   }
   return _lineSearchName(lineName).replaceAll('선', '');
+}
+
+String _lineRegion(String lineName) {
+  for (final region in const ['수도권', '부산', '대구', '대전', '광주']) {
+    if (lineName.startsWith(region)) {
+      return region;
+    }
+  }
+  return '수도권';
 }
 
 String _dateLabelFromEpoch(int? value) {
