@@ -1218,40 +1218,21 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
             _RoutePointPickerCard(
+              key: const Key('routePointPickerCard'),
               originStation: _originStation,
               destinationStation: _destinationStation,
+              originPicker: _activeStationPicker == _RouteStationRole.origin
+                  ? _buildRouteStationPicker(_RouteStationRole.origin)
+                  : null,
+              destinationPicker:
+                  _activeStationPicker == _RouteStationRole.destination
+                  ? _buildRouteStationPicker(_RouteStationRole.destination)
+                  : null,
               onOriginTap: () => _openStationPicker(_RouteStationRole.origin),
               onDestinationTap: () =>
                   _openStationPicker(_RouteStationRole.destination),
               onSwap: _swapStations,
             ),
-            if (_activeStationPicker != null) ...[
-              const SizedBox(height: 12),
-              _RouteStationPicker(
-                labelText: _activeStationPicker == _RouteStationRole.origin
-                    ? '출발역'
-                    : '도착역',
-                inputKey: _activeStationPicker == _RouteStationRole.origin
-                    ? const Key('routeOriginStationInput')
-                    : const Key('routeDestinationStationInput'),
-                searchButtonKey:
-                    _activeStationPicker == _RouteStationRole.origin
-                    ? const Key('routeOriginStationSearchButton')
-                    : const Key('routeDestinationStationSearchButton'),
-                optionKeyPrefix:
-                    _activeStationPicker == _RouteStationRole.origin
-                    ? 'routeOriginStationOption'
-                    : 'routeDestinationStationOption',
-                selectedStation:
-                    _activeStationPicker == _RouteStationRole.origin
-                    ? _originStation
-                    : _destinationStation,
-                repository: widget.stationRepository,
-                onSelected: _activeStationPicker == _RouteStationRole.origin
-                    ? _updateOriginStation
-                    : _updateDestinationStation,
-              ),
-            ],
             const SizedBox(height: 18),
             _RouteRecentDestinationList(
               repository: widget.favoriteRouteRepository,
@@ -1347,6 +1328,25 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         destinationStationId: _destinationStation!.id,
         mobilityType: _selectedMobilityType,
       ),
+    );
+  }
+
+  Widget _buildRouteStationPicker(_RouteStationRole role) {
+    final isOrigin = role == _RouteStationRole.origin;
+    return _RouteStationPicker(
+      labelText: isOrigin ? '출발역' : '도착역',
+      inputKey: isOrigin
+          ? const Key('routeOriginStationInput')
+          : const Key('routeDestinationStationInput'),
+      searchButtonKey: isOrigin
+          ? const Key('routeOriginStationSearchButton')
+          : const Key('routeDestinationStationSearchButton'),
+      optionKeyPrefix: isOrigin
+          ? 'routeOriginStationOption'
+          : 'routeDestinationStationOption',
+      selectedStation: isOrigin ? _originStation : _destinationStation,
+      repository: widget.stationRepository,
+      onSelected: isOrigin ? _updateOriginStation : _updateDestinationStation,
     );
   }
 
@@ -1504,13 +1504,18 @@ class _RoutePointPickerCard extends StatelessWidget {
   const _RoutePointPickerCard({
     required this.originStation,
     required this.destinationStation,
+    required this.originPicker,
+    required this.destinationPicker,
     required this.onOriginTap,
     required this.onDestinationTap,
     required this.onSwap,
+    super.key,
   });
 
   final StationSearchResult? originStation;
   final StationSearchResult? destinationStation;
+  final Widget? originPicker;
+  final Widget? destinationPicker;
   final VoidCallback onOriginTap;
   final VoidCallback onDestinationTap;
   final VoidCallback onSwap;
@@ -1537,21 +1542,23 @@ class _RoutePointPickerCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 8, 58, 8),
             child: Column(
               children: [
-                _RoutePointRow(
-                  key: const Key('routeOriginPointButton'),
-                  label: '출발',
-                  station: originStation,
-                  fallback: '출발역 선택',
-                  onTap: onOriginTap,
-                ),
+                originPicker ??
+                    _RoutePointRow(
+                      key: const Key('routeOriginPointButton'),
+                      label: '출발',
+                      station: originStation,
+                      fallback: '출발역 선택',
+                      onTap: onOriginTap,
+                    ),
                 const Divider(height: 1, color: Color(0xFFE0E7EC)),
-                _RoutePointRow(
-                  key: const Key('routeDestinationPointButton'),
-                  label: '도착',
-                  station: destinationStation,
-                  fallback: '도착역 선택',
-                  onTap: onDestinationTap,
-                ),
+                destinationPicker ??
+                    _RoutePointRow(
+                      key: const Key('routeDestinationPointButton'),
+                      label: '도착',
+                      station: destinationStation,
+                      fallback: '도착역 선택',
+                      onTap: onDestinationTap,
+                    ),
               ],
             ),
           ),
