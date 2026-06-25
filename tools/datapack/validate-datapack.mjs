@@ -761,13 +761,15 @@ function productionVerifiedCoverage(database, edgeRows) {
       continue;
     }
     const edgeType = normalizedEdgeType(edge.edge_type);
+    const fromNodeId = coverageNodeId(edge.from_node_id);
+    const toNodeId = coverageNodeId(edge.to_node_id);
     if (edgeType === "ENTRY") {
-      verifiedEntryPairs.add(edgePairKey(edge.from_node_id, edge.to_node_id));
+      verifiedEntryPairs.add(edgePairKey(fromNodeId, toNodeId));
     } else if (edgeType === "EXIT") {
-      verifiedExitPairs.add(edgePairKey(edge.from_node_id, edge.to_node_id));
+      verifiedExitPairs.add(edgePairKey(fromNodeId, toNodeId));
     } else if (edgeType === "TRANSFER") {
-      verifiedTransferPairs.add(edgePairKey(edge.from_node_id, edge.to_node_id));
-      verifiedTransferPairs.add(edgePairKey(edge.to_node_id, edge.from_node_id));
+      verifiedTransferPairs.add(edgePairKey(fromNodeId, toNodeId));
+      verifiedTransferPairs.add(edgePairKey(toNodeId, fromNodeId));
     }
   }
 
@@ -810,6 +812,10 @@ function isVerifiedPositiveAccessibilityEdge(edge) {
 
 function edgePairKey(fromNodeId, toNodeId) {
   return `${fromNodeId}->${toNodeId}`;
+}
+
+function coverageNodeId(nodeId) {
+  return stationLineNodeFromRouteNodeId(nodeId) ?? nodeId;
 }
 
 function timestampSeconds(value) {
