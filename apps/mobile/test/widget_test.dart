@@ -742,6 +742,16 @@ void main() {
     expect(find.text('저장'), findsNothing);
     expect(find.text('테스트권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const Key('mapRegionTabs'))).height,
+      greaterThanOrEqualTo(EasySubwayTouchTarget.general),
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('networkMapLineFilter'))).height,
+      greaterThanOrEqualTo(EasySubwayTouchTarget.general),
+    );
+    expect(find.bySemanticsLabel('지역: 테스트권'), findsOneWidget);
+    expect(find.bySemanticsLabel('노선: 전체 노선'), findsOneWidget);
     final viewer = tester.widget<InteractiveViewer>(
       find.byKey(const Key('networkMapInteractiveViewer')),
     );
