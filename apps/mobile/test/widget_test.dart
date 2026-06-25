@@ -960,6 +960,107 @@ void main() {
     expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
   });
 
+  testWidgets('노선도 역 좌표가 겹쳐도 탭한 위치에서 가장 가까운 역을 선택한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-6',
+            name: '수도권 6호선',
+            color: '#CD7C2F',
+            region: '테스트권',
+          ),
+          NetworkMapLine(
+            id: 'gtx-a',
+            name: '수도권 GTX-A',
+            color: '#9A4DA3',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-gusan',
+            nameKo: '구산',
+            nameEn: 'Gusan',
+            region: '테스트권',
+            lineId: 'seoul-6',
+            stationCode: '615',
+            sequence: 6,
+            position: NetworkMapPosition(
+              x: 390,
+              y: 320,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'qa-wikimedia-seoul-svg-coordinate',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-yeonsinnae',
+            nameKo: '연신내',
+            nameEn: 'Yeonsinnae',
+            region: '테스트권',
+            lineId: 'gtx-a',
+            stationCode: 'X615',
+            sequence: 7,
+            position: NetworkMapPosition(
+              x: 410,
+              y: 320,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'qa-wikimedia-seoul-svg-coordinate',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'qa-wikimedia-seoul-svg-coordinate',
+            name: '수도권 SVG 좌표',
+            licenseStatus: 'reviewed',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-gusan',
+            lineId: 'seoul-6',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-yeonsinnae',
+            lineId: 'gtx-a',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-gusan-seoul-6')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('구산역'), findsOneWidget);
+    expect(find.text('연신내역'), findsNothing);
+  });
+
   testWidgets('홈 화면은 v3 기준 큰 행동과 짧은 상태 카드로 구성된다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -7822,6 +7923,7 @@ class FakeStationSearchRepository
     this.queryResults = const {},
     this.lineOptions = const [],
     this.networkMapRegionNames = const ['테스트권'],
+    this.networkMapData,
     this.searchCompleter,
     StationDetail? stationDetail,
     this.stationExits = const [],
@@ -7835,6 +7937,7 @@ class FakeStationSearchRepository
   final Map<String, List<StationSearchResult>> queryResults;
   final List<SubwayLineOption> lineOptions;
   final List<String> networkMapRegionNames;
+  final NetworkMapData? networkMapData;
   final Completer<List<StationSearchResult>>? searchCompleter;
   final StationDetail stationDetail;
   final List<StationExitInfo> stationExits;
@@ -7912,6 +8015,10 @@ class FakeStationSearchRepository
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
     requestedNetworkMapRegions.add(region);
     requestedNetworkMapLineIds.add(lineId);
+    final customMapData = networkMapData;
+    if (customMapData != null) {
+      return customMapData;
+    }
     final selectedRegion = region ?? networkMapRegionNames.first;
     const lines = [
       NetworkMapLine(
