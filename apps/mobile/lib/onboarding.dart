@@ -889,7 +889,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       _OnboardingViewPreferenceSwitch(
                         key: const Key('onboardingPreference-largeText'),
-                        title: '큰 글씨',
+                        title: '큰 글자',
                         subtitle: '글자를 더 크게 표시',
                         value: _preferences.largeTextEnabled,
                         onChanged: (value) {
@@ -917,7 +917,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       const _OnboardingPreferenceDivider(),
                       _OnboardingViewPreferenceSwitch(
                         key: const Key('onboardingPreference-simpleView'),
-                        title: '단순 보기',
+                        title: '간편 보기',
                         subtitle: '중요한 정보만 먼저 표시',
                         value: _preferences.simpleViewEnabled,
                         onChanged: (value) {
@@ -937,7 +937,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Semantics(
                     header: true,
                     child: Text(
-                      '필요한 권한을 나중에 켤 수 있어요',
+                      '위치와 알림은 나중에도 켤 수 있어요',
                       style: textTheme.headlineSmall?.copyWith(
                         color: const Color(0xFF102A2C),
                         fontWeight: FontWeight.w900,
@@ -986,7 +986,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('선택한 권한 허용하고 시작'),
+                    child: const Text('선택한 기능 설정하고 시작'),
                   ),
                   const SizedBox(height: 9),
                   OutlinedButton(
@@ -1085,13 +1085,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '온보딩 알림 권한 준비 중 예외가 발생했습니다.',
+        context: '온보딩 알림 켜기 준비 중 예외가 발생했습니다.',
       );
     } catch (error, stackTrace) {
       reportMobileError(
         error,
         stackTrace,
-        context: '온보딩 알림 권한 준비 중 알 수 없는 예외가 발생했습니다.',
+        context: '온보딩 알림 켜기 준비 중 알 수 없는 예외가 발생했습니다.',
       );
     }
     if (mounted) {

@@ -59,7 +59,8 @@ void main() {
     expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
-    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
@@ -105,7 +106,8 @@ void main() {
     await _openOnboarding(tester);
     await _continueFromProfileToPermission(tester);
 
-    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     expect(find.text('현재 위치'), findsOneWidget);
     expect(find.text('알림'), findsOneWidget);
     expect(

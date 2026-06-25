@@ -1238,14 +1238,14 @@ class _MapControls extends StatelessWidget {
         const SizedBox(height: 8),
         _MapControlButton(
           key: const Key('networkMapOverviewButton'),
-          tooltip: '전체 보기',
+          tooltip: '전체 노선도',
           icon: Icons.fit_screen,
           onPressed: onOverview,
         ),
         const SizedBox(height: 8),
         _MapControlButton(
           key: const Key('networkMapLocateButton'),
-          tooltip: '중심 보기',
+          tooltip: '처음 위치로',
           icon: Icons.center_focus_strong,
           onPressed: onCenter,
         ),
@@ -1331,7 +1331,7 @@ class _OriginalRouteMapUnavailable extends StatelessWidget {
       color: Colors.white,
       child: Center(
         child: Text(
-          '원본 노선도를 불러올 수 없습니다.',
+          '노선도를 불러오지 못했어요',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
