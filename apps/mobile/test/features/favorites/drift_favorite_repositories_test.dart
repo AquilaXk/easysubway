@@ -58,7 +58,39 @@ void main() {
     expect(favorites.single.facilityId, 'facility-sangnoksu-elevator-1');
     expect(favorites.single.stationNameKo, '상록수');
     expect(favorites.single.name, '1번 출구 엘리베이터');
+    expect(favorites.single.verificationStatusLabel, '시설 상태 확인됨');
+    expect(favorites.single.lastUpdatedAt, '2026-06-19');
     expect(favorites.single.addedAt, '2026-06-19T09:00:00.000Z');
+  });
+
+  test('로컬 시설 즐겨찾기는 시설 field 검증 시각을 최근 확인일로 쓴다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    await userDatabase
+        .into(userDatabase.favoriteFacilities)
+        .insert(
+          user_db.FavoriteFacilitiesCompanion.insert(
+            facilityId: 'facility-sangnoksu-accessible-toilet-1',
+            stationId: 'station-sangnoksu',
+            addedAt: DateTime.utc(2026, 6, 19, 9),
+          ),
+        );
+    final repository = DriftFavoriteFacilityRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    final favorites = await repository.listFavoriteFacilities();
+
+    expect(
+      favorites.single.facilityId,
+      'facility-sangnoksu-accessible-toilet-1',
+    );
+    expect(favorites.single.verificationStatusLabel, '상태 재확인 필요');
+    expect(favorites.single.lastUpdatedAt, '2025-06-01');
   });
 
   test('로컬 시설 즐겨찾기는 시설 id로 저장하고 삭제한다', () async {

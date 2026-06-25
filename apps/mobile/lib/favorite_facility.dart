@@ -189,6 +189,7 @@ class FavoriteFacility {
     required this.status,
     required this.dataConfidence,
     this.dataSourceType = '',
+    this.fieldValidationStatus = 'UNKNOWN',
     required this.lastUpdatedAt,
     required this.addedAt,
   });
@@ -209,6 +210,11 @@ class FavoriteFacility {
       status: _requiredString(json, 'status'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
+      fieldValidationStatus: _stringOrDefault(
+        json,
+        'fieldValidationStatus',
+        'UNKNOWN',
+      ),
       lastUpdatedAt: _requiredString(json, 'lastUpdatedAt'),
       addedAt: _requiredString(json, 'addedAt'),
     );
@@ -228,6 +234,7 @@ class FavoriteFacility {
   final String status;
   final String dataConfidence;
   final String dataSourceType;
+  final String fieldValidationStatus;
   final String lastUpdatedAt;
   final String addedAt;
 
@@ -279,13 +286,19 @@ class FavoriteFacility {
 
   int get statusPriority => statusPresentation.priority;
 
+  String get verificationStatusLabel =>
+      _facilityVerificationStatusLabel(fieldValidationStatus);
+
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
   String get locationLabel {
     if (description.trim().isNotEmpty) {
-      return description;
+      final descriptionLabel = _facilityUserLocationLabel(description);
+      if (descriptionLabel.isNotEmpty) {
+        return descriptionLabel;
+      }
     }
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
@@ -295,13 +308,8 @@ class FavoriteFacility {
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
-  String get semanticLabel {
-    final statusSemanticLabel = facilityStatusSemanticLabel(
-      statusLabel: statusLabel,
-      severityLabel: severityLabel,
-    );
-    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
-  }
+  String get semanticLabel =>
+      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, 다음 행동 $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }
@@ -637,7 +645,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        favorite.statusLabel,
+                        favorite.statusTitle,
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF405A5D),
                           height: 1.3,
@@ -670,15 +678,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        favorite.confidenceLabel,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        favorite.dataSourceLabel,
+                        favorite.verificationStatusLabel,
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF405A5D),
                           height: 1.3,
@@ -743,6 +743,18 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
   return value is String ? value : '';
 }
 
+String _stringOrDefault(
+  Map<String, Object?> json,
+  String key,
+  String fallback,
+) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value;
+  }
+  return fallback;
+}
+
 String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
     'HIGH' => '정보 신뢰도 높음',
@@ -750,6 +762,29 @@ String _dataConfidenceLabel(String dataConfidence) {
     'LOW' => '정보 확인 필요',
     _ => '정보 확인 필요',
   };
+}
+
+String _facilityVerificationStatusLabel(String fieldValidationStatus) {
+  return switch (fieldValidationStatus.trim().toUpperCase()) {
+    'VERIFIED' => '시설 상태 확인됨',
+    'STALE' => '상태 재확인 필요',
+    _ => '상태 확인 필요',
+  };
+}
+
+String _facilityUserLocationLabel(String description) {
+  var label = description.trim();
+  const internalValidationPhrases = [
+    '현장 검증됨',
+    '현장 검증 전',
+    '현장 재확인 필요',
+    '관리자 검수',
+  ];
+  for (final phrase in internalValidationPhrases) {
+    label = label.replaceAll(phrase, '');
+  }
+  label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return label;
 }
 
 String _dataSourceLabel(String dataSourceType) {
