@@ -682,8 +682,7 @@ class RouteSearchResult {
     };
   }
 
-  String get scoreLabel =>
-      isBlocked || warnings.isNotEmpty ? '이동 부담 확인 필요' : '이동 부담 낮음';
+  String get scoreLabel => burdenLevelLabel;
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
@@ -718,21 +717,24 @@ class RouteSearchResult {
     if (isBlocked) {
       return '다른 경로 필요';
     }
-    return warnings.isEmpty ? '이동 부담 낮음' : '확인 필요 구간 있음';
+    return burdenLevelLabel;
   }
 
   String get guidanceLabel {
     if (isBlocked) {
-      return '다른 경로가 필요합니다';
+      return '현재 조건으로 안내 어려움';
     }
-    return status == 'FOUND' ? '이동할 수 있는 경로' : '확인이 필요합니다';
+    if (status == 'FOUND' && warnings.isEmpty) {
+      return '안내 가능';
+    }
+    return '확인 후 이동';
   }
 
   IconData get guidanceIcon {
     if (isBlocked) {
       return Icons.priority_high;
     }
-    return status == 'FOUND' ? Icons.check_circle : Icons.warning_amber;
+    return guidanceLabel == '안내 가능' ? Icons.check_circle : Icons.warning_amber;
   }
 
   String get attentionLabel {
@@ -787,6 +789,41 @@ class RouteSearchResult {
       parts.add('확인 요청 $_routeBlockedConfirmationNotice');
     }
     return parts.join(', ');
+  }
+
+  String get burdenLevelLabel {
+    if (isBlocked) {
+      return '이동 부담 확인 필요';
+    }
+    if (movementSteps.isEmpty) {
+      return '이동 부담 확인 필요';
+    }
+    if (_hasHighBurdenFact) {
+      return '이동 부담 높음';
+    }
+    if (_hasMediumBurdenFact) {
+      return '이동 부담 보통';
+    }
+    return '이동 부담 낮음';
+  }
+
+  bool get _hasHighBurdenFact {
+    return walkingDistanceMeters >= 1000 ||
+        transferCount >= 2 ||
+        movementSteps.any(
+          (step) =>
+              step.includesStairs || _routeStepStairState(step) == 'stairOnly',
+        );
+  }
+
+  bool get _hasMediumBurdenFact {
+    return walkingDistanceMeters >= 400 ||
+        transferCount >= 1 ||
+        movementSteps.any(
+          (step) =>
+              step.requiresAccessibilityCheck ||
+              _routeStepStairState(step) == 'unknown',
+        );
   }
 }
 
@@ -943,14 +980,14 @@ String _routeDistanceLabel(int distanceMeters) {
   return '${kilometers.toStringAsFixed(1)}km';
 }
 
-String _routeWarningLabel(String code, String message) {
+String _routeWarningLabel(String code) {
   return switch (code.trim()) {
     'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
-    _ => '이동 전 현장 안내를 확인해 주세요.',
+    _ => '일부 이동 정보를 확인하지 못했어요.',
   };
 }
 
@@ -987,19 +1024,19 @@ String _routeStepDetailLabel({required String stepType}) {
 }
 
 class RouteSearchWarning {
-  const RouteSearchWarning({required this.code, required this.message});
+  const RouteSearchWarning({required this.code, this.message = ''});
 
   factory RouteSearchWarning.fromJson(Map<String, Object?> json) {
     return RouteSearchWarning(
       code: _requiredRouteString(json, 'code'),
-      message: _requiredRouteString(json, 'message'),
+      message: _optionalRouteString(json, 'message'),
     );
   }
 
   final String code;
   final String message;
 
-  String get userMessage => _routeWarningLabel(code, message);
+  String get userMessage => _routeWarningLabel(code);
 }
 
 enum RouteSearchViewStatus { idle, loading, success, failure }
@@ -4263,9 +4300,14 @@ class FavoriteRouteListController extends ChangeNotifier {
 }
 
 class FavoriteRouteListScreen extends StatefulWidget {
-  const FavoriteRouteListScreen({required this.repository, super.key});
+  const FavoriteRouteListScreen({
+    required this.repository,
+    this.onSearchAgain,
+    super.key,
+  });
 
   final FavoriteRouteRepository repository;
+  final ValueChanged<FavoriteRoute>? onSearchAgain;
 
   @override
   State<FavoriteRouteListScreen> createState() =>
@@ -4277,15 +4319,23 @@ class _FavoriteRouteListScreenState extends State<FavoriteRouteListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('즐겨찾기 경로')),
-      body: FavoriteRouteListContent(repository: widget.repository),
+      body: FavoriteRouteListContent(
+        repository: widget.repository,
+        onSearchAgain: widget.onSearchAgain,
+      ),
     );
   }
 }
 
 class FavoriteRouteListContent extends StatefulWidget {
-  const FavoriteRouteListContent({required this.repository, super.key});
+  const FavoriteRouteListContent({
+    required this.repository,
+    this.onSearchAgain,
+    super.key,
+  });
 
   final FavoriteRouteRepository repository;
+  final ValueChanged<FavoriteRoute>? onSearchAgain;
 
   @override
   State<FavoriteRouteListContent> createState() =>
@@ -4317,6 +4367,7 @@ class _FavoriteRouteListContentState extends State<FavoriteRouteListContent> {
           state: _controller.state,
           onRetry: _controller.load,
           onRemove: _controller.remove,
+          onSearchAgain: widget.onSearchAgain,
         ),
       ),
     );
@@ -4328,11 +4379,13 @@ class _FavoriteRouteListBody extends StatelessWidget {
     required this.state,
     required this.onRetry,
     required this.onRemove,
+    required this.onSearchAgain,
   });
 
   final FavoriteRouteListState state;
   final VoidCallback onRetry;
   final ValueChanged<FavoriteRoute> onRemove;
+  final ValueChanged<FavoriteRoute>? onSearchAgain;
 
   @override
   Widget build(BuildContext context) {
@@ -4398,6 +4451,7 @@ class _FavoriteRouteListBody extends StatelessWidget {
                     favorite.favoriteRouteId,
                   ),
                   onRemove: onRemove,
+                  onSearchAgain: onSearchAgain,
                 ),
             ],
           ),
@@ -4412,11 +4466,13 @@ class _FavoriteRouteTile extends StatelessWidget {
     required this.favorite,
     required this.isRemoving,
     required this.onRemove,
+    required this.onSearchAgain,
   });
 
   final FavoriteRoute favorite;
   final bool isRemoving;
   final ValueChanged<FavoriteRoute> onRemove;
+  final ValueChanged<FavoriteRoute>? onSearchAgain;
 
   @override
   Widget build(BuildContext context) {
@@ -4430,8 +4486,21 @@ class _FavoriteRouteTile extends StatelessWidget {
       children: [
         _FavoriteRouteSummaryCard(favorite: favorite),
         Row(
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            if (onSearchAgain != null) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: Key(
+                    'favoriteRouteSearchAgain-${favorite.favoriteRouteId}',
+                  ),
+                  onPressed: isRemoving ? null : () => onSearchAgain!(favorite),
+                  icon: const Icon(Icons.search),
+                  label: const Text('최신 경로 다시 찾기'),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ] else
+              const Spacer(),
             if (isRemoving) ...[
               const SizedBox.square(
                 dimension: 18,
