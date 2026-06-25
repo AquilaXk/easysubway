@@ -750,7 +750,7 @@ class RouteSearchResult {
     }
     final arrivalStep = arrivalGuidanceStep;
     if (arrivalStep != null) {
-      parts.add('도착 안내 ${arrivalStep.description}');
+      parts.add('도착 안내 ${arrivalStep.userDescription}');
     }
     final safeBlockedReasons = blockedReasonLabels;
     if (safeBlockedReasons.isNotEmpty) {
@@ -3680,7 +3680,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    step.description,
+                    step.userDescription,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF102A2C),
                       fontWeight: FontWeight.w800,

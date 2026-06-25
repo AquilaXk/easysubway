@@ -359,11 +359,33 @@ void main() {
           distanceSource: 'MEASURED',
           confidenceLabel: '높은 신뢰도',
         ),
+        RouteSearchStep(
+          sequence: 2,
+          title: '도착역 출구 이동',
+          description: 'edge:exit-b line:test STATIC_ESTIMATE',
+          lineId: 'line-test',
+          lineName: '테스트 노선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 1,
+          distanceMeters: 40,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+          actionTitle: '출구 이동',
+          actionDetail: 'edge:exit-b line:test STATIC_ESTIMATE',
+          reason: 'OFFICIAL_FILE',
+          evidenceSources: ['edge:exit-b'],
+          timeSource: 'STATIC_ESTIMATE',
+          distanceSource: 'MEASURED',
+          confidenceLabel: '측정값',
+          stepType: 'exit',
+        ),
       ],
     );
 
     final semanticLabel = result.semanticLabel;
     expect(semanticLabel, contains('선택한 경로 기준으로 안내합니다.'));
+    expect(semanticLabel, contains('도착역에서 계단 없는 출구 동선을 확인합니다.'));
     expect(semanticLabel, isNot(contains('edge:')));
     expect(semanticLabel, isNot(contains('line:')));
     expect(semanticLabel, isNot(contains('OFFICIAL_')));
