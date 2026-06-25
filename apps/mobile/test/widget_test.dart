@@ -4969,10 +4969,7 @@ void main() {
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
-      expect(
-        find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'),
-        findsOneWidget,
-      );
+      expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
 
       await tester.ensureVisible(
         find.byKey(const Key('routeStartGuidanceButton')),
@@ -6164,7 +6161,7 @@ void main() {
       expect(find.text('계단 없는 경로가 없습니다'), findsOneWidget);
       expect(find.text('추천 이유'), findsNothing);
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
-      expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
+      expect(find.text('안내 가능한 경로를 찾지 못했습니다.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
