@@ -365,7 +365,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                       key: const Key('networkMapListButton'),
                       onPressed: () => _showMapList(data),
                       icon: const Icon(Icons.list_alt),
-                      label: const Text('노선 목록으로 보기'),
+                      label: const Text('노선별로 보기'),
                     ),
                   ),
                 ),
@@ -1725,12 +1725,12 @@ class _NetworkMapListSheet extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
         children: [
           const Text(
-            '노선과 역 목록',
+            '노선별 역 보기',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           const Text(
-            '지도 조작이 어려울 때 목록에서 역을 선택하세요.',
+            '노선별 목록에서 역을 선택하세요.',
             style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
           ),
           const SizedBox(height: 14),
