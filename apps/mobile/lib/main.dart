@@ -551,6 +551,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _savingOnboardingResult = false;
   OnboardingResult? _pendingOnboardingResult;
   UserDataDeletionResult? _dataDeletionResult;
+  UserDataDeletionScope _dataDeletionScope = UserDataDeletionScope.deviceOnly;
 
   @override
   void initState() {
@@ -574,9 +575,11 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     if (dataDeletionResult != null) {
       return UserDataDeletionResultScreen(
         result: dataDeletionResult,
+        deletionScope: _dataDeletionScope,
         onRestart: () {
           setState(() {
             _dataDeletionResult = null;
+            _dataDeletionScope = UserDataDeletionScope.deviceOnly;
           });
         },
       );
@@ -685,6 +688,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _startScreenDismissed = false;
       _introScreenDismissed = false;
       _dataDeletionResult = result;
+      _dataDeletionScope = _userDataDeletionScope(
+        widget.userDataDeletionRepository,
+      );
     });
   }
 
@@ -3844,11 +3850,19 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final deletionScope = _userDataDeletionScope(repository);
+    final title = deletionScope == UserDataDeletionScope.deviceOnly
+        ? '이 기기의 앱 데이터 삭제'
+        : '내 데이터 삭제';
+    final helperText = deletionScope == UserDataDeletionScope.deviceOnly
+        ? '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.'
+        : '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.';
     void openDeletionScreen() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => UserDataDeletionScreen(
             repository: repository,
+            deletionScope: deletionScope,
             onDeleted: onDeleted,
           ),
         ),
@@ -3858,7 +3872,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
-      label: '이 기기의 앱 데이터 삭제, 로컬 삭제 범위와 복구 불가 여부를 확인하고 앱 안에서 삭제를 진행합니다.',
+      label: '$title, $helperText',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
         child: Material(
@@ -3872,33 +3886,33 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: openDeletionScreen,
-            child: const Padding(
-              padding: EdgeInsets.all(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.delete_outline,
                     color: Color(0xFF8B1E1E),
                     size: 28,
                   ),
-                  SizedBox(width: 14),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '이 기기의 앱 데이터 삭제',
-                          style: TextStyle(
+                          title,
+                          style: const TextStyle(
                             color: Color(0xFF102A2C),
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                             height: 1.25,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
-                          style: TextStyle(
+                          helperText,
+                          style: const TextStyle(
                             color: Color(0xFF466467),
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -3908,7 +3922,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: Color(0xFF466467)),
+                  const Icon(Icons.chevron_right, color: Color(0xFF466467)),
                 ],
               ),
             ),
@@ -3919,14 +3933,71 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
   }
 }
 
+enum UserDataDeletionScope { deviceOnly, remoteAndDevice }
+
+UserDataDeletionScope _userDataDeletionScope(
+  UserDataDeletionRepository? repository,
+) {
+  if (repository is UserDataDeletionApiRepository ||
+      repository is UserDataDeletionCompositeRepository) {
+    return UserDataDeletionScope.remoteAndDevice;
+  }
+  return UserDataDeletionScope.deviceOnly;
+}
+
+class _UserDataDeletionCopy {
+  const _UserDataDeletionCopy({
+    required this.title,
+    required this.body,
+    required this.notices,
+    required this.confirmText,
+  });
+
+  factory _UserDataDeletionCopy.forScope(UserDataDeletionScope scope) {
+    return switch (scope) {
+      UserDataDeletionScope.deviceOnly => const _UserDataDeletionCopy(
+        title: '이 기기의 앱 데이터 삭제',
+        body:
+            '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
+        notices: [
+          '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
+          '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
+          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
+          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
+        ],
+        confirmText: '삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.',
+      ),
+      UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
+        title: '내 데이터 삭제',
+        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        notices: [
+          '삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.',
+          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
+          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
+        ],
+        confirmText: '삭제 후에는 앱에 저장된 데이터와 설정이 지워지고 되돌릴 수 없습니다.',
+      ),
+    };
+  }
+
+  final String title;
+  final String body;
+  final List<String> notices;
+  final String confirmText;
+}
+
 class UserDataDeletionScreen extends StatefulWidget {
   const UserDataDeletionScreen({
     required this.repository,
+    required this.deletionScope,
     required this.onDeleted,
     super.key,
   });
 
   final UserDataDeletionRepository repository;
+  final UserDataDeletionScope deletionScope;
   final Future<void> Function(UserDataDeletionResult result)? onDeleted;
 
   @override
@@ -3939,8 +4010,9 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final copy = _UserDataDeletionCopy.forScope(widget.deletionScope);
     return Scaffold(
-      appBar: AppBar(title: const Text('이 기기의 앱 데이터 삭제')),
+      appBar: AppBar(title: Text(copy.title)),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         child: FilledButton.icon(
@@ -3953,7 +4025,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
               : const Icon(Icons.delete_forever_outlined),
-          label: Text(_isDeleting ? '삭제 중' : '이 기기의 앱 데이터 삭제'),
+          label: Text(_isDeleting ? '삭제 중' : copy.title),
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF8B1E1E),
             foregroundColor: Colors.white,
@@ -3977,26 +4049,15 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
+              copy.body,
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF102A2C),
                 height: 1.4,
               ),
             ),
             const SizedBox(height: 16),
-            const _DataDeletionNoticeLine(
-              text: '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
-            ),
-            const _DataDeletionNoticeLine(
-              text: '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
-            ),
-            const _DataDeletionNoticeLine(text: '삭제한 데이터는 앱에서 복구할 수 없습니다.'),
-            const _DataDeletionNoticeLine(
-              text: '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
-            ),
-            const _DataDeletionNoticeLine(
-              text: '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
-            ),
+            for (final notice in copy.notices)
+              _DataDeletionNoticeLine(text: notice),
           ],
         ),
       ),
@@ -4008,7 +4069,9 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('정말 삭제할까요?'),
-        content: const Text('삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.'),
+        content: Text(
+          _UserDataDeletionCopy.forScope(widget.deletionScope).confirmText,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -4104,11 +4167,13 @@ class _DataDeletionNoticeLine extends StatelessWidget {
 class UserDataDeletionResultScreen extends StatelessWidget {
   const UserDataDeletionResultScreen({
     required this.result,
+    required this.deletionScope,
     required this.onRestart,
     super.key,
   });
 
   final UserDataDeletionResult result;
+  final UserDataDeletionScope deletionScope;
   final VoidCallback onRestart;
 
   @override
@@ -4186,9 +4251,19 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                   ),
                   _DataDeletionResultRow(
                     icon: Icons.report_outlined,
-                    title: '이 기기의 제보 기록',
-                    value: '${result.anonymizedReportCount}건 삭제',
+                    title: deletionScope == UserDataDeletionScope.deviceOnly
+                        ? '이 기기의 제보 기록'
+                        : '제보 연결 정보',
+                    value: deletionScope == UserDataDeletionScope.deviceOnly
+                        ? '${result.anonymizedReportCount}건 삭제'
+                        : '${result.anonymizedReportCount}건 익명화',
                   ),
+                  if (deletionScope == UserDataDeletionScope.remoteAndDevice)
+                    _DataDeletionResultRow(
+                      icon: Icons.rate_review_outlined,
+                      title: '경로 의견 연결 정보',
+                      value: '${result.anonymizedRouteFeedbackCount}건 익명화',
+                    ),
                 ],
               ),
             ),

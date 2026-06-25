@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
@@ -2471,6 +2472,51 @@ void main() {
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+  });
+
+  testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
+    final deletionRepository = UserDataDeletionApiRepository(
+      baseUri: Uri.parse('https://api.easysubway.example'),
+      authProvider: const NoAuthorizationHeaderProvider(),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        userDataDeletionRepository: deletionRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openSupportAccessScreen(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('dataDeletionAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('내 데이터 삭제'), findsWidgets);
+    expect(
+      find.text('즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
+    expect(find.text('삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text('삭제 후에는 앱에 저장된 데이터와 설정이 지워지고 되돌릴 수 없습니다.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다', (tester) async {
