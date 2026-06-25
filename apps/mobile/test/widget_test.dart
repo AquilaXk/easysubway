@@ -19,6 +19,7 @@ import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:easysubway_mobile/user_data_deletion.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -928,6 +929,38 @@ void main() {
     expect(decoration.borderRadius, isNull);
     expect(find.byKey(const Key('originalRouteMapView')), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
+  });
+
+  testWidgets('수도권 노선도는 Android에서도 원본 source 좌표계를 유지한다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.view.devicePixelRatio = 3;
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+
+      final viewer = tester.widget<InteractiveViewer>(
+        find.byKey(const Key('networkMapInteractiveViewer')),
+      );
+      final mapContent = viewer.child as SizedBox;
+      expect(mapContent.width, 5724);
+      expect(mapContent.height, 6516);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.resetDevicePixelRatio();
+    }
   });
 
   testWidgets('노선도 역을 누르면 출발 도착 설정 sheet를 보여준다', (tester) async {
