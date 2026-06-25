@@ -548,8 +548,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _startScreenDismissed = false;
   bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
-  bool _savingViewPreferences = false;
-  OnboardingViewPreferences? _pendingViewPreferences;
+  bool _savingOnboardingResult = false;
+  OnboardingResult? _pendingOnboardingResult;
   UserDataDeletionResult? _dataDeletionResult;
 
   @override
@@ -725,7 +725,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     _schedulePendingFacilityReportPhotoRecovery();
   }
 
-  Future<void> _saveOnboardingResult(OnboardingResult result) async {
+  Future<void> _persistOnboardingResult(OnboardingResult result) async {
     try {
       await widget.onboardingStore?.saveResult(result);
     } catch (error, stackTrace) {
@@ -734,6 +734,27 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         stackTrace,
         context: '온보딩 설정을 저장하는 중 예외가 발생했습니다.',
       );
+    }
+  }
+
+  Future<void> _saveOnboardingResult(OnboardingResult result) async {
+    _pendingOnboardingResult = result;
+    _applyOnboardingResult(result);
+    if (_savingOnboardingResult) {
+      return;
+    }
+    _savingOnboardingResult = true;
+    try {
+      while (mounted) {
+        final nextResult = _pendingOnboardingResult;
+        _pendingOnboardingResult = null;
+        if (nextResult == null) {
+          break;
+        }
+        await _persistOnboardingResult(nextResult);
+      }
+    } finally {
+      _savingOnboardingResult = false;
     }
   }
 
@@ -747,58 +768,29 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       preferences: currentResult.preferences,
     );
     await _saveOnboardingResult(nextResult);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _onboardingState = OnboardingState.completed(result: nextResult);
-    });
   }
 
   Future<void> _saveViewPreferences(
     OnboardingViewPreferences preferences,
   ) async {
-    _pendingViewPreferences = preferences;
-    _applyViewPreferences(preferences);
-    if (_savingViewPreferences) {
-      return;
-    }
-    _savingViewPreferences = true;
-    try {
-      while (mounted) {
-        final nextPreferences = _pendingViewPreferences;
-        _pendingViewPreferences = null;
-        if (nextPreferences == null) {
-          break;
-        }
-        final currentResult = _onboardingState.result;
-        if (currentResult == null) {
-          break;
-        }
-        await _saveOnboardingResult(
-          OnboardingResult(
-            profile: currentResult.profile,
-            preferences: nextPreferences,
-          ),
-        );
-      }
-    } finally {
-      _savingViewPreferences = false;
-    }
-  }
-
-  void _applyViewPreferences(OnboardingViewPreferences preferences) {
     final currentResult = _onboardingState.result;
     if (currentResult == null) {
       return;
     }
+    await _saveOnboardingResult(
+      OnboardingResult(
+        profile: currentResult.profile,
+        preferences: preferences,
+      ),
+    );
+  }
+
+  void _applyOnboardingResult(OnboardingResult result) {
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      _onboardingState = OnboardingState.completed(
-        result: OnboardingResult(
-          profile: currentResult.profile,
-          preferences: preferences,
-        ),
-      );
+      _onboardingState = OnboardingState.completed(result: result);
     });
   }
 

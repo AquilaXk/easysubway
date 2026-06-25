@@ -1719,6 +1719,62 @@ void main() {
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
   });
 
+  testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    expect(onboardingStore.saveCount, 1);
+
+    await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+
+    firstSave.complete();
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.complete();
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.savedResult?.profile.id, 'wheelchair');
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+  });
+
   testWidgets('설정 화면 보기 옵션은 큰 글자에서도 스위치를 조작할 수 있다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
