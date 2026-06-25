@@ -923,6 +923,49 @@ void main() {
     });
   });
 
+  test('내 신고 API 저장소는 빈 공개 번호 응답에서 로컬 제보 번호를 유지한다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'id': 'report-1',
+              'stationId': 'station-sangnoksu',
+              'facilityId': 'facility-sangnoksu-elevator-1',
+              'reportType': 'BROKEN',
+              'description': '버튼이 눌리지 않습니다.',
+              'status': 'ACCEPTED',
+              'createdAt': '2026-06-14T09:00:00',
+              'publicReceiptCode': ' ',
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final receiptStore = FakeFacilityReportReceiptStore({
+      'report-1': 'receipt-token-1',
+    });
+    receiptStore.savedPublicReceiptCodes['report-1'] = 'ES-CACHED1';
+    final repository = FacilityReportApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      receiptStore: receiptStore,
+    );
+
+    final reports = await repository.listMyReports();
+
+    expect(reports.single.publicReceiptCode, 'ES-CACHED1');
+    expect(reports.single.displayReceiptCode, 'ES-CACHED1');
+    expect(receiptStore.savedPublicReceiptCodes['report-1'], 'ES-CACHED1');
+    expect(receiptStore.savedStatuses['report-1'], 'ACCEPTED');
+  });
+
   test('내 신고 API 저장소는 receipt가 없으면 목록 조회 네트워크를 호출하지 않는다', () async {
     var requestCount = 0;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

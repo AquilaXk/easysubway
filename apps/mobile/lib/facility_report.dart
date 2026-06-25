@@ -315,8 +315,12 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         receipts.map((receipt) async {
           try {
             final report = await getReport(receipt.reportId);
-            await _refreshReceiptIfPossible(receipt, report);
-            return report;
+            final reportWithReceiptCode = _reportWithReceiptCodeFallback(
+              report,
+              receipt,
+            );
+            await _refreshReceiptIfPossible(receipt, reportWithReceiptCode);
+            return reportWithReceiptCode;
           } catch (error, stackTrace) {
             reportMobileError(
               error,
@@ -350,7 +354,8 @@ class FacilityReportApiRepository implements FacilityReportRepository {
               receiptId: receipt.receiptId,
               reportId: receipt.reportId,
               publicReceiptCode:
-                  report.publicReceiptCode ?? receipt.publicReceiptCode,
+                  _nonBlankReportString(report.publicReceiptCode) ??
+                  _nonBlankReportString(receipt.publicReceiptCode),
               status: report.status,
               receiptToken: receipt.receiptToken,
               createdAt: receipt.createdAt,
@@ -364,6 +369,30 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         context: '시설 제보 receipt 상태 갱신 중 예외가 발생했습니다.',
       );
     }
+  }
+
+  FacilityReportResult _reportWithReceiptCodeFallback(
+    FacilityReportResult report,
+    FacilityReportReceipt receipt,
+  ) {
+    final publicReceiptCode =
+        _nonBlankReportString(report.publicReceiptCode) ??
+        _nonBlankReportString(receipt.publicReceiptCode);
+    if (publicReceiptCode == null ||
+        publicReceiptCode == report.publicReceiptCode) {
+      return report;
+    }
+    return FacilityReportResult(
+      id: report.id,
+      stationId: report.stationId,
+      facilityId: report.facilityId,
+      reportType: report.reportType,
+      description: report.description,
+      status: report.status,
+      createdAt: report.createdAt,
+      receiptToken: report.receiptToken,
+      publicReceiptCode: publicReceiptCode,
+    );
   }
 
   FacilityReportResult _reportResultFromJson(
@@ -2556,6 +2585,14 @@ String _optionalReportString(Map<String, Object?> json, String key) {
     return value;
   }
   return '';
+}
+
+String? _nonBlankReportString(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  return trimmed;
 }
 
 String _reportDateLabel(String createdAt) {
