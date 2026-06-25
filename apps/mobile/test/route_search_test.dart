@@ -157,6 +157,15 @@ void main() {
               'lineId': 'seoul-4',
               'lineName': '수도권 4호선',
               'score': 92,
+              'burdenCost': 41,
+              'estimatedDurationSeconds': 420,
+              'walkingDistanceMeters': 300,
+              'transferCount': 0,
+              'evidenceSummary': [
+                'ACCESSIBILITY_CHECK_REQUIRED',
+                'DURATION_ESTIMATED',
+                'DISTANCE_MEASURED',
+              ],
               'steps': [
                 {
                   'sequence': 1,
@@ -233,6 +242,16 @@ void main() {
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
+    expect(result.score, 92);
+    expect(result.burdenCost, 41);
+    expect(result.estimatedDurationSeconds, 420);
+    expect(result.walkingDistanceMeters, 300);
+    expect(result.transferCount, 0);
+    expect(result.evidenceSummary, [
+      'ACCESSIBILITY_CHECK_REQUIRED',
+      'DURATION_ESTIMATED',
+      'DISTANCE_MEASURED',
+    ]);
     expect(result.scoreLabel, '이동 부담 보통');
     expect(result.scoreLabel, isNot(contains('92점')));
     expect(result.recommendationReasons, [
@@ -356,6 +375,59 @@ void main() {
     expect(result.warnings.single.userMessage, '일부 이동 정보를 확인하지 못했어요.');
     expect(result.semanticLabel, contains('일부 이동 정보를 확인하지 못했어요.'));
     expect(result.semanticLabel, isNot(contains('SERVER_RAW_WARNING')));
+  });
+
+  test('경로 contract는 burdenCost 우선 읽기와 score-only legacy fallback을 지원한다', () {
+    final newContractResult = RouteSearchResult.fromJson({
+      'routeSearchId': 'route-new-contract',
+      'originStationId': 'station-sangnoksu',
+      'originStationName': '상록수',
+      'destinationStationId': 'station-sadang',
+      'destinationStationName': '사당',
+      'mobilityType': 'SENIOR',
+      'status': 'FOUND',
+      'lineId': 'seoul-4',
+      'lineName': '수도권 4호선',
+      'burdenCost': 31,
+      'estimatedDurationSeconds': 420,
+      'walkingDistanceMeters': 250,
+      'transferCount': 1,
+      'evidenceSummary': ['DURATION_ESTIMATED', 'DISTANCE_MEASURED'],
+      'steps': <Object?>[],
+      'warnings': <Object?>[],
+      'recommendationReasons': <Object?>[],
+      'blockedReasons': <Object?>[],
+      'createdAt': '2026-06-13T04:20:00',
+    });
+    final legacyResult = RouteSearchResult.fromJson({
+      'routeSearchId': 'route-legacy-score',
+      'originStationId': 'station-sangnoksu',
+      'originStationName': '상록수',
+      'destinationStationId': 'station-sadang',
+      'destinationStationName': '사당',
+      'mobilityType': 'SENIOR',
+      'status': 'FOUND',
+      'lineId': 'seoul-4',
+      'lineName': '수도권 4호선',
+      'score': 92,
+      'steps': <Object?>[],
+      'warnings': <Object?>[],
+      'recommendationReasons': <Object?>[],
+      'blockedReasons': <Object?>[],
+      'createdAt': '2026-06-13T04:20:00',
+    });
+
+    expect(newContractResult.score, 31);
+    expect(newContractResult.burdenCost, 31);
+    expect(newContractResult.estimatedDurationSeconds, 420);
+    expect(newContractResult.walkingDistanceMeters, 250);
+    expect(newContractResult.transferCount, 1);
+    expect(newContractResult.evidenceSummary, [
+      'DURATION_ESTIMATED',
+      'DISTANCE_MEASURED',
+    ]);
+    expect(legacyResult.score, 92);
+    expect(legacyResult.burdenCost, 92);
   });
 
   test('경로 이동 부담은 warning 없음만으로 낮음이 되지 않는다', () {
@@ -599,6 +671,7 @@ void main() {
 
     expect(result.walkingDistanceMeters, 300);
     expect(result.transferCount, 1);
+    expect(result.estimatedDurationSeconds, 2220);
   });
 
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
