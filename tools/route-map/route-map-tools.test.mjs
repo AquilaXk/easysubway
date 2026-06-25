@@ -28,8 +28,9 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
 
   const texts = output.labels.map((label) => label.sourceText).sort();
   assert.deepEqual(texts, ["1호선", "Not to scale", "알파역", "회전역"]);
-  assert.equal(output.labels.find((label) => label.sourceText === "숨김역"), undefined);
-  assert.equal(output.labels.find((label) => label.sourceText === "템플릿역"), undefined);
+  for (const hiddenText of ["숨김역", "투명역", "비가시역", "레이어숨김역", "템플릿역"]) {
+    assert.equal(output.labels.find((label) => label.sourceText === hiddenText), undefined);
+  }
 
   const line = output.labels.find((label) => label.sourceText === "1호선");
   assert.equal(line.classification, "LINE_LABEL");

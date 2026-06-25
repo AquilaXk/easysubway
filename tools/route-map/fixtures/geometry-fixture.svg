@@ -9,6 +9,15 @@
     <text id="notice" x="100" y="100" font-size="8">Not to scale</text>
     <text id="hidden" class="hidden" x="5" y="100">숨김역</text>
   </g>
+  <g id="transparent-layer" opacity="0">
+    <text x="20" y="20">투명역</text>
+  </g>
+  <g id="hidden-layer" visibility="hidden">
+    <text x="20" y="40">비가시역</text>
+  </g>
+  <g id="display-none-layer" display="none">
+    <text x="20" y="60">레이어숨김역</text>
+  </g>
   <defs>
     <text id="template" x="0" y="0">템플릿역</text>
   </defs>

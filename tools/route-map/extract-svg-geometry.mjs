@@ -132,11 +132,14 @@ function browserExtractorExpression(svg) {
         },
       };
     }
-    function isVisibleText(element) {
+    function isVisibleText(element, root) {
       if (element.closest("defs")) return false;
-      const style = getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") return false;
-      if (Number.parseFloat(style.opacity || "1") === 0) return false;
+      for (let current = element; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (Number.parseFloat(style.opacity || "1") <= 0) return false;
+        if (current === root) break;
+      }
       return true;
     }
     function sourceViewBox(root) {
@@ -165,7 +168,7 @@ function browserExtractorExpression(svg) {
 
     for (const element of root.querySelectorAll("text")) {
       const sourceText = normalizeText(element.textContent || "");
-      if (!sourceText || !isVisibleText(element)) continue;
+      if (!sourceText || !isVisibleText(element, root)) continue;
       let bbox;
       try {
         bbox = element.getBBox();
