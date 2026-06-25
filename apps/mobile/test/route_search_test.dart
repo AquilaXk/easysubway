@@ -115,14 +115,14 @@ void main() {
       'toNodeId': 'node-sangnoksu-faregate',
       'mobilityType': 'WHEELCHAIR',
     });
-    expect(result.statusLabel, '내부 이동 경로를 찾았습니다');
+    expect(result.statusLabel, '역 안 이동 경로를 찾았어요');
     expect(result.summaryLabel, '1번 출구 엘리베이터에서 개찰구까지');
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
     expect(
       result.steps.single.burdenLabel,
-      '약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요',
+      '약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요',
     );
-    expect(result.semanticLabel, contains('1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지'));
+    expect(result.semanticLabel, contains('1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지'));
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
   });
 
@@ -148,7 +148,7 @@ void main() {
         isA<InternalRouteException>().having(
           (error) => error.message,
           'message',
-          '내부 이동 안내를 불러오지 못했습니다.',
+          '역 안 이동 안내를 불러오지 못했습니다.',
         ),
       ),
     );

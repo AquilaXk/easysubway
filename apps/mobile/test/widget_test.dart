@@ -5374,14 +5374,20 @@ void main() {
 
     expect(internalRouteRepository.requests, hasLength(1));
     expect(find.text('역 안 이동 순서'), findsOneWidget);
-    expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
+    expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
     expect(find.text('엘리베이터에서 개찰구까지 이동합니다.'), findsOneWidget);
-    expect(find.text('약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요'), findsOneWidget);
+    expect(
+      find.text('약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요'),
+      findsOneWidget,
+    );
+    expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
+    expect(find.text('현장 검증 전'), findsNothing);
+    expect(find.text('엘리베이터 필요'), findsNothing);
     expect(
       find.bySemanticsLabel(
-        '역 안 이동 순서, 내부 이동 경로를 찾았습니다, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 내부 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 현장 검증 전 · 엘리베이터 필요, 엘리베이터에서 개찰구까지 이동합니다.',
+        '역 안 이동 순서, 역 안 이동 경로를 찾았어요, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요, 엘리베이터에서 개찰구까지 이동합니다.',
       ),
       findsOneWidget,
     );
@@ -5433,7 +5439,36 @@ void main() {
     );
     expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
     expect(find.text('역 안 이동 순서'), findsOneWidget);
-    expect(find.text('내부 이동 경로를 찾았습니다'), findsOneWidget);
+    expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
+    expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
+  });
+
+  testWidgets('역 상세는 역 안 이동 정보가 부족하면 쉬운 안내를 보여준다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+    final internalRouteRepository = FakeInternalRouteRepository(
+      nodes: const [],
+      result: _internalRouteResult(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          stationId: 'station-sangnoksu',
+          internalRouteRepository: internalRouteRepository,
+          internalRouteMobilityType: 'WHEELCHAIR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
+    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 길 안내에 필요한 정보를 찾지 못했어요.'), findsOneWidget);
+    expect(find.textContaining('기준점'), findsNothing);
   });
 
   testWidgets('역 상세는 현재 역을 즐겨찾기에 저장하고 해제한다', (tester) async {

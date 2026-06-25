@@ -164,10 +164,10 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('내부 이동 경로 접근성 상태를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 확인하지 못했어요.'));
   });
 
-  test('로컬 내부 이동 단계는 현장 검증 상태를 부담 라벨에서 구분한다', () async {
+  test('로컬 내부 이동 단계는 최근 확인 상태를 부담 라벨에서 구분한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
@@ -227,15 +227,15 @@ void main() {
 
     expect(
       await burdenLabelFor('node-verified-from', 'node-verified-to'),
-      contains('현장 검증됨'),
+      contains('최근 확인됨'),
     );
     expect(
       await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
-      contains('현장 검증 전'),
+      contains('최근 확인 정보 없음'),
     );
     expect(
       await burdenLabelFor('node-stale-from', 'node-stale-to'),
-      contains('현장 재확인 필요'),
+      contains('최근 상태 확인 필요'),
     );
   });
 
@@ -312,7 +312,7 @@ void main() {
     expect(wheelchairResult.steps, isEmpty);
     expect(
       wheelchairResult.blockedReasons,
-      contains('내부 이동 경로 접근성 상태를 확인할 수 없습니다.'),
+      contains('엘리베이터와 통로 상태를 확인하지 못했어요.'),
     );
   });
 
