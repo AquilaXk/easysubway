@@ -764,6 +764,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
               : _MapGeometry.fromOriginalAsset(
                   mapAsset,
                   View.of(context).devicePixelRatio,
+                  defaultTargetPlatform,
                 );
           final fullBounds = Rect.fromLTWH(
             0,
@@ -1326,14 +1327,14 @@ class _MapGeometry {
   factory _MapGeometry.fromOriginalAsset(
     _RouteMapAsset asset,
     double devicePixelRatio,
+    TargetPlatform platform,
   ) {
     final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
     final maxLogicalExtent =
         _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
-    final displayScale = math.min(
-      1.0,
-      maxLogicalExtent / math.max(asset.width, asset.height),
-    );
+    final displayScale = platform == TargetPlatform.android
+        ? math.min(1.0, maxLogicalExtent / math.max(asset.width, asset.height))
+        : 1.0;
     final displayWidth = asset.width * displayScale;
     final displayHeight = asset.height * displayScale;
     return _MapGeometry(
