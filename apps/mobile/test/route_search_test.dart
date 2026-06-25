@@ -449,6 +449,32 @@ void main() {
     expect(step.burdenLabel, '시간 확인 필요 · 180m');
   });
 
+  test('경로 계단 상태는 unknown을 계단 없음으로 올리지 않는다', () {
+    final result = _sampleRouteSearchResult(
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '출발역 승강장 접근',
+          description: '승강장까지 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 3,
+          distanceMeters: 80,
+          includesStairs: false,
+          stairAccessState: 'unknown',
+          requiresAccessibilityCheck: true,
+        ),
+      ],
+    );
+
+    expect(result.stairAccessLabel, '계단 여부 확인 필요');
+    expect(result.semanticLabel, contains('계단 여부 확인 필요'));
+    expect(result.semanticLabel, isNot(contains('계단 없음')));
+  });
+
   test('경로 요약 사실값은 열차 거리와 환승 문구에 의존하지 않는다', () {
     final result = _sampleRouteSearchResult(
       steps: const [

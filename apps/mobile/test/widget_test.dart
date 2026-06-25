@@ -5040,6 +5040,9 @@ void main() {
       expect(find.text('환승 적은 순'), findsOneWidget);
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
+      expect(find.text('계단 여부 확인 필요'), findsWidgets);
+      expect(find.text('계단 없음'), findsNothing);
+      expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
       expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
       expect(find.text('추천'), findsOneWidget);
@@ -5071,6 +5074,24 @@ void main() {
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
+          ),
+          matching: find.byIcon(Icons.help_outline),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
+          ),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsNothing,
+      );
 
       await tester.ensureVisible(
         find.byKey(const Key('routeStartGuidanceButton')),
@@ -5683,13 +5704,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+      final routeItemSemantics = tester
+          .getSemantics(find.byKey(const Key('routeResultListItem')))
+          .getSemanticsData();
       expect(
-        tester
-            .getSemantics(find.byKey(const Key('routeResultListItem')))
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
+        routeItemSemantics.hasAction(SemanticsAction.tap),
         isTrue,
       );
+      expect(routeItemSemantics.label, contains('계단 여부 확인 필요'));
     } finally {
       semanticsHandle.dispose();
     }
