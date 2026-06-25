@@ -19,6 +19,7 @@ import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:easysubway_mobile/user_data_deletion.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -928,6 +929,145 @@ void main() {
     expect(decoration.borderRadius, isNull);
     expect(find.byKey(const Key('originalRouteMapView')), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
+  });
+
+  testWidgets('수도권 노선도는 Android에서도 원본 source 좌표계를 유지한다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.view.devicePixelRatio = 3;
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+
+      final viewer = tester.widget<InteractiveViewer>(
+        find.byKey(const Key('networkMapInteractiveViewer')),
+      );
+      final mapContent = viewer.child as SizedBox;
+      expect(mapContent.width, 5724);
+      expect(mapContent.height, 6516);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.resetDevicePixelRatio();
+    }
+  });
+
+  testWidgets('viewBox 좌표 노선도 overlay는 표시 크기 배율을 보정한다', (tester) async {
+    const gwangjuMap = NetworkMapData(
+      regions: [NetworkMapRegion(name: '광주')],
+      selectedRegion: '광주',
+      lines: [
+        NetworkMapLine(
+          id: 'gwangju-1',
+          name: '광주 1호선',
+          color: '#009088',
+          region: '광주',
+        ),
+      ],
+      stations: [
+        NetworkMapStation(
+          id: 'station-gwangju-a',
+          nameKo: '녹동',
+          nameEn: 'Nokdong',
+          region: '광주',
+          lineId: 'gwangju-1',
+          stationCode: '100',
+          sequence: 1,
+          position: NetworkMapPosition(
+            x: 35,
+            y: 33,
+            labelDx: 0,
+            labelDy: 26,
+            upPath: '',
+            downPath: '',
+            sourceId: 'grtc-cyberstation',
+          ),
+        ),
+        NetworkMapStation(
+          id: 'station-gwangju-b',
+          nameKo: '소태',
+          nameEn: 'Sotae',
+          region: '광주',
+          lineId: 'gwangju-1',
+          stationCode: '101',
+          sequence: 2,
+          position: NetworkMapPosition(
+            x: 35,
+            y: 48,
+            labelDx: 0,
+            labelDy: 26,
+            upPath: '',
+            downPath: '',
+            sourceId: 'grtc-cyberstation',
+          ),
+        ),
+      ],
+      edges: [
+        NetworkMapEdge(
+          id: 'gwangju-edge-a-b',
+          lineId: 'gwangju-1',
+          fromStationId: 'station-gwangju-a:gwangju-1',
+          toStationId: 'station-gwangju-b:gwangju-1',
+          accessibilityStatus: 'AVAILABLE',
+          reliabilityScore: 100,
+        ),
+      ],
+      positionSources: [
+        NetworkMapPositionSource(
+          id: 'grtc-cyberstation',
+          name: '광주 공식 사이버스테이션',
+          licenseStatus: 'official',
+        ),
+      ],
+      stationLineMemberships: [
+        NetworkMapStationLineMembership(
+          stationId: 'station-gwangju-a',
+          lineId: 'gwangju-1',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-gwangju-b',
+          lineId: 'gwangju-1',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapRegionNames: const ['광주'],
+          networkMapData: gwangjuMap,
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapLineFilter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('광주 1호선'));
+    await tester.pumpAndSettle();
+
+    final overlay = tester.widget<CustomPaint>(
+      find.byKey(const Key('networkMapSelectedLineOverlay')),
+    );
+    final painter = overlay.painter as dynamic;
+    expect(painter.styleScale as double, closeTo(190.50001 / 720, 0.001));
   });
 
   testWidgets('노선도 역을 누르면 출발 도착 설정 sheet를 보여준다', (tester) async {
