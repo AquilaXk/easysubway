@@ -3303,12 +3303,22 @@ void main() {
       );
 
       await _openRouteOriginStationInput(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routePointPickerCard')),
+          matching: find.byKey(const Key('routeOriginStationInput')),
+        ),
+        findsOneWidget,
+      );
       final originInput = tester.widget<TextField>(
         find.byKey(const Key('routeOriginStationInput')),
       );
       expect(originInput.decoration?.suffixIcon, isNotNull);
       expect(
-        find.byKey(const Key('routeOriginStationSearchButton')),
+        find.descendant(
+          of: find.byKey(const Key('routePointPickerCard')),
+          matching: find.byKey(const Key('routeOriginStationSearchButton')),
+        ),
         findsOneWidget,
       );
     } finally {
