@@ -1318,6 +1318,82 @@ void main() {
     expect(find.text('연신내역'), findsNothing);
   });
 
+  testWidgets('노선도 역명 label polygon 영역을 탭하면 해당 역을 선택한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-polygon',
+            nameKo: '다각형',
+            nameEn: 'Polygon',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '499',
+            sequence: 99,
+            position: NetworkMapPosition(
+              x: 100,
+              y: 100,
+              labelDx: 0,
+              labelDy: 0,
+              labelPolygon:
+                  '[{"x":180,"y":80},{"x":300,"y":80},{"x":300,"y":120},{"x":180,"y":120}]',
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-polygon',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const Key('networkMapStation-polygon-seoul-4')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('다각형역'), findsOneWidget);
+  });
+
   testWidgets('홈 화면은 v3 기준 큰 행동과 짧은 상태 카드로 구성된다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(

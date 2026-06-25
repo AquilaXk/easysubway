@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -1541,6 +1542,13 @@ class _MapGeometry {
         maxX = math.max(maxX, bounds.right);
         maxY = math.max(maxY, bounds.bottom);
       }
+      final labelPolygonBounds = _labelPolygonBoundsFor(station);
+      if (labelPolygonBounds != null) {
+        minX = math.min(minX, labelPolygonBounds.left);
+        minY = math.min(minY, labelPolygonBounds.top);
+        maxX = math.max(maxX, labelPolygonBounds.right);
+        maxY = math.max(maxY, labelPolygonBounds.bottom);
+      }
     }
     if (!minX.isFinite || !minY.isFinite) {
       return _MapGeometry(
@@ -1587,6 +1595,10 @@ Rect _stationHitRect(
     height: nodeRadius * 2,
   );
   final labelOffset = _labelOffsetFor(station);
+  final labelPolygon = _labelPolygonFor(station, geometry);
+  if (labelPolygon != null) {
+    return node.expandToInclude(_boundsForPolygon(labelPolygon));
+  }
   final labelCenter = Offset(
     geometry.x(station) + labelOffset.dx,
     geometry.y(station) + labelOffset.dy,
@@ -1609,13 +1621,12 @@ NetworkMapStation? _stationAtMapPosition(
   NetworkMapStation? bestStation;
   var bestScore = double.infinity;
   for (final station in stations) {
-    final hitRect = _stationHitRect(
+    if (!_stationHitTestContains(
+      position,
       station,
       geometry,
-      nodeRadius: sceneHitRadius,
-      labelHeight: sceneHitRadius * 2,
-    );
-    if (!hitRect.contains(position)) {
+      sceneHitRadius: sceneHitRadius,
+    )) {
       continue;
     }
     final score =
@@ -1637,6 +1648,13 @@ double _stationTapScore(
   _MapGeometry geometry,
 ) {
   final nodeCenter = Offset(geometry.x(station), geometry.y(station));
+  final labelPolygon = _labelPolygonFor(station, geometry);
+  if (labelPolygon != null) {
+    return math.min(
+      (position - nodeCenter).distanceSquared,
+      _distanceSquaredToPolygon(position, labelPolygon),
+    );
+  }
   final labelOffset = _labelOffsetFor(station);
   final labelCenter = Offset(
     nodeCenter.dx + labelOffset.dx,
@@ -1646,6 +1664,157 @@ double _stationTapScore(
     (position - nodeCenter).distanceSquared,
     (position - labelCenter).distanceSquared,
   );
+}
+
+bool _stationHitTestContains(
+  Offset position,
+  NetworkMapStation station,
+  _MapGeometry geometry, {
+  required double sceneHitRadius,
+}) {
+  final nodeCenter = Offset(geometry.x(station), geometry.y(station));
+  if ((position - nodeCenter).distanceSquared <=
+      sceneHitRadius * sceneHitRadius) {
+    return true;
+  }
+  final labelPolygon = _labelPolygonFor(station, geometry);
+  if (labelPolygon != null) {
+    return _distanceSquaredToPolygon(position, labelPolygon) <=
+        sceneHitRadius * sceneHitRadius;
+  }
+  return _stationHitRect(
+    station,
+    geometry,
+    nodeRadius: sceneHitRadius,
+    labelHeight: sceneHitRadius * 2,
+  ).contains(position);
+}
+
+Rect? _labelPolygonBoundsFor(NetworkMapStation station) {
+  final polygon = _parseLabelPolygon(station.position.labelPolygon);
+  return polygon == null ? null : _boundsForPolygon(polygon);
+}
+
+List<Offset>? _labelPolygonFor(
+  NetworkMapStation station,
+  _MapGeometry geometry,
+) {
+  final polygon = _parseLabelPolygon(station.position.labelPolygon);
+  if (polygon == null) {
+    return null;
+  }
+  return [
+    for (final point in polygon)
+      Offset(point.dx - geometry.origin.dx, point.dy - geometry.origin.dy),
+  ];
+}
+
+List<Offset>? _parseLabelPolygon(String value) {
+  if (value.trim().isEmpty) {
+    return null;
+  }
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is! List || decoded.length < 3) {
+      return null;
+    }
+    final points = <Offset>[];
+    for (final rawPoint in decoded) {
+      if (rawPoint is! Map) {
+        return null;
+      }
+      final x = rawPoint['x'];
+      final y = rawPoint['y'];
+      if (x is! num || y is! num) {
+        return null;
+      }
+      final dx = x.toDouble();
+      final dy = y.toDouble();
+      if (!dx.isFinite || !dy.isFinite || dx < 0 || dy < 0) {
+        return null;
+      }
+      points.add(Offset(dx, dy));
+    }
+    return points;
+  } on FormatException {
+    return null;
+  }
+}
+
+Rect _boundsForPolygon(List<Offset> polygon) {
+  var minX = double.infinity;
+  var minY = double.infinity;
+  var maxX = -double.infinity;
+  var maxY = -double.infinity;
+  for (final point in polygon) {
+    minX = math.min(minX, point.dx);
+    minY = math.min(minY, point.dy);
+    maxX = math.max(maxX, point.dx);
+    maxY = math.max(maxY, point.dy);
+  }
+  return Rect.fromLTRB(minX, minY, maxX, maxY);
+}
+
+double _distanceSquaredToPolygon(Offset point, List<Offset> polygon) {
+  if (_pointInPolygon(point, polygon)) {
+    return 0;
+  }
+  var best = double.infinity;
+  for (var index = 0; index < polygon.length; index += 1) {
+    best = math.min(
+      best,
+      _distanceSquaredToSegment(
+        point,
+        polygon[index],
+        polygon[(index + 1) % polygon.length],
+      ),
+    );
+  }
+  return best;
+}
+
+bool _pointInPolygon(Offset point, List<Offset> polygon) {
+  var inside = false;
+  for (
+    var index = 0, previous = polygon.length - 1;
+    index < polygon.length;
+    previous = index, index += 1
+  ) {
+    final currentPoint = polygon[index];
+    final previousPoint = polygon[previous];
+    final crossesY =
+        (currentPoint.dy > point.dy) != (previousPoint.dy > point.dy);
+    if (!crossesY) {
+      continue;
+    }
+    final intersectionX =
+        (previousPoint.dx - currentPoint.dx) *
+            (point.dy - currentPoint.dy) /
+            (previousPoint.dy - currentPoint.dy) +
+        currentPoint.dx;
+    if (point.dx < intersectionX) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+double _distanceSquaredToSegment(Offset point, Offset start, Offset end) {
+  final segment = end - start;
+  final lengthSquared = segment.distanceSquared;
+  if (lengthSquared == 0) {
+    return (point - start).distanceSquared;
+  }
+  final t =
+      (((point.dx - start.dx) * segment.dx) +
+          ((point.dy - start.dy) * segment.dy)) /
+      lengthSquared;
+  final clampedT = t.clamp(0.0, 1.0).toDouble();
+  final projection = Offset(
+    start.dx + segment.dx * clampedT,
+    start.dy + segment.dy * clampedT,
+  );
+  return (point - projection).distanceSquared;
 }
 
 double _median(List<double> values) {
