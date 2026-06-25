@@ -36,7 +36,7 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -47,6 +47,11 @@ class UserDatabase extends _$UserDatabase {
       onUpgrade: (_, from, to) async {
         if (from < 1) {
           throw StateError('Unsupported user database schema version: $from');
+        }
+        if (from < 2) {
+          await customStatement(
+            'ALTER TABLE report_receipts ADD COLUMN public_receipt_code TEXT',
+          );
         }
       },
       beforeOpen: (_) async {

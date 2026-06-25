@@ -90,6 +90,8 @@ class ReportReceipts extends Table {
 
   TextColumn get receiptId => text().named('receipt_id')();
   TextColumn get reportId => text().named('report_id').nullable()();
+  TextColumn get publicReceiptCode =>
+      text().named('public_receipt_code').nullable()();
   TextColumn get status => text()();
   DateTimeColumn get createdAt => dateTime().named('created_at')();
 

@@ -18,7 +18,8 @@ import 'mobile_error_reporter.dart';
 
 export 'features/stations/domain/station_line.dart';
 
-const _currentLocationDisabledMessage = '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _currentLocationDisabledMessage =
+    '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _nearbyLocationMaxAge = Duration(minutes: 5);
 const _nearbyLocationMaxAccuracyMeters = 500.0;
 const _locationQualityUnavailableMessage =
@@ -31,7 +32,7 @@ const _locationQualityMockedMessage =
     '모의 위치는 가까운 역 찾기에 사용할 수 없어요. 출발역을 직접 선택해 주세요.';
 const _locationPermissionRationaleTitle = '현재 위치 사용';
 const _locationPermissionRationalePurpose =
-    '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
+    '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
 const _locationPermissionRationaleFallback =
     '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
 const _stationSearchFailureNextAction = '역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.';
