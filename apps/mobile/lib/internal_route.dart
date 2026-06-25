@@ -328,7 +328,9 @@ class InternalRouteResult {
       totalBurdenLabel,
     ];
     if (warnings.isNotEmpty) {
-      parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
+      parts.add(
+        '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
+      );
     }
     if (steps.isNotEmpty) {
       parts.add('이동 단계 ${steps.map((step) => step.semanticLabel).join(', ')}');
@@ -424,17 +426,30 @@ class InternalRouteStep {
 }
 
 class InternalRouteWarning {
-  const InternalRouteWarning({required this.code, required this.message});
+  const InternalRouteWarning({required this.code, this.rawMessage = ''});
 
   factory InternalRouteWarning.fromJson(Map<String, Object?> json) {
     return InternalRouteWarning(
       code: _requiredInternalRouteString(json, 'code'),
-      message: _requiredInternalRouteString(json, 'message'),
+      rawMessage: _optionalInternalRouteString(json, 'message'),
     );
   }
 
   final String code;
-  final String message;
+  final String rawMessage;
+
+  String get message => userMessage;
+
+  String get userMessage {
+    return switch (code.trim()) {
+      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
+      'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
+      'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
+      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+      'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+      _ => '일부 이동 정보를 확인하지 못했어요.',
+    };
+  }
 }
 
 enum InternalRouteViewStatus { loading, success, failure }
