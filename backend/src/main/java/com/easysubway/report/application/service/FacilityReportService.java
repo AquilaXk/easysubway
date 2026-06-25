@@ -37,6 +37,7 @@ import com.easysubway.transit.application.port.out.SaveAccessibilityFacilityStat
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
 import com.easysubway.transit.domain.Station;
 import com.easysubway.transit.domain.StationNotFoundException;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +63,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 	private static final Logger log = LoggerFactory.getLogger(FacilityReportService.class);
 	private static final String LOCAL_DEV_RECEIPT_TOKEN_PEPPER = "local-dev-report-receipt-pepper";
 	private static final String UNCLAIMED_UPLOAD_OBJECT_PREFIX = "facility-reports/unclaimed/";
+	private static final int PUBLIC_RECEIPT_CODE_SAVE_ATTEMPTS = 3;
 
 	private final LoadTransitMasterPort loadTransitMasterPort;
 	private final SaveAccessibilityFacilityStatusPort saveAccessibilityFacilityStatusPort;
@@ -381,7 +384,6 @@ public class FacilityReportService implements FacilityReportUseCase {
 		// 신고 대상 시설이 요청한 역에 속해야 다른 역 시설 상태가 잘못 갱신되는 일을 막을 수 있다.
 		requireFacilityInStation(command.stationId(), command.facilityId());
 		String reportId = "report-" + UUID.randomUUID();
-		String publicReceiptCode = newPublicReceiptCode();
 		FacilityReportPhotoAttachment photo = preparePhoto(command);
 		StoredFacilityReportPhoto storedPhoto = photo == null ? null : storePhoto(reportId, photo);
 		String storedUserId = hasText(command.userId())
@@ -404,9 +406,8 @@ public class FacilityReportService implements FacilityReportUseCase {
 			? hasText(command.photoContentType()) ? command.photoContentType().trim() : null
 			: photo.contentType();
 
-		FacilityReport report = new FacilityReport(
+		FacilityReport saved = saveNewReportWithReceiptCodeRetry(
 			reportId,
-			publicReceiptCode,
 			storedUserId,
 			command.stationId(),
 			command.facilityId(),
@@ -420,18 +421,66 @@ public class FacilityReportService implements FacilityReportUseCase {
 			photoSizeBytes,
 			command.latitude(),
 			command.longitude(),
-			null,
-			FacilityReportStatus.SUBMITTED,
 			LocalDateTime.now(clock),
-			null,
-			null,
 			hasText(command.clientSubmissionId()) ? command.clientSubmissionId().trim() : null,
 			receiptTokenHash
 		);
-
-		FacilityReport saved = saveFacilityReportPort.saveReport(report);
 		claimUploadedPhotoObject(command, storedPhoto);
 		return saved;
+	}
+
+	private FacilityReport saveNewReportWithReceiptCodeRetry(
+		String reportId,
+		String storedUserId,
+		String stationId,
+		String facilityId,
+		FacilityReportType reportType,
+		String description,
+		String photoFileName,
+		String photoContentType,
+		String photoObjectKey,
+		String photoThumbnailObjectKey,
+		String photoSha256,
+		Long photoSizeBytes,
+		BigDecimal latitude,
+		BigDecimal longitude,
+		LocalDateTime createdAt,
+		String clientSubmissionId,
+		String receiptTokenHash
+	) {
+		DataIntegrityViolationException lastException = null;
+		for (int attempt = 0; attempt < PUBLIC_RECEIPT_CODE_SAVE_ATTEMPTS; attempt++) {
+			FacilityReport report = new FacilityReport(
+				reportId,
+				newPublicReceiptCode(),
+				storedUserId,
+				stationId,
+				facilityId,
+				reportType,
+				description,
+				photoFileName,
+				photoContentType,
+				photoObjectKey,
+				photoThumbnailObjectKey,
+				photoSha256,
+				photoSizeBytes,
+				latitude,
+				longitude,
+				null,
+				FacilityReportStatus.SUBMITTED,
+				createdAt,
+				null,
+				null,
+				clientSubmissionId,
+				receiptTokenHash
+			);
+			try {
+				return saveFacilityReportPort.saveReport(report);
+			} catch (DataIntegrityViolationException exception) {
+				lastException = exception;
+			}
+		}
+		throw lastException;
 	}
 
 	private void claimUploadedPhotoObject(CreateFacilityReportCommand command, StoredFacilityReportPhoto storedPhoto) {
