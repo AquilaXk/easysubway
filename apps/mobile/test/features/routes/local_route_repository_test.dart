@@ -56,6 +56,7 @@ void main() {
     expect(result.lineId, 'seoul-4');
     expect(result.lineName, '수도권 4호선');
     expect(result.isLocalResult, isTrue);
+    expect(result.score, greaterThan(100));
     expect(
       result.steps
           .map((step) => step.lineId)

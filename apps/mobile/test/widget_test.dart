@@ -2502,7 +2502,8 @@ void main() {
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
-      expect(find.text('이동 편의도 92점'), findsOneWidget);
+      expect(find.text('이동 편의도 92점'), findsNothing);
+      expect(find.text('상세 이동 정보는 다시 검색해 확인'), findsOneWidget);
       expect(
         find.text('기준: 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13'),
         findsOneWidget,
@@ -2511,7 +2512,7 @@ void main() {
       expect(find.text('계단 정보 확인 필요 · 엘리베이터 연결 확인 필요'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 이동 편의도 92점, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
         ),
         findsOneWidget,
       );
