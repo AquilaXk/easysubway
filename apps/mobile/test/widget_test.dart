@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
+import 'user_copy_guard.dart';
 
 OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
   return OnboardingState.completed(
@@ -727,9 +728,10 @@ void main() {
     expect(find.text('점검·제보 · 엘리베이터 제보됨'), findsOneWidget);
     expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*출처 공식 파일, 권장 행동 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*공식 정보, 권장 행동 역무원 도움 요청')),
       findsOneWidget,
     );
+    expectNoForbiddenUserCopy(tester);
   });
 
   testWidgets('홈 노선도 버튼은 v3 노선도 화면을 연다', (tester) async {
@@ -751,6 +753,7 @@ void main() {
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('mapRegionTabs')), findsOneWidget);
+    expectNoForbiddenUserCopy(tester);
     expect(find.byKey(const Key('networkMapLineFilter')), findsOneWidget);
     expect(find.byKey(const Key('networkMapZoomInButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapZoomOutButton')), findsOneWidget);
@@ -1579,9 +1582,10 @@ void main() {
     expect(find.text('고장·폐쇄 · 엘리베이터 폐쇄'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*출처 공식 파일, 다음 행동 대체 출구 보기')),
+      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*공식 정보, 다음 행동 대체 출구 보기')),
       findsOneWidget,
     );
+    expectNoForbiddenUserCopy(tester);
   });
 
   testWidgets('홈 시설 알림은 주의 상태 시설이 없으면 섹션을 숨긴다', (tester) async {
@@ -1998,6 +2002,7 @@ void main() {
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
+      expectNoForbiddenUserCopy(tester);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -2735,6 +2740,7 @@ void main() {
       find.byKey(const Key('dataDeletionResultRow-favoriteFacilities')),
     );
     expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(10));
+    expectNoForbiddenUserCopy(tester);
 
     await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
     await tester.pumpAndSettle();
@@ -5127,7 +5133,8 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 보기'));
       await tester.pumpAndSettle();
       expect(find.text('정보 기준'), findsOneWidget);
-      expect(find.text('출처 공식 파일'), findsOneWidget);
+      expect(find.text('공식 정보'), findsOneWidget);
+      expectNoForbiddenUserCopy(tester);
       await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 접기'));
       await tester.pumpAndSettle();
       expect(find.text('출처 공식 파일'), findsNothing);
@@ -5346,9 +5353,10 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 보기'));
     await tester.pumpAndSettle();
     expect(find.text('정보 기준'), findsOneWidget);
-    expect(find.text('현장 검증됨'), findsOneWidget);
-    expect(find.text('정보 신뢰도 높음'), findsOneWidget);
-    expect(find.text('출처 공식 파일'), findsOneWidget);
+    expect(find.text('최근 확인됨'), findsOneWidget);
+    expect(find.text('확인 수준 높음'), findsOneWidget);
+    expect(find.text('공식 정보'), findsOneWidget);
+    expectNoForbiddenUserCopy(tester);
 
     await tester.scrollUntilVisible(
       find.byKey(
@@ -6202,6 +6210,7 @@ void main() {
 
       expect(find.text('역 안 이동 순서'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('이동 점수')), findsNothing);
+      expectNoForbiddenUserCopy(tester);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -7543,6 +7552,7 @@ void main() {
       expect(find.text('처리 상태를 확인했습니다.'), findsOneWidget);
       expect(find.text('반영됨'), findsOneWidget);
       expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 반영됨'), findsOneWidget);
+      expectNoForbiddenUserCopy(tester);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));

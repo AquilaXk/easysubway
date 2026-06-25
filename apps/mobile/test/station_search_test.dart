@@ -158,7 +158,7 @@ void main() {
     expect(results.single.nameKo, '상록수');
     expect(results.single.region, '수도권');
     expect(results.single.dataQualityLabel, '기본 정보만 있음');
-    expect(results.single.dataSourceLabel, '출처 공식 파일');
+    expect(results.single.dataSourceLabel, '공식 정보');
     expect(results.single.lines.single.name, '수도권 4호선');
   });
 
@@ -578,21 +578,21 @@ void main() {
     expect(detail.latitude, 37.302795);
     expect(detail.longitude, 126.866489);
     expect(detail.dataQualityLabel, '기본 정보만 있음');
-    expect(detail.dataSourceLabel, '출처 공식 파일');
+    expect(detail.dataSourceLabel, '공식 정보');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
     expect(exits.single.latitude, 37.302795);
     expect(exits.single.longitude, 126.866489);
     expect(exits.single.elevatorConnectionLabel, '엘리베이터 연결');
     expect(exits.single.stairPathLabel, '계단 없는 이동 가능');
-    expect(exits.single.dataSourceLabel, '출처 공식 파일');
+    expect(exits.single.dataSourceLabel, '공식 정보');
     expect(facilities.single.typeLabel, '엘리베이터');
     expect(facilities.single.latitude, 37.302795);
     expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
     expect(facilities.single.statusTitle, '이용 가능');
-    expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
-    expect(facilities.single.dataSourceLabel, '출처 공식 파일');
+    expect(facilities.single.confidenceLabel, '확인 수준 높음');
+    expect(facilities.single.dataSourceLabel, '공식 정보');
   });
 
   test('즐겨찾기 역 API 저장소는 인증 헤더와 함께 목록을 요청하고 결과를 파싱한다', () async {
@@ -658,7 +658,7 @@ void main() {
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
     expect(favorites.single.dataQualityLabel, '기본 정보만 있음');
-    expect(favorites.single.dataSourceLabel, '출처 공식 파일');
+    expect(favorites.single.dataSourceLabel, '공식 정보');
   });
 
   test('즐겨찾기 역 API 저장소는 인증 제공자가 없으면 인증 헤더를 보내지 않는다', () async {
@@ -1371,7 +1371,7 @@ void main() {
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
     expect(customerCenter.severityLabel, '정상');
-    expect(customerCenter.fieldValidationLabel, '현장 검증됨');
+    expect(customerCenter.fieldValidationLabel, '최근 확인됨');
     expect(customerCenter.statusTitle, '이용 가능');
     expect(customerCenter.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(customerCenter.semanticLabel, isNot(contains('현장 검증')));
