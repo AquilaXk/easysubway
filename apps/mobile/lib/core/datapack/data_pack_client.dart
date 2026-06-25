@@ -41,10 +41,12 @@ class DataPackClient {
 
     final response = await request.close().timeout(_manifestFetchTimeout);
     if (response.statusCode == HttpStatus.notModified && cache != null) {
+      final checkedAt = _now().toUtc();
       await stateRepository.saveManifestCache(
         etag: cache.etag,
-        checkedAt: _now().toUtc(),
-        ttl: cache.ttl,
+        checkedAt: checkedAt,
+        ttl: _cacheTtlBoundedByExpiry(cache.ttl, cache.expiresAt, checkedAt),
+        expiresAt: cache.expiresAt,
       );
       return const DataPackManifestFetchResult(
         status: DataPackManifestFetchStatus.notModified,
@@ -87,23 +89,29 @@ class DataPackClient {
     if (manifest == null || checkedAt == null) {
       return;
     }
-    var cacheTtl = manifest.ttl;
     final expiresAt = manifest.expiresAt;
-    if (expiresAt != null) {
-      final expiryTtl = expiresAt.difference(checkedAt.toUtc());
-      if (expiryTtl <= Duration.zero) {
-        throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
-      }
-      if (expiryTtl < cacheTtl) {
-        cacheTtl = expiryTtl;
-      }
-    }
     await stateRepository.saveManifestCache(
       etag: result.etag,
       checkedAt: checkedAt,
-      ttl: cacheTtl,
+      ttl: _cacheTtlBoundedByExpiry(manifest.ttl, expiresAt, checkedAt),
+      expiresAt: expiresAt,
     );
     await stateRepository.saveAcceptedManifestState(manifest);
+  }
+
+  Duration _cacheTtlBoundedByExpiry(
+    Duration ttl,
+    DateTime? expiresAt,
+    DateTime checkedAt,
+  ) {
+    if (expiresAt == null) {
+      return ttl;
+    }
+    final expiryTtl = expiresAt.difference(checkedAt.toUtc());
+    if (expiryTtl <= Duration.zero) {
+      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+    }
+    return expiryTtl < ttl ? expiryTtl : ttl;
   }
 }
 

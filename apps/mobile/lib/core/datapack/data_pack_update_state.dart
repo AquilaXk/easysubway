@@ -12,6 +12,7 @@ class DataPackUpdateStateRepository {
   static const _manifestEtagKey = 'datapack_manifest_etag';
   static const _manifestCheckedAtKey = 'datapack_manifest_checked_at_ms';
   static const _manifestTtlKey = 'datapack_manifest_ttl_seconds';
+  static const _manifestExpiresAtKey = 'datapack_manifest_expires_at_ms';
   static const _acceptedSequencePrefix = 'datapack_manifest_accepted_sequence_';
   static const _acceptedHashPrefix = 'datapack_manifest_accepted_hash_';
   static const _acceptedAtPrefix = 'datapack_manifest_accepted_at_ms_';
@@ -22,11 +23,12 @@ class DataPackUpdateStateRepository {
   Future<DataPackManifestCache?> readManifestCache() async {
     final rows = await userDatabase
         .customSelect(
-          'SELECT key, value FROM data_pack_update_state WHERE key IN (?, ?, ?)',
+          'SELECT key, value FROM data_pack_update_state WHERE key IN (?, ?, ?, ?)',
           variables: [
             Variable<String>(_manifestEtagKey),
             Variable<String>(_manifestCheckedAtKey),
             Variable<String>(_manifestTtlKey),
+            Variable<String>(_manifestExpiresAtKey),
           ],
           readsFrom: {userDatabase.dataPackUpdateState},
         )
@@ -37,6 +39,7 @@ class DataPackUpdateStateRepository {
     };
     final checkedAtMs = int.tryParse(values[_manifestCheckedAtKey] ?? '');
     final ttlSeconds = int.tryParse(values[_manifestTtlKey] ?? '');
+    final expiresAtMs = int.tryParse(values[_manifestExpiresAtKey] ?? '');
     if (checkedAtMs == null || ttlSeconds == null || ttlSeconds <= 0) {
       return null;
     }
@@ -44,6 +47,9 @@ class DataPackUpdateStateRepository {
       etag: values[_manifestEtagKey],
       checkedAt: DateTime.fromMillisecondsSinceEpoch(checkedAtMs, isUtc: true),
       ttl: Duration(seconds: ttlSeconds),
+      expiresAt: expiresAtMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(expiresAtMs, isUtc: true),
     );
   }
 
@@ -51,6 +57,7 @@ class DataPackUpdateStateRepository {
     required String? etag,
     required DateTime checkedAt,
     required Duration ttl,
+    DateTime? expiresAt,
   }) async {
     await userDatabase.transaction(() async {
       if (etag == null || etag.isEmpty) {
@@ -67,6 +74,18 @@ class DataPackUpdateStateRepository {
         checkedAt,
       );
       await _put(_manifestTtlKey, ttl.inSeconds.toString(), checkedAt);
+      if (expiresAt == null) {
+        await userDatabase.customStatement(
+          'DELETE FROM data_pack_update_state WHERE key = ?',
+          [_manifestExpiresAtKey],
+        );
+      } else {
+        await _put(
+          _manifestExpiresAtKey,
+          expiresAt.toUtc().millisecondsSinceEpoch.toString(),
+          checkedAt,
+        );
+      }
     });
   }
 
@@ -155,7 +174,12 @@ class DataPackUpdateStateRepository {
   }
 
   bool isFresh(DataPackManifestCache cache) {
-    return !_now().toUtc().isAfter(cache.checkedAt.add(cache.ttl));
+    final now = _now().toUtc();
+    final expiresAt = cache.expiresAt;
+    if (expiresAt != null && !now.isBefore(expiresAt)) {
+      return false;
+    }
+    return !now.isAfter(cache.checkedAt.add(cache.ttl));
   }
 
   Future<void> _put(String key, String value, DateTime updatedAt) async {
@@ -185,11 +209,13 @@ class DataPackManifestCache {
     required this.checkedAt,
     required this.ttl,
     this.etag,
+    this.expiresAt,
   });
 
   final String? etag;
   final DateTime checkedAt;
   final Duration ttl;
+  final DateTime? expiresAt;
 }
 
 class DataPackAcceptedManifestState {

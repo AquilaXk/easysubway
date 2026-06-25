@@ -94,9 +94,11 @@ async function main() {
         }
       : {}),
     ttlSeconds: fixture.manifest.ttlSeconds,
-    activePack: fixture.manifest.activePack,
     packs: manifestPacks,
   };
+  if (fixture.manifest.activePack !== undefined) {
+    manifest.activePack = fixture.manifest.activePack;
+  }
   if (fixture.manifest.emergencyOverride !== undefined) {
     manifest.emergencyOverride = fixture.manifest.emergencyOverride;
   }

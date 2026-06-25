@@ -271,6 +271,43 @@ void main() {
     );
     final cache = await stateRepository.readManifestCache();
     expect(cache?.ttl, const Duration(minutes: 5));
+    expect(cache?.expiresAt, DateTime.utc(2026, 6, 25, 12, 5));
+  });
+
+  test('manifest client는 만료된 v2 cache를 304 응답으로 연장하지 않는다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 25, 12, 6),
+    );
+    await stateRepository.saveManifestCache(
+      etag: 'etag-v20',
+      checkedAt: DateTime.utc(2026, 6, 25, 12),
+      ttl: const Duration(minutes: 5),
+      expiresAt: DateTime.utc(2026, 6, 25, 12, 5),
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.notModified
+        ..close();
+    });
+    final client = DataPackClient(
+      manifestUri: Uri.parse(
+        'http://${server.address.host}:${server.port}/manifest.json',
+      ),
+      stateRepository: stateRepository,
+      now: () => DateTime.utc(2026, 6, 25, 12, 6),
+    );
+
+    await expectLater(
+      client.fetchManifestIfNeeded(),
+      throwsA(isA<DataPackClientException>()),
+    );
+    final cache = await stateRepository.readManifestCache();
+    expect(cache?.checkedAt, DateTime.utc(2026, 6, 25, 12));
   });
 
   test('update state는 v2 manifest downgrade와 equivocation을 거부한다', () async {
