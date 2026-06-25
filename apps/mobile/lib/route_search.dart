@@ -1284,12 +1284,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
             ],
             _RouteSectionHeader(
               title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건',
-              trailing: widget.simpleViewEnabled
-                  ? _RouteHeaderActionButton(
-                      label: '변경',
-                      onPressed: _showMobilityTypePicker,
-                    )
-                  : null,
             ),
             const SizedBox(height: 8),
             // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
@@ -1612,11 +1606,8 @@ class _RoutePointPickerCard extends StatelessWidget {
                   icon: const Icon(Icons.swap_vert),
                   color: const Color(0xFF102A2C),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF3F7F8),
-                    fixedSize: const Size(42, 42),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
+                    fixedSize: const Size(48, 48),
+                    side: const BorderSide(color: Color(0xFF9DB6BA)),
                   ),
                 ),
               ),
@@ -1659,7 +1650,7 @@ class _RoutePointRow extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Row(
               children: [
                 Expanded(
@@ -1683,10 +1674,9 @@ class _RoutePointRow extends StatelessWidget {
 }
 
 class _RouteSectionHeader extends StatelessWidget {
-  const _RouteSectionHeader({required this.title, this.trailing});
+  const _RouteSectionHeader({required this.title});
 
   final String title;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1702,56 +1692,7 @@ class _RouteSectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        ?trailing,
       ],
-    );
-  }
-}
-
-class _RouteHeaderActionButton extends StatelessWidget {
-  const _RouteHeaderActionButton({
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(8),
-            child: Ink(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: const Color(0xFF006D77)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 9,
-                ),
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF006D77),
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1992,19 +1933,9 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final option = _mobilityOptionFor(mobilityType);
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '적용 중인 조건',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF29484B),
-            fontWeight: FontWeight.w700,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 3),
         Text(
           option.title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -2025,58 +1956,53 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
       ],
     );
     return Semantics(
-      button: true,
-      label: '이동 조건 바꾸기, 현재 ${option.title}',
+      container: true,
+      explicitChildNodes: true,
+      label:
+          '현재 이동 조건 ${option.title}, ${_routeMobilityConditionLabel(option)}',
       liveRegion: true,
-      onTap: onChangeRequested,
-      child: ExcludeSemantics(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            key: const Key('routeSimpleMobilityTypeButton'),
-            onTap: onChangeRequested,
-            borderRadius: BorderRadius.circular(8),
-            child: Ink(
-              decoration: BoxDecoration(
-                color: const Color(0xFFE9F5F6),
-                border: Border.all(color: const Color(0xFFB9D4D8)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: textScale >= 2
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                option.icon,
-                                color: const Color(0xFF006D77),
-                                size: 26,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(child: content),
-                            ],
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Icon(
-                            option.icon,
-                            color: const Color(0xFF006D77),
-                            size: 26,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: content),
-                        ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFE9F5F6),
+          border: Border.all(color: const Color(0xFFB9D4D8)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: ExcludeSemantics(
+                  child: Row(
+                    children: [
+                      Icon(
+                        option.icon,
+                        color: const Color(0xFF006D77),
+                        size: 26,
                       ),
+                      const SizedBox(width: 10),
+                      Expanded(child: content),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Semantics(
+                button: true,
+                label: '이동 조건 바꾸기, 현재 ${option.title}',
+                onTap: onChangeRequested,
+                child: ExcludeSemantics(
+                  child: OutlinedButton(
+                    key: const Key('routeSimpleMobilityTypeButton'),
+                    onPressed: onChangeRequested,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                    ),
+                    child: const Text('변경'),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2687,8 +2613,6 @@ class _RouteResultsListView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _RouteWorkflowSummary(result: result),
-                const SizedBox(height: 12),
                 _RouteSectionHeader(title: '추천 경로'),
                 const SizedBox(height: 8),
               ],
@@ -3188,50 +3112,6 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
         else
           _RouteFeedbackButtons(result: result, repository: feedbackRepository),
       ],
-    );
-  }
-}
-
-class _RouteWorkflowSummary extends StatelessWidget {
-  const _RouteWorkflowSummary({required this.result});
-
-  final RouteSearchResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE9F5F6),
-        border: Border.all(color: const Color(0xFFB9D4D8)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${result.originStationName} → ${result.destinationStationName}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF102A2C),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _routeMobilityConditionLabel(
-                      _mobilityOptionFor(result.mobilityType),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
