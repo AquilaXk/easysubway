@@ -101,6 +101,22 @@ void main() {
     );
   });
 
+  test('health monitor cancels pending watchdog during recovery', () async {
+    final controller = _FakeRouteMapRendererController();
+    final monitor = RouteMapRendererHealthMonitor(
+      controller,
+      blankTimeout: const Duration(milliseconds: 10),
+    )..start();
+    addTearDown(monitor.stop);
+
+    controller
+      ..emit(const RouteMapRendererCameraRequested(8))
+      ..emit(const RouteMapRendererProcessGone(didCrash: true));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(controller.retryCalls, 1);
+  });
+
   test('health monitor delegates memory pressure trim to controller', () async {
     final controller = _FakeRouteMapRendererController();
     final monitor = RouteMapRendererHealthMonitor(controller)..start();
