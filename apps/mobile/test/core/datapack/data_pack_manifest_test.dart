@@ -171,6 +171,17 @@ void main() {
     );
   });
 
+  test('manifest v2는 timezone 없는 timestamp를 거부한다', () {
+    final json = _v2FixtureManifest();
+    json['publishedAt'] = '2026-06-25T00:00:00';
+    json['signature'] = {
+      'algorithm': 'sha256-manifest-v2',
+      'value': sha256.convert(utf8.encode(_canonicalJson(json))).toString(),
+    };
+
+    expect(() => DataPackManifest.fromJson(json), throwsFormatException);
+  });
+
   test('production 데이터팩 manifest는 HTTPS URL과 source inventory가 필요하다', () {
     expect(
       () => DataPackManifest.fromJson({

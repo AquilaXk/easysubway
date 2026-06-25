@@ -747,7 +747,7 @@ function validateManifestJsonSchema(manifest) {
 }
 
 function validateManifestV2Envelope(manifest) {
-  requiredString(manifest.channel, "manifest.channel");
+  requiredChannel(manifest.channel, "manifest.channel");
   requiredPositiveInteger(manifest.releaseSequence, "manifest.releaseSequence");
   const publishedAt = requiredDate(manifest.publishedAt, "manifest.publishedAt");
   const expiresAt = requiredDate(manifest.expiresAt, "manifest.expiresAt");
@@ -1170,6 +1170,14 @@ function requiredString(value, label) {
     throw new Error(`${label} must be a non-empty string`);
   }
   return value.trim();
+}
+
+function requiredChannel(value, label) {
+  const channel = requiredString(value, label);
+  if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(channel)) {
+    throw new Error(`${label} must match ^[A-Za-z][A-Za-z0-9_-]*$`);
+  }
+  return channel;
 }
 
 function requiredStringArray(value, label) {

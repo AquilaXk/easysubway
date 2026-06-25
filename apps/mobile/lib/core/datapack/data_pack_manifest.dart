@@ -940,6 +940,9 @@ int _requiredPositiveInt(Map<String, Object?> json, String key) {
 
 DateTime _requiredUtcDateTime(Map<String, Object?> json, String key) {
   final rawValue = _requiredString(json, key);
+  if (!RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(rawValue)) {
+    throw const FormatException('Invalid data pack manifest value.');
+  }
   final parsed = DateTime.tryParse(rawValue);
   if (parsed == null) {
     throw const FormatException('Invalid data pack manifest value.');
