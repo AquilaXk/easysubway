@@ -111,6 +111,20 @@ void main() {
     expect(controller.trimMemoryCalls, 1);
   });
 
+  test('health monitor stops delegating after renderer is disposed', () async {
+    final controller = _FakeRouteMapRendererController();
+    final monitor = RouteMapRendererHealthMonitor(controller)..start();
+    addTearDown(monitor.stop);
+
+    controller.emit(const RouteMapRendererDisposed());
+    await pumpEventQueue();
+    await monitor.trimMemory();
+    await monitor.disposeRenderer();
+
+    expect(controller.trimMemoryCalls, 0);
+    expect(controller.disposeCalls, 0);
+  });
+
   test('fake controller mirrors camera request and latency events', () async {
     final controller = _FakeRouteMapRendererController();
     final observed = <RouteMapRendererEvent>[];
