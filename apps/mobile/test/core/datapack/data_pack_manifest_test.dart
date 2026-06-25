@@ -171,6 +171,17 @@ void main() {
     );
   });
 
+  test('manifest v2 replay hash는 signed payload만 사용한다', () {
+    final json = _v2FixtureManifest();
+    final manifest = DataPackManifest.fromJson(json);
+    final signature = json['signature']! as Map<String, Object?>;
+    signature['unsignedTrace'] = 'debug';
+
+    final withUnsignedSignatureField = DataPackManifest.fromJson(json);
+
+    expect(withUnsignedSignatureField.manifestHash, manifest.manifestHash);
+  });
+
   test('manifest v2는 timezone 없는 timestamp를 거부한다', () {
     final json = _v2FixtureManifest();
     json['publishedAt'] = '2026-06-25T00:00:00';

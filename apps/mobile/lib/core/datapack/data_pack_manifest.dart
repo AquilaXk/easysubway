@@ -35,6 +35,9 @@ class DataPackManifest {
         ? _parseManifestEnvelopeSignature(json['signature'])
         : null;
     final keyId = manifestVersion == 2 ? _requiredString(json, 'keyId') : null;
+    final signedCanonicalManifest = manifestVersion == 2
+        ? _canonicalJson(_withoutSignature(json))
+        : null;
 
     final manifest = DataPackManifest(
       manifestVersion: manifestVersion,
@@ -68,7 +71,7 @@ class DataPackManifest {
       keyId: keyId,
       signature: signature,
       manifestHash: manifestVersion == 2
-          ? sha256.convert(utf8.encode(_canonicalJson(json))).toString()
+          ? sha256.convert(utf8.encode(signedCanonicalManifest!)).toString()
           : null,
     );
     manifest._validateEnvelopeSignature(json, productionSigningPublicKey);

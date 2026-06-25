@@ -628,6 +628,16 @@ function validateFixture(fixture) {
   if (!fixture || typeof fixture !== "object") {
     throw new Error("fixture must be an object");
   }
+  if (!fixture.manifest || typeof fixture.manifest !== "object" || Array.isArray(fixture.manifest)) {
+    throw new Error("fixture manifest must be an object");
+  }
+  if (
+    fixture.manifest.manifestVersion !== undefined &&
+    fixture.manifest.manifestVersion !== 1 &&
+    fixture.manifest.manifestVersion !== 2
+  ) {
+    throw new Error("manifest.manifestVersion must be 1 or 2");
+  }
   if (!Number.isInteger(fixture.manifest?.ttlSeconds) || fixture.manifest.ttlSeconds <= 0) {
     throw new Error("manifest ttlSeconds must be a positive integer");
   }
