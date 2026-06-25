@@ -184,13 +184,14 @@ void main() {
   });
 
   test(
-    'controller emits created and initial camera request after subscribe',
+    'controller emits initial camera request after asset is ready',
     () async {
       final controller = AndroidRouteMapViewportController(8);
       final emitted = expectLater(
         controller.events,
         emitsInOrder(<Matcher>[
           isA<RouteMapRendererCreated>(),
+          isA<RouteMapRendererAssetReady>(),
           isA<RouteMapRendererCameraRequested>().having(
             (event) => event.revision,
             'revision',
@@ -202,6 +203,14 @@ void main() {
       );
 
       controller.emitCreated(initialRevision: 3);
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/8',
+            const StandardMethodCodec().encodeMethodCall(
+              const MethodCall('assetReady'),
+            ),
+            (_) {},
+          );
 
       await controller.dispose();
       await emitted;
@@ -239,9 +248,12 @@ void main() {
       final controller = AndroidRouteMapViewportController(10);
       final firstDispose = controller.dispose();
       final secondDispose = controller.dispose();
+      var secondCompleted = false;
+      unawaited(secondDispose.then((_) => secondCompleted = true));
       await pumpEventQueue();
 
       expect(disposeCalls, 1);
+      expect(secondCompleted, isFalse);
 
       disposeCompleter.complete();
       await Future.wait(<Future<void>>[firstDispose, secondDispose]);

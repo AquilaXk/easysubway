@@ -111,8 +111,10 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   final MethodChannel _channel;
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
   final _pendingCameraFrames = <int, Stopwatch>{};
+  int? _initialRevision;
+  bool _initialCameraRequested = false;
   bool _createdEmitted = false;
-  bool _disposeStarted = false;
+  Future<void>? _disposeFuture;
 
   @override
   Stream<RouteMapRendererEvent> get events => _events.stream;
@@ -122,14 +124,14 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
       return;
     }
     _createdEmitted = true;
+    _initialRevision = initialRevision;
     _events.add(const RouteMapRendererCreated());
-    if (initialRevision != null) {
-      _events.add(RouteMapRendererCameraRequested(initialRevision));
-    }
   }
 
   @override
   Future<void> setCamera(MapCameraState camera) {
+    _initialRevision = null;
+    _initialCameraRequested = true;
     _recordCameraRequest(camera.revision);
     return _channel.invokeMethod<void>('setCamera', <String, Object?>{
       'viewBox': _viewBoxFor(camera),
@@ -149,16 +151,20 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   }
 
   @override
-  Future<void> dispose() async {
-    if (_disposeStarted || _events.isClosed) {
-      return;
+  Future<void> dispose() {
+    if (_events.isClosed) {
+      return Future<void>.value();
     }
-    _disposeStarted = true;
+    return _disposeFuture ??= _dispose();
+  }
+
+  Future<void> _dispose() async {
     try {
       await _channel.invokeMethod<void>('dispose');
     } on MissingPluginException {
       // Platform views can already be gone during widget replacement.
     } finally {
+      _initialRevision = null;
       _pendingCameraFrames.clear();
       _channel.setMethodCallHandler(null);
       if (!_events.isClosed) {
@@ -173,6 +179,7 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
     switch (call.method) {
       case 'assetReady':
         _events.add(const RouteMapRendererAssetReady());
+        _recordInitialCameraRequest();
       case 'framePresented':
         final revision = (arguments?['revision'] as int?) ?? 0;
         _recordFrameLatency(revision);
@@ -184,6 +191,19 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
           ),
         );
     }
+  }
+
+  void _recordInitialCameraRequest() {
+    if (_initialCameraRequested || _events.isClosed) {
+      return;
+    }
+    final revision = _initialRevision;
+    if (revision == null) {
+      return;
+    }
+    _initialRevision = null;
+    _initialCameraRequested = true;
+    _recordCameraRequest(revision);
   }
 
   void _recordCameraRequest(int revision) {
