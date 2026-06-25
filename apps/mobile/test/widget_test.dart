@@ -1512,6 +1512,8 @@ void main() {
       expect(find.text('간편 보기'), findsOneWidget);
       expect(find.text('켜짐'), findsNWidgets(2));
       expect(find.text('꺼짐'), findsOneWidget);
+      expect(find.textContaining('데이터팩'), findsNothing);
+      expect(find.textContaining('실기기 QA'), findsNothing);
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
@@ -1521,19 +1523,19 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '큰 글자, 켜짐, 처음 설정에서 변경할 수 있어요',
+          '큰 글자, 켜짐, 두 번 탭해 끄기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
       expect(
         settingsActionSemantics(
-          '간편 보기, 꺼짐, 처음 설정에서 변경할 수 있어요',
+          '간편 보기, 꺼짐, 두 번 탭해 켜기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
       expect(
         settingsActionSemantics(
-          '고대비, 켜짐, 처음 설정에서 변경할 수 있어요',
+          '고대비, 켜짐, 두 번 탭해 끄기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -1591,6 +1593,115 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 3);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isTrue,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
+    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
+    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    final homeContext = tester.element(find.byType(HomeScreen));
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
+    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+  });
+
+  testWidgets('설정 화면 보기 옵션은 큰 글자에서도 스위치를 조작할 수 있다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingStateWithPreferences(
+          preferences: const OnboardingViewPreferences(
+            largeTextEnabled: true,
+            highContrastEnabled: true,
+            simpleViewEnabled: false,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+
+    expect(find.byKey(const Key('largeTextSettingsButton')), findsOneWidget);
+    expect(find.byKey(const Key('highContrastSettingsButton')), findsOneWidget);
+    expect(find.byKey(const Key('simpleViewSettingsButton')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settingsSection-notification')),
+      160,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('알림은 아직 사용할 수 없어요'), findsOneWidget);
+    expect(find.textContaining('실기기 QA'), findsNothing);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
 
   testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {

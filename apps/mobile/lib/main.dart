@@ -657,6 +657,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         recentRoutesFuture: widget.recentRoutesFuture,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
+        onViewPreferencesChanged: _saveViewPreferences,
       ),
     );
   }
@@ -742,6 +743,26 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     final nextResult = OnboardingResult(
       profile: profile,
       preferences: currentResult.preferences,
+    );
+    await _saveOnboardingResult(nextResult);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _onboardingState = OnboardingState.completed(result: nextResult);
+    });
+  }
+
+  Future<void> _saveViewPreferences(
+    OnboardingViewPreferences preferences,
+  ) async {
+    final currentResult = _onboardingState.result;
+    if (currentResult == null) {
+      return;
+    }
+    final nextResult = OnboardingResult(
+      profile: currentResult.profile,
+      preferences: preferences,
     );
     await _saveOnboardingResult(nextResult);
     if (!mounted) {
@@ -1006,6 +1027,7 @@ class HomeScreen extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
+    required this.onViewPreferencesChanged,
     required this.recentRoutesFuture,
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
@@ -1034,6 +1056,8 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
+  final Future<void> Function(OnboardingViewPreferences preferences)
+  onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
@@ -1153,6 +1177,7 @@ class _HomeScreenState extends State<HomeScreen> {
             viewPreferences: widget.viewPreferences,
             notificationRepository: notificationRepository,
             notificationPermissionProvider: notificationPermissionProvider,
+            onViewPreferencesChanged: widget.onViewPreferencesChanged,
             onOpenMobilityProfile: _openMobilityProfile,
             onOpenSupportAccess: openSupportAccess,
             onOpenMyReports: openMyReports,
@@ -2789,6 +2814,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.viewPreferences,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
+    required this.onViewPreferencesChanged,
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
@@ -2799,6 +2825,8 @@ class AppSettingsScreen extends StatefulWidget {
   final OnboardingViewPreferences viewPreferences;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
+  final Future<void> Function(OnboardingViewPreferences preferences)
+  onViewPreferencesChanged;
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
@@ -2809,6 +2837,15 @@ class AppSettingsScreen extends StatefulWidget {
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
   late MobilityProfileOption _profile = widget.currentProfile;
+  late OnboardingViewPreferences _viewPreferences = widget.viewPreferences;
+
+  @override
+  void didUpdateWidget(AppSettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewPreferences != widget.viewPreferences) {
+      _viewPreferences = widget.viewPreferences;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2847,22 +2884,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   key: const Key('largeTextSettingsButton'),
                   icon: Icons.text_fields,
                   title: '큰 글자',
-                  enabled: widget.viewPreferences.largeTextEnabled,
-                  onTap: _showViewPreferenceGuide,
+                  enabled: _viewPreferences.largeTextEnabled,
+                  onChanged: (value) {
+                    _updateViewPreferences(
+                      _viewPreferences.copyWith(largeTextEnabled: value),
+                    );
+                  },
                 ),
                 _AppSettingsPreferenceTile(
                   key: const Key('simpleViewSettingsButton'),
                   icon: Icons.visibility_outlined,
                   title: '간편 보기',
-                  enabled: widget.viewPreferences.simpleViewEnabled,
-                  onTap: _showViewPreferenceGuide,
+                  enabled: _viewPreferences.simpleViewEnabled,
+                  onChanged: (value) {
+                    _updateViewPreferences(
+                      _viewPreferences.copyWith(simpleViewEnabled: value),
+                    );
+                  },
                 ),
                 _AppSettingsPreferenceTile(
                   key: const Key('highContrastSettingsButton'),
                   icon: Icons.contrast,
                   title: '고대비',
-                  enabled: widget.viewPreferences.highContrastEnabled,
-                  onTap: _showViewPreferenceGuide,
+                  enabled: _viewPreferences.highContrastEnabled,
+                  onChanged: (value) {
+                    _updateViewPreferences(
+                      _viewPreferences.copyWith(highContrastEnabled: value),
+                    );
+                  },
                 ),
               ],
             ),
@@ -2873,7 +2922,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const _AppSettingsInfoTile(
                   icon: Icons.public,
                   title: '수도권 우선',
-                  subtitle: '오프라인 데이터팩과 검증된 출처를 먼저 사용해요',
+                  subtitle: '인터넷이 불안정해도 주요 역 정보를 먼저 보여줘요',
                 ),
                 _AppSettingsActionTile(
                   key: const Key('offlineDataSettingsButton'),
@@ -2897,8 +2946,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 if (widget.notificationRepository == null)
                   const _AppSettingsInfoTile(
                     icon: Icons.notifications_off_outlined,
-                    title: '알림 설정 대기 중',
-                    subtitle: '실기기 QA 전에는 푸시 알림을 켜지 않아요',
+                    title: '알림은 아직 사용할 수 없어요',
+                    subtitle: '시설 상태와 신고 처리 안내는 앱 안에서 확인할 수 있어요',
                   )
                 else
                   _AppSettingsActionTile(
@@ -2952,10 +3001,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     );
   }
 
-  void _showViewPreferenceGuide() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('보기 설정은 처음 설정에서 변경할 수 있어요.')));
+  Future<void> _updateViewPreferences(
+    OnboardingViewPreferences preferences,
+  ) async {
+    setState(() {
+      _viewPreferences = preferences;
+    });
+    await widget.onViewPreferencesChanged(preferences);
   }
 }
 
@@ -3097,25 +3149,26 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.enabled,
-    required this.onTap,
+    required this.onChanged,
     super.key,
   });
 
   final IconData icon;
   final String title;
   final bool enabled;
-  final VoidCallback onTap;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final value = enabled ? '켜짐' : '꺼짐';
+    final action = enabled ? '끄기' : '켜기';
     return Semantics(
-      button: true,
-      label: '$title, $value, 처음 설정에서 변경할 수 있어요',
-      onTap: onTap,
+      label: '$title, $value, 두 번 탭해 $action',
+      toggled: enabled,
+      onTap: () => onChanged(!enabled),
       child: ExcludeSemantics(
         child: ListTile(
-          onTap: onTap,
+          onTap: () => onChanged(!enabled),
           minVerticalPadding: 12,
           minLeadingWidth: 32,
           leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
@@ -3128,7 +3181,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
             ),
           ),
           subtitle: Text(
-            '처음 설정에서 변경할 수 있어요',
+            '설정 화면에서 바로 바꿀 수 있어요',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: EasySubwayAccessibleColors.mutedText,
               height: 1.3,
@@ -3144,8 +3197,16 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right),
+              const SizedBox(width: 8),
+              Switch(
+                value: enabled,
+                onChanged: onChanged,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF0D8A6D),
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: const Color(0xFFC8D3DC),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+              ),
             ],
           ),
           shape: Border(
