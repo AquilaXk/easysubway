@@ -11,10 +11,10 @@ import 'mobile_error_reporter.dart';
 const _notificationSettingsTimeout = Duration(seconds: 8);
 const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했습니다.';
 const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했습니다.';
-const _deviceRegistrationErrorMessage = '기기 알림 등록을 마치지 못했습니다.';
-const _notificationPermissionErrorMessage = '알림 권한을 확인하지 못했습니다.';
+const _deviceRegistrationErrorMessage = '알림을 켜지 못했어요.';
+const _notificationPermissionErrorMessage = '알림을 켤 수 있는지 확인하지 못했어요.';
 const _notificationRegistrationFailureNextAction =
-    '기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.';
+    '휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -53,7 +53,7 @@ class MethodChannelNotificationPermissionProvider
           ? NotificationPermissionStatus.granted
           : NotificationPermissionStatus.denied;
     } on PlatformException catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '알림 권한 요청 중 예외가 발생했습니다.');
+      reportMobileError(error, stackTrace, context: '알림 켜기 요청 중 예외가 발생했습니다.');
       throw const NotificationSettingsException(
         _notificationPermissionErrorMessage,
       );
@@ -220,7 +220,7 @@ class DeviceRegistrationApiRepository implements DeviceRegistrationRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '기기 알림 등록 응답 처리 중 예외가 발생했습니다.',
+        context: '알림 등록 응답 처리 중 예외가 발생했습니다.',
       );
       throw const NotificationSettingsException(
         _deviceRegistrationErrorMessage,
@@ -299,7 +299,7 @@ class DeviceRegistrationApiRepository implements DeviceRegistrationRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '기기 알림 등록 응답 파싱 중 예외가 발생했습니다.',
+        context: '알림 등록 응답 파싱 중 예외가 발생했습니다.',
       );
       throw const NotificationSettingsException(
         _deviceRegistrationErrorMessage,
@@ -684,7 +684,7 @@ class _NotificationSettingsScreenState
       builder: (context) => AlertDialog(
         title: const Text('알림 받기'),
         content: const Text(
-          '즐겨찾는 역과 경로의 시설 상태, 내 제보 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
+          '즐겨찾는 역과 경로의 시설 변경, 제보 처리 상황, 최신 안내를 알려드려요. 알림 설정에서 언제든 끌 수 있습니다.',
         ),
         actions: [
           TextButton(
@@ -715,8 +715,8 @@ class _NotificationSettingsScreenState
       setState(() {
         _notificationPermissionMessage =
             status == NotificationPermissionStatus.granted
-            ? '기기 알림이 켜졌습니다.'
-            : '기기 알림 권한을 켜 주세요.';
+            ? '알림이 켜졌어요.'
+            : '휴대전화 설정에서 알림을 허용해 주세요.';
       });
     } on NotificationSettingsException catch (error) {
       if (!mounted) {
@@ -729,7 +729,7 @@ class _NotificationSettingsScreenState
       reportMobileError(
         error,
         stackTrace,
-        context: '알림 권한 요청 화면 처리 중 예외가 발생했습니다.',
+        context: '알림 켜기 화면 처리 중 예외가 발생했습니다.',
       );
       if (!mounted) {
         return;
@@ -782,9 +782,7 @@ class _NotificationSettingsContent extends StatelessWidget {
       children: [
         if (notificationPermissionProvider != null) ...[
           Semantics(
-            label: isRequestingNotificationPermission
-                ? '기기 알림 권한 확인 중'
-                : '기기 알림 켜기',
+            label: isRequestingNotificationPermission ? '알림 확인 중' : '알림 켜기',
             child: OutlinedButton.icon(
               key: const Key('notificationPermissionButton'),
               onPressed: isRequestingNotificationPermission
@@ -798,7 +796,7 @@ class _NotificationSettingsContent extends StatelessWidget {
                     )
                   : const Icon(Icons.notifications_active_outlined),
               label: Text(
-                isRequestingNotificationPermission ? '확인 중' : '기기 알림 켜기',
+                isRequestingNotificationPermission ? '확인 중' : '알림 켜기',
               ),
             ),
           ),
@@ -837,7 +835,7 @@ class _NotificationSettingsContent extends StatelessWidget {
         ),
         _NotificationSwitchTile(
           key: const Key('notificationSwitch-dataQualityAlerts'),
-          title: '정보 갱신 알림',
+          title: '최신 안내 알림',
           value: settings.dataQualityAlerts,
           enabled: !isSaving,
           onChanged: onDataQualityAlertsChanged,

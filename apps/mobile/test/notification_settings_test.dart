@@ -156,7 +156,7 @@ void main() {
         isA<NotificationSettingsException>().having(
           (error) => error.message,
           'message',
-          '기기 알림 등록을 마치지 못했습니다.',
+          '알림을 켜지 못했어요.',
         ),
       ),
     );

@@ -2986,7 +2986,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
-                      subtitle: '시설 상태, 제보 처리, 정보 갱신 알림을 관리해요',
+                      subtitle: '시설 상태, 제보 처리, 최신 안내 알림을 관리해요',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -3794,6 +3794,7 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.privacy_tip_outlined,
               title: '개인정보처리방침',
               value: accessInfo.privacyPolicyUrl,
+              displayValue: '웹에서 확인',
               uri: _httpsUri(accessInfo.privacyPolicyUrl),
               launcher: launcher,
             ),
@@ -3804,6 +3805,7 @@ class SupportAccessScreen extends StatelessWidget {
                 icon: Icons.delete_outline,
                 title: '데이터 삭제 요청',
                 value: accessInfo.dataDeletionEmail,
+                displayValue: '이메일 보내기',
                 helperText: '삭제 범위와 처리 절차를 메일로 문의해요',
                 uri: _mailtoUri(
                   accessInfo.dataDeletionEmail,
@@ -3827,6 +3829,7 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.support_agent,
               title: '고객지원',
               value: accessInfo.supportEmail,
+              displayValue: '이메일 보내기',
               uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
               launcher: launcher,
             ),
@@ -3838,6 +3841,7 @@ class SupportAccessScreen extends StatelessWidget {
               icon: Icons.security_outlined,
               title: '보안 문의',
               value: accessInfo.securityEmail,
+              displayValue: '보안 문제 알리기',
               uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
               launcher: launcher,
             ),
@@ -4781,6 +4785,7 @@ class _SupportAccessItem extends StatelessWidget {
     required this.value,
     required this.uri,
     required this.launcher,
+    this.displayValue,
     this.helperText,
     super.key,
   });
@@ -4790,16 +4795,21 @@ class _SupportAccessItem extends StatelessWidget {
   final String value;
   final Uri? uri;
   final SupportAccessLauncher launcher;
+  final String? displayValue;
   final String? helperText;
 
   @override
   Widget build(BuildContext context) {
     final targetUri = uri;
+    final fallbackTarget = value.trim();
     final displayValue = targetUri == null
         ? '현재 이용할 수 없음 · 준비 중'
-        : value.trim();
+        : this.displayValue ?? fallbackTarget;
     final secondaryText = helperText;
     final semanticLabelParts = [title, displayValue];
+    if (targetUri != null && displayValue != fallbackTarget) {
+      semanticLabelParts.add(fallbackTarget);
+    }
     if (secondaryText != null) {
       semanticLabelParts.add(secondaryText);
     }
@@ -4809,12 +4819,13 @@ class _SupportAccessItem extends StatelessWidget {
       label: semanticLabelParts.join(', '),
       onTap: targetUri == null
           ? null
-          : () => unawaited(_openTarget(context, targetUri)),
+          : () => unawaited(_openTarget(context, targetUri, fallbackTarget)),
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
           onPressed: targetUri == null
               ? null
-              : () => unawaited(_openTarget(context, targetUri)),
+              : () =>
+                    unawaited(_openTarget(context, targetUri, fallbackTarget)),
           icon: Icon(icon),
           label: Align(
             alignment: Alignment.centerLeft,
@@ -4853,7 +4864,11 @@ class _SupportAccessItem extends StatelessWidget {
     );
   }
 
-  Future<void> _openTarget(BuildContext context, Uri uri) async {
+  Future<void> _openTarget(
+    BuildContext context,
+    Uri uri,
+    String fallbackTarget,
+  ) async {
     bool opened = false;
     try {
       opened = await launcher.open(uri);
@@ -4870,7 +4885,7 @@ class _SupportAccessItem extends StatelessWidget {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.')),
+      SnackBar(content: Text('연결할 수 없습니다. 직접 확인해 주세요: $fallbackTarget')),
     );
   }
 }
