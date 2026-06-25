@@ -832,6 +832,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                                   stationsById: stationsById,
                                   edges: widget.data.edges,
                                   geometry: geometry,
+                                  styleScale: geometry.overlayStyleScale,
                                 ),
                               ),
                             ),
@@ -964,6 +965,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     required this.stationsById,
     required this.edges,
     required this.geometry,
+    required this.styleScale,
   });
 
   final String lineId;
@@ -971,6 +973,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
   final Map<String, NetworkMapStation> stationsById;
   final List<NetworkMapEdge> edges;
   final _MapGeometry geometry;
+  final double styleScale;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -987,7 +990,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       ..color = lineColor
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 14
+      ..strokeWidth = 14 * styleScale
       ..style = PaintingStyle.stroke;
     for (final edge in edges) {
       if (edge.lineId != lineId) {
@@ -1016,8 +1019,8 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         continue;
       }
       final center = Offset(geometry.x(station), geometry.y(station));
-      canvas.drawCircle(center, 13, stationBorderPaint);
-      canvas.drawCircle(center, 7, stationFillPaint);
+      canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
+      canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
     }
   }
 
@@ -1027,7 +1030,8 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.linesById != linesById ||
         oldDelegate.stationsById != stationsById ||
         oldDelegate.edges != edges ||
-        oldDelegate.geometry != geometry;
+        oldDelegate.geometry != geometry ||
+        oldDelegate.styleScale != styleScale;
   }
 }
 
@@ -1326,6 +1330,7 @@ class _MapGeometry {
     Rect? initialBounds,
     double? surfaceWidth,
     double? surfaceHeight,
+    this.overlayStyleScale = 1.0,
   }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height),
        surfaceWidth = surfaceWidth ?? width,
        surfaceHeight = surfaceHeight ?? height;
@@ -1337,6 +1342,7 @@ class _MapGeometry {
   final Rect initialBounds;
   final double surfaceWidth;
   final double surfaceHeight;
+  final double overlayStyleScale;
 
   // Android WebView platform view는 큰 Surface에서 GL memory가 급증한다.
   static const _maxAndroidViewSurfaceExtent = 4096.0;
@@ -1358,6 +1364,10 @@ class _MapGeometry {
         : 1.0;
     final sourceWidth = asset.coordinateWidth;
     final sourceHeight = asset.coordinateHeight;
+    final overlayStyleScale = math.min(
+      sourceWidth / asset.width,
+      sourceHeight / asset.height,
+    );
     return _MapGeometry(
       origin: Offset.zero,
       focus: Offset(sourceWidth / 2, sourceHeight / 2),
@@ -1373,6 +1383,9 @@ class _MapGeometry {
       ),
       surfaceWidth: sourceWidth * surfaceScale,
       surfaceHeight: sourceHeight * surfaceScale,
+      overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
+          ? overlayStyleScale
+          : 1.0,
     );
   }
 
