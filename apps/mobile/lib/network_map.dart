@@ -979,11 +979,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _setCamera(MapCameraState camera) {
-    if (_camera == camera) {
+    final currentCamera = _camera;
+    final nextCamera = currentCamera == null
+        ? camera
+        : networkMapCameraWithMonotonicRevision(
+            current: currentCamera,
+            next: camera,
+          );
+    if (_camera == nextCamera) {
       return;
     }
     setState(() {
-      _camera = camera;
+      _camera = nextCamera;
     });
   }
 
@@ -1383,6 +1390,17 @@ MapCameraState _cameraForBounds(
     maxScale: _maxMapScale,
     revision: revision,
   ).clamped(viewportMargin: 220);
+}
+
+@visibleForTesting
+MapCameraState networkMapCameraWithMonotonicRevision({
+  required MapCameraState current,
+  required MapCameraState next,
+}) {
+  if (next.revision > current.revision) {
+    return next;
+  }
+  return next.copyWith(revision: current.revision + 1);
 }
 
 Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {

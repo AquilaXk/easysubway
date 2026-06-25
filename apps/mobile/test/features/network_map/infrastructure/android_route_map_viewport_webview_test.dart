@@ -183,19 +183,30 @@ void main() {
         );
   });
 
-  test('controller emits created after listeners subscribe', () async {
-    final controller = AndroidRouteMapViewportController(8);
-    final created = expectLater(
-      controller.events,
-      emits(isA<RouteMapRendererCreated>()),
-    );
+  test(
+    'controller emits created and initial camera request after subscribe',
+    () async {
+      final controller = AndroidRouteMapViewportController(8);
+      final emitted = expectLater(
+        controller.events,
+        emitsInOrder(<Matcher>[
+          isA<RouteMapRendererCreated>(),
+          isA<RouteMapRendererCameraRequested>().having(
+            (event) => event.revision,
+            'revision',
+            3,
+          ),
+          isA<RouteMapRendererDisposed>(),
+          emitsDone,
+        ]),
+      );
 
-    controller.emitCreated();
+      controller.emitCreated(initialRevision: 3);
 
-    await created;
-    await controller.dispose();
-    await expectLater(controller.events, emitsDone);
-  });
+      await controller.dispose();
+      await emitted;
+    },
+  );
 
   test(
     'controller ignores duplicate dispose while first call is pending',
