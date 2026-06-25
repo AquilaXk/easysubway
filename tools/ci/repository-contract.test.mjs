@@ -305,6 +305,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(workflow, /name: iOS CI/);
   assert.doesNotMatch(workflow, /runs-on: macos-latest/);
   assert.match(workflow, /Repository CI \/ Run contract tests/);
+  assert.match(workflow, /Repository CI \/ Run route map tool tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
   assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
@@ -5566,6 +5567,13 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(datapack.android, "true");
   assert.equal(datapack.ios, "true");
   assert.equal(datapack.deploy, "true");
+
+  const routeMapTool = await classifyChangedFiles(["tools/route-map/extract-svg-geometry.mjs"]);
+  assert.equal(routeMapTool.repository, "true");
+  assert.equal(routeMapTool.mobile, "false");
+  assert.equal(routeMapTool.android, "false");
+  assert.equal(routeMapTool.ios, "false");
+  assert.equal(routeMapTool.deploy, "false");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
