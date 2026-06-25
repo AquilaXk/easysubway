@@ -187,12 +187,14 @@ class NetworkMapPosition {
     required this.upPath,
     required this.downPath,
     required this.sourceId,
+    this.labelPolygon = '',
   });
 
   final int x;
   final int y;
   final int labelDx;
   final int labelDy;
+  final String labelPolygon;
   final String upPath;
   final String downPath;
   final String sourceId;
@@ -203,6 +205,7 @@ class NetworkMapPosition {
       y: json['y'] as int? ?? 0,
       labelDx: json['labelDx'] as int? ?? 0,
       labelDy: json['labelDy'] as int? ?? 0,
+      labelPolygon: json['labelPolygon'] as String? ?? '',
       upPath: json['upPath'] as String? ?? '',
       downPath: json['downPath'] as String? ?? '',
       sourceId: json['sourceId'] as String? ?? '',
