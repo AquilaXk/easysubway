@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
+import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
@@ -892,6 +893,30 @@ void main() {
     expect(find.text('사당역'), findsOneWidget);
     expect(find.text('2호선'), findsOneWidget);
     expect(find.text('4호선'), findsOneWidget);
+  });
+
+  test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {
+    const current = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+
+    final first = networkMapCameraWithMonotonicRevision(
+      current: current,
+      next: current.copyWith(center: const Offset(510, 250), revision: 4),
+    );
+    final second = networkMapCameraWithMonotonicRevision(
+      current: first,
+      next: current.copyWith(center: const Offset(520, 250), revision: 4),
+    );
+
+    expect(first.revision, 4);
+    expect(second.revision, 5);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {

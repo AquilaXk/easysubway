@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_renderer.dart';
@@ -124,19 +126,193 @@ void main() {
         );
   });
 
-  test('controller emits created after listeners subscribe', () async {
-    final controller = AndroidRouteMapViewportController(8);
-    final created = expectLater(
-      controller.events,
-      emits(isA<RouteMapRendererCreated>()),
+  test('controller emits camera request and latency events', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          ),
+          (_) async => null,
+        );
+    final controller = AndroidRouteMapViewportController(9);
+    final events = <RouteMapRendererEvent>[];
+    final subscription = controller.events.listen(events.add);
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('assetReady'),
+          ),
+          (_) {},
+        );
+    await controller.setCamera(camera);
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('framePresented', <String, Object?>{
+              'revision': 3,
+            }),
+          ),
+          (_) {},
+        );
+    await pumpEventQueue();
+
+    expect(
+      events,
+      containsAllInOrder(<Matcher>[
+        isA<RouteMapRendererCameraRequested>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+        isA<RouteMapRendererCameraLatency>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+        isA<RouteMapRendererFramePresented>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+      ]),
     );
 
-    controller.emitCreated();
-
-    await created;
+    await subscription.cancel();
     await controller.dispose();
-    await expectLater(controller.events, emitsDone);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          ),
+          null,
+        );
   });
+
+  test('controller defers camera request until asset is ready', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+          ),
+          (_) async => null,
+        );
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel(
+              'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+            ),
+            null,
+          );
+    });
+    final controller = AndroidRouteMapViewportController(11);
+    final events = <RouteMapRendererEvent>[];
+    final subscription = controller.events.listen(events.add);
+
+    await controller.setCamera(camera);
+    await pumpEventQueue();
+
+    expect(events.whereType<RouteMapRendererCameraRequested>(), isEmpty);
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('assetReady'),
+          ),
+          (_) {},
+        );
+    await pumpEventQueue();
+
+    expect(
+      events.whereType<RouteMapRendererCameraRequested>().single.revision,
+      3,
+    );
+
+    await subscription.cancel();
+    await controller.dispose();
+  });
+
+  test(
+    'controller emits initial camera request after asset is ready',
+    () async {
+      final controller = AndroidRouteMapViewportController(8);
+      final emitted = expectLater(
+        controller.events,
+        emitsInOrder(<Matcher>[
+          isA<RouteMapRendererCreated>(),
+          isA<RouteMapRendererAssetReady>(),
+          isA<RouteMapRendererCameraRequested>().having(
+            (event) => event.revision,
+            'revision',
+            3,
+          ),
+          isA<RouteMapRendererDisposed>(),
+          emitsDone,
+        ]),
+      );
+
+      controller.emitCreated(initialRevision: 3);
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/8',
+            const StandardMethodCodec().encodeMethodCall(
+              const MethodCall('assetReady'),
+            ),
+            (_) {},
+          );
+
+      await controller.dispose();
+      await emitted;
+    },
+  );
+
+  test(
+    'controller ignores duplicate dispose while first call is pending',
+    () async {
+      final disposeCompleter = Completer<void>();
+      var disposeCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel(
+              'com.easysubway.easysubway_mobile/route_map_viewport_webview/10',
+            ),
+            (call) {
+              if (call.method == 'dispose') {
+                disposeCalls += 1;
+                return disposeCompleter.future;
+              }
+              return Future<void>.value();
+            },
+          );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel(
+                'com.easysubway.easysubway_mobile/route_map_viewport_webview/10',
+              ),
+              null,
+            );
+      });
+
+      final controller = AndroidRouteMapViewportController(10);
+      final firstDispose = controller.dispose();
+      final secondDispose = controller.dispose();
+      var secondCompleted = false;
+      unawaited(secondDispose.then((_) => secondCompleted = true));
+      await pumpEventQueue();
+
+      expect(disposeCalls, 1);
+      expect(secondCompleted, isFalse);
+
+      disposeCompleter.complete();
+      await Future.wait(<Future<void>>[firstDispose, secondDispose]);
+      await expectLater(controller.events, emitsDone);
+    },
+  );
 
   testWidgets('widget recreates platform view when asset identity changes', (
     tester,

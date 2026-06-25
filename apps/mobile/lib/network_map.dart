@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'accessible_design.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
+import 'features/network_map/infrastructure/route_map_renderer.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 
@@ -740,11 +742,54 @@ class _NetworkMapCanvas extends StatefulWidget {
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
 
-class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
+class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
+    with WidgetsBindingObserver {
   String? _layoutKey;
   MapCameraState? _camera;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
+  RouteMapRendererHealthMonitor? _rendererMonitor;
+  RouteMapRendererController? _rendererController;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_rendererMonitor?.stop());
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.inactive || AppLifecycleState.paused:
+        _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
+      case AppLifecycleState.detached:
+        final monitor = _rendererMonitor;
+        _rendererMonitor = null;
+        _rendererController = null;
+        _ignoreRendererLifecycleFailure(monitor?.disposeRenderer());
+      case AppLifecycleState.resumed || AppLifecycleState.hidden:
+        break;
+    }
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
+  }
+
+  void _ignoreRendererLifecycleFailure(Future<void>? future) {
+    if (future == null) {
+      return;
+    }
+    unawaited(future.catchError((Object _) {}));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -798,6 +843,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
                         camera: camera,
+                        onControllerCreated: _attachRendererController,
                       ),
               ),
               if (widget.selectedLineId != null)
@@ -943,11 +989,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
   }
 
   void _setCamera(MapCameraState camera) {
-    if (_camera == camera) {
+    final currentCamera = _camera;
+    final nextCamera = currentCamera == null
+        ? camera
+        : networkMapCameraWithMonotonicRevision(
+            current: currentCamera,
+            next: camera,
+          );
+    if (_camera == nextCamera) {
       return;
     }
     setState(() {
-      _camera = camera;
+      _camera = nextCamera;
     });
   }
 
@@ -969,6 +1022,57 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
       return;
     }
     widget.onStationTap(station, stationLinesById[station.id] ?? const []);
+  }
+
+  void _attachRendererController(RouteMapRendererController controller) {
+    if (identical(_rendererController, controller)) {
+      return;
+    }
+    unawaited(_rendererMonitor?.stop());
+    _rendererController = controller;
+    late final RouteMapRendererHealthMonitor monitor;
+    monitor = RouteMapRendererHealthMonitor(
+      controller,
+      onEvent: (event) => _handleRendererEvent(monitor, event),
+    );
+    _rendererMonitor = monitor;
+    monitor.start();
+  }
+
+  void _handleRendererEvent(
+    RouteMapRendererHealthMonitor monitor,
+    RouteMapRendererEvent event,
+  ) {
+    if (event is RouteMapRendererDisposed &&
+        identical(_rendererMonitor, monitor)) {
+      _rendererMonitor = null;
+      _rendererController = null;
+    }
+    if (!kDebugMode && !kProfileMode) {
+      return;
+    }
+    switch (event) {
+      case RouteMapRendererCameraLatency(:final revision, :final elapsed):
+        debugPrint(
+          'routeMapRenderer cameraLatency revision=$revision elapsedMs=${elapsed.inMilliseconds}',
+        );
+      case RouteMapRendererFrameTimeout(:final revision):
+        debugPrint('routeMapRenderer frameTimeout revision=$revision');
+      case RouteMapRendererRecovering(:final attempt):
+        debugPrint('routeMapRenderer recovering attempt=$attempt');
+      case RouteMapRendererProcessGone(:final didCrash):
+        debugPrint('routeMapRenderer processGone didCrash=$didCrash');
+      case RouteMapRendererMemoryTrimmed():
+        debugPrint('routeMapRenderer memoryTrimmed');
+      case RouteMapRendererCreated() ||
+          RouteMapRendererAssetLoading() ||
+          RouteMapRendererAssetReady() ||
+          RouteMapRendererCameraRequested() ||
+          RouteMapRendererFramePresented() ||
+          RouteMapRendererFailed() ||
+          RouteMapRendererDisposed():
+        break;
+    }
   }
 }
 
@@ -1178,10 +1282,15 @@ class _MapControlButton extends StatelessWidget {
 }
 
 class _RouteMapViewportRenderer extends StatelessWidget {
-  const _RouteMapViewportRenderer({required this.asset, required this.camera});
+  const _RouteMapViewportRenderer({
+    required this.asset,
+    required this.camera,
+    required this.onControllerCreated,
+  });
 
   final _RouteMapAsset asset;
   final MapCameraState camera;
+  final ValueChanged<RouteMapRendererController> onControllerCreated;
 
   @override
   Widget build(BuildContext context) {
@@ -1196,11 +1305,13 @@ class _RouteMapViewportRenderer extends StatelessWidget {
         assetPath: asset.path,
         mimeType: asset.mimeType,
         camera: camera,
+        onControllerCreated: onControllerCreated,
       ),
       TargetPlatform.iOS => IosRouteMapViewportWebView(
         assetPath: asset.path,
         mimeType: asset.mimeType,
         camera: camera,
+        onControllerCreated: onControllerCreated,
       ),
       _ => const ColoredBox(color: Colors.white),
     };
@@ -1289,6 +1400,17 @@ MapCameraState _cameraForBounds(
     maxScale: _maxMapScale,
     revision: revision,
   ).clamped(viewportMargin: 220);
+}
+
+@visibleForTesting
+MapCameraState networkMapCameraWithMonotonicRevision({
+  required MapCameraState current,
+  required MapCameraState next,
+}) {
+  if (next.revision > current.revision) {
+    return next;
+  }
+  return next.copyWith(revision: current.revision + 1);
 }
 
 Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
