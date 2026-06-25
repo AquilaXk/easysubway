@@ -90,7 +90,7 @@ class _AndroidRouteMapViewportWebViewState
         final controller = AndroidRouteMapViewportController(viewId);
         _controller = controller;
         widget.onControllerCreated?.call(controller);
-        controller.emitCreated();
+        controller.emitCreated(initialRevision: widget.camera.revision);
       },
     );
   }
@@ -117,12 +117,15 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   @override
   Stream<RouteMapRendererEvent> get events => _events.stream;
 
-  void emitCreated() {
+  void emitCreated({int? initialRevision}) {
     if (_createdEmitted || _events.isClosed) {
       return;
     }
     _createdEmitted = true;
     _events.add(const RouteMapRendererCreated());
+    if (initialRevision != null) {
+      _events.add(RouteMapRendererCameraRequested(initialRevision));
+    }
   }
 
   @override
