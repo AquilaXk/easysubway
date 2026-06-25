@@ -140,10 +140,10 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
       blockedReasons: blockedReasonCodes
           .map(
             (code) => switch (code) {
-              'STAIR_ONLY_ACCESS' => '계단 없는 내부 이동 경로가 없습니다.',
-              'ACCESSIBILITY_STATE_UNKNOWN' => '내부 이동 경로 접근성 상태를 확인할 수 없습니다.',
-              'FACILITY_UNAVAILABLE' => '필수 내부 이동 시설을 사용할 수 없습니다.',
-              _ => '내부 이동 경로가 차단되었습니다.',
+              'STAIR_ONLY_ACCESS' => '계단 없는 역 안 이동 경로를 찾지 못했어요.',
+              'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 확인하지 못했어요.',
+              'FACILITY_UNAVAILABLE' => '역 안 이동에 필요한 시설을 이용할 수 없어요.',
+              _ => '역 안 이동 경로를 이용할 수 없어요.',
             },
           )
           .toList(growable: false),
