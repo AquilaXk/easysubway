@@ -145,6 +145,12 @@ void main() {
           FROM internal_route_edges
           ORDER BY id
           ''').get();
+    final routeMapPosition = await database.customSelect('''
+          SELECT label_polygon
+          FROM route_map_positions
+          WHERE station_id = 'station-sangnoksu'
+            AND line_id = 'seoul-4'
+          ''').getSingle();
 
     expect(metadata.read<String>('value'), '1');
     expect(stations.map((row) => row.read<String>('name_ko')).toList(), [
@@ -263,6 +269,10 @@ void main() {
           .map((row) => row.read<String>('accessibility_status'))
           .toSet(),
       {'AVAILABLE'},
+    );
+    expect(
+      routeMapPosition.read<String>('label_polygon'),
+      '[{"x":2318.642,"y":4961.953},{"x":2355.324,"y":4925.272},{"x":2372.294,"y":4942.242},{"x":2335.613,"y":4978.923}]',
     );
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
