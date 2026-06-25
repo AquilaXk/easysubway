@@ -124,6 +124,20 @@ void main() {
         );
   });
 
+  test('controller emits created after listeners subscribe', () async {
+    final controller = AndroidRouteMapViewportController(8);
+    final created = expectLater(
+      controller.events,
+      emits(isA<RouteMapRendererCreated>()),
+    );
+
+    controller.emitCreated();
+
+    await created;
+    await controller.dispose();
+    await expectLater(controller.events, emitsDone);
+  });
+
   testWidgets('widget recreates platform view when asset identity changes', (
     tester,
   ) async {

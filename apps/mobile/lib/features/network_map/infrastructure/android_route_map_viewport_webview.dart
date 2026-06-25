@@ -83,9 +83,14 @@ class _AndroidRouteMapViewportWebViewState
       ),
       creationParamsCodec: const StandardMessageCodec(),
       onPlatformViewCreated: (viewId) {
+        final previousController = _controller;
+        if (previousController != null) {
+          unawaited(previousController.dispose());
+        }
         final controller = AndroidRouteMapViewportController(viewId);
         _controller = controller;
         widget.onControllerCreated?.call(controller);
+        controller.emitCreated();
       },
     );
   }
@@ -101,14 +106,22 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
          binaryMessenger,
        ) {
     _channel.setMethodCallHandler(_handleNativeCall);
-    _events.add(const RouteMapRendererCreated());
   }
 
   final MethodChannel _channel;
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
+  bool _createdEmitted = false;
 
   @override
   Stream<RouteMapRendererEvent> get events => _events.stream;
+
+  void emitCreated() {
+    if (_createdEmitted || _events.isClosed) {
+      return;
+    }
+    _createdEmitted = true;
+    _events.add(const RouteMapRendererCreated());
+  }
 
   @override
   Future<void> setCamera(MapCameraState camera) {
@@ -126,9 +139,17 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
 
   @override
   Future<void> dispose() async {
-    await _channel.invokeMethod<void>('dispose');
-    _channel.setMethodCallHandler(null);
-    await _events.close();
+    if (_events.isClosed) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod<void>('dispose');
+    } on MissingPluginException {
+      // Platform views can already be gone during widget replacement.
+    } finally {
+      _channel.setMethodCallHandler(null);
+      await _events.close();
+    }
   }
 
   Future<void> _handleNativeCall(MethodCall call) async {
