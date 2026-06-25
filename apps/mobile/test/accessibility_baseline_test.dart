@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
@@ -10,6 +12,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('접근성 색상 토큰은 일반 텍스트 대비 기준을 넘는다', () {
+    const appBackground = Color(0xFFF6F8F9);
+
+    expect(
+      _contrastRatio(EasySubwayAccessibleColors.mint, Colors.white),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      _contrastRatio(EasySubwayAccessibleColors.mutedText, appBackground),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
   testWidgets('모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     tester.platformDispatcher.accessibilityFeaturesTestValue =
@@ -87,6 +102,31 @@ void main() {
       semanticsHandle.dispose();
     }
   });
+}
+
+double _contrastRatio(Color foreground, Color background) {
+  final light = math.max(
+    _relativeLuminance(foreground),
+    _relativeLuminance(background),
+  );
+  final dark = math.min(
+    _relativeLuminance(foreground),
+    _relativeLuminance(background),
+  );
+  return (light + 0.05) / (dark + 0.05);
+}
+
+double _relativeLuminance(Color color) {
+  final red = _linearRgb(color.r);
+  final green = _linearRgb(color.g);
+  final blue = _linearRgb(color.b);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+double _linearRgb(double channel) {
+  return channel <= 0.03928
+      ? channel / 12.92
+      : math.pow((channel + 0.055) / 1.055, 2.4).toDouble();
 }
 
 OnboardingState _completedOnboardingState({

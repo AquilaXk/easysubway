@@ -291,8 +291,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   void _reload({String? region, String? lineId}) {
     setState(() {
+      final isChangingRegion = region != null && region != _selectedRegion;
       _selectedRegion = region ?? _selectedRegion;
-      _selectedLineId = lineId;
+      _selectedLineId = isChangingRegion ? null : lineId;
       _future = _loadMap();
     });
   }
@@ -475,11 +476,11 @@ class _LineFilterMenu extends StatelessWidget {
         break;
       }
     }
-    final label = selectedLine?.shortName ?? '노선 선택';
+    final label = selectedLine?.shortName ?? '전체 노선';
     return SizedBox(
       key: const Key('networkMapLineFilter'),
       width: 142,
-      height: 40,
+      height: EasySubwayTouchTarget.general,
       child: PopupMenuButton<String>(
         padding: EdgeInsets.zero,
         initialValue: selectedLineId ?? '',
@@ -489,7 +490,7 @@ class _LineFilterMenu extends StatelessWidget {
           for (final line in lines)
             PopupMenuItem<String>(value: line.id, child: Text(line.shortName)),
         ],
-        child: _RegionMenuButton(label: label),
+        child: _RegionMenuButton(label: label, semanticLabel: '노선: $label'),
       ),
     );
   }
@@ -518,7 +519,7 @@ class _RegionTabs extends StatelessWidget {
     return SizedBox(
       key: const Key('mapRegionTabs'),
       width: 108,
-      height: 40,
+      height: EasySubwayTouchTarget.general,
       child: PopupMenuButton<String>(
         padding: EdgeInsets.zero,
         initialValue: selected,
@@ -530,25 +531,29 @@ class _RegionTabs extends StatelessWidget {
               child: Text(region.displayName),
             ),
         ],
-        child: _RegionMenuButton(label: _displayRegionName(selected)),
+        child: _RegionMenuButton(
+          label: _displayRegionName(selected),
+          semanticLabel: '지역: ${_displayRegionName(selected)}',
+        ),
       ),
     );
   }
 }
 
 class _RegionMenuButton extends StatelessWidget {
-  const _RegionMenuButton({required this.label});
+  const _RegionMenuButton({required this.label, required this.semanticLabel});
 
   final String label;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: label,
+      label: semanticLabel,
       child: ExcludeSemantics(
         child: Container(
-          height: 40,
+          height: EasySubwayTouchTarget.general,
           padding: const EdgeInsets.only(left: 10, right: 6),
           decoration: BoxDecoration(
             color: Colors.white,
