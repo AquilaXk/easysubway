@@ -1971,9 +1971,21 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              Icon(option.icon, color: const Color(0xFF006D77), size: 26),
-              const SizedBox(width: 10),
-              Expanded(child: content),
+              Expanded(
+                child: ExcludeSemantics(
+                  child: Row(
+                    children: [
+                      Icon(
+                        option.icon,
+                        color: const Color(0xFF006D77),
+                        size: 26,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: content),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(width: 10),
               Semantics(
                 button: true,
