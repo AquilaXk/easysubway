@@ -1958,6 +1958,8 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
+      label:
+          '현재 이동 조건 ${option.title}, ${_routeMobilityConditionLabel(option)}',
       liveRegion: true,
       child: DecoratedBox(
         decoration: BoxDecoration(

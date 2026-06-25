@@ -6178,6 +6178,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
+        find.bySemanticsLabel('현재 이동 조건 천천히 이동, 계단 피하기 · 환승 줄이기'),
+        findsOneWidget,
+      );
+      expect(
         tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
           label: '이동 조건 바꾸기, 현재 천천히 이동',
