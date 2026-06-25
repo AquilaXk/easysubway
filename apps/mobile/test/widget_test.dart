@@ -2197,7 +2197,10 @@ void main() {
       final privacySemantics = tester
           .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
           .getSemanticsData();
-      expect(privacySemantics.label, '개인정보처리방침, 웹에서 확인');
+      expect(
+        privacySemantics.label,
+        '개인정보처리방침, 웹에서 확인, https://easysubway.example/privacy',
+      );
       expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
 
       await tester.scrollUntilVisible(
@@ -2218,7 +2221,7 @@ void main() {
           .getSemanticsData();
       expect(
         deletionSemantics.label,
-        '데이터 삭제 요청, 이메일 보내기, 삭제 범위와 처리 절차를 메일로 문의해요',
+        '데이터 삭제 요청, 이메일 보내기, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
 
@@ -2400,7 +2403,7 @@ void main() {
             .getSemantics(find.byKey(const Key('securityContactAccessItem')))
             .getSemanticsData()
             .label,
-        '보안 문의, 보안 문제 알리기',
+        '보안 문의, 보안 문제 알리기, security@easysubway.example',
       );
 
       await tester.tap(find.byKey(const Key('securityContactAccessItem')));
@@ -2875,7 +2878,10 @@ void main() {
     await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
     await tester.pump();
 
-    expect(find.text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+    expect(
+      find.text('연결할 수 없습니다. 직접 확인해 주세요: https://easysubway.example/privacy'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다', (tester) async {
