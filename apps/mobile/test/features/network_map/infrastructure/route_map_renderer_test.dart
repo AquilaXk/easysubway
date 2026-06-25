@@ -71,6 +71,22 @@ void main() {
     expect(observed.whereType<RouteMapRendererFrameTimeout>(), isEmpty);
   });
 
+  test('health monitor ignores stale higher revision frame', () async {
+    final controller = _FakeRouteMapRendererController();
+    final monitor = RouteMapRendererHealthMonitor(
+      controller,
+      blankTimeout: const Duration(milliseconds: 10),
+    )..start();
+    addTearDown(monitor.stop);
+
+    controller
+      ..emit(const RouteMapRendererCameraRequested(0))
+      ..emit(const RouteMapRendererFramePresented(5));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(controller.retryCalls, 1);
+  });
+
   test('health monitor retries when renderer process is gone', () async {
     final controller = _FakeRouteMapRendererController();
     final observed = <RouteMapRendererEvent>[];

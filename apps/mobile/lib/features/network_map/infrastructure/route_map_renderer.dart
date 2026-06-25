@@ -137,7 +137,7 @@ final class RouteMapRendererHealthMonitor {
       case RouteMapRendererCameraRequested(:final revision):
         _watchRevision(revision);
       case RouteMapRendererFramePresented(:final revision):
-        if (_pendingRevision != null && revision >= _pendingRevision!) {
+        if (_pendingRevision != null && revision == _pendingRevision!) {
           _clearPendingFrame();
         }
       case RouteMapRendererProcessGone():
