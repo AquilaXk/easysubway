@@ -1120,6 +1120,52 @@ void main() {
     expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
   });
 
+  testWidgets('노선도 역은 스크린리더 tap으로도 설정 sheet를 연다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const Key('networkMapSurface')),
+        const Offset(0, 180),
+      );
+      await tester.pumpAndSettle();
+
+      final stationFinder = find.byKey(
+        const Key('networkMapStation-sadang-seoul-4'),
+      );
+      final stationSemantics = tester.getSemantics(stationFinder);
+      expect(
+        stationSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      stationSemantics.owner!.performAction(
+        stationSemantics.id,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      expect(find.text('사당역'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '출발로 설정'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '도착으로 설정'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('노선도 역 좌표가 겹쳐도 탭한 위치에서 가장 가까운 역을 선택한다', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapData: const NetworkMapData(
