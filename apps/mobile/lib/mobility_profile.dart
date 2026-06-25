@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'accessible_design.dart';
+
 class MobilityProfileOption {
   const MobilityProfileOption({
     required this.id,
@@ -148,8 +150,8 @@ class _MobilityProfileScreenState extends State<MobilityProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('이동 조건')),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      bottomNavigationBar: Padding(
+        padding: easySubwayBottomActionInsets(context),
         child: FilledButton.icon(
           key: const Key('mobilityProfileDoneButton'),
           onPressed: _selectedOption == null
