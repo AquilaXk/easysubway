@@ -172,6 +172,7 @@ private class RouteMapViewportPlatformView(
 
     private fun applyViewBox() {
         val values = normalizedViewBox()
+        val frameRevision = revision
         val script = String.format(
             Locale.US,
             "const svg=document.querySelector('svg');if(svg){svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');}",
@@ -181,7 +182,7 @@ private class RouteMapViewportPlatformView(
             values[3],
         )
         webView?.evaluateJavascript(script) {
-            channel.invokeMethod("framePresented", mapOf("revision" to revision))
+            channel.invokeMethod("framePresented", mapOf("revision" to frameRevision))
         }
     }
 
