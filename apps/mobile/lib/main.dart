@@ -4801,11 +4801,15 @@ class _SupportAccessItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final targetUri = uri;
+    final fallbackTarget = value.trim();
     final displayValue = targetUri == null
         ? '현재 이용할 수 없음 · 준비 중'
-        : this.displayValue ?? value.trim();
+        : this.displayValue ?? fallbackTarget;
     final secondaryText = helperText;
     final semanticLabelParts = [title, displayValue];
+    if (targetUri != null && displayValue != fallbackTarget) {
+      semanticLabelParts.add(fallbackTarget);
+    }
     if (secondaryText != null) {
       semanticLabelParts.add(secondaryText);
     }
@@ -4815,12 +4819,13 @@ class _SupportAccessItem extends StatelessWidget {
       label: semanticLabelParts.join(', '),
       onTap: targetUri == null
           ? null
-          : () => unawaited(_openTarget(context, targetUri)),
+          : () => unawaited(_openTarget(context, targetUri, fallbackTarget)),
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
           onPressed: targetUri == null
               ? null
-              : () => unawaited(_openTarget(context, targetUri)),
+              : () =>
+                    unawaited(_openTarget(context, targetUri, fallbackTarget)),
           icon: Icon(icon),
           label: Align(
             alignment: Alignment.centerLeft,
@@ -4859,7 +4864,11 @@ class _SupportAccessItem extends StatelessWidget {
     );
   }
 
-  Future<void> _openTarget(BuildContext context, Uri uri) async {
+  Future<void> _openTarget(
+    BuildContext context,
+    Uri uri,
+    String fallbackTarget,
+  ) async {
     bool opened = false;
     try {
       opened = await launcher.open(uri);
@@ -4876,7 +4885,7 @@ class _SupportAccessItem extends StatelessWidget {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('연결할 수 없습니다. 잠시 후 다시 시도해 주세요.')),
+      SnackBar(content: Text('연결할 수 없습니다. 직접 확인해 주세요: $fallbackTarget')),
     );
   }
 }
