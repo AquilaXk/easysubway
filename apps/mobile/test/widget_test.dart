@@ -803,12 +803,20 @@ void main() {
 
     await tester.tap(find.byKey(const Key('bottomNavMap')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapLineFilter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('4호선'));
+    await tester.pumpAndSettle();
+    expect(repository.requestedNetworkMapLineIds.last, 'seoul-4');
+
     await tester.tap(find.text('테스트권'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('부산'));
     await tester.pumpAndSettle();
 
     expect(repository.requestedNetworkMapRegions, contains('부산'));
+    expect(repository.requestedNetworkMapLineIds.last, isNull);
+    expect(find.bySemanticsLabel('노선: 전체 노선'), findsOneWidget);
     expect(find.text('부산'), findsOneWidget);
   });
 
