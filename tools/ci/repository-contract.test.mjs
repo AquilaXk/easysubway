@@ -2333,6 +2333,15 @@ test("백엔드 web message source는 기본 한국어 bundle과 code 기반 val
   const dataCollectionController = read(
     "backend/src/main/java/com/easysubway/collection/adapter/in/web/DataCollectionController.java",
   );
+  const notificationController = read(
+    "backend/src/main/java/com/easysubway/notification/adapter/in/web/PushNotificationController.java",
+  );
+  const transitController = read(
+    "backend/src/main/java/com/easysubway/transit/adapter/in/web/TransitMasterController.java",
+  );
+  const fieldVerificationController = read(
+    "backend/src/main/java/com/easysubway/field/adapter/in/web/FieldVerificationAdminController.java",
+  );
   const reportAdminController = read(
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
   );
@@ -2346,6 +2355,14 @@ test("백엔드 web message source는 기본 한국어 bundle과 code 기반 val
   assert.match(messages, /^common\.error\.unreadable-body=요청 본문을 확인해야 합니다\.$/m);
   assert.match(messages, /^common\.error\.invalid-body=요청 값을 확인해야 합니다\.$/m);
   assert.match(messages, /^validation\.collection\.source\.required=수집 대상을 선택해야 합니다\.$/m);
+  assert.match(messages, /^validation\.notification\.user-id\.required=사용자 식별자가 필요합니다\.$/m);
+  assert.match(messages, /^validation\.notification\.type\.required=알림 종류를 선택해야 합니다\.$/m);
+  assert.match(messages, /^validation\.notification\.title\.required=알림 제목이 필요합니다\.$/m);
+  assert.match(messages, /^validation\.notification\.body\.required=알림 본문이 필요합니다\.$/m);
+  assert.match(messages, /^validation\.transit\.facility-status\.required=시설 상태를 선택해야 합니다\.$/m);
+  assert.match(messages, /^validation\.transit\.layout-status\.required=구조도 상태를 선택해야 합니다\.$/m);
+  assert.match(messages, /^validation\.transit\.route-node-display-coordinate\.required=노드 표시 좌표가 필요합니다\.$/m);
+  assert.match(messages, /^validation\.field-verification\.status\.required=현장 검증 상태를 선택해야 합니다\.$/m);
   assert.match(messages, /^admin\.report\.status\.SUBMITTED=접수됨$/m);
   assert.match(messages, /^admin\.report\.type\.BROKEN=고장$/m);
   assert.match(messages, /^admin\.report\.review-decision\.ACCEPT=승인$/m);
@@ -2357,6 +2374,20 @@ test("백엔드 web message source는 기본 한국어 bundle과 code 기반 val
   assert.match(exceptionHandler, /common\.error\.invalid-body/);
   assert.match(exceptionHandler, /common\.error\.invalid-parameter/);
   assert.match(dataCollectionController, /@NotNull\(message = "\{validation\.collection\.source\.required\}"\)/);
+  assert.match(notificationController, /@Valid @RequestBody PushNotificationDispatchRequest request/);
+  assert.match(notificationController, /@Valid @RequestBody PushNotificationDeliveryRequest request/);
+  assert.match(notificationController, /@NotBlank\(message = "\{validation\.notification\.user-id\.required\}"\)/);
+  assert.match(notificationController, /@NotNull\(message = "\{validation\.notification\.type\.required\}"\)/);
+  assert.match(notificationController, /@NotBlank\(message = "\{validation\.notification\.title\.required\}"\)/);
+  assert.match(notificationController, /@NotBlank\(message = "\{validation\.notification\.body\.required\}"\)/);
+  assert.match(transitController, /@Valid @RequestBody UpdateAccessibilityFacilityStatusRequest request/);
+  assert.match(transitController, /@Valid @RequestBody UpdateSimplifiedStationLayoutStatusRequest request/);
+  assert.match(transitController, /@Valid @RequestBody UpdateRouteNodeDisplayRequest request/);
+  assert.match(transitController, /@NotNull\(message = "\{validation\.transit\.facility-status\.required\}"\)/);
+  assert.match(transitController, /@NotNull\(message = "\{validation\.transit\.layout-status\.required\}"\)/);
+  assert.match(transitController, /@NotNull\(message = "\{validation\.transit\.route-node-display-coordinate\.required\}"\)/);
+  assert.match(fieldVerificationController, /@Valid @RequestBody UpdateFieldVerificationItemStatusRequest request/);
+  assert.match(fieldVerificationController, /@NotNull\(message = "\{validation\.field-verification\.status\.required\}"\)/);
   assert.match(reportAdminController, /messages\.enumLabel\("admin\.report\.status"/);
   assert.match(reportAdminController, /messages\.enumLabel\("admin\.report\.type"/);
   assert.match(reportAdminController, /messages\.enumLabel\("admin\.report\.review-decision"/);
