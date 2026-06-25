@@ -4801,13 +4801,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
   assert.match(facilityReport, /refreshCurrentReport/);
   assert.match(facilityReport, /처리 상태 확인 중/);
-  assert.match(facilityReport, /접수번호/);
+  assert.match(facilityReport, /제보 번호/);
   assert.match(facilityReport, /facilityReportRefreshButton/);
   assert.match(facilityReport, /facilityReportFailureNextAction/);
   assert.match(facilityReport, /내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요\./);
   assert.match(facilityReportTest, /접수번호로 처리 상태를 조회한다/);
   assert.match(facilityReportTest, /접수 후 처리 상태를 다시 확인한다/);
-  assert.match(widgetTest, /신고 접수번호 report-1, 현재 상태 반영됨/);
+  assert.match(widgetTest, /제보 번호 ES-1001, 현재 상태 반영됨/);
   assert.match(widgetTest, /시설 신고 실패는 다음 행동을 쉬운 문구로 안내한다/);
   assert.match(notificationSettings, /class NotificationSettingsApiRepository/);
   assert.match(notificationSettings, /\/api\/v1\/me\/notification-settings/);
@@ -4817,7 +4817,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /class NotificationSettingsScreen extends StatefulWidget/);
   assert.match(notificationSettings, /역 시설 알림/);
   assert.match(notificationSettings, /경로 시설 알림/);
-  assert.match(notificationSettings, /신고 처리 알림/);
+  assert.match(notificationSettings, /제보 처리 알림/);
   assert.match(notificationSettings, /정보 갱신 알림/);
   assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 상태/);
   assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
@@ -4831,10 +4831,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 다음 행동을 안내한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
-  assert.match(stationSearch, /가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다/);
+  assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
   assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
-  assert.match(facilityReport, /사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다/);
-  assert.match(facilityReport, /신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
+  assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
+  assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
   assert.match(widgetTest, /역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
@@ -4908,7 +4908,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   );
   assert.match(main, /개인정보 사용 안내/);
   assert.match(main, /안전과 데이터 안내/);
-  assert.match(main, /현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다/);
+  assert.match(main, /현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다/);
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);

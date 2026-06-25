@@ -2015,6 +2015,18 @@ class $ReportReceiptsTable extends ReportReceipts
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _publicReceiptCodeMeta = const VerificationMeta(
+    'publicReceiptCode',
+  );
+  @override
+  late final GeneratedColumn<String> publicReceiptCode =
+      GeneratedColumn<String>(
+        'public_receipt_code',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -2039,6 +2051,7 @@ class $ReportReceiptsTable extends ReportReceipts
   List<GeneratedColumn> get $columns => [
     receiptId,
     reportId,
+    publicReceiptCode,
     status,
     createdAt,
   ];
@@ -2066,6 +2079,15 @@ class $ReportReceiptsTable extends ReportReceipts
       context.handle(
         _reportIdMeta,
         reportId.isAcceptableOrUnknown(data['report_id']!, _reportIdMeta),
+      );
+    }
+    if (data.containsKey('public_receipt_code')) {
+      context.handle(
+        _publicReceiptCodeMeta,
+        publicReceiptCode.isAcceptableOrUnknown(
+          data['public_receipt_code']!,
+          _publicReceiptCodeMeta,
+        ),
       );
     }
     if (data.containsKey('status')) {
@@ -2101,6 +2123,10 @@ class $ReportReceiptsTable extends ReportReceipts
         DriftSqlType.string,
         data['${effectivePrefix}report_id'],
       ),
+      publicReceiptCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}public_receipt_code'],
+      ),
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -2121,11 +2147,13 @@ class $ReportReceiptsTable extends ReportReceipts
 class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
   final String receiptId;
   final String? reportId;
+  final String? publicReceiptCode;
   final String status;
   final DateTime createdAt;
   const ReportReceipt({
     required this.receiptId,
     this.reportId,
+    this.publicReceiptCode,
     required this.status,
     required this.createdAt,
   });
@@ -2135,6 +2163,9 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
     map['receipt_id'] = Variable<String>(receiptId);
     if (!nullToAbsent || reportId != null) {
       map['report_id'] = Variable<String>(reportId);
+    }
+    if (!nullToAbsent || publicReceiptCode != null) {
+      map['public_receipt_code'] = Variable<String>(publicReceiptCode);
     }
     map['status'] = Variable<String>(status);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -2147,6 +2178,9 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
       reportId: reportId == null && nullToAbsent
           ? const Value.absent()
           : Value(reportId),
+      publicReceiptCode: publicReceiptCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(publicReceiptCode),
       status: Value(status),
       createdAt: Value(createdAt),
     );
@@ -2160,6 +2194,9 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
     return ReportReceipt(
       receiptId: serializer.fromJson<String>(json['receiptId']),
       reportId: serializer.fromJson<String?>(json['reportId']),
+      publicReceiptCode: serializer.fromJson<String?>(
+        json['publicReceiptCode'],
+      ),
       status: serializer.fromJson<String>(json['status']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
@@ -2170,6 +2207,7 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
     return <String, dynamic>{
       'receiptId': serializer.toJson<String>(receiptId),
       'reportId': serializer.toJson<String?>(reportId),
+      'publicReceiptCode': serializer.toJson<String?>(publicReceiptCode),
       'status': serializer.toJson<String>(status),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
@@ -2178,11 +2216,15 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
   ReportReceipt copyWith({
     String? receiptId,
     Value<String?> reportId = const Value.absent(),
+    Value<String?> publicReceiptCode = const Value.absent(),
     String? status,
     DateTime? createdAt,
   }) => ReportReceipt(
     receiptId: receiptId ?? this.receiptId,
     reportId: reportId.present ? reportId.value : this.reportId,
+    publicReceiptCode: publicReceiptCode.present
+        ? publicReceiptCode.value
+        : this.publicReceiptCode,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
   );
@@ -2190,6 +2232,9 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
     return ReportReceipt(
       receiptId: data.receiptId.present ? data.receiptId.value : this.receiptId,
       reportId: data.reportId.present ? data.reportId.value : this.reportId,
+      publicReceiptCode: data.publicReceiptCode.present
+          ? data.publicReceiptCode.value
+          : this.publicReceiptCode,
       status: data.status.present ? data.status.value : this.status,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -2200,6 +2245,7 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
     return (StringBuffer('ReportReceipt(')
           ..write('receiptId: $receiptId, ')
           ..write('reportId: $reportId, ')
+          ..write('publicReceiptCode: $publicReceiptCode, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -2207,13 +2253,15 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
   }
 
   @override
-  int get hashCode => Object.hash(receiptId, reportId, status, createdAt);
+  int get hashCode =>
+      Object.hash(receiptId, reportId, publicReceiptCode, status, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ReportReceipt &&
           other.receiptId == this.receiptId &&
           other.reportId == this.reportId &&
+          other.publicReceiptCode == this.publicReceiptCode &&
           other.status == this.status &&
           other.createdAt == this.createdAt);
 }
@@ -2221,12 +2269,14 @@ class ReportReceipt extends DataClass implements Insertable<ReportReceipt> {
 class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
   final Value<String> receiptId;
   final Value<String?> reportId;
+  final Value<String?> publicReceiptCode;
   final Value<String> status;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const ReportReceiptsCompanion({
     this.receiptId = const Value.absent(),
     this.reportId = const Value.absent(),
+    this.publicReceiptCode = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2234,6 +2284,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
   ReportReceiptsCompanion.insert({
     required String receiptId,
     this.reportId = const Value.absent(),
+    this.publicReceiptCode = const Value.absent(),
     required String status,
     required DateTime createdAt,
     this.rowid = const Value.absent(),
@@ -2243,6 +2294,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
   static Insertable<ReportReceipt> custom({
     Expression<String>? receiptId,
     Expression<String>? reportId,
+    Expression<String>? publicReceiptCode,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
@@ -2250,6 +2302,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
     return RawValuesInsertable({
       if (receiptId != null) 'receipt_id': receiptId,
       if (reportId != null) 'report_id': reportId,
+      if (publicReceiptCode != null) 'public_receipt_code': publicReceiptCode,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
@@ -2259,6 +2312,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
   ReportReceiptsCompanion copyWith({
     Value<String>? receiptId,
     Value<String?>? reportId,
+    Value<String?>? publicReceiptCode,
     Value<String>? status,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
@@ -2266,6 +2320,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
     return ReportReceiptsCompanion(
       receiptId: receiptId ?? this.receiptId,
       reportId: reportId ?? this.reportId,
+      publicReceiptCode: publicReceiptCode ?? this.publicReceiptCode,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
@@ -2280,6 +2335,9 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
     }
     if (reportId.present) {
       map['report_id'] = Variable<String>(reportId.value);
+    }
+    if (publicReceiptCode.present) {
+      map['public_receipt_code'] = Variable<String>(publicReceiptCode.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -2298,6 +2356,7 @@ class ReportReceiptsCompanion extends UpdateCompanion<ReportReceipt> {
     return (StringBuffer('ReportReceiptsCompanion(')
           ..write('receiptId: $receiptId, ')
           ..write('reportId: $reportId, ')
+          ..write('publicReceiptCode: $publicReceiptCode, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
@@ -3955,6 +4014,7 @@ typedef $$ReportReceiptsTableCreateCompanionBuilder =
     ReportReceiptsCompanion Function({
       required String receiptId,
       Value<String?> reportId,
+      Value<String?> publicReceiptCode,
       required String status,
       required DateTime createdAt,
       Value<int> rowid,
@@ -3963,6 +4023,7 @@ typedef $$ReportReceiptsTableUpdateCompanionBuilder =
     ReportReceiptsCompanion Function({
       Value<String> receiptId,
       Value<String?> reportId,
+      Value<String?> publicReceiptCode,
       Value<String> status,
       Value<DateTime> createdAt,
       Value<int> rowid,
@@ -3984,6 +4045,11 @@ class $$ReportReceiptsTableFilterComposer
 
   ColumnFilters<String> get reportId => $composableBuilder(
     column: $table.reportId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get publicReceiptCode => $composableBuilder(
+    column: $table.publicReceiptCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4017,6 +4083,11 @@ class $$ReportReceiptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get publicReceiptCode => $composableBuilder(
+    column: $table.publicReceiptCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -4042,6 +4113,11 @@ class $$ReportReceiptsTableAnnotationComposer
 
   GeneratedColumn<String> get reportId =>
       $composableBuilder(column: $table.reportId, builder: (column) => column);
+
+  GeneratedColumn<String> get publicReceiptCode => $composableBuilder(
+    column: $table.publicReceiptCode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -4085,12 +4161,14 @@ class $$ReportReceiptsTableTableManager
               ({
                 Value<String> receiptId = const Value.absent(),
                 Value<String?> reportId = const Value.absent(),
+                Value<String?> publicReceiptCode = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReportReceiptsCompanion(
                 receiptId: receiptId,
                 reportId: reportId,
+                publicReceiptCode: publicReceiptCode,
                 status: status,
                 createdAt: createdAt,
                 rowid: rowid,
@@ -4099,12 +4177,14 @@ class $$ReportReceiptsTableTableManager
               ({
                 required String receiptId,
                 Value<String?> reportId = const Value.absent(),
+                Value<String?> publicReceiptCode = const Value.absent(),
                 required String status,
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => ReportReceiptsCompanion.insert(
                 receiptId: receiptId,
                 reportId: reportId,
+                publicReceiptCode: publicReceiptCode,
                 status: status,
                 createdAt: createdAt,
                 rowid: rowid,

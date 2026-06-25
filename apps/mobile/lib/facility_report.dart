@@ -15,24 +15,23 @@ import 'mobile_error_reporter.dart';
 import 'secure_key_value_storage.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
-const _facilityReportErrorMessage = '신고를 보내지 못했습니다.';
+const _facilityReportErrorMessage = '제보를 보내지 못했습니다.';
 const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
-const _facilityReportListErrorMessage = '신고 내역을 불러오지 못했습니다.';
+const _facilityReportListErrorMessage = '제보 내역을 불러오지 못했습니다.';
 const _facilityReportFailureNextAction = '내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportPhotoUploadMaxAttempts = 2;
 const _facilityReportLocationDisabledMessage =
-    '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+    '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
 const _facilityReportLocationRationaleTitle = '현재 위치 사용';
 const _facilityReportLocationRationalePurpose =
-    '가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.';
+    '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
 const _facilityReportLocationRationaleFallback =
     '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
 const _facilityReportUploadDisclosureTitle = '사진·위치 확인';
-const _facilityReportUploadDisclosurePurpose =
-    '사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.';
+const _facilityReportUploadDisclosurePurpose = '사진과 제보 위치는 시설 제보 확인에만 사용됩니다.';
 const _facilityReportUploadDisclosureScope =
-    '신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.';
+    '제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
 
@@ -92,7 +91,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 접수 응답 처리 중 예외가 발생했습니다.',
+        context: '시설 제보 접수 응답 처리 중 예외가 발생했습니다.',
       );
       throw const FacilityReportException(_facilityReportErrorMessage);
     }
@@ -236,7 +235,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 receipt token 저장 중 예외가 발생했습니다.',
+        context: '시설 제보 receipt token 저장 중 예외가 발생했습니다.',
       );
     }
   }
@@ -250,6 +249,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       FacilityReportReceipt(
         receiptId: result.id,
         reportId: result.id,
+        publicReceiptCode: result.publicReceiptCode,
         status: result.status,
         receiptToken: receiptToken,
         createdAt: DateTime.now(),
@@ -295,7 +295,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 처리 상태 응답 처리 중 예외가 발생했습니다.',
+        context: '시설 제보 처리 상태 응답 처리 중 예외가 발생했습니다.',
       );
       throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
@@ -314,12 +314,18 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       return Future.wait(
         receipts.map((receipt) async {
           try {
-            return await getReport(receipt.reportId);
+            final report = await getReport(receipt.reportId);
+            final reportWithReceiptCode = _reportWithReceiptCodeFallback(
+              report,
+              receipt,
+            );
+            await _refreshReceiptIfPossible(receipt, reportWithReceiptCode);
+            return reportWithReceiptCode;
           } catch (error, stackTrace) {
             reportMobileError(
               error,
               stackTrace,
-              context: '시설 신고 receipt 기반 상태 조회 중 예외가 발생했습니다.',
+              context: '시설 제보 receipt 기반 상태 조회 중 예외가 발생했습니다.',
             );
             return _reportResultFromReceipt(receipt);
           }
@@ -331,10 +337,62 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '내 시설 신고 목록 응답 처리 중 예외가 발생했습니다.',
+        context: '내 시설 제보 목록 응답 처리 중 예외가 발생했습니다.',
       );
       throw const FacilityReportException(_facilityReportListErrorMessage);
     }
+  }
+
+  Future<void> _refreshReceiptIfPossible(
+    FacilityReportReceipt receipt,
+    FacilityReportResult report,
+  ) async {
+    try {
+      await receiptStore
+          ?.saveReceipt(
+            FacilityReportReceipt(
+              receiptId: receipt.receiptId,
+              reportId: receipt.reportId,
+              publicReceiptCode:
+                  _nonBlankReportString(report.publicReceiptCode) ??
+                  _nonBlankReportString(receipt.publicReceiptCode),
+              status: report.status,
+              receiptToken: receipt.receiptToken,
+              createdAt: receipt.createdAt,
+            ),
+          )
+          .timeout(_facilityReportTimeout);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 제보 receipt 상태 갱신 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  FacilityReportResult _reportWithReceiptCodeFallback(
+    FacilityReportResult report,
+    FacilityReportReceipt receipt,
+  ) {
+    final publicReceiptCode =
+        _nonBlankReportString(report.publicReceiptCode) ??
+        _nonBlankReportString(receipt.publicReceiptCode);
+    if (publicReceiptCode == null ||
+        publicReceiptCode == report.publicReceiptCode) {
+      return report;
+    }
+    return FacilityReportResult(
+      id: report.id,
+      stationId: report.stationId,
+      facilityId: report.facilityId,
+      reportType: report.reportType,
+      description: report.description,
+      status: report.status,
+      createdAt: report.createdAt,
+      receiptToken: report.receiptToken,
+      publicReceiptCode: publicReceiptCode,
+    );
   }
 
   FacilityReportResult _reportResultFromJson(
@@ -363,6 +421,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       status: receipt.status,
       createdAt: receipt.createdAt.toIso8601String(),
       receiptToken: receipt.receiptToken,
+      publicReceiptCode: receipt.publicReceiptCode,
     );
   }
 }
@@ -576,10 +635,12 @@ class FacilityReportReceipt {
     required this.status,
     required this.receiptToken,
     required this.createdAt,
+    this.publicReceiptCode,
   });
 
   final String receiptId;
   final String reportId;
+  final String? publicReceiptCode;
   final String status;
   final String receiptToken;
   final DateTime createdAt;
@@ -612,6 +673,7 @@ class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
           user_db.ReportReceiptsCompanion.insert(
             receiptId: receipt.receiptId,
             reportId: Value(receipt.reportId),
+            publicReceiptCode: Value(receipt.publicReceiptCode),
             status: receipt.status,
             createdAt: receipt.createdAt,
           ),
@@ -662,6 +724,7 @@ class DriftFacilityReportReceiptStore implements FacilityReportReceiptStore {
         FacilityReportReceipt(
           receiptId: receipt.receiptId,
           reportId: reportId,
+          publicReceiptCode: receipt.publicReceiptCode,
           status: receipt.status,
           receiptToken: receiptToken,
           createdAt: receipt.createdAt,
@@ -807,6 +870,7 @@ class FacilityReportResult {
     required this.status,
     required this.createdAt,
     this.receiptToken,
+    this.publicReceiptCode,
   });
 
   factory FacilityReportResult.fromJson(Map<String, Object?> json) {
@@ -819,6 +883,7 @@ class FacilityReportResult {
       status: _requiredReportString(json, 'status'),
       createdAt: _requiredReportString(json, 'createdAt'),
       receiptToken: _optionalReportString(json, 'receiptToken'),
+      publicReceiptCode: _optionalReportString(json, 'publicReceiptCode'),
     );
   }
 
@@ -830,6 +895,15 @@ class FacilityReportResult {
   final String status;
   final String createdAt;
   final String? receiptToken;
+  final String? publicReceiptCode;
+
+  String get displayReceiptCode {
+    final code = publicReceiptCode?.trim();
+    if (code == null || code.isEmpty) {
+      return '준비 중';
+    }
+    return code;
+  }
 
   String get statusLabel {
     return switch (status) {
@@ -837,7 +911,7 @@ class FacilityReportResult {
       'UNDER_REVIEW' => '확인 중',
       'ACCEPTED' => '반영됨',
       'REJECTED' => '반려됨',
-      'DUPLICATE' => '중복 신고',
+      'DUPLICATE' => '중복 제보',
       'RESOLVED' => '처리 완료',
       _ => '접수 상태 확인 필요',
     };
@@ -851,7 +925,7 @@ class FacilityReportResult {
       'LOCATION_WRONG' => '위치가 달라요',
       'INFORMATION_WRONG' => '정보가 달라요',
       'RECOVERED' => '다시 정상',
-      _ => '시설 신고',
+      _ => '시설 제보',
     };
   }
 }
@@ -936,7 +1010,7 @@ class SecureFacilityReportDraftTargetStore
       reportMobileError(
         error,
         stackTrace,
-        context: '저장된 시설 신고 대상을 읽는 중 예외가 발생했습니다.',
+        context: '저장된 시설 제보 대상을 읽는 중 예외가 발생했습니다.',
       );
       await _clearTargetAfterReadFailure();
       return null;
@@ -963,7 +1037,7 @@ class SecureFacilityReportDraftTargetStore
       reportMobileError(
         error,
         stackTrace,
-        context: '손상된 시설 신고 대상을 지우는 중 예외가 발생했습니다.',
+        context: '손상된 시설 제보 대상을 지우는 중 예외가 발생했습니다.',
       );
     }
   }
@@ -1057,7 +1131,7 @@ class FacilityReportController extends ChangeNotifier {
     _emitState(
       const FacilityReportState(
         status: FacilityReportViewStatus.loading,
-        message: '신고 보내는 중',
+        message: '제보 보내는 중',
       ),
     );
 
@@ -1078,7 +1152,7 @@ class FacilityReportController extends ChangeNotifier {
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.success,
-          message: '신고가 접수되었습니다.',
+          message: '제보를 보냈어요.',
           result: result,
         ),
       );
@@ -1093,7 +1167,7 @@ class FacilityReportController extends ChangeNotifier {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 화면 제출 처리 중 예외가 발생했습니다.',
+        context: '시설 제보 화면 제출 처리 중 예외가 발생했습니다.',
       );
       _emitState(
         const FacilityReportState(
@@ -1130,7 +1204,7 @@ class FacilityReportController extends ChangeNotifier {
         ),
       );
     } on FacilityReportException catch (error) {
-      // 상태 확인이 실패해도 사용자가 접수번호를 잃지 않도록 직전 결과는 유지한다.
+      // 상태 확인이 실패해도 사용자가 제보 번호를 잃지 않도록 직전 결과는 유지한다.
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.failure,
@@ -1142,7 +1216,7 @@ class FacilityReportController extends ChangeNotifier {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 처리 상태 새로고침 중 예외가 발생했습니다.',
+        context: '시설 제보 처리 상태 새로고침 중 예외가 발생했습니다.',
       );
       // 알 수 없는 오류도 같은 화면에서 다시 확인할 수 있게 접수 결과를 보존한다.
       _emitState(
@@ -1222,7 +1296,7 @@ class _MyFacilityReportListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('내 신고')),
+      appBar: AppBar(title: const Text('내 제보')),
       body: SafeArea(
         child: FutureBuilder<List<FacilityReportResult>>(
           future: _reportsFuture,
@@ -1266,7 +1340,7 @@ class _MyReportLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '신고 내역 불러오는 중',
+      label: '제보 내역 불러오는 중',
       liveRegion: true,
       child: const Center(child: CircularProgressIndicator()),
     );
@@ -1282,7 +1356,7 @@ class _MyReportEmpty extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          '접수한 신고가 없습니다.',
+          '접수한 제보가 없습니다.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: const Color(0xFF102A2C),
@@ -1353,7 +1427,7 @@ class _MyReportListItem extends StatelessWidget {
 
     return Semantics(
       label:
-          '내 신고, ${report.reportTypeLabel}, 접수번호 ${report.id}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
+          '내 제보, ${report.reportTypeLabel}, 제보 번호 ${report.displayReceiptCode}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
       button: true,
       onTap: openReportDetail,
       child: ExcludeSemantics(
@@ -1403,7 +1477,10 @@ class _MyReportListItem extends StatelessWidget {
                     spacing: 12,
                     runSpacing: 6,
                     children: [
-                      _MyReportMetaText(label: '접수번호', value: report.id),
+                      _MyReportMetaText(
+                        label: '제보 번호',
+                        value: report.displayReceiptCode,
+                      ),
                       _MyReportMetaText(label: '접수일', value: createdAtLabel),
                     ],
                   ),
@@ -1430,11 +1507,11 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
     final createdAtLabel = _reportDateLabel(report.createdAt);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('신고 상세')),
+      appBar: AppBar(title: const Text('제보 상세')),
       body: SafeArea(
         child: Semantics(
           label:
-              '내 신고 상세, ${report.reportTypeLabel}, 현재 상태 ${report.statusLabel}, 접수번호 ${report.id}',
+              '내 제보 상세, ${report.reportTypeLabel}, 현재 상태 ${report.statusLabel}, 제보 번호 ${report.displayReceiptCode}',
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
             children: [
@@ -1449,11 +1526,14 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _MyReportDetailStatus(label: report.statusLabel),
               const SizedBox(height: 24),
-              _MyReportDetailRow(label: '접수번호', value: report.id),
+              _MyReportDetailRow(
+                label: '제보 번호',
+                value: report.displayReceiptCode,
+              ),
               const Divider(height: 32),
               _MyReportDetailRow(label: '접수일', value: createdAtLabel),
               const Divider(height: 32),
-              _MyReportDetailRow(label: '신고 내용', value: description),
+              _MyReportDetailRow(label: '제보 내용', value: description),
             ],
           ),
         ),
@@ -1630,7 +1710,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         (widget.locationLoader != null && _attachedLocation == null);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('시설 신고')),
+      appBar: AppBar(title: const Text('시설 상태 제보')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -1773,7 +1853,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     )
                   : const Icon(Icons.send),
-              label: Text(hasSubmittedReport ? '접수 완료' : '신고 보내기'),
+              label: Text(hasSubmittedReport ? '제보 완료' : '제보 보내기'),
             ),
           ],
         ),
@@ -1848,7 +1928,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('사진은 신고 확인에만 사용됩니다.'),
+            Text('사진은 제보 내용을 확인하는 데만 사용해요.'),
             SizedBox(height: 8),
             Text('얼굴이나 전화번호가 보이면 가려 주세요.'),
           ],
@@ -1877,7 +1957,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (mounted) {
         setState(() {
           _attachedLocation = null;
-          _locationMessage = '위치 안내를 확인한 뒤 신고 위치를 첨부해 주세요.';
+          _locationMessage = '위치 안내를 확인한 뒤 제보 위치를 첨부해 주세요.';
           _isLocationFailure = true;
         });
       }
@@ -1898,7 +1978,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 위치 권한 사전 확인 중 예외가 발생했습니다.',
+        context: '시설 제보 위치 권한 사전 확인 중 예외가 발생했습니다.',
       );
     }
     if (!needsPermissionRequest) {
@@ -1993,7 +2073,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 사진 첨부 중 예외가 발생했습니다.',
+        context: '시설 제보 사진 첨부 중 예외가 발생했습니다.',
       );
       if (mounted) {
         setState(() {
@@ -2039,7 +2119,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 사진 선택 복구 중 예외가 발생했습니다.',
+        context: '시설 제보 사진 선택 복구 중 예외가 발생했습니다.',
       );
       if (mounted) {
         setState(() {
@@ -2057,7 +2137,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 사진 선택 대상 저장 중 예외가 발생했습니다.',
+        context: '시설 제보 사진 선택 대상 저장 중 예외가 발생했습니다.',
       );
     }
   }
@@ -2069,7 +2149,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 사진 선택 대상 정리 중 예외가 발생했습니다.',
+        context: '시설 제보 사진 선택 대상 정리 중 예외가 발생했습니다.',
       );
     }
   }
@@ -2136,7 +2216,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 현재 위치 확인 중 예외가 발생했습니다.',
+        context: '시설 제보 현재 위치 확인 중 예외가 발생했습니다.',
       );
       if (!mounted) {
         return;
@@ -2179,14 +2259,18 @@ class _FacilityReportStatusPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Semantics(
-              // 접수번호와 상태를 한 문장으로 묶어 스크린리더가 상태 변화를 읽게 한다.
-              label: '신고 접수번호 ${result.id}, 현재 상태 ${result.statusLabel}',
+              // 제보 번호와 상태를 한 문장으로 묶어 스크린리더가 상태 변화를 읽게 한다.
+              label:
+                  '제보 번호 ${result.displayReceiptCode}, 현재 상태 ${result.statusLabel}',
               liveRegion: true,
               child: ExcludeSemantics(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FacilityReportStatusRow(label: '접수번호', value: result.id),
+                    _FacilityReportStatusRow(
+                      label: '제보 번호',
+                      value: result.displayReceiptCode,
+                    ),
                     const SizedBox(height: 10),
                     _FacilityReportStatusRow(
                       label: '처리 상태',
@@ -2501,6 +2585,14 @@ String _optionalReportString(Map<String, Object?> json, String key) {
     return value;
   }
   return '';
+}
+
+String? _nonBlankReportString(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  return trimmed;
 }
 
 String _reportDateLabel(String createdAt) {
