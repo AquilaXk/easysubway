@@ -197,12 +197,13 @@ class StartScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final topGap = (constraints.maxHeight * 0.34).clamp(84.0, 212.0);
+              final bottomGap = 35 + MediaQuery.viewPaddingOf(context).bottom;
               return SingleChildScrollView(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: IntrinsicHeight(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 48, 24, 35),
+                      padding: EdgeInsets.fromLTRB(24, 48, 24, bottomGap),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -324,16 +325,6 @@ class OnboardingIntroScreen extends StatelessWidget {
                 ),
               ),
               child: const Text('기본 설정으로 시작'),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              '천천히 이동 · 큰 글씨 · 단순 보기 적용',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF647686),
-                fontWeight: FontWeight.w700,
-                height: 1.3,
-              ),
             ),
           ],
         ),
