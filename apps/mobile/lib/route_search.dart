@@ -2645,11 +2645,7 @@ class _RouteResultsListView extends StatelessWidget {
               children: [
                 _RouteWorkflowSummary(result: result),
                 const SizedBox(height: 12),
-                const _RouteSegmentedLabels(
-                  labels: ['편한 순', '빠른 순', '환승 적은 순'],
-                ),
-                const SizedBox(height: 18),
-                _RouteSectionHeader(title: '추천 경로 목록'),
+                _RouteSectionHeader(title: '추천 경로'),
                 const SizedBox(height: 8),
               ],
             ),
@@ -2683,7 +2679,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _RouteWorkflowBackButton(label: '추천 경로', onPressed: onBack),
+        _RouteWorkflowBackButton(label: '경로 목록', onPressed: onBack),
         const SizedBox(height: 8),
         _RouteDarkSummaryCard(
           title: totalMinutes > 0 ? '$totalMinutes분' : result.statusLabel,
@@ -2802,24 +2798,6 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                   height: 1.4,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Container(
-                                  width: 39,
-                                  height: 39,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        EasySubwayAccessibleColors.mintBorder,
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.edit_outlined,
-                                    color: EasySubwayAccessibleColors.mintDark,
-                                    size: 17,
-                                  ),
-                                ),
-                              ),
                             ],
                           )
                         : Row(
@@ -2851,35 +2829,16 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              Container(
-                                width: 39,
-                                height: 39,
-                                decoration: BoxDecoration(
-                                  color: EasySubwayAccessibleColors.mintBorder,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Icon(
-                                  Icons.edit_outlined,
-                                  color: EasySubwayAccessibleColors.mintDark,
-                                  size: 17,
-                                ),
-                              ),
                             ],
                           ),
                   ),
                 ),
                 const SizedBox(height: 22),
                 _RoutePrototypeSection(
-                  title: result.isBlocked
-                      ? '안내 불가 이유'
-                      : _isRecommendedRoute(result)
-                      ? '추천 경로 1개'
-                      : result.statusLabel,
+                  title: result.isBlocked ? '안내 불가 이유' : '추천 경로',
                   subtitle: result.isBlocked
                       ? '현재 조건에서 막힌 이유를 확인하세요'
-                      : _isRecommendedRoute(result)
-                      ? '편함·불편함과 시간·환승·걷기만 비교합니다.'
-                      : '이 경로는 이동 전 확인이 필요합니다',
+                      : '시간·환승·걷기와 편한 정도를 확인하세요.',
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -2924,13 +2883,6 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                   height: 1.4,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              if (_isRecommendedRoute(result))
-                                const _RoutePrototypeChip(
-                                  label: '가장 추천',
-                                  icon: Icons.check,
-                                ),
-                              const SizedBox(height: 5),
                               Text(
                                 result.comfortLabel,
                                 style: textTheme.bodyMedium?.copyWith(
@@ -2971,12 +2923,6 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  if (_isRecommendedRoute(result))
-                                    const _RoutePrototypeChip(
-                                      label: '가장 추천',
-                                      icon: Icons.check,
-                                    ),
-                                  const SizedBox(height: 5),
                                   Text(
                                     result.comfortLabel,
                                     style: textTheme.bodyMedium?.copyWith(
@@ -3233,50 +3179,9 @@ class _RouteWorkflowSummary extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.edit_outlined, color: Color(0xFF006D77)),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _RouteSegmentedLabels extends StatelessWidget {
-  const _RouteSegmentedLabels({required this.labels});
-
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final label in labels) ...[
-          Expanded(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: label == labels.first
-                    ? const Color(0xFF006D77)
-                    : const Color(0xFFE8F0F1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: label == labels.first
-                        ? Colors.white
-                        : const Color(0xFF29484B),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (label != labels.last) const SizedBox(width: 6),
-        ],
-      ],
     );
   }
 }
@@ -3324,10 +3229,6 @@ class _RouteResultListButton extends StatelessWidget {
                                   fontWeight: FontWeight.w900,
                                 ),
                           ),
-                        ),
-                        const _RoutePrototypeChip(
-                          label: '추천',
-                          icon: Icons.check,
                         ),
                       ],
                     ),

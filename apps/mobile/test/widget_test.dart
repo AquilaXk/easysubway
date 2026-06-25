@@ -5316,10 +5316,11 @@ void main() {
         'station-sadang',
       );
       expect(routeRepository.requests.single.mobilityType, 'SENIOR');
-      expect(find.text('추천 경로 목록'), findsOneWidget);
-      expect(find.text('편한 순'), findsOneWidget);
-      expect(find.text('빠른 순'), findsOneWidget);
-      expect(find.text('환승 적은 순'), findsOneWidget);
+      expect(find.text('추천 경로'), findsOneWidget);
+      expect(find.text('추천 경로 목록'), findsNothing);
+      expect(find.text('편한 순'), findsNothing);
+      expect(find.text('빠른 순'), findsNothing);
+      expect(find.text('환승 적은 순'), findsNothing);
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
       expect(find.text('계단 여부 확인 필요'), findsWidgets);
@@ -5327,7 +5328,8 @@ void main() {
       expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
       expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
-      expect(find.text('추천'), findsOneWidget);
+      expect(find.text('추천'), findsNothing);
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.textContaining('이동 점수'), findsNothing);
       expect(find.text('추천 이유'), findsNothing);
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
@@ -5341,8 +5343,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('routeResultListItem')));
       await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, 600));
+      await tester.pumpAndSettle();
 
-      expect(find.text('추천 경로'), findsOneWidget);
+      expect(find.text('경로 목록'), findsOneWidget);
+      expect(find.text('추천 경로 1개'), findsNothing);
+      expect(find.text('가장 추천'), findsNothing);
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.text('이동 순서'), findsOneWidget);
       expect(find.text('도착 안내'), findsOneWidget);
       expect(find.text('도착역에서 계단 없는 출구 동선을 확인합니다.'), findsOneWidget);
@@ -5939,6 +5946,7 @@ void main() {
     await _openFirstRouteResultDetail(tester);
 
     expect(find.byKey(const Key('routeOpenFeedbackButton')), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
 
     await tester.ensureVisible(
       find.byKey(const Key('routeStartGuidanceButton')),
@@ -5949,6 +5957,7 @@ void main() {
 
     expect(find.byKey(const Key('routeGuidanceFeedbackButton')), findsNothing);
     expect(find.byKey(const Key('routeOpenBlockedButton')), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
     expect(
       find.byKey(const Key('routeOpenInternalRouteButton')),
       findsOneWidget,
