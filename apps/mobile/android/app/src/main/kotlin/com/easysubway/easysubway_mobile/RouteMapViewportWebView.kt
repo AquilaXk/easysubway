@@ -87,6 +87,7 @@ private class RouteMapViewportPlatformView(
     }
 
     private fun load() {
+        destroyWebView()
         container.removeAllViews()
         val svgWebView = WebView(container.context)
         webView = svgWebView
@@ -203,6 +204,11 @@ private class RouteMapViewportPlatformView(
 
     override fun dispose() {
         channel.setMethodCallHandler(null)
+        destroyWebView()
+        container.removeAllViews()
+    }
+
+    private fun destroyWebView() {
         webView?.let { view ->
             view.stopLoading()
             view.loadUrl("about:blank")
@@ -210,7 +216,6 @@ private class RouteMapViewportPlatformView(
             view.destroy()
         }
         webView = null
-        container.removeAllViews()
     }
 }
 
