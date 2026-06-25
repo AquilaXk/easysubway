@@ -295,7 +295,10 @@ class FavoriteFacility {
 
   String get locationLabel {
     if (description.trim().isNotEmpty) {
-      return _facilityUserLocationLabel(description);
+      final descriptionLabel = _facilityUserLocationLabel(description);
+      if (descriptionLabel.isNotEmpty) {
+        return descriptionLabel;
+      }
     }
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
@@ -781,7 +784,7 @@ String _facilityUserLocationLabel(String description) {
     label = label.replaceAll(phrase, '');
   }
   label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
-  return label.isEmpty ? '위치 확인 필요' : label;
+  return label;
 }
 
 String _dataSourceLabel(String dataSourceType) {

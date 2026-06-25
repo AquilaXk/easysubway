@@ -1344,6 +1344,19 @@ void main() {
       dataConfidence: 'LOW',
       lastUpdatedAt: '2026-06-13',
     );
+    const metadataOnlyDescription = StationFacilityInfo(
+      id: 'facility-elevator-1',
+      stationId: 'station-sangnoksu',
+      exitId: 'exit-sangnoksu-1',
+      type: 'ELEVATOR',
+      name: '1번 출구 엘리베이터',
+      floorFrom: 'B1',
+      floorTo: '1F',
+      description: '현장 검증됨',
+      status: 'NORMAL',
+      dataConfidence: 'HIGH',
+      lastUpdatedAt: '2026-06-13',
+    );
 
     expect(ramp.typeLabel, '경사로');
     expect(ramp.statusLabel, '공사 중');
@@ -1365,6 +1378,7 @@ void main() {
     expect(customerCenter.semanticLabel, isNot(contains('출처')));
     expect(uncheckedDescription.locationLabel, '이동 보조 시설');
     expect(uncheckedDescription.semanticLabel, isNot(contains('현장 검증')));
+    expect(metadataOnlyDescription.locationLabel, 'B1-1F');
   });
 }
 
