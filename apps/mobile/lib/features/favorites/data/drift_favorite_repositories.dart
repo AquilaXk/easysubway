@@ -580,6 +580,11 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'lineId': result.lineId,
     'lineName': result.lineName,
     'score': result.score,
+    'burdenCost': result.burdenCost,
+    'estimatedDurationSeconds': result.estimatedDurationSeconds,
+    'walkingDistanceMeters': result.walkingDistanceMeters,
+    'transferCount': result.transferCount,
+    'evidenceSummary': result.evidenceSummary,
     'steps': result.steps.map(_routeStepToJson).toList(growable: false),
     'warnings': result.warnings
         .map(_routeWarningToJson)
@@ -593,6 +598,7 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
 Map<String, Object?> _routeStepToJson(RouteSearchStep step) {
   return {
     'sequence': step.sequence,
+    'stepType': step.stepType,
     'title': step.title,
     'description': step.description,
     'lineId': step.lineId,

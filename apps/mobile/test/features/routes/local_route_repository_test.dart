@@ -57,6 +57,23 @@ void main() {
     expect(result.lineName, '수도권 4호선');
     expect(result.isLocalResult, isTrue);
     expect(result.score, greaterThan(100));
+    expect(result.burdenCost, result.score);
+    expect(
+      result.estimatedDurationSeconds,
+      result.steps.fold<int>(
+        0,
+        (sum, step) => sum + step.estimatedMinutes * 60,
+      ),
+    );
+    expect(
+      result.walkingDistanceMeters,
+      result.steps
+          .where((step) => step.isWalkingStep)
+          .fold<int>(0, (sum, step) => sum + step.distanceMeters),
+    );
+    expect(result.transferCount, 0);
+    expect(result.evidenceSummary, contains('DURATION_ESTIMATED'));
+    expect(result.evidenceSummary, contains('DISTANCE_UNKNOWN'));
     expect(
       result.steps
           .map((step) => step.lineId)

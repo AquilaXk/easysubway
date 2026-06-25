@@ -42,6 +42,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     final lineIds = result.lineIds;
     final primaryLineId = lineIds.isEmpty ? '' : lineIds.first;
     final primaryLineName = catalog.lineName(primaryLineId);
+    final steps = _toSteps(result, catalog);
 
     return RouteSearchResult(
       routeSearchId:
@@ -55,7 +56,12 @@ class LocalRouteRepository implements RouteSearchRepository {
       lineId: primaryLineId,
       lineName: primaryLineName,
       score: result.totalCost,
-      steps: _toSteps(result, catalog),
+      burdenCost: result.totalCost,
+      estimatedDurationSeconds: _estimatedDurationSeconds(steps),
+      walkingDistanceMeters: _walkingDistanceMeters(steps),
+      transferCount: _transferCount(steps),
+      evidenceSummary: _evidenceSummary(result),
+      steps: steps,
       warnings: result.warnings
           .map(
             (warning) => RouteSearchWarning(
@@ -114,6 +120,66 @@ class LocalRouteRepository implements RouteSearchRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  int _estimatedDurationSeconds(List<RouteSearchStep> steps) {
+    return steps.fold<int>(
+      0,
+      (sum, step) =>
+          sum + (step.estimatedMinutes < 0 ? 0 : step.estimatedMinutes * 60),
+    );
+  }
+
+  int _walkingDistanceMeters(List<RouteSearchStep> steps) {
+    return steps.fold<int>(
+      0,
+      (sum, step) => step.isWalkingStep ? sum + step.distanceMeters : sum,
+    );
+  }
+
+  int _transferCount(List<RouteSearchStep> steps) {
+    final typedTransfers = steps.where((step) => step.stepType == 'transfer');
+    if (typedTransfers.isNotEmpty) {
+      return typedTransfers.length;
+    }
+    var previousLine = '';
+    var changes = 0;
+    for (final step in steps) {
+      final line = step.lineId.isNotEmpty ? step.lineId : step.lineName;
+      if (line.isEmpty) {
+        continue;
+      }
+      if (previousLine.isNotEmpty && previousLine != line) {
+        changes += 1;
+      }
+      previousLine = line;
+    }
+    return changes;
+  }
+
+  List<String> _evidenceSummary(local.LocalRouteResult result) {
+    if (result.steps.isEmpty) {
+      return const [];
+    }
+    final requiresAccessibilityCheck = result.steps.any(
+      (step) =>
+          step.type.name == 'entry' ||
+          step.type.name == 'exit' ||
+          step.stairAccessState == 'unknown',
+    );
+    final hasDurationEstimate = result.steps.every(
+      (step) => step.durationSeconds > 0,
+    );
+    final hasDistanceMeasure = result.steps.every(
+      (step) => step.distanceMeters > 0,
+    );
+    return [
+      requiresAccessibilityCheck
+          ? 'ACCESSIBILITY_CHECK_REQUIRED'
+          : 'ACCESSIBILITY_VERIFIED',
+      hasDurationEstimate ? 'DURATION_ESTIMATED' : 'DURATION_UNKNOWN',
+      hasDistanceMeasure ? 'DISTANCE_MEASURED' : 'DISTANCE_UNKNOWN',
+    ];
   }
 
   String _stepTitle(
