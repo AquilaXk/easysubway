@@ -865,7 +865,7 @@ void main() {
     expect(find.text('4호선'), findsWidgets);
   });
 
-  testWidgets('노선도 목록 대체 화면에서 역을 선택할 수 있다', (tester) async {
+  testWidgets('노선도 노선별 보기 화면에서 역을 선택할 수 있다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -882,8 +882,10 @@ void main() {
     await tester.tap(find.byKey(const Key('networkMapListButton')));
     await tester.pumpAndSettle();
 
+    expect(find.text('노선별로 보기'), findsOneWidget);
     expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
-    expect(find.text('노선과 역 목록'), findsOneWidget);
+    expect(find.text('노선별 역 보기'), findsOneWidget);
+    expect(find.text('노선별 목록에서 역을 선택하세요.'), findsOneWidget);
     await tester.tap(
       find.byKey(const Key('networkMapListStation-station-sadang-seoul-4')),
     );
