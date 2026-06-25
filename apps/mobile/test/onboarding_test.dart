@@ -100,6 +100,10 @@ void main() {
       expect(find.text('엘리베이터 이용'), findsOneWidget);
       expect(find.text('우선 적용'), findsWidgets);
       expect(find.text('보기 설정'), findsOneWidget);
+      expect(find.text('큰 글씨'), findsNothing);
+      expect(find.text('큰 글자'), findsOneWidget);
+      expect(find.text('단순 보기'), findsNothing);
+      expect(find.text('간편 보기'), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel('계단 피하기 우선 적용, 계단 없는 길')),
         isSemantics(label: '계단 피하기 우선 적용, 계단 없는 길'),
@@ -128,7 +132,8 @@ void main() {
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+      expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+      expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
       expect(find.text('현재 위치'), findsOneWidget);
       expect(find.text('알림'), findsOneWidget);
       expect(find.bySemanticsLabel('현재 위치 꺼짐'), findsOneWidget);
@@ -173,7 +178,8 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
@@ -332,7 +338,8 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
     expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);

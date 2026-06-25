@@ -757,6 +757,12 @@ void main() {
     expect(find.byKey(const Key('networkMapOverviewButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapLocateButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapListButton')), findsOneWidget);
+    expect(find.byTooltip('전체 노선도'), findsOneWidget);
+    expect(find.byTooltip('처음 위치로'), findsOneWidget);
+    expect(find.text('노선별로 보기'), findsOneWidget);
+    expect(find.byTooltip('전체 보기'), findsNothing);
+    expect(find.byTooltip('중심 보기'), findsNothing);
+    expect(find.text('노선 목록으로 보기'), findsNothing);
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
     expect(find.text('즐겨찾기'), findsOneWidget);
     expect(find.text('저장'), findsNothing);
@@ -808,6 +814,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('bottomNavMap')));
     await tester.pumpAndSettle();
+    expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
+    expect(find.text('원본 노선도를 불러올 수 없습니다.'), findsNothing);
     await tester.tap(find.byKey(const Key('networkMapLineFilter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('4호선'));
@@ -1825,7 +1833,7 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '알림 설정, 시설 상태, 제보 처리, 정보 갱신 알림을 관리해요',
+          '알림 설정, 시설 상태, 제보 처리, 최신 안내 알림을 관리해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -2180,7 +2188,8 @@ void main() {
 
       expect(find.text('도움말·문의'), findsOneWidget);
       expect(find.text('개인정보처리방침'), findsOneWidget);
-      expect(find.text('https://easysubway.example/privacy'), findsOneWidget);
+      expect(find.text('https://easysubway.example/privacy'), findsNothing);
+      expect(find.text('웹에서 확인'), findsOneWidget);
       final privacyButtonSize = tester.getSize(
         find.byKey(const Key('privacyPolicyAccessItem')),
       );
@@ -2188,10 +2197,7 @@ void main() {
       final privacySemantics = tester
           .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
           .getSemanticsData();
-      expect(
-        privacySemantics.label,
-        '개인정보처리방침, https://easysubway.example/privacy',
-      );
+      expect(privacySemantics.label, '개인정보처리방침, 웹에서 확인');
       expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
 
       await tester.scrollUntilVisible(
@@ -2212,7 +2218,7 @@ void main() {
           .getSemanticsData();
       expect(
         deletionSemantics.label,
-        '데이터 삭제 요청, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
+        '데이터 삭제 요청, 이메일 보내기, 삭제 범위와 처리 절차를 메일로 문의해요',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
 
@@ -2223,7 +2229,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('고객지원'), findsOneWidget);
-      expect(find.text('support@easysubway.example'), findsOneWidget);
+      expect(find.text('support@easysubway.example'), findsNothing);
+      expect(find.text('이메일 보내기'), findsWidgets);
       await tester.scrollUntilVisible(
         find.byKey(const Key('securityContactAccessItem')),
         120,
@@ -2386,13 +2393,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('보안 문의'), findsOneWidget);
-      expect(find.text('security@easysubway.example'), findsOneWidget);
+      expect(find.text('security@easysubway.example'), findsNothing);
+      expect(find.text('보안 문제 알리기'), findsOneWidget);
       expect(
         tester
             .getSemantics(find.byKey(const Key('securityContactAccessItem')))
             .getSemanticsData()
             .label,
-        '보안 문의, security@easysubway.example',
+        '보안 문의, 보안 문제 알리기',
       );
 
       await tester.tap(find.byKey(const Key('securityContactAccessItem')));
@@ -2892,7 +2900,8 @@ void main() {
       expect(find.text('역 시설 알림'), findsOneWidget);
       expect(find.text('경로 시설 알림'), findsOneWidget);
       expect(find.text('제보 처리 알림'), findsOneWidget);
-      expect(find.text('정보 갱신 알림'), findsOneWidget);
+      expect(find.text('정보 갱신 알림'), findsNothing);
+      expect(find.text('최신 안내 알림'), findsOneWidget);
       expect(find.bySemanticsLabel('역 시설 알림 켜짐'), findsOneWidget);
       expect(find.bySemanticsLabel('경로 시설 알림 꺼짐'), findsOneWidget);
 
@@ -2950,7 +2959,7 @@ void main() {
     expect(find.text('알림 받기'), findsOneWidget);
     expect(
       find.text(
-        '즐겨찾는 역과 경로의 시설 상태, 내 제보 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
+        '즐겨찾는 역과 경로의 시설 변경, 제보 처리 상황, 최신 안내를 알려드려요. 알림 설정에서 언제든 끌 수 있습니다.',
       ),
       findsOneWidget,
     );
@@ -2960,8 +2969,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(notificationPermissionProvider.requestCount, 1);
-    expect(find.text('기기 알림이 켜졌습니다.'), findsOneWidget);
-    expect(find.bySemanticsLabel('기기 알림이 켜졌습니다.'), findsOneWidget);
+    expect(find.text('기기 알림이 켜졌습니다.'), findsNothing);
+    expect(find.text('알림이 켜졌어요.'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림이 켜졌어요.'), findsOneWidget);
   });
 
   testWidgets('알림 설정 화면은 기기 알림 권한 거부를 짧게 안내한다', (tester) async {
@@ -2988,8 +2998,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(notificationPermissionProvider.requestCount, 1);
-    expect(find.text('기기 알림 권한을 켜 주세요.'), findsOneWidget);
-    expect(find.bySemanticsLabel('기기 알림 권한을 켜 주세요.'), findsOneWidget);
+    expect(find.text('기기 알림 권한을 켜 주세요.'), findsNothing);
+    expect(find.text('휴대전화 설정에서 알림을 허용해 주세요.'), findsOneWidget);
+    expect(find.bySemanticsLabel('휴대전화 설정에서 알림을 허용해 주세요.'), findsOneWidget);
     expect(find.text('기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'), findsNothing);
   });
 
@@ -2997,7 +3008,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     final notificationPermissionProvider = FakeNotificationPermissionProvider(
       nextStatus: NotificationPermissionStatus.denied,
-      error: const NotificationSettingsException('기기 알림 등록을 마치지 못했습니다.'),
+      error: const NotificationSettingsException('알림을 켜지 못했어요.'),
     );
 
     try {
@@ -3020,10 +3031,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(notificationPermissionProvider.requestCount, 1);
-      expect(find.text('기기 알림 등록을 마치지 못했습니다.'), findsOneWidget);
-      expect(find.text('기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'), findsOneWidget);
+      expect(find.text('기기 알림 등록을 마치지 못했습니다.'), findsNothing);
+      expect(find.text('알림을 켜지 못했어요.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('다음 행동, 기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
+        find.text('휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('다음 행동, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
         findsOneWidget,
       );
       expect(
@@ -3031,7 +3046,7 @@ void main() {
           find.byKey(const Key('notificationRegistrationFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+          label: '다음 행동, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
           isLiveRegion: true,
         ),
       );
