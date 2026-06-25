@@ -757,8 +757,8 @@ String _stringOrDefault(
 
 String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
-    'HIGH' => '정보 신뢰도 높음',
-    'MEDIUM' => '정보 신뢰도 보통',
+    'HIGH' => '확인 수준 높음',
+    'MEDIUM' => '확인 수준 보통',
     'LOW' => '정보 확인 필요',
     _ => '정보 확인 필요',
   };
@@ -789,12 +789,12 @@ String _facilityUserLocationLabel(String description) {
 
 String _dataSourceLabel(String dataSourceType) {
   return switch (dataSourceType) {
-    'OFFICIAL_API' => '출처 공공 API',
-    'OFFICIAL_FILE' => '출처 공식 파일',
-    'OPERATOR_PAGE' => '출처 운영기관 페이지',
+    'OFFICIAL_API' => '공식 정보',
+    'OFFICIAL_FILE' => '공식 정보',
+    'OPERATOR_PAGE' => '운영기관 안내',
     'USER_REPORT' => '출처 사용자 제보',
-    'ADMIN_VERIFIED' => '출처 관리자 검수',
-    'PARTNER_FEED' => '출처 제휴 데이터',
+    'ADMIN_VERIFIED' => '확인된 정보',
+    'PARTNER_FEED' => '연계 정보',
     _ => '출처 확인 필요',
   };
 }
