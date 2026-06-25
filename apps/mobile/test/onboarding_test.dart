@@ -58,6 +58,23 @@ void main() {
     expect(find.text('천천히 이동 · 큰 글씨 · 단순 보기 적용'), findsNothing);
   });
 
+  testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    final screenBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
+  });
+
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     OnboardingResult? completedResult;

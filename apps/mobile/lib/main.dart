@@ -4279,7 +4279,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     color: EasySubwayAccessibleColors.mintDark,
                     size: 56,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Text(
                     '내 데이터가 삭제됐어요',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -4306,21 +4306,21 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     title: '즐겨찾기한 역',
                     value: '${result.deletedFavoriteStationCount}개 삭제',
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _DataDeletionResultRow(
                     id: 'favoriteFacilities',
                     icon: Icons.elevator_outlined,
                     title: '즐겨찾기한 시설',
                     value: '${result.deletedFavoriteFacilityCount}개 삭제',
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _DataDeletionResultRow(
                     id: 'favoriteRoutes',
                     icon: Icons.route_outlined,
                     title: '즐겨찾기한 경로',
                     value: '${result.deletedFavoriteRouteCount}개 삭제',
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _DataDeletionResultRow(
                     id: 'notifications',
                     icon: Icons.notifications_none,
@@ -4341,7 +4341,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                         : '${result.anonymizedReportCount}건 익명화',
                   ),
                   if (deletionScope != UserDataDeletionScope.deviceOnly)
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                   if (deletionScope != UserDataDeletionScope.deviceOnly)
                     _DataDeletionResultRow(
                       id: 'routeFeedback',
@@ -4434,14 +4434,14 @@ class _DataDeletionResultRow extends StatelessWidget {
           children: [
             Container(
               key: Key('dataDeletionResultIcon-$id'),
-              width: 56,
-              height: 56,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFFD3F0E6),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: EasySubwayAccessibleColors.mint,
-                  width: 1.5,
+                  color: EasySubwayAccessibleColors.mintDark,
+                  width: 2,
                 ),
               ),
               child: Icon(

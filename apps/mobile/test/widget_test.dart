@@ -2729,17 +2729,19 @@ void main() {
     );
     final stationIconDecoration = stationIconBadge.decoration! as BoxDecoration;
     expect(stationIconDecoration.border, isNotNull);
+    expect(stationIconDecoration.color, Colors.white);
     expect(
-      stationIconDecoration.color,
-      isNot(EasySubwayAccessibleColors.mintSoft),
+      (stationIconDecoration.border! as Border).top.color,
+      EasySubwayAccessibleColors.mintDark,
     );
+    expect((stationIconDecoration.border! as Border).top.width, 2);
     final stationRow = tester.getRect(
       find.byKey(const Key('dataDeletionResultRow-favoriteStations')),
     );
     final facilityRow = tester.getRect(
       find.byKey(const Key('dataDeletionResultRow-favoriteFacilities')),
     );
-    expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(10));
+    expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(16));
     expectNoForbiddenUserCopy(tester);
 
     await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
@@ -2791,7 +2793,7 @@ void main() {
       find.byKey(const Key('dataDeletionResultStartButton')),
     );
 
-    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
   });
 
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
@@ -4014,7 +4016,7 @@ void main() {
       find.byKey(const Key('routeSearchSubmitButton')),
     );
 
-    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
   });
 
   testWidgets('길찾기 하단 버튼은 가로 safe-area 안쪽에 배치된다', (tester) async {
