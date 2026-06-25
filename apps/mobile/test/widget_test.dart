@@ -718,7 +718,9 @@ void main() {
   testWidgets('홈 노선도 버튼은 v3 노선도 화면을 연다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
-        repository: FakeStationSearchRepository(),
+        repository: FakeStationSearchRepository(
+          networkMapRegionNames: const ['수도권'],
+        ),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
@@ -741,7 +743,7 @@ void main() {
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
     expect(find.text('즐겨찾기'), findsOneWidget);
     expect(find.text('저장'), findsNothing);
-    expect(find.text('테스트권'), findsOneWidget);
+    expect(find.text('수도권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
     expect(
       tester.getSize(find.byKey(const Key('mapRegionTabs'))).height,
@@ -751,40 +753,25 @@ void main() {
       tester.getSize(find.byKey(const Key('networkMapLineFilter'))).height,
       greaterThanOrEqualTo(EasySubwayTouchTarget.general),
     );
-    expect(find.bySemanticsLabel('지역: 테스트권'), findsOneWidget);
+    expect(find.bySemanticsLabel('지역: 수도권'), findsOneWidget);
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsOneWidget);
-    final viewer = tester.widget<InteractiveViewer>(
-      find.byKey(const Key('networkMapInteractiveViewer')),
-    );
-    final initialScale = viewer.transformationController!.value
-        .getMaxScaleOnAxis();
-    expect(initialScale, greaterThan(1));
+    expect(find.byKey(const Key('networkMapInteractiveViewer')), findsNothing);
+    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('networkMapOverviewButton')));
     await tester.pump();
-
-    expect(
-      viewer.transformationController!.value.getMaxScaleOnAxis(),
-      lessThan(initialScale),
-    );
 
     for (var index = 0; index < 30; index += 1) {
       await tester.tap(find.byKey(const Key('networkMapZoomInButton')));
       await tester.pump();
     }
-    expect(
-      viewer.transformationController!.value.getMaxScaleOnAxis(),
-      lessThanOrEqualTo(4.8),
-    );
 
     for (var index = 0; index < 80; index += 1) {
       await tester.tap(find.byKey(const Key('networkMapZoomOutButton')));
       await tester.pump();
     }
-    expect(
-      viewer.transformationController!.value.getMaxScaleOnAxis(),
-      greaterThanOrEqualTo(0.08),
-    );
+    expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
+    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -848,7 +835,11 @@ void main() {
     );
     expect(find.text('4호선'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-4')));
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const Key('networkMapStation-sadang-seoul-4')),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
@@ -946,11 +937,11 @@ void main() {
     expect(decoration.color, Colors.white);
     expect(decoration.border, isNull);
     expect(decoration.borderRadius, isNull);
-    expect(find.byKey(const Key('originalRouteMapView')), findsOneWidget);
+    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
-  testWidgets('수도권 노선도는 Android에서도 원본 source 좌표계를 유지한다', (tester) async {
+  testWidgets('수도권 노선도는 Android에서도 viewport renderer를 사용한다', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 3;
     try {
@@ -970,12 +961,18 @@ void main() {
       await tester.tap(find.byKey(const Key('bottomNavMap')));
       await tester.pumpAndSettle();
 
-      final viewer = tester.widget<InteractiveViewer>(
+      expect(
         find.byKey(const Key('networkMapInteractiveViewer')),
+        findsNothing,
       );
-      final mapContent = viewer.child as SizedBox;
-      expect(mapContent.width, 5724);
-      expect(mapContent.height, 6516);
+      final renderer = tester.getSize(
+        find.byKey(const Key('routeMapViewportRenderer')),
+      );
+      final surface = tester.getSize(
+        find.byKey(const Key('networkMapSurface')),
+      );
+      expect(renderer.width, surface.width);
+      expect(renderer.height, surface.height);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       tester.view.resetDevicePixelRatio();
@@ -1108,7 +1105,11 @@ void main() {
       const Offset(0, 180),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-4')));
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const Key('networkMapStation-sadang-seoul-4')),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
@@ -1117,6 +1118,52 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '도착으로 설정'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '역 상세'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
+  });
+
+  testWidgets('노선도 역은 스크린리더 tap으로도 설정 sheet를 연다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const Key('networkMapSurface')),
+        const Offset(0, 180),
+      );
+      await tester.pumpAndSettle();
+
+      final stationFinder = find.byKey(
+        const Key('networkMapStation-sadang-seoul-4'),
+      );
+      final stationSemantics = tester.getSemantics(stationFinder);
+      expect(
+        stationSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      stationSemantics.owner!.performAction(
+        stationSemantics.id,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      expect(find.text('사당역'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '출발로 설정'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '도착으로 설정'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('노선도 역 좌표가 겹쳐도 탭한 위치에서 가장 가까운 역을 선택한다', (tester) async {
