@@ -175,7 +175,7 @@ private class RouteMapViewportPlatformView(
         val frameRevision = revision
         val script = String.format(
             Locale.US,
-            "const svg=document.querySelector('svg');if(svg){svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');}",
+            "(function(){const svg=document.querySelector('svg');if(svg){svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');}})();",
             values[0],
             values[1],
             values[2],
