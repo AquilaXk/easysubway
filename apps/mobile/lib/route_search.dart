@@ -3293,7 +3293,7 @@ class _RouteResultListButton extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '${result.summaryTitle}, ${_routeMetaLabel(result)}, ${result.comfortLabel}',
+          '${result.summaryTitle}, ${_routeMetaLabel(result)}, ${result.comfortLabel}, ${result.stairAccessLabel}',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Material(

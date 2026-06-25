@@ -5704,13 +5704,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+      final routeItemSemantics = tester
+          .getSemantics(find.byKey(const Key('routeResultListItem')))
+          .getSemanticsData();
       expect(
-        tester
-            .getSemantics(find.byKey(const Key('routeResultListItem')))
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
+        routeItemSemantics.hasAction(SemanticsAction.tap),
         isTrue,
       );
+      expect(routeItemSemantics.label, contains('계단 여부 확인 필요'));
     } finally {
       semanticsHandle.dispose();
     }
