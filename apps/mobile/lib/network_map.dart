@@ -1673,8 +1673,12 @@ bool _stationHitTestContains(
   required double sceneHitRadius,
 }) {
   final nodeCenter = Offset(geometry.x(station), geometry.y(station));
-  if ((position - nodeCenter).distanceSquared <=
-      sceneHitRadius * sceneHitRadius) {
+  final nodeRect = Rect.fromCenter(
+    center: nodeCenter,
+    width: sceneHitRadius * 2,
+    height: sceneHitRadius * 2,
+  );
+  if (nodeRect.contains(position)) {
     return true;
   }
   final labelPolygon = _labelPolygonFor(station, geometry);
