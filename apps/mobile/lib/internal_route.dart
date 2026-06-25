@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
-const _internalRouteErrorMessage = '내부 이동 안내를 불러오지 못했습니다.';
+const _internalRouteErrorMessage = '역 안 이동 안내를 불러오지 못했습니다.';
 
 abstract class InternalRouteRepository {
   Future<List<InternalRouteNode>> listRouteNodes(String stationId);
@@ -283,9 +283,9 @@ class InternalRouteResult {
 
   String get statusLabel {
     return switch (status) {
-      'FOUND' => '내부 이동 경로를 찾았습니다',
-      'BLOCKED' => '계단 없는 내부 이동 경로가 없습니다',
-      _ => '내부 이동 확인이 필요합니다',
+      'FOUND' => '역 안 이동 경로를 찾았어요',
+      'BLOCKED' => '계단 없는 역 안 이동 경로를 찾지 못했어요',
+      _ => '역 안 이동 확인이 필요해요',
     };
   }
 
@@ -392,15 +392,15 @@ class InternalRouteStep {
       _internalRouteDistanceLabel(distanceMeters),
       _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
-      if (requiresElevator) '엘리베이터 필요',
-      if (requiresEscalator) '에스컬레이터 확인',
-      if (reliabilityScore < 80) '추가 확인 필요',
+      if (requiresElevator) '엘리베이터를 이용해요',
+      if (requiresEscalator) '에스컬레이터 상태 확인 필요',
+      if (reliabilityScore < 80) '이동 전 역무원 확인 필요',
     ];
     return labels.join(' · ');
   }
 
   String get semanticLabel =>
-      '$sequence번 내부 이동, $title, $burdenLabel, $guidance';
+      '$sequence번 역 안 이동, $title, $burdenLabel, $guidance';
 }
 
 class InternalRouteWarning {
@@ -420,11 +420,11 @@ class InternalRouteWarning {
 
   String get userMessage {
     return switch (code.trim()) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
-      'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 이동 전 확인이 필요해요.',
+      'STALE_ACCESSIBILITY_DATA' => '엘리베이터와 통로 상태를 최근에 확인하지 못했어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
-      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
-      'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 확인하지 못했어요.',
+      'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 확인하지 못했어요.',
       _ => '일부 이동 정보를 확인하지 못했어요.',
     };
   }
@@ -479,7 +479,7 @@ class InternalRouteController extends ChangeNotifier {
         }
         _state = const InternalRouteState(
           status: InternalRouteViewStatus.failure,
-          message: '내부 이동 기준점을 아직 확인하지 못했습니다.',
+          message: '역 안 길 안내에 필요한 정보를 찾지 못했어요.',
         );
         notifyListeners();
         return;
@@ -622,10 +622,10 @@ String _internalRouteDistanceLabel(int distanceMeters) {
 
 String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus) {
-    'VERIFIED' => '현장 검증됨',
-    'STALE' => '현장 재확인 필요',
-    'UNKNOWN' => '현장 검증 전',
-    _ => '현장 검증 전',
+    'VERIFIED' => '최근 확인됨',
+    'STALE' => '최근 상태 확인 필요',
+    'UNKNOWN' => '최근 확인 정보 없음',
+    _ => '최근 확인 정보 없음',
   };
 }
 
