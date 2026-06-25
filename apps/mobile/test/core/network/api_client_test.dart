@@ -255,6 +255,46 @@ void main() {
     });
   });
 
+  test('ApiResponse는 success/data envelope만 추출한다', () {
+    final response = ApiResponse(
+      statusCode: HttpStatus.ok,
+      jsonBody: {
+        'success': true,
+        'data': {'id': 'route-1'},
+      },
+    );
+
+    expect(
+      response.requireSuccessData(
+        expectedStatusCode: HttpStatus.ok,
+        errorFactory: () => const FormatException('invalid envelope'),
+      ),
+      {'id': 'route-1'},
+    );
+    expect(
+      () =>
+          ApiResponse(
+            statusCode: HttpStatus.created,
+            jsonBody: const {'success': true, 'data': null},
+          ).requireSuccessData(
+            expectedStatusCode: HttpStatus.ok,
+            errorFactory: () => const FormatException('invalid envelope'),
+          ),
+      throwsFormatException,
+    );
+    expect(
+      () =>
+          ApiResponse(
+            statusCode: HttpStatus.ok,
+            jsonBody: const {'success': false},
+          ).requireSuccessData(
+            expectedStatusCode: HttpStatus.ok,
+            errorFactory: () => const FormatException('invalid envelope'),
+          ),
+      throwsFormatException,
+    );
+  });
+
   test('ApiClient 예외는 인증 토큰을 노출하지 않는다', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
