@@ -2500,12 +2500,12 @@ void main() {
 
       expect(
         find.text(
-          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
+          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
         ),
         findsOneWidget,
       );
       expect(
-        find.text('이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
+        find.text('이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
         findsOneWidget,
       );
 
@@ -2515,12 +2515,12 @@ void main() {
       expect(
         summarySemantics.label,
         contains(
-          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
+          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
         ),
       );
       expect(
         summarySemantics.label,
-        contains('이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
+        contains('이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
       );
 
       await tester.scrollUntilVisible(
@@ -2533,7 +2533,9 @@ void main() {
 
       expect(find.text('서버 데이터 삭제'), findsWidgets);
       expect(
-        find.text('즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
+        find.text(
+          '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);

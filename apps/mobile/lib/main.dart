@@ -3991,7 +3991,7 @@ class _UserDataDeletionCopy {
       UserDataDeletionScope.remoteOnly => const _UserDataDeletionCopy(
         title: '서버 데이터 삭제',
         helperText: '서버 삭제 범위와 앱 초기화 여부를 확인하고 진행합니다.',
-        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
           '삭제가 끝나면 서버에 연결된 데이터가 정리되고 앱의 임시 설정이 초기화됩니다.',
           '앱은 처음 설정 화면으로 돌아갑니다.',
@@ -4005,7 +4005,7 @@ class _UserDataDeletionCopy {
       UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
         title: '내 데이터 삭제',
         helperText: '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
-        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
           '삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.',
           '삭제한 데이터는 앱에서 복구할 수 없습니다.',
@@ -4542,14 +4542,14 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _deviceDeletionScope =
       '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
   static const _remoteDeletionScope =
-      '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.';
+      '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.';
   static const _combinedDeletionScope =
-      '내 데이터 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 서버에 연결된 제보·경로 피드백 정보를 삭제하거나 익명화합니다.';
+      '내 데이터 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 서버에 연결된 신고 내용·사진·위치, 경로 피드백 정보를 삭제하거나 익명화합니다.';
   static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.';
   static const _deviceSentReportNotice =
       '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
   static const _remoteSentReportNotice =
-      '이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.';
+      '이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
 
   String get _deletionScopeText {
