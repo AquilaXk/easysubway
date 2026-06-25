@@ -29,7 +29,7 @@ void main() {
     controller.emit(const RouteMapRendererCameraRequested(5));
     await Future<void>.delayed(const Duration(milliseconds: 30));
 
-    expect(controller.retryCalls, 1);
+    expect(controller.retryCalls, greaterThanOrEqualTo(1));
     expect(
       observed,
       containsAllInOrder(<Matcher>[
@@ -50,6 +50,20 @@ void main() {
         ),
       ]),
     );
+  });
+
+  test('health monitor re-arms blank watchdog after timeout retry', () async {
+    final controller = _FakeRouteMapRendererController();
+    final monitor = RouteMapRendererHealthMonitor(
+      controller,
+      blankTimeout: const Duration(milliseconds: 10),
+    )..start();
+    addTearDown(monitor.stop);
+
+    controller.emit(const RouteMapRendererCameraRequested(5));
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+
+    expect(controller.retryCalls, greaterThanOrEqualTo(2));
   });
 
   test('health monitor cancels blank watchdog after frame presents', () async {
@@ -84,7 +98,7 @@ void main() {
       ..emit(const RouteMapRendererFramePresented(5));
     await Future<void>.delayed(const Duration(milliseconds: 30));
 
-    expect(controller.retryCalls, 1);
+    expect(controller.retryCalls, greaterThanOrEqualTo(2));
   });
 
   test('health monitor retries when renderer process is gone', () async {
