@@ -175,6 +175,24 @@ class ApiResponse {
   bool get isUnauthorized => statusCode == HttpStatus.unauthorized;
   bool get isOk => statusCode == HttpStatus.ok;
   bool get isSuccess => _isSuccessStatus(statusCode);
+
+  Object? requireSuccessData({
+    required Object Function() errorFactory,
+    int? expectedStatusCode,
+  }) {
+    final statusMatches = expectedStatusCode == null
+        ? isSuccess
+        : statusCode == expectedStatusCode;
+    if (!statusMatches) {
+      throw errorFactory();
+    }
+
+    final decoded = jsonBody;
+    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+      throw errorFactory();
+    }
+    return decoded['data'];
+  }
 }
 
 enum HttpMethod { get, delete, post, put }
