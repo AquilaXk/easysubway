@@ -37,6 +37,19 @@ void main() {
     );
   });
 
+  test(
+    'camera update is needed when viewBox changes without revision change',
+    () {
+      expect(
+        androidRouteMapViewportNeedsCameraUpdate(
+          previous: camera,
+          next: camera.copyWith(viewportSize: const Size(500, 125)),
+        ),
+        isTrue,
+      );
+    },
+  );
+
   test('controller sends camera updates to the view channel', () async {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

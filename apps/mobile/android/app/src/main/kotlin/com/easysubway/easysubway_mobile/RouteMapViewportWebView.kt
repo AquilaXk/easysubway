@@ -97,31 +97,7 @@ private class RouteMapViewportPlatformView(
         svgWebView.settings.javaScriptEnabled = true
         svgWebView.settings.builtInZoomControls = false
         svgWebView.settings.displayZoomControls = false
-        svgWebView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest,
-            ): Boolean = true
-
-            @Deprecated("Old Android callback kept so external navigation stays blocked.")
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
-
-            override fun onPageFinished(view: WebView, url: String) {
-                channel.invokeMethod("assetReady", null)
-                applyViewBox()
-            }
-
-            override fun onRenderProcessGone(
-                view: WebView,
-                detail: RenderProcessGoneDetail,
-            ): Boolean {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && webView === view) {
-                    channel.invokeMethod("processGone", mapOf("didCrash" to detail.didCrash()))
-                    showFallback(view)
-                }
-                return true
-            }
-        }
+        svgWebView.webViewClient = routeMapWebViewClient()
         svgWebView.loadDataWithBaseURL(
             "file:///android_asset/",
             htmlForSvg(container.context),
@@ -136,6 +112,39 @@ private class RouteMapViewportPlatformView(
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
+    }
+
+    private fun routeMapWebViewClient(): WebViewClient {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return object : BlockingRouteMapWebViewClient() {
+                override fun onRenderProcessGone(
+                    view: WebView,
+                    detail: RenderProcessGoneDetail,
+                ): Boolean {
+                    if (webView === view) {
+                        channel.invokeMethod("processGone", mapOf("didCrash" to detail.didCrash()))
+                        showFallback(view)
+                    }
+                    return true
+                }
+            }
+        }
+        return BlockingRouteMapWebViewClient()
+    }
+
+    private open inner class BlockingRouteMapWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest,
+        ): Boolean = true
+
+        @Deprecated("Old Android callback kept so external navigation stays blocked.")
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
+
+        override fun onPageFinished(view: WebView, url: String) {
+            channel.invokeMethod("assetReady", null)
+            applyViewBox()
+        }
     }
 
     private fun htmlForSvg(context: Context): String {

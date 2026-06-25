@@ -52,7 +52,10 @@ class _AndroidRouteMapViewportWebViewState
   @override
   void didUpdateWidget(AndroidRouteMapViewportWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.camera.revision != widget.camera.revision) {
+    if (androidRouteMapViewportNeedsCameraUpdate(
+      previous: oldWidget.camera,
+      next: widget.camera,
+    )) {
       _controller?.setCamera(widget.camera);
     }
   }
@@ -150,4 +153,22 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
 List<double> _viewBoxFor(MapCameraState camera) {
   final rect = camera.visibleSourceRect;
   return <double>[rect.left, rect.top, rect.width, rect.height];
+}
+
+@visibleForTesting
+bool androidRouteMapViewportNeedsCameraUpdate({
+  required MapCameraState previous,
+  required MapCameraState next,
+}) {
+  if (previous.revision != next.revision) {
+    return true;
+  }
+  final previousViewBox = _viewBoxFor(previous);
+  final nextViewBox = _viewBoxFor(next);
+  for (var index = 0; index < previousViewBox.length; index += 1) {
+    if (previousViewBox[index] != nextViewBox[index]) {
+      return true;
+    }
+  }
+  return false;
 }
