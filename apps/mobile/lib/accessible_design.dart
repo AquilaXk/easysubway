@@ -33,7 +33,7 @@ EdgeInsets easySubwayBottomActionInsets(
   BuildContext context, {
   double horizontal = 20,
   double top = 8,
-  double bottom = 20,
+  double bottom = 32,
 }) {
   final viewPadding = MediaQuery.viewPaddingOf(context);
   final viewInsets = MediaQuery.viewInsetsOf(context);
