@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
+import java.io.IOException
 import java.util.Locale
 
 class RouteMapViewportWebViewFactory(
@@ -142,6 +143,9 @@ private class RouteMapViewportPlatformView(
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
 
         override fun onPageFinished(view: WebView, url: String) {
+            if (webView !== view) {
+                return
+            }
             channel.invokeMethod("assetReady", null)
             applyViewBox()
         }
@@ -149,11 +153,17 @@ private class RouteMapViewportPlatformView(
 
     private fun htmlForSvg(context: Context): String {
         if (mimeType != "image/svg+xml" || assetPath.isBlank()) {
-            return "<!doctype html><html><body></body></html>"
+            return emptyHtml()
         }
         val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(assetPath)
-        val svg = context.assets.open(lookupKey).bufferedReader().use { reader ->
-            reader.readText()
+        val svg = try {
+            context.assets.open(lookupKey).bufferedReader().use { reader ->
+                reader.readText()
+            }
+        } catch (exception: RuntimeException) {
+            return emptyHtml()
+        } catch (exception: IOException) {
+            return emptyHtml()
         }
         return """
             <!doctype html>
@@ -170,19 +180,23 @@ private class RouteMapViewportPlatformView(
         """.trimIndent()
     }
 
+    private fun emptyHtml(): String = "<!doctype html><html><body></body></html>"
+
     private fun applyViewBox() {
         val values = normalizedViewBox()
         val frameRevision = revision
         val script = String.format(
             Locale.US,
-            "(function(){const svg=document.querySelector('svg');if(svg){svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');}})();",
+            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');return true;})();",
             values[0],
             values[1],
             values[2],
             values[3],
         )
-        webView?.evaluateJavascript(script) {
-            channel.invokeMethod("framePresented", mapOf("revision" to frameRevision))
+        webView?.evaluateJavascript(script) { result ->
+            if (result == "true") {
+                channel.invokeMethod("framePresented", mapOf("revision" to frameRevision))
+            }
         }
     }
 
