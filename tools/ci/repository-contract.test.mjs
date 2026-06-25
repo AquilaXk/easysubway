@@ -307,6 +307,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Repository CI \/ Set up Chrome for route map tests/);
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
+  assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);

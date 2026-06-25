@@ -136,6 +136,7 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
+          ROUTE_MAP_CHROME_NO_SANDBOX: "1"
         run: node --test tools/route-map/*.test.mjs
 
       - name: Repository CI / Run realtime provider contract tests
