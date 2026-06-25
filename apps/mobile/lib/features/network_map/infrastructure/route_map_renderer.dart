@@ -168,7 +168,7 @@ final class RouteMapRendererHealthMonitor {
         return;
       }
       onEvent?.call(RouteMapRendererFrameTimeout(revision));
-      _recover();
+      _recover(rewatchRevision: revision);
     });
   }
 
@@ -178,10 +178,13 @@ final class RouteMapRendererHealthMonitor {
     _blankTimer = null;
   }
 
-  void _recover() {
+  void _recover({int? rewatchRevision}) {
     _clearPendingFrame();
     _recoveryAttempt += 1;
     onEvent?.call(RouteMapRendererRecovering(_recoveryAttempt));
     unawaited(_controller.retry());
+    if (rewatchRevision != null) {
+      _watchRevision(rewatchRevision);
+    }
   }
 }
