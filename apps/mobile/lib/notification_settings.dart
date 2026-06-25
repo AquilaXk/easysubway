@@ -684,7 +684,7 @@ class _NotificationSettingsScreenState
       builder: (context) => AlertDialog(
         title: const Text('알림 받기'),
         content: const Text(
-          '즐겨찾는 역과 경로의 시설 상태, 내 신고 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
+          '즐겨찾는 역과 경로의 시설 상태, 내 제보 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
         ),
         actions: [
           TextButton(
@@ -830,7 +830,7 @@ class _NotificationSettingsContent extends StatelessWidget {
         ),
         _NotificationSwitchTile(
           key: const Key('notificationSwitch-reportStatusAlerts'),
-          title: '신고 처리 알림',
+          title: '제보 처리 알림',
           value: settings.reportStatusAlerts,
           enabled: !isSaving,
           onChanged: onReportStatusAlertsChanged,

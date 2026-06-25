@@ -1178,8 +1178,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('길찾기')),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      bottomNavigationBar: Padding(
+        padding: easySubwayBottomActionInsets(context),
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {

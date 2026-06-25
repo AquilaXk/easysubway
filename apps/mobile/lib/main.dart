@@ -1754,8 +1754,9 @@ class _NotificationInboxItem {
     return _NotificationInboxItem(
       icon: Icons.report_outlined,
       title: '제보 ${report.statusLabel}',
-      subtitle: '접수번호 ${report.id}',
-      semanticLabel: '제보 ${report.statusLabel}, 접수번호 ${report.id}',
+      subtitle: '제보 번호 ${report.displayReceiptCode}',
+      semanticLabel:
+          '제보 ${report.statusLabel}, 제보 번호 ${report.displayReceiptCode}',
       kind: '제보',
       report: report,
     );
@@ -2976,14 +2977,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     const _AppSettingsInfoTile(
                       icon: Icons.notifications_off_outlined,
                       title: '알림은 아직 사용할 수 없어요',
-                      subtitle: '시설 상태와 신고 처리 안내는 앱 안에서 확인할 수 있어요',
+                      subtitle: '시설 상태와 제보 처리 안내는 앱 안에서 확인할 수 있어요',
                     )
                   else
                     _AppSettingsActionTile(
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
-                      subtitle: '시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+                      subtitle: '시설 상태, 제보 처리, 정보 갱신 알림을 관리해요',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -3005,8 +3006,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   _AppSettingsActionTile(
                     key: const Key('myReportsSettingsButton'),
                     icon: Icons.receipt_long_outlined,
-                    title: '내 신고',
-                    subtitle: '접수한 시설 신고와 처리 상태를 확인해요',
+                    title: '내 제보',
+                    subtitle: '접수한 시설 제보와 처리 상태를 확인해요',
                     onTap: widget.onOpenMyReports,
                   ),
                 ],
@@ -4051,8 +4052,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
     final copy = _UserDataDeletionCopy.forScope(widget.deletionScope);
     return Scaffold(
       appBar: AppBar(title: Text(copy.title)),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      bottomNavigationBar: Padding(
+        padding: easySubwayBottomActionInsets(context),
         child: FilledButton.icon(
           key: const Key('dataDeletionStartButton'),
           onPressed: _isDeleting ? null : _confirmAndDelete,
@@ -4221,8 +4222,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
         title: const Text('삭제 완료'),
         automaticallyImplyLeading: false,
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      bottomNavigationBar: Padding(
+        padding: easySubwayBottomActionInsets(context),
         child: FilledButton.icon(
           key: const Key('dataDeletionResultStartButton'),
           onPressed: onRestart,
@@ -4266,28 +4267,37 @@ class UserDataDeletionResultScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _DataDeletionResultRow(
+                    id: 'favoriteStations',
                     icon: Icons.train_outlined,
                     title: '즐겨찾기한 역',
                     value: '${result.deletedFavoriteStationCount}개 삭제',
                   ),
+                  const SizedBox(height: 12),
                   _DataDeletionResultRow(
+                    id: 'favoriteFacilities',
                     icon: Icons.elevator_outlined,
                     title: '즐겨찾기한 시설',
                     value: '${result.deletedFavoriteFacilityCount}개 삭제',
                   ),
+                  const SizedBox(height: 12),
                   _DataDeletionResultRow(
+                    id: 'favoriteRoutes',
                     icon: Icons.route_outlined,
                     title: '즐겨찾기한 경로',
                     value: '${result.deletedFavoriteRouteCount}개 삭제',
                   ),
+                  const SizedBox(height: 12),
                   _DataDeletionResultRow(
+                    id: 'notifications',
                     icon: Icons.notifications_none,
                     title: '알림 설정',
                     value: result.notificationSettingsDeleted
                         ? '삭제'
                         : '삭제할 항목 없음',
                   ),
+                  const SizedBox(height: 12),
                   _DataDeletionResultRow(
+                    id: 'reportReceipts',
                     icon: Icons.report_outlined,
                     title: deletionScope == UserDataDeletionScope.deviceOnly
                         ? '이 기기의 제보 기록'
@@ -4297,7 +4307,10 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                         : '${result.anonymizedReportCount}건 익명화',
                   ),
                   if (deletionScope != UserDataDeletionScope.deviceOnly)
+                    const SizedBox(height: 12),
+                  if (deletionScope != UserDataDeletionScope.deviceOnly)
                     _DataDeletionResultRow(
+                      id: 'routeFeedback',
                       icon: Icons.rate_review_outlined,
                       title: '경로 의견 연결 정보',
                       value: '${result.anonymizedRouteFeedbackCount}건 익명화',
@@ -4325,24 +4338,106 @@ class UserDataDeletionResultScreen extends StatelessWidget {
 
 class _DataDeletionResultRow extends StatelessWidget {
   const _DataDeletionResultRow({
+    required this.id,
     required this.icon,
     required this.title,
     required this.value,
   });
 
+  final String id;
   final IconData icon;
   final String title;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return _PrototypeInfoRow(
-      icon: icon,
-      iconBackground: EasySubwayAccessibleColors.mintSoft,
-      iconColor: EasySubwayAccessibleColors.mintDark,
-      title: title,
-      subtitle: value,
-      trailing: '완료',
+    final textTheme = Theme.of(context).textTheme;
+    final textScaler = MediaQuery.textScalerOf(context).scale(1);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: textTheme.titleMedium?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: textTheme.bodyMedium?.copyWith(
+            color: EasySubwayAccessibleColors.mutedText,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+    final statusBadge = Container(
+      key: Key('dataDeletionResultStatus-$id'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDFF4EC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF8AC7B7)),
+      ),
+      child: const Text(
+        '완료',
+        style: TextStyle(
+          color: EasySubwayAccessibleColors.text,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+
+    return Semantics(
+      key: Key('dataDeletionResultRow-$id'),
+      container: true,
+      label: '$title, $value, 완료',
+      child: ExcludeSemantics(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              key: Key('dataDeletionResultIcon-$id'),
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD3F0E6),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: EasySubwayAccessibleColors.mint,
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: EasySubwayAccessibleColors.mintDark,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: textScaler >= 1.5
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        content,
+                        const SizedBox(height: 8),
+                        statusBadge,
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: content),
+                        const SizedBox(width: 12),
+                        statusBadge,
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -4537,7 +4632,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   final UserDataDeletionScope deletionScope;
 
   static const _title = '개인정보 사용 안내';
-  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
+  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _requestDeletionScope =
       '데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';

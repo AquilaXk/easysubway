@@ -29,6 +29,22 @@ class EasySubwayTouchTarget {
   static const primary = 60.0;
 }
 
+EdgeInsets easySubwayBottomActionInsets(
+  BuildContext context, {
+  double horizontal = 20,
+  double top = 8,
+  double bottom = 20,
+}) {
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final viewInsets = MediaQuery.viewInsetsOf(context);
+  final left = viewPadding.left > horizontal ? viewPadding.left : horizontal;
+  final right = viewPadding.right > horizontal ? viewPadding.right : horizontal;
+  final bottomInset = viewInsets.bottom > viewPadding.bottom
+      ? viewInsets.bottom
+      : viewPadding.bottom;
+  return EdgeInsets.fromLTRB(left, top, right, bottom + bottomInset);
+}
+
 class AccessibleShortcutButton extends StatelessWidget {
   const AccessibleShortcutButton({
     required this.onPressed,

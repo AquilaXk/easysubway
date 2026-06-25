@@ -42,6 +42,22 @@ void main() {
     expect(storage.deletedKeys, isEmpty);
   });
 
+  testWidgets('온보딩 소개는 기본 시작 버튼 아래 보조 문구를 표시하지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingIntroScreen(onConfigure: () {}, onSkip: () {}),
+      ),
+    );
+
+    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
+    expect(find.text('천천히 이동 · 큰 글씨 · 단순 보기 적용'), findsNothing);
+  });
+
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     OnboardingResult? completedResult;
