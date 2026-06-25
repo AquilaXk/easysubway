@@ -252,6 +252,20 @@ void main() {
     expect(result.statusLabel, '접수됨');
   });
 
+  test('시설 신고 결과는 공개 번호가 없으면 라벨 없는 준비 중 값을 보여준다', () {
+    const result = FacilityReportResult(
+      id: 'report-1',
+      stationId: 'station-sangnoksu',
+      facilityId: 'facility-sangnoksu-elevator-1',
+      reportType: 'BROKEN',
+      description: '문이 열리지 않습니다.',
+      status: 'SUBMITTED',
+      createdAt: '2026-06-13T10:00:00',
+    );
+
+    expect(result.displayReceiptCode, '준비 중');
+  });
+
   test('시설 신고 요청은 사진 Base64 대신 object metadata를 전송한다', () {
     final request = FacilityReportRequest(
       userId: 'anonymous-mobile-user',
@@ -878,12 +892,13 @@ void main() {
         ..close();
     });
 
+    final receiptStore = FakeFacilityReportReceiptStore({
+      'report-2': 'receipt-token-2',
+      'report-1': 'receipt-token-1',
+    });
     final repository = FacilityReportApiRepository(
       baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
-      receiptStore: FakeFacilityReportReceiptStore({
-        'report-2': 'receipt-token-2',
-        'report-1': 'receipt-token-1',
-      }),
+      receiptStore: receiptStore,
     );
 
     final reports = await repository.listMyReports();
@@ -898,6 +913,14 @@ void main() {
     expect(reports.first.publicReceiptCode, 'ES-1002');
     expect(reports.first.statusLabel, '반영됨');
     expect(reports.last.statusLabel, '접수됨');
+    expect(receiptStore.savedPublicReceiptCodes, {
+      'report-2': 'ES-1002',
+      'report-1': 'ES-1001',
+    });
+    expect(receiptStore.savedStatuses, {
+      'report-2': 'ACCEPTED',
+      'report-1': 'SUBMITTED',
+    });
   });
 
   test('내 신고 API 저장소는 receipt가 없으면 목록 조회 네트워크를 호출하지 않는다', () async {
@@ -1192,6 +1215,7 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
   final Map<String, String> _receiptTokens;
   final Map<String, DateTime> _createdAtByReportId;
   final Map<String, String> savedPublicReceiptCodes = {};
+  final Map<String, String> savedStatuses = {};
   final bool throwOnSave;
 
   @override
@@ -1203,6 +1227,7 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
     if (receipt.publicReceiptCode != null) {
       savedPublicReceiptCodes[receipt.reportId] = receipt.publicReceiptCode!;
     }
+    savedStatuses[receipt.reportId] = receipt.status;
     _createdAtByReportId[receipt.reportId] = receipt.createdAt;
   }
 

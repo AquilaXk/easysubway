@@ -314,7 +314,9 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       return Future.wait(
         receipts.map((receipt) async {
           try {
-            return await getReport(receipt.reportId);
+            final report = await getReport(receipt.reportId);
+            await _refreshReceiptIfPossible(receipt, report);
+            return report;
           } catch (error, stackTrace) {
             reportMobileError(
               error,
@@ -334,6 +336,33 @@ class FacilityReportApiRepository implements FacilityReportRepository {
         context: '내 시설 제보 목록 응답 처리 중 예외가 발생했습니다.',
       );
       throw const FacilityReportException(_facilityReportListErrorMessage);
+    }
+  }
+
+  Future<void> _refreshReceiptIfPossible(
+    FacilityReportReceipt receipt,
+    FacilityReportResult report,
+  ) async {
+    try {
+      await receiptStore
+          ?.saveReceipt(
+            FacilityReportReceipt(
+              receiptId: receipt.receiptId,
+              reportId: receipt.reportId,
+              publicReceiptCode:
+                  report.publicReceiptCode ?? receipt.publicReceiptCode,
+              status: report.status,
+              receiptToken: receipt.receiptToken,
+              createdAt: receipt.createdAt,
+            ),
+          )
+          .timeout(_facilityReportTimeout);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '시설 제보 receipt 상태 갱신 중 예외가 발생했습니다.',
+      );
     }
   }
 
@@ -842,7 +871,7 @@ class FacilityReportResult {
   String get displayReceiptCode {
     final code = publicReceiptCode?.trim();
     if (code == null || code.isEmpty) {
-      return '제보 번호 준비 중';
+      return '준비 중';
     }
     return code;
   }
