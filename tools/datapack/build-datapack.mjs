@@ -56,6 +56,7 @@ async function main() {
       signature: packSignature({
         id: pack.id,
         version: pack.version,
+        manifestVersion: fixture.manifest.manifestVersion ?? 1,
         artifactKind,
         url: packUrl,
         sha256: compressedSha256,
@@ -82,12 +83,25 @@ async function main() {
   }
 
   const manifest = {
+    ...(fixture.manifest.manifestVersion === 2
+      ? {
+          manifestVersion: 2,
+          channel: requiredString(fixture.manifest.channel, "manifest.channel"),
+          releaseSequence: requiredPositiveInteger(fixture.manifest.releaseSequence, "manifest.releaseSequence"),
+          publishedAt: requiredString(fixture.manifest.publishedAt, "manifest.publishedAt"),
+          expiresAt: requiredString(fixture.manifest.expiresAt, "manifest.expiresAt"),
+          keyId: requiredString(fixture.manifest.keyId, "manifest.keyId"),
+        }
+      : {}),
     ttlSeconds: fixture.manifest.ttlSeconds,
     activePack: fixture.manifest.activePack,
     packs: manifestPacks,
   };
   if (fixture.manifest.emergencyOverride !== undefined) {
     manifest.emergencyOverride = fixture.manifest.emergencyOverride;
+  }
+  if (fixture.manifest.manifestVersion === 2) {
+    manifest.signature = manifestSignature(manifest, manifestPacks);
   }
 
   await writeFile(path.join(outputDir, "current.json"), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -142,14 +156,52 @@ function packSignature(pack) {
   if (pack.artifactKind === "production") {
     const canonical = productionSignaturePayload(pack);
     return {
-      algorithm: "rsa-sha256-pack-manifest-v1",
+      algorithm: pack.manifestVersion === 2 ? "rsa-sha256-pack-manifest-v2" : "rsa-sha256-pack-manifest-v1",
       value: rsaSha256Signature(signingPrivateKey(), canonical),
     };
   }
   return {
-    algorithm: "sha256-pack-manifest-v1",
+    algorithm: pack.manifestVersion === 2 ? "sha256-pack-manifest-v2" : "sha256-pack-manifest-v1",
     value: sha256(Buffer.from(fixtureSignaturePayload(pack))),
   };
+}
+
+function manifestSignature(manifest, packs) {
+  const hasProductionPack = packs.some((pack) => pack.artifactKind === "production");
+  const canonical = canonicalJson(withoutSignature(manifest));
+  if (hasProductionPack) {
+    return {
+      algorithm: "rsa-sha256-manifest-v2",
+      value: rsaSha256Signature(signingPrivateKey(), canonical),
+    };
+  }
+  return {
+    algorithm: "sha256-manifest-v2",
+    value: sha256(Buffer.from(canonical)),
+  };
+}
+
+function withoutSignature(value) {
+  const copy = { ...value };
+  delete copy.signature;
+  return copy;
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(canonicalValue(value));
+}
+
+function canonicalValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue);
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
+  }
+  throw new Error("manifest canonical value is unsupported");
 }
 
 function fixtureSignaturePayload(pack) {
@@ -818,6 +870,14 @@ function requiredInteger(value, label) {
     throw new Error(`${label} must be an integer`);
   }
   return value;
+}
+
+function requiredPositiveInteger(value, label) {
+  const integer = requiredInteger(value, label);
+  if (integer <= 0) {
+    throw new Error(`${label} must be a positive integer`);
+  }
+  return integer;
 }
 
 function requiredNonNegativeInteger(value, label) {

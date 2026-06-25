@@ -65,6 +65,14 @@ class DataPackClient {
       decoded,
       productionSigningPublicKey: productionSigningPublicKey,
     );
+    if (manifest.isExpiredAt(_now())) {
+      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+    }
+    try {
+      await stateRepository.ensureManifestCanBeAccepted(manifest);
+    } on DataPackManifestReplayException catch (error) {
+      throw DataPackClientException(error.message);
+    }
     return DataPackManifestFetchResult(
       status: DataPackManifestFetchStatus.updated,
       manifest: manifest,
@@ -84,6 +92,7 @@ class DataPackClient {
       checkedAt: checkedAt,
       ttl: manifest.ttl,
     );
+    await stateRepository.saveAcceptedManifestState(manifest);
   }
 }
 

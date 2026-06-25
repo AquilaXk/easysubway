@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
+import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -189,6 +190,82 @@ void main() {
     expect(cache?.etag, 'etag-v18');
     expect(cache?.ttl, const Duration(minutes: 1));
   });
+
+  test('manifest client는 만료된 v2 manifest를 거부하고 기존 cache를 유지한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 27, 12),
+    );
+    await stateRepository.saveManifestCache(
+      etag: 'etag-v18',
+      checkedAt: DateTime.utc(2026, 6, 27, 10),
+      ttl: const Duration(minutes: 30),
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.set(HttpHeaders.etagHeader, 'etag-v19')
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode(
+            _v2ManifestJson(
+              sequence: 43,
+              version: '19',
+              expiresAt: '2026-06-26T00:00:00.000Z',
+            ),
+          ),
+        )
+        ..close();
+    });
+
+    final client = DataPackClient(
+      manifestUri: Uri.parse(
+        'http://${server.address.host}:${server.port}/manifest.json',
+      ),
+      stateRepository: stateRepository,
+      now: () => DateTime.utc(2026, 6, 27, 12),
+    );
+
+    await expectLater(
+      client.fetchManifestIfNeeded(),
+      throwsA(isA<DataPackClientException>()),
+    );
+    final cache = await stateRepository.readManifestCache();
+    expect(cache?.etag, 'etag-v18');
+  });
+
+  test('update state는 v2 manifest downgrade와 equivocation을 거부한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 25, 12),
+    );
+    final accepted = _v2Manifest(sequence: 42, version: '18');
+    await stateRepository.saveAcceptedManifestState(accepted);
+
+    final state = await stateRepository.readAcceptedManifestState('production');
+    expect(state?.releaseSequence, 42);
+    expect(state?.manifestHash, accepted.manifestHash);
+
+    await expectLater(
+      stateRepository.ensureManifestCanBeAccepted(
+        _v2Manifest(sequence: 41, version: '17'),
+      ),
+      throwsA(isA<DataPackManifestReplayException>()),
+    );
+    await expectLater(
+      stateRepository.ensureManifestCanBeAccepted(
+        _v2Manifest(sequence: 42, version: '19'),
+      ),
+      throwsA(isA<DataPackManifestReplayException>()),
+    );
+    await stateRepository.ensureManifestCanBeAccepted(accepted);
+  });
 }
 
 String _signatureValue(
@@ -219,4 +296,101 @@ String _routeRegressionSignatureValue(
         ),
       )
       .toString();
+}
+
+DataPackManifest _v2Manifest({required int sequence, required String version}) {
+  return DataPackManifest.fromJson(
+    _v2ManifestJson(sequence: sequence, version: version),
+  );
+}
+
+Map<String, Object?> _v2ManifestJson({
+  required int sequence,
+  required String version,
+  String expiresAt = '2026-06-26T00:00:00.000Z',
+}) {
+  final manifest = <String, Object?>{
+    'manifestVersion': 2,
+    'channel': 'production',
+    'releaseSequence': sequence,
+    'publishedAt': '2026-06-25T00:00:00.000Z',
+    'expiresAt': expiresAt,
+    'ttlSeconds': 3600,
+    'keyId': 'fixture-key',
+    'activePack': {'id': 'capital', 'version': version},
+    'packs': [
+      {
+        'id': 'capital',
+        'version': version,
+        'url': 'capital-v$version.sqlite.gz',
+        'sha256': 'a' * 64,
+        'sqliteSha256': 'b' * 64,
+        'sizeBytes': 1024,
+        'artifactKind': 'fixture',
+        'representativeRouteRegressions': _representativeRouteRegressions,
+        'representativeRouteRegressionSignature': {
+          'algorithm': 'sha256-route-regression-v1',
+          'value': _routeRegressionSignatureValue(
+            'capital',
+            version,
+            'a' * 64,
+            'b' * 64,
+            1024,
+          ),
+        },
+        'signature': {
+          'algorithm': 'sha256-pack-manifest-v2',
+          'value': _signatureValue(
+            'capital',
+            version,
+            'a' * 64,
+            'b' * 64,
+            1024,
+          ),
+        },
+        'sourceInventory': [
+          {
+            'id': 'fixture-capital-catalog',
+            'owner': '테스트',
+            'url': 'https://example.invalid/fixture',
+            'license': 'fixture-only',
+            'licenseStatus': 'fixture-only',
+            'redistributionAllowed': false,
+            'updateFrequency': 'manual',
+            'updatedAt': '2026-06-19T00:00:00.000Z',
+            'fields': ['stations'],
+          },
+        ],
+        'regionalQualityMetrics': {
+          'stationCount': 2,
+          'facilityCoverageRatio': 0.5,
+          'edgeCount': 2,
+          'unknownAccessibilityRatio': 0.0,
+        },
+        'schemaVersion': '1',
+        'requiredTables': ['catalog_metadata'],
+      },
+    ],
+  };
+  manifest['signature'] = {
+    'algorithm': 'sha256-manifest-v2',
+    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+  };
+  return manifest;
+}
+
+String _canonicalJson(Object? value) => jsonEncode(_canonicalValue(value));
+
+Object? _canonicalValue(Object? value) {
+  if (value == null || value is String || value is num || value is bool) {
+    return value;
+  }
+  if (value is List<Object?>) {
+    return value.map(_canonicalValue).toList(growable: false);
+  }
+  if (value is Map<String, Object?>) {
+    final sortedKeys = value.keys.toList()..sort();
+    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
+  }
+  throw StateError('unsupported value: $value');
 }

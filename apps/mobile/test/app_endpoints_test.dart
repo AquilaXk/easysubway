@@ -7,6 +7,7 @@ void main() {
       dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks/',
       dataPackSigningPublicKeyModulus: ' public-modulus ',
       dataPackSigningPublicKeyExponent: ' AQAB ',
+      dataPackSigningKeyId: ' production-v2 ',
       reportApiBaseUrl: 'https://api.easysubway.example',
     );
 
@@ -23,6 +24,10 @@ void main() {
     expect(
       endpoints.productionDataPackSigningPublicKey?.exponentBase64Url,
       'AQAB',
+    );
+    expect(
+      endpoints.productionDataPackSigningPublicKey?.keyId,
+      'production-v2',
     );
   });
 

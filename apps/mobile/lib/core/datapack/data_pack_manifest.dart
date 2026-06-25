@@ -7,23 +7,37 @@ final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
 
 class DataPackManifest {
   const DataPackManifest({
+    required this.manifestVersion,
     required this.ttl,
     required this.packs,
     this.activePack,
     this.emergencyOverride,
+    this.channel,
+    this.releaseSequence,
+    this.publishedAt,
+    this.expiresAt,
+    this.keyId,
+    this.signature,
+    this.manifestHash,
   });
 
   factory DataPackManifest.fromJson(
     Map<String, Object?> json, {
     DataPackSigningPublicKey? productionSigningPublicKey,
   }) {
+    final manifestVersion = _parseManifestVersion(json['manifestVersion']);
     final ttlSeconds = json['ttlSeconds'];
     final rawPacks = json['packs'];
     if (ttlSeconds is! int || ttlSeconds <= 0 || rawPacks is! List<Object?>) {
       throw const FormatException('Invalid data pack manifest.');
     }
+    final signature = manifestVersion == 2
+        ? _parseManifestEnvelopeSignature(json['signature'])
+        : null;
+    final keyId = manifestVersion == 2 ? _requiredString(json, 'keyId') : null;
 
-    return DataPackManifest(
+    final manifest = DataPackManifest(
+      manifestVersion: manifestVersion,
       ttl: Duration(seconds: ttlSeconds),
       packs: rawPacks
           .map((rawPack) {
@@ -32,19 +46,82 @@ class DataPackManifest {
             }
             return DataPackManifestEntry.fromJson(
               rawPack,
+              manifestVersion: manifestVersion,
               productionSigningPublicKey: productionSigningPublicKey,
             );
           })
           .toList(growable: false),
       activePack: _parseActivePack(json['activePack']),
       emergencyOverride: _parseOverride(json['emergencyOverride']),
+      channel: manifestVersion == 2
+          ? _readManifestChannel(json['channel'])
+          : null,
+      releaseSequence: manifestVersion == 2
+          ? _requiredPositiveInt(json, 'releaseSequence')
+          : null,
+      publishedAt: manifestVersion == 2
+          ? _requiredUtcDateTime(json, 'publishedAt')
+          : null,
+      expiresAt: manifestVersion == 2
+          ? _requiredUtcDateTime(json, 'expiresAt')
+          : null,
+      keyId: keyId,
+      signature: signature,
+      manifestHash: manifestVersion == 2
+          ? sha256.convert(utf8.encode(_canonicalJson(json))).toString()
+          : null,
     );
+    manifest._validateEnvelopeSignature(json, productionSigningPublicKey);
+    return manifest;
   }
 
+  final int manifestVersion;
   final Duration ttl;
   final List<DataPackManifestEntry> packs;
   final ActiveDataPackManifest? activePack;
   final EmergencyOverrideManifest? emergencyOverride;
+  final String? channel;
+  final int? releaseSequence;
+  final DateTime? publishedAt;
+  final DateTime? expiresAt;
+  final String? keyId;
+  final DataPackSignature? signature;
+  final String? manifestHash;
+
+  bool get hasReplayProtection => manifestVersion == 2;
+
+  bool isExpiredAt(DateTime now) {
+    final expiry = expiresAt;
+    return expiry != null && !now.toUtc().isBefore(expiry);
+  }
+
+  void _validateEnvelopeSignature(
+    Map<String, Object?> json,
+    DataPackSigningPublicKey? productionSigningPublicKey,
+  ) {
+    if (manifestVersion != 2) {
+      return;
+    }
+    final canonical = _canonicalJson(_withoutSignature(json));
+    final parsedSignature = signature;
+    if (parsedSignature == null) {
+      throw const FormatException('Invalid data pack manifest signature.');
+    }
+    final publicKey = productionSigningPublicKey;
+    if (publicKey != null) {
+      if (keyId != publicKey.keyId ||
+          parsedSignature.algorithm != 'rsa-sha256-manifest-v2' ||
+          !publicKey.verify(canonical, parsedSignature.value)) {
+        throw const FormatException('Invalid data pack manifest signature.');
+      }
+      return;
+    }
+    if (parsedSignature.algorithm != 'sha256-manifest-v2' ||
+        parsedSignature.value !=
+            sha256.convert(utf8.encode(canonical)).toString()) {
+      throw const FormatException('Invalid data pack manifest signature.');
+    }
+  }
 }
 
 /// Production manifests sign the source inventory, regional quality metrics,
@@ -67,11 +144,13 @@ class DataPackManifestEntry {
     required this.representativeRouteRegressionSignature,
     required this.schemaVersion,
     required this.requiredTables,
+    this.manifestVersion = 1,
     this.minimumTableRows = const {},
   });
 
   factory DataPackManifestEntry.fromJson(
     Map<String, Object?> json, {
+    int manifestVersion = 1,
     DataPackSigningPublicKey? productionSigningPublicKey,
   }) {
     final id = _readPackId(json['id']);
@@ -91,6 +170,7 @@ class DataPackManifestEntry {
       compressedSha256: _requiredString(json, 'sha256'),
       sqliteSha256: _requiredString(json, 'sqliteSha256'),
       sizeBytes: _optionalPositiveInt(json, 'sizeBytes', artifactKind),
+      manifestVersion: manifestVersion,
       artifactKind: artifactKind,
       signature: _parseSignature(json['signature'], artifactKind),
       sourceInventory: _parseSourceInventory(
@@ -126,6 +206,7 @@ class DataPackManifestEntry {
   final String compressedSha256;
   final String sqliteSha256;
   final int? sizeBytes;
+  final int manifestVersion;
   final DataPackArtifactKind artifactKind;
   final DataPackSignature signature;
   final List<DataPackSourceInventoryEntry> sourceInventory;
@@ -176,7 +257,7 @@ class DataPackManifestEntry {
       if (publicKey == null) {
         throw const FormatException('Invalid data pack signature.');
       }
-      if (signature.algorithm != 'rsa-sha256-pack-manifest-v1' ||
+      if (signature.algorithm != _packSignatureAlgorithm(production: true) ||
           !publicKey.verify(canonical, signature.value)) {
         throw const FormatException('Invalid data pack signature.');
       }
@@ -186,7 +267,7 @@ class DataPackManifestEntry {
       );
       return;
     }
-    if (signature.algorithm != 'sha256-pack-manifest-v1') {
+    if (signature.algorithm != _packSignatureAlgorithm(production: false)) {
       throw const FormatException('Invalid data pack signature.');
     }
     if (signature.value != sha256.convert(utf8.encode(canonical)).toString()) {
@@ -258,6 +339,13 @@ class DataPackManifestEntry {
     return '$id:$version:$compressedSha256:$sqliteSha256:$expectedSizeBytes';
   }
 
+  String _packSignatureAlgorithm({required bool production}) {
+    final prefix = production ? 'rsa-sha256' : 'sha256';
+    return manifestVersion == 2
+        ? '$prefix-pack-manifest-v2'
+        : '$prefix-pack-manifest-v1';
+  }
+
   String _representativeRouteRegressionPayload() {
     return jsonEncode(
       representativeRouteRegressions
@@ -271,10 +359,12 @@ class DataPackSigningPublicKey {
   const DataPackSigningPublicKey({
     required this.modulusBase64Url,
     required this.exponentBase64Url,
+    this.keyId = 'production-v1',
   });
 
   final String modulusBase64Url;
   final String exponentBase64Url;
+  final String keyId;
 
   bool verify(String message, String signatureBase64Url) {
     try {
@@ -349,6 +439,10 @@ class DataPackSignature {
     final algorithm = _requiredString(json, 'algorithm');
     if (algorithm != 'sha256-pack-manifest-v1' &&
         algorithm != 'rsa-sha256-pack-manifest-v1' &&
+        algorithm != 'sha256-pack-manifest-v2' &&
+        algorithm != 'rsa-sha256-pack-manifest-v2' &&
+        algorithm != 'sha256-manifest-v2' &&
+        algorithm != 'rsa-sha256-manifest-v2' &&
         algorithm != 'sha256-route-regression-v1' &&
         algorithm != 'rsa-sha256-route-regression-v1') {
       throw const FormatException('Invalid data pack signature.');
@@ -363,6 +457,56 @@ class DataPackSignature {
 
   final String algorithm;
   final String value;
+}
+
+int _parseManifestVersion(Object? rawVersion) {
+  if (rawVersion == null) {
+    return 1;
+  }
+  if (rawVersion != 2) {
+    throw const FormatException('Invalid data pack manifest version.');
+  }
+  return 2;
+}
+
+String _readManifestChannel(Object? value) {
+  final channel = _readRequiredString(value);
+  if (!RegExp(r'^[A-Za-z][A-Za-z0-9_-]*$').hasMatch(channel)) {
+    throw const FormatException('Invalid data pack manifest channel.');
+  }
+  return channel;
+}
+
+DataPackSignature _parseManifestEnvelopeSignature(Object? rawSignature) {
+  if (rawSignature is! Map<String, Object?>) {
+    throw const FormatException('Invalid data pack manifest signature.');
+  }
+  return DataPackSignature.fromJson(rawSignature);
+}
+
+Map<String, Object?> _withoutSignature(Map<String, Object?> json) {
+  return {
+    for (final entry in json.entries)
+      if (entry.key != 'signature') entry.key: entry.value,
+  };
+}
+
+String _canonicalJson(Object? value) {
+  return jsonEncode(_canonicalValue(value));
+}
+
+Object? _canonicalValue(Object? value) {
+  if (value == null || value is String || value is num || value is bool) {
+    return value;
+  }
+  if (value is List<Object?>) {
+    return value.map(_canonicalValue).toList(growable: false);
+  }
+  if (value is Map<String, Object?>) {
+    final sortedKeys = value.keys.toList()..sort();
+    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
+  }
+  throw const FormatException('Invalid data pack manifest canonical value.');
 }
 
 bool _isAbsoluteHttpsWithHost(Uri uri) {
@@ -784,6 +928,23 @@ int _requiredNonNegativeInt(Map<String, Object?> json, String key) {
     throw const FormatException('Invalid data pack manifest value.');
   }
   return value;
+}
+
+int _requiredPositiveInt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is! int || value <= 0) {
+    throw const FormatException('Invalid data pack manifest value.');
+  }
+  return value;
+}
+
+DateTime _requiredUtcDateTime(Map<String, Object?> json, String key) {
+  final rawValue = _requiredString(json, key);
+  final parsed = DateTime.tryParse(rawValue);
+  if (parsed == null) {
+    throw const FormatException('Invalid data pack manifest value.');
+  }
+  return parsed.toUtc();
 }
 
 bool _requiredBool(Map<String, Object?> json, String key) {

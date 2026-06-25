@@ -144,6 +144,33 @@ void main() {
     expect(manifest.emergencyOverride?.version, '17');
   });
 
+  test('manifest v2는 envelope signature로 active pack 선택을 보호한다', () {
+    final json = _v2FixtureManifest();
+    final manifest = DataPackManifest.fromJson(json);
+
+    expect(manifest.manifestVersion, 2);
+    expect(manifest.channel, 'production');
+    expect(manifest.releaseSequence, 42);
+    expect(manifest.activePack?.version, '18');
+    expect(manifest.signature?.algorithm, 'sha256-manifest-v2');
+    expect(
+      manifest.packs.single.signature.algorithm,
+      'sha256-pack-manifest-v2',
+    );
+
+    final tampered = jsonDecode(jsonEncode(json)) as Map<String, Object?>;
+    tampered['activePack'] = {'id': 'capital', 'version': '17'};
+
+    expect(() => DataPackManifest.fromJson(tampered), throwsFormatException);
+    expect(
+      () => DataPackManifest.fromJson(
+        json,
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('production 데이터팩 manifest는 HTTPS URL과 source inventory가 필요하다', () {
     expect(
       () => DataPackManifest.fromJson({
@@ -724,6 +751,87 @@ String _signatureValue(
         utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
       )
       .toString();
+}
+
+Map<String, Object?> _v2FixtureManifest() {
+  final manifest = <String, Object?>{
+    'manifestVersion': 2,
+    'channel': 'production',
+    'releaseSequence': 42,
+    'publishedAt': '2026-06-25T00:00:00.000Z',
+    'expiresAt': '2026-06-26T00:00:00.000Z',
+    'ttlSeconds': 3600,
+    'keyId': 'fixture-key',
+    'activePack': {'id': 'capital', 'version': '18'},
+    'packs': [
+      {
+        'id': 'capital',
+        'version': '18',
+        'url': 'catalog/capital-v18.sqlite.gz',
+        'sha256': 'a' * 64,
+        'sqliteSha256': 'b' * 64,
+        'sizeBytes': 1024,
+        'artifactKind': 'fixture',
+        'representativeRouteRegressions': _representativeRouteRegressions,
+        'representativeRouteRegressionSignature': {
+          'algorithm': 'sha256-route-regression-v1',
+          'value': _routeRegressionSignatureValue(
+            'capital',
+            '18',
+            'a' * 64,
+            'b' * 64,
+            1024,
+          ),
+        },
+        'signature': {
+          'algorithm': 'sha256-pack-manifest-v2',
+          'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
+        },
+        'sourceInventory': [
+          {
+            'id': 'fixture-capital-catalog',
+            'owner': '테스트',
+            'url': 'https://example.invalid/fixture',
+            'license': 'fixture-only',
+            'licenseStatus': 'fixture-only',
+            'redistributionAllowed': false,
+            'updateFrequency': 'manual',
+            'updatedAt': '2026-06-19T00:00:00.000Z',
+            'fields': ['stations', 'network_edges'],
+          },
+        ],
+        'regionalQualityMetrics': {
+          'stationCount': 2,
+          'facilityCoverageRatio': 0.5,
+          'edgeCount': 2,
+          'unknownAccessibilityRatio': 0.0,
+        },
+        'schemaVersion': '1',
+        'requiredTables': ['catalog_metadata', 'stations'],
+      },
+    ],
+  };
+  manifest['signature'] = {
+    'algorithm': 'sha256-manifest-v2',
+    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+  };
+  return manifest;
+}
+
+String _canonicalJson(Object? value) => jsonEncode(_canonicalValue(value));
+
+Object? _canonicalValue(Object? value) {
+  if (value == null || value is String || value is num || value is bool) {
+    return value;
+  }
+  if (value is List<Object?>) {
+    return value.map(_canonicalValue).toList(growable: false);
+  }
+  if (value is Map<String, Object?>) {
+    final sortedKeys = value.keys.toList()..sort();
+    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
+  }
+  throw StateError('unsupported value: $value');
 }
 
 String _routeRegressionSignatureValue(
