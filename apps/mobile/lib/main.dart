@@ -3442,7 +3442,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
           icon: Icons.route_outlined,
           label: '경로',
           countLabel: _countLabel(routeCount),
-          subtitle: '이동 편의도와 저장한 경로를 다시 확인해요',
+          subtitle: '이동 조건과 저장한 경로를 다시 확인해요',
           onTap: onRoutes,
         ),
       ],

@@ -231,7 +231,8 @@ void main() {
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
-    expect(result.scoreLabel, '이동 편의도 92점');
+    expect(result.scoreLabel, '이동 부담 확인 필요');
+    expect(result.scoreLabel, isNot(contains('92점')));
     expect(result.recommendationReasons, [
       '엘리베이터 동선을 우선했어요',
       '계단 없는 출구를 확인했어요',
@@ -481,7 +482,8 @@ void main() {
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
     expect(saved.mobilityLabel, '천천히 이동');
-    expect(saved.scoreLabel, '이동 편의도 92점');
+    expect(saved.scoreLabel, '상세 이동 정보는 다시 검색해 확인');
+    expect(saved.scoreLabel, isNot(contains('92점')));
   });
 
   test('경로 피드백 API 저장소는 익명 사용자 식별자와 평가를 전송한다', () async {
