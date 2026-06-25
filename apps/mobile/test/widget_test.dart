@@ -1621,6 +1621,12 @@ void main() {
     await _openSettingsScreen(tester);
     await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
     await tester.pumpAndSettle();
+    expect(
+      MediaQuery.textScalerOf(
+        tester.element(find.byKey(const Key('largeTextSettingsButton'))),
+      ).scale(20),
+      closeTo(20, 0.01),
+    );
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
@@ -1658,6 +1664,59 @@ void main() {
     expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
     expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
     expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+  });
+
+  testWidgets('설정 화면 보기 옵션은 빠른 연속 변경에서도 마지막 값을 저장한다', (tester) async {
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
+    await tester.pump();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
+    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+
+    firstSave.complete();
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.complete();
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isTrue,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
   });
 
   testWidgets('설정 화면 보기 옵션은 큰 글자에서도 스위치를 조작할 수 있다', (tester) async {
@@ -8799,10 +8858,12 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
   MemoryOnboardingResultStore({
     OnboardingResult? initialResult,
     this.throwOnRead = false,
+    this.saveCompleters = const [],
   }) : savedResult = initialResult;
 
   OnboardingResult? savedResult;
   final bool throwOnRead;
+  final List<Completer<void>> saveCompleters;
   int readCount = 0;
   int saveCount = 0;
 
@@ -8817,7 +8878,11 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
 
   @override
   Future<void> saveResult(OnboardingResult result) async {
+    final saveCompleter = saveCount < saveCompleters.length
+        ? saveCompleters[saveCount]
+        : null;
     saveCount++;
+    await saveCompleter?.future;
     savedResult = result;
   }
 
