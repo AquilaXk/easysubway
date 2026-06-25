@@ -2500,7 +2500,7 @@ void main() {
 
       expect(
         find.text(
-          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
         ),
         findsOneWidget,
       );
@@ -2514,7 +2514,9 @@ void main() {
           .getSemanticsData();
       expect(
         summarySemantics.label,
-        contains('서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
+        contains(
+          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
+        ),
       );
       expect(
         summarySemantics.label,
@@ -2535,14 +2537,20 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
-      expect(find.text('삭제가 끝나면 서버에 연결된 데이터가 정리됩니다.'), findsOneWidget);
+      expect(
+        find.text('삭제가 끝나면 서버에 연결된 데이터가 정리되고 앱의 임시 설정이 초기화됩니다.'),
+        findsOneWidget,
+      );
+      expect(find.text('앱은 처음 설정 화면으로 돌아갑니다.'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(
-        find.text('삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.'),
+        find.text(
+          '삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
+        ),
         findsOneWidget,
       );
     } finally {
