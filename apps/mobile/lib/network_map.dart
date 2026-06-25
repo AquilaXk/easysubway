@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
+import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
+import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 
@@ -739,15 +741,10 @@ const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
-  final TransformationController _controller = TransformationController();
-  final GlobalKey _mapContentKey = GlobalKey();
   String? _layoutKey;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  MapCameraState? _camera;
+  MapCameraState? _gestureStartCamera;
+  Offset? _gestureStartFocalPoint;
 
   @override
   Widget build(BuildContext context) {
@@ -766,11 +763,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
         builder: (context, constraints) {
           final geometry = mapAsset == null
               ? _MapGeometry.fromStations(widget.data.stations)
-              : _MapGeometry.fromOriginalAsset(
-                  mapAsset,
-                  View.of(context).devicePixelRatio,
-                  defaultTargetPlatform,
-                );
+              : _MapGeometry.fromOriginalAsset(mapAsset);
           final fullBounds = Rect.fromLTWH(
             0,
             0,
@@ -782,133 +775,126 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
-            _controller.value = _initialMapTransform(
-              geometry,
+            _camera = _cameraForBounds(
+              geometry.initialBounds,
               constraints,
+              sourceBounds: fullBounds,
               minScale: minScale,
             );
           }
+          final camera =
+              _camera ??
+              _cameraForBounds(
+                geometry.initialBounds,
+                constraints,
+                sourceBounds: fullBounds,
+                minScale: minScale,
+              );
           return Stack(
             children: [
               Positioned.fill(
-                child: InteractiveViewer(
-                  key: const Key('networkMapInteractiveViewer'),
-                  transformationController: _controller,
-                  constrained: false,
-                  minScale: minScale,
-                  maxScale: _maxMapScale,
-                  boundaryMargin: const EdgeInsets.all(220),
-                  child: SizedBox(
-                    key: _mapContentKey,
-                    width: geometry.width,
-                    height: geometry.height,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: mapAsset == null
-                              ? const _OriginalRouteMapUnavailable()
-                              : Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Transform.scale(
-                                    alignment: Alignment.topLeft,
-                                    scaleX:
-                                        geometry.width / geometry.surfaceWidth,
-                                    scaleY:
-                                        geometry.height /
-                                        geometry.surfaceHeight,
-                                    child: SizedBox(
-                                      width: geometry.surfaceWidth,
-                                      height: geometry.surfaceHeight,
-                                      child: _OriginalRouteMapView(
-                                        asset: mapAsset,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                        if (widget.selectedLineId != null)
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: CustomPaint(
-                                key: const Key('networkMapSelectedLineOverlay'),
-                                painter: _SelectedLineOverlayPainter(
-                                  lineId: widget.selectedLineId!,
-                                  linesById: linesById,
-                                  stationsById: stationsById,
-                                  edges: widget.data.edges,
-                                  geometry: geometry,
-                                  styleScale: geometry.overlayStyleScale,
-                                ),
-                              ),
-                            ),
-                          ),
-                        Positioned.fill(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.translucent,
-                            onTapUp: (details) {
-                              _openNearestStation(
-                                details.localPosition,
-                                widget.data.stations,
-                                stationLinesById,
-                                geometry,
-                              );
-                            },
-                          ),
-                        ),
-                        for (final station in widget.data.stations)
-                          Positioned.fromRect(
-                            rect: _stationHitRect(station, geometry),
-                            child: _StationHitTarget(
-                              key: Key(
-                                'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
-                              ),
-                              station: station,
-                              onTap: () => widget.onStationTap(
-                                station,
-                                stationLinesById[station.id] ?? const [],
-                              ),
-                              onTapUp: (details) {
-                                final renderObject = _mapContentKey
-                                    .currentContext
-                                    ?.findRenderObject();
-                                if (renderObject is! RenderBox) {
-                                  return;
-                                }
-                                _openNearestStation(
-                                  renderObject.globalToLocal(
-                                    details.globalPosition,
-                                  ),
-                                  widget.data.stations,
-                                  stationLinesById,
-                                  geometry,
-                                );
-                              },
-                            ),
-                          ),
-                      ],
+                child: mapAsset == null
+                    ? const _OriginalRouteMapUnavailable()
+                    : _RouteMapViewportRenderer(
+                        asset: mapAsset,
+                        camera: camera,
+                      ),
+              ),
+              if (widget.selectedLineId != null)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      key: const Key('networkMapSelectedLineOverlay'),
+                      painter: _SelectedLineOverlayPainter(
+                        lineId: widget.selectedLineId!,
+                        linesById: linesById,
+                        stationsById: stationsById,
+                        edges: widget.data.edges,
+                        geometry: geometry,
+                        camera: camera,
+                        styleScale: geometry.overlayStyleScale,
+                      ),
                     ),
                   ),
                 ),
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onScaleStart: (details) {
+                    _gestureStartCamera = camera;
+                    _gestureStartFocalPoint = details.localFocalPoint;
+                  },
+                  onScaleUpdate: (details) {
+                    _updateCameraForGesture(details);
+                  },
+                  onScaleEnd: (_) {
+                    _gestureStartCamera = null;
+                    _gestureStartFocalPoint = null;
+                  },
+                  onTapUp: (details) {
+                    _openNearestStation(
+                      camera.viewportToSourcePoint(details.localPosition),
+                      widget.data.stations,
+                      stationLinesById,
+                      geometry,
+                      camera,
+                    );
+                  },
+                ),
               ),
+              for (final station in widget.data.stations)
+                if (_stationHitRect(
+                  station,
+                  geometry,
+                ).overlaps(camera.visibleSourceRect.inflate(96 / camera.scale)))
+                  Positioned.fromRect(
+                    rect: _sourceRectToViewport(
+                      _stationHitRect(
+                        station,
+                        geometry,
+                        nodeRadius: 24 / camera.scale,
+                        labelHeight: 40 / camera.scale,
+                      ),
+                      camera,
+                    ),
+                    child: _StationHitTarget(
+                      key: Key(
+                        'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+                      ),
+                      station: station,
+                      onTap: () => widget.onStationTap(
+                        station,
+                        stationLinesById[station.id] ?? const [],
+                      ),
+                    ),
+                  ),
               Positioned(
                 right: 14,
                 top: 12,
                 child: _MapControls(
-                  onZoomIn: () => _scaleMap(1.25, minScale, constraints),
-                  onZoomOut: () => _scaleMap(0.8, minScale, constraints),
+                  onZoomIn: () => _scaleMap(1.25),
+                  onZoomOut: () => _scaleMap(0.8),
                   onOverview: () {
-                    _controller.value = _mapTransformForBounds(
-                      fullBounds,
-                      constraints,
-                      contain: true,
-                      minScale: minScale,
+                    _setCamera(
+                      _cameraForBounds(
+                        fullBounds,
+                        constraints,
+                        sourceBounds: fullBounds,
+                        contain: true,
+                        minScale: minScale,
+                        revision: camera.revision + 1,
+                      ),
                     );
                   },
                   onCenter: () {
-                    _controller.value = _mapTransformForBounds(
-                      _readableBoundsFor(geometry),
-                      constraints,
-                      minScale: minScale,
+                    _setCamera(
+                      _cameraForBounds(
+                        _readableBoundsFor(geometry),
+                        constraints,
+                        sourceBounds: fullBounds,
+                        minScale: minScale,
+                        revision: camera.revision + 1,
+                      ),
                     );
                   },
                 ),
@@ -920,40 +906,63 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
     );
   }
 
-  void _scaleMap(double factor, double minScale, BoxConstraints constraints) {
-    final currentScale = _controller.value.getMaxScaleOnAxis();
-    if (currentScale <= 0) {
+  void _scaleMap(double factor) {
+    final camera = _camera;
+    if (camera == null || camera.viewportSize == Size.zero) {
       return;
     }
-    final targetScale = (currentScale * factor)
-        .clamp(minScale, _maxMapScale)
+    _setCamera(
+      camera
+          .zoomBy(factor, focalPoint: camera.viewportSize.center(Offset.zero))
+          .clamped(viewportMargin: 220),
+    );
+  }
+
+  void _updateCameraForGesture(ScaleUpdateDetails details) {
+    final startCamera = _gestureStartCamera;
+    final startFocalPoint = _gestureStartFocalPoint;
+    if (startCamera == null || startFocalPoint == null) {
+      return;
+    }
+    final viewportCenter = startCamera.viewportSize.center(Offset.zero);
+    final sourceBefore = startCamera.viewportToSourcePoint(startFocalPoint);
+    final nextScale = (startCamera.scale * details.scale)
+        .clamp(startCamera.minScale, startCamera.maxScale)
         .toDouble();
-    final viewportCenter = Offset(
-      (constraints.hasBoundedWidth ? constraints.maxWidth : 0) / 2,
-      (constraints.hasBoundedHeight ? constraints.maxHeight : 0) / 2,
+    final nextCenter =
+        sourceBefore - (details.localFocalPoint - viewportCenter) / nextScale;
+    _setCamera(
+      startCamera
+          .copyWith(
+            center: nextCenter,
+            scale: nextScale,
+            revision: startCamera.revision + 1,
+          )
+          .clamped(viewportMargin: 220),
     );
-    final sceneCenter = MatrixUtils.transformPoint(
-      Matrix4.inverted(_controller.value),
-      viewportCenter,
-    );
-    _controller.value = Matrix4.identity()
-      ..translateByDouble(viewportCenter.dx, viewportCenter.dy, 0, 1)
-      ..scaleByDouble(targetScale, targetScale, 1, 1)
-      ..translateByDouble(-sceneCenter.dx, -sceneCenter.dy, 0, 1);
+  }
+
+  void _setCamera(MapCameraState camera) {
+    if (_camera == camera) {
+      return;
+    }
+    setState(() {
+      _camera = camera;
+    });
   }
 
   void _openNearestStation(
-    Offset mapPosition,
+    Offset sourcePosition,
     List<NetworkMapStation> stations,
     Map<String, List<NetworkMapLine>> stationLinesById,
     _MapGeometry geometry,
+    MapCameraState camera,
   ) {
-    final scale = _controller.value.getMaxScaleOnAxis();
     final station = _stationAtMapPosition(
-      mapPosition,
+      sourcePosition,
       stations,
       geometry,
-      sceneHitRadius: 24 / (scale > 0 && scale.isFinite ? scale : 1),
+      sceneHitRadius: 24 / (camera.scale > 0 ? camera.scale : 1),
       selectedLineId: widget.selectedLineId,
     );
     if (station == null) {
@@ -970,6 +979,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     required this.stationsById,
     required this.edges,
     required this.geometry,
+    required this.camera,
     required this.styleScale,
   });
 
@@ -978,6 +988,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
   final Map<String, NetworkMapStation> stationsById;
   final List<NetworkMapEdge> edges;
   final _MapGeometry geometry;
+  final MapCameraState camera;
   final double styleScale;
 
   @override
@@ -991,6 +1002,9 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       Offset.zero & size,
       Paint()..color = Colors.white.withValues(alpha: 0.58),
     );
+    canvas
+      ..save()
+      ..transform(camera.sourceToViewport.storage);
     final pathPaint = Paint()
       ..color = lineColor
       ..strokeCap = StrokeCap.round
@@ -1027,6 +1041,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
       canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
     }
+    canvas.restore();
   }
 
   @override
@@ -1036,6 +1051,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.stationsById != stationsById ||
         oldDelegate.edges != edges ||
         oldDelegate.geometry != geometry ||
+        oldDelegate.camera != camera ||
         oldDelegate.styleScale != styleScale;
   }
 }
@@ -1161,50 +1177,36 @@ class _MapControlButton extends StatelessWidget {
   }
 }
 
-class _OriginalRouteMapView extends StatelessWidget {
-  const _OriginalRouteMapView({required this.asset});
-
-  static const _viewType =
-      'com.easysubway.easysubway_mobile/original_route_map_asset';
+class _RouteMapViewportRenderer extends StatelessWidget {
+  const _RouteMapViewportRenderer({required this.asset, required this.camera});
 
   final _RouteMapAsset asset;
+  final MapCameraState camera;
 
   @override
   Widget build(BuildContext context) {
     if (_isWidgetTest) {
-      return ColoredBox(
-        key: const Key('originalRouteMapView'),
+      return const ColoredBox(
+        key: Key('routeMapViewportRenderer'),
         color: Colors.white,
-        child: Semantics(
-          label: '원본 노선도',
-          image: true,
-          child: const SizedBox.expand(),
-        ),
       );
     }
-    final platformViewKey = ValueKey('originalRouteMapView-${asset.path}');
-    final creationParams = <String, Object?>{
-      'assetPath': asset.path,
-      'mimeType': asset.mimeType,
-    };
-    final nativeView = switch (defaultTargetPlatform) {
-      TargetPlatform.android => AndroidView(
-        key: platformViewKey,
-        viewType: _viewType,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
+    final renderer = switch (defaultTargetPlatform) {
+      TargetPlatform.android => AndroidRouteMapViewportWebView(
+        assetPath: asset.path,
+        mimeType: asset.mimeType,
+        camera: camera,
       ),
-      TargetPlatform.iOS => UiKitView(
-        key: platformViewKey,
-        viewType: _viewType,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
+      TargetPlatform.iOS => IosRouteMapViewportWebView(
+        assetPath: asset.path,
+        mimeType: asset.mimeType,
+        camera: camera,
       ),
       _ => const ColoredBox(color: Colors.white),
     };
     return KeyedSubtree(
-      key: const Key('originalRouteMapView'),
-      child: IgnorePointer(child: nativeView),
+      key: const Key('routeMapViewportRenderer'),
+      child: renderer,
     );
   }
 }
@@ -1247,30 +1249,30 @@ String _displayRegionName(String region) {
   };
 }
 
-Matrix4 _initialMapTransform(
-  _MapGeometry geometry,
-  BoxConstraints constraints, {
-  required double minScale,
-}) {
-  return _mapTransformForBounds(
-    geometry.initialBounds,
-    constraints,
-    minScale: minScale,
-  );
-}
-
-Matrix4 _mapTransformForBounds(
+MapCameraState _cameraForBounds(
   Rect bounds,
   BoxConstraints constraints, {
+  required Rect sourceBounds,
   bool contain = false,
   double minScale = _minMapScale,
+  int revision = 0,
 }) {
-  final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
+  final viewportWidth = constraints.hasBoundedWidth
+      ? constraints.maxWidth
+      : 0.0;
   final viewportHeight = constraints.hasBoundedHeight
       ? constraints.maxHeight
-      : 0;
+      : 0.0;
   if (viewportWidth <= 0 || viewportHeight <= 0) {
-    return Matrix4.identity();
+    return MapCameraState(
+      sourceBounds: sourceBounds,
+      viewportSize: Size.zero,
+      center: sourceBounds.center,
+      scale: minScale,
+      minScale: minScale,
+      maxScale: _maxMapScale,
+      revision: revision,
+    );
   }
   final widthScale = viewportWidth / bounds.width;
   final heightScale = viewportHeight / bounds.height;
@@ -1278,15 +1280,26 @@ Matrix4 _mapTransformForBounds(
       ? math.min(widthScale, heightScale)
       : math.max(widthScale, heightScale);
   final initialScale = computedScale.clamp(minScale, _maxMapScale).toDouble();
-  final dx =
-      (viewportWidth - bounds.width * initialScale) / 2 -
-      bounds.left * initialScale;
-  final dy =
-      (viewportHeight - bounds.height * initialScale) / 2 -
-      bounds.top * initialScale;
-  return Matrix4.identity()
-    ..translateByDouble(dx, dy, 0, 1)
-    ..scaleByDouble(initialScale, initialScale, 1, 1);
+  return MapCameraState(
+    sourceBounds: sourceBounds,
+    viewportSize: Size(viewportWidth, viewportHeight),
+    center: bounds.center,
+    scale: initialScale,
+    minScale: minScale,
+    maxScale: _maxMapScale,
+    revision: revision,
+  ).clamped(viewportMargin: 220);
+}
+
+Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
+  final topLeft = camera.sourceToViewportPoint(sourceRect.topLeft);
+  final bottomRight = camera.sourceToViewportPoint(sourceRect.bottomRight);
+  return Rect.fromLTRB(
+    math.min(topLeft.dx, bottomRight.dx),
+    math.min(topLeft.dy, bottomRight.dy),
+    math.max(topLeft.dx, bottomRight.dx),
+    math.max(topLeft.dy, bottomRight.dy),
+  );
 }
 
 double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
@@ -1333,40 +1346,17 @@ class _MapGeometry {
     required this.width,
     required this.height,
     Rect? initialBounds,
-    double? surfaceWidth,
-    double? surfaceHeight,
     this.overlayStyleScale = 1.0,
-  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height),
-       surfaceWidth = surfaceWidth ?? width,
-       surfaceHeight = surfaceHeight ?? height;
+  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height);
 
   final Offset origin;
   final Offset focus;
   final double width;
   final double height;
   final Rect initialBounds;
-  final double surfaceWidth;
-  final double surfaceHeight;
   final double overlayStyleScale;
 
-  // Android WebView platform view는 큰 Surface에서 GL memory가 급증한다.
-  static const _maxAndroidViewSurfaceExtent = 4096.0;
-
-  factory _MapGeometry.fromOriginalAsset(
-    _RouteMapAsset asset,
-    double devicePixelRatio,
-    TargetPlatform platform,
-  ) {
-    final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
-    final maxLogicalExtent =
-        _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
-    final surfaceScale = platform == TargetPlatform.android
-        ? math.min(
-            1.0,
-            maxLogicalExtent /
-                math.max(asset.coordinateWidth, asset.coordinateHeight),
-          )
-        : 1.0;
+  factory _MapGeometry.fromOriginalAsset(_RouteMapAsset asset) {
     final sourceWidth = asset.coordinateWidth;
     final sourceHeight = asset.coordinateHeight;
     final overlayStyleScale = math.min(
@@ -1386,8 +1376,6 @@ class _MapGeometry {
           height: sourceHeight,
         ),
       ),
-      surfaceWidth: sourceWidth * surfaceScale,
-      surfaceHeight: sourceHeight * surfaceScale,
       overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
           ? overlayStyleScale
           : 1.0,
@@ -1578,13 +1566,11 @@ class _StationHitTarget extends StatelessWidget {
   const _StationHitTarget({
     required this.station,
     required this.onTap,
-    required this.onTapUp,
     super.key,
   });
 
   final NetworkMapStation station;
   final VoidCallback onTap;
-  final GestureTapUpCallback onTapUp;
 
   @override
   Widget build(BuildContext context) {
@@ -1592,11 +1578,7 @@ class _StationHitTarget extends StatelessWidget {
       button: true,
       label: station.displayName,
       onTap: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapUp: onTapUp,
-        child: const SizedBox.expand(),
-      ),
+      child: const SizedBox.expand(),
     );
   }
 }
