@@ -98,6 +98,7 @@ final class RouteMapRendererHealthMonitor {
   StreamSubscription<RouteMapRendererEvent>? _subscription;
   Timer? _blankTimer;
   int? _pendingRevision;
+  int? _retryWatchRevision;
   int _recoveryAttempt = 0;
   bool _closed = false;
 
@@ -127,6 +128,7 @@ final class RouteMapRendererHealthMonitor {
     _closed = true;
     _blankTimer?.cancel();
     _blankTimer = null;
+    _retryWatchRevision = null;
     await _subscription?.cancel();
     _subscription = null;
   }
@@ -144,9 +146,14 @@ final class RouteMapRendererHealthMonitor {
         _recover();
       case RouteMapRendererDisposed():
         unawaited(stop());
+      case RouteMapRendererAssetReady():
+        final retryRevision = _retryWatchRevision;
+        if (retryRevision != null) {
+          _retryWatchRevision = null;
+          _watchRevision(retryRevision);
+        }
       case RouteMapRendererCreated() ||
           RouteMapRendererAssetLoading() ||
-          RouteMapRendererAssetReady() ||
           RouteMapRendererCameraLatency() ||
           RouteMapRendererFrameTimeout() ||
           RouteMapRendererRecovering() ||
@@ -157,6 +164,7 @@ final class RouteMapRendererHealthMonitor {
   }
 
   void _watchRevision(int revision) {
+    _retryWatchRevision = null;
     _pendingRevision = revision;
     _blankTimer?.cancel();
     _blankTimer = _timerFactory(blankTimeout, () {
@@ -180,11 +188,9 @@ final class RouteMapRendererHealthMonitor {
 
   void _recover({int? rewatchRevision}) {
     _clearPendingFrame();
+    _retryWatchRevision = rewatchRevision;
     _recoveryAttempt += 1;
     onEvent?.call(RouteMapRendererRecovering(_recoveryAttempt));
     unawaited(_controller.retry());
-    if (rewatchRevision != null) {
-      _watchRevision(rewatchRevision);
-    }
   }
 }
