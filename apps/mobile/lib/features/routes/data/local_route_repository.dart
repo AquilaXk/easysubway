@@ -87,6 +87,7 @@ class LocalRouteRepository implements RouteSearchRepository {
 
           return RouteSearchStep(
             sequence: step.sequence,
+            stepType: step.type.name,
             title: _stepTitle(step.type.name, fromName, toName, lineName),
             description: _stepDescription(step.type.name, fromName, toName),
             lineId: step.lineId,
