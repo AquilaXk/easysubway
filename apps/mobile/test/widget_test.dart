@@ -2837,9 +2837,7 @@ void main() {
       );
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel(
-            '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
-          ),
+          find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
         ),
         isSemantics(
           label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
@@ -4077,6 +4075,20 @@ void main() {
           lastUpdatedAt: '2026-06-14',
           fieldValidationStatus: 'VERIFIED',
         ),
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-info-needed',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-3',
+          type: 'ESCALATOR',
+          name: '3번 출구 에스컬레이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '3번 출구 앞',
+          status: 'NEEDS_CHECK',
+          dataConfidence: 'LOW',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-10',
+        ),
       ],
     );
 
@@ -4179,9 +4191,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨, 지도 위치',
-        ),
+        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨, 지도 위치'),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
@@ -4209,9 +4219,7 @@ void main() {
       expect(find.text('엘리베이터 연결'), findsOneWidget);
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
       expect(
-        find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨',
-        ),
+        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨'),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
@@ -4221,11 +4229,27 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
-      expect(find.text('확인 필요 1개'), findsNothing);
-      expect(find.bySemanticsLabel('확인이 필요한 시설 1개'), findsNothing);
       expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('엘리베이터'), findsWidgets);
       expect(find.text('이용 불가 확인'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+        ),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3번 출구 에스컬레이터'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+          ),
+          matching: find.text('정보 확인 필요'),
+        ),
+        findsOneWidget,
+      );
       await tester.scrollUntilVisible(
         find.byKey(
           const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -5108,18 +5132,14 @@ void main() {
       expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byKey(
-            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
-          ),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부 확인 필요')),
           matching: find.byIcon(Icons.help_outline),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byKey(
-            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
-          ),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부 확인 필요')),
           matching: find.byIcon(Icons.check),
         ),
         findsNothing,
@@ -5739,10 +5759,7 @@ void main() {
       final routeItemSemantics = tester
           .getSemantics(find.byKey(const Key('routeResultListItem')))
           .getSemanticsData();
-      expect(
-        routeItemSemantics.hasAction(SemanticsAction.tap),
-        isTrue,
-      );
+      expect(routeItemSemantics.hasAction(SemanticsAction.tap), isTrue);
       expect(routeItemSemantics.label, contains('계단 여부 확인 필요'));
     } finally {
       semanticsHandle.dispose();

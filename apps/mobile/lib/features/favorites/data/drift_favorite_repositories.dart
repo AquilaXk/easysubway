@@ -233,7 +233,8 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
             row.read<int?>('field_checked_at_value'),
           ),
           lastUpdatedAt: _dateLabelFromEpoch(
-            row.read<int?>('last_verified_at_value'),
+            row.read<int?>('field_checked_at_value') ??
+                row.read<int?>('last_verified_at_value'),
           ),
           addedAt: _isoFromEpoch(favoriteRow.read<int?>('added_at_value')),
         ),

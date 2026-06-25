@@ -3946,10 +3946,7 @@ class _StationDetailContent extends StatelessWidget {
         _StationDetailHeader(detail: detail),
         const SizedBox(height: 12),
         _InfoBasisDisclosure(
-          labels: [
-            detail.dataSourceLabel,
-            '마지막 확인 ${detail.lastVerifiedAt}',
-          ],
+          labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
         ),
         const SizedBox(height: 12),
         if (facilityAttentionSummary.isNotEmpty) ...[
@@ -4957,7 +4954,7 @@ class _StationFacilityCard extends StatelessWidget {
                   children: [
                     _StationDetailTextPill(text: facility.typeLabel),
                     _StationDetailTextPill(text: facility.statusTitle),
-                    if (facility.severityLabel != facility.statusLabel)
+                    if (facility.severityLabel != facility.statusTitle)
                       _StationDetailTextPill(text: facility.severityLabel),
                   ],
                 ),
