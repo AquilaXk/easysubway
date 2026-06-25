@@ -91,6 +91,11 @@ class DataPackUpdateStateRepository {
 
   Future<void> ensureManifestCanBeAccepted(DataPackManifest manifest) async {
     if (!manifest.hasReplayProtection) {
+      if (await hasAcceptedManifestState()) {
+        throw const DataPackManifestReplayException(
+          '데이터팩 manifest 보호 정보가 없습니다.',
+        );
+      }
       return;
     }
     final channel = manifest.channel!;
@@ -149,6 +154,17 @@ class DataPackUpdateStateRepository {
         isUtc: true,
       ),
     );
+  }
+
+  Future<bool> hasAcceptedManifestState() async {
+    final row = await userDatabase
+        .customSelect(
+          'SELECT COUNT(*) AS count FROM data_pack_update_state WHERE key LIKE ?',
+          variables: [Variable<String>('$_acceptedSequencePrefix%')],
+          readsFrom: {userDatabase.dataPackUpdateState},
+        )
+        .getSingle();
+    return row.read<int>('count') > 0;
   }
 
   Future<void> saveAcceptedManifestState(DataPackManifest manifest) async {

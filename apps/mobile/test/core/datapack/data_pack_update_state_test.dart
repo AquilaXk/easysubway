@@ -274,6 +274,34 @@ void main() {
     expect(cache?.expiresAt, DateTime.utc(2026, 6, 25, 12, 5));
   });
 
+  test('manifest client는 v2 replay floor를 cache보다 먼저 저장한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = _RecordingUpdateStateRepository(
+      userDatabase: userDatabase,
+    );
+    final checkedAt = DateTime.utc(2026, 6, 25, 12);
+    final manifest = _v2Manifest(sequence: 44, version: '20');
+    final client = DataPackClient(
+      manifestUri: Uri.parse(
+        'https://cdn.easysubway.example/catalog/current.json',
+      ),
+      stateRepository: stateRepository,
+      now: () => checkedAt,
+    );
+
+    await client.saveManifestCache(
+      DataPackManifestFetchResult(
+        status: DataPackManifestFetchStatus.updated,
+        manifest: manifest,
+        etag: 'etag-v20',
+        checkedAt: checkedAt,
+      ),
+    );
+
+    expect(stateRepository.calls, ['accepted', 'cache']);
+  });
+
   test('manifest client는 만료된 v2 cache를 304 응답으로 연장하지 않는다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
@@ -336,6 +364,10 @@ void main() {
       ),
       throwsA(isA<DataPackManifestReplayException>()),
     );
+    await expectLater(
+      stateRepository.ensureManifestCanBeAccepted(_v1Manifest(version: '17')),
+      throwsA(isA<DataPackManifestReplayException>()),
+    );
     await stateRepository.ensureManifestCanBeAccepted(accepted);
   });
 }
@@ -374,6 +406,24 @@ DataPackManifest _v2Manifest({required int sequence, required String version}) {
   return DataPackManifest.fromJson(
     _v2ManifestJson(sequence: sequence, version: version),
   );
+}
+
+DataPackManifest _v1Manifest({required String version}) {
+  final json = _v2ManifestJson(sequence: 1, version: version);
+  json.remove('manifestVersion');
+  json.remove('channel');
+  json.remove('releaseSequence');
+  json.remove('publishedAt');
+  json.remove('expiresAt');
+  json.remove('keyId');
+  json.remove('signature');
+  final packs = json['packs']! as List<Object?>;
+  final pack = packs.single as Map<String, Object?>;
+  pack['signature'] = {
+    'algorithm': 'sha256-pack-manifest-v1',
+    'value': _signatureValue('capital', version, 'a' * 64, 'b' * 64, 1024),
+  };
+  return DataPackManifest.fromJson(json);
 }
 
 Map<String, Object?> _v2ManifestJson({
@@ -449,6 +499,27 @@ Map<String, Object?> _v2ManifestJson({
     'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
   };
   return manifest;
+}
+
+class _RecordingUpdateStateRepository extends DataPackUpdateStateRepository {
+  _RecordingUpdateStateRepository({required super.userDatabase});
+
+  final List<String> calls = [];
+
+  @override
+  Future<void> saveAcceptedManifestState(DataPackManifest manifest) async {
+    calls.add('accepted');
+  }
+
+  @override
+  Future<void> saveManifestCache({
+    required String? etag,
+    required DateTime checkedAt,
+    required Duration ttl,
+    DateTime? expiresAt,
+  }) async {
+    calls.add('cache');
+  }
 }
 
 String _canonicalJson(Object? value) => jsonEncode(_canonicalValue(value));

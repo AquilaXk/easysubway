@@ -90,13 +90,13 @@ class DataPackClient {
       return;
     }
     final expiresAt = manifest.expiresAt;
+    await stateRepository.saveAcceptedManifestState(manifest);
     await stateRepository.saveManifestCache(
       etag: result.etag,
       checkedAt: checkedAt,
       ttl: _cacheTtlBoundedByExpiry(manifest.ttl, expiresAt, checkedAt),
       expiresAt: expiresAt,
     );
-    await stateRepository.saveAcceptedManifestState(manifest);
   }
 
   Duration _cacheTtlBoundedByExpiry(
