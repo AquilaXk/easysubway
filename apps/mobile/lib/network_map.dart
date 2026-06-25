@@ -1119,16 +1119,10 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..strokeWidth = 14 * styleScale
       ..style = PaintingStyle.stroke;
-    for (final edge in edges) {
-      if (edge.lineId != lineId) {
-        continue;
-      }
-      final from = stationsById[edge.fromStationId];
-      final to = stationsById[edge.toStationId];
-      if (from == null || to == null) {
-        continue;
-      }
-      final segmentPath = _segmentPath(from, to);
+    for (final edge in _visibleEdges) {
+      final from = edge.from;
+      final to = edge.to;
+      final segmentPath = edge.segmentPath;
       if (segmentPath == null) {
         canvas.drawLine(
           Offset(geometry.x(from), geometry.y(from)),
@@ -1141,15 +1135,74 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     }
     final stationBorderPaint = Paint()..color = lineColor;
     final stationFillPaint = Paint()..color = Colors.white;
-    for (final station in stationsById.values.toSet()) {
-      if (station.lineId != lineId) {
-        continue;
-      }
+    for (final station in _visibleStations) {
       final center = Offset(geometry.x(station), geometry.y(station));
       canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
       canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
     }
     canvas.restore();
+  }
+
+  int get visibleEdgeCount => _visibleEdges.length;
+
+  int get visibleStationCount => _visibleStations.length;
+
+  Rect get _visibleSourceBounds =>
+      camera.visibleSourceRect.inflate(96 / camera.scale);
+
+  List<_SelectedLineVisibleEdge> get _visibleEdges {
+    final visibleBounds = _visibleSourceBounds;
+    final visibleEdges = <_SelectedLineVisibleEdge>[];
+    for (final edge in edges) {
+      if (edge.lineId != lineId) {
+        continue;
+      }
+      final from = stationsById[edge.fromStationId];
+      final to = stationsById[edge.toStationId];
+      if (from == null || to == null) {
+        continue;
+      }
+      final segmentPath = _segmentPath(from, to);
+      final bounds = _edgeSourceBounds(from, to, segmentPath);
+      if (!bounds.overlaps(visibleBounds)) {
+        continue;
+      }
+      visibleEdges.add(
+        _SelectedLineVisibleEdge(from: from, to: to, segmentPath: segmentPath),
+      );
+    }
+    return visibleEdges;
+  }
+
+  List<NetworkMapStation> get _visibleStations {
+    final visibleBounds = _visibleSourceBounds;
+    return [
+      for (final station in stationsById.values.toSet())
+        if (station.lineId == lineId &&
+            _stationOverlayBounds(station).overlaps(visibleBounds))
+          station,
+    ];
+  }
+
+  Rect _edgeSourceBounds(
+    NetworkMapStation from,
+    NetworkMapStation to,
+    Path? segmentPath,
+  ) {
+    final bounds = segmentPath == null
+        ? Rect.fromPoints(
+            Offset(geometry.x(from), geometry.y(from)),
+            Offset(geometry.x(to), geometry.y(to)),
+          )
+        : segmentPath.getBounds().shift(-geometry.origin);
+    return bounds.inflate(16 * styleScale);
+  }
+
+  Rect _stationOverlayBounds(NetworkMapStation station) {
+    return Rect.fromCircle(
+      center: Offset(geometry.x(station), geometry.y(station)),
+      radius: 13 * styleScale,
+    );
   }
 
   @override
@@ -1162,6 +1215,18 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.camera != camera ||
         oldDelegate.styleScale != styleScale;
   }
+}
+
+class _SelectedLineVisibleEdge {
+  const _SelectedLineVisibleEdge({
+    required this.from,
+    required this.to,
+    required this.segmentPath,
+  });
+
+  final NetworkMapStation from;
+  final NetworkMapStation to;
+  final Path? segmentPath;
 }
 
 Path? _segmentPath(NetworkMapStation from, NetworkMapStation to) {
