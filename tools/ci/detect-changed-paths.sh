@@ -55,6 +55,9 @@ while IFS= read -r file; do
       ios=true
       deploy=true
       ;;
+    tools/route-map/**)
+      repository=true
+      ;;
     apps/mobile/release/**)
       mobile=true
       android=true
