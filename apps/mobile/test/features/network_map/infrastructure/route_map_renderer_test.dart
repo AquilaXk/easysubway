@@ -18,18 +18,21 @@ void main() {
 
   test('health monitor retries when requested camera frame is blank', () async {
     final controller = _FakeRouteMapRendererController();
+    final timers = _ManualTimerFactory();
     final observed = <RouteMapRendererEvent>[];
     final monitor = RouteMapRendererHealthMonitor(
       controller,
       blankTimeout: const Duration(milliseconds: 10),
       onEvent: observed.add,
+      timerFactory: timers.create,
     )..start();
     addTearDown(monitor.stop);
 
     controller.emit(const RouteMapRendererCameraRequested(5));
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await pumpEventQueue();
+    timers.elapse(const Duration(milliseconds: 10));
 
-    expect(controller.retryCalls, greaterThanOrEqualTo(1));
+    expect(controller.retryCalls, 1);
     expect(
       observed,
       containsAllInOrder(<Matcher>[
@@ -54,14 +57,17 @@ void main() {
 
   test('health monitor waits for asset ready before retry watchdog', () async {
     final controller = _FakeRouteMapRendererController();
+    final timers = _ManualTimerFactory();
     final monitor = RouteMapRendererHealthMonitor(
       controller,
       blankTimeout: const Duration(milliseconds: 10),
+      timerFactory: timers.create,
     )..start();
     addTearDown(monitor.stop);
 
     controller.emit(const RouteMapRendererCameraRequested(5));
-    await Future<void>.delayed(const Duration(milliseconds: 35));
+    await pumpEventQueue();
+    timers.elapse(const Duration(milliseconds: 35));
 
     expect(controller.retryCalls, 1);
   });
@@ -70,35 +76,42 @@ void main() {
     'health monitor re-arms blank watchdog after retry asset ready',
     () async {
       final controller = _FakeRouteMapRendererController();
+      final timers = _ManualTimerFactory();
       final monitor = RouteMapRendererHealthMonitor(
         controller,
         blankTimeout: const Duration(milliseconds: 10),
+        timerFactory: timers.create,
       )..start();
       addTearDown(monitor.stop);
 
       controller.emit(const RouteMapRendererCameraRequested(5));
-      await Future<void>.delayed(const Duration(milliseconds: 25));
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
       controller.emit(const RouteMapRendererAssetReady());
-      await Future<void>.delayed(const Duration(milliseconds: 25));
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
 
-      expect(controller.retryCalls, greaterThanOrEqualTo(2));
+      expect(controller.retryCalls, 2);
     },
   );
 
   test('health monitor cancels blank watchdog after frame presents', () async {
     final controller = _FakeRouteMapRendererController();
+    final timers = _ManualTimerFactory();
     final observed = <RouteMapRendererEvent>[];
     final monitor = RouteMapRendererHealthMonitor(
       controller,
       blankTimeout: const Duration(milliseconds: 20),
       onEvent: observed.add,
+      timerFactory: timers.create,
     )..start();
     addTearDown(monitor.stop);
 
     controller
       ..emit(const RouteMapRendererCameraRequested(7))
       ..emit(const RouteMapRendererFramePresented(7));
-    await Future<void>.delayed(const Duration(milliseconds: 40));
+    await pumpEventQueue();
+    timers.elapse(const Duration(milliseconds: 40));
 
     expect(controller.retryCalls, 0);
     expect(observed.whereType<RouteMapRendererFrameTimeout>(), isEmpty);
@@ -106,16 +119,19 @@ void main() {
 
   test('health monitor ignores stale higher revision frame', () async {
     final controller = _FakeRouteMapRendererController();
+    final timers = _ManualTimerFactory();
     final monitor = RouteMapRendererHealthMonitor(
       controller,
       blankTimeout: const Duration(milliseconds: 10),
+      timerFactory: timers.create,
     )..start();
     addTearDown(monitor.stop);
 
     controller
       ..emit(const RouteMapRendererCameraRequested(0))
       ..emit(const RouteMapRendererFramePresented(5));
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await pumpEventQueue();
+    timers.elapse(const Duration(milliseconds: 10));
 
     expect(controller.retryCalls, 1);
   });
@@ -152,18 +168,46 @@ void main() {
 
   test('health monitor cancels pending watchdog during recovery', () async {
     final controller = _FakeRouteMapRendererController();
+    final timers = _ManualTimerFactory();
     final monitor = RouteMapRendererHealthMonitor(
       controller,
       blankTimeout: const Duration(milliseconds: 10),
+      timerFactory: timers.create,
     )..start();
     addTearDown(monitor.stop);
 
     controller
       ..emit(const RouteMapRendererCameraRequested(8))
       ..emit(const RouteMapRendererProcessGone(didCrash: true));
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await pumpEventQueue();
+    timers.elapse(const Duration(milliseconds: 30));
 
     expect(controller.retryCalls, 1);
+  });
+
+  test('health monitor reports retry errors without throwing', () async {
+    final controller = _FakeRouteMapRendererController()
+      ..retryError = StateError('reload failed');
+    final observed = <RouteMapRendererEvent>[];
+    final monitor = RouteMapRendererHealthMonitor(
+      controller,
+      onEvent: observed.add,
+    )..start();
+    addTearDown(monitor.stop);
+
+    controller.emit(const RouteMapRendererProcessGone(didCrash: true));
+    await pumpEventQueue();
+
+    expect(
+      observed,
+      contains(
+        isA<RouteMapRendererFailed>().having(
+          (event) => event.reason,
+          'reason',
+          contains('reload failed'),
+        ),
+      ),
+    );
   });
 
   test('health monitor delegates memory pressure trim to controller', () async {
@@ -226,6 +270,7 @@ void main() {
 class _FakeRouteMapRendererController implements RouteMapRendererController {
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
   final _pendingCameraFrames = <int, Stopwatch>{};
+  Object? retryError;
   int retryCalls = 0;
   int trimMemoryCalls = 0;
   int disposeCalls = 0;
@@ -258,6 +303,10 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
   @override
   Future<void> retry() async {
     retryCalls += 1;
+    final error = retryError;
+    if (error != null) {
+      throw error;
+    }
   }
 
   @override
@@ -271,4 +320,54 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
     disposeCalls += 1;
     await _events.close();
   }
+}
+
+class _ManualTimerFactory {
+  final _timers = <_ManualTimer>[];
+
+  Timer create(Duration duration, void Function() callback) {
+    final timer = _ManualTimer(duration, callback);
+    _timers.add(timer);
+    return timer;
+  }
+
+  void elapse(Duration duration) {
+    for (final timer in List<_ManualTimer>.of(_timers)) {
+      timer.elapse(duration);
+    }
+    _timers.removeWhere((timer) => !timer.isActive);
+  }
+}
+
+class _ManualTimer implements Timer {
+  _ManualTimer(this._remaining, this._callback);
+
+  Duration _remaining;
+  final void Function() _callback;
+  bool _active = true;
+  int _tick = 0;
+
+  void elapse(Duration duration) {
+    if (!_active) {
+      return;
+    }
+    _remaining -= duration;
+    if (_remaining > Duration.zero) {
+      return;
+    }
+    _active = false;
+    _tick = 1;
+    _callback();
+  }
+
+  @override
+  void cancel() {
+    _active = false;
+  }
+
+  @override
+  bool get isActive => _active;
+
+  @override
+  int get tick => _tick;
 }

@@ -768,9 +768,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.inactive || AppLifecycleState.paused:
-        unawaited(_rendererMonitor?.trimMemory());
+        _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
       case AppLifecycleState.detached:
-        unawaited(_rendererMonitor?.disposeRenderer());
+        final monitor = _rendererMonitor;
+        _rendererMonitor = null;
+        _rendererController = null;
+        _ignoreRendererLifecycleFailure(monitor?.disposeRenderer());
       case AppLifecycleState.resumed || AppLifecycleState.hidden:
         break;
     }
@@ -778,7 +781,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   @override
   void didHaveMemoryPressure() {
-    unawaited(_rendererMonitor?.trimMemory());
+    _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
+  }
+
+  void _ignoreRendererLifecycleFailure(Future<void>? future) {
+    if (future == null) {
+      return;
+    }
+    unawaited(future.catchError((Object _) {}));
   }
 
   @override

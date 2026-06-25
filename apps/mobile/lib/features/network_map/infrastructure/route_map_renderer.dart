@@ -191,6 +191,12 @@ final class RouteMapRendererHealthMonitor {
     _retryWatchRevision = rewatchRevision;
     _recoveryAttempt += 1;
     onEvent?.call(RouteMapRendererRecovering(_recoveryAttempt));
-    unawaited(_controller.retry());
+    unawaited(
+      _controller.retry().catchError((Object error) {
+        if (!_closed) {
+          onEvent?.call(RouteMapRendererFailed(error.toString()));
+        }
+      }),
+    );
   }
 }
