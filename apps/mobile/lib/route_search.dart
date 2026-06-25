@@ -857,8 +857,7 @@ class RouteSearchStep {
 
   String get userReason => _routeStepReasonLabel(reason);
 
-  String get userDescription =>
-      _routeStepDetailLabel(stepType: stepType, detail: description);
+  String get userDescription => _routeStepDetailLabel(stepType: stepType);
 
   String get burdenLabel {
     final labels = <String>[
@@ -874,10 +873,7 @@ class RouteSearchStep {
     final safeReason = _routeStepReasonLabel(reason);
     final labels = <String>[
       '$sequence번 ${actionTitle.isEmpty ? title : actionTitle}',
-      _routeStepDetailLabel(
-        stepType: stepType,
-        detail: actionDetail.isEmpty ? description : actionDetail,
-      ),
+      _routeStepDetailLabel(stepType: stepType),
       if (safeReason.isNotEmpty) safeReason,
       burdenLabel,
       if (hasMetricSourceMetadata) '시간과 거리는 앱 경로 데이터 기준',
@@ -958,41 +954,17 @@ String _routeStepReasonLabel(String reason) {
   if (reason.trim().isEmpty) {
     return '';
   }
-  return _routeSafeUserCopy(reason, fallback: '선택한 경로 기준으로 안내합니다.');
+  return '선택한 경로 기준으로 안내합니다.';
 }
 
-String _routeStepDetailLabel({
-  required String stepType,
-  required String detail,
-}) {
-  final fallback = switch (stepType) {
+String _routeStepDetailLabel({required String stepType}) {
+  return switch (stepType) {
     'entry' => '계단 없는 승강장 접근 동선을 확인해 이동합니다.',
     'exit' => '도착역에서 계단 없는 출구 동선을 확인합니다.',
     'transfer' => '다음 노선으로 갈아탈 준비를 합니다.',
     'ride' => '열차를 이용해 이동합니다.',
     _ => '안내된 순서대로 이동합니다.',
   };
-  return _routeSafeUserCopy(detail, fallback: fallback);
-}
-
-String _routeSafeUserCopy(String value, {required String fallback}) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty || _routeLooksInternalCopy(trimmed)) {
-    return fallback;
-  }
-  return trimmed;
-}
-
-bool _routeLooksInternalCopy(String value) {
-  if (value.contains('edge:') ||
-      value.contains('line:') ||
-      value.contains('OFFICIAL_') ||
-      value.contains('STATIC_ESTIMATE') ||
-      value.contains('REALTIME_ADJUSTED') ||
-      value.contains('MEASURED')) {
-    return true;
-  }
-  return RegExp(r'^[A-Z][A-Z0-9_]+$').hasMatch(value);
 }
 
 class RouteSearchWarning {
