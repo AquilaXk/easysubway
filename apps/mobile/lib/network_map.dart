@@ -291,8 +291,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   void _reload({String? region, String? lineId}) {
     setState(() {
+      final isChangingRegion = region != null && region != _selectedRegion;
       _selectedRegion = region ?? _selectedRegion;
-      _selectedLineId = lineId;
+      _selectedLineId = isChangingRegion ? null : lineId;
       _future = _loadMap();
     });
   }
