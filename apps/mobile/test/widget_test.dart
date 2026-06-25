@@ -51,9 +51,15 @@ OnboardingState _completedOnboardingStateWithPreferences({
   );
 }
 
-Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
+Future<void> _openFavoriteList(
+  WidgetTester tester, {
+  Key? tabKey,
+  RouteDraftController? routeDraftController,
+  Future<void> Function(RouteDraft draft)? onOpenRouteSearch,
+}) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
+  final draftController = routeDraftController ?? RouteDraftController();
   unawaited(
     Navigator.of(homeContext).push(
       MaterialPageRoute<void>(
@@ -66,8 +72,11 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
           locationProvider: home.locationProvider,
           facilityReportDraftTargetStore: home.facilityReportDraftTargetStore,
           internalRouteRepository: home.internalRouteRepository,
-          routeDraftController: RouteDraftController(),
+          routeDraftController: draftController,
           initialMobilityType: home.initialMobilityType,
+          onOpenRouteSearch: onOpenRouteSearch == null
+              ? null
+              : () => onOpenRouteSearch(draftController.draft),
         ),
       ),
     ),
@@ -3181,6 +3190,8 @@ void main() {
     final favoriteRouteRepository = FakeFavoriteRouteRepository(
       favorites: [_favoriteRoute()],
     );
+    final routeDraftController = RouteDraftController();
+    RouteDraft? searchAgainDraft;
 
     try {
       await tester.pumpWidget(
@@ -3196,7 +3207,13 @@ void main() {
         ),
       );
 
-      await _openFavoriteList(tester);
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft) async {
+          searchAgainDraft = draft;
+        },
+      );
 
       expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
@@ -3224,6 +3241,28 @@ void main() {
           isButton: true,
           hasTapAction: true,
         ),
+      );
+      expect(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
+      expect(searchAgainDraft?.origin?.nameKo, '상록수');
+      expect(searchAgainDraft?.destination?.id, 'station-sadang');
+      expect(searchAgainDraft?.destination?.nameKo, '사당');
+
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft) async {
+          searchAgainDraft = draft;
+        },
       );
 
       await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
