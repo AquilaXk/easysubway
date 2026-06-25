@@ -623,6 +623,33 @@ class RouteSearchResult {
   final List<String> blockedReasons;
   final String createdAt;
 
+  int get walkingDistanceMeters {
+    return steps.fold<int>(
+      0,
+      (sum, step) => step.isWalkingStep ? sum + step.distanceMeters : sum,
+    );
+  }
+
+  int get transferCount {
+    final typedTransfers = steps.where((step) => step.stepType == 'transfer');
+    if (typedTransfers.isNotEmpty) {
+      return typedTransfers.length;
+    }
+    var previousLine = '';
+    var changes = 0;
+    for (final step in movementSteps) {
+      final line = step.lineId.isNotEmpty ? step.lineId : step.lineName;
+      if (line.isEmpty) {
+        continue;
+      }
+      if (previousLine.isNotEmpty && previousLine != line) {
+        changes += 1;
+      }
+      previousLine = line;
+    }
+    return changes;
+  }
+
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
   String get statusLabel {
@@ -739,6 +766,7 @@ class RouteSearchResult {
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
+    this.stepType = '',
     required this.title,
     required this.description,
     required this.lineId,
@@ -763,6 +791,7 @@ class RouteSearchStep {
     final description = _requiredRouteString(json, 'description');
     return RouteSearchStep(
       sequence: _requiredRouteInt(json, 'sequence'),
+      stepType: _optionalRouteString(json, 'stepType'),
       title: title,
       description: description,
       lineId: _optionalRouteString(json, 'lineId'),
@@ -792,6 +821,7 @@ class RouteSearchStep {
   }
 
   final int sequence;
+  final String stepType;
   final String title;
   final String description;
   final String lineId;
@@ -839,6 +869,14 @@ class RouteSearchStep {
       timeSource.isNotEmpty ||
       distanceSource.isNotEmpty ||
       confidenceLabel.isNotEmpty;
+
+  bool get isWalkingStep {
+    return switch (stepType) {
+      'entry' || 'exit' || 'transfer' || 'internal' => true,
+      'ride' => false,
+      _ => requiresAccessibilityCheck,
+    };
+  }
 
   String get metricSourceLabel {
     if (!hasMetricSourceMetadata) {
@@ -2564,16 +2602,6 @@ class _RouteResultsListView extends StatelessWidget {
   }
 }
 
-bool _routeStepIsExplicitTransfer(RouteSearchStep step) {
-  return step.actionTitle.contains('환승') ||
-      step.title.contains('환승') ||
-      step.description.contains('환승');
-}
-
-int _routeExplicitTransferCount(List<RouteSearchStep> steps) {
-  return steps.where(_routeStepIsExplicitTransfer).length;
-}
-
 class _RouteDetailWorkflowView extends StatelessWidget {
   const _RouteDetailWorkflowView({
     required this.result,
@@ -3353,33 +3381,13 @@ int _routeTotalMinutes(RouteSearchResult result) {
   return result.steps.fold<int>(0, (sum, step) => sum + step.estimatedMinutes);
 }
 
-int _routeTotalDistanceMeters(RouteSearchResult result) {
-  return result.steps.fold<int>(0, (sum, step) => sum + step.distanceMeters);
-}
-
 String _routeTransferLabel(RouteSearchResult result) {
-  final movementSteps = result.movementSteps;
-  final explicitTransfers = _routeExplicitTransferCount(movementSteps);
-  if (explicitTransfers > 0) {
-    return '환승 $explicitTransfers회';
-  }
-  var previousLine = '';
-  var changes = 0;
-  for (final step in movementSteps) {
-    final line = step.lineId.isNotEmpty ? step.lineId : step.lineName;
-    if (line.isEmpty) {
-      continue;
-    }
-    if (previousLine.isNotEmpty && previousLine != line) {
-      changes += 1;
-    }
-    previousLine = line;
-  }
-  return changes == 0 ? '환승 없음' : '환승 $changes회';
+  final transfers = result.transferCount;
+  return transfers == 0 ? '환승 없음' : '환승 $transfers회';
 }
 
 String _routeWalkingDistanceLabel(RouteSearchResult result) {
-  return _routeDistanceLabel(_routeTotalDistanceMeters(result));
+  return _routeDistanceLabel(result.walkingDistanceMeters);
 }
 
 String _routeMetaLabel(RouteSearchResult result) {
