@@ -396,7 +396,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel, $dataSourceLabel';
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
   }
 }
 
@@ -548,7 +548,7 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, $dataSourceLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
   }
 }
 
@@ -614,8 +614,11 @@ class StationExitInfo {
   String get fieldValidationLabel =>
       _fieldValidationLabel(fieldValidationStatus);
 
+  String get verificationStatusLabel =>
+      _fieldVerificationStatusLabel(fieldValidationStatus);
+
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel';
+    return '$name, $elevatorConnectionLabel, $stairPathLabel, $verificationStatusLabel';
   }
 }
 
@@ -768,9 +771,15 @@ class StationFacilityInfo {
   String get fieldValidationLabel =>
       _fieldValidationLabel(fieldValidationStatus);
 
+  String get verificationStatusLabel =>
+      _fieldVerificationStatusLabel(fieldValidationStatus);
+
   String get locationLabel {
     if (description.trim().isNotEmpty) {
-      return description;
+      final descriptionLabel = _facilityUserLocationLabel(description);
+      if (descriptionLabel.isNotEmpty) {
+        return descriptionLabel;
+      }
     }
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
@@ -781,11 +790,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    final statusSemanticLabel = facilityStatusSemanticLabel(
-      statusLabel: statusLabel,
-      severityLabel: severityLabel,
-    );
-    return '$name, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $fieldValidationLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
+    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, 다음 행동 $nextActionLabel';
   }
 }
 
@@ -944,6 +949,30 @@ String _fieldValidationLabel(String fieldValidationStatus) {
     'UNKNOWN' => '현장 검증 전',
     _ => '현장 검증 전',
   };
+}
+
+String _fieldVerificationStatusLabel(String fieldValidationStatus) {
+  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
+  return switch (normalizedStatus) {
+    'VERIFIED' => '시설 상태 확인됨',
+    'STALE' => '상태 재확인 필요',
+    _ => '상태 확인 필요',
+  };
+}
+
+String _facilityUserLocationLabel(String description) {
+  var label = description.trim();
+  const internalValidationPhrases = [
+    '현장 검증됨',
+    '현장 검증 전',
+    '현장 재확인 필요',
+    '관리자 검수',
+  ];
+  for (final phrase in internalValidationPhrases) {
+    label = label.replaceAll(phrase, '');
+  }
+  label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return label;
 }
 
 String _dataSourceLabel(String dataSourceType) {
@@ -2985,8 +3014,7 @@ class _NearbyStationOverview extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             _StationDetailTextPill(
-                              text:
-                                  '${result.dataQualityLabel} · ${result.dataSourceLabel}',
+                              text: result.dataQualityLabel,
                             ),
                           ],
                         ),
@@ -3196,7 +3224,7 @@ class _StationSearchResultTile extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${result.dataQualityLabel} · ${result.dataSourceLabel}',
+                                  result.dataQualityLabel,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyMedium?.copyWith(
@@ -3329,9 +3357,9 @@ String _stationResultSemanticLabel(StationSearchResult result) {
   final stationName = _stationResultDisplayName(result.nameKo);
   final distance = result.distanceLabel;
   if (distance.isEmpty) {
-    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}, ${result.dataSourceLabel}';
+    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
   }
-  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}, ${result.dataSourceLabel}';
+  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
 }
 
 class FavoriteStationListScreen extends StatefulWidget {
@@ -3666,14 +3694,6 @@ class _FavoriteStationTile extends StatelessWidget {
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            favorite.dataSourceLabel,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF405A5D),
-                              height: 1.3,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -3924,6 +3944,10 @@ class _StationDetailContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _StationDetailHeader(detail: detail),
+        const SizedBox(height: 12),
+        _InfoBasisDisclosure(
+          labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+        ),
         const SizedBox(height: 12),
         if (facilityAttentionSummary.isNotEmpty) ...[
           _StationFacilityStatusSummary(
@@ -4415,15 +4439,6 @@ class _StationDetailHeader extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        detail.dataSourceLabel,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFC8D9E2),
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
                         '마지막 확인 ${detail.lastVerifiedAt}',
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFFC8D9E2),
@@ -4709,6 +4724,79 @@ class _StationDetailInfoRow extends StatelessWidget {
   }
 }
 
+class _InfoBasisDisclosure extends StatefulWidget {
+  const _InfoBasisDisclosure({required this.labels});
+
+  final List<String> labels;
+
+  @override
+  State<_InfoBasisDisclosure> createState() => _InfoBasisDisclosureState();
+}
+
+class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = widget.labels
+        .where((label) => label.trim().isNotEmpty)
+        .toList(growable: false);
+    if (labels.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _expanded = !_expanded),
+          icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+          label: Text(_expanded ? '정보 기준 접기' : '정보 기준 보기'),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 10),
+          Card(
+            margin: EdgeInsets.zero,
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '정보 기준',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final label in labels) ...[
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (label != labels.last) const SizedBox(height: 4),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _StationDetailSectionTitle extends StatelessWidget {
   const _StationDetailSectionTitle({required this.title});
 
@@ -4796,16 +4884,7 @@ class _StationExitCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    exit.confidenceLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    exit.dataSourceLabel,
+                    exit.verificationStatusLabel,
                     style: textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF405A5D),
                       fontWeight: FontWeight.w700,
@@ -4874,8 +4953,8 @@ class _StationFacilityCard extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     _StationDetailTextPill(text: facility.typeLabel),
-                    _StationDetailTextPill(text: facility.statusLabel),
-                    if (facility.severityLabel != facility.statusLabel)
+                    _StationDetailTextPill(text: facility.statusTitle),
+                    if (facility.severityLabel != facility.statusTitle)
                       _StationDetailTextPill(text: facility.severityLabel),
                   ],
                 ),
@@ -4891,7 +4970,7 @@ class _StationFacilityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${facility.confidenceLabel} · ${facility.dataSourceLabel}',
+                  facility.verificationStatusLabel,
                   style: textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF405A5D),
                     fontWeight: FontWeight.w600,
@@ -5114,15 +5193,17 @@ class FacilityDetailScreen extends StatelessWidget {
                       icon: Icons.event_available,
                       text: facility.updatedLabel,
                     ),
-                    const SizedBox(height: 10),
-                    _StationDetailInfoRow(
-                      icon: Icons.verified_outlined,
-                      text:
-                          '${facility.confidenceLabel} · ${facility.dataSourceLabel}',
-                    ),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            _InfoBasisDisclosure(
+              labels: [
+                facility.fieldValidationLabel,
+                facility.confidenceLabel,
+                facility.dataSourceLabel,
+              ],
             ),
             const SizedBox(height: 16),
             FilledButton.icon(

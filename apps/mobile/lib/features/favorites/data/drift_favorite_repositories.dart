@@ -180,13 +180,33 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
               s.name_ko AS station_name_ko,
               s.name_en AS station_name_en,
               s.data_source_type,
-              CAST(s.last_verified_at AS INTEGER) AS last_verified_at_value
+              CAST(s.last_verified_at AS INTEGER) AS last_verified_at_value,
+              (
+                SELECT q.quality_level
+                FROM data_quality_records q
+                WHERE UPPER(q.target_type) = 'FACILITY'
+                  AND q.target_id = f.id
+                ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                LIMIT 1
+              ) AS field_quality_level,
+              (
+                SELECT q.checked_at
+                FROM data_quality_records q
+                WHERE UPPER(q.target_type) = 'FACILITY'
+                  AND q.target_id = f.id
+                ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                LIMIT 1
+              ) AS field_checked_at_value
             FROM facilities f
             JOIN stations s ON s.id = f.station_id
             WHERE f.id = ?
             ''',
             variables: [Variable.withString(facilityId)],
-            readsFrom: {catalogDatabase.facilities, catalogDatabase.stations},
+            readsFrom: {
+              catalogDatabase.facilities,
+              catalogDatabase.stations,
+              catalogDatabase.dataQualityRecords,
+            },
           )
           .getSingleOrNull();
       if (row == null) {
@@ -208,8 +228,13 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
           status: row.read<String?>('status') ?? '',
           dataConfidence: 'MEDIUM',
           dataSourceType: row.read<String?>('data_source_type') ?? '',
+          fieldValidationStatus: _fieldValidationStatus(
+            row.read<String?>('field_quality_level'),
+            row.read<int?>('field_checked_at_value'),
+          ),
           lastUpdatedAt: _dateLabelFromEpoch(
-            row.read<int?>('last_verified_at_value'),
+            row.read<int?>('field_checked_at_value') ??
+                row.read<int?>('last_verified_at_value'),
           ),
           addedAt: _isoFromEpoch(favoriteRow.read<int?>('added_at_value')),
         ),
@@ -615,6 +640,16 @@ DateTime _dateTimeFromEpoch(int value) {
       isUtc: true,
     ),
     _ => DateTime.fromMillisecondsSinceEpoch(value, isUtc: true),
+  };
+}
+
+String _fieldValidationStatus(String? qualityLevel, int? checkedAt) {
+  final normalizedLevel = qualityLevel?.trim().toUpperCase();
+  return switch (normalizedLevel) {
+    'FIELD_VERIFIED' when checkedAt != null => 'VERIFIED',
+    'FIELD_STALE' => 'STALE',
+    'FIELD_UNKNOWN' => 'UNKNOWN',
+    _ => 'UNKNOWN',
   };
 }
 

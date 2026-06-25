@@ -35,7 +35,7 @@ void main() {
                 'name': '1번 출구 엘리베이터',
                 'floorFrom': '1F',
                 'floorTo': 'B1',
-                'description': '1번 출구 앞',
+                'description': '현장 검증 전 1번 출구 앞',
                 'status': 'NORMAL',
                 'dataConfidence': 'HIGH',
                 'dataSourceType': 'OFFICIAL_FILE',
@@ -69,12 +69,17 @@ void main() {
     expect(favorites.single.statusLabel, '정상');
     expect(favorites.single.severityLabel, '정상');
     expect(favorites.single.nextActionLabel, '상태 제보');
+    expect(favorites.single.statusTitle, '이용 가능');
     expect(favorites.single.confidenceLabel, '정보 신뢰도 높음');
     expect(favorites.single.dataSourceLabel, '출처 공식 파일');
+    expect(favorites.single.locationLabel, '1번 출구 앞');
+    expect(favorites.single.verificationStatusLabel, '상태 확인 필요');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태 확인 필요, 다음 행동 상태 제보',
     );
+    expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
+    expect(favorites.single.semanticLabel, isNot(contains('출처')));
   });
 
   test('즐겨찾기 시설 상태는 심각도와 다음 행동을 구분한다', () {
@@ -83,6 +88,8 @@ void main() {
     final reported = _favoriteFacility(status: 'USER_REPORTED');
     final unknown = _favoriteFacility(status: 'NEEDS_CHECK');
     final available = _favoriteFacility(status: 'AVAILABLE');
+    final verified = _favoriteFacility(fieldValidationStatus: 'VERIFIED');
+    final metadataOnlyDescription = _favoriteFacility(description: '현장 검증 전');
 
     expect(closed.severityLabel, '고장·폐쇄');
     expect(closed.nextActionLabel, '대체 출구 보기');
@@ -95,6 +102,9 @@ void main() {
     expect(unknown.nextActionLabel, '시설 상세 보기');
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
+    expect(available.verificationStatusLabel, '상태 확인 필요');
+    expect(verified.verificationStatusLabel, '시설 상태 확인됨');
+    expect(metadataOnlyDescription.locationLabel, '1F-B1');
   });
 
   test('즐겨찾기 시설 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
@@ -281,7 +291,11 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
   }
 }
 
-FavoriteFacility _favoriteFacility({String status = 'NORMAL'}) {
+FavoriteFacility _favoriteFacility({
+  String status = 'NORMAL',
+  String fieldValidationStatus = 'UNKNOWN',
+  String description = '1번 출구 앞',
+}) {
   return FavoriteFacility(
     userId: 'anonymous-user-1',
     facilityId: 'facility-sangnoksu-elevator-1',
@@ -293,10 +307,11 @@ FavoriteFacility _favoriteFacility({String status = 'NORMAL'}) {
     name: '1번 출구 엘리베이터',
     floorFrom: '1F',
     floorTo: 'B1',
-    description: '1번 출구 앞',
+    description: description,
     status: status,
     dataConfidence: 'HIGH',
     dataSourceType: 'OFFICIAL_FILE',
+    fieldValidationStatus: fieldValidationStatus,
     lastUpdatedAt: '2026-06-12',
     addedAt: '2026-06-14T10:00:00',
   );
