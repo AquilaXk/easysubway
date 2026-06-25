@@ -6,8 +6,8 @@ class EasySubwayAccessibleColors {
   static const primary = Color(0xFF006D77);
   static const brandDark = Color(0xFF071B2F);
   static const brand = Color(0xFF17527C);
-  static const mint = Color(0xFF0D8A6D);
-  static const mintDark = Color(0xFF0A705A);
+  static const mint = Color(0xFF0A705A);
+  static const mintDark = Color(0xFF075D4B);
   static const mintSoft = Color(0xFFF0FBF7);
   static const mintBorder = Color(0xFFCBEADD);
   static const amberSoft = Color(0xFFFFF0D1);
