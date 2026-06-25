@@ -1120,12 +1120,9 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       ..strokeWidth = 14 * styleScale
       ..style = PaintingStyle.stroke;
     for (final edge in _visibleEdges) {
-      final from = stationsById[edge.fromStationId];
-      final to = stationsById[edge.toStationId];
-      if (from == null || to == null) {
-        continue;
-      }
-      final segmentPath = _segmentPath(from, to);
+      final from = edge.from;
+      final to = edge.to;
+      final segmentPath = edge.segmentPath;
       if (segmentPath == null) {
         canvas.drawLine(
           Offset(geometry.x(from), geometry.y(from)),
@@ -1153,14 +1150,28 @@ class _SelectedLineOverlayPainter extends CustomPainter {
   Rect get _visibleSourceBounds =>
       camera.visibleSourceRect.inflate(96 / camera.scale);
 
-  List<NetworkMapEdge> get _visibleEdges {
+  List<_SelectedLineVisibleEdge> get _visibleEdges {
     final visibleBounds = _visibleSourceBounds;
-    return [
-      for (final edge in edges)
-        if (edge.lineId == lineId &&
-            _edgeSourceBounds(edge)?.overlaps(visibleBounds) == true)
-          edge,
-    ];
+    final visibleEdges = <_SelectedLineVisibleEdge>[];
+    for (final edge in edges) {
+      if (edge.lineId != lineId) {
+        continue;
+      }
+      final from = stationsById[edge.fromStationId];
+      final to = stationsById[edge.toStationId];
+      if (from == null || to == null) {
+        continue;
+      }
+      final segmentPath = _segmentPath(from, to);
+      final bounds = _edgeSourceBounds(from, to, segmentPath);
+      if (!bounds.overlaps(visibleBounds)) {
+        continue;
+      }
+      visibleEdges.add(
+        _SelectedLineVisibleEdge(from: from, to: to, segmentPath: segmentPath),
+      );
+    }
+    return visibleEdges;
   }
 
   List<NetworkMapStation> get _visibleStations {
@@ -1173,13 +1184,11 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     ];
   }
 
-  Rect? _edgeSourceBounds(NetworkMapEdge edge) {
-    final from = stationsById[edge.fromStationId];
-    final to = stationsById[edge.toStationId];
-    if (from == null || to == null) {
-      return null;
-    }
-    final segmentPath = _segmentPath(from, to);
+  Rect _edgeSourceBounds(
+    NetworkMapStation from,
+    NetworkMapStation to,
+    Path? segmentPath,
+  ) {
     final bounds = segmentPath == null
         ? Rect.fromPoints(
             Offset(geometry.x(from), geometry.y(from)),
@@ -1206,6 +1215,18 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.camera != camera ||
         oldDelegate.styleScale != styleScale;
   }
+}
+
+class _SelectedLineVisibleEdge {
+  const _SelectedLineVisibleEdge({
+    required this.from,
+    required this.to,
+    required this.segmentPath,
+  });
+
+  final NetworkMapStation from;
+  final NetworkMapStation to;
+  final Path? segmentPath;
 }
 
 Path? _segmentPath(NetworkMapStation from, NetworkMapStation to) {
