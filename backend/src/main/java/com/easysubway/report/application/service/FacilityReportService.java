@@ -670,7 +670,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 		return "ES-" + UUID.randomUUID()
 			.toString()
 			.replace("-", "")
-			.substring(0, 8)
+			.substring(0, 12)
 			.toUpperCase(java.util.Locale.ROOT);
 	}
 

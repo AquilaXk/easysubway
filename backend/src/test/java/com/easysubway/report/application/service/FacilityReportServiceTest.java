@@ -88,6 +88,7 @@ class FacilityReportServiceTest {
 		assertThat(report.facilityId()).isEqualTo("facility-sangnoksu-elevator-1");
 		assertThat(report.reportType()).isEqualTo(FacilityReportType.BROKEN);
 		assertThat(report.publicReceiptCode()).startsWith("ES-");
+		assertThat(report.publicReceiptCode()).matches("^ES-[0-9A-F]{12}$");
 		assertThat(report.publicReceiptCode()).doesNotContain("report-");
 		assertThat(report.publicReceiptCode()).isNotEqualTo(report.id());
 		assertThat(report.status()).isEqualTo(FacilityReportStatus.SUBMITTED);

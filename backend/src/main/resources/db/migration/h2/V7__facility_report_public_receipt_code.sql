@@ -2,7 +2,11 @@ ALTER TABLE facility_reports
 	ADD COLUMN IF NOT EXISTS public_receipt_code VARCHAR(16);
 
 UPDATE facility_reports
-SET public_receipt_code = 'ES-' || upper(substring(regexp_replace(report_id, '^report-', ''), 1, 8))
+SET public_receipt_code = 'ES-' || LPAD(CAST((
+	SELECT COUNT(*)
+	FROM facility_reports existing_report
+	WHERE existing_report.report_id <= facility_reports.report_id
+) AS VARCHAR), 12, '0')
 WHERE public_receipt_code IS NULL;
 
 ALTER TABLE facility_reports
