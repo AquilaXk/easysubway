@@ -403,6 +403,7 @@ class FacilityReportController {
 
 	record FacilityReportStatusResponse(
 		String id,
+		String publicReceiptCode,
 		String stationId,
 		String facilityId,
 		FacilityReportType reportType,
@@ -416,6 +417,7 @@ class FacilityReportController {
 		static FacilityReportStatusResponse from(FacilityReportSummary report) {
 			return new FacilityReportStatusResponse(
 				report.id(),
+				report.publicReceiptCode(),
 				report.stationId(),
 				report.facilityId(),
 				report.reportType(),
@@ -431,6 +433,7 @@ class FacilityReportController {
 			// 사용자용 상태 조회는 소유자에게도 내부 식별자와 정확한 위치 메타데이터를 숨긴다.
 			return new FacilityReportStatusResponse(
 				report.id(),
+				report.publicReceiptCode(),
 				report.stationId(),
 				report.facilityId(),
 				report.reportType(),
@@ -445,6 +448,7 @@ class FacilityReportController {
 
 	record FacilityReportCreatedResponse(
 		String id,
+		String publicReceiptCode,
 		String stationId,
 		String facilityId,
 		FacilityReportType reportType,
@@ -459,6 +463,7 @@ class FacilityReportController {
 		static FacilityReportCreatedResponse from(FacilityReport report, String receiptToken) {
 			return new FacilityReportCreatedResponse(
 				report.id(),
+				report.publicReceiptCode(),
 				report.stationId(),
 				report.facilityId(),
 				report.reportType(),

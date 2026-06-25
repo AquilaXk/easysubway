@@ -381,6 +381,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 		// 신고 대상 시설이 요청한 역에 속해야 다른 역 시설 상태가 잘못 갱신되는 일을 막을 수 있다.
 		requireFacilityInStation(command.stationId(), command.facilityId());
 		String reportId = "report-" + UUID.randomUUID();
+		String publicReceiptCode = newPublicReceiptCode();
 		FacilityReportPhotoAttachment photo = preparePhoto(command);
 		StoredFacilityReportPhoto storedPhoto = photo == null ? null : storePhoto(reportId, photo);
 		String storedUserId = hasText(command.userId())
@@ -405,6 +406,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 
 		FacilityReport report = new FacilityReport(
 			reportId,
+			publicReceiptCode,
 			storedUserId,
 			command.stationId(),
 			command.facilityId(),
@@ -550,6 +552,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 		String duplicateOfReportId = resolveDuplicateOfReportId(command, report);
 		FacilityReport reviewed = new FacilityReport(
 			report.id(),
+			report.publicReceiptCode(),
 			report.userId(),
 			report.stationId(),
 			report.facilityId(),
@@ -614,6 +617,7 @@ public class FacilityReportService implements FacilityReportUseCase {
 		}
 		return saveFacilityReportPort.saveReport(new FacilityReport(
 			report.id(),
+			report.publicReceiptCode(),
 			report.userId(),
 			report.stationId(),
 			report.facilityId(),
@@ -660,6 +664,14 @@ public class FacilityReportService implements FacilityReportUseCase {
 
 	private boolean hasText(String value) {
 		return value != null && !value.isBlank();
+	}
+
+	private String newPublicReceiptCode() {
+		return "ES-" + UUID.randomUUID()
+			.toString()
+			.replace("-", "")
+			.substring(0, 8)
+			.toUpperCase(java.util.Locale.ROOT);
 	}
 
 	private FacilityReportPhotoAttachment preparePhoto(CreateFacilityReportCommand command) {

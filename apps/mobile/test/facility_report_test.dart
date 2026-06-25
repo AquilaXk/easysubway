@@ -174,6 +174,7 @@ void main() {
                   'description': '문이 열리지 않습니다.',
                   'status': 'SUBMITTED',
                   'createdAt': '2026-06-13T10:00:00',
+                  'publicReceiptCode': 'ES-1001',
                   'receiptToken': 'receipt-token-1',
                 },
               }),
@@ -245,6 +246,8 @@ void main() {
     expect(requestBody['longitude'], 126.866221);
     expect(authorizationHeader, isNotNull);
     expect(result.id, 'report-1');
+    expect(result.publicReceiptCode, 'ES-1001');
+    expect(result.displayReceiptCode, 'ES-1001');
     expect(result.receiptToken, 'receipt-token-1');
     expect(result.statusLabel, '접수됨');
   });
@@ -470,6 +473,7 @@ void main() {
               'description': '문이 열리지 않습니다.',
               'status': 'SUBMITTED',
               'createdAt': '2026-06-13T10:00:00',
+              'publicReceiptCode': 'ES-1001',
               'receiptToken': 'receipt-token-1',
             },
           }),
@@ -520,6 +524,7 @@ void main() {
               'description': '문이 열리지 않습니다.',
               'status': 'SUBMITTED',
               'createdAt': '2026-06-13T10:00:00',
+              'publicReceiptCode': 'ES-1001',
               'receiptToken': 'receipt-token-1',
             },
           }),
@@ -546,6 +551,8 @@ void main() {
     expect(requestBody['clientSubmissionId'], isNot(isEmpty));
     expect(requestBody, isNot(contains('photoObjectKey')));
     expect(result.receiptToken, 'receipt-token-1');
+    expect(result.publicReceiptCode, 'ES-1001');
+    expect(receiptStore.savedPublicReceiptCodes['report-1'], 'ES-1001');
     expect(
       await receiptStore.receiptTokenForReport('report-1'),
       'receipt-token-1',
@@ -724,7 +731,7 @@ void main() {
           isA<FacilityReportException>().having(
             (error) => error.message,
             'message',
-            '신고를 보내지 못했습니다.',
+            '제보를 보내지 못했습니다.',
           ),
         ),
       );
@@ -764,7 +771,7 @@ void main() {
           isA<FacilityReportException>().having(
             (error) => error.message,
             'message',
-            '신고를 보내지 못했습니다.',
+            '제보를 보내지 못했습니다.',
           ),
         ),
       );
@@ -806,6 +813,7 @@ void main() {
               'description': '문이 열리지 않습니다.',
               'status': 'ACCEPTED',
               'createdAt': '2026-06-13T10:00:00',
+              'publicReceiptCode': 'ES-1001',
             },
           }),
         )
@@ -861,6 +869,9 @@ void main() {
               'createdAt': reportId == 'report-2'
                   ? '2026-06-15T09:00:00'
                   : '2026-06-14T09:00:00',
+              'publicReceiptCode': reportId == 'report-2'
+                  ? 'ES-1002'
+                  : 'ES-1001',
             },
           }),
         )
@@ -884,6 +895,7 @@ void main() {
     expect(receiptTokens, ['receipt-token-2', 'receipt-token-1']);
     expect(reports, hasLength(2));
     expect(reports.first.id, 'report-2');
+    expect(reports.first.publicReceiptCode, 'ES-1002');
     expect(reports.first.statusLabel, '반영됨');
     expect(reports.last.statusLabel, '접수됨');
   });
@@ -965,7 +977,7 @@ void main() {
 
     expect(repository.requests, hasLength(1));
     expect(controller.state.status, FacilityReportViewStatus.success);
-    expect(controller.state.message, '신고가 접수되었습니다.');
+    expect(controller.state.message, '제보를 보냈어요.');
   });
 
   test('시설 신고 컨트롤러는 접수 후 처리 상태를 다시 확인한다', () async {
@@ -1065,6 +1077,7 @@ class PendingFacilityReportRepository implements FacilityReportRepository {
     _completer.complete(
       const FacilityReportResult(
         id: 'report-1',
+        publicReceiptCode: 'ES-1001',
         stationId: 'station-sangnoksu',
         facilityId: 'facility-sangnoksu-elevator-1',
         reportType: 'BROKEN',
@@ -1087,6 +1100,7 @@ class RefreshableFacilityReportRepository implements FacilityReportRepository {
     return Future.value(
       const FacilityReportResult(
         id: 'report-1',
+        publicReceiptCode: 'ES-1001',
         stationId: 'station-sangnoksu',
         facilityId: 'facility-sangnoksu-elevator-1',
         reportType: 'BROKEN',
@@ -1113,6 +1127,7 @@ class RefreshableFacilityReportRepository implements FacilityReportRepository {
     _refreshCompleter!.complete(
       const FacilityReportResult(
         id: 'report-1',
+        publicReceiptCode: 'ES-1001',
         stationId: 'station-sangnoksu',
         facilityId: 'facility-sangnoksu-elevator-1',
         reportType: 'BROKEN',
@@ -1176,6 +1191,7 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
 
   final Map<String, String> _receiptTokens;
   final Map<String, DateTime> _createdAtByReportId;
+  final Map<String, String> savedPublicReceiptCodes = {};
   final bool throwOnSave;
 
   @override
@@ -1184,6 +1200,9 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
       throw StateError('receipt save failed');
     }
     _receiptTokens[receipt.reportId] = receipt.receiptToken;
+    if (receipt.publicReceiptCode != null) {
+      savedPublicReceiptCodes[receipt.reportId] = receipt.publicReceiptCode!;
+    }
     _createdAtByReportId[receipt.reportId] = receipt.createdAt;
   }
 
@@ -1199,6 +1218,7 @@ class FakeFacilityReportReceiptStore implements FacilityReportReceiptStore {
         FacilityReportReceipt(
           receiptId: entry.key,
           reportId: entry.key,
+          publicReceiptCode: savedPublicReceiptCodes[entry.key],
           status: 'SUBMITTED',
           receiptToken: entry.value,
           createdAt:

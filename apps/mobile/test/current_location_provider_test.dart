@@ -99,7 +99,7 @@ void main() {
         isA<CurrentLocationException>().having(
           (error) => error.message,
           'message',
-          '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+          '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
         ),
       ),
     );

@@ -101,6 +101,7 @@ class FacilityReportControllerTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.id").isNotEmpty())
+			.andExpect(jsonPath("$.data.publicReceiptCode").isNotEmpty())
 			.andExpect(jsonPath("$.data.receiptToken").isNotEmpty())
 			.andExpect(jsonPath("$.data.userId").doesNotExist())
 			.andExpect(jsonPath("$.data.photoDataBase64").doesNotExist())
@@ -109,6 +110,7 @@ class FacilityReportControllerTest {
 			.getContentAsString();
 
 		String reportId = JsonPath.read(response, "$.data.id");
+		String publicReceiptCode = JsonPath.read(response, "$.data.publicReceiptCode");
 		String receiptToken = JsonPath.read(response, "$.data.receiptToken");
 
 		mockMvc.perform(get("/api/v1/reports/{reportId}", reportId))
@@ -119,6 +121,7 @@ class FacilityReportControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.id").value(reportId))
+			.andExpect(jsonPath("$.data.publicReceiptCode").value(publicReceiptCode))
 			.andExpect(jsonPath("$.data.receiptToken").doesNotExist())
 			.andExpect(jsonPath("$.data.status").value("SUBMITTED"));
 	}

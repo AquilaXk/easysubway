@@ -1754,8 +1754,9 @@ class _NotificationInboxItem {
     return _NotificationInboxItem(
       icon: Icons.report_outlined,
       title: '제보 ${report.statusLabel}',
-      subtitle: '접수번호 ${report.id}',
-      semanticLabel: '제보 ${report.statusLabel}, 접수번호 ${report.id}',
+      subtitle: '제보 번호 ${report.displayReceiptCode}',
+      semanticLabel:
+          '제보 ${report.statusLabel}, 제보 번호 ${report.displayReceiptCode}',
       kind: '제보',
       report: report,
     );
@@ -2976,14 +2977,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     const _AppSettingsInfoTile(
                       icon: Icons.notifications_off_outlined,
                       title: '알림은 아직 사용할 수 없어요',
-                      subtitle: '시설 상태와 신고 처리 안내는 앱 안에서 확인할 수 있어요',
+                      subtitle: '시설 상태와 제보 처리 안내는 앱 안에서 확인할 수 있어요',
                     )
                   else
                     _AppSettingsActionTile(
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
-                      subtitle: '시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+                      subtitle: '시설 상태, 제보 처리, 정보 갱신 알림을 관리해요',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -3005,8 +3006,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   _AppSettingsActionTile(
                     key: const Key('myReportsSettingsButton'),
                     icon: Icons.receipt_long_outlined,
-                    title: '내 신고',
-                    subtitle: '접수한 시설 신고와 처리 상태를 확인해요',
+                    title: '내 제보',
+                    subtitle: '접수한 시설 제보와 처리 상태를 확인해요',
                     onTap: widget.onOpenMyReports,
                   ),
                 ],
@@ -4537,7 +4538,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   final UserDataDeletionScope deletionScope;
 
   static const _title = '개인정보 사용 안내';
-  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
+  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _requestDeletionScope =
       '데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';

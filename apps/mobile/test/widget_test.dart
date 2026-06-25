@@ -172,6 +172,7 @@ void main() {
       reports: [
         const FacilityReportResult(
           id: 'report-2',
+          publicReceiptCode: 'ES-1002',
           stationId: 'station-sangnoksu',
           facilityId: 'facility-sangnoksu-elevator-1',
           reportType: 'CLOSED',
@@ -196,12 +197,12 @@ void main() {
 
     await _openMyReportsScreen(tester);
 
-    expect(find.text('내 신고'), findsOneWidget);
+    expect(find.text('내 제보'), findsOneWidget);
     expect(find.text('반영됨'), findsOneWidget);
     expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        '내 신고, 폐쇄, 접수번호 report-2, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
+        '내 제보, 폐쇄, 제보 번호 ES-1002, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
       ),
       findsOneWidget,
     );
@@ -213,6 +214,7 @@ void main() {
       reports: [
         const FacilityReportResult(
           id: 'report-2',
+          publicReceiptCode: 'ES-1002',
           stationId: 'station-sangnoksu',
           facilityId: 'facility-sangnoksu-elevator-1',
           reportType: 'CLOSED',
@@ -238,7 +240,7 @@ void main() {
     await _openMyReportsScreen(tester);
     final reportSemantics = tester.getSemantics(
       find.bySemanticsLabel(
-        '내 신고, 폐쇄, 접수번호 report-2, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
+        '내 제보, 폐쇄, 제보 번호 ES-1002, 반영됨, 출입문이 막혀 있습니다., 접수일 2026.06.15',
       ),
     );
     expect(
@@ -249,21 +251,22 @@ void main() {
     await tester.tap(find.byKey(const Key('myReport-report-2')));
     await tester.pumpAndSettle();
 
-    expect(find.text('신고 상세'), findsOneWidget);
+    expect(find.text('제보 상세'), findsOneWidget);
     expect(find.text('폐쇄'), findsOneWidget);
     expect(find.text('반영됨'), findsOneWidget);
-    expect(find.text('접수번호'), findsOneWidget);
-    expect(find.text('report-2'), findsOneWidget);
+    expect(find.text('제보 번호'), findsOneWidget);
+    expect(find.text('ES-1002'), findsOneWidget);
+    expect(find.text('report-2'), findsNothing);
     expect(find.text('접수일'), findsOneWidget);
     expect(find.text('2026.06.15'), findsOneWidget);
     expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('내 신고 상세, 폐쇄, 현재 상태 반영됨, 접수번호 report-2'),
+      find.bySemanticsLabel('내 제보 상세, 폐쇄, 현재 상태 반영됨, 제보 번호 ES-1002'),
       findsOneWidget,
     );
   });
 
-  testWidgets('내 신고 화면은 접수한 신고가 없으면 짧은 빈 상태를 보여준다', (tester) async {
+  testWidgets('내 제보 화면은 접수한 제보가 없으면 짧은 빈 상태를 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: MyFacilityReportListScreen(
@@ -273,7 +276,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('접수한 신고가 없습니다.'), findsOneWidget);
+    expect(find.text('접수한 제보가 없습니다.'), findsOneWidget);
     expect(find.byKey(const Key('myReportsRetryButton')), findsNothing);
   });
 
@@ -1735,7 +1738,7 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '알림 설정, 시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+          '알림 설정, 시설 상태, 제보 처리, 정보 갱신 알림을 관리해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -2170,7 +2173,7 @@ void main() {
 
       expect(find.text('개인정보 사용 안내'), findsOneWidget);
       expect(
-        find.text('현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.'),
+        find.text('현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.'),
         findsOneWidget,
       );
       expect(
@@ -2197,7 +2200,7 @@ void main() {
           .getSemanticsData();
       expect(
         summarySemantics.label,
-        contains('개인정보 사용 안내, 현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.'),
+        contains('개인정보 사용 안내, 현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.'),
       );
       expect(
         summarySemantics.label,
@@ -2745,7 +2748,7 @@ void main() {
       expect(find.text('알림 설정'), findsOneWidget);
       expect(find.text('역 시설 알림'), findsOneWidget);
       expect(find.text('경로 시설 알림'), findsOneWidget);
-      expect(find.text('신고 처리 알림'), findsOneWidget);
+      expect(find.text('제보 처리 알림'), findsOneWidget);
       expect(find.text('정보 갱신 알림'), findsOneWidget);
       expect(find.bySemanticsLabel('역 시설 알림 켜짐'), findsOneWidget);
       expect(find.bySemanticsLabel('경로 시설 알림 꺼짐'), findsOneWidget);
@@ -2804,7 +2807,7 @@ void main() {
     expect(find.text('알림 받기'), findsOneWidget);
     expect(
       find.text(
-        '즐겨찾는 역과 경로의 시설 상태, 내 신고 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
+        '즐겨찾는 역과 경로의 시설 상태, 내 제보 처리 결과, 정보 갱신을 알려드립니다. 알림 설정에서 언제든 끌 수 있습니다.',
       ),
       findsOneWidget,
     );
@@ -3067,7 +3070,7 @@ void main() {
     expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 0);
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
   });
 
   testWidgets('홈 즐겨찾기 경로는 저장한 경로를 큰 목록으로 보여주고 삭제한다', (tester) async {
@@ -4306,7 +4309,7 @@ void main() {
     expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 0);
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
     expect(
       find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
       findsOneWidget,
@@ -4482,7 +4485,7 @@ void main() {
   testWidgets('역 검색은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+        '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -4504,7 +4507,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
       findsOneWidget,
@@ -4886,7 +4889,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
   });
 
@@ -6952,7 +6955,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('시설 신고'), findsOneWidget);
+      expect(find.text('시설 상태 제보'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('무엇을 알려드릴까요?'), findsOneWidget);
@@ -6990,16 +6993,14 @@ void main() {
       expect(reportRepository.requests.single.photoFileName, isNull);
       expect(reportRepository.requests.single.photoContentType, isNull);
       expect(reportRepository.requests.single.photoDataBase64, isNull);
-      expect(find.text('신고가 접수되었습니다.'), findsOneWidget);
-      expect(find.bySemanticsLabel('신고가 접수되었습니다.'), findsOneWidget);
-      expect(find.text('접수번호'), findsOneWidget);
-      expect(find.text('report-1'), findsOneWidget);
+      expect(find.text('제보를 보냈어요.'), findsOneWidget);
+      expect(find.bySemanticsLabel('제보를 보냈어요.'), findsOneWidget);
+      expect(find.text('제보 번호'), findsOneWidget);
+      expect(find.text('ES-1001'), findsOneWidget);
+      expect(find.text('report-1'), findsNothing);
       expect(find.text('처리 상태'), findsOneWidget);
       expect(find.text('접수됨'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 접수됨'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 접수됨'), findsOneWidget);
       expect(
         find.byKey(const Key('facilityReportPhotoUrlInput')),
         findsNothing,
@@ -7016,10 +7017,7 @@ void main() {
       expect(reportRepository.loadedReportIds, ['report-1']);
       expect(find.text('처리 상태를 확인했습니다.'), findsOneWidget);
       expect(find.text('반영됨'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('신고 접수번호 report-1, 현재 상태 반영됨'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 반영됨'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -7133,7 +7131,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진 확인'), findsOneWidget);
-    expect(find.text('사진은 신고 확인에만 사용됩니다.'), findsOneWidget);
+    expect(find.text('사진은 제보 내용을 확인하는 데만 사용해요.'), findsOneWidget);
     expect(find.text('얼굴이나 전화번호가 보이면 가려 주세요.'), findsOneWidget);
     expect(pickerCallCount, 0);
 
@@ -7449,7 +7447,7 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
       findsOneWidget,
@@ -7545,7 +7543,7 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
       findsOneWidget,
@@ -7597,7 +7595,7 @@ void main() {
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<StateError>());
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('시설 상태 제보'), findsOneWidget);
     await tester.dragUntilVisible(
       find.bySemanticsLabel('사진 1장 추가됨'),
       find.byType(Scrollable).first,
@@ -7664,9 +7662,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(find.text('사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.'), findsOneWidget);
+    expect(find.text('사진과 제보 위치는 시설 제보 확인에만 사용됩니다.'), findsOneWidget);
     expect(
-      find.text('신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
+      find.text('제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
       findsOneWidget,
     );
     expect(find.text('사진 확인'), findsNothing);
@@ -7762,7 +7760,7 @@ void main() {
     expect(permissionCheckCount, 1);
     expect(requestCount, 0);
     expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('가까운 역 찾기와 시설 신고 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
+    expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
     expect(
       find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
       findsOneWidget,
@@ -7815,7 +7813,7 @@ void main() {
             requestCount++;
             if (requestCount == 1) {
               throw const FacilityReportLocationException(
-                '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+                '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
               );
             }
             if (requestCount == 2) {
@@ -7865,7 +7863,7 @@ void main() {
       requestCount++;
       if (requestCount == 1) {
         throw const FacilityReportLocationException(
-          '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+          '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
         );
       }
       return const FacilityReportLocation(
@@ -7899,7 +7897,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
@@ -7926,7 +7924,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+        '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -7994,7 +7992,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(find.text('현재 위치 첨부됨'), findsNothing);
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
     expect(find.text('위치 확인됨'), findsNothing);
@@ -8021,7 +8019,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
-        '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+        '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
       ),
       needsPermissionRequest: false,
     );
@@ -8087,7 +8085,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       findsOneWidget,
@@ -8122,7 +8120,7 @@ void main() {
           locationLoader: () async {
             requestCount++;
             throw const FacilityReportLocationException(
-              '기기 위치(GPS)를 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+              '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
             );
           },
           needsLocationPermissionRequest: () async => false,
@@ -8221,7 +8219,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 신고'), findsOneWidget);
+    expect(find.text('시설 상태 제보'), findsOneWidget);
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportDescriptionInput')),
     );
@@ -8240,9 +8238,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(find.text('사진과 신고 위치는 시설 신고 확인과 운영 검수에만 사용됩니다.'), findsOneWidget);
+    expect(find.text('사진과 제보 위치는 시설 제보 확인에만 사용됩니다.'), findsOneWidget);
     expect(
-      find.text('신고 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
+      find.text('제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.'),
       findsOneWidget,
     );
     expect(reportRepository.requests, isEmpty);
@@ -8927,6 +8925,7 @@ class FakeFacilityReportRepository implements FacilityReportRepository {
     }
     return FacilityReportResult(
       id: 'report-${requests.length}',
+      publicReceiptCode: 'ES-100${requests.length}',
       stationId: request.stationId,
       facilityId: request.facilityId,
       reportType: request.reportType,
@@ -8945,6 +8944,7 @@ class FakeFacilityReportRepository implements FacilityReportRepository {
     }
     return FacilityReportResult(
       id: reportId,
+      publicReceiptCode: 'ES-1001',
       stationId: 'station-sangnoksu',
       facilityId: 'facility-sangnoksu-elevator-1',
       reportType: 'CLOSED',

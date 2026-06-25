@@ -87,6 +87,9 @@ class FacilityReportServiceTest {
 		assertThat(report.stationId()).isEqualTo("station-sangnoksu");
 		assertThat(report.facilityId()).isEqualTo("facility-sangnoksu-elevator-1");
 		assertThat(report.reportType()).isEqualTo(FacilityReportType.BROKEN);
+		assertThat(report.publicReceiptCode()).startsWith("ES-");
+		assertThat(report.publicReceiptCode()).doesNotContain("report-");
+		assertThat(report.publicReceiptCode()).isNotEqualTo(report.id());
 		assertThat(report.status()).isEqualTo(FacilityReportStatus.SUBMITTED);
 		assertThat(report.createdAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 9, 0));
 		assertThat(service.getReport(report.id())).isEqualTo(report);
