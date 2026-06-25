@@ -2479,48 +2479,77 @@ void main() {
   });
 
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final deletionRepository = UserDataDeletionApiRepository(
       baseUri: Uri.parse('https://api.easysubway.example'),
       authProvider: const NoAuthorizationHeaderProvider(),
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        userDataDeletionRepository: deletionRepository,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          userDataDeletionRepository: deletionRepository,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
 
-    await _openSupportAccessScreen(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('dataDeletionAccessItem')),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
-    await tester.pumpAndSettle();
+      await _openSupportAccessScreen(tester);
 
-    expect(find.text('서버 데이터 삭제'), findsWidgets);
-    expect(
-      find.text('즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
-    expect(find.text('삭제가 끝나면 서버에 연결된 데이터가 정리됩니다.'), findsOneWidget);
+      expect(
+        find.text(
+          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
-    await tester.pumpAndSettle();
+      final summarySemantics = tester
+          .getSemantics(find.byKey(const Key('privacyDataUseSummary')))
+          .getSemanticsData();
+      expect(
+        summarySemantics.label,
+        contains('서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
+      );
+      expect(
+        summarySemantics.label,
+        contains('이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.'),
+      );
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(
-      find.text('삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.'),
-      findsOneWidget,
-    );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('dataDeletionAccessItem')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('서버 데이터 삭제'), findsWidgets);
+      expect(
+        find.text('즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
+      expect(find.text('삭제가 끝나면 서버에 연결된 데이터가 정리됩니다.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.text('삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.'),
+        findsOneWidget,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다', (tester) async {

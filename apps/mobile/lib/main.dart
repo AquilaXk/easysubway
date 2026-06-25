@@ -3748,6 +3748,7 @@ class SupportAccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final deletionScope = _userDataDeletionScope(userDataDeletionRepository);
     return Scaffold(
       appBar: AppBar(title: const Text('도움말·문의')),
       body: SafeArea(
@@ -3755,7 +3756,7 @@ class SupportAccessScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
             const _SupportSectionTitle(title: '개인정보 및 데이터'),
-            const _PrivacyDataUseSummary(),
+            _PrivacyDataUseSummary(deletionScope: deletionScope),
             const SizedBox(height: 12),
             _SupportAccessItem(
               key: const Key('privacyPolicyAccessItem'),
@@ -3782,6 +3783,7 @@ class SupportAccessScreen extends StatelessWidget {
             else
               _UserDataDeletionAccessItem(
                 repository: userDataDeletionRepository!,
+                deletionScope: deletionScope,
                 onDeleted: onUserDataDeleted,
               ),
             const SizedBox(height: 20),
@@ -3842,15 +3844,16 @@ class _SupportSectionTitle extends StatelessWidget {
 class _UserDataDeletionAccessItem extends StatelessWidget {
   const _UserDataDeletionAccessItem({
     required this.repository,
+    required this.deletionScope,
     required this.onDeleted,
   });
 
   final UserDataDeletionRepository repository;
+  final UserDataDeletionScope deletionScope;
   final Future<void> Function(UserDataDeletionResult result)? onDeleted;
 
   @override
   Widget build(BuildContext context) {
-    final deletionScope = _userDataDeletionScope(repository);
     final copy = _UserDataDeletionCopy.forScope(deletionScope);
     void openDeletionScreen() {
       Navigator.of(context).push(
@@ -4507,24 +4510,51 @@ class _SafetyDataNoticeLine extends StatelessWidget {
 }
 
 class _PrivacyDataUseSummary extends StatelessWidget {
-  const _PrivacyDataUseSummary();
+  const _PrivacyDataUseSummary({required this.deletionScope});
+
+  final UserDataDeletionScope deletionScope;
 
   static const _title = '개인정보 사용 안내';
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
-  static const _deletionScope =
+  static const _deviceDeletionScope =
       '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
-  static const _sentReportNotice = '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
+  static const _remoteDeletionScope =
+      '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.';
+  static const _combinedDeletionScope =
+      '내 데이터 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 서버에 연결된 제보·경로 피드백 정보를 삭제하거나 익명화합니다.';
+  static const _deviceSentReportNotice =
+      '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
+  static const _remoteSentReportNotice =
+      '이미 보낸 시설 제보, 위치 정보, 경로 피드백은 서버에서 삭제되거나 익명화됩니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
+
+  String get _deletionScopeText {
+    return switch (deletionScope) {
+      UserDataDeletionScope.deviceOnly => _deviceDeletionScope,
+      UserDataDeletionScope.remoteOnly => _remoteDeletionScope,
+      UserDataDeletionScope.remoteAndDevice => _combinedDeletionScope,
+    };
+  }
+
+  String get _sentReportNoticeText {
+    return switch (deletionScope) {
+      UserDataDeletionScope.deviceOnly => _deviceSentReportNotice,
+      UserDataDeletionScope.remoteOnly ||
+      UserDataDeletionScope.remoteAndDevice => _remoteSentReportNotice,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final deletionScopeText = _deletionScopeText;
+    final sentReportNoticeText = _sentReportNoticeText;
     return Semantics(
       key: const Key('privacyDataUseSummary'),
       container: true,
       label:
-          '$_title, $_locationPurpose $_appDataPurpose $_deletionScope $_sentReportNotice $_retentionNotice',
+          '$_title, $_locationPurpose $_appDataPurpose $deletionScopeText $sentReportNoticeText $_retentionNotice',
       child: ExcludeSemantics(
         child: Container(
           decoration: BoxDecoration(
@@ -4548,8 +4578,8 @@ class _PrivacyDataUseSummary extends StatelessWidget {
                 const SizedBox(height: 10),
                 const _PrivacyDataUseLine(text: _locationPurpose),
                 const _PrivacyDataUseLine(text: _appDataPurpose),
-                const _PrivacyDataUseLine(text: _deletionScope),
-                const _PrivacyDataUseLine(text: _sentReportNotice),
+                _PrivacyDataUseLine(text: deletionScopeText),
+                _PrivacyDataUseLine(text: sentReportNoticeText),
                 const _PrivacyDataUseLine(text: _retentionNotice),
               ],
             ),
