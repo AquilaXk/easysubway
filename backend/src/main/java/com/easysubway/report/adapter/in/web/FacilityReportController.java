@@ -366,6 +366,7 @@ class FacilityReportController {
 
 	record FacilityReportListResponse(
 		String id,
+		String publicReceiptCode,
 		String userId,
 		String stationId,
 		String facilityId,
@@ -384,6 +385,7 @@ class FacilityReportController {
 		static FacilityReportListResponse from(FacilityReportSummary report) {
 			return new FacilityReportListResponse(
 				report.id(),
+				report.publicReceiptCode(),
 				report.userId(),
 				report.stationId(),
 				report.facilityId(),
@@ -499,6 +501,7 @@ class FacilityReportController {
 
 	record FacilityReportResponse(
 		String id,
+		String publicReceiptCode,
 		String userId,
 		String stationId,
 		String facilityId,
@@ -522,6 +525,7 @@ class FacilityReportController {
 		static FacilityReportResponse from(FacilityReport report) {
 			return new FacilityReportResponse(
 				report.id(),
+				report.publicReceiptCode(),
 				report.userId(),
 				report.stationId(),
 				report.facilityId(),

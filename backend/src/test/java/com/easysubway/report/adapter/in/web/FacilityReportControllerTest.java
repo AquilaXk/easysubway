@@ -416,6 +416,7 @@ class FacilityReportControllerTest {
 
 		Assertions.assertThat(adminReportsResponse)
 			.contains("hasPhoto")
+			.contains("publicReceiptCode")
 			.doesNotContain("photoFileName")
 			.doesNotContain("photoContentType")
 			.doesNotContain("photoObjectKey")
@@ -829,6 +830,7 @@ class FacilityReportControllerTest {
 			.getContentAsString();
 
 		String reportId = JsonPath.read(response, "$.data.id");
+		String publicReceiptCode = JsonPath.read(response, "$.data.publicReceiptCode");
 		Assertions.assertThat(response)
 			.doesNotContain("photoDataBase64")
 			.doesNotContain("aW1hZ2UtYnl0ZXM=");
@@ -838,6 +840,7 @@ class FacilityReportControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.id").value(reportId))
+			.andExpect(jsonPath("$.data.publicReceiptCode").value(publicReceiptCode))
 			.andExpect(jsonPath("$.data.userId").value("basic-user"))
 			.andExpect(jsonPath("$.data.description").value("엘리베이터 앞 안내문이 떨어져 있습니다."))
 			.andExpect(jsonPath("$.data.photoFileName").value("elevator-notice.png"))
