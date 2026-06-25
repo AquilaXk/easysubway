@@ -3851,12 +3851,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deletionScope = _userDataDeletionScope(repository);
-    final title = deletionScope == UserDataDeletionScope.deviceOnly
-        ? '이 기기의 앱 데이터 삭제'
-        : '내 데이터 삭제';
-    final helperText = deletionScope == UserDataDeletionScope.deviceOnly
-        ? '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.'
-        : '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.';
+    final copy = _UserDataDeletionCopy.forScope(deletionScope);
     void openDeletionScreen() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -3872,7 +3867,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
-      label: '$title, $helperText',
+      label: '${copy.title}, ${copy.helperText}',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
         child: Material(
@@ -3901,7 +3896,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title,
+                          copy.title,
                           style: const TextStyle(
                             color: Color(0xFF102A2C),
                             fontSize: 18,
@@ -3911,7 +3906,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          helperText,
+                          copy.helperText,
                           style: const TextStyle(
                             color: Color(0xFF466467),
                             fontSize: 15,
@@ -3933,14 +3928,16 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
   }
 }
 
-enum UserDataDeletionScope { deviceOnly, remoteAndDevice }
+enum UserDataDeletionScope { deviceOnly, remoteOnly, remoteAndDevice }
 
 UserDataDeletionScope _userDataDeletionScope(
   UserDataDeletionRepository? repository,
 ) {
-  if (repository is UserDataDeletionApiRepository ||
-      repository is UserDataDeletionCompositeRepository) {
+  if (repository is UserDataDeletionCompositeRepository) {
     return UserDataDeletionScope.remoteAndDevice;
+  }
+  if (repository is UserDataDeletionApiRepository) {
+    return UserDataDeletionScope.remoteOnly;
   }
   return UserDataDeletionScope.deviceOnly;
 }
@@ -3948,6 +3945,7 @@ UserDataDeletionScope _userDataDeletionScope(
 class _UserDataDeletionCopy {
   const _UserDataDeletionCopy({
     required this.title,
+    required this.helperText,
     required this.body,
     required this.notices,
     required this.confirmText,
@@ -3957,19 +3955,33 @@ class _UserDataDeletionCopy {
     return switch (scope) {
       UserDataDeletionScope.deviceOnly => const _UserDataDeletionCopy(
         title: '이 기기의 앱 데이터 삭제',
+        helperText: '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
         body:
             '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
         notices: [
           '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
           '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
           '삭제한 데이터는 앱에서 복구할 수 없습니다.',
-          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '삭제를 완료하지 못하면 오류 안내를 보고 다시 시도할 수 있습니다.',
           '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
         ],
         confirmText: '삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.',
       ),
+      UserDataDeletionScope.remoteOnly => const _UserDataDeletionCopy(
+        title: '서버 데이터 삭제',
+        helperText: '서버 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
+        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        notices: [
+          '삭제가 끝나면 서버에 연결된 데이터가 정리됩니다.',
+          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
+          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
+        ],
+        confirmText: '삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.',
+      ),
       UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
         title: '내 데이터 삭제',
+        helperText: '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
         body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
           '삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.',
@@ -3977,12 +3989,13 @@ class _UserDataDeletionCopy {
           '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
           '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
         ],
-        confirmText: '삭제 후에는 앱에 저장된 데이터와 설정이 지워지고 되돌릴 수 없습니다.',
+        confirmText: '삭제 후에는 이 기기와 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.',
       ),
     };
   }
 
   final String title;
+  final String helperText;
   final String body;
   final List<String> notices;
   final String confirmText;
@@ -4258,7 +4271,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                         ? '${result.anonymizedReportCount}건 삭제'
                         : '${result.anonymizedReportCount}건 익명화',
                   ),
-                  if (deletionScope == UserDataDeletionScope.remoteAndDevice)
+                  if (deletionScope != UserDataDeletionScope.deviceOnly)
                     _DataDeletionResultRow(
                       icon: Icons.rate_review_outlined,
                       title: '경로 의견 연결 정보',

@@ -2201,6 +2201,10 @@ void main() {
         summarySemantics.label,
         contains('개인정보 사용 안내, 현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.'),
       );
+      expect(
+        summarySemantics.label,
+        contains('이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.'),
+      );
       expect(summarySemantics.label, isNot(contains('익명화')));
     } finally {
       semanticsHandle.dispose();
@@ -2501,20 +2505,20 @@ void main() {
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.pumpAndSettle();
 
-    expect(find.text('내 데이터 삭제'), findsWidgets);
+    expect(find.text('서버 데이터 삭제'), findsWidgets);
     expect(
       find.text('즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.'),
       findsOneWidget,
     );
     expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
-    expect(find.text('삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.'), findsOneWidget);
+    expect(find.text('삭제가 끝나면 서버에 연결된 데이터가 정리됩니다.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(
-      find.text('삭제 후에는 앱에 저장된 데이터와 설정이 지워지고 되돌릴 수 없습니다.'),
+      find.text('삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.'),
       findsOneWidget,
     );
   });
