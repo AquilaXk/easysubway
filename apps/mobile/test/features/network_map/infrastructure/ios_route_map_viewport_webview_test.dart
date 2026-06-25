@@ -138,6 +138,14 @@ void main() {
     final events = <RouteMapRendererEvent>[];
     final subscription = controller.events.listen(events.add);
 
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('assetReady'),
+          ),
+          (_) {},
+        );
     await controller.setCamera(camera);
     await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .handlePlatformMessage(
@@ -181,6 +189,51 @@ void main() {
           ),
           null,
         );
+  });
+
+  test('controller defers camera request until asset is ready', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+          ),
+          (_) async => null,
+        );
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel(
+              'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+            ),
+            null,
+          );
+    });
+    final controller = IosRouteMapViewportController(11);
+    final events = <RouteMapRendererEvent>[];
+    final subscription = controller.events.listen(events.add);
+
+    await controller.setCamera(camera);
+    await pumpEventQueue();
+
+    expect(events.whereType<RouteMapRendererCameraRequested>(), isEmpty);
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/11',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('assetReady'),
+          ),
+          (_) {},
+        );
+    await pumpEventQueue();
+
+    expect(
+      events.whereType<RouteMapRendererCameraRequested>().single.revision,
+      3,
+    );
+
+    await subscription.cancel();
+    await controller.dispose();
   });
 
   test(
