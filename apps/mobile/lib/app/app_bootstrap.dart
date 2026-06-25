@@ -152,6 +152,7 @@ Future<void> _defaultDataPackUpdateRunner({
       manifestUri: manifestUri,
       stateRepository: stateRepository,
       productionSigningPublicKey: endpoints.productionDataPackSigningPublicKey,
+      expectedManifestChannel: endpoints.expectedDataPackChannel,
     ),
     installer: DataPackInstaller(
       catalogDirectory: catalogDirectory,

@@ -233,7 +233,7 @@ void main() {
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
-    expect(result.scoreLabel, '이동 부담 확인 필요');
+    expect(result.scoreLabel, '이동 부담 보통');
     expect(result.scoreLabel, isNot(contains('92점')));
     expect(result.recommendationReasons, [
       '엘리베이터 동선을 우선했어요',
@@ -255,8 +255,8 @@ void main() {
       containsAll(['LOW_DATA_CONFIDENCE', 'STALE_ACCESSIBILITY_DATA']),
     );
     expect(
-      result.warnings.map((warning) => warning.message),
-      contains('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
+      result.warnings.map((warning) => warning.userMessage),
+      contains('접근성 시설 정보가 최근 확인되지 않았습니다.'),
     );
     expect(result.semanticLabel, isNot(contains('시간 확인 필요')));
     expect(result.semanticLabel, isNot(contains('거리 확인 필요')));
@@ -327,9 +327,83 @@ void main() {
     final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
 
     expect(result.statusLabel, '확인이 필요합니다');
-    expect(result.guidanceLabel, '확인이 필요합니다');
+    expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
+  });
+
+  test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {
+    final result = RouteSearchResult.fromJson({
+      'routeSearchId': 'route-unknown-warning',
+      'originStationId': 'station-sangnoksu',
+      'originStationName': '상록수',
+      'destinationStationId': 'station-sadang',
+      'destinationStationName': '사당',
+      'mobilityType': 'SENIOR',
+      'status': 'FOUND',
+      'lineId': 'seoul-4',
+      'lineName': '수도권 4호선',
+      'score': 92,
+      'steps': <Object?>[],
+      'warnings': [
+        {'code': 'SERVER_RAW_WARNING'},
+      ],
+      'recommendationReasons': <Object?>[],
+      'blockedReasons': <Object?>[],
+      'createdAt': '2026-06-13T04:20:00',
+    });
+
+    expect(result.warnings.single.userMessage, '일부 이동 정보를 확인하지 못했어요.');
+    expect(result.semanticLabel, contains('일부 이동 정보를 확인하지 못했어요.'));
+    expect(result.semanticLabel, isNot(contains('SERVER_RAW_WARNING')));
+  });
+
+  test('경로 이동 부담은 warning 없음만으로 낮음이 되지 않는다', () {
+    final longWalkingResult = _sampleRouteSearchResult(
+      warnings: const [],
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '출발역 승강장 접근',
+          description: '승강장까지 길게 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 18,
+          distanceMeters: 1200,
+          includesStairs: false,
+          stairAccessState: 'stepFree',
+          requiresAccessibilityCheck: false,
+        ),
+      ],
+    );
+    final uncertainResult = _sampleRouteSearchResult(
+      warnings: const [],
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '출발역 승강장 접근',
+          description: '승강장까지 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 3,
+          distanceMeters: 80,
+          includesStairs: false,
+          stairAccessState: 'unknown',
+          requiresAccessibilityCheck: true,
+        ),
+      ],
+    );
+
+    expect(longWalkingResult.guidanceLabel, '안내 가능');
+    expect(longWalkingResult.scoreLabel, '이동 부담 높음');
+    expect(uncertainResult.guidanceLabel, '안내 가능');
+    expect(uncertainResult.scoreLabel, '이동 부담 보통');
   });
 
   test('경로 검색 결과 음성 안내는 내부 식별자와 운영 출처 값을 읽지 않는다', () {
@@ -699,6 +773,12 @@ RouteSearchResult _sampleRouteSearchResult({
     '계단 없는 출구를 확인했어요',
     '천천히 이동하기 쉬운 동선을 확인했어요',
   ],
+  List<RouteSearchWarning> warnings = const [
+    RouteSearchWarning(
+      code: 'LOW_DATA_CONFIDENCE',
+      message: '일부 시설 정보는 확인이 필요합니다.',
+    ),
+  ],
 }) {
   return RouteSearchResult(
     routeSearchId: 'route-1',
@@ -712,12 +792,7 @@ RouteSearchResult _sampleRouteSearchResult({
     lineName: '수도권 4호선',
     score: 92,
     steps: steps,
-    warnings: const [
-      RouteSearchWarning(
-        code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 정보는 확인이 필요합니다.',
-      ),
-    ],
+    warnings: warnings,
     recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',

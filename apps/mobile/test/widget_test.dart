@@ -52,9 +52,16 @@ OnboardingState _completedOnboardingStateWithPreferences({
   );
 }
 
-Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
+Future<void> _openFavoriteList(
+  WidgetTester tester, {
+  Key? tabKey,
+  RouteDraftController? routeDraftController,
+  Future<void> Function(RouteDraft draft, String mobilityType)?
+  onOpenRouteSearch,
+}) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
+  final draftController = routeDraftController ?? RouteDraftController();
   unawaited(
     Navigator.of(homeContext).push(
       MaterialPageRoute<void>(
@@ -67,8 +74,14 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
           locationProvider: home.locationProvider,
           facilityReportDraftTargetStore: home.facilityReportDraftTargetStore,
           internalRouteRepository: home.internalRouteRepository,
-          routeDraftController: RouteDraftController(),
+          routeDraftController: draftController,
           initialMobilityType: home.initialMobilityType,
+          onOpenRouteSearch: onOpenRouteSearch == null
+              ? null
+              : ([mobilityType]) => onOpenRouteSearch(
+                  draftController.draft,
+                  mobilityType ?? home.initialMobilityType,
+                ),
         ),
       ),
     ),
@@ -2534,6 +2547,26 @@ void main() {
     expect(find.textContaining('연결 정보'), findsNothing);
     expect(find.textContaining('익명화'), findsNothing);
     expect(find.textContaining('local-user'), findsNothing);
+    expect(
+      find.byKey(const Key('dataDeletionResultStatus-favoriteStations')),
+      findsOneWidget,
+    );
+    final stationIconBadge = tester.widget<Container>(
+      find.byKey(const Key('dataDeletionResultIcon-favoriteStations')),
+    );
+    final stationIconDecoration = stationIconBadge.decoration! as BoxDecoration;
+    expect(stationIconDecoration.border, isNotNull);
+    expect(
+      stationIconDecoration.color,
+      isNot(EasySubwayAccessibleColors.mintSoft),
+    );
+    final stationRow = tester.getRect(
+      find.byKey(const Key('dataDeletionResultRow-favoriteStations')),
+    );
+    final facilityRow = tester.getRect(
+      find.byKey(const Key('dataDeletionResultRow-favoriteFacilities')),
+    );
+    expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(10));
 
     await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
     await tester.pumpAndSettle();
@@ -2549,6 +2582,42 @@ void main() {
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+  });
+
+  testWidgets('데이터 삭제 결과 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UserDataDeletionResultScreen(
+          result: const UserDataDeletionResult(
+            userId: 'anonymous-user-1',
+            deletedFavoriteStationCount: 1,
+            deletedFavoriteFacilityCount: 1,
+            deletedFavoriteRouteCount: 1,
+            anonymizedRouteFeedbackCount: 1,
+            notificationSettingsDeleted: true,
+            deletedRegisteredDeviceCount: 1,
+            deletedPushNotificationCount: 1,
+            mobilityProfileDeleted: true,
+            anonymizedReportCount: 1,
+          ),
+          deletionScope: UserDataDeletionScope.deviceOnly,
+          onRestart: () {},
+        ),
+      ),
+    );
+
+    final screenBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('dataDeletionResultStartButton')),
+    );
+
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
   });
 
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
@@ -3150,6 +3219,9 @@ void main() {
     final favoriteRouteRepository = FakeFavoriteRouteRepository(
       favorites: [_favoriteRoute()],
     );
+    final routeDraftController = RouteDraftController();
+    RouteDraft? searchAgainDraft;
+    String? searchAgainMobilityType;
 
     try {
       await tester.pumpWidget(
@@ -3165,7 +3237,14 @@ void main() {
         ),
       );
 
-      await _openFavoriteList(tester);
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft, mobilityType) async {
+          searchAgainDraft = draft;
+          searchAgainMobilityType = mobilityType;
+        },
+      );
 
       expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
@@ -3193,6 +3272,30 @@ void main() {
           isButton: true,
           hasTapAction: true,
         ),
+      );
+      expect(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
+      expect(searchAgainDraft?.origin?.nameKo, '상록수');
+      expect(searchAgainDraft?.destination?.id, 'station-sadang');
+      expect(searchAgainDraft?.destination?.nameKo, '사당');
+      expect(searchAgainMobilityType, 'SENIOR');
+
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft, mobilityType) async {
+          searchAgainDraft = draft;
+          searchAgainMobilityType = mobilityType;
+        },
       );
 
       await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
@@ -3266,6 +3369,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
+  });
+
+  testWidgets('즐겨찾기 경로 다시 찾기는 저장된 이동 조건으로 연다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
+    );
+    final routeDraftController = RouteDraftController();
+    RouteDraft? searchAgainDraft;
+    String? searchAgainMobilityType;
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+      ),
+    );
+
+    await _openFavoriteList(
+      tester,
+      routeDraftController: routeDraftController,
+      onOpenRouteSearch: (draft, mobilityType) async {
+        searchAgainDraft = draft;
+        searchAgainMobilityType = mobilityType;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    await tester.pumpAndSettle();
+
+    expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
+    expect(searchAgainDraft?.destination?.id, 'station-sadang');
+    expect(searchAgainMobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
@@ -3665,6 +3806,91 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('길찾기 하단 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    final screenBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
+  });
+
+  testWidgets('길찾기 하단 버튼은 가로 safe-area 안쪽에 배치된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(
+      left: 44,
+      right: 56,
+      bottom: 34,
+    );
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+
+    expect(buttonRect.left, greaterThanOrEqualTo(44));
+    expect(390 - buttonRect.right, greaterThanOrEqualTo(56));
+  });
+
+  testWidgets('길찾기 하단 버튼은 키보드가 열려도 가려지지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    final visibleBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+        tester.view.viewInsets.bottom;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+
+    expect(visibleBottom - buttonRect.bottom, greaterThanOrEqualTo(20));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
@@ -8511,8 +8737,8 @@ FavoriteFacility _favoriteFacility({
   );
 }
 
-FavoriteRoute _favoriteRoute() {
-  return const FavoriteRoute(
+FavoriteRoute _favoriteRoute({String mobilityType = 'SENIOR'}) {
+  return FavoriteRoute(
     userId: 'anonymous-user-1',
     favoriteRouteId: 'route-1',
     routeSearchId: 'route-1',
@@ -8520,7 +8746,7 @@ FavoriteRoute _favoriteRoute() {
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
     destinationStationName: '사당',
-    mobilityType: 'SENIOR',
+    mobilityType: mobilityType,
     status: 'FOUND',
     lineId: 'seoul-4',
     lineName: '수도권 4호선',

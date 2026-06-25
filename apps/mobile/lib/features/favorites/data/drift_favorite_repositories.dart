@@ -607,7 +607,7 @@ Map<String, Object?> _routeStepToJson(RouteSearchStep step) {
 }
 
 Map<String, Object?> _routeWarningToJson(RouteSearchWarning warning) {
-  return {'code': warning.code, 'message': warning.message};
+  return {'code': warning.code};
 }
 
 String _isoFromSql(DateTime value) => value.toUtc().toIso8601String();
