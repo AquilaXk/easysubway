@@ -3723,6 +3723,36 @@ void main() {
     expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
   });
 
+  testWidgets('길찾기 하단 버튼은 가로 safe-area 안쪽에 배치된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(
+      left: 44,
+      right: 56,
+      bottom: 34,
+    );
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+
+    expect(buttonRect.left, greaterThanOrEqualTo(44));
+    expect(390 - buttonRect.right, greaterThanOrEqualTo(56));
+  });
+
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(

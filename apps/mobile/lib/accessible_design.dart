@@ -35,12 +35,10 @@ EdgeInsets easySubwayBottomActionInsets(
   double top = 8,
   double bottom = 20,
 }) {
-  return EdgeInsets.fromLTRB(
-    horizontal,
-    top,
-    horizontal,
-    bottom + MediaQuery.viewPaddingOf(context).bottom,
-  );
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final left = viewPadding.left > horizontal ? viewPadding.left : horizontal;
+  final right = viewPadding.right > horizontal ? viewPadding.right : horizontal;
+  return EdgeInsets.fromLTRB(left, top, right, bottom + viewPadding.bottom);
 }
 
 class AccessibleShortcutButton extends StatelessWidget {
