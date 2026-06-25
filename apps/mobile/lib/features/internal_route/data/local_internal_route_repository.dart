@@ -113,12 +113,7 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
       totalEstimatedSeconds: result.totalEstimatedSeconds,
       steps: steps,
       warnings: result.warningCodes
-          .map(
-            (code) => InternalRouteWarning(
-              code: code,
-              message: '역 내부 이동 전 현장 안내를 확인해 주세요.',
-            ),
-          )
+          .map((code) => InternalRouteWarning(code: code))
           .toList(growable: false),
       blockedReasons: const [],
     );

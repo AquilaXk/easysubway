@@ -7,6 +7,8 @@ void main() {
       dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks/',
       dataPackSigningPublicKeyModulus: ' public-modulus ',
       dataPackSigningPublicKeyExponent: ' AQAB ',
+      dataPackSigningKeyId: ' production-v2 ',
+      dataPackChannel: ' production ',
       reportApiBaseUrl: 'https://api.easysubway.example',
     );
 
@@ -24,6 +26,11 @@ void main() {
       endpoints.productionDataPackSigningPublicKey?.exponentBase64Url,
       'AQAB',
     );
+    expect(
+      endpoints.productionDataPackSigningPublicKey?.keyId,
+      'production-v2',
+    );
+    expect(endpoints.expectedDataPackChannel, 'production');
   });
 
   test('앱 endpoint는 slash가 없는 데이터팩 base URL도 directory로 처리한다', () {
@@ -61,5 +68,17 @@ void main() {
       ).dataPackManifestUri,
       isNull,
     );
+  });
+
+  test('앱 endpoint는 비어 있는 데이터팩 channel을 production으로 처리한다', () {
+    const endpoints = AppEndpoints(
+      dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks/',
+      dataPackSigningPublicKeyModulus: '',
+      dataPackSigningPublicKeyExponent: '',
+      dataPackChannel: ' ',
+      reportApiBaseUrl: 'https://api.easysubway.example',
+    );
+
+    expect(endpoints.expectedDataPackChannel, 'production');
   });
 }
