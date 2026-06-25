@@ -112,7 +112,9 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
   final _pendingCameraFrames = <int, Stopwatch>{};
   int? _initialRevision;
+  int? _deferredCameraRevision;
   bool _initialCameraRequested = false;
+  bool _assetReady = false;
   bool _createdEmitted = false;
   Future<void>? _disposeFuture;
 
@@ -132,7 +134,11 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   Future<void> setCamera(MapCameraState camera) {
     _initialRevision = null;
     _initialCameraRequested = true;
-    _recordCameraRequest(camera.revision);
+    if (_assetReady) {
+      _recordCameraRequest(camera.revision);
+    } else {
+      _deferredCameraRevision = camera.revision;
+    }
     return _channel.invokeMethod<void>('setCamera', <String, Object?>{
       'viewBox': _viewBoxFor(camera),
       'revision': camera.revision,
@@ -140,7 +146,10 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   }
 
   @override
-  Future<void> retry() => _channel.invokeMethod<void>('reload');
+  Future<void> retry() {
+    _assetReady = false;
+    return _channel.invokeMethod<void>('reload');
+  }
 
   @override
   Future<void> trimMemory() async {
@@ -165,6 +174,8 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
       // Platform views can already be gone during widget replacement.
     } finally {
       _initialRevision = null;
+      _deferredCameraRevision = null;
+      _assetReady = false;
       _pendingCameraFrames.clear();
       _channel.setMethodCallHandler(null);
       if (!_events.isClosed) {
@@ -178,8 +189,9 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
     final arguments = (call.arguments as Map?)?.cast<String, Object?>();
     switch (call.method) {
       case 'assetReady':
+        _assetReady = true;
         _events.add(const RouteMapRendererAssetReady());
-        _recordInitialCameraRequest();
+        _recordReadyCameraRequest();
       case 'framePresented':
         final revision = (arguments?['revision'] as int?) ?? 0;
         _recordFrameLatency(revision);
@@ -204,6 +216,16 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
     _initialRevision = null;
     _initialCameraRequested = true;
     _recordCameraRequest(revision);
+  }
+
+  void _recordReadyCameraRequest() {
+    final deferredRevision = _deferredCameraRevision;
+    if (deferredRevision != null) {
+      _deferredCameraRevision = null;
+      _recordCameraRequest(deferredRevision);
+      return;
+    }
+    _recordInitialCameraRequest();
   }
 
   void _recordCameraRequest(int revision) {
