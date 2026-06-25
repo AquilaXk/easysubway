@@ -5834,8 +5834,12 @@ void main() {
       expect(find.text('도착역 선택'), findsOneWidget);
       expect(find.text('출발역 ID'), findsNothing);
       expect(find.text('도착역 ID'), findsNothing);
-      expect(find.text('적용 중인 조건'), findsOneWidget);
+      expect(find.text('적용 중인 조건'), findsNothing);
       expect(find.text('천천히 이동'), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeSimpleMobilityTypeButton')),
+        findsOneWidget,
+      );
       expect(find.byType(DropdownButton<String>), findsNothing);
 
       await _openRouteOriginStationInput(tester);
@@ -5877,6 +5881,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final originButtonLeft = tester.getTopLeft(
+        find.byKey(const Key('routeOriginPointButton')),
+      );
+      final originTextLeft = tester.getTopLeft(find.text('상록수역'));
+      expect(originTextLeft.dx - originButtonLeft.dx, greaterThanOrEqualTo(24));
+
       await tester.drag(find.byType(ListView), const Offset(0, -360));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
@@ -5898,7 +5908,7 @@ void main() {
       expect(find.text('편한 순'), findsNothing);
       expect(find.text('빠른 순'), findsNothing);
       expect(find.text('환승 적은 순'), findsNothing);
-      expect(find.text('상록수 → 사당'), findsOneWidget);
+      expect(find.text('상록수 → 사당'), findsNothing);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
       expect(find.text('계단 여부 확인 필요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
@@ -6167,6 +6177,10 @@ void main() {
       await tester.tap(find.byKey(const Key('routeSearchButton')));
       await tester.pumpAndSettle();
 
+      expect(
+        find.bySemanticsLabel('현재 이동 조건 천천히 이동, 계단 피하기 · 환승 줄이기'),
+        findsOneWidget,
+      );
       expect(
         tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
@@ -7068,7 +7082,7 @@ void main() {
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('상록수 → 사당'), findsOneWidget);
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, 700));
     await tester.pumpAndSettle();
@@ -7091,7 +7105,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
 
-    expect(find.text('상록수 → 사당'), findsNothing);
+    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
   });
 
   testWidgets('경로 검색 중에는 버튼을 비활성화하고 안내 불가 이유를 보여준다', (tester) async {
