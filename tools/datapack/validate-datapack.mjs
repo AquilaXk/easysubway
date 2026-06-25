@@ -1196,6 +1196,9 @@ function requiredPositiveInteger(value, label) {
 
 function requiredDate(value, label) {
   const rawValue = requiredString(value, label);
+  if (!/(Z|[+-]\d{2}:\d{2})$/.test(rawValue)) {
+    throw new Error(`${label} must include timezone offset`);
+  }
   const parsed = new Date(rawValue);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(`${label} must be an ISO date-time`);

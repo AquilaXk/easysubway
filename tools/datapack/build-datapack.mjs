@@ -88,8 +88,8 @@ async function main() {
           manifestVersion: 2,
           channel: requiredString(fixture.manifest.channel, "manifest.channel"),
           releaseSequence: requiredPositiveInteger(fixture.manifest.releaseSequence, "manifest.releaseSequence"),
-          publishedAt: requiredString(fixture.manifest.publishedAt, "manifest.publishedAt"),
-          expiresAt: requiredString(fixture.manifest.expiresAt, "manifest.expiresAt"),
+          publishedAt: requiredUtcDateString(fixture.manifest.publishedAt, "manifest.publishedAt"),
+          expiresAt: requiredUtcDateString(fixture.manifest.expiresAt, "manifest.expiresAt"),
           keyId: requiredString(fixture.manifest.keyId, "manifest.keyId"),
         }
       : {}),
@@ -854,6 +854,18 @@ function requiredString(value, label) {
     throw new Error(`${label} must be a non-empty string`);
   }
   return value.trim();
+}
+
+function requiredUtcDateString(value, label) {
+  const rawValue = requiredString(value, label);
+  if (!/(Z|[+-]\d{2}:\d{2})$/.test(rawValue)) {
+    throw new Error(`${label} must include timezone offset`);
+  }
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${label} must be an ISO date-time`);
+  }
+  return rawValue;
 }
 
 function requiredStringArray(value, label) {

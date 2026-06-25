@@ -384,6 +384,72 @@ test("데이터팩 검증기는 v2 manifest channel pattern을 앱 parser와 동
   );
 });
 
+test("데이터팩 도구는 v2 manifest timestamp timezone 계약을 앱 parser와 동일하게 강제한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-v2-timestamp-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture-v2-timestamp.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const fixture = JSON.parse(await readFile(path.join(root, "tools/datapack/fixtures/catalog-fixture.json"), "utf8"));
+  fixture.manifest = {
+    ...fixture.manifest,
+    manifestVersion: 2,
+    channel: "production",
+    releaseSequence: 9,
+    publishedAt: "2026-06-25T00:00:00",
+    expiresAt: "2026-06-26T00:00:00.000Z",
+    keyId: "fixture-key",
+  };
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        fixturePath,
+        "--output",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /manifest.publishedAt must include timezone offset/,
+  );
+
+  fixture.manifest.publishedAt = "2026-06-25T00:00:00.000Z";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  const manifestPath = path.join(outputDir, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.publishedAt = "2026-06-25T00:00:00";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /manifest.publishedAt must include timezone offset/,
+  );
+});
+
 test("데이터팩 publish preflight plan은 pack 검증 후 manifest publish를 마지막 단계로 고정한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-publish-plan-${Date.now()}`);
   const stageDir = path.join(tmpdir(), `easysubway-datapack-publish-stage-${Date.now()}`);
