@@ -13,6 +13,7 @@ class RouteStep {
     this.lineId = '',
     this.transferStationId = '',
     this.includesStairs = false,
+    this.stairAccessState = 'unknown',
     this.evidenceSources = const [],
     this.timeSource = 'UNKNOWN',
     this.distanceSource = 'UNKNOWN',
@@ -30,6 +31,7 @@ class RouteStep {
   final String lineId;
   final String transferStationId;
   final bool includesStairs;
+  final String stairAccessState;
   final List<String> evidenceSources;
   final String timeSource;
   final String distanceSource;

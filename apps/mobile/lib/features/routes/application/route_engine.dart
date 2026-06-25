@@ -57,6 +57,7 @@ class LocalRouteEngine {
           lineId: edge.lineId,
           transferStationId: _transferStationId(edge),
           includesStairs: edge.includesStairs,
+          stairAccessState: edge.stairAccessState.name,
           evidenceSources: _evidenceSources(edge),
           timeSource: edge.durationSeconds > 0 ? 'STATIC_ESTIMATE' : 'UNKNOWN',
           distanceSource: edge.distanceMeters > 0 ? 'MEASURED' : 'UNKNOWN',
