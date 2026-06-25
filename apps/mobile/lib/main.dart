@@ -3764,12 +3764,12 @@ class SupportAccessScreen extends StatelessWidget {
               _SupportAccessItem(
                 key: const Key('dataDeletionAccessItem'),
                 icon: Icons.delete_outline,
-                title: '데이터 삭제 요청',
+                title: '이 기기의 앱 데이터 삭제',
                 value: accessInfo.dataDeletionEmail,
-                helperText: '삭제 범위와 복구 불가 여부를 먼저 확인해요',
+                helperText: '로컬 삭제 범위와 복구 불가 여부를 먼저 확인해요',
                 uri: _mailtoUri(
                   accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 데이터 삭제 요청',
+                  '쉬운 지하철 이 기기의 앱 데이터 삭제',
                 ),
                 launcher: launcher,
               )
@@ -3858,7 +3858,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
-      label: '데이터 삭제 요청, 삭제 범위와 복구 불가 여부를 확인하고 앱 안에서 삭제를 진행합니다.',
+      label: '이 기기의 앱 데이터 삭제, 로컬 삭제 범위와 복구 불가 여부를 확인하고 앱 안에서 삭제를 진행합니다.',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
         child: Material(
@@ -3887,7 +3887,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '데이터 삭제 요청',
+                          '이 기기의 앱 데이터 삭제',
                           style: TextStyle(
                             color: Color(0xFF102A2C),
                             fontSize: 18,
@@ -3897,7 +3897,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
+                          '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
                           style: TextStyle(
                             color: Color(0xFF466467),
                             fontSize: 15,
@@ -3940,7 +3940,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('내 데이터 삭제')),
+      appBar: AppBar(title: const Text('이 기기의 앱 데이터 삭제')),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         child: FilledButton.icon(
@@ -3953,7 +3953,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
               : const Icon(Icons.delete_forever_outlined),
-          label: Text(_isDeleting ? '삭제 중' : '내 데이터 삭제'),
+          label: Text(_isDeleting ? '삭제 중' : '이 기기의 앱 데이터 삭제'),
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF8B1E1E),
             foregroundColor: Colors.white,
@@ -3977,7 +3977,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+              '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
               style: textTheme.bodyLarge?.copyWith(
                 color: const Color(0xFF102A2C),
                 height: 1.4,
@@ -3985,7 +3985,10 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 16),
             const _DataDeletionNoticeLine(
-              text: '삭제가 끝나면 현재 로그인 정보는 지워지고 처음 설정 화면으로 돌아갑니다.',
+              text: '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
+            ),
+            const _DataDeletionNoticeLine(
+              text: '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
             ),
             const _DataDeletionNoticeLine(text: '삭제한 데이터는 앱에서 복구할 수 없습니다.'),
             const _DataDeletionNoticeLine(
@@ -4005,7 +4008,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('정말 삭제할까요?'),
-        content: const Text('삭제 후에는 앱에 저장된 인증 정보와 설정이 지워지고 되돌릴 수 없습니다.'),
+        content: const Text('삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -4183,13 +4186,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                   ),
                   _DataDeletionResultRow(
                     icon: Icons.report_outlined,
-                    title: '제보 연결 정보',
-                    value: '${result.anonymizedReportCount}건 익명화',
-                  ),
-                  _DataDeletionResultRow(
-                    icon: Icons.rate_review_outlined,
-                    title: '경로 의견 연결 정보',
-                    value: '${result.anonymizedRouteFeedbackCount}건 익명화',
+                    title: '이 기기의 제보 기록',
+                    value: '${result.anonymizedReportCount}건 삭제',
                   ),
                 ],
               ),
@@ -4241,7 +4239,7 @@ class _SecurityContactNotice extends StatelessWidget {
 
   static const _title = '보안 문의 안내';
   static const _contactNotice = '취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요.';
-  static const _scopeNotice = '위치, 신고 사진, 알림, 계정 접근 문제를 함께 접수할 수 있습니다.';
+  static const _scopeNotice = '위치, 신고 사진, 알림, 개인정보 보호 우려를 함께 접수할 수 있습니다.';
 
   @override
   Widget build(BuildContext context) {
@@ -4427,7 +4425,8 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _deletionScope =
-      '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.';
+      '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
+  static const _sentReportNotice = '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
   static const _retentionNotice = '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.';
 
   @override
@@ -4437,7 +4436,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
       key: const Key('privacyDataUseSummary'),
       container: true,
       label:
-          '$_title, $_locationPurpose $_appDataPurpose $_deletionScope $_retentionNotice',
+          '$_title, $_locationPurpose $_appDataPurpose $_deletionScope $_sentReportNotice $_retentionNotice',
       child: ExcludeSemantics(
         child: Container(
           decoration: BoxDecoration(
@@ -4462,6 +4461,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
                 const _PrivacyDataUseLine(text: _locationPurpose),
                 const _PrivacyDataUseLine(text: _appDataPurpose),
                 const _PrivacyDataUseLine(text: _deletionScope),
+                const _PrivacyDataUseLine(text: _sentReportNotice),
                 const _PrivacyDataUseLine(text: _retentionNotice),
               ],
             ),
