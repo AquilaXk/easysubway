@@ -179,6 +179,7 @@ final class RouteMapRendererHealthMonitor {
   }
 
   void _recover() {
+    _clearPendingFrame();
     _recoveryAttempt += 1;
     onEvent?.call(RouteMapRendererRecovering(_recoveryAttempt));
     unawaited(_controller.retry());
