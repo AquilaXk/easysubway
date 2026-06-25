@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
+import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
@@ -864,7 +865,7 @@ void main() {
     expect(find.text('4호선'), findsWidgets);
   });
 
-  testWidgets('노선도 목록 대체 화면에서 역을 선택할 수 있다', (tester) async {
+  testWidgets('노선도 노선별 보기 화면에서 역을 선택할 수 있다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -881,8 +882,10 @@ void main() {
     await tester.tap(find.byKey(const Key('networkMapListButton')));
     await tester.pumpAndSettle();
 
+    expect(find.text('노선별로 보기'), findsOneWidget);
     expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
-    expect(find.text('노선과 역 목록'), findsOneWidget);
+    expect(find.text('노선별 역 보기'), findsOneWidget);
+    expect(find.text('노선별 목록에서 역을 선택하세요.'), findsOneWidget);
     await tester.tap(
       find.byKey(const Key('networkMapListStation-station-sadang-seoul-4')),
     );
@@ -892,6 +895,30 @@ void main() {
     expect(find.text('사당역'), findsOneWidget);
     expect(find.text('2호선'), findsOneWidget);
     expect(find.text('4호선'), findsOneWidget);
+  });
+
+  test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {
+    const current = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+
+    final first = networkMapCameraWithMonotonicRevision(
+      current: current,
+      next: current.copyWith(center: const Offset(510, 250), revision: 4),
+    );
+    final second = networkMapCameraWithMonotonicRevision(
+      current: first,
+      next: current.copyWith(center: const Offset(520, 250), revision: 4),
+    );
+
+    expect(first.revision, 4);
+    expect(second.revision, 5);
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
@@ -5809,8 +5836,12 @@ void main() {
       expect(find.text('도착역 선택'), findsOneWidget);
       expect(find.text('출발역 ID'), findsNothing);
       expect(find.text('도착역 ID'), findsNothing);
-      expect(find.text('적용 중인 조건'), findsOneWidget);
+      expect(find.text('적용 중인 조건'), findsNothing);
       expect(find.text('천천히 이동'), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeSimpleMobilityTypeButton')),
+        findsOneWidget,
+      );
       expect(find.byType(DropdownButton<String>), findsNothing);
 
       await _openRouteOriginStationInput(tester);
@@ -5852,6 +5883,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final originButtonLeft = tester.getTopLeft(
+        find.byKey(const Key('routeOriginPointButton')),
+      );
+      final originTextLeft = tester.getTopLeft(find.text('상록수역'));
+      expect(originTextLeft.dx - originButtonLeft.dx, greaterThanOrEqualTo(24));
+
       await tester.drag(find.byType(ListView), const Offset(0, -360));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
@@ -5873,7 +5910,7 @@ void main() {
       expect(find.text('편한 순'), findsNothing);
       expect(find.text('빠른 순'), findsNothing);
       expect(find.text('환승 적은 순'), findsNothing);
-      expect(find.text('상록수 → 사당'), findsOneWidget);
+      expect(find.text('상록수 → 사당'), findsNothing);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
       expect(find.text('계단 여부 확인 필요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
@@ -6142,6 +6179,10 @@ void main() {
       await tester.tap(find.byKey(const Key('routeSearchButton')));
       await tester.pumpAndSettle();
 
+      expect(
+        find.bySemanticsLabel('현재 이동 조건 천천히 이동, 계단 피하기 · 환승 줄이기'),
+        findsOneWidget,
+      );
       expect(
         tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
@@ -7043,7 +7084,7 @@ void main() {
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('상록수 → 사당'), findsOneWidget);
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, 700));
     await tester.pumpAndSettle();
@@ -7066,7 +7107,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
 
-    expect(find.text('상록수 → 사당'), findsNothing);
+    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
   });
 
   testWidgets('경로 검색 중에는 버튼을 비활성화하고 안내 불가 이유를 보여준다', (tester) async {
