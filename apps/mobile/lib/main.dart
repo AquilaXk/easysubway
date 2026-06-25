@@ -548,6 +548,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _startScreenDismissed = false;
   bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
+  bool _savingOnboardingResult = false;
+  OnboardingResult? _pendingOnboardingResult;
   UserDataDeletionResult? _dataDeletionResult;
 
   @override
@@ -657,6 +659,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         recentRoutesFuture: widget.recentRoutesFuture,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
+        onViewPreferencesChanged: _saveViewPreferences,
       ),
     );
   }
@@ -722,7 +725,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     _schedulePendingFacilityReportPhotoRecovery();
   }
 
-  Future<void> _saveOnboardingResult(OnboardingResult result) async {
+  Future<void> _persistOnboardingResult(OnboardingResult result) async {
     try {
       await widget.onboardingStore?.saveResult(result);
     } catch (error, stackTrace) {
@@ -731,6 +734,27 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         stackTrace,
         context: '온보딩 설정을 저장하는 중 예외가 발생했습니다.',
       );
+    }
+  }
+
+  Future<void> _saveOnboardingResult(OnboardingResult result) async {
+    _pendingOnboardingResult = result;
+    _applyOnboardingResult(result);
+    if (_savingOnboardingResult) {
+      return;
+    }
+    _savingOnboardingResult = true;
+    try {
+      while (mounted) {
+        final nextResult = _pendingOnboardingResult;
+        _pendingOnboardingResult = null;
+        if (nextResult == null) {
+          break;
+        }
+        await _persistOnboardingResult(nextResult);
+      }
+    } finally {
+      _savingOnboardingResult = false;
     }
   }
 
@@ -744,11 +768,29 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       preferences: currentResult.preferences,
     );
     await _saveOnboardingResult(nextResult);
+  }
+
+  Future<void> _saveViewPreferences(
+    OnboardingViewPreferences preferences,
+  ) async {
+    final currentResult = _onboardingState.result;
+    if (currentResult == null) {
+      return;
+    }
+    await _saveOnboardingResult(
+      OnboardingResult(
+        profile: currentResult.profile,
+        preferences: preferences,
+      ),
+    );
+  }
+
+  void _applyOnboardingResult(OnboardingResult result) {
     if (!mounted) {
       return;
     }
     setState(() {
-      _onboardingState = OnboardingState.completed(result: nextResult);
+      _onboardingState = OnboardingState.completed(result: result);
     });
   }
 
@@ -1006,6 +1048,7 @@ class HomeScreen extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
+    required this.onViewPreferencesChanged,
     required this.recentRoutesFuture,
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
@@ -1034,6 +1077,8 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
+  final Future<void> Function(OnboardingViewPreferences preferences)
+  onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
@@ -1153,6 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> {
             viewPreferences: widget.viewPreferences,
             notificationRepository: notificationRepository,
             notificationPermissionProvider: notificationPermissionProvider,
+            onViewPreferencesChanged: widget.onViewPreferencesChanged,
             onOpenMobilityProfile: _openMobilityProfile,
             onOpenSupportAccess: openSupportAccess,
             onOpenMyReports: openMyReports,
@@ -2789,6 +2835,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.viewPreferences,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
+    required this.onViewPreferencesChanged,
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
@@ -2799,6 +2846,8 @@ class AppSettingsScreen extends StatefulWidget {
   final OnboardingViewPreferences viewPreferences;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
+  final Future<void> Function(OnboardingViewPreferences preferences)
+  onViewPreferencesChanged;
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
@@ -2809,153 +2858,180 @@ class AppSettingsScreen extends StatefulWidget {
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
   late MobilityProfileOption _profile = widget.currentProfile;
+  late OnboardingViewPreferences _viewPreferences = widget.viewPreferences;
+
+  @override
+  void didUpdateWidget(AppSettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewPreferences != widget.viewPreferences) {
+      _viewPreferences = widget.viewPreferences;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          children: [
-            _AppSettingsSection(
-              key: const Key('settingsSection-mobility'),
-              title: '이동 조건',
-              children: [
-                _AppSettingsActionTile(
-                  key: const Key('mobilityProfileButton'),
-                  icon: Icons.directions_walk,
-                  title: _profile.appliedConditionLabel,
-                  subtitle: _profile.summary,
-                  onTap: () async {
-                    final selected = await widget.onOpenMobilityProfile();
-                    if (!mounted || selected == null) {
-                      return;
-                    }
-                    setState(() {
-                      _profile = selected;
-                    });
-                  },
-                ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-reading'),
-              title: '화면 및 접근성',
-              children: [
-                _AppSettingsPreferenceTile(
-                  key: const Key('largeTextSettingsButton'),
-                  icon: Icons.text_fields,
-                  title: '큰 글자',
-                  enabled: widget.viewPreferences.largeTextEnabled,
-                  onTap: _showViewPreferenceGuide,
-                ),
-                _AppSettingsPreferenceTile(
-                  key: const Key('simpleViewSettingsButton'),
-                  icon: Icons.visibility_outlined,
-                  title: '간편 보기',
-                  enabled: widget.viewPreferences.simpleViewEnabled,
-                  onTap: _showViewPreferenceGuide,
-                ),
-                _AppSettingsPreferenceTile(
-                  key: const Key('highContrastSettingsButton'),
-                  icon: Icons.contrast,
-                  title: '고대비',
-                  enabled: widget.viewPreferences.highContrastEnabled,
-                  onTap: _showViewPreferenceGuide,
-                ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-region-data'),
-              title: '기본 지역과 데이터',
-              children: [
-                const _AppSettingsInfoTile(
-                  icon: Icons.public,
-                  title: '수도권 우선',
-                  subtitle: '오프라인 데이터팩과 검증된 출처를 먼저 사용해요',
-                ),
-                _AppSettingsActionTile(
-                  key: const Key('offlineDataSettingsButton'),
-                  icon: Icons.offline_pin_outlined,
-                  title: '인터넷 없이 이용',
-                  subtitle: '노선도와 역 정보 사용 범위를 확인해요',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const OfflineDataScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-notification'),
-              title: '알림',
-              children: [
-                if (widget.notificationRepository == null)
-                  const _AppSettingsInfoTile(
-                    icon: Icons.notifications_off_outlined,
-                    title: '알림 설정 대기 중',
-                    subtitle: '실기기 QA 전에는 푸시 알림을 켜지 않아요',
-                  )
-                else
+    return _OnboardingPreferenceScope(
+      preferences: _viewPreferences,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('설정')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            children: [
+              _AppSettingsSection(
+                key: const Key('settingsSection-mobility'),
+                title: '이동 조건',
+                children: [
                   _AppSettingsActionTile(
-                    key: const Key('notificationSettingsButton'),
-                    icon: Icons.notifications_active_outlined,
-                    title: '알림 설정',
-                    subtitle: '시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+                    key: const Key('mobilityProfileButton'),
+                    icon: Icons.directions_walk,
+                    title: _profile.appliedConditionLabel,
+                    subtitle: _profile.summary,
+                    onTap: () async {
+                      final selected = await widget.onOpenMobilityProfile();
+                      if (!mounted || selected == null) {
+                        return;
+                      }
+                      setState(() {
+                        _profile = selected;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              _AppSettingsSection(
+                key: const Key('settingsSection-reading'),
+                title: '화면 및 접근성',
+                children: [
+                  _AppSettingsPreferenceTile(
+                    key: const Key('largeTextSettingsButton'),
+                    icon: Icons.text_fields,
+                    title: '큰 글자',
+                    enabled: _viewPreferences.largeTextEnabled,
+                    onChanged: (value) {
+                      _updateViewPreferences(
+                        _viewPreferences.copyWith(largeTextEnabled: value),
+                      );
+                    },
+                  ),
+                  _AppSettingsPreferenceTile(
+                    key: const Key('simpleViewSettingsButton'),
+                    icon: Icons.visibility_outlined,
+                    title: '간편 보기',
+                    enabled: _viewPreferences.simpleViewEnabled,
+                    onChanged: (value) {
+                      _updateViewPreferences(
+                        _viewPreferences.copyWith(simpleViewEnabled: value),
+                      );
+                    },
+                  ),
+                  _AppSettingsPreferenceTile(
+                    key: const Key('highContrastSettingsButton'),
+                    icon: Icons.contrast,
+                    title: '고대비',
+                    enabled: _viewPreferences.highContrastEnabled,
+                    onChanged: (value) {
+                      _updateViewPreferences(
+                        _viewPreferences.copyWith(highContrastEnabled: value),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              _AppSettingsSection(
+                key: const Key('settingsSection-region-data'),
+                title: '기본 지역과 데이터',
+                children: [
+                  const _AppSettingsInfoTile(
+                    icon: Icons.public,
+                    title: '수도권 우선',
+                    subtitle: '인터넷이 불안정해도 주요 역 정보를 먼저 보여줘요',
+                  ),
+                  _AppSettingsActionTile(
+                    key: const Key('offlineDataSettingsButton'),
+                    icon: Icons.offline_pin_outlined,
+                    title: '인터넷 없이 이용',
+                    subtitle: '노선도와 역 정보 사용 범위를 확인해요',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => NotificationSettingsScreen(
-                            repository: widget.notificationRepository!,
-                            notificationPermissionProvider:
-                                widget.notificationPermissionProvider,
-                          ),
+                          builder: (_) => const OfflineDataScreen(),
                         ),
                       );
                     },
                   ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-activity'),
-              title: '내 활동',
-              children: [
-                _AppSettingsActionTile(
-                  key: const Key('myReportsSettingsButton'),
-                  icon: Icons.receipt_long_outlined,
-                  title: '내 신고',
-                  subtitle: '접수한 시설 신고와 처리 상태를 확인해요',
-                  onTap: widget.onOpenMyReports,
-                ),
-              ],
-            ),
-            _AppSettingsSection(
-              key: const Key('settingsSection-help-privacy'),
-              title: '개인정보 및 도움말',
-              children: [
-                _AppSettingsActionTile(
-                  key: const Key('settingsSupportPrivacyButton'),
-                  icon: Icons.help_outline,
-                  title: '도움말·문의',
-                  subtitle: '사용법, 개인정보, 문의 경로를 확인해요',
-                  onTap: widget.onOpenSupportAccess,
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              _AppSettingsSection(
+                key: const Key('settingsSection-notification'),
+                title: '알림',
+                children: [
+                  if (widget.notificationRepository == null)
+                    const _AppSettingsInfoTile(
+                      icon: Icons.notifications_off_outlined,
+                      title: '알림은 아직 사용할 수 없어요',
+                      subtitle: '시설 상태와 신고 처리 안내는 앱 안에서 확인할 수 있어요',
+                    )
+                  else
+                    _AppSettingsActionTile(
+                      key: const Key('notificationSettingsButton'),
+                      icon: Icons.notifications_active_outlined,
+                      title: '알림 설정',
+                      subtitle: '시설 상태, 신고 처리, 정보 갱신 알림을 관리해요',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => NotificationSettingsScreen(
+                              repository: widget.notificationRepository!,
+                              notificationPermissionProvider:
+                                  widget.notificationPermissionProvider,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+              _AppSettingsSection(
+                key: const Key('settingsSection-activity'),
+                title: '내 활동',
+                children: [
+                  _AppSettingsActionTile(
+                    key: const Key('myReportsSettingsButton'),
+                    icon: Icons.receipt_long_outlined,
+                    title: '내 신고',
+                    subtitle: '접수한 시설 신고와 처리 상태를 확인해요',
+                    onTap: widget.onOpenMyReports,
+                  ),
+                ],
+              ),
+              _AppSettingsSection(
+                key: const Key('settingsSection-help-privacy'),
+                title: '개인정보 및 도움말',
+                children: [
+                  _AppSettingsActionTile(
+                    key: const Key('settingsSupportPrivacyButton'),
+                    icon: Icons.help_outline,
+                    title: '도움말·문의',
+                    subtitle: '사용법, 개인정보, 문의 경로를 확인해요',
+                    onTap: widget.onOpenSupportAccess,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showViewPreferenceGuide() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('보기 설정은 처음 설정에서 변경할 수 있어요.')));
+  Future<void> _updateViewPreferences(
+    OnboardingViewPreferences preferences,
+  ) async {
+    setState(() {
+      _viewPreferences = preferences;
+    });
+    await widget.onViewPreferencesChanged(preferences);
   }
 }
 
@@ -3097,25 +3173,26 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.enabled,
-    required this.onTap,
+    required this.onChanged,
     super.key,
   });
 
   final IconData icon;
   final String title;
   final bool enabled;
-  final VoidCallback onTap;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final value = enabled ? '켜짐' : '꺼짐';
+    final action = enabled ? '끄기' : '켜기';
     return Semantics(
-      button: true,
-      label: '$title, $value, 처음 설정에서 변경할 수 있어요',
-      onTap: onTap,
+      label: '$title, $value, 두 번 탭해 $action',
+      toggled: enabled,
+      onTap: () => onChanged(!enabled),
       child: ExcludeSemantics(
         child: ListTile(
-          onTap: onTap,
+          onTap: () => onChanged(!enabled),
           minVerticalPadding: 12,
           minLeadingWidth: 32,
           leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
@@ -3128,7 +3205,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
             ),
           ),
           subtitle: Text(
-            '처음 설정에서 변경할 수 있어요',
+            '설정 화면에서 바로 바꿀 수 있어요',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: EasySubwayAccessibleColors.mutedText,
               height: 1.3,
@@ -3144,8 +3221,16 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right),
+              const SizedBox(width: 8),
+              Switch(
+                value: enabled,
+                onChanged: onChanged,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF0D8A6D),
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: const Color(0xFFC8D3DC),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+              ),
             ],
           ),
           shape: Border(
