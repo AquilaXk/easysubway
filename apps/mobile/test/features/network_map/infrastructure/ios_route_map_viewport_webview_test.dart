@@ -124,6 +124,63 @@ void main() {
         );
   });
 
+  test('controller emits camera request and latency events', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          ),
+          (_) async => null,
+        );
+    final controller = IosRouteMapViewportController(9);
+    final events = <RouteMapRendererEvent>[];
+    final subscription = controller.events.listen(events.add);
+
+    await controller.setCamera(camera);
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('framePresented', <String, Object?>{
+              'revision': 3,
+            }),
+          ),
+          (_) {},
+        );
+    await pumpEventQueue();
+
+    expect(
+      events,
+      containsAllInOrder(<Matcher>[
+        isA<RouteMapRendererCameraRequested>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+        isA<RouteMapRendererCameraLatency>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+        isA<RouteMapRendererFramePresented>().having(
+          (event) => event.revision,
+          'revision',
+          3,
+        ),
+      ]),
+    );
+
+    await subscription.cancel();
+    await controller.dispose();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(
+            'com.easysubway.easysubway_mobile/route_map_viewport_webview/9',
+          ),
+          null,
+        );
+  });
+
   test('controller emits created after listeners subscribe', () async {
     final controller = IosRouteMapViewportController(8);
     final created = expectLater(
