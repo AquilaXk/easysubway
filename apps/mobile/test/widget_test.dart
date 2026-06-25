@@ -4962,15 +4962,15 @@ void main() {
       expect(find.text('2번 출구의 엘리베이터를 먼저 확인하세요.'), findsOneWidget);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('열차 이동'), findsOneWidget);
-      expect(
-        find.text('선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.'),
-        findsOneWidget,
-      );
+      expect(find.text('선택한 경로 기준으로 안내합니다.'), findsOneWidget);
+      expect(find.textContaining('edge:'), findsNothing);
+      expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
+      expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(
-        find.text('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
+        find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'),
         findsOneWidget,
       );
 

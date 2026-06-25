@@ -332,9 +332,12 @@ void main() {
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
   });
 
-  test('경로 검색 결과 음성 안내는 단계 행동 이유와 근거 출처를 같은 순서로 읽는다', () {
+  test('경로 검색 결과 음성 안내는 내부 식별자와 운영 출처 값을 읽지 않는다', () {
     final result = _sampleRouteSearchResult(
-      recommendationReasons: const ['선택된 경로 edge:edge-a-b-local 근거로 안내합니다.'],
+      recommendationReasons: const [
+        '선택된 경로 edge:edge-a-b-local 근거로 안내합니다.',
+        'OFFICIAL_FILE',
+      ],
       steps: const [
         RouteSearchStep(
           sequence: 1,
@@ -360,15 +363,14 @@ void main() {
     );
 
     final semanticLabel = result.semanticLabel;
-    expect(
-      semanticLabel,
-      contains(
-        '1번 열차 이동, 출발역에서 중간역까지 테스트 노선을 이용합니다., '
-        '선택된 경로 edge:edge-a-b-local 근거로 안내합니다., '
-        '약 2분 · 830m, '
-        '시간 정적 추정, 거리 측정값, 높은 신뢰도, 근거 edge:edge-a-b-local',
-      ),
-    );
+    expect(semanticLabel, contains('선택한 경로 기준으로 안내합니다.'));
+    expect(semanticLabel, isNot(contains('edge:')));
+    expect(semanticLabel, isNot(contains('line:')));
+    expect(semanticLabel, isNot(contains('OFFICIAL_')));
+    expect(semanticLabel, isNot(contains('STATIC_ESTIMATE')));
+    expect(semanticLabel, isNot(contains('MEASURED')));
+    expect(semanticLabel, isNot(contains('정적 추정')));
+    expect(semanticLabel, isNot(contains('측정값')));
   });
 
   test('경로 단계 이동 부담은 긴 거리를 킬로미터로 표시한다', () {
