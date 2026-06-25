@@ -802,7 +802,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                         Positioned.fill(
                           child: mapAsset == null
                               ? const _OriginalRouteMapUnavailable()
-                              : _OriginalRouteMapView(asset: mapAsset),
+                              : Align(
+                                  alignment: Alignment.topLeft,
+                                  child: Transform.scale(
+                                    alignment: Alignment.topLeft,
+                                    scaleX:
+                                        geometry.width / geometry.surfaceWidth,
+                                    scaleY:
+                                        geometry.height /
+                                        geometry.surfaceHeight,
+                                    child: SizedBox(
+                                      width: geometry.surfaceWidth,
+                                      height: geometry.surfaceHeight,
+                                      child: _OriginalRouteMapView(
+                                        asset: mapAsset,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                         ),
                         if (widget.selectedLineId != null)
                           Positioned.fill(
@@ -815,6 +832,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                                   stationsById: stationsById,
                                   edges: widget.data.edges,
                                   geometry: geometry,
+                                  styleScale: geometry.overlayStyleScale,
                                 ),
                               ),
                             ),
@@ -925,10 +943,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
     Map<String, List<NetworkMapLine>> stationLinesById,
     _MapGeometry geometry,
   ) {
+    final scale = _controller.value.getMaxScaleOnAxis();
     final station = _stationAtMapPosition(
       mapPosition,
       stations,
       geometry,
+      sceneHitRadius: 24 / (scale > 0 && scale.isFinite ? scale : 1),
       selectedLineId: widget.selectedLineId,
     );
     if (station == null) {
@@ -945,6 +965,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     required this.stationsById,
     required this.edges,
     required this.geometry,
+    required this.styleScale,
   });
 
   final String lineId;
@@ -952,6 +973,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
   final Map<String, NetworkMapStation> stationsById;
   final List<NetworkMapEdge> edges;
   final _MapGeometry geometry;
+  final double styleScale;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -968,7 +990,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       ..color = lineColor
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 14
+      ..strokeWidth = 14 * styleScale
       ..style = PaintingStyle.stroke;
     for (final edge in edges) {
       if (edge.lineId != lineId) {
@@ -997,8 +1019,8 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         continue;
       }
       final center = Offset(geometry.x(station), geometry.y(station));
-      canvas.drawCircle(center, 13, stationBorderPaint);
-      canvas.drawCircle(center, 7, stationFillPaint);
+      canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
+      canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
     }
   }
 
@@ -1008,7 +1030,8 @@ class _SelectedLineOverlayPainter extends CustomPainter {
         oldDelegate.linesById != linesById ||
         oldDelegate.stationsById != stationsById ||
         oldDelegate.edges != edges ||
-        oldDelegate.geometry != geometry;
+        oldDelegate.geometry != geometry ||
+        oldDelegate.styleScale != styleScale;
   }
 }
 
@@ -1044,18 +1067,14 @@ void _drawScaledPath(
 ) {
   canvas
     ..save()
-    ..scale(geometry.scaleX, geometry.scaleY)
     ..translate(-geometry.origin.dx, -geometry.origin.dy);
-  final strokeScale = math.max(geometry.scaleX, geometry.scaleY);
   canvas.drawPath(
     path,
     Paint()
       ..color = paint.color
       ..strokeCap = paint.strokeCap
       ..strokeJoin = paint.strokeJoin
-      ..strokeWidth = strokeScale <= 0
-          ? paint.strokeWidth
-          : paint.strokeWidth / strokeScale
+      ..strokeWidth = paint.strokeWidth
       ..style = paint.style,
   );
   canvas.restore();
@@ -1309,17 +1328,21 @@ class _MapGeometry {
     required this.width,
     required this.height,
     Rect? initialBounds,
-    this.scaleX = 1,
-    this.scaleY = 1,
-  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height);
+    double? surfaceWidth,
+    double? surfaceHeight,
+    this.overlayStyleScale = 1.0,
+  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height),
+       surfaceWidth = surfaceWidth ?? width,
+       surfaceHeight = surfaceHeight ?? height;
 
   final Offset origin;
   final Offset focus;
   final double width;
   final double height;
   final Rect initialBounds;
-  final double scaleX;
-  final double scaleY;
+  final double surfaceWidth;
+  final double surfaceHeight;
+  final double overlayStyleScale;
 
   // Android WebView platform view는 큰 Surface에서 GL memory가 급증한다.
   static const _maxAndroidViewSurfaceExtent = 4096.0;
@@ -1332,26 +1355,37 @@ class _MapGeometry {
     final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
     final maxLogicalExtent =
         _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
-    final displayScale = platform == TargetPlatform.android
-        ? math.min(1.0, maxLogicalExtent / math.max(asset.width, asset.height))
+    final surfaceScale = platform == TargetPlatform.android
+        ? math.min(
+            1.0,
+            maxLogicalExtent /
+                math.max(asset.coordinateWidth, asset.coordinateHeight),
+          )
         : 1.0;
-    final displayWidth = asset.width * displayScale;
-    final displayHeight = asset.height * displayScale;
+    final sourceWidth = asset.coordinateWidth;
+    final sourceHeight = asset.coordinateHeight;
+    final overlayStyleScale = math.min(
+      sourceWidth / asset.width,
+      sourceHeight / asset.height,
+    );
     return _MapGeometry(
       origin: Offset.zero,
-      focus: Offset(displayWidth / 2, displayHeight / 2),
-      width: displayWidth,
-      height: displayHeight,
+      focus: Offset(sourceWidth / 2, sourceHeight / 2),
+      width: sourceWidth,
+      height: sourceHeight,
       initialBounds: _readableBoundsFor(
         _MapGeometry(
           origin: Offset.zero,
-          focus: Offset(displayWidth / 2, displayHeight / 2),
-          width: displayWidth,
-          height: displayHeight,
+          focus: Offset(sourceWidth / 2, sourceHeight / 2),
+          width: sourceWidth,
+          height: sourceHeight,
         ),
       ),
-      scaleX: displayWidth / asset.coordinateWidth,
-      scaleY: displayHeight / asset.coordinateHeight,
+      surfaceWidth: sourceWidth * surfaceScale,
+      surfaceHeight: sourceHeight * surfaceScale,
+      overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
+          ? overlayStyleScale
+          : 1.0,
     );
   }
 
@@ -1418,28 +1452,31 @@ class _MapGeometry {
     );
   }
 
-  double x(NetworkMapStation station) =>
-      (station.position.x - origin.dx) * scaleX;
+  double x(NetworkMapStation station) => station.position.x - origin.dx;
 
-  double y(NetworkMapStation station) =>
-      (station.position.y - origin.dy) * scaleY;
+  double y(NetworkMapStation station) => station.position.y - origin.dy;
 }
 
-Rect _stationHitRect(NetworkMapStation station, _MapGeometry geometry) {
+Rect _stationHitRect(
+  NetworkMapStation station,
+  _MapGeometry geometry, {
+  double nodeRadius = 24,
+  double labelHeight = 40,
+}) {
   final node = Rect.fromCenter(
     center: Offset(geometry.x(station), geometry.y(station)),
-    width: 48,
-    height: 48,
+    width: nodeRadius * 2,
+    height: nodeRadius * 2,
   );
   final labelOffset = _labelOffsetFor(station);
   final labelCenter = Offset(
-    geometry.x(station) + labelOffset.dx * geometry.scaleX,
-    geometry.y(station) + labelOffset.dy * geometry.scaleY,
+    geometry.x(station) + labelOffset.dx,
+    geometry.y(station) + labelOffset.dy,
   );
   final label = Rect.fromCenter(
     center: labelCenter,
     width: math.max(64, station.nameKo.characters.length * 18 + 32),
-    height: 40,
+    height: labelHeight,
   );
   return node.expandToInclude(label);
 }
@@ -1448,12 +1485,18 @@ NetworkMapStation? _stationAtMapPosition(
   Offset position,
   List<NetworkMapStation> stations,
   _MapGeometry geometry, {
+  required double sceneHitRadius,
   String? selectedLineId,
 }) {
   NetworkMapStation? bestStation;
   var bestScore = double.infinity;
   for (final station in stations) {
-    final hitRect = _stationHitRect(station, geometry);
+    final hitRect = _stationHitRect(
+      station,
+      geometry,
+      nodeRadius: sceneHitRadius,
+      labelHeight: sceneHitRadius * 2,
+    );
     if (!hitRect.contains(position)) {
       continue;
     }
@@ -1478,8 +1521,8 @@ double _stationTapScore(
   final nodeCenter = Offset(geometry.x(station), geometry.y(station));
   final labelOffset = _labelOffsetFor(station);
   final labelCenter = Offset(
-    nodeCenter.dx + labelOffset.dx * geometry.scaleX,
-    nodeCenter.dy + labelOffset.dy * geometry.scaleY,
+    nodeCenter.dx + labelOffset.dx,
+    nodeCenter.dy + labelOffset.dy,
   );
   return math.min(
     (position - nodeCenter).distanceSquared,

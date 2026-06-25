@@ -2,9 +2,14 @@ package com.easysubway.easysubway_mobile
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Build
+import android.view.Gravity
 import android.view.View
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.TextView
 import io.flutter.FlutterInjector
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
@@ -38,6 +43,32 @@ private class OriginalRouteMapAssetPlatformView(
             svgWebView.setBackgroundColor(Color.WHITE)
             svgWebView.isHorizontalScrollBarEnabled = false
             svgWebView.isVerticalScrollBarEnabled = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                svgWebView.webViewClient = object : WebViewClient() {
+                    override fun onRenderProcessGone(
+                        view: WebView,
+                        detail: RenderProcessGoneDetail,
+                    ): Boolean {
+                        if (webView === view) {
+                            container.removeView(view)
+                            view.destroy()
+                            webView = null
+                            container.addView(
+                                TextView(context).apply {
+                                    text = "노선도를 다시 불러오지 못했습니다."
+                                    gravity = Gravity.CENTER
+                                    setTextColor(Color.BLACK)
+                                },
+                                FrameLayout.LayoutParams(
+                                    FrameLayout.LayoutParams.MATCH_PARENT,
+                                    FrameLayout.LayoutParams.MATCH_PARENT,
+                                ),
+                            )
+                        }
+                        return true
+                    }
+                }
+            }
             val html = """
                 <!doctype html>
                 <html>
