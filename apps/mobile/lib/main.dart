@@ -3991,7 +3991,8 @@ class _UserDataDeletionCopy {
       UserDataDeletionScope.remoteOnly => const _UserDataDeletionCopy(
         title: '서버 데이터 삭제',
         helperText: '서버 삭제 범위와 앱 초기화 여부를 확인하고 진행합니다.',
-        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        body:
+            '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
           '삭제가 끝나면 서버에 연결된 데이터가 정리되고 앱의 임시 설정이 초기화됩니다.',
           '앱은 처음 설정 화면으로 돌아갑니다.',
@@ -4005,7 +4006,8 @@ class _UserDataDeletionCopy {
       UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
         title: '내 데이터 삭제',
         helperText: '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
-        body: '즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화합니다.',
+        body:
+            '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
           '삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.',
           '삭제한 데이터는 앱에서 복구할 수 없습니다.',
