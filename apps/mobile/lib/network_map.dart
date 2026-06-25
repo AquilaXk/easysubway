@@ -735,6 +735,7 @@ const _maxMapScale = 4.8;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
   final TransformationController _controller = TransformationController();
+  final GlobalKey _mapContentKey = GlobalKey();
   String? _layoutKey;
 
   @override
@@ -763,6 +764,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
               : _MapGeometry.fromOriginalAsset(
                   mapAsset,
                   View.of(context).devicePixelRatio,
+                  defaultTargetPlatform,
                 );
           final fullBounds = Rect.fromLTWH(
             0,
@@ -792,6 +794,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                   maxScale: _maxMapScale,
                   boundaryMargin: const EdgeInsets.all(220),
                   child: SizedBox(
+                    key: _mapContentKey,
                     width: geometry.width,
                     height: geometry.height,
                     child: Stack(
@@ -816,6 +819,19 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                               ),
                             ),
                           ),
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTapUp: (details) {
+                              _openNearestStation(
+                                details.localPosition,
+                                widget.data.stations,
+                                stationLinesById,
+                                geometry,
+                              );
+                            },
+                          ),
+                        ),
                         for (final station in widget.data.stations)
                           Positioned.fromRect(
                             rect: _stationHitRect(station, geometry),
@@ -828,6 +844,22 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                                 station,
                                 stationLinesById[station.id] ?? const [],
                               ),
+                              onTapUp: (details) {
+                                final renderObject = _mapContentKey
+                                    .currentContext
+                                    ?.findRenderObject();
+                                if (renderObject is! RenderBox) {
+                                  return;
+                                }
+                                _openNearestStation(
+                                  renderObject.globalToLocal(
+                                    details.globalPosition,
+                                  ),
+                                  widget.data.stations,
+                                  stationLinesById,
+                                  geometry,
+                                );
+                              },
                             ),
                           ),
                       ],
@@ -839,8 +871,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
                 right: 14,
                 top: 12,
                 child: _MapControls(
-                  onZoomIn: () => _scaleMap(1.25, minScale),
-                  onZoomOut: () => _scaleMap(0.8, minScale),
+                  onZoomIn: () => _scaleMap(1.25, minScale, constraints),
+                  onZoomOut: () => _scaleMap(0.8, minScale, constraints),
                   onOverview: () {
                     _controller.value = _mapTransformForBounds(
                       fullBounds,
@@ -865,7 +897,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
     );
   }
 
-  void _scaleMap(double factor, double minScale) {
+  void _scaleMap(double factor, double minScale, BoxConstraints constraints) {
     final currentScale = _controller.value.getMaxScaleOnAxis();
     if (currentScale <= 0) {
       return;
@@ -873,9 +905,36 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas> {
     final targetScale = (currentScale * factor)
         .clamp(minScale, _maxMapScale)
         .toDouble();
-    final adjustedFactor = targetScale / currentScale;
-    _controller.value = Matrix4.copy(_controller.value)
-      ..scaleByDouble(adjustedFactor, adjustedFactor, 1, 1);
+    final viewportCenter = Offset(
+      (constraints.hasBoundedWidth ? constraints.maxWidth : 0) / 2,
+      (constraints.hasBoundedHeight ? constraints.maxHeight : 0) / 2,
+    );
+    final sceneCenter = MatrixUtils.transformPoint(
+      Matrix4.inverted(_controller.value),
+      viewportCenter,
+    );
+    _controller.value = Matrix4.identity()
+      ..translateByDouble(viewportCenter.dx, viewportCenter.dy, 0, 1)
+      ..scaleByDouble(targetScale, targetScale, 1, 1)
+      ..translateByDouble(-sceneCenter.dx, -sceneCenter.dy, 0, 1);
+  }
+
+  void _openNearestStation(
+    Offset mapPosition,
+    List<NetworkMapStation> stations,
+    Map<String, List<NetworkMapLine>> stationLinesById,
+    _MapGeometry geometry,
+  ) {
+    final station = _stationAtMapPosition(
+      mapPosition,
+      stations,
+      geometry,
+      selectedLineId: widget.selectedLineId,
+    );
+    if (station == null) {
+      return;
+    }
+    widget.onStationTap(station, stationLinesById[station.id] ?? const []);
   }
 }
 
@@ -1262,19 +1321,20 @@ class _MapGeometry {
   final double scaleX;
   final double scaleY;
 
-  static const _maxAndroidViewSurfaceExtent = 12000.0;
+  // Android WebView platform view는 큰 Surface에서 GL memory가 급증한다.
+  static const _maxAndroidViewSurfaceExtent = 4096.0;
 
   factory _MapGeometry.fromOriginalAsset(
     _RouteMapAsset asset,
     double devicePixelRatio,
+    TargetPlatform platform,
   ) {
     final safeDevicePixelRatio = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
     final maxLogicalExtent =
         _maxAndroidViewSurfaceExtent / safeDevicePixelRatio;
-    final displayScale = math.min(
-      1.0,
-      maxLogicalExtent / math.max(asset.width, asset.height),
-    );
+    final displayScale = platform == TargetPlatform.android
+        ? math.min(1.0, maxLogicalExtent / math.max(asset.width, asset.height))
+        : 1.0;
     final displayWidth = asset.width * displayScale;
     final displayHeight = asset.height * displayScale;
     return _MapGeometry(
@@ -1384,6 +1444,49 @@ Rect _stationHitRect(NetworkMapStation station, _MapGeometry geometry) {
   return node.expandToInclude(label);
 }
 
+NetworkMapStation? _stationAtMapPosition(
+  Offset position,
+  List<NetworkMapStation> stations,
+  _MapGeometry geometry, {
+  String? selectedLineId,
+}) {
+  NetworkMapStation? bestStation;
+  var bestScore = double.infinity;
+  for (final station in stations) {
+    final hitRect = _stationHitRect(station, geometry);
+    if (!hitRect.contains(position)) {
+      continue;
+    }
+    final score =
+        _stationTapScore(position, station, geometry) +
+        (selectedLineId != null && station.lineId != selectedLineId
+            ? 1000000
+            : 0);
+    if (score < bestScore) {
+      bestScore = score;
+      bestStation = station;
+    }
+  }
+  return bestStation;
+}
+
+double _stationTapScore(
+  Offset position,
+  NetworkMapStation station,
+  _MapGeometry geometry,
+) {
+  final nodeCenter = Offset(geometry.x(station), geometry.y(station));
+  final labelOffset = _labelOffsetFor(station);
+  final labelCenter = Offset(
+    nodeCenter.dx + labelOffset.dx * geometry.scaleX,
+    nodeCenter.dy + labelOffset.dy * geometry.scaleY,
+  );
+  return math.min(
+    (position - nodeCenter).distanceSquared,
+    (position - labelCenter).distanceSquared,
+  );
+}
+
 double _median(List<double> values) {
   if (values.isEmpty) {
     return 0;
@@ -1427,20 +1530,23 @@ class _StationHitTarget extends StatelessWidget {
   const _StationHitTarget({
     required this.station,
     required this.onTap,
+    required this.onTapUp,
     super.key,
   });
 
   final NetworkMapStation station;
   final VoidCallback onTap;
+  final GestureTapUpCallback onTapUp;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       label: station.displayName,
+      onTap: onTap,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTapUp: onTapUp,
         child: const SizedBox.expand(),
       ),
     );
