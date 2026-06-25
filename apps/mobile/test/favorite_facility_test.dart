@@ -73,9 +73,10 @@ void main() {
     expect(favorites.single.confidenceLabel, '정보 신뢰도 높음');
     expect(favorites.single.dataSourceLabel, '출처 공식 파일');
     expect(favorites.single.locationLabel, '1번 출구 앞');
+    expect(favorites.single.verificationStatusLabel, '상태 확인 필요');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태 확인됨, 다음 행동 상태 제보',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태 확인 필요, 다음 행동 상태 제보',
     );
     expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(favorites.single.semanticLabel, isNot(contains('출처')));
@@ -87,6 +88,7 @@ void main() {
     final reported = _favoriteFacility(status: 'USER_REPORTED');
     final unknown = _favoriteFacility(status: 'NEEDS_CHECK');
     final available = _favoriteFacility(status: 'AVAILABLE');
+    final verified = _favoriteFacility(fieldValidationStatus: 'VERIFIED');
 
     expect(closed.severityLabel, '고장·폐쇄');
     expect(closed.nextActionLabel, '대체 출구 보기');
@@ -99,6 +101,8 @@ void main() {
     expect(unknown.nextActionLabel, '시설 상세 보기');
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
+    expect(available.verificationStatusLabel, '상태 확인 필요');
+    expect(verified.verificationStatusLabel, '시설 상태 확인됨');
   });
 
   test('즐겨찾기 시설 API 저장소는 인증 실패 시 인증을 지우고 한 번 재시도한다', () async {
@@ -285,7 +289,10 @@ class FakeFavoriteFacilityRepository implements FavoriteFacilityRepository {
   }
 }
 
-FavoriteFacility _favoriteFacility({String status = 'NORMAL'}) {
+FavoriteFacility _favoriteFacility({
+  String status = 'NORMAL',
+  String fieldValidationStatus = 'UNKNOWN',
+}) {
   return FavoriteFacility(
     userId: 'anonymous-user-1',
     facilityId: 'facility-sangnoksu-elevator-1',
@@ -301,6 +308,7 @@ FavoriteFacility _favoriteFacility({String status = 'NORMAL'}) {
     status: status,
     dataConfidence: 'HIGH',
     dataSourceType: 'OFFICIAL_FILE',
+    fieldValidationStatus: fieldValidationStatus,
     lastUpdatedAt: '2026-06-12',
     addedAt: '2026-06-14T10:00:00',
   );

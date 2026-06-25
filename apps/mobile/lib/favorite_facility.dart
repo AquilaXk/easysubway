@@ -189,6 +189,7 @@ class FavoriteFacility {
     required this.status,
     required this.dataConfidence,
     this.dataSourceType = '',
+    this.fieldValidationStatus = 'UNKNOWN',
     required this.lastUpdatedAt,
     required this.addedAt,
   });
@@ -209,6 +210,11 @@ class FavoriteFacility {
       status: _requiredString(json, 'status'),
       dataConfidence: _requiredString(json, 'dataConfidence'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
+      fieldValidationStatus: _stringOrDefault(
+        json,
+        'fieldValidationStatus',
+        'UNKNOWN',
+      ),
       lastUpdatedAt: _requiredString(json, 'lastUpdatedAt'),
       addedAt: _requiredString(json, 'addedAt'),
     );
@@ -228,6 +234,7 @@ class FavoriteFacility {
   final String status;
   final String dataConfidence;
   final String dataSourceType;
+  final String fieldValidationStatus;
   final String lastUpdatedAt;
   final String addedAt;
 
@@ -280,7 +287,7 @@ class FavoriteFacility {
   int get statusPriority => statusPresentation.priority;
 
   String get verificationStatusLabel =>
-      _facilityVerificationStatusLabel(dataConfidence);
+      _facilityVerificationStatusLabel(fieldValidationStatus);
 
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
@@ -733,6 +740,18 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
   return value is String ? value : '';
 }
 
+String _stringOrDefault(
+  Map<String, Object?> json,
+  String key,
+  String fallback,
+) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value;
+  }
+  return fallback;
+}
+
 String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
     'HIGH' => '정보 신뢰도 높음',
@@ -742,9 +761,10 @@ String _dataConfidenceLabel(String dataConfidence) {
   };
 }
 
-String _facilityVerificationStatusLabel(String dataConfidence) {
-  return switch (dataConfidence.trim().toUpperCase()) {
-    'HIGH' || 'MEDIUM' => '시설 상태 확인됨',
+String _facilityVerificationStatusLabel(String fieldValidationStatus) {
+  return switch (fieldValidationStatus.trim().toUpperCase()) {
+    'VERIFIED' => '시설 상태 확인됨',
+    'STALE' => '상태 재확인 필요',
     _ => '상태 확인 필요',
   };
 }

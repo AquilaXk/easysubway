@@ -2512,7 +2512,7 @@ void main() {
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('이용 가능'), findsOneWidget);
-      expect(find.text('시설 상태 확인됨'), findsOneWidget);
+      expect(find.text('상태 확인 필요'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '상태 제보'), findsOneWidget);
@@ -2524,7 +2524,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태 확인됨, 다음 행동 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태 확인 필요, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
