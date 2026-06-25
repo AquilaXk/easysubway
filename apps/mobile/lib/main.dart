@@ -1275,7 +1275,8 @@ class _HomeScreenState extends State<HomeScreen> {
       await refreshHomeState();
     }
 
-    Future<void> openRouteSearch() async {
+    Future<void> openRouteSearch([String? mobilityType]) async {
+      final routeSearchMobilityType = mobilityType ?? initialMobilityType;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => RouteSearchScreen(
@@ -1283,7 +1284,7 @@ class _HomeScreenState extends State<HomeScreen> {
             stationRepository: repository,
             routeFeedbackRepository: routeFeedbackRepository,
             favoriteRouteRepository: favoriteRouteRepository,
-            initialMobilityType: initialMobilityType,
+            initialMobilityType: routeSearchMobilityType,
             initialDraft: _routeDraftController.draft,
             simpleViewEnabled: simpleViewEnabled,
           ),
@@ -1309,6 +1310,7 @@ class _HomeScreenState extends State<HomeScreen> {
             internalRouteRepository: internalRouteRepository,
             routeDraftController: _routeDraftController,
             initialMobilityType: initialMobilityType,
+            onOpenRouteSearch: openRouteSearch,
           ),
         ),
       );
@@ -3263,6 +3265,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.internalRouteRepository,
     required this.routeDraftController,
     required this.initialMobilityType,
+    this.onOpenRouteSearch,
     super.key,
   });
 
@@ -3276,6 +3279,7 @@ class FavoriteHomeScreen extends StatefulWidget {
   final InternalRouteRepository internalRouteRepository;
   final RouteDraftController routeDraftController;
   final String initialMobilityType;
+  final Future<void> Function([String? mobilityType])? onOpenRouteSearch;
 
   @override
   State<FavoriteHomeScreen> createState() => _FavoriteHomeScreenState();
@@ -3405,9 +3409,35 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     unawaited(
       _openFavoriteListScreen(
         title: '즐겨찾기한 경로',
-        child: FavoriteRouteListContent(repository: repository),
+        child: FavoriteRouteListContent(
+          repository: repository,
+          onSearchAgain: widget.onOpenRouteSearch == null
+              ? null
+              : _openRouteSearchFromFavorite,
+        ),
       ),
     );
+  }
+
+  void _openRouteSearchFromFavorite(FavoriteRoute favorite) {
+    widget.routeDraftController.setOrigin(
+      RouteDraftStation(
+        id: favorite.originStationId,
+        nameKo: favorite.originStationName,
+      ),
+    );
+    widget.routeDraftController.setDestination(
+      RouteDraftStation(
+        id: favorite.destinationStationId,
+        nameKo: favorite.destinationStationName,
+      ),
+    );
+    final openRouteSearch = widget.onOpenRouteSearch;
+    if (openRouteSearch == null) {
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    unawaited(openRouteSearch(favorite.mobilityType));
   }
 
   void _openFavoriteStations() {

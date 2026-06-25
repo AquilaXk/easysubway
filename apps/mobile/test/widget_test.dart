@@ -51,9 +51,16 @@ OnboardingState _completedOnboardingStateWithPreferences({
   );
 }
 
-Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
+Future<void> _openFavoriteList(
+  WidgetTester tester, {
+  Key? tabKey,
+  RouteDraftController? routeDraftController,
+  Future<void> Function(RouteDraft draft, String mobilityType)?
+  onOpenRouteSearch,
+}) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
+  final draftController = routeDraftController ?? RouteDraftController();
   unawaited(
     Navigator.of(homeContext).push(
       MaterialPageRoute<void>(
@@ -66,8 +73,14 @@ Future<void> _openFavoriteList(WidgetTester tester, {Key? tabKey}) async {
           locationProvider: home.locationProvider,
           facilityReportDraftTargetStore: home.facilityReportDraftTargetStore,
           internalRouteRepository: home.internalRouteRepository,
-          routeDraftController: RouteDraftController(),
+          routeDraftController: draftController,
           initialMobilityType: home.initialMobilityType,
+          onOpenRouteSearch: onOpenRouteSearch == null
+              ? null
+              : ([mobilityType]) => onOpenRouteSearch(
+                  draftController.draft,
+                  mobilityType ?? home.initialMobilityType,
+                ),
         ),
       ),
     ),
@@ -3181,6 +3194,9 @@ void main() {
     final favoriteRouteRepository = FakeFavoriteRouteRepository(
       favorites: [_favoriteRoute()],
     );
+    final routeDraftController = RouteDraftController();
+    RouteDraft? searchAgainDraft;
+    String? searchAgainMobilityType;
 
     try {
       await tester.pumpWidget(
@@ -3196,7 +3212,14 @@ void main() {
         ),
       );
 
-      await _openFavoriteList(tester);
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft, mobilityType) async {
+          searchAgainDraft = draft;
+          searchAgainMobilityType = mobilityType;
+        },
+      );
 
       expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
@@ -3224,6 +3247,30 @@ void main() {
           isButton: true,
           hasTapAction: true,
         ),
+      );
+      expect(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
+      expect(searchAgainDraft?.origin?.nameKo, '상록수');
+      expect(searchAgainDraft?.destination?.id, 'station-sadang');
+      expect(searchAgainDraft?.destination?.nameKo, '사당');
+      expect(searchAgainMobilityType, 'SENIOR');
+
+      await _openFavoriteList(
+        tester,
+        routeDraftController: routeDraftController,
+        onOpenRouteSearch: (draft, mobilityType) async {
+          searchAgainDraft = draft;
+          searchAgainMobilityType = mobilityType;
+        },
       );
 
       await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
@@ -3297,6 +3344,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
+  });
+
+  testWidgets('즐겨찾기 경로 다시 찾기는 저장된 이동 조건으로 연다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
+    );
+    final routeDraftController = RouteDraftController();
+    RouteDraft? searchAgainDraft;
+    String? searchAgainMobilityType;
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+      ),
+    );
+
+    await _openFavoriteList(
+      tester,
+      routeDraftController: routeDraftController,
+      onOpenRouteSearch: (draft, mobilityType) async {
+        searchAgainDraft = draft;
+        searchAgainMobilityType = mobilityType;
+      },
+    );
+
+    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    await tester.pumpAndSettle();
+
+    expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
+    expect(searchAgainDraft?.destination?.id, 'station-sadang');
+    expect(searchAgainMobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
@@ -8627,8 +8712,8 @@ FavoriteFacility _favoriteFacility({
   );
 }
 
-FavoriteRoute _favoriteRoute() {
-  return const FavoriteRoute(
+FavoriteRoute _favoriteRoute({String mobilityType = 'SENIOR'}) {
+  return FavoriteRoute(
     userId: 'anonymous-user-1',
     favoriteRouteId: 'route-1',
     routeSearchId: 'route-1',
@@ -8636,7 +8721,7 @@ FavoriteRoute _favoriteRoute() {
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
     destinationStationName: '사당',
-    mobilityType: 'SENIOR',
+    mobilityType: mobilityType,
     status: 'FOUND',
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
