@@ -64,7 +64,7 @@ void main() {
         isA<NotificationSettingsException>().having(
           (error) => error.message,
           'message',
-          '알림 권한을 확인하지 못했습니다.',
+          '알림을 켤 수 있는지 확인하지 못했어요.',
         ),
       ),
     );
