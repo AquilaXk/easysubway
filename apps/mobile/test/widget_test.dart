@@ -2110,7 +2110,7 @@ void main() {
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(find.text('이 기기의 앱 데이터 삭제'), findsOneWidget);
+      expect(find.text('데이터 삭제 요청'), findsOneWidget);
 
       final deletionButtonSize = tester.getSize(
         find.byKey(const Key('dataDeletionAccessItem')),
@@ -2122,7 +2122,7 @@ void main() {
           .getSemanticsData();
       expect(
         deletionSemantics.label,
-        '이 기기의 앱 데이터 삭제, privacy@easysubway.example, 로컬 삭제 범위와 복구 불가 여부를 먼저 확인해요',
+        '데이터 삭제 요청, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
 
@@ -2178,13 +2178,11 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text(
-          '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.',
-        ),
+        find.text('데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.'),
         findsOneWidget,
       );
       expect(
-        find.text('이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.'),
+        find.text('앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.'),
         findsOneWidget,
       );
       expect(find.text('법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.'), findsOneWidget);
@@ -2203,7 +2201,7 @@ void main() {
       );
       expect(
         summarySemantics.label,
-        contains('이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.'),
+        contains('앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.'),
       );
       expect(summarySemantics.label, isNot(contains('익명화')));
     } finally {
@@ -2653,7 +2651,7 @@ void main() {
           .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
           .getSemanticsData()
           .label,
-      '이 기기의 앱 데이터 삭제, 현재 이용할 수 없음 · 준비 중, 로컬 삭제 범위와 복구 불가 여부를 먼저 확인해요',
+      '데이터 삭제 요청, 현재 이용할 수 없음 · 준비 중, 삭제 범위와 처리 절차를 메일로 문의해요',
     );
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.scrollUntilVisible(

@@ -3771,12 +3771,12 @@ class SupportAccessScreen extends StatelessWidget {
               _SupportAccessItem(
                 key: const Key('dataDeletionAccessItem'),
                 icon: Icons.delete_outline,
-                title: '이 기기의 앱 데이터 삭제',
+                title: '데이터 삭제 요청',
                 value: accessInfo.dataDeletionEmail,
-                helperText: '로컬 삭제 범위와 복구 불가 여부를 먼저 확인해요',
+                helperText: '삭제 범위와 처리 절차를 메일로 문의해요',
                 uri: _mailtoUri(
                   accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 이 기기의 앱 데이터 삭제',
+                  '쉬운 지하철 데이터 삭제 요청',
                 ),
                 launcher: launcher,
               )
@@ -3931,11 +3931,19 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
   }
 }
 
-enum UserDataDeletionScope { deviceOnly, remoteOnly, remoteAndDevice }
+enum UserDataDeletionScope {
+  requestOnly,
+  deviceOnly,
+  remoteOnly,
+  remoteAndDevice,
+}
 
 UserDataDeletionScope _userDataDeletionScope(
   UserDataDeletionRepository? repository,
 ) {
+  if (repository == null) {
+    return UserDataDeletionScope.requestOnly;
+  }
   if (repository is UserDataDeletionCompositeRepository) {
     return UserDataDeletionScope.remoteAndDevice;
   }
@@ -3956,6 +3964,16 @@ class _UserDataDeletionCopy {
 
   factory _UserDataDeletionCopy.forScope(UserDataDeletionScope scope) {
     return switch (scope) {
+      UserDataDeletionScope.requestOnly => const _UserDataDeletionCopy(
+        title: '데이터 삭제 요청',
+        helperText: '삭제 범위와 처리 절차를 메일로 문의합니다.',
+        body: '삭제가 필요한 데이터와 처리 절차를 지원 메일로 문의합니다.',
+        notices: [
+          '앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.',
+          '요청 전 개인정보처리방침에서 보관 범위와 기간을 확인할 수 있습니다.',
+        ],
+        confirmText: '데이터 삭제 요청 메일을 보낼까요?',
+      ),
       UserDataDeletionScope.deviceOnly => const _UserDataDeletionCopy(
         title: '이 기기의 앱 데이터 삭제',
         helperText: '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
@@ -4517,12 +4535,15 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _title = '개인정보 사용 안내';
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 신고 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
+  static const _requestDeletionScope =
+      '데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';
   static const _deviceDeletionScope =
       '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
   static const _remoteDeletionScope =
       '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 위치, 경로 피드백을 삭제하거나 익명화합니다.';
   static const _combinedDeletionScope =
       '내 데이터 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 서버에 연결된 제보·경로 피드백 정보를 삭제하거나 익명화합니다.';
+  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.';
   static const _deviceSentReportNotice =
       '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
   static const _remoteSentReportNotice =
@@ -4531,6 +4552,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
 
   String get _deletionScopeText {
     return switch (deletionScope) {
+      UserDataDeletionScope.requestOnly => _requestDeletionScope,
       UserDataDeletionScope.deviceOnly => _deviceDeletionScope,
       UserDataDeletionScope.remoteOnly => _remoteDeletionScope,
       UserDataDeletionScope.remoteAndDevice => _combinedDeletionScope,
@@ -4539,6 +4561,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
 
   String get _sentReportNoticeText {
     return switch (deletionScope) {
+      UserDataDeletionScope.requestOnly => _requestNotice,
       UserDataDeletionScope.deviceOnly => _deviceSentReportNotice,
       UserDataDeletionScope.remoteOnly ||
       UserDataDeletionScope.remoteAndDevice => _remoteSentReportNotice,
