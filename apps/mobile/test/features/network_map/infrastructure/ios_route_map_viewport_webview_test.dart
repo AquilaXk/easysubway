@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_renderer.dart';
@@ -194,6 +196,47 @@ void main() {
     await controller.dispose();
     await expectLater(controller.events, emitsDone);
   });
+
+  test(
+    'controller ignores duplicate dispose while first call is pending',
+    () async {
+      final disposeCompleter = Completer<void>();
+      var disposeCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel(
+              'com.easysubway.easysubway_mobile/route_map_viewport_webview/10',
+            ),
+            (call) {
+              if (call.method == 'dispose') {
+                disposeCalls += 1;
+                return disposeCompleter.future;
+              }
+              return Future<void>.value();
+            },
+          );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel(
+                'com.easysubway.easysubway_mobile/route_map_viewport_webview/10',
+              ),
+              null,
+            );
+      });
+
+      final controller = IosRouteMapViewportController(10);
+      final firstDispose = controller.dispose();
+      final secondDispose = controller.dispose();
+      await pumpEventQueue();
+
+      expect(disposeCalls, 1);
+
+      disposeCompleter.complete();
+      await Future.wait(<Future<void>>[firstDispose, secondDispose]);
+      await expectLater(controller.events, emitsDone);
+    },
+  );
 
   testWidgets('widget recreates platform view when asset identity changes', (
     tester,

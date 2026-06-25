@@ -112,6 +112,7 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
   final _pendingCameraFrames = <int, Stopwatch>{};
   bool _createdEmitted = false;
+  bool _disposeStarted = false;
 
   @override
   Stream<RouteMapRendererEvent> get events => _events.stream;
@@ -146,9 +147,10 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
 
   @override
   Future<void> dispose() async {
-    if (_events.isClosed) {
+    if (_disposeStarted || _events.isClosed) {
       return;
     }
+    _disposeStarted = true;
     try {
       await _channel.invokeMethod<void>('dispose');
     } on MissingPluginException {
@@ -156,8 +158,10 @@ class AndroidRouteMapViewportController implements RouteMapRendererController {
     } finally {
       _pendingCameraFrames.clear();
       _channel.setMethodCallHandler(null);
-      _events.add(const RouteMapRendererDisposed());
-      await _events.close();
+      if (!_events.isClosed) {
+        _events.add(const RouteMapRendererDisposed());
+        await _events.close();
+      }
     }
   }
 
