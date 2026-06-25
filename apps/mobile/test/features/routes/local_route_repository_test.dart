@@ -95,9 +95,10 @@ void main() {
     expect(result.status, 'FOUND');
     expect(result.blockedReasons, isEmpty);
     expect(
-      result.steps.expand((step) => step.evidenceSources),
-      containsAll(['edge:entry-sangnoksu-seoul-4', 'edge:exit-sadang-seoul-4']),
+      result.steps.map((step) => step.stepType),
+      containsAll(['entry', 'exit']),
     );
+    expect(result.steps.expand((step) => step.evidenceSources), isEmpty);
   });
 
   test('기존 baseline access edge 값은 보강 과정에서 덮어쓰지 않는다', () async {
@@ -175,12 +176,12 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.evidenceSources.contains('edge:edge-a-b-local'),
+      (step) => step.stepType == 'ride',
     );
     expect(rideStep.actionTitle, '열차 이동');
     expect(rideStep.actionDetail, contains('출발역에서 중간역까지'));
-    expect(rideStep.reason, contains('선택된 경로 edge'));
-    expect(rideStep.evidenceSources, contains('edge:edge-a-b-local'));
+    expect(rideStep.reason, '선택한 경로 기준으로 안내합니다.');
+    expect(rideStep.evidenceSources, isEmpty);
     expect(rideStep.timeSource, 'STATIC_ESTIMATE');
     expect(rideStep.distanceSource, 'MEASURED');
     expect(rideStep.confidenceLabel, '높은 신뢰도');
@@ -1414,7 +1415,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.evidenceSources.contains('edge:edge-a-b-low-confidence'),
+      (step) => step.stepType == 'ride',
     );
     expect(result.status, 'FOUND');
     expect(result.warnings.map((warning) => warning.code), {
@@ -1460,7 +1461,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.evidenceSources.contains('edge:edge-a-b-duration-unknown'),
+      (step) => step.stepType == 'ride',
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 0);
@@ -1501,9 +1502,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) => step.evidenceSources.contains(
-        'edge:edge-a-b-low-confidence-distance-unknown',
-      ),
+      (step) => step.stepType == 'ride',
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 2);
@@ -1546,8 +1545,7 @@ void main() {
     );
 
     final rideStep = result.steps.singleWhere(
-      (step) =>
-          step.evidenceSources.contains('edge:edge-a-b-measured-distance'),
+      (step) => step.stepType == 'ride',
     );
     expect(result.status, 'FOUND');
     expect(rideStep.estimatedMinutes, 2);
