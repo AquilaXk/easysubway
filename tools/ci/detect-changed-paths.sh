@@ -58,6 +58,9 @@ while IFS= read -r file; do
     tools/route-map/**)
       repository=true
       ;;
+    tools/realtime/**)
+      repository=true
+      ;;
     apps/mobile/release/**)
       mobile=true
       android=true
