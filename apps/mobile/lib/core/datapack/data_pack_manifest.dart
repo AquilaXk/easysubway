@@ -463,10 +463,10 @@ int _parseManifestVersion(Object? rawVersion) {
   if (rawVersion == null) {
     return 1;
   }
-  if (rawVersion != 2) {
-    throw const FormatException('Invalid data pack manifest version.');
+  if (rawVersion is int && (rawVersion == 1 || rawVersion == 2)) {
+    return rawVersion;
   }
-  return 2;
+  throw const FormatException('Invalid data pack manifest version.');
 }
 
 String _readManifestChannel(Object? value) {

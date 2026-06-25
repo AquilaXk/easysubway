@@ -87,10 +87,21 @@ class DataPackClient {
     if (manifest == null || checkedAt == null) {
       return;
     }
+    var cacheTtl = manifest.ttl;
+    final expiresAt = manifest.expiresAt;
+    if (expiresAt != null) {
+      final expiryTtl = expiresAt.difference(checkedAt.toUtc());
+      if (expiryTtl <= Duration.zero) {
+        throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+      }
+      if (expiryTtl < cacheTtl) {
+        cacheTtl = expiryTtl;
+      }
+    }
     await stateRepository.saveManifestCache(
       etag: result.etag,
       checkedAt: checkedAt,
-      ttl: manifest.ttl,
+      ttl: cacheTtl,
     );
     await stateRepository.saveAcceptedManifestState(manifest);
   }

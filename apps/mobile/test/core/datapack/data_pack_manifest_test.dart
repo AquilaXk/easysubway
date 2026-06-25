@@ -412,6 +412,7 @@ void main() {
 
   test('legacy fixture manifest는 신규 metadata 없이도 파싱된다', () {
     final manifest = DataPackManifest.fromJson({
+      'manifestVersion': 1,
       'ttlSeconds': 3600,
       'packs': [
         {
@@ -427,6 +428,7 @@ void main() {
     });
 
     final pack = manifest.packs.single;
+    expect(manifest.manifestVersion, 1);
     expect(pack.artifactKind, DataPackArtifactKind.fixture);
     expect(pack.sizeBytes, isNull);
     expect(pack.signature.value, '0' * 64);

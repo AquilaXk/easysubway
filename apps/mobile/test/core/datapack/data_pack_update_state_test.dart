@@ -238,6 +238,41 @@ void main() {
     expect(cache?.etag, 'etag-v18');
   });
 
+  test('manifest client는 v2 manifest cache TTL을 expiresAt으로 제한한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 25, 12),
+    );
+    final checkedAt = DateTime.utc(2026, 6, 25, 12);
+    final manifest = DataPackManifest.fromJson(
+      _v2ManifestJson(
+        sequence: 44,
+        version: '20',
+        expiresAt: '2026-06-25T12:05:00.000Z',
+      ),
+    );
+    final client = DataPackClient(
+      manifestUri: Uri.parse(
+        'https://cdn.easysubway.example/catalog/current.json',
+      ),
+      stateRepository: stateRepository,
+      now: () => checkedAt,
+    );
+
+    await client.saveManifestCache(
+      DataPackManifestFetchResult(
+        status: DataPackManifestFetchStatus.updated,
+        manifest: manifest,
+        etag: 'etag-v20',
+        checkedAt: checkedAt,
+      ),
+    );
+    final cache = await stateRepository.readManifestCache();
+    expect(cache?.ttl, const Duration(minutes: 5));
+  });
+
   test('update state는 v2 manifest downgrade와 equivocation을 거부한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
