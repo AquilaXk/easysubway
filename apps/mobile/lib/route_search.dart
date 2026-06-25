@@ -2835,10 +2835,16 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 _RoutePrototypeSection(
-                  title: result.isBlocked ? '안내 불가 이유' : '추천 경로',
+                  title: result.isBlocked
+                      ? '안내 불가 이유'
+                      : _isRecommendedRoute(result)
+                      ? '추천 경로'
+                      : result.statusLabel,
                   subtitle: result.isBlocked
                       ? '현재 조건에서 막힌 이유를 확인하세요'
-                      : '시간·환승·걷기와 편한 정도를 확인하세요.',
+                      : _isRecommendedRoute(result)
+                      ? '시간·환승·걷기와 편한 정도를 확인하세요.'
+                      : '이 경로는 이동 전 확인이 필요합니다',
                 ),
                 Container(
                   decoration: BoxDecoration(

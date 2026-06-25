@@ -6306,6 +6306,21 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('routeGuidanceMobilityChip')), findsOneWidget);
     expect(find.text('이동 조건 확인 필요'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStartGuidanceButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('확인이 필요합니다'), findsWidgets);
+    expect(find.text('이 경로는 이동 전 확인이 필요합니다'), findsOneWidget);
+    expect(find.text('추천 경로'), findsNothing);
   });
 
   testWidgets('경로 검색은 입력만 하고 선택하지 않은 역을 쉬운 문구로 안내한다', (tester) async {
