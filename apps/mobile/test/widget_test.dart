@@ -4939,6 +4939,9 @@ void main() {
       expect(find.text('환승 적은 순'), findsOneWidget);
       expect(find.text('상록수 → 사당'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
+      expect(find.text('계단 여부 확인 필요'), findsWidgets);
+      expect(find.text('계단 없음'), findsNothing);
+      expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
       expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
       expect(find.text('추천'), findsOneWidget);

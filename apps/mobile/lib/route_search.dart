@@ -634,6 +634,17 @@ class RouteSearchResult {
     return blockedReasons.map(_routeBlockedReasonLabel).toList(growable: false);
   }
 
+  String get stairAccessLabel {
+    if (steps.any((step) => _routeStepStairState(step) == 'stairOnly')) {
+      return '계단 포함';
+    }
+    if (steps.isNotEmpty &&
+        steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
+      return '계단 없음 확인';
+    }
+    return '계단 여부 확인 필요';
+  }
+
   int get walkingDistanceMeters {
     return steps.fold<int>(
       0,
@@ -740,6 +751,7 @@ class RouteSearchResult {
       summaryTitle,
       lineLabel,
       comfortLabel,
+      stairAccessLabel,
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
@@ -791,6 +803,7 @@ class RouteSearchStep {
     required this.estimatedMinutes,
     required this.distanceMeters,
     required this.includesStairs,
+    this.stairAccessState = '',
     required this.requiresAccessibilityCheck,
     this.actionTitle = '',
     this.actionDetail = '',
@@ -804,6 +817,7 @@ class RouteSearchStep {
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
     final title = _requiredRouteString(json, 'title');
     final description = _requiredRouteString(json, 'description');
+    final includesStairs = _requiredRouteBool(json, 'includesStairs');
     return RouteSearchStep(
       sequence: _requiredRouteInt(json, 'sequence'),
       stepType: _optionalRouteString(json, 'stepType'),
@@ -815,7 +829,11 @@ class RouteSearchStep {
       toStationId: _optionalRouteString(json, 'toStationId'),
       estimatedMinutes: _requiredRouteInt(json, 'estimatedMinutes'),
       distanceMeters: _requiredRouteInt(json, 'distanceMeters'),
-      includesStairs: _requiredRouteBool(json, 'includesStairs'),
+      includesStairs: includesStairs,
+      stairAccessState: _routeStepStairAccessStateFromJson(
+        json,
+        includesStairs,
+      ),
       requiresAccessibilityCheck: _requiredRouteBool(
         json,
         'requiresAccessibilityCheck',
@@ -846,6 +864,7 @@ class RouteSearchStep {
   final int estimatedMinutes;
   final int distanceMeters;
   final bool includesStairs;
+  final String stairAccessState;
   final bool requiresAccessibilityCheck;
   final String actionTitle;
   final String actionDetail;
@@ -2669,11 +2688,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         _RouteDarkSummaryCard(
           title: totalMinutes > 0 ? '$totalMinutes분' : result.statusLabel,
           subtitle: meta,
-          chips: [
-            result.comfortLabel,
-            if (_routeHasNoStairs(result)) '계단 없음',
-            '엘리베이터 이용',
-          ],
+          chips: [result.comfortLabel, result.stairAccessLabel],
         ),
         const SizedBox(height: 16),
         _RouteStepSection(steps: result.movementSteps),
@@ -3074,7 +3089,7 @@ class _RouteInternalWorkflowView extends StatelessWidget {
           title:
               '${result.originStationName} → ${result.lineName.isEmpty ? '승강장' : result.lineName}',
           subtitle: _routeMetaLabel(result),
-          chips: const ['계단 없음', '엘리베이터 이용'],
+          chips: [result.stairAccessLabel],
         ),
         const SizedBox(height: 14),
         _RouteSectionHeader(title: '역 안 이동 순서'),
@@ -3330,10 +3345,8 @@ class _RouteResultListButton extends StatelessWidget {
                           icon: Icons.accessible_forward,
                         ),
                         _RoutePrototypeChip(
-                          label: _routeHasNoStairs(result) ? '계단 없음' : '계단 있음',
-                          icon: _routeHasNoStairs(result)
-                              ? Icons.check
-                              : Icons.stairs_outlined,
+                          label: result.stairAccessLabel,
+                          icon: _routeStairAccessIcon(result),
                         ),
                       ],
                     ),
@@ -3465,8 +3478,38 @@ String _routeWorkflowSummarySubtitle(RouteSearchResult result) {
       : result.statusLabel;
 }
 
-bool _routeHasNoStairs(RouteSearchResult result) {
-  return result.steps.every((step) => !step.includesStairs);
+IconData _routeStairAccessIcon(RouteSearchResult result) {
+  return switch (result.stairAccessLabel) {
+    '계단 없음 확인' => Icons.check,
+    '계단 포함' => Icons.stairs_outlined,
+    _ => Icons.help_outline,
+  };
+}
+
+String _routeStepStairAccessStateFromJson(
+  Map<String, Object?> json,
+  bool includesStairs,
+) {
+  final raw = _optionalRouteString(json, 'stairAccessState');
+  if (raw.isEmpty) {
+    return includesStairs ? 'stairOnly' : 'unknown';
+  }
+  return _normalizeRouteStairState(raw);
+}
+
+String _routeStepStairState(RouteSearchStep step) {
+  if (step.includesStairs) {
+    return 'stairOnly';
+  }
+  return _normalizeRouteStairState(step.stairAccessState);
+}
+
+String _normalizeRouteStairState(String value) {
+  return switch (value.trim().toUpperCase()) {
+    'STEP_FREE' || 'STEPFREE' => 'stepFree',
+    'STAIR_ONLY' || 'STAIRONLY' => 'stairOnly',
+    _ => 'unknown',
+  };
 }
 
 class _RoutePrototypeSection extends StatelessWidget {

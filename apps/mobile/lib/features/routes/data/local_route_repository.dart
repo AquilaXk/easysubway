@@ -96,6 +96,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             estimatedMinutes: _estimatedMinutesFor(step.durationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
+            stairAccessState: step.stairAccessState,
             requiresAccessibilityCheck:
                 step.type.name == 'entry' || step.type.name == 'exit',
             actionTitle: _stepActionTitle(step.type.name),
