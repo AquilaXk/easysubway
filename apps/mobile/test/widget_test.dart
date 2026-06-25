@@ -2043,7 +2043,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 안전 고지와 데이터 한계를 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('도움말은 안전과 데이터 안내를 함께 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -2064,7 +2064,7 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('안전 안내'), findsWidgets);
+      expect(find.text('안전과 데이터 안내'), findsWidgets);
       expect(find.text('경로와 시설 정보는 이동을 돕는 참고 정보입니다.'), findsOneWidget);
       expect(
         find.text('실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.'),
@@ -2082,7 +2082,7 @@ void main() {
           .getSemanticsData();
       expect(
         noticeSemantics.label,
-        '안전 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
+        '안전과 데이터 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
       );
     } finally {
       semanticsHandle.dispose();
