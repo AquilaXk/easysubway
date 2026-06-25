@@ -1013,13 +1013,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     unawaited(_rendererMonitor?.stop());
     _rendererController = controller;
-    _rendererMonitor = RouteMapRendererHealthMonitor(
+    late final RouteMapRendererHealthMonitor monitor;
+    monitor = RouteMapRendererHealthMonitor(
       controller,
-      onEvent: _logRendererEvent,
-    )..start();
+      onEvent: (event) => _handleRendererEvent(monitor, event),
+    );
+    _rendererMonitor = monitor;
+    monitor.start();
   }
 
-  void _logRendererEvent(RouteMapRendererEvent event) {
+  void _handleRendererEvent(
+    RouteMapRendererHealthMonitor monitor,
+    RouteMapRendererEvent event,
+  ) {
+    if (event is RouteMapRendererDisposed &&
+        identical(_rendererMonitor, monitor)) {
+      _rendererMonitor = null;
+      _rendererController = null;
+    }
     if (!kDebugMode && !kProfileMode) {
       return;
     }

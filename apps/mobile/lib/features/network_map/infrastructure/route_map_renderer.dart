@@ -110,10 +110,16 @@ final class RouteMapRendererHealthMonitor {
   }
 
   Future<void> trimMemory() {
+    if (_closed) {
+      return Future<void>.value();
+    }
     return _controller.trimMemory();
   }
 
   Future<void> disposeRenderer() {
+    if (_closed) {
+      return Future<void>.value();
+    }
     return _controller.dispose();
   }
 
@@ -136,6 +142,8 @@ final class RouteMapRendererHealthMonitor {
         }
       case RouteMapRendererProcessGone():
         _recover();
+      case RouteMapRendererDisposed():
+        unawaited(stop());
       case RouteMapRendererCreated() ||
           RouteMapRendererAssetLoading() ||
           RouteMapRendererAssetReady() ||
@@ -143,8 +151,7 @@ final class RouteMapRendererHealthMonitor {
           RouteMapRendererFrameTimeout() ||
           RouteMapRendererRecovering() ||
           RouteMapRendererFailed() ||
-          RouteMapRendererMemoryTrimmed() ||
-          RouteMapRendererDisposed():
+          RouteMapRendererMemoryTrimmed():
         break;
     }
   }
