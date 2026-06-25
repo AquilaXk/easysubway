@@ -460,7 +460,7 @@ class FavoriteRoute {
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
-  String get scoreLabel => '이동 편의도 $score점';
+  String get scoreLabel => '상세 이동 정보는 다시 검색해 확인';
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
@@ -633,7 +633,8 @@ class RouteSearchResult {
     };
   }
 
-  String get scoreLabel => '이동 편의도 $score점';
+  String get scoreLabel =>
+      isBlocked || warnings.isNotEmpty ? '이동 부담 확인 필요' : '이동 부담 낮음';
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
@@ -668,7 +669,7 @@ class RouteSearchResult {
     if (isBlocked) {
       return '다른 경로 필요';
     }
-    return score >= 80 ? '이동 편함' : '조금 불편';
+    return warnings.isEmpty ? '이동 부담 낮음' : '확인 필요 구간 있음';
   }
 
   String get guidanceLabel {

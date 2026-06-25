@@ -55,7 +55,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       status: result.status == local.RouteStatus.found ? 'FOUND' : 'BLOCKED',
       lineId: primaryLineId,
       lineName: primaryLineName,
-      score: _scoreFromCost(result.totalCost),
+      score: result.totalCost,
       steps: _toSteps(result, catalog),
       warnings: result.warnings
           .map(
@@ -171,13 +171,6 @@ class LocalRouteRepository implements RouteSearchRepository {
         ? '선택된 경로'
         : '선택된 경로 ${step.evidenceSources.first}';
     return '$source 근거로 안내합니다.';
-  }
-
-  int _scoreFromCost(int cost) {
-    if (cost <= 0) {
-      return 0;
-    }
-    return (100 - (cost / 20).round()).clamp(1, 100);
   }
 
   List<String> _recommendationReasons(local.LocalRouteResult result) {
