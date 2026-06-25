@@ -302,6 +302,39 @@ void main() {
     expect(stateRepository.calls, ['accepted', 'cache']);
   });
 
+  test('manifest client는 expected channel과 다른 v2 manifest를 거부한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = _RecordingUpdateStateRepository(
+      userDatabase: userDatabase,
+    );
+    final checkedAt = DateTime.utc(2026, 6, 25, 12);
+    final manifest = DataPackManifest.fromJson(
+      _v2ManifestJson(sequence: 1, version: '1', channel: 'staging'),
+    );
+    final client = DataPackClient(
+      manifestUri: Uri.parse(
+        'https://cdn.easysubway.example/catalog/current.json',
+      ),
+      stateRepository: stateRepository,
+      expectedManifestChannel: 'production',
+      now: () => checkedAt,
+    );
+
+    await expectLater(
+      client.saveManifestCache(
+        DataPackManifestFetchResult(
+          status: DataPackManifestFetchStatus.updated,
+          manifest: manifest,
+          etag: 'etag-staging',
+          checkedAt: checkedAt,
+        ),
+      ),
+      throwsA(isA<DataPackClientException>()),
+    );
+    expect(stateRepository.calls, isEmpty);
+  });
+
   test('manifest client는 만료된 v2 cache를 304 응답으로 연장하지 않는다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
@@ -429,11 +462,12 @@ DataPackManifest _v1Manifest({required String version}) {
 Map<String, Object?> _v2ManifestJson({
   required int sequence,
   required String version,
+  String channel = 'production',
   String expiresAt = '2026-06-26T00:00:00.000Z',
 }) {
   final manifest = <String, Object?>{
     'manifestVersion': 2,
-    'channel': 'production',
+    'channel': channel,
     'releaseSequence': sequence,
     'publishedAt': '2026-06-25T00:00:00.000Z',
     'expiresAt': expiresAt,
