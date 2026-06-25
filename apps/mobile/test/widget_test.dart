@@ -4973,6 +4973,24 @@ void main() {
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
       expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
+          ),
+          matching: find.byIcon(Icons.help_outline),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('routeDarkSummaryChip-계단 여부 확인 필요'),
+          ),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsNothing,
+      );
 
       await tester.ensureVisible(
         find.byKey(const Key('routeStartGuidanceButton')),

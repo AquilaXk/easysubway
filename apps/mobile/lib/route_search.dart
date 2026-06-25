@@ -2688,7 +2688,13 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         _RouteDarkSummaryCard(
           title: totalMinutes > 0 ? '$totalMinutes분' : result.statusLabel,
           subtitle: meta,
-          chips: [result.comfortLabel, result.stairAccessLabel],
+          chips: [
+            _RouteSummaryChip(label: result.comfortLabel),
+            _RouteSummaryChip(
+              label: result.stairAccessLabel,
+              icon: _routeStairAccessIcon(result),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         _RouteStepSection(steps: result.movementSteps),
@@ -3089,7 +3095,12 @@ class _RouteInternalWorkflowView extends StatelessWidget {
           title:
               '${result.originStationName} → ${result.lineName.isEmpty ? '승강장' : result.lineName}',
           subtitle: _routeMetaLabel(result),
-          chips: [result.stairAccessLabel],
+          chips: [
+            _RouteSummaryChip(
+              label: result.stairAccessLabel,
+              icon: _routeStairAccessIcon(result),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         _RouteSectionHeader(title: '역 안 이동 순서'),
@@ -3370,7 +3381,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
 
   final String title;
   final String subtitle;
-  final List<String> chips;
+  final List<_RouteSummaryChip> chips;
 
   @override
   Widget build(BuildContext context) {
@@ -3399,7 +3410,11 @@ class _RouteDarkSummaryCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 for (final chip in chips)
-                  _RoutePrototypeChip(label: chip, icon: Icons.check),
+                  _RoutePrototypeChip(
+                    key: Key('routeDarkSummaryChip-${chip.label}'),
+                    label: chip.label,
+                    icon: chip.icon,
+                  ),
               ],
             ),
           ],
@@ -3583,6 +3598,13 @@ class _RoutePrototypeChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RouteSummaryChip {
+  const _RouteSummaryChip({required this.label, this.icon = Icons.check});
+
+  final String label;
+  final IconData icon;
 }
 
 class _RoutePrototypeLinePath extends StatelessWidget {
