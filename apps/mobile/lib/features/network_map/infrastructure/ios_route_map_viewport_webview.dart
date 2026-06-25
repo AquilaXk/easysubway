@@ -108,6 +108,7 @@ class IosRouteMapViewportController implements RouteMapRendererController {
 
   final MethodChannel _channel;
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
+  final _pendingCameraFrames = <int, Stopwatch>{};
   bool _createdEmitted = false;
 
   @override
@@ -123,6 +124,7 @@ class IosRouteMapViewportController implements RouteMapRendererController {
 
   @override
   Future<void> setCamera(MapCameraState camera) {
+    _recordCameraRequest(camera.revision);
     return _channel.invokeMethod<void>('setCamera', <String, Object?>{
       'viewBox': _viewBoxFor(camera),
       'revision': camera.revision,
@@ -133,7 +135,12 @@ class IosRouteMapViewportController implements RouteMapRendererController {
   Future<void> retry() => _channel.invokeMethod<void>('reload');
 
   @override
-  Future<void> trimMemory() => _channel.invokeMethod<void>('trimMemory');
+  Future<void> trimMemory() async {
+    await _channel.invokeMethod<void>('trimMemory');
+    if (!_events.isClosed) {
+      _events.add(const RouteMapRendererMemoryTrimmed());
+    }
+  }
 
   @override
   Future<void> dispose() async {
@@ -145,7 +152,9 @@ class IosRouteMapViewportController implements RouteMapRendererController {
     } on MissingPluginException {
       // Platform views can already be gone during widget replacement.
     } finally {
+      _pendingCameraFrames.clear();
       _channel.setMethodCallHandler(null);
+      _events.add(const RouteMapRendererDisposed());
       await _events.close();
     }
   }
@@ -156,9 +165,9 @@ class IosRouteMapViewportController implements RouteMapRendererController {
       case 'assetReady':
         _events.add(const RouteMapRendererAssetReady());
       case 'framePresented':
-        _events.add(
-          RouteMapRendererFramePresented((arguments?['revision'] as int?) ?? 0),
-        );
+        final revision = (arguments?['revision'] as int?) ?? 0;
+        _recordFrameLatency(revision);
+        _events.add(RouteMapRendererFramePresented(revision));
       case 'processGone':
         _events.add(
           RouteMapRendererProcessGone(
@@ -166,6 +175,28 @@ class IosRouteMapViewportController implements RouteMapRendererController {
           ),
         );
     }
+  }
+
+  void _recordCameraRequest(int revision) {
+    if (_events.isClosed) {
+      return;
+    }
+    _pendingCameraFrames[revision] = Stopwatch()..start();
+    _events.add(RouteMapRendererCameraRequested(revision));
+  }
+
+  void _recordFrameLatency(int revision) {
+    final pending = _pendingCameraFrames.remove(revision);
+    if (pending == null || _events.isClosed) {
+      return;
+    }
+    pending.stop();
+    _events.add(
+      RouteMapRendererCameraLatency(
+        revision: revision,
+        elapsed: pending.elapsed,
+      ),
+    );
   }
 }
 
