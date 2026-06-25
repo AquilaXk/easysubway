@@ -541,18 +541,38 @@ class RouteSearchResult {
     required this.lineId,
     required this.lineName,
     required this.score,
+    int? burdenCost,
+    int? estimatedDurationSeconds,
+    int? walkingDistanceMeters,
+    int? transferCount,
+    this.evidenceSummary = const [],
     required this.steps,
     required this.warnings,
     this.recommendationReasons = const [],
     required this.blockedReasons,
     required this.createdAt,
-  });
+  }) : // `burdenCost`는 API contract 이름이고 저장 필드는 fallback용 private 값이다.
+       // ignore: prefer_initializing_formals
+       _burdenCost = burdenCost,
+       // ignore: prefer_initializing_formals
+       _estimatedDurationSeconds = estimatedDurationSeconds,
+       // ignore: prefer_initializing_formals
+       _walkingDistanceMeters = walkingDistanceMeters,
+       // ignore: prefer_initializing_formals
+       _transferCount = transferCount;
 
   factory RouteSearchResult.fromJson(Map<String, Object?> json) {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
     final rawRecommendationReasons = json['recommendationReasons'];
     final rawBlockedReasons = json['blockedReasons'];
+    final legacyScore = _optionalRouteInt(json, 'score');
+    final burdenCost =
+        _optionalRouteInt(json, 'burdenCost') ??
+        legacyScore ??
+        (throw const FormatException(
+          'Missing required route field: burdenCost',
+        ));
     if (rawSteps is! List<Object?> ||
         rawWarnings is! List<Object?> ||
         (rawRecommendationReasons != null &&
@@ -574,7 +594,14 @@ class RouteSearchResult {
       status: _requiredRouteString(json, 'status'),
       lineId: _optionalRouteString(json, 'lineId'),
       lineName: _optionalRouteString(json, 'lineName'),
-      score: _requiredRouteInt(json, 'score'),
+      score: legacyScore ?? burdenCost,
+      burdenCost: burdenCost,
+      estimatedDurationSeconds: _optionalRouteInt(
+        json,
+        'estimatedDurationSeconds',
+      ),
+      walkingDistanceMeters: _optionalRouteInt(json, 'walkingDistanceMeters'),
+      transferCount: _optionalRouteInt(json, 'transferCount'),
       steps: rawSteps
           .map((item) {
             if (item is! Map<String, Object?>) {
@@ -594,6 +621,10 @@ class RouteSearchResult {
       recommendationReasons: _routeStringList(
         rawRecommendationReasons,
         'recommendation reason',
+      ),
+      evidenceSummary: _routeStringList(
+        json['evidenceSummary'],
+        'route evidence summary',
       ),
       blockedReasons: rawBlockedReasons
           .map((item) {
@@ -617,11 +648,28 @@ class RouteSearchResult {
   final String lineId;
   final String lineName;
   final int score;
+  final int? _burdenCost;
+  final int? _estimatedDurationSeconds;
+  final int? _walkingDistanceMeters;
+  final int? _transferCount;
+  final List<String> evidenceSummary;
   final List<RouteSearchStep> steps;
   final List<RouteSearchWarning> warnings;
   final List<String> recommendationReasons;
   final List<String> blockedReasons;
   final String createdAt;
+
+  int get burdenCost => _burdenCost ?? score;
+
+  int get estimatedDurationSeconds {
+    return _estimatedDurationSeconds ??
+        steps.fold<int>(
+          0,
+          (sum, step) =>
+              sum +
+              (step.estimatedMinutes < 0 ? 0 : step.estimatedMinutes * 60),
+        );
+  }
 
   List<String> get recommendationReasonLabels {
     if (recommendationReasons.isEmpty) {
@@ -646,13 +694,17 @@ class RouteSearchResult {
   }
 
   int get walkingDistanceMeters {
-    return steps.fold<int>(
-      0,
-      (sum, step) => step.isWalkingStep ? sum + step.distanceMeters : sum,
-    );
+    return _walkingDistanceMeters ??
+        steps.fold<int>(
+          0,
+          (sum, step) => step.isWalkingStep ? sum + step.distanceMeters : sum,
+        );
   }
 
   int get transferCount {
+    if (_transferCount != null) {
+      return _transferCount;
+    }
     final typedTransfers = steps.where((step) => step.stepType == 'transfer');
     if (typedTransfers.isNotEmpty) {
       return typedTransfers.length;
@@ -4602,6 +4654,14 @@ int _requiredRouteInt(Map<String, Object?> json, String key) {
     return value;
   }
   throw FormatException('Missing required route field: $key');
+}
+
+int? _optionalRouteInt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is int) {
+    return value;
+  }
+  return null;
 }
 
 bool _requiredRouteBool(Map<String, Object?> json, String key) {

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:drift/drift.dart';
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
@@ -138,6 +141,11 @@ void main() {
       lineId: 'seoul-4',
       lineName: '수도권 4호선',
       score: 92,
+      burdenCost: 44,
+      estimatedDurationSeconds: 600,
+      walkingDistanceMeters: 120,
+      transferCount: 1,
+      evidenceSummary: const ['DURATION_ESTIMATED', 'DISTANCE_MEASURED'],
       steps: const [],
       warnings: const [],
       blockedReasons: const [],
@@ -154,6 +162,28 @@ void main() {
     expect(saved.routeSearchId, result.routeSearchId);
     expect(favorites.single.lineName, '수도권 4호선');
     expect(favorites.single.score, 92);
+    final snapshotRows = await userDatabase
+        .customSelect(
+          'SELECT value FROM app_preferences WHERE key = ?',
+          variables: [
+            Variable.withString(
+              'favorite_route_snapshot:${result.routeSearchId}::SENIOR',
+            ),
+          ],
+          readsFrom: {userDatabase.appPreferences},
+        )
+        .get();
+    final snapshot =
+        jsonDecode(snapshotRows.single.read<String>('value'))
+            as Map<String, Object?>;
+    expect(snapshot['burdenCost'], 44);
+    expect(snapshot['estimatedDurationSeconds'], 600);
+    expect(snapshot['walkingDistanceMeters'], 120);
+    expect(snapshot['transferCount'], 1);
+    expect(snapshot['evidenceSummary'], [
+      'DURATION_ESTIMATED',
+      'DISTANCE_MEASURED',
+    ]);
 
     await repository.removeFavoriteRoute(saved.favoriteRouteId);
 
