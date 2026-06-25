@@ -1119,10 +1119,7 @@ class _SelectedLineOverlayPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..strokeWidth = 14 * styleScale
       ..style = PaintingStyle.stroke;
-    for (final edge in edges) {
-      if (edge.lineId != lineId) {
-        continue;
-      }
+    for (final edge in _visibleEdges) {
       final from = stationsById[edge.fromStationId];
       final to = stationsById[edge.toStationId];
       if (from == null || to == null) {
@@ -1141,15 +1138,62 @@ class _SelectedLineOverlayPainter extends CustomPainter {
     }
     final stationBorderPaint = Paint()..color = lineColor;
     final stationFillPaint = Paint()..color = Colors.white;
-    for (final station in stationsById.values.toSet()) {
-      if (station.lineId != lineId) {
-        continue;
-      }
+    for (final station in _visibleStations) {
       final center = Offset(geometry.x(station), geometry.y(station));
       canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
       canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
     }
     canvas.restore();
+  }
+
+  int get visibleEdgeCount => _visibleEdges.length;
+
+  int get visibleStationCount => _visibleStations.length;
+
+  Rect get _visibleSourceBounds =>
+      camera.visibleSourceRect.inflate(96 / camera.scale);
+
+  List<NetworkMapEdge> get _visibleEdges {
+    final visibleBounds = _visibleSourceBounds;
+    return [
+      for (final edge in edges)
+        if (edge.lineId == lineId &&
+            _edgeSourceBounds(edge)?.overlaps(visibleBounds) == true)
+          edge,
+    ];
+  }
+
+  List<NetworkMapStation> get _visibleStations {
+    final visibleBounds = _visibleSourceBounds;
+    return [
+      for (final station in stationsById.values.toSet())
+        if (station.lineId == lineId &&
+            _stationOverlayBounds(station).overlaps(visibleBounds))
+          station,
+    ];
+  }
+
+  Rect? _edgeSourceBounds(NetworkMapEdge edge) {
+    final from = stationsById[edge.fromStationId];
+    final to = stationsById[edge.toStationId];
+    if (from == null || to == null) {
+      return null;
+    }
+    final segmentPath = _segmentPath(from, to);
+    final bounds = segmentPath == null
+        ? Rect.fromPoints(
+            Offset(geometry.x(from), geometry.y(from)),
+            Offset(geometry.x(to), geometry.y(to)),
+          )
+        : segmentPath.getBounds().shift(-geometry.origin);
+    return bounds.inflate(16 * styleScale);
+  }
+
+  Rect _stationOverlayBounds(NetworkMapStation station) {
+    return Rect.fromCircle(
+      center: Offset(geometry.x(station), geometry.y(station)),
+      radius: 13 * styleScale,
+    );
   }
 
   @override
