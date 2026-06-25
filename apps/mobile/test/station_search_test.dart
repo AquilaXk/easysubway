@@ -590,6 +590,7 @@ void main() {
     expect(facilities.single.latitude, 37.302795);
     expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
+    expect(facilities.single.statusTitle, '이용 가능');
     expect(facilities.single.confidenceLabel, '정보 신뢰도 높음');
     expect(facilities.single.dataSourceLabel, '출처 공식 파일');
   });
@@ -1330,22 +1331,40 @@ void main() {
       lastUpdatedAt: '2026-06-13',
       fieldValidationStatus: ' verified ',
     );
+    const uncheckedDescription = StationFacilityInfo(
+      id: 'facility-escalator-1',
+      stationId: 'station-sangnoksu',
+      exitId: 'exit-sangnoksu-1',
+      type: 'ESCALATOR',
+      name: '1번 출구 에스컬레이터',
+      floorFrom: '',
+      floorTo: '',
+      description: '현장 검증 전 이동 보조 시설',
+      status: 'NORMAL',
+      dataConfidence: 'LOW',
+      lastUpdatedAt: '2026-06-13',
+    );
 
     expect(ramp.typeLabel, '경사로');
     expect(ramp.statusLabel, '공사 중');
     expect(ramp.severityLabel, '점검·제보');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
     expect(ramp.confidenceLabel, '정보 확인 필요');
+    expect(ramp.statusTitle, '현장 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 공사 중, 점검·제보, 1F-B1, 최근 확인 2026-06-13, 현장 검증 전, 정보 확인 필요, 출처 확인 필요, 다음 행동 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태 확인 필요, 다음 행동 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '검수 완료');
     expect(customerCenter.severityLabel, '정상');
     expect(customerCenter.fieldValidationLabel, '현장 검증됨');
-    expect(customerCenter.semanticLabel, contains('정보 신뢰도 높음'));
-    expect(customerCenter.semanticLabel, contains('현장 검증됨'));
+    expect(customerCenter.statusTitle, '이용 가능');
+    expect(customerCenter.semanticLabel, isNot(contains('정보 신뢰도')));
+    expect(customerCenter.semanticLabel, isNot(contains('현장 검증')));
+    expect(customerCenter.semanticLabel, isNot(contains('출처')));
+    expect(uncheckedDescription.locationLabel, '이동 보조 시설');
+    expect(uncheckedDescription.semanticLabel, isNot(contains('현장 검증')));
   });
 }
 

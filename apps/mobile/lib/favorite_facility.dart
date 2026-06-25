@@ -279,13 +279,16 @@ class FavoriteFacility {
 
   int get statusPriority => statusPresentation.priority;
 
+  String get verificationStatusLabel =>
+      _facilityVerificationStatusLabel(dataConfidence);
+
   String get confidenceLabel => _dataConfidenceLabel(dataConfidence);
 
   String get dataSourceLabel => _dataSourceLabel(dataSourceType);
 
   String get locationLabel {
     if (description.trim().isNotEmpty) {
-      return description;
+      return _facilityUserLocationLabel(description);
     }
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
@@ -295,13 +298,8 @@ class FavoriteFacility {
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
-  String get semanticLabel {
-    final statusSemanticLabel = facilityStatusSemanticLabel(
-      statusLabel: statusLabel,
-      severityLabel: severityLabel,
-    );
-    return '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusSemanticLabel, $locationLabel, $updatedLabel, $confidenceLabel, $dataSourceLabel, 다음 행동 $nextActionLabel';
-  }
+  String get semanticLabel =>
+      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, 다음 행동 $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }
@@ -637,7 +635,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        favorite.statusLabel,
+                        favorite.statusTitle,
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF405A5D),
                           height: 1.3,
@@ -670,15 +668,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        favorite.confidenceLabel,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        favorite.dataSourceLabel,
+                        favorite.verificationStatusLabel,
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF405A5D),
                           height: 1.3,
@@ -750,6 +740,28 @@ String _dataConfidenceLabel(String dataConfidence) {
     'LOW' => '정보 확인 필요',
     _ => '정보 확인 필요',
   };
+}
+
+String _facilityVerificationStatusLabel(String dataConfidence) {
+  return switch (dataConfidence.trim().toUpperCase()) {
+    'HIGH' || 'MEDIUM' => '시설 상태 확인됨',
+    _ => '상태 확인 필요',
+  };
+}
+
+String _facilityUserLocationLabel(String description) {
+  var label = description.trim();
+  const internalValidationPhrases = [
+    '현장 검증됨',
+    '현장 검증 전',
+    '현장 재확인 필요',
+    '관리자 검수',
+  ];
+  for (final phrase in internalValidationPhrases) {
+    label = label.replaceAll(phrase, '');
+  }
+  label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return label.isEmpty ? '위치 확인 필요' : label;
 }
 
 String _dataSourceLabel(String dataSourceType) {

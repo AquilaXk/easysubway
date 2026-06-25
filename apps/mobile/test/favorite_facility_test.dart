@@ -35,7 +35,7 @@ void main() {
                 'name': '1번 출구 엘리베이터',
                 'floorFrom': '1F',
                 'floorTo': 'B1',
-                'description': '1번 출구 앞',
+                'description': '현장 검증 전 1번 출구 앞',
                 'status': 'NORMAL',
                 'dataConfidence': 'HIGH',
                 'dataSourceType': 'OFFICIAL_FILE',
@@ -69,12 +69,16 @@ void main() {
     expect(favorites.single.statusLabel, '정상');
     expect(favorites.single.severityLabel, '정상');
     expect(favorites.single.nextActionLabel, '상태 제보');
+    expect(favorites.single.statusTitle, '이용 가능');
     expect(favorites.single.confidenceLabel, '정보 신뢰도 높음');
     expect(favorites.single.dataSourceLabel, '출처 공식 파일');
+    expect(favorites.single.locationLabel, '1번 출구 앞');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 정상, 1번 출구 앞, 최근 확인 2026-06-12, 정보 신뢰도 높음, 출처 공식 파일, 다음 행동 상태 제보',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태 확인됨, 다음 행동 상태 제보',
     );
+    expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
+    expect(favorites.single.semanticLabel, isNot(contains('출처')));
   });
 
   test('즐겨찾기 시설 상태는 심각도와 다음 행동을 구분한다', () {
