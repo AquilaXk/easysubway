@@ -2509,6 +2509,26 @@ void main() {
     expect(find.textContaining('연결 정보'), findsNothing);
     expect(find.textContaining('익명화'), findsNothing);
     expect(find.textContaining('local-user'), findsNothing);
+    expect(
+      find.byKey(const Key('dataDeletionResultStatus-favoriteStations')),
+      findsOneWidget,
+    );
+    final stationIconBadge = tester.widget<Container>(
+      find.byKey(const Key('dataDeletionResultIcon-favoriteStations')),
+    );
+    final stationIconDecoration = stationIconBadge.decoration! as BoxDecoration;
+    expect(stationIconDecoration.border, isNotNull);
+    expect(
+      stationIconDecoration.color,
+      isNot(EasySubwayAccessibleColors.mintSoft),
+    );
+    final stationRow = tester.getRect(
+      find.byKey(const Key('dataDeletionResultRow-favoriteStations')),
+    );
+    final facilityRow = tester.getRect(
+      find.byKey(const Key('dataDeletionResultRow-favoriteFacilities')),
+    );
+    expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(10));
 
     await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
     await tester.pumpAndSettle();
@@ -2524,6 +2544,42 @@ void main() {
     expect(onboardingStore.savedResult, isNull);
     expect(draftTargetStore.target, isNull);
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+  });
+
+  testWidgets('데이터 삭제 결과 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UserDataDeletionResultScreen(
+          result: const UserDataDeletionResult(
+            userId: 'anonymous-user-1',
+            deletedFavoriteStationCount: 1,
+            deletedFavoriteFacilityCount: 1,
+            deletedFavoriteRouteCount: 1,
+            anonymizedRouteFeedbackCount: 1,
+            notificationSettingsDeleted: true,
+            deletedRegisteredDeviceCount: 1,
+            deletedPushNotificationCount: 1,
+            mobilityProfileDeleted: true,
+            anonymizedReportCount: 1,
+          ),
+          deletionScope: UserDataDeletionScope.deviceOnly,
+          onRestart: () {},
+        ),
+      ),
+    );
+
+    final screenBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('dataDeletionResultStartButton')),
+    );
+
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
   });
 
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
@@ -3640,6 +3696,31 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('길찾기 하단 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+
+    final screenBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final buttonRect = tester.getRect(
+      find.byKey(const Key('routeSearchSubmitButton')),
+    );
+
+    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(54));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
