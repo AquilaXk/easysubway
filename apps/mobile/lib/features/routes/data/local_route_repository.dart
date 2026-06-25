@@ -4,7 +4,6 @@ import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
 import '../domain/route_result.dart' as local;
-import '../domain/route_step.dart' as local;
 
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({required this.catalogDatabase});
@@ -55,7 +54,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       status: result.status == local.RouteStatus.found ? 'FOUND' : 'BLOCKED',
       lineId: primaryLineId,
       lineName: primaryLineName,
-      score: _scoreFromCost(result.totalCost),
+      score: result.totalCost,
       steps: _toSteps(result, catalog),
       warnings: result.warnings
           .map(
@@ -87,6 +86,7 @@ class LocalRouteRepository implements RouteSearchRepository {
 
           return RouteSearchStep(
             sequence: step.sequence,
+            stepType: step.type.name,
             title: _stepTitle(step.type.name, fromName, toName, lineName),
             description: _stepDescription(step.type.name, fromName, toName),
             lineId: step.lineId,
@@ -105,8 +105,8 @@ class LocalRouteRepository implements RouteSearchRepository {
               toName,
               lineName,
             ),
-            reason: _stepReason(step),
-            evidenceSources: step.evidenceSources,
+            reason: _stepReason(),
+            evidenceSources: const [],
             timeSource: step.timeSource,
             distanceSource: step.distanceSource,
             confidenceLabel: step.confidenceLabel,
@@ -166,18 +166,8 @@ class LocalRouteRepository implements RouteSearchRepository {
     };
   }
 
-  String _stepReason(local.RouteStep step) {
-    final source = step.evidenceSources.isEmpty
-        ? '선택된 경로'
-        : '선택된 경로 ${step.evidenceSources.first}';
-    return '$source 근거로 안내합니다.';
-  }
-
-  int _scoreFromCost(int cost) {
-    if (cost <= 0) {
-      return 0;
-    }
-    return (100 - (cost / 20).round()).clamp(1, 100);
+  String _stepReason() {
+    return '선택한 경로 기준으로 안내합니다.';
   }
 
   List<String> _recommendationReasons(local.LocalRouteResult result) {

@@ -2603,7 +2603,8 @@ void main() {
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
-      expect(find.text('이동 편의도 92점'), findsOneWidget);
+      expect(find.text('이동 편의도 92점'), findsNothing);
+      expect(find.text('상세 이동 정보는 다시 검색해 확인'), findsOneWidget);
       expect(
         find.text('기준: 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13'),
         findsOneWidget,
@@ -2612,7 +2613,7 @@ void main() {
       expect(find.text('계단 정보 확인 필요 · 엘리베이터 연결 확인 필요'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 이동 편의도 92점, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
         ),
         findsOneWidget,
       );
@@ -5059,20 +5060,17 @@ void main() {
       expect(find.text('추천 경로'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
       expect(find.text('도착 안내'), findsOneWidget);
-      expect(find.text('2번 출구의 엘리베이터를 먼저 확인하세요.'), findsOneWidget);
+      expect(find.text('도착역에서 계단 없는 출구 동선을 확인합니다.'), findsOneWidget);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('열차 이동'), findsOneWidget);
-      expect(
-        find.text('선택된 경로 edge:edge-sangnoksu-sadang 근거로 안내합니다.'),
-        findsOneWidget,
-      );
-      expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
+      expect(find.text('선택한 경로 기준으로 안내합니다.'), findsOneWidget);
+      expect(find.textContaining('edge:'), findsNothing);
+      expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
+      expect(find.textContaining('MEASURED'), findsNothing);
+      expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
       expect(find.text('일부 시설 정보는 확인이 필요합니다.'), findsOneWidget);
-      expect(
-        find.text('접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.'),
-        findsOneWidget,
-      );
+      expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
 
       await tester.ensureVisible(
         find.byKey(const Key('routeStartGuidanceButton')),
@@ -5082,7 +5080,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('단계별 안내'), findsOneWidget);
-      expect(find.text('상록수역에서 4호선 승강장으로 이동'), findsOneWidget);
+      expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('다음'), findsOneWidget);
       expect(
         find.byKey(const Key('routeOpenInternalRouteButton')),
@@ -5697,7 +5695,7 @@ void main() {
     }
   });
 
-  testWidgets('같은 노선의 명시적 환승 단계는 환승 횟수에 포함된다', (tester) async {
+  testWidgets('경로 요약은 stepType 기반 환승과 보행 거리만 표시한다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: RouteSearchScreen(
@@ -5706,20 +5704,21 @@ void main() {
               steps: const [
                 RouteSearchStep(
                   sequence: 1,
-                  title: '상록수역에서 대기',
-                  description: '승강장에서 다음 열차를 기다립니다.',
+                  stepType: 'entry',
+                  title: '출발역 승강장 접근',
+                  description: '엘리베이터로 승강장까지 이동합니다.',
                   lineId: 'seoul-4',
                   lineName: '수도권 4호선',
                   fromStationId: 'station-sangnoksu',
                   toStationId: 'station-sangnoksu',
                   estimatedMinutes: 2,
-                  distanceMeters: 0,
+                  distanceMeters: 180,
                   includesStairs: false,
-                  requiresAccessibilityCheck: false,
-                  actionTitle: '환승',
+                  requiresAccessibilityCheck: true,
                 ),
                 RouteSearchStep(
                   sequence: 2,
+                  stepType: 'ride',
                   title: '사당역까지 이동',
                   description: '같은 4호선 열차로 이동합니다.',
                   lineId: 'seoul-4',
@@ -5727,10 +5726,24 @@ void main() {
                   fromStationId: 'station-sangnoksu',
                   toStationId: 'station-sadang',
                   estimatedMinutes: 20,
-                  distanceMeters: 0,
+                  distanceMeters: 10000,
                   includesStairs: false,
                   requiresAccessibilityCheck: false,
                   actionTitle: '열차 이동',
+                ),
+                RouteSearchStep(
+                  sequence: 3,
+                  stepType: 'transfer',
+                  title: '노선 변경 준비',
+                  description: '다음 열차 승강장으로 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sadang',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 4,
+                  distanceMeters: 120,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
                 ),
               ],
             ),
@@ -5754,7 +5767,8 @@ void main() {
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('환승 1회'), findsWidgets);
+    expect(find.text('환승 1회 · 걷기 300m'), findsOneWidget);
+    expect(find.textContaining('걷기 10.3km'), findsNothing);
   });
 
   testWidgets('길이 막혔어요는 성공 경로를 blocked 화면으로 바꾸지 않는다', (tester) async {
@@ -6248,7 +6262,7 @@ void main() {
       expect(find.text('계단 없는 경로가 없습니다'), findsOneWidget);
       expect(find.text('추천 이유'), findsNothing);
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
-      expect(find.text('휠체어로 이동 가능한 엘리베이터가 없습니다.'), findsOneWidget);
+      expect(find.text('안내 가능한 경로를 찾지 못했습니다.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
@@ -8852,6 +8866,7 @@ RouteSearchResult _sampleRouteSearchResult({
             timeSource: 'STATIC_ESTIMATE',
             distanceSource: 'MEASURED',
             confidenceLabel: '높은 신뢰도',
+            stepType: 'entry',
           ),
           RouteSearchStep(
             sequence: 2,
@@ -8865,6 +8880,7 @@ RouteSearchResult _sampleRouteSearchResult({
             distanceMeters: 120,
             includesStairs: false,
             requiresAccessibilityCheck: true,
+            stepType: 'exit',
           ),
         ],
     warnings: const [

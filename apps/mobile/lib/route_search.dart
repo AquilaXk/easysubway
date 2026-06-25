@@ -460,7 +460,7 @@ class FavoriteRoute {
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
-  String get scoreLabel => '이동 편의도 $score점';
+  String get scoreLabel => '상세 이동 정보는 다시 검색해 확인';
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
@@ -623,6 +623,44 @@ class RouteSearchResult {
   final List<String> blockedReasons;
   final String createdAt;
 
+  List<String> get recommendationReasonLabels {
+    if (recommendationReasons.isEmpty) {
+      return const [];
+    }
+    return const ['선택한 경로 기준으로 안내합니다.'];
+  }
+
+  List<String> get blockedReasonLabels {
+    return blockedReasons.map(_routeBlockedReasonLabel).toList(growable: false);
+  }
+
+  int get walkingDistanceMeters {
+    return steps.fold<int>(
+      0,
+      (sum, step) => step.isWalkingStep ? sum + step.distanceMeters : sum,
+    );
+  }
+
+  int get transferCount {
+    final typedTransfers = steps.where((step) => step.stepType == 'transfer');
+    if (typedTransfers.isNotEmpty) {
+      return typedTransfers.length;
+    }
+    var previousLine = '';
+    var changes = 0;
+    for (final step in movementSteps) {
+      final line = step.lineId.isNotEmpty ? step.lineId : step.lineName;
+      if (line.isEmpty) {
+        continue;
+      }
+      if (previousLine.isNotEmpty && previousLine != line) {
+        changes += 1;
+      }
+      previousLine = line;
+    }
+    return changes;
+  }
+
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
   String get statusLabel {
@@ -633,7 +671,8 @@ class RouteSearchResult {
     };
   }
 
-  String get scoreLabel => '이동 편의도 $score점';
+  String get scoreLabel =>
+      isBlocked || warnings.isNotEmpty ? '이동 부담 확인 필요' : '이동 부담 낮음';
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
@@ -668,7 +707,7 @@ class RouteSearchResult {
     if (isBlocked) {
       return '다른 경로 필요';
     }
-    return score >= 80 ? '이동 편함' : '조금 불편';
+    return warnings.isEmpty ? '이동 부담 낮음' : '확인 필요 구간 있음';
   }
 
   String get guidanceLabel {
@@ -705,21 +744,25 @@ class RouteSearchResult {
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
     }
-    if (!isBlocked && recommendationReasons.isNotEmpty) {
-      parts.add('추천 이유 ${recommendationReasons.join(', ')}');
+    final safeRecommendationReasons = recommendationReasonLabels;
+    if (!isBlocked && safeRecommendationReasons.isNotEmpty) {
+      parts.add('추천 이유 ${safeRecommendationReasons.join(', ')}');
     }
     final arrivalStep = arrivalGuidanceStep;
     if (arrivalStep != null) {
-      parts.add('도착 안내 ${arrivalStep.description}');
+      parts.add('도착 안내 ${arrivalStep.userDescription}');
     }
-    if (blockedReasons.isNotEmpty) {
-      parts.add('안내 불가 이유 ${blockedReasons.join(', ')}');
+    final safeBlockedReasons = blockedReasonLabels;
+    if (safeBlockedReasons.isNotEmpty) {
+      parts.add('안내 불가 이유 ${safeBlockedReasons.join(', ')}');
     }
     if (isBlocked) {
       parts.add('다음 행동 $_routeSearchFailureNextAction');
     }
     if (warnings.isNotEmpty) {
-      parts.add('주의 ${warnings.map((warning) => warning.message).join(', ')}');
+      parts.add(
+        '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
+      );
     }
     final stepsForGuidance = movementSteps;
     if (stepsForGuidance.isNotEmpty) {
@@ -738,6 +781,7 @@ class RouteSearchResult {
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
+    this.stepType = '',
     required this.title,
     required this.description,
     required this.lineId,
@@ -762,6 +806,7 @@ class RouteSearchStep {
     final description = _requiredRouteString(json, 'description');
     return RouteSearchStep(
       sequence: _requiredRouteInt(json, 'sequence'),
+      stepType: _optionalRouteString(json, 'stepType'),
       title: title,
       description: description,
       lineId: _optionalRouteString(json, 'lineId'),
@@ -791,6 +836,7 @@ class RouteSearchStep {
   }
 
   final int sequence;
+  final String stepType;
   final String title;
   final String description;
   final String lineId;
@@ -809,6 +855,10 @@ class RouteSearchStep {
   final String distanceSource;
   final String confidenceLabel;
 
+  String get userReason => _routeStepReasonLabel(reason);
+
+  String get userDescription => _routeStepDetailLabel(stepType: stepType);
+
   String get burdenLabel {
     final labels = <String>[
       _routeDurationLabel(estimatedMinutes),
@@ -820,16 +870,13 @@ class RouteSearchStep {
   }
 
   String get semanticGuidanceLabel {
+    final safeReason = _routeStepReasonLabel(reason);
     final labels = <String>[
       '$sequence번 ${actionTitle.isEmpty ? title : actionTitle}',
-      actionDetail.isEmpty ? description : actionDetail,
-      if (reason.isNotEmpty) reason,
+      _routeStepDetailLabel(stepType: stepType),
+      if (safeReason.isNotEmpty) safeReason,
       burdenLabel,
-      if (hasMetricSourceMetadata) '시간 ${_routeTimeSourceLabel(timeSource)}',
-      if (hasMetricSourceMetadata)
-        '거리 ${_routeDistanceSourceLabel(distanceSource)}',
-      if (hasMetricSourceMetadata) confidenceLabel,
-      if (evidenceSources.isNotEmpty) '근거 ${evidenceSources.join(', ')}',
+      if (hasMetricSourceMetadata) '시간과 거리는 앱 경로 데이터 기준',
     ];
     return labels.join(', ');
   }
@@ -839,15 +886,19 @@ class RouteSearchStep {
       distanceSource.isNotEmpty ||
       confidenceLabel.isNotEmpty;
 
+  bool get isWalkingStep {
+    return switch (stepType) {
+      'entry' || 'exit' || 'transfer' || 'internal' => true,
+      'ride' => false,
+      _ => requiresAccessibilityCheck,
+    };
+  }
+
   String get metricSourceLabel {
     if (!hasMetricSourceMetadata) {
       return '';
     }
-    return [
-      '시간 ${_routeTimeSourceLabel(timeSource)}',
-      '거리 ${_routeDistanceSourceLabel(distanceSource)}',
-      confidenceLabel,
-    ].join(' · ');
+    return '앱 경로 데이터 기준';
   }
 }
 
@@ -873,20 +924,46 @@ String _routeDistanceLabel(int distanceMeters) {
   return '${kilometers.toStringAsFixed(1)}km';
 }
 
-String _routeTimeSourceLabel(String source) {
-  return switch (source) {
-    'STATIC_ESTIMATE' => '정적 추정',
-    'REALTIME_ADJUSTED' => '실시간 보정',
-    'MEASURED' => '측정값',
-    _ => '확인 필요',
+String _routeWarningLabel(String code, String message) {
+  return switch (code.trim()) {
+    'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
+    'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
+    'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
+    'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+    _ => '이동 전 현장 안내를 확인해 주세요.',
   };
 }
 
-String _routeDistanceSourceLabel(String source) {
-  return switch (source) {
-    'MEASURED' => '측정값',
-    'STATIC_ESTIMATE' => '정적 추정',
-    _ => '확인 필요',
+String _routeBlockedReasonLabel(String reason) {
+  return switch (reason.trim()) {
+    'STAIR_ONLY_ACCESS' => '계단 없는 경로를 찾지 못했습니다.',
+    'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
+    'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+    '계단 없는 경로를 찾지 못했습니다.' => '계단 없는 경로를 찾지 못했습니다.',
+    '계단 없는 동선 여부를 확인할 수 없습니다.' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    '필수 접근성 시설을 사용할 수 없습니다.' => '필수 접근성 시설을 사용할 수 없습니다.',
+    '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+    _ => '안내 가능한 경로를 찾지 못했습니다.',
+  };
+}
+
+String _routeStepReasonLabel(String reason) {
+  if (reason.trim().isEmpty) {
+    return '';
+  }
+  return '선택한 경로 기준으로 안내합니다.';
+}
+
+String _routeStepDetailLabel({required String stepType}) {
+  return switch (stepType) {
+    'entry' => '계단 없는 승강장 접근 동선을 확인해 이동합니다.',
+    'exit' => '도착역에서 계단 없는 출구 동선을 확인합니다.',
+    'transfer' => '다음 노선으로 갈아탈 준비를 합니다.',
+    'ride' => '열차를 이용해 이동합니다.',
+    _ => '안내된 순서대로 이동합니다.',
   };
 }
 
@@ -902,6 +979,8 @@ class RouteSearchWarning {
 
   final String code;
   final String message;
+
+  String get userMessage => _routeWarningLabel(code, message);
 }
 
 enum RouteSearchViewStatus { idle, loading, success, failure }
@@ -2563,16 +2642,6 @@ class _RouteResultsListView extends StatelessWidget {
   }
 }
 
-bool _routeStepIsExplicitTransfer(RouteSearchStep step) {
-  return step.actionTitle.contains('환승') ||
-      step.title.contains('환승') ||
-      step.description.contains('환승');
-}
-
-int _routeExplicitTransferCount(List<RouteSearchStep> steps) {
-  return steps.where(_routeStepIsExplicitTransfer).length;
-}
-
 class _RouteDetailWorkflowView extends StatelessWidget {
   const _RouteDetailWorkflowView({
     required this.result,
@@ -2617,7 +2686,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
           for (final warning in result.warnings)
             _RouteNotice(
               title: '주의 확인',
-              text: warning.message,
+              text: warning.userMessage,
               icon: Icons.warning_amber,
             ),
         ],
@@ -2663,6 +2732,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final steps = result.movementSteps;
     final nextStep = steps.length > 1 ? steps[1] : result.arrivalGuidanceStep;
+    final blockedReasonLabels = result.blockedReasonLabels;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2903,9 +2973,9 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                           const SizedBox(height: 15),
                           const _RoutePrototypeLinePath(),
                         ],
-                        if (result.blockedReasons.isNotEmpty) ...[
+                        if (blockedReasonLabels.isNotEmpty) ...[
                           const SizedBox(height: 13),
-                          for (final reason in result.blockedReasons)
+                          for (final reason in blockedReasonLabels)
                             _RoutePrototypeReason(text: reason, blocked: true),
                         ],
                         if (result.arrivalGuidanceStep != null) ...[
@@ -2919,7 +2989,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                           for (final warning in result.warnings)
                             _RouteNotice(
                               title: '주의 확인',
-                              text: warning.message,
+                              text: warning.userMessage,
                               icon: Icons.warning_amber,
                             ),
                         ],
@@ -3022,9 +3092,9 @@ class _RouteBlockedWorkflow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reasons = result.blockedReasons.isNotEmpty
-        ? result.blockedReasons
-        : result.warnings.map((warning) => warning.message);
+    final reasons = result.blockedReasonLabels.isNotEmpty
+        ? result.blockedReasonLabels
+        : result.warnings.map((warning) => warning.userMessage);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3352,33 +3422,13 @@ int _routeTotalMinutes(RouteSearchResult result) {
   return result.steps.fold<int>(0, (sum, step) => sum + step.estimatedMinutes);
 }
 
-int _routeTotalDistanceMeters(RouteSearchResult result) {
-  return result.steps.fold<int>(0, (sum, step) => sum + step.distanceMeters);
-}
-
 String _routeTransferLabel(RouteSearchResult result) {
-  final movementSteps = result.movementSteps;
-  final explicitTransfers = _routeExplicitTransferCount(movementSteps);
-  if (explicitTransfers > 0) {
-    return '환승 $explicitTransfers회';
-  }
-  var previousLine = '';
-  var changes = 0;
-  for (final step in movementSteps) {
-    final line = step.lineId.isNotEmpty ? step.lineId : step.lineName;
-    if (line.isEmpty) {
-      continue;
-    }
-    if (previousLine.isNotEmpty && previousLine != line) {
-      changes += 1;
-    }
-    previousLine = line;
-  }
-  return changes == 0 ? '환승 없음' : '환승 $changes회';
+  final transfers = result.transferCount;
+  return transfers == 0 ? '환승 없음' : '환승 $transfers회';
 }
 
 String _routeWalkingDistanceLabel(RouteSearchResult result) {
-  return _routeDistanceLabel(_routeTotalDistanceMeters(result));
+  return _routeDistanceLabel(result.walkingDistanceMeters);
 }
 
 String _routeMetaLabel(RouteSearchResult result) {
@@ -3602,7 +3652,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    step.description,
+                    step.userDescription,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF102A2C),
                       fontWeight: FontWeight.w800,
@@ -3776,17 +3826,17 @@ class _RouteStepTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  step.description,
+                  step.userDescription,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: const Color(0xFF405A5D),
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
                 ),
-                if (step.reason.isNotEmpty) ...[
+                if (step.userReason.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    step.reason,
+                    step.userReason,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF405A5D),
                       fontWeight: FontWeight.w700,

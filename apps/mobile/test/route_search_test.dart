@@ -160,6 +160,7 @@ void main() {
               'steps': [
                 {
                   'sequence': 1,
+                  'stepType': 'entry',
                   'title': '상록수역에서 4호선 승강장으로 이동',
                   'description': '엘리베이터를 이용해 승강장으로 이동합니다.',
                   'lineId': 'seoul-4',
@@ -173,6 +174,7 @@ void main() {
                 },
                 {
                   'sequence': 2,
+                  'stepType': 'exit',
                   'title': '사당역에서 출구 접근성 정보를 확인',
                   'description': '2번 출구의 엘리베이터를 먼저 확인하세요.',
                   'lineId': 'seoul-4',
@@ -231,7 +233,8 @@ void main() {
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
-    expect(result.scoreLabel, '이동 편의도 92점');
+    expect(result.scoreLabel, '이동 부담 확인 필요');
+    expect(result.scoreLabel, isNot(contains('92점')));
     expect(result.recommendationReasons, [
       '엘리베이터 동선을 우선했어요',
       '계단 없는 출구를 확인했어요',
@@ -242,6 +245,7 @@ void main() {
     expect(result.steps.first.hasMetricSourceMetadata, isFalse);
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
+    expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
     expect(result.steps.first.burdenLabel, '약 4분 · 180m · 접근성 확인');
@@ -328,9 +332,12 @@ void main() {
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
   });
 
-  test('경로 검색 결과 음성 안내는 단계 행동 이유와 근거 출처를 같은 순서로 읽는다', () {
+  test('경로 검색 결과 음성 안내는 내부 식별자와 운영 출처 값을 읽지 않는다', () {
     final result = _sampleRouteSearchResult(
-      recommendationReasons: const ['선택된 경로 edge:edge-a-b-local 근거로 안내합니다.'],
+      recommendationReasons: const [
+        '선택된 경로 edge:edge-a-b-local 근거로 안내합니다.',
+        'OFFICIAL_FILE',
+      ],
       steps: const [
         RouteSearchStep(
           sequence: 1,
@@ -352,19 +359,40 @@ void main() {
           distanceSource: 'MEASURED',
           confidenceLabel: '높은 신뢰도',
         ),
+        RouteSearchStep(
+          sequence: 2,
+          title: '도착역 출구 이동',
+          description: 'edge:exit-b line:test STATIC_ESTIMATE',
+          lineId: 'line-test',
+          lineName: '테스트 노선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 1,
+          distanceMeters: 40,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+          actionTitle: '출구 이동',
+          actionDetail: 'edge:exit-b line:test STATIC_ESTIMATE',
+          reason: 'OFFICIAL_FILE',
+          evidenceSources: ['edge:exit-b'],
+          timeSource: 'STATIC_ESTIMATE',
+          distanceSource: 'MEASURED',
+          confidenceLabel: '측정값',
+          stepType: 'exit',
+        ),
       ],
     );
 
     final semanticLabel = result.semanticLabel;
-    expect(
-      semanticLabel,
-      contains(
-        '1번 열차 이동, 출발역에서 중간역까지 테스트 노선을 이용합니다., '
-        '선택된 경로 edge:edge-a-b-local 근거로 안내합니다., '
-        '약 2분 · 830m, '
-        '시간 정적 추정, 거리 측정값, 높은 신뢰도, 근거 edge:edge-a-b-local',
-      ),
-    );
+    expect(semanticLabel, contains('선택한 경로 기준으로 안내합니다.'));
+    expect(semanticLabel, contains('도착역에서 계단 없는 출구 동선을 확인합니다.'));
+    expect(semanticLabel, isNot(contains('edge:')));
+    expect(semanticLabel, isNot(contains('line:')));
+    expect(semanticLabel, isNot(contains('OFFICIAL_')));
+    expect(semanticLabel, isNot(contains('STATIC_ESTIMATE')));
+    expect(semanticLabel, isNot(contains('MEASURED')));
+    expect(semanticLabel, isNot(contains('정적 추정')));
+    expect(semanticLabel, isNot(contains('측정값')));
   });
 
   test('경로 단계 이동 부담은 긴 거리를 킬로미터로 표시한다', () {
@@ -419,6 +447,58 @@ void main() {
     );
 
     expect(step.burdenLabel, '시간 확인 필요 · 180m');
+  });
+
+  test('경로 요약 사실값은 열차 거리와 환승 문구에 의존하지 않는다', () {
+    final result = _sampleRouteSearchResult(
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '출발역 승강장 접근',
+          description: '엘리베이터로 승강장까지 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 3,
+          distanceMeters: 180,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+        ),
+        RouteSearchStep(
+          sequence: 2,
+          stepType: 'ride',
+          title: '수도권 4호선 이동',
+          description: '열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 30,
+          distanceMeters: 10000,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+        RouteSearchStep(
+          sequence: 3,
+          stepType: 'transfer',
+          title: '노선 변경 준비',
+          description: '다음 열차 승강장으로 이동합니다.',
+          lineId: 'seoul-2',
+          lineName: '수도권 2호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 4,
+          distanceMeters: 120,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+        ),
+      ],
+    );
+
+    expect(result.walkingDistanceMeters, 300);
+    expect(result.transferCount, 1);
   });
 
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {
@@ -481,7 +561,8 @@ void main() {
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
     expect(saved.mobilityLabel, '천천히 이동');
-    expect(saved.scoreLabel, '이동 편의도 92점');
+    expect(saved.scoreLabel, '상세 이동 정보는 다시 검색해 확인');
+    expect(saved.scoreLabel, isNot(contains('92점')));
   });
 
   test('경로 피드백 API 저장소는 익명 사용자 식별자와 평가를 전송한다', () async {
