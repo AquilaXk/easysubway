@@ -319,6 +319,7 @@ class DriftStationRepository
             rmp.y,
             rmp.label_dx,
             rmp.label_dy,
+            rmp.label_polygon,
             rmp.up_path,
             rmp.down_path,
             rmp.source_id
@@ -349,6 +350,7 @@ class DriftStationRepository
               y: row.read<int>('y'),
               labelDx: row.read<int>('label_dx'),
               labelDy: row.read<int>('label_dy'),
+              labelPolygon: row.read<String>('label_polygon'),
               upPath: row.read<String>('up_path'),
               downPath: row.read<String>('down_path'),
               sourceId: row.read<String>('source_id'),

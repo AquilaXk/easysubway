@@ -42,7 +42,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -63,6 +63,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 4) {
           await _addRouteMapPathColumns();
+        }
+        if (from < 5) {
+          await _addRouteMapLabelPolygonColumn();
         }
       },
       beforeOpen: (_) async {
@@ -518,6 +521,7 @@ class CatalogDatabase extends _$CatalogDatabase {
         y INTEGER NOT NULL CHECK (y >= 0),
         label_dx INTEGER NOT NULL DEFAULT 0,
         label_dy INTEGER NOT NULL DEFAULT 0,
+        label_polygon TEXT NOT NULL DEFAULT '',
         up_path TEXT NOT NULL DEFAULT '',
         down_path TEXT NOT NULL DEFAULT '',
         source_id TEXT NOT NULL,
@@ -535,6 +539,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   Future<void> _addRouteMapPathColumns() async {
+    await _addRouteMapLabelPolygonColumn();
     await _addColumnIfMissing(
       'route_map_positions',
       'up_path',
@@ -543,6 +548,14 @@ class CatalogDatabase extends _$CatalogDatabase {
     await _addColumnIfMissing(
       'route_map_positions',
       'down_path',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  Future<void> _addRouteMapLabelPolygonColumn() async {
+    await _addColumnIfMissing(
+      'route_map_positions',
+      'label_polygon',
       "TEXT NOT NULL DEFAULT ''",
     );
   }
