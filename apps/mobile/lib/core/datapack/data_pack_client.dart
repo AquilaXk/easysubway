@@ -12,6 +12,7 @@ class DataPackClient {
     required this.manifestUri,
     required this.stateRepository,
     this.productionSigningPublicKey,
+    this.expectedManifestChannel = 'production',
     HttpClient? httpClient,
     DateTime Function()? now,
   }) : _httpClient = httpClient ?? HttpClient(),
@@ -20,6 +21,7 @@ class DataPackClient {
   final Uri manifestUri;
   final DataPackUpdateStateRepository stateRepository;
   final DataPackSigningPublicKey? productionSigningPublicKey;
+  final String expectedManifestChannel;
   final HttpClient _httpClient;
   final DateTime Function() _now;
 
@@ -41,10 +43,12 @@ class DataPackClient {
 
     final response = await request.close().timeout(_manifestFetchTimeout);
     if (response.statusCode == HttpStatus.notModified && cache != null) {
+      final checkedAt = _now().toUtc();
       await stateRepository.saveManifestCache(
         etag: cache.etag,
-        checkedAt: _now().toUtc(),
-        ttl: cache.ttl,
+        checkedAt: checkedAt,
+        ttl: _cacheTtlBoundedByExpiry(cache.ttl, cache.expiresAt, checkedAt),
+        expiresAt: cache.expiresAt,
       );
       return const DataPackManifestFetchResult(
         status: DataPackManifestFetchStatus.notModified,
@@ -65,6 +69,15 @@ class DataPackClient {
       decoded,
       productionSigningPublicKey: productionSigningPublicKey,
     );
+    _ensureExpectedManifestChannel(manifest);
+    if (manifest.isExpiredAt(_now())) {
+      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+    }
+    try {
+      await stateRepository.ensureManifestCanBeAccepted(manifest);
+    } on DataPackManifestReplayException catch (error) {
+      throw DataPackClientException(error.message);
+    }
     return DataPackManifestFetchResult(
       status: DataPackManifestFetchStatus.updated,
       manifest: manifest,
@@ -79,11 +92,42 @@ class DataPackClient {
     if (manifest == null || checkedAt == null) {
       return;
     }
+    _ensureExpectedManifestChannel(manifest);
+    final expiresAt = manifest.expiresAt;
+    await stateRepository.saveAcceptedManifestState(manifest);
     await stateRepository.saveManifestCache(
       etag: result.etag,
       checkedAt: checkedAt,
-      ttl: manifest.ttl,
+      ttl: _cacheTtlBoundedByExpiry(manifest.ttl, expiresAt, checkedAt),
+      expiresAt: expiresAt,
     );
+  }
+
+  Duration _cacheTtlBoundedByExpiry(
+    Duration ttl,
+    DateTime? expiresAt,
+    DateTime checkedAt,
+  ) {
+    if (expiresAt == null) {
+      return ttl;
+    }
+    final expiryTtl = expiresAt.difference(checkedAt.toUtc());
+    if (expiryTtl <= Duration.zero) {
+      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+    }
+    return expiryTtl < ttl ? expiryTtl : ttl;
+  }
+
+  void _ensureExpectedManifestChannel(DataPackManifest manifest) {
+    if (!manifest.hasReplayProtection) {
+      return;
+    }
+    final expected = expectedManifestChannel.trim().isEmpty
+        ? 'production'
+        : expectedManifestChannel.trim();
+    if (manifest.channel != expected) {
+      throw const DataPackClientException('데이터팩 manifest 채널이 올바르지 않습니다.');
+    }
   }
 }
 
