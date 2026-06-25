@@ -69,6 +69,9 @@ class _AndroidRouteMapViewportWebViewState
       return const ColoredBox(color: Color(0xffffffff));
     }
     return AndroidView(
+      key: ValueKey<String>(
+        'routeMapViewportWebView:${widget.assetPath}:${widget.mimeType}',
+      ),
       viewType: androidRouteMapViewportWebViewType,
       creationParams: androidRouteMapViewportCreationParams(
         assetPath: widget.assetPath,

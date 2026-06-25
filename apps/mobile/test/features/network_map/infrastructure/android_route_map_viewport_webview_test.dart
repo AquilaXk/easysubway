@@ -1,7 +1,9 @@
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_renderer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -107,5 +109,33 @@ void main() {
           ),
           null,
         );
+  });
+
+  testWidgets('widget recreates platform view when asset identity changes', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: AndroidRouteMapViewportWebView(
+          assetPath: 'assets/datapacks/maps/seoul-official-route-map.svg',
+          mimeType: 'image/svg+xml',
+          camera: camera,
+        ),
+      ),
+    );
+
+    final view = tester.widget<AndroidView>(find.byType(AndroidView));
+
+    expect(
+      view.key,
+      const ValueKey<String>(
+        'routeMapViewportWebView:assets/datapacks/maps/seoul-official-route-map.svg:image/svg+xml',
+      ),
+    );
+    debugDefaultTargetPlatformOverride = null;
   });
 }
