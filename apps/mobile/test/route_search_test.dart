@@ -126,6 +126,34 @@ void main() {
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
   });
 
+  test('내부 경로 API 저장소는 잘못된 envelope를 기능 오류로 바꾼다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'success': false}))
+        ..close();
+    });
+
+    final repository = InternalRouteApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await expectLater(
+      repository.listRouteNodes('station-sangnoksu'),
+      throwsA(
+        isA<InternalRouteException>().having(
+          (error) => error.message,
+          'message',
+          '내부 이동 안내를 불러오지 못했습니다.',
+        ),
+      ),
+    );
+  });
+
   test('경로 API 저장소는 백엔드 경로 검색을 요청하고 결과를 파싱한다', () async {
     late Uri requestedUri;
     late String requestedBody;

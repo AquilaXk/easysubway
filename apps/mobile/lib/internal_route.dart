@@ -1,12 +1,10 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
-const _internalRouteTimeout = Duration(seconds: 8);
 const _internalRouteErrorMessage = '내부 이동 안내를 불러오지 못했습니다.';
 
 abstract class InternalRouteRepository {
@@ -16,20 +14,19 @@ abstract class InternalRouteRepository {
 }
 
 class InternalRouteApiRepository implements InternalRouteRepository {
-  InternalRouteApiRepository({required this.baseUri, HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  InternalRouteApiRepository({required Uri baseUri, ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient(baseUri: baseUri);
 
-  final Uri baseUri;
-  final HttpClient _httpClient;
+  final ApiClient _apiClient;
 
   @override
   Future<List<InternalRouteNode>> listRouteNodes(String stationId) async {
-    final uri = baseUri.resolve(
-      '/api/v1/stations/${Uri.encodeComponent(stationId.trim())}/route-nodes',
-    );
-
     try {
-      final data = await _getData(uri);
+      final data = await _requestData(
+        () => _apiClient.getJson(
+          '/api/v1/stations/${Uri.encodeComponent(stationId.trim())}/route-nodes',
+        ),
+      );
       if (data is! List<Object?>) {
         throw const InternalRouteException(_internalRouteErrorMessage);
       }
@@ -57,16 +54,13 @@ class InternalRouteApiRepository implements InternalRouteRepository {
   Future<InternalRouteResult> searchInternalRoute(
     InternalRouteRequest routeRequest,
   ) async {
-    final uri = baseUri.resolve('/api/v1/routes/internal');
-
     try {
-      final request = await _httpClient
-          .postUrl(uri)
-          .timeout(_internalRouteTimeout);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(routeRequest.toJson()));
-
-      final data = await _readResponseData(request);
+      final data = await _requestData(
+        () => _apiClient.postJson(
+          '/api/v1/routes/internal',
+          body: routeRequest.toJson(),
+        ),
+      );
       if (data is! Map<String, Object?>) {
         throw const InternalRouteException(_internalRouteErrorMessage);
       }
@@ -84,29 +78,13 @@ class InternalRouteApiRepository implements InternalRouteRepository {
     }
   }
 
-  Future<Object?> _getData(Uri uri) async {
-    final request = await _httpClient
-        .getUrl(uri)
-        .timeout(_internalRouteTimeout);
-    return _readResponseData(request);
-  }
-
-  Future<Object?> _readResponseData(HttpClientRequest request) async {
-    final response = await request.close().timeout(_internalRouteTimeout);
-    final body = await utf8
-        .decodeStream(response)
-        .timeout(_internalRouteTimeout);
-
-    if (response.statusCode != HttpStatus.ok) {
-      throw const InternalRouteException(_internalRouteErrorMessage);
-    }
-
-    final decoded = jsonDecode(body);
-    if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-      throw const InternalRouteException(_internalRouteErrorMessage);
-    }
-
-    return decoded['data'];
+  Future<Object?> _requestData(Future<ApiResponse> Function() send) async {
+    final response = await send();
+    return response.requireSuccessData(
+      expectedStatusCode: HttpStatus.ok,
+      errorFactory: () =>
+          const InternalRouteException(_internalRouteErrorMessage),
+    );
   }
 }
 
