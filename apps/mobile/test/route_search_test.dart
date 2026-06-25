@@ -160,6 +160,7 @@ void main() {
               'steps': [
                 {
                   'sequence': 1,
+                  'stepType': 'entry',
                   'title': '상록수역에서 4호선 승강장으로 이동',
                   'description': '엘리베이터를 이용해 승강장으로 이동합니다.',
                   'lineId': 'seoul-4',
@@ -173,6 +174,7 @@ void main() {
                 },
                 {
                   'sequence': 2,
+                  'stepType': 'exit',
                   'title': '사당역에서 출구 접근성 정보를 확인',
                   'description': '2번 출구의 엘리베이터를 먼저 확인하세요.',
                   'lineId': 'seoul-4',
@@ -243,6 +245,7 @@ void main() {
     expect(result.steps.first.hasMetricSourceMetadata, isFalse);
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
+    expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
     expect(result.steps.first.burdenLabel, '약 4분 · 180m · 접근성 확인');
@@ -420,6 +423,58 @@ void main() {
     );
 
     expect(step.burdenLabel, '시간 확인 필요 · 180m');
+  });
+
+  test('경로 요약 사실값은 열차 거리와 환승 문구에 의존하지 않는다', () {
+    final result = _sampleRouteSearchResult(
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '출발역 승강장 접근',
+          description: '엘리베이터로 승강장까지 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 3,
+          distanceMeters: 180,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+        ),
+        RouteSearchStep(
+          sequence: 2,
+          stepType: 'ride',
+          title: '수도권 4호선 이동',
+          description: '열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 30,
+          distanceMeters: 10000,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+        RouteSearchStep(
+          sequence: 3,
+          stepType: 'transfer',
+          title: '노선 변경 준비',
+          description: '다음 열차 승강장으로 이동합니다.',
+          lineId: 'seoul-2',
+          lineName: '수도권 2호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 4,
+          distanceMeters: 120,
+          includesStairs: false,
+          requiresAccessibilityCheck: true,
+        ),
+      ],
+    );
+
+    expect(result.walkingDistanceMeters, 300);
+    expect(result.transferCount, 1);
   });
 
   test('즐겨찾기 경로 API 저장소는 인증 헤더로 저장과 목록과 삭제를 요청한다', () async {

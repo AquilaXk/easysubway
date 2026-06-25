@@ -5597,7 +5597,7 @@ void main() {
     }
   });
 
-  testWidgets('같은 노선의 명시적 환승 단계는 환승 횟수에 포함된다', (tester) async {
+  testWidgets('경로 요약은 stepType 기반 환승과 보행 거리만 표시한다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: RouteSearchScreen(
@@ -5606,20 +5606,21 @@ void main() {
               steps: const [
                 RouteSearchStep(
                   sequence: 1,
-                  title: '상록수역에서 대기',
-                  description: '승강장에서 다음 열차를 기다립니다.',
+                  stepType: 'entry',
+                  title: '출발역 승강장 접근',
+                  description: '엘리베이터로 승강장까지 이동합니다.',
                   lineId: 'seoul-4',
                   lineName: '수도권 4호선',
                   fromStationId: 'station-sangnoksu',
                   toStationId: 'station-sangnoksu',
                   estimatedMinutes: 2,
-                  distanceMeters: 0,
+                  distanceMeters: 180,
                   includesStairs: false,
-                  requiresAccessibilityCheck: false,
-                  actionTitle: '환승',
+                  requiresAccessibilityCheck: true,
                 ),
                 RouteSearchStep(
                   sequence: 2,
+                  stepType: 'ride',
                   title: '사당역까지 이동',
                   description: '같은 4호선 열차로 이동합니다.',
                   lineId: 'seoul-4',
@@ -5627,10 +5628,24 @@ void main() {
                   fromStationId: 'station-sangnoksu',
                   toStationId: 'station-sadang',
                   estimatedMinutes: 20,
-                  distanceMeters: 0,
+                  distanceMeters: 10000,
                   includesStairs: false,
                   requiresAccessibilityCheck: false,
                   actionTitle: '열차 이동',
+                ),
+                RouteSearchStep(
+                  sequence: 3,
+                  stepType: 'transfer',
+                  title: '노선 변경 준비',
+                  description: '다음 열차 승강장으로 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sadang',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 4,
+                  distanceMeters: 120,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
                 ),
               ],
             ),
@@ -5654,7 +5669,8 @@ void main() {
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('환승 1회'), findsWidgets);
+    expect(find.text('환승 1회 · 걷기 300m'), findsOneWidget);
+    expect(find.textContaining('걷기 10.3km'), findsNothing);
   });
 
   testWidgets('길이 막혔어요는 성공 경로를 blocked 화면으로 바꾸지 않는다', (tester) async {
