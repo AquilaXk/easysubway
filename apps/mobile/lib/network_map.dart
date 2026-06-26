@@ -1893,14 +1893,14 @@ _StationTapScore? _stationTapScore(
   final nodeCenter = camera.sourceToViewportPoint(
     Offset(geometry.x(station), geometry.y(station)),
   );
-  final nodeDistance = math
-      .max(
-        0.0,
-        (viewportPosition - nodeCenter).distance - _maximumStationHitDistance,
-      )
-      .toDouble();
-  var bestDistance = nodeDistance;
-  var containsShape = nodeDistance == 0;
+  final nodeHitRect = Rect.fromCenter(
+    center: nodeCenter,
+    width: _maximumStationHitDistance * 2,
+    height: _maximumStationHitDistance * 2,
+  );
+  final containsNode = nodeHitRect.contains(viewportPosition);
+  var bestDistance = containsNode ? 0.0 : double.infinity;
+  var containsShape = containsNode;
   final labelPolygon = _labelPolygonFor(station, geometry);
   if (labelPolygon != null) {
     final viewportPolygon = [
@@ -1914,7 +1914,7 @@ _StationTapScore? _stationTapScore(
   } else {
     final labelDistance = _distanceToRect(
       viewportPosition,
-      _sourceRectToViewport(_stationHitRect(station, geometry), camera),
+      _sourceRectToViewport(_stationLabelRect(station, geometry), camera),
     );
     bestDistance = math.min(bestDistance, labelDistance);
     containsShape = containsShape || labelDistance == 0;
@@ -1926,6 +1926,23 @@ _StationTapScore? _stationTapScore(
     containsShape: containsShape,
     screenDistance: bestDistance,
     stableKey: _stationGeometryKey(station),
+  );
+}
+
+Rect _stationLabelRect(
+  NetworkMapStation station,
+  _MapGeometry geometry, {
+  double labelHeight = 40,
+}) {
+  final labelOffset = _labelOffsetFor(station);
+  final labelCenter = Offset(
+    geometry.x(station) + labelOffset.dx,
+    geometry.y(station) + labelOffset.dy,
+  );
+  return Rect.fromCenter(
+    center: labelCenter,
+    width: math.max(64, station.nameKo.characters.length * 18 + 32),
+    height: labelHeight,
   );
 }
 

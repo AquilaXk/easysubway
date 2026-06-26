@@ -1823,6 +1823,8 @@ void main() {
               y: 120,
               labelDx: 0,
               labelDy: 0,
+              labelPolygon:
+                  '[{"x":300,"y":100},{"x":360,"y":100},{"x":360,"y":140},{"x":300,"y":140}]',
               upPath: '',
               downPath: '',
               sourceId: 'fixture-route-map-source-capital-review',
@@ -1859,6 +1861,16 @@ void main() {
 
     await tester.tap(find.byKey(const Key('bottomNavMap')));
     await tester.pumpAndSettle();
+
+    final stationRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-near-seoul-4')),
+    );
+    final nodeCenter = stationRect.topLeft + const Offset(24, 24);
+    await tester.tapAt(nodeCenter + const Offset(32, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('가까운역'), findsNothing);
 
     final surfaceRect = tester.getRect(
       find.byKey(const Key('networkMapSurface')),
