@@ -165,6 +165,28 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('휠체어 조건은 미확인 사유가 확정 차단 사유와 섞여도 UNKNOWN으로 남긴다', () {
+      final engine = LocalRouteEngine(
+        graph: _mixedUnknownAndBlockedFixtureGraph(),
+      );
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-b',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+      expect(result.blockedReasonCodes, [
+        'ACCESSIBILITY_STATE_UNKNOWN',
+        'STAIR_ONLY_ACCESS',
+      ]);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('휠체어 조건은 계단 상태가 없는 기본 edge를 안전한 경로로 사용하지 않는다', () {
       final engine = LocalRouteEngine(graph: _missingStairAccessFixtureGraph());
 
@@ -751,6 +773,36 @@ NetworkGraph _unknownStairAccessFixtureGraph() {
         type: RouteEdgeType.exit,
         baseCost: 60,
         stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _mixedUnknownAndBlockedFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(id: 'station-a', stationId: 'station-a', lineId: 'line-1'),
+      RouteNode(id: 'station-b', stationId: 'station-b', lineId: 'line-1'),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'ride-a-b-unknown-accessibility',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-b',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+        accessibilityState: RouteAccessibilityState.unknown,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-b-stair-only',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-b',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+        stairAccessState: RouteStairAccessState.stairOnly,
       ),
     ],
   );

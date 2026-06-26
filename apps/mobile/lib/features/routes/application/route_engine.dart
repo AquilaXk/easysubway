@@ -26,7 +26,7 @@ class LocalRouteEngine {
       final reasonCodes = blockedReasonCodes.isEmpty
           ? const ['ROUTE_GRAPH_UNKNOWN']
           : blockedReasonCodes.toList(growable: false);
-      if (_isUnknownRoute(reasonCodes)) {
+      if (_hasUnknownRouteReason(reasonCodes)) {
         return LocalRouteResult.unknown(reasonCodes);
       }
       return LocalRouteResult.blocked(reasonCodes);
@@ -77,7 +77,10 @@ class LocalRouteEngine {
     );
   }
 
-  bool _isUnknownRoute(List<String> reasonCodes) {
+  bool _hasUnknownRouteReason(List<String> reasonCodes) {
+    if (reasonCodes.contains('FACILITY_UNAVAILABLE')) {
+      return false;
+    }
     const unknownCodes = {
       'ACCESSIBILITY_STATE_UNKNOWN',
       'STAIR_ONLY_ACCESS_UNKNOWN',
@@ -85,7 +88,7 @@ class LocalRouteEngine {
       'ROUTE_GRAPH_UNKNOWN',
     };
     return reasonCodes.isNotEmpty &&
-        reasonCodes.every((code) => unknownCodes.contains(code));
+        reasonCodes.any((code) => unknownCodes.contains(code));
   }
 
   List<RouteEdge>? _findLowestCostPath(
