@@ -61,8 +61,12 @@
       "photo-picker-route-map-report-upload-smoke"
     ],
     "playGeneratedArtifact": [
+      "play-generated-apk-device-matrix-gate-manifest",
       "internal-app-sharing-or-track-upload-record",
       "app-bundle-explorer-generated-apk-record",
+      "play-app-signing-certificate-record",
+      "split-apk-manifest-permission-network-config-record",
+      "device-matrix-smoke-summary",
       "play-generated-apk-or-installed-build-smoke",
       "play-installed-build-logcat-no-crash"
     ],
