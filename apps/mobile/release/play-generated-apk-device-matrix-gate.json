@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "play-generated-apk-device-matrix",
+  "issue": 922,
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "androidReleaseQualityGate": "apps/mobile/release/android-release-quality-gate.json",
+  "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
+  "status": "BLOCKED_PLAY_GENERATED_ARTIFACT_EVIDENCE_MISSING",
+  "acceptedArtifactSources": [
+    "internal-app-sharing",
+    "internal-testing-track",
+    "closed-testing-track",
+    "app-bundle-explorer-generated-apk",
+    "play-installed-build"
+  ],
+  "requiredArtifactEvidence": [
+    "play-app-signing-certificate-record",
+    "upload-key-vs-app-signing-key-separation-record",
+    "play-generated-split-apk-install-log",
+    "device-specific-manifest-dump",
+    "package-versioncode-minsdk-targetsdk-record",
+    "permission-network-security-config-review",
+    "native-library-delivery-and-16kb-page-size-record"
+  ],
+  "deviceMatrix": [
+    {
+      "id": "android_15_phone_small_screen_large_font",
+      "releaseBlocker": true,
+      "platform": "Android 15+ local emulator or Play-installed device",
+      "conditions": ["small-screen", "font-scale-150-200", "TalkBack"],
+      "smoke": ["app-start", "datapack-install", "station-search", "route-search", "route-map"]
+    },
+    {
+      "id": "android_16_16kb_page_size",
+      "releaseBlocker": true,
+      "platform": "Android 16 16 KB page-size emulator or Play-installed device",
+      "conditions": ["PAGE_SIZE=16384", "split-apk-native-library-delivery"],
+      "smoke": ["app-start", "datapack-install", "station-search", "route-search", "facility-report-photo"]
+    },
+    {
+      "id": "network_block_low_storage_low_memory",
+      "releaseBlocker": true,
+      "platform": "Android local emulator or Play-installed device",
+      "conditions": ["network-block", "low-storage", "low-memory-or-process-death"],
+      "smoke": ["offline-datapack-fallback", "error-message-recovery", "app-relaunch-state-restore"]
+    }
+  ],
+  "goNoGoRules": {
+    "localAabOnly": "BLOCKED_EXTERNAL",
+    "missingPlayGeneratedArtifact": "BLOCKED_EXTERNAL",
+    "manifestMismatch": "BLOCKED_TECHNICAL",
+    "playInstalledSmokeCrash": "BLOCKED_TECHNICAL",
+    "deviceMatrixP0Failure": "BLOCKED_TECHNICAL"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/play-generated-apk-device-matrix/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-console-link",
+    "sensitiveEvidence": [
+      "Google Play Console screenshots",
+      "AAB/APK files",
+      "device identifiers",
+      "network traces",
+      "tester personal data"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 파일로 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 Console 링크만 적는다."
+  }
+}
