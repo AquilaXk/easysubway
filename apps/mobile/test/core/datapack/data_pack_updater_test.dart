@@ -146,6 +146,79 @@ void main() {
     expect(manifestCache, isNull);
   });
 
+  test('updater는 손상된 current pointer가 있어도 새 pack으로 복구한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-bad-pointer-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    await File(
+      '${catalogDirectory.path}/current.json',
+    ).writeAsString('{not-json');
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'packs': [
+                  _packJson(
+                    version: '18',
+                    url: 'catalog/capital-v18.sqlite.gz',
+                    compressedBytes: compressedBytes,
+                    sqliteBytes: sqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v18.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(compressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 19, 10, 30),
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: stateRepository,
+      ),
+      installer: installer,
+    );
+
+    final results = await updater.checkForUpdates();
+    final pointer = await installer.readCurrentPointer();
+
+    expect(results.single.status, DataPackInstallStatus.installed);
+    expect(pointer?.version, '18');
+    expect(await stateRepository.readManifestCache(), isNotNull);
+  });
+
   test('updater는 manifest에서 emergency override가 해제되면 저장값을 지운다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
@@ -260,6 +333,476 @@ void main() {
       '/datapacks/catalog/current.json',
       '/datapacks/catalog/capital-v18.sqlite.gz',
     ]);
+  });
+
+  test('updater는 fresh cache여도 설치 journal을 먼저 복구한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-journal-fresh-cache-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final now = DateTime.utc(2026, 6, 19, 16);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => now,
+    );
+    await stateRepository.saveManifestCache(
+      etag: 'fresh-etag',
+      checkedAt: now,
+      ttl: const Duration(minutes: 10),
+    );
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final targetPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await targetPack.writeAsBytes(sqliteBytes, flush: true);
+    final journal = File('${catalogDirectory.path}/current.json.installing');
+    await journal.writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': targetPack.path,
+        'sha256': sha256.convert(sqliteBytes).toString(),
+      }),
+      flush: true,
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse('http://127.0.0.1:9/catalog/current.json'),
+        stateRepository: stateRepository,
+      ),
+      installer: installer,
+    );
+
+    final results = await updater.checkForUpdates();
+
+    expect(results, isEmpty);
+    expect(await journal.exists(), isFalse);
+    expect(
+      await File('${catalogDirectory.path}/current.json').exists(),
+      isTrue,
+    );
+    expect((await installer.readCurrentPointer())?.version, '18');
+  });
+
+  test('updater는 active pack history와 명시 dependency만 다운로드한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-active-only-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final activeSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final activeCompressedBytes = gzip.encode(activeSqliteBytes);
+    final dependencySqliteBytes = await _validCatalogSqliteBytes(directory);
+    final dependencyCompressedBytes = gzip.encode(dependencySqliteBytes);
+    final inactiveSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final inactiveCompressedBytes = gzip.encode(inactiveSqliteBytes);
+    await catalogDirectory.create(recursive: true);
+    await File(
+      '${catalogDirectory.path}/common-v2.sqlite',
+    ).writeAsString('old dependency v2');
+    await File(
+      '${catalogDirectory.path}/common-v3.sqlite',
+    ).writeAsString('old dependency v3');
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '19'},
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '19',
+                    url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: activeCompressedBytes,
+                    sqliteBytes: activeSqliteBytes,
+                    dependencies: const [
+                      {'id': 'common', 'version': '1'},
+                    ],
+                  ),
+                  _packJson(
+                    id: 'common',
+                    version: '1',
+                    url: 'catalog/common-v1.sqlite.gz',
+                    compressedBytes: dependencyCompressedBytes,
+                    sqliteBytes: dependencySqliteBytes,
+                  ),
+                  _packJson(
+                    id: 'busan',
+                    version: '9',
+                    url: 'catalog/busan-v9.sqlite.gz',
+                    compressedBytes: inactiveCompressedBytes,
+                    sqliteBytes: inactiveSqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(activeCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/common-v1.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(dependencyCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/busan-v9.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.internalServerError
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 25, 10),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+    final pointer = await updater.installer.readCurrentPointer();
+
+    expect(results, hasLength(2));
+    expect(
+      results.every(
+        (result) => result.status == DataPackInstallStatus.installed,
+      ),
+      isTrue,
+    );
+    expect(pointer?.id, 'capital');
+    expect(pointer?.version, '19');
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v19.sqlite.gz',
+      '/datapacks/catalog/common-v1.sqlite.gz',
+    ]);
+    expect(
+      await File('${catalogDirectory.path}/common-v1.sqlite').exists(),
+      isTrue,
+    );
+  });
+
+  test('updater는 active pack과 별도 emergency override pack을 다운로드한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-override-pack-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final activeSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final activeCompressedBytes = gzip.encode(activeSqliteBytes);
+    final overrideSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final overrideCompressedBytes = gzip.encode(overrideSqliteBytes);
+    final dependencySqliteBytes = await _validCatalogSqliteBytes(directory);
+    final dependencyCompressedBytes = gzip.encode(dependencySqliteBytes);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '19'},
+                'emergencyOverride': {
+                  'id': 'capital-emergency',
+                  'version': '7',
+                  'reason': '시설 상태 긴급 정정',
+                },
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '19',
+                    url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: activeCompressedBytes,
+                    sqliteBytes: activeSqliteBytes,
+                  ),
+                  _packJson(
+                    id: 'capital-emergency',
+                    version: '7',
+                    url: 'catalog/capital-emergency-v7.sqlite.gz',
+                    compressedBytes: overrideCompressedBytes,
+                    sqliteBytes: overrideSqliteBytes,
+                    dependencies: const [
+                      {'id': 'common-emergency', 'version': '1'},
+                    ],
+                  ),
+                  _packJson(
+                    id: 'common-emergency',
+                    version: '1',
+                    url: 'catalog/common-emergency-v1.sqlite.gz',
+                    compressedBytes: dependencyCompressedBytes,
+                    sqliteBytes: dependencySqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(activeCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/capital-emergency-v7.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(overrideCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/common-emergency-v1.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(dependencyCompressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 19, 16),
+        ),
+      ),
+      installer: installer,
+      emergencyOverrideRepository: overrideRepository,
+    );
+
+    final results = await updater.checkForUpdates();
+    final override = await overrideRepository.readOverride();
+
+    expect(
+      results.map((result) => result.pointer?.id).whereType<String>().toList(),
+      ['capital', 'capital-emergency', 'common-emergency'],
+    );
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v19.sqlite.gz',
+      '/datapacks/catalog/capital-emergency-v7.sqlite.gz',
+      '/datapacks/catalog/common-emergency-v1.sqlite.gz',
+    ]);
+    expect(override?.id, 'capital-emergency');
+    expect(override?.version, '7');
+  });
+
+  test('updater는 default activePackId의 dependency를 다운로드한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-default-dependency-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final activeSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final activeCompressedBytes = gzip.encode(activeSqliteBytes);
+    final dependencySqliteBytes = await _validCatalogSqliteBytes(directory);
+    final dependencyCompressedBytes = gzip.encode(dependencySqliteBytes);
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '19',
+                    url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: activeCompressedBytes,
+                    sqliteBytes: activeSqliteBytes,
+                    dependencies: const [
+                      {'id': 'common', 'version': '1'},
+                    ],
+                  ),
+                  _packJson(
+                    id: 'common',
+                    version: '1',
+                    url: 'catalog/common-v1.sqlite.gz',
+                    compressedBytes: dependencyCompressedBytes,
+                    sqliteBytes: dependencySqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(activeCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/common-v1.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(dependencyCompressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 19, 16),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+
+    expect(
+      results.map((result) => result.pointer?.id).whereType<String>().toList(),
+      ['capital', 'common'],
+    );
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v19.sqlite.gz',
+      '/datapacks/catalog/common-v1.sqlite.gz',
+    ]);
+  });
+
+  test('updater는 background update prune에서 기존 current pack을 보존한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-prune-current-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final currentPack = File('${catalogDirectory.path}/capital-v17.sqlite');
+    await currentPack.writeAsString('open current');
+    await File(
+      '${catalogDirectory.path}/capital-v18.sqlite',
+    ).writeAsString('old installed v18');
+    await File(
+      '${catalogDirectory.path}/capital-v19.sqlite',
+    ).writeAsString('old installed v19');
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({'id': 'capital', 'version': '17', 'path': currentPack.path}),
+    );
+    final newSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final newCompressedBytes = gzip.encode(newSqliteBytes);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '20'},
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '20',
+                    url: 'catalog/capital-v20.sqlite.gz',
+                    compressedBytes: newCompressedBytes,
+                    sqliteBytes: newSqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v20.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(newCompressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 19, 16),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+
+    expect(results.single.status, DataPackInstallStatus.installed);
+    expect(await currentPack.exists(), isTrue);
   });
 
   test('updater는 multi-pack 실패 시 기존 current pointer를 유지한다', () async {
@@ -868,21 +1411,24 @@ void main() {
 }
 
 Map<String, Object?> _packJson({
+  String id = 'capital',
   required String version,
   required String url,
   required List<int> compressedBytes,
   required List<int> sqliteBytes,
+  List<Map<String, String>> dependencies = const [],
 }) {
   final compressedSha256 = sha256.convert(compressedBytes).toString();
   final sqliteSha256 = sha256.convert(sqliteBytes).toString();
   return {
-    'id': 'capital',
+    'id': id,
     'version': version,
     'url': url,
     'sha256': compressedSha256,
     'sqliteSha256': sqliteSha256,
     'sizeBytes': compressedBytes.length,
     ..._fixtureManifestMetadata(
+      id: id,
       version: version,
       compressedSha256: compressedSha256,
       sqliteSha256: sqliteSha256,
@@ -890,10 +1436,12 @@ Map<String, Object?> _packJson({
     ),
     'schemaVersion': '1',
     'requiredTables': ['catalog_metadata'],
+    if (dependencies.isNotEmpty) 'dependencies': dependencies,
   };
 }
 
 Map<String, Object?> _fixtureManifestMetadata({
+  String id = 'capital',
   required String version,
   required String compressedSha256,
   required String sqliteSha256,
@@ -905,7 +1453,7 @@ Map<String, Object?> _fixtureManifestMetadata({
     'representativeRouteRegressionSignature': {
       'algorithm': 'sha256-route-regression-v1',
       'value': _routeRegressionSignatureValue(
-        'capital',
+        id,
         version,
         compressedSha256,
         sqliteSha256,
@@ -915,7 +1463,7 @@ Map<String, Object?> _fixtureManifestMetadata({
     'signature': {
       'algorithm': 'sha256-pack-manifest-v1',
       'value': _signatureValue(
-        'capital',
+        id,
         version,
         compressedSha256,
         sqliteSha256,

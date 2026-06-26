@@ -7,6 +7,7 @@ import 'data_pack_manifest.dart';
 import 'emergency_override_repository.dart';
 
 const _dataPackDownloadTimeout = Duration(seconds: 20);
+const _maxDataPackDownloadBytes = 250 * 1024 * 1024;
 
 class DataPackUpdater {
   DataPackUpdater({
@@ -24,28 +25,43 @@ class DataPackUpdater {
   final HttpClient _httpClient;
 
   Future<List<DataPackInstallResult>> checkForUpdates() async {
+    await installer.recoverInstallJournal();
     final manifestResult = await client.fetchManifestIfNeeded();
     final manifest = manifestResult.manifest;
     if (manifest == null) {
       return const [];
     }
 
+    final preUpdateCurrentPointer = await _readCurrentPointerSafely();
     final override = manifest.emergencyOverride;
-    final protectedVersions = <String>{};
+    final protectedVersionsByPackId = <String, Set<String>>{};
+    if (preUpdateCurrentPointer != null) {
+      _protectVersion(
+        protectedVersionsByPackId,
+        id: preUpdateCurrentPointer.id,
+        version: preUpdateCurrentPointer.version,
+      );
+    }
     if (override != null) {
-      protectedVersions.add(_normalizedVersion(override.version));
+      _protectVersion(
+        protectedVersionsByPackId,
+        id: override.id,
+        version: override.version,
+      );
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
+    final packs = _packsToInstall(manifest);
     final results = <DataPackInstallResult>[];
-    for (final pack in manifest.packs) {
+    for (final pack in packs) {
       final uri = packBaseUri.resolve(pack.url.toString());
-      final compressedBytes = await _download(uri);
+      final compressedFile = await _downloadToTemporaryFile(uri, pack);
       results.add(
-        await installer.install(
+        await installer.installFromCompressedFile(
           pack: pack,
-          compressedBytes: compressedBytes,
-          protectedVersions: protectedVersions,
+          compressedFile: compressedFile,
+          protectedVersions:
+              protectedVersionsByPackId[pack.id] ?? const <String>{},
           activateCurrent: false,
         ),
       );
@@ -59,29 +75,88 @@ class DataPackUpdater {
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
-        protectedVersions.add(_normalizedVersion(currentPointer.version));
+        _protectVersion(
+          protectedVersionsByPackId,
+          id: currentPointer.id,
+          version: currentPointer.version,
+        );
       }
-      for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
+      for (final result in results) {
+        final pointer = result.pointer;
+        if (pointer != null) {
+          _protectVersion(
+            protectedVersionsByPackId,
+            id: pointer.id,
+            version: pointer.version,
+          );
+        }
+      }
+      for (final packId in packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
           packId,
           keepVersionCount: 2,
-          protectedVersions: protectedVersions,
+          protectedVersions:
+              protectedVersionsByPackId[packId] ?? const <String>{},
         );
       }
       if (override != null) {
-        await emergencyOverrideRepository?.saveOverride(
-          EmergencyDataPackOverride(
-            id: override.id,
-            version: override.version,
-            reason: override.reason,
-          ),
+        final installedOverride = await installer.readInstalledPointer(
+          id: override.id,
+          version: override.version,
         );
+        if (installedOverride != null) {
+          await emergencyOverrideRepository?.saveOverride(
+            EmergencyDataPackOverride(
+              id: override.id,
+              version: override.version,
+              reason: override.reason,
+            ),
+          );
+        } else {
+          await emergencyOverrideRepository?.clearOverride();
+        }
       } else {
         await emergencyOverrideRepository?.clearOverride();
       }
       await client.saveManifestCache(manifestResult);
     }
     return results;
+  }
+
+  Future<InstalledDataPackPointer?> _readCurrentPointerSafely() async {
+    try {
+      return await installer.readCurrentPointer();
+    } on Object {
+      return null;
+    }
+  }
+
+  List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
+    final activePack = manifest.activePack;
+    final override = manifest.emergencyOverride;
+    final selectedPacks = manifest.packs
+        .where((pack) {
+          final selectedActiveId = activePack?.id ?? activePackId;
+          return pack.id == selectedActiveId ||
+              _matchesOverride(pack, override);
+        })
+        .toList(growable: false);
+    final selectedDependencies = selectedPacks
+        .expand((pack) => pack.dependencies)
+        .toList(growable: false);
+    return manifest.packs
+        .where((pack) {
+          if (selectedPacks.contains(pack)) {
+            return true;
+          }
+          return selectedDependencies.any(
+            (dependency) =>
+                dependency.id == pack.id &&
+                _versionNumber(dependency.version) ==
+                    _versionNumber(pack.version),
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<InstalledDataPackPointer?> _currentPointerForManifest({
@@ -140,7 +215,10 @@ class DataPackUpdater {
     return manifestDirectory;
   }
 
-  Future<List<int>> _download(Uri uri) async {
+  Future<File> _downloadToTemporaryFile(
+    Uri uri,
+    DataPackManifestEntry pack,
+  ) async {
     final request = await _httpClient
         .getUrl(uri)
         .timeout(_dataPackDownloadTimeout);
@@ -148,16 +226,64 @@ class DataPackUpdater {
     if (response.statusCode != HttpStatus.ok) {
       throw const DataPackClientException('데이터팩을 내려받지 못했습니다.');
     }
-    final bytes = <int>[];
-    await for (final chunk in response.timeout(_dataPackDownloadTimeout)) {
-      bytes.addAll(chunk);
+    final expectedSizeBytes = pack.sizeBytes;
+    final contentLength = response.contentLength;
+    final maxBytes = expectedSizeBytes ?? _maxDataPackDownloadBytes;
+    if (contentLength > maxBytes || contentLength > _maxDataPackDownloadBytes) {
+      throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
     }
-    return bytes;
+    final directory = await installer.catalogDirectory.create(recursive: true);
+    final temporary = File(
+      '${directory.path}/${pack.id}-v${pack.version}.sqlite.gz.downloading',
+    );
+    final sink = temporary.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response.timeout(_dataPackDownloadTimeout)) {
+        received += chunk.length;
+        if (received > maxBytes || received > _maxDataPackDownloadBytes) {
+          throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
+        }
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
+      return temporary;
+    } on Object {
+      await sink.close();
+      await _deleteIfExists(temporary);
+      rethrow;
+    }
+  }
+}
+
+Future<void> _deleteIfExists(File file) async {
+  if (await file.exists()) {
+    await file.delete();
   }
 }
 
 int _versionNumber(String version) {
   return int.tryParse(version) ?? 0;
+}
+
+bool _matchesOverride(
+  DataPackManifestEntry pack,
+  EmergencyOverrideManifest? override,
+) {
+  return override != null &&
+      pack.id == override.id &&
+      _versionNumber(pack.version) == _versionNumber(override.version);
+}
+
+void _protectVersion(
+  Map<String, Set<String>> protectedVersionsByPackId, {
+  required String id,
+  required String version,
+}) {
+  protectedVersionsByPackId
+      .putIfAbsent(id, () => <String>{})
+      .add(_normalizedVersion(version));
 }
 
 String _normalizedVersion(String version) {
