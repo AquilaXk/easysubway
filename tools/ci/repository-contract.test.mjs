@@ -5741,6 +5741,73 @@ test("노선도 Android 실기기 evidence runner는 frame, memory, renderer rec
   assert.match(script, /summary\.md/);
 });
 
+test("노선도 Android evidence analyzer는 profile frame, memory, camera latency를 요약한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-evidence-"));
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=3",
+      "captured_at_utc=2026-06-26T01:00:00Z",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    [
+      "Total frames rendered: 56",
+      "Janky frames: 3 (5.36%)",
+      "50th percentile: 10ms",
+      "90th percentile: 18ms",
+      "95th percentile: 25ms",
+      "99th percentile: 33ms",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    15256",
+      "Native Heap:    92580",
+      "Graphics:   183577",
+      "TOTAL PSS:   591090            TOTAL RSS:   723053       TOTAL SWAP PSS:      272",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "route-map-renderer.log"),
+    [
+      "06-26 10:25:37.509 I/flutter: routeMapRenderer cameraLatency revision=0 elapsedMs=12",
+      "06-26 10:25:42.432 I/flutter: routeMapRenderer cameraLatency revision=1 elapsedMs=48",
+      "06-26 10:25:46.185 I/flutter: routeMapRenderer disposed",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  assert.equal(output.artifactKind, "route-map-android-evidence-summary");
+  assert.equal(output.runs[0].buildMode, "profile");
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, 5.36);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, 33);
+  assert.equal(output.runs[0].meminfo.totalPssKb, 591090);
+  assert.equal(output.runs[0].renderer.cameraLatencyP95Ms, 48);
+  assert.equal(output.aggregate.disposeObservedInAllRuns, true);
+});
+
 async function classifyChangedFiles(files) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-ci-"));
   const changedFilesPath = path.join(dir, "changed-files.txt");
