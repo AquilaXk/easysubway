@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseBlockerPolicy": true,
+  "sensitiveEvidenceLocalOnlyPath": ".codex/evidence/security-privacy-release/<pr-or-rc>/",
+  "datapackSigningKeyLifecycle": {
+    "requiredEvidence": [
+      "manifest public keyring snapshot",
+      "signature verification test vector",
+      "rotation approval record",
+      "revocation drill result",
+      "emergency rollback key approval"
+    ],
+    "privateKeyPolicyKo": "signing private key는 저장소, release artifact, PR 본문에 포함하지 않고 local-only evidence에는 fingerprint와 검증 결과만 남긴다."
+  },
+  "releaseArtifactSecretScan": {
+    "forbiddenClasses": [
+      "provider-key",
+      "signing-private-key",
+      "upload-url",
+      "receipt-token",
+      "local-placeholder-endpoint"
+    ],
+    "requiredArtifacts": [
+      "Android AAB or Play-generated APK scan log",
+      "iOS IPA or archive scan log when iOS release candidate exists",
+      "release network trace endpoint summary"
+    ],
+    "androidEvidenceSourceKo": "QA 요청에 따라 실기기가 아니라 로컬 Android emulator에서 앱 실행, UI tree, logcat, network endpoint trace 요약을 수집한다."
+  },
+  "maliciousPhotoUploadDefense": {
+    "requiredChecks": [
+      "MIME type allowlist",
+      "file extension match",
+      "magic bytes match",
+      "checksum generation",
+      "image decode success",
+      "thumbnail generation success",
+      "orphan cleanup on failed claim"
+    ]
+  },
+  "userDataDeletionE2E": {
+    "targets": [
+      "local data 삭제",
+      "report link 익명화",
+      "report photo object 삭제",
+      "notification preference 삭제",
+      "favorite 삭제",
+      "search history 삭제",
+      "profile 삭제"
+    ],
+    "requiredEvidence": [
+      "backend UserDataDeletionService test output",
+      "backend JdbcFacilityReportRepository photo object deletion test output",
+      "mobile user_data_deletion_test output",
+      "Android emulator deletion screen screenshot or UI tree"
+    ]
+  }
+}
