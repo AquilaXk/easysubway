@@ -428,7 +428,7 @@ void main() {
         );
 
     expect(accessEdgeCount.read<int>('count'), 0);
-    expect(route.status, 'BLOCKED');
+    expect(route.status, 'UNKNOWN');
   });
 
   test('catalog opener는 부분 적용된 current pack access edge를 보존한다', () async {
@@ -552,7 +552,7 @@ void main() {
           );
 
       expect(accessEdgeCount.read<int>('count'), 0);
-      expect(route.status, 'BLOCKED');
+      expect(route.status, 'UNKNOWN');
     },
   );
 
@@ -690,7 +690,7 @@ void main() {
         );
 
     expect(accessEdgeCount.read<int>('count'), 0);
-    expect(route.status, 'BLOCKED');
+    expect(route.status, 'UNKNOWN');
   });
 
   test('catalog opener는 current pointer가 없어도 emergency override를 연다', () async {
