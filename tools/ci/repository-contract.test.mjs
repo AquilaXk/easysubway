@@ -3953,8 +3953,17 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
-  assert.match(security, /roles\("OPERATOR_ADMIN"\)/);
+  assert.match(security, /AdminIdentityRepository/);
+  assert.match(security, /AdminIdentityUserDetailsService/);
+  assert.match(security, /upsertBootstrap/);
+  assert.match(security, /AdminIdentityRole\.OPERATOR_ADMIN/);
+  assert.match(security, /easysubway\.admin\.break-glass\.username/);
+  assert.match(security, /easysubway\.admin\.break-glass\.password/);
+  assert.match(security, /easysubway\.admin\.break-glass\.reason/);
+  assert.match(security, /AdminIdentityAuthMethod\.BREAK_GLASS/);
   assert.match(security, /validateOperatorCredentials/);
+  assert.match(security, /validateBreakGlassCredentials/);
+  assert.match(security, /validateDistinctAdminLoginIds/);
   assert.doesNotMatch(security, /publicSecurityFilterChain[\s\S]*?anyRequest\(\)\.permitAll\(\)/);
   assert.match(security, /httpBasic/);
   assert.match(security, /PasswordEncoder/);
@@ -6131,6 +6140,13 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const adminOperatorLockoutProvider = read(
     "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java",
   );
+  const adminIdentityPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V9__admin_identity.sql");
+  const adminIdentityUserDetailsService = read(
+    "backend/src/main/java/com/easysubway/admin/identity/application/service/AdminIdentityUserDetailsService.java",
+  );
+  const jdbcAdminIdentityRepository = read(
+    "backend/src/main/java/com/easysubway/admin/identity/adapter/out/persistence/JdbcAdminIdentityRepository.java",
+  );
   const facilityReportAbuseControl = read(
     "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
   );
@@ -6242,9 +6258,19 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(securityConfig, /easysubway\.admin\.basic-auth\.enabled/);
   assert.match(securityConfig, /easysubway\.admin\.basic-auth\.exception-owner/);
   assert.match(securityConfig, /easysubway\.admin\.basic-auth\.exception-expires-at/);
+  assert.match(securityConfig, /AdminIdentityRepository/);
+  assert.match(securityConfig, /upsertBootstrap/);
+  assert.match(securityConfig, /easysubway\.admin\.break-glass\.username/);
+  assert.match(securityConfig, /easysubway\.admin\.break-glass\.password/);
+  assert.match(securityConfig, /easysubway\.admin\.break-glass\.reason/);
   assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED:false/);
   assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BREAK_GLASS_USERNAME/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BREAK_GLASS_PASSWORD/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BREAK_GLASS_REASON/);
+  assert.match(prodConfig, /EASYSUBWAY_OPERATOR_USERNAME/);
+  assert.match(prodConfig, /EASYSUBWAY_OPERATOR_PASSWORD/);
   assert.match(adminOperatorAuditFilter, /tenant=\{\}/);
   assert.match(adminOperatorAuditFilter, /outcome=\{\}/);
   assert.match(adminOperatorAuditFilter, /correlation_id=\{\}/);
@@ -6263,7 +6289,29 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/pull_request_template.md"));
   assert.match(adminOperatorLockoutProvider, /LockedException/);
   assert.match(adminOperatorLockoutProvider, /BadCredentialsException/);
-  assert.match(adminOperatorLockoutProvider, /lockedUntil/);
+  assert.match(adminOperatorLockoutProvider, /AdminIdentityRepository/);
+  assert.match(adminOperatorLockoutProvider, /recordLoginAudit/);
+  assert.match(adminOperatorLockoutProvider, /recordLoginSuccess/);
+  assert.match(adminOperatorLockoutProvider, /lockedAt/);
+  assert.match(adminIdentityPostgresSchema, /CREATE TABLE admin_users/);
+  assert.match(adminIdentityPostgresSchema, /login_id VARCHAR\(120\) NOT NULL PRIMARY KEY/);
+  assert.match(adminIdentityPostgresSchema, /password_hash VARCHAR\(255\) NOT NULL/);
+  assert.match(adminIdentityPostgresSchema, /auth_method VARCHAR\(40\) NOT NULL/);
+  assert.match(adminIdentityPostgresSchema, /auth_method IN \('LOCAL', 'BREAK_GLASS'\)/);
+  assert.match(adminIdentityPostgresSchema, /role IN \('ADMIN', 'OPERATOR_ADMIN'\)/);
+  assert.match(adminIdentityPostgresSchema, /status IN \('ACTIVE', 'DISABLED', 'LOCKED', 'PASSWORD_EXPIRED', 'CREDENTIAL_ROTATION_REQUIRED'\)/);
+  assert.match(adminIdentityPostgresSchema, /failed_login_count INTEGER NOT NULL DEFAULT 0/);
+  assert.match(adminIdentityPostgresSchema, /failed_login_count >= 0/);
+  assert.match(adminIdentityPostgresSchema, /locked_until TIMESTAMP/);
+  assert.match(adminIdentityPostgresSchema, /credential_rotation_required BOOLEAN NOT NULL DEFAULT FALSE/);
+  assert.match(adminIdentityPostgresSchema, /CREATE TABLE admin_login_audits/);
+  assert.match(adminIdentityPostgresSchema, /outcome IN \('FAILED', 'LOCKED', 'DISABLED', 'PASSWORD_EXPIRED', 'CREDENTIAL_ROTATION_REQUIRED', 'SUCCESS'\)/);
+  assert.match(adminIdentityPostgresSchema, /idx_admin_login_audits_login_occurred_at/);
+  assert.match(adminIdentityUserDetailsService, /fallbackUserDetailsService/);
+  assert.match(adminIdentityUserDetailsService, /credentialsExpired/);
+  assert.match(jdbcAdminIdentityRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcAdminIdentityRepository, /INSERT INTO admin_users/);
+  assert.match(jdbcAdminIdentityRepository, /INSERT INTO admin_login_audits/);
   const abuseControlGate = items.get("backend_report_abuse_control_release_gate");
   assert.match(abuseControlGate.readyWhenKo, /local store|release blocker|분산/);
   assert.ok(abuseControlGate.evidence.includes("facility-report-abuse-control-tests"));
