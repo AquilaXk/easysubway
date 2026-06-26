@@ -853,6 +853,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const playGeneratedApkDeviceMatrixGate = readJson(playGeneratedApkDeviceMatrixPath);
   const postLaunchOperationsReviewPath = "apps/mobile/release/post-launch-operations-review-gate.json";
   const postLaunchOperationsReviewGate = readJson(postLaunchOperationsReviewPath);
+  const supportIncidentResponsePath = "apps/mobile/release/support-incident-response-gate.json";
+  const supportIncidentResponseGate = readJson(supportIncidentResponsePath);
   const workflow = read(".github/workflows/release-artifacts.yml");
   const readme = read("README.md");
 
@@ -866,6 +868,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.playProductionAccessGate, playProductionAccessPath);
   assert.equal(gate.playGeneratedApkDeviceMatrixGate, playGeneratedApkDeviceMatrixPath);
   assert.equal(gate.postLaunchOperationsReviewGate, postLaunchOperationsReviewPath);
+  assert.equal(gate.supportIncidentResponseGate, supportIncidentResponsePath);
 
   assert.equal(gate.officialRequirements.android.targetApiLevelMinimum, 35);
   assert.equal(gate.officialRequirements.android.requiredFrom, "2025-08-31");
@@ -887,6 +890,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play production access or closed test requirement satisfaction evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK device compatibility matrix evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Post-launch 2h/24h/7d/30d operations review evidence"));
+  assert.ok(
+    gate.artifacts.android.storeReadyRequires.includes(
+      "Support, data correction, incident notice, emergency datapack response evidence",
+    ),
+  );
   assert.equal(playProductionAccessGate.releaseGate, "play-production-access-closed-test");
   assert.equal(playProductionAccessGate.issue, 920);
   assert.equal(playProductionAccessGate.parentEvidenceManifest, androidRcEvidencePath);
@@ -932,6 +940,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_POST_LAUNCH_EVIDENCE_MISSING");
   assert.equal(postLaunchOperationsReviewGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "apps/mobile/release/operations-release-evidence.json");
+  assert.equal(postLaunchOperationsReviewGate.supportIncidentResponseGate, supportIncidentResponsePath);
   assert.match(postLaunchOperationsReviewGate.evidenceRoot, /\.codex\/evidence\/release\/post-launch-operations-review\/<rc-or-run>/);
   assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
@@ -950,6 +959,29 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(postLaunchOperationsReviewGate.stagedRolloutPolicy.initialProductionRelease, "not-available-for-first-public-release");
   assert.ok(postLaunchOperationsReviewGate.stagedRolloutPolicy.secondAndLaterUpdates.includes("halt-rollout-on-p0-or-policy-warning"));
   assert.ok(postLaunchOperationsReviewGate.dryRunRequiredEvidence.includes("alert-route-dry-run-log"));
+  assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
+  assert.equal(supportIncidentResponseGate.issue, 924);
+  assert.equal(supportIncidentResponseGate.status, "BLOCKED_SUPPORT_INCIDENT_EVIDENCE_MISSING");
+  assert.equal(supportIncidentResponseGate.androidRcEvidenceManifest, androidRcEvidencePath);
+  assert.equal(supportIncidentResponseGate.postLaunchOperationsReviewGate, postLaunchOperationsReviewPath);
+  assert.match(supportIncidentResponseGate.evidenceRoot, /\.codex\/evidence\/release\/support-incident-response\/<rc-or-run>/);
+  assert.deepEqual(
+    supportIncidentResponseGate.supportChannels.map((channel) => channel.id).sort(),
+    ["faq_and_status_notice", "security_privacy_deletion", "support_email"],
+  );
+  assert.deepEqual(
+    supportIncidentResponseGate.intakeCategories.map((category) => category.id).sort(),
+    ["p0_safety_data_error", "p1_accessibility_blocker", "p2_support_question"],
+  );
+  assert.equal(supportIncidentResponseGate.dataCorrectionFlow.slaTargets.p0SafetyErrorTriage, "PT2H");
+  assert.equal(supportIncidentResponseGate.dataCorrectionFlow.slaTargets.dataCorrectionApproval, "P1D");
+  assert.equal(supportIncidentResponseGate.dataCorrectionFlow.slaTargets.emergencyOverridePublish, "PT4H");
+  assert.equal(supportIncidentResponseGate.dataCorrectionFlow.slaTargets.emergencyDatapackRelease, "P1D");
+  assert.ok(supportIncidentResponseGate.operatorContactRoutes.map((route) => route.id).includes("seoul_metro_or_city_provider"));
+  assert.ok(supportIncidentResponseGate.incidentNoticeTemplates.map((notice) => notice.id).includes("data_error_notice"));
+  assert.ok(supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence.includes("override-rollback-sample"));
+  assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("data-error-triage-dry-run"));
+  assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("local-emulator-help-screen-screenshot-or-ui-tree"));
   assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
   assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
   assert.equal(androidRcEvidence.scope.platform.android, "RELEASE_REQUIRED");
@@ -985,11 +1017,17 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("data-safety-binary-network-trace-match"));
   assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-crash-0"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("post-launch-operations-review-gate-manifest"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("support-incident-response-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("first-2h-monitoring-owner-schedule"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("24h-7d-30d-review-owner-schedule"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("backend-datapack-realtime-kill-switch-rollback-owner-record"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("fixed-release-submission-procedure-record"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("second-update-staged-rollout-halt-rollback-procedure"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("support-faq-and-incident-notice-copy-review"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("data-error-triage-dry-run"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("operator-contact-route-record"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("emergency-datapack-release-rollback-runbook-match"));
+  assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("retention-duplicate-override-recovery-policy"));
   assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
 
   assert.equal(gate.artifacts.ios.format, "Runner.app.zip");
@@ -1013,6 +1051,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /cp release\/play-store-submission-content\.json release-artifacts\/android\/play-store-submission-content\.json/);
   assert.match(workflow, /cp release\/play-generated-apk-device-matrix-gate\.json release-artifacts\/android\/play-generated-apk-device-matrix-gate\.json/);
   assert.match(workflow, /cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
   assert.match(workflow, /page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes/);
@@ -1020,6 +1059,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /play_app_content_data_safety_listing_evidence=blocked_until_play_store_submission_content_console_summary_is_satisfied/);
   assert.match(workflow, /play_generated_apk_device_matrix_evidence=blocked_until_play_generated_apk_device_matrix_gate_is_satisfied/);
   assert.match(workflow, /post_launch_operations_review_evidence=blocked_until_post_launch_operations_review_gate_is_satisfied/);
+  assert.match(workflow, /support_incident_response_evidence=blocked_until_support_incident_response_gate_is_satisfied/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
   assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
@@ -1045,6 +1085,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /Android 출시 후 2시간\/24시간\/7일\/30일 운영 검토/);
   assert.match(readme, /post-launch-operations-review-gate\.json/);
   assert.match(readme, /로컬 Android emulator/);
+  assert.match(readme, /사용자 지원, 데이터 오류, 장애 대응 gate/);
+  assert.match(readme, /support-incident-response-gate\.json/);
+  assert.match(readme, /emergency datapack release\/rollback/);
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
