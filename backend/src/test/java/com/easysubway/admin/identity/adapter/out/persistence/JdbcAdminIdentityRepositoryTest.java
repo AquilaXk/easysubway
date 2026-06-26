@@ -9,6 +9,8 @@ import com.easysubway.admin.identity.domain.AdminIdentityStatus;
 import com.easysubway.admin.identity.domain.AdminLoginAudit;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Optional;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -23,12 +25,7 @@ class JdbcAdminIdentityRepositoryTest {
 	@Test
 	@DisplayName("관리자 계정 상태와 로그인 감사 기록을 DB에 저장한다")
 	void saveIdentityAndLoginAudit() {
-		var dataSource = new EmbeddedDatabaseBuilder()
-			.setType(EmbeddedDatabaseType.H2)
-			.generateUniqueName(true)
-			.build();
-		new ResourceDatabasePopulator(new ClassPathResource("db/migration/h2/V9__admin_identity.sql"))
-			.execute(dataSource);
+		var dataSource = adminIdentityDataSource();
 		var repository = new JdbcAdminIdentityRepository(dataSource);
 		var jdbcTemplate = new JdbcTemplate(dataSource);
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
@@ -49,6 +46,45 @@ class JdbcAdminIdentityRepositoryTest {
 		assertThat(loaded.role()).isEqualTo(AdminIdentityRole.ADMIN);
 		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM admin_login_audits", Integer.class))
 			.isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("동시 bootstrap 중 중복 insert가 발생하면 기존 계정을 반환한다")
+	void upsertBootstrapReturnsExistingIdentityAfterDuplicateInsert() {
+		var dataSource = adminIdentityDataSource();
+		var repository = new JdbcAdminIdentityRepository(dataSource);
+		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
+		AdminIdentity identity = localIdentity("admin-user", now);
+		repository.save(identity);
+
+		var staleReadRepository = new JdbcAdminIdentityRepository(dataSource) {
+			private int findAttempts;
+
+			@Override
+			public Optional<AdminIdentity> findByLoginId(String loginId) {
+				if (findAttempts++ == 0) {
+					return Optional.empty();
+				}
+				return super.findByLoginId(loginId);
+			}
+		};
+
+		var loaded = staleReadRepository.upsertBootstrap(identity);
+
+		assertThat(loaded.loginId()).isEqualTo("admin-user");
+		assertThat(repository.findByLoginId("admin-user")).hasValueSatisfying(existing ->
+			assertThat(existing.createdAt()).isEqualTo(now)
+		);
+	}
+
+	private DataSource adminIdentityDataSource() {
+		var dataSource = new EmbeddedDatabaseBuilder()
+			.setType(EmbeddedDatabaseType.H2)
+			.generateUniqueName(true)
+			.build();
+		new ResourceDatabasePopulator(new ClassPathResource("db/migration/h2/V9__admin_identity.sql"))
+			.execute(dataSource);
+		return dataSource;
 	}
 
 	private AdminIdentity localIdentity(String loginId, LocalDateTime now) {

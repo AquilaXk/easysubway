@@ -16,6 +16,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -100,8 +101,12 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 		if (current.isPresent()) {
 			return current.orElseThrow();
 		}
-		insert(identity);
-		return identity;
+		try {
+			insert(identity);
+			return identity;
+		} catch (DuplicateKeyException exception) {
+			return findByLoginId(identity.loginId()).orElseThrow(() -> exception);
+		}
 	}
 
 	@Override
