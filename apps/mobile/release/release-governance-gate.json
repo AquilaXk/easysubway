@@ -51,6 +51,7 @@
     "evidencePaths",
     "expiresWhen"
   ],
+  "rcEvidenceManifestContract": "apps/mobile/release/rc-evidence-manifest-contract.json",
   "releaseReadiness": {
     "openAndroidP0BlocksGo": true,
     "iosBlocksAndroidRelease": false,

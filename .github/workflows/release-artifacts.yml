@@ -187,6 +187,7 @@ jobs:
           cp release/post-launch-operations-review-gate.json release-artifacts/android/post-launch-operations-review-gate.json
           cp release/support-incident-response-gate.json release-artifacts/android/support-incident-response-gate.json
           cp release/abuse-penetration-rehearsal-gate.json release-artifacts/android/abuse-penetration-rehearsal-gate.json
+          cp release/rc-evidence-manifest-contract.json release-artifacts/android/rc-evidence-manifest-contract.json
           cp ../../tools/mobile/check-android-aab-16kb-page-size.sh release-artifacts/android/check-android-aab-16kb-page-size.sh
           cp ../../tools/mobile/check-elf-load-alignment.mjs release-artifacts/android/check-elf-load-alignment.mjs
           if [[ -f build/app/outputs/mapping/release/mapping.txt ]]; then
@@ -194,11 +195,25 @@ jobs:
           else
             printf 'mapping=not-generated\n' > release-artifacts/android/mapping.txt
           fi
+          node ../../tools/release/generate-rc-evidence-manifest.mjs \
+            --repo-root ../.. \
+            --app-root . \
+            --aab release-artifacts/android/app-release.aab \
+            --data-pack-manifest assets/datapacks/metro_map_pack/manifest.json \
+            --output release-artifacts/android/rc-evidence-manifest.json \
+            --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/" \
+            --device local_android_emulator \
+            --android-version android-15-or-16 \
+            --gate-status androidRcEvidence=BLOCKED_EXTERNAL \
+            --gate-status playGeneratedApkDeviceMatrix=BLOCKED_EXTERNAL \
+            --gate-status androidReleaseQuality=BLOCKED_EXTERNAL \
+            --gate-status abusePenetrationRehearsal=BLOCKED_EXTERNAL
           {
             echo "commit=${GITHUB_SHA}"
             echo "artifact=app-release.aab"
             echo "store_ready=false"
             echo "signing_key_type=temporary-self-signed"
+            echo "rc_evidence_manifest=release-artifacts/android/rc-evidence-manifest.json"
             echo "mapping=build/app/outputs/mapping/release/mapping.txt"
             echo "mapping_retention_days=90"
             echo "play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report"

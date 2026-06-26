@@ -5,6 +5,7 @@
   "releaseGate": "mobile-signed-release-artifacts",
   "storeReadyStatus": "blocked_external_distribution_evidence_missing",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "rcEvidenceManifestContract": "apps/mobile/release/rc-evidence-manifest-contract.json",
   "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
   "playProductionAccessGate": "apps/mobile/release/play-production-access-gate.json",
   "playGeneratedApkDeviceMatrixGate": "apps/mobile/release/play-generated-apk-device-matrix-gate.json",
