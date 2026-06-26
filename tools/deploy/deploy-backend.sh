@@ -114,6 +114,9 @@ if [[ -f "${SHARED_DIR}/current-sha" ]]; then
 	fi
 fi
 
+git checkout --detach "${DEPLOY_SHA}"
+git clean -ffdx
+
 pushd "${INCOMING_DIR}" >/dev/null
 sha256sum -c "$(basename "${CHECKSUM_FILE}")"
 popd >/dev/null
@@ -140,22 +143,36 @@ compose() {
 
 compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" config --quiet
 
-postgres_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q postgres || true)"
-object_storage_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q object-storage || true)"
-if [[ -z "${postgres_id}" || -z "${object_storage_id}" ]]; then
-	write_result "blocked" "stateful_missing"
+timeout 600 compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" up -d --no-build postgres object-storage
+
+wait_stateful_service() {
+	local service="$1"
+	local container_id=""
+	local label_project=""
+	local label_service=""
+	local health=""
+	for _ in $(seq 1 60); do
+		container_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q "${service}" || true)"
+		if [[ -n "${container_id}" ]]; then
+			label_project="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "${container_id}")"
+			label_service="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "${container_id}")"
+			if [[ "${label_project}" != "${DEPLOY_COMPOSE_PROJECT}" || "${label_service}" != "${service}" ]]; then
+				write_result "blocked" "stateful_${service}_drift"
+				exit 1
+			fi
+			health="$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}missing{{ end }}' "${container_id}")"
+			if [[ "${health}" == "healthy" ]]; then
+				return 0
+			fi
+		fi
+		sleep 5
+	done
+	write_result "blocked" "stateful_${service}_unhealthy"
 	exit 1
-fi
+}
 
 for service in postgres object-storage; do
-	container_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q "${service}")"
-	label_project="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "${container_id}")"
-	label_service="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "${container_id}")"
-	health="$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}missing{{ end }}' "${container_id}")"
-	if [[ "${label_project}" != "${DEPLOY_COMPOSE_PROJECT}" || "${label_service}" != "${service}" || "${health}" != "healthy" ]]; then
-		write_result "blocked" "stateful_${service}_drift"
-		exit 1
-	fi
+	wait_stateful_service "${service}"
 done
 
 backend_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q backend || true)"
@@ -197,8 +214,6 @@ if [[ "${current_sha}" == "${DEPLOY_SHA}" && "${current_env_hash}" == "${target_
 	fi
 fi
 
-git checkout --detach "${DEPLOY_SHA}"
-git clean -ffdx
 mkdir -p backend/build/libs
 cp "${JAR_FILE}" backend/build/libs/app.jar
 
