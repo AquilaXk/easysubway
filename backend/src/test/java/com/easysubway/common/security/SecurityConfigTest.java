@@ -553,6 +553,59 @@ class SecurityConfigTest {
 			.isEqualTo(AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED);
 	}
 
+	@Test
+	@DisplayName("break-glass bootstrap은 비밀번호가 바뀌면 rotation 요구를 해제하고 새 비밀번호를 저장한다")
+	void breakGlassBootstrapRestoresAccessWhenSecretChanges() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"old-break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		repository.save(repository.findByLoginId("break-glass")
+			.orElseThrow()
+			.recordBreakGlassSuccess(LocalDateTime.of(2026, 6, 27, 0, 0)));
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"new-break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		var breakGlass = repository.findByLoginId("break-glass").orElseThrow();
+		assertThat(breakGlass.status()).isEqualTo(AdminIdentityStatus.ACTIVE);
+		assertThat(passwordEncoder.matches("old-break-password", breakGlass.passwordHash())).isFalse();
+		assertThat(passwordEncoder.matches("new-break-password", breakGlass.passwordHash())).isTrue();
+	}
+
 	private org.springframework.security.core.Authentication authenticate(
 		AuthenticationManager authenticationManager,
 		String username,

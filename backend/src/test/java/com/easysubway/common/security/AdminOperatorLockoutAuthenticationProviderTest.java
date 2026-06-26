@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -69,6 +70,79 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 			.isTrue();
 		assertThat(repository.findByLoginId("admin-user").orElseThrow().failedLoginCount())
 			.isZero();
+	}
+
+	@Test
+	@DisplayName("잠금 상태에서 거절된 인증도 감사에 남긴다")
+	void lockedAuthenticationWritesAudit() {
+		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
+		var repository = new InMemoryAdminIdentityRepository();
+		var provider = provider(clock, repository, 1, Duration.ofMinutes(5));
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "bad-password")))
+			.isInstanceOf(BadCredentialsException.class);
+		int auditCountBeforeLockedReject = repository.audits().size();
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "admin-password")))
+			.isInstanceOf(LockedException.class);
+
+		assertThat(repository.audits()).hasSize(auditCountBeforeLockedReject + 1);
+		assertThat(repository.audits().getLast().outcome()).isEqualTo("LOCKED");
+	}
+
+	@Test
+	@DisplayName("disabled 상태에서 거절된 인증도 감사에 남긴다")
+	void disabledAuthenticationWritesAudit() {
+		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
+		var repository = new InMemoryAdminIdentityRepository();
+		var provider = provider(clock, repository, 2, Duration.ofMinutes(5));
+		repository.save(repository.findByLoginId("admin-user").orElseThrow().disable(LocalDateTime.now(clock)));
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "admin-password")))
+			.isInstanceOf(DisabledException.class);
+
+		assertThat(repository.audits()).hasSize(1);
+		assertThat(repository.audits().getFirst().outcome()).isEqualTo("LOCKED");
+	}
+
+	@Test
+	@DisplayName("credential rotation 플래그가 있으면 ACTIVE 상태라도 인증을 차단한다")
+	void credentialRotationFlagBlocksAuthentication() {
+		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
+		var repository = new InMemoryAdminIdentityRepository();
+		var provider = provider(clock, repository, 2, Duration.ofMinutes(5));
+		var current = repository.findByLoginId("admin-user").orElseThrow();
+		repository.save(new AdminIdentity(
+			current.loginId(),
+			current.displayName(),
+			current.email(),
+			current.passwordHash(),
+			current.authMethod(),
+			current.role(),
+			AdminIdentityStatus.ACTIVE,
+			current.failedLoginCount(),
+			current.lockedUntil(),
+			current.passwordChangedAt(),
+			current.passwordExpiresAt(),
+			true,
+			current.breakGlassReason(),
+			current.bootstrapManaged(),
+			current.createdAt(),
+			LocalDateTime.now(clock)
+		));
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "admin-password")))
+			.isInstanceOf(DisabledException.class);
+	}
+
+	@Test
+	@DisplayName("락아웃 정책 값이 잘못되면 provider를 만들 수 없다")
+	void rejectsInvalidLockoutPolicy() {
+		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
+		assertThatThrownBy(() -> provider(clock, new InMemoryAdminIdentityRepository(), 0, Duration.ofMinutes(5)))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> provider(clock, new InMemoryAdminIdentityRepository(), 2, Duration.ZERO))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test

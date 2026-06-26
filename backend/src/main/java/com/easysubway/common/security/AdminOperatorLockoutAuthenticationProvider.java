@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
@@ -52,11 +53,14 @@ public class AdminOperatorLockoutAuthenticationProvider implements Authenticatio
 			return delegate.authenticate(authentication);
 		}
 
-		rejectIfLocked(identity.get());
 		try {
+			rejectIfLocked(identity.get());
 			Authentication result = delegate.authenticate(authentication);
 			recordSuccess(identity.get());
 			return result;
+		} catch (AccountStatusException exception) {
+			recordBlocked(identity.get());
+			throw exception;
 		} catch (BadCredentialsException exception) {
 			recordFailure(identity.get());
 			throw exception;
@@ -93,14 +97,23 @@ public class AdminOperatorLockoutAuthenticationProvider implements Authenticatio
 
 	private void recordSuccess(AdminIdentity identity) {
 		LocalDateTime now = LocalDateTime.now(clock);
-		AdminIdentity saved = identity.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS
-			? adminIdentityRepository.save(identity.recordBreakGlassSuccess(now))
-			: adminIdentityRepository.save(identity.recordLocalSuccess(now));
+		AdminIdentity saved = adminIdentityRepository.recordLoginSuccess(identity.loginId(), now);
 		adminIdentityRepository.recordLoginAudit(new AdminLoginAudit(
 			saved.loginId(),
 			saved.authMethod(),
 			"SUCCESS",
 			saved.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS ? saved.breakGlassReason() : null,
+			now
+		));
+	}
+
+	private void recordBlocked(AdminIdentity identity) {
+		LocalDateTime now = LocalDateTime.now(clock);
+		adminIdentityRepository.recordLoginAudit(new AdminLoginAudit(
+			identity.loginId(),
+			identity.authMethod(),
+			"LOCKED",
+			null,
 			now
 		));
 	}

@@ -19,5 +19,7 @@ public interface AdminIdentityRepository {
 
 	AdminIdentity recordLoginFailure(String loginId, LocalDateTime now, int maxFailures, Duration lockoutDuration);
 
+	AdminIdentity recordLoginSuccess(String loginId, LocalDateTime now);
+
 	void recordLoginAudit(AdminLoginAudit audit);
 }

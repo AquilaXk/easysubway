@@ -22,21 +22,21 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
 @Profile("prod")
 public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 
 	private final JdbcTemplate jdbcTemplate;
+	private final TransactionTemplate transactionTemplate;
 
 	@Autowired
 	public JdbcAdminIdentityRepository(DataSource dataSource) {
-		this(new JdbcTemplate(dataSource));
-	}
-
-	JdbcAdminIdentityRepository(JdbcTemplate jdbcTemplate) {
-		this.jdbcTemplate = jdbcTemplate;
+		this.jdbcTemplate = new JdbcTemplate(dataSource);
+		this.transactionTemplate = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
 	}
 
 	@Override
@@ -160,37 +160,27 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 		Duration lockoutDuration
 	) {
 		String normalizedLoginId = normalize(loginId);
-		int updated = jdbcTemplate.update("""
-			UPDATE admin_users
-			SET failed_login_count = CASE
-					WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1
-					ELSE failed_login_count + 1
-				END,
-				locked_until = CASE
-					WHEN (
-						CASE
-							WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1
-							ELSE failed_login_count + 1
-						END
-					) >= ? THEN ?
-					WHEN locked_until IS NOT NULL AND locked_until <= ? THEN NULL
-					ELSE locked_until
-				END,
-				updated_at = ?
-			WHERE login_id = ?
-			""",
-			now,
-			now,
-			maxFailures,
-			now.plus(lockoutDuration),
-			now,
-			now,
-			normalizedLoginId
-		);
-		if (updated == 0) {
-			throw new IllegalStateException("관리자 identity를 찾을 수 없습니다.");
-		}
-		return findByLoginId(normalizedLoginId).orElseThrow();
+		return transactionTemplate.execute(status -> {
+			AdminIdentity current = findByLoginIdForUpdate(normalizedLoginId)
+				.orElseThrow(() -> new IllegalStateException("관리자 identity를 찾을 수 없습니다."));
+			AdminIdentity saved = current.recordFailure(now, maxFailures, lockoutDuration);
+			save(saved);
+			return saved;
+		});
+	}
+
+	@Override
+	public AdminIdentity recordLoginSuccess(String loginId, LocalDateTime now) {
+		String normalizedLoginId = normalize(loginId);
+		return transactionTemplate.execute(status -> {
+			AdminIdentity current = findByLoginIdForUpdate(normalizedLoginId)
+				.orElseThrow(() -> new IllegalStateException("관리자 identity를 찾을 수 없습니다."));
+			AdminIdentity saved = current.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS
+				? current.recordBreakGlassSuccess(now)
+				: current.recordLocalSuccess(now);
+			save(saved);
+			return saved;
+		});
 	}
 
 	@Override
@@ -254,6 +244,25 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 			resultSet.getTimestamp("created_at").toLocalDateTime(),
 			resultSet.getTimestamp("updated_at").toLocalDateTime()
 		);
+	}
+
+	private Optional<AdminIdentity> findByLoginIdForUpdate(String loginId) {
+		try {
+			return Optional.ofNullable(jdbcTemplate.queryForObject(
+				"""
+					SELECT login_id, display_name, email, password_hash, auth_method, role, status,
+						failed_login_count, locked_until, password_changed_at, password_expires_at,
+						credential_rotation_required, break_glass_reason, bootstrap_managed, created_at, updated_at
+					FROM admin_users
+					WHERE login_id = ?
+					FOR UPDATE
+					""",
+				this::mapIdentity,
+				normalize(loginId)
+			));
+		} catch (EmptyResultDataAccessException exception) {
+			return Optional.empty();
+		}
 	}
 
 	private static java.time.LocalDateTime toLocalDateTime(Timestamp timestamp) {

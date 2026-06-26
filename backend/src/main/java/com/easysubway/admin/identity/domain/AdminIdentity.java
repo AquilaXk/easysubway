@@ -62,7 +62,9 @@ public record AdminIdentity(
 	}
 
 	public boolean disabled() {
-		return status == AdminIdentityStatus.DISABLED || status == AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED;
+		return credentialRotationRequired
+			|| status == AdminIdentityStatus.DISABLED
+			|| status == AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED;
 	}
 
 	public boolean credentialsExpiredAt(LocalDateTime now) {
@@ -71,6 +73,12 @@ public record AdminIdentity(
 	}
 
 	public AdminIdentity recordFailure(LocalDateTime now, int maxFailures, Duration lockoutDuration) {
+		if (maxFailures < 1) {
+			throw new IllegalArgumentException("최대 로그인 실패 횟수는 1 이상이어야 합니다.");
+		}
+		if (lockoutDuration == null || lockoutDuration.isZero() || lockoutDuration.isNegative()) {
+			throw new IllegalArgumentException("락아웃 기간은 양수여야 합니다.");
+		}
 		boolean lockoutExpired = lockedUntil != null && !lockedUntil.isAfter(now);
 		int baselineFailures = lockoutExpired ? 0 : failedLoginCount;
 		LocalDateTime baselineLockedUntil = lockoutExpired ? null : lockedUntil;

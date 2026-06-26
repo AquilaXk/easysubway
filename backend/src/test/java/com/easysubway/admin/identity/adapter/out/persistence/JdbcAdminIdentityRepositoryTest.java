@@ -54,8 +54,10 @@ class JdbcAdminIdentityRepositoryTest {
 		var dataSource = adminIdentityDataSource();
 		var repository = new JdbcAdminIdentityRepository(dataSource);
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
-		AdminIdentity identity = localIdentity("admin-user", now);
-		repository.save(identity);
+		LocalDateTime existingCreatedAt = now.minusDays(1);
+		AdminIdentity persisted = localIdentity("admin-user", existingCreatedAt);
+		AdminIdentity bootstrap = localIdentity("admin-user", now);
+		repository.save(persisted);
 
 		var staleReadRepository = new JdbcAdminIdentityRepository(dataSource) {
 			private int findAttempts;
@@ -69,11 +71,12 @@ class JdbcAdminIdentityRepositoryTest {
 			}
 		};
 
-		var loaded = staleReadRepository.upsertBootstrap(identity);
+		var loaded = staleReadRepository.upsertBootstrap(bootstrap);
 
 		assertThat(loaded.loginId()).isEqualTo("admin-user");
+		assertThat(loaded.createdAt()).isEqualTo(existingCreatedAt);
 		assertThat(repository.findByLoginId("admin-user")).hasValueSatisfying(existing ->
-			assertThat(existing.createdAt()).isEqualTo(now)
+			assertThat(existing.createdAt()).isEqualTo(existingCreatedAt)
 		);
 	}
 

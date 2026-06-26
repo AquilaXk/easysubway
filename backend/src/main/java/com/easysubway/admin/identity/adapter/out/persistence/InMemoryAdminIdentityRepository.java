@@ -2,6 +2,7 @@ package com.easysubway.admin.identity.adapter.out.persistence;
 
 import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
 import com.easysubway.admin.identity.domain.AdminIdentity;
+import com.easysubway.admin.identity.domain.AdminIdentityAuthMethod;
 import com.easysubway.admin.identity.domain.AdminIdentityStatus;
 import com.easysubway.admin.identity.domain.AdminLoginAudit;
 import java.time.Duration;
@@ -72,6 +73,22 @@ public class InMemoryAdminIdentityRepository implements AdminIdentityRepository 
 				throw new IllegalStateException("관리자 identity를 찾을 수 없습니다.");
 			}
 			AdminIdentity next = current.recordFailure(now, maxFailures, lockoutDuration);
+			saved.set(next);
+			return next;
+		});
+		return saved.get();
+	}
+
+	@Override
+	public AdminIdentity recordLoginSuccess(String loginId, LocalDateTime now) {
+		var saved = new AtomicReference<AdminIdentity>();
+		identitiesByLoginId.compute(normalize(loginId), (key, current) -> {
+			if (current == null) {
+				throw new IllegalStateException("관리자 identity를 찾을 수 없습니다.");
+			}
+			AdminIdentity next = current.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS
+				? current.recordBreakGlassSuccess(now)
+				: current.recordLocalSuccess(now);
 			saved.set(next);
 			return next;
 		});
