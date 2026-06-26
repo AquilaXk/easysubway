@@ -1947,6 +1947,7 @@ _StationTapScore? _stationTapScore(
     return null;
   }
   return _StationTapScore(
+    containsNode: containsNode,
     containsShape: containsShape,
     screenDistance: bestDistance,
     stableKey: _stationGeometryKey(station),
@@ -1989,17 +1990,25 @@ double _distanceToRect(Offset point, Rect rect) {
 
 class _StationTapScore implements Comparable<_StationTapScore> {
   const _StationTapScore({
+    required this.containsNode,
     required this.containsShape,
     required this.screenDistance,
     required this.stableKey,
   });
 
+  final bool containsNode;
   final bool containsShape;
   final double screenDistance;
   final String stableKey;
 
   @override
   int compareTo(_StationTapScore other) {
+    final nodeComparison = _scoreBool(
+      containsNode,
+    ).compareTo(_scoreBool(other.containsNode));
+    if (nodeComparison != 0) {
+      return nodeComparison;
+    }
     final containsComparison = _scoreBool(
       containsShape,
     ).compareTo(_scoreBool(other.containsShape));
