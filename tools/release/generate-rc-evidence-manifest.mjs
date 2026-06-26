@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -27,7 +26,7 @@ const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const backendIdentity = readBackendIdentity(args);
 const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const expectedValues = parsePairs(args.expect);
-const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? gitRevParse(repoRoot);
+const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
 
 const identity = {
   gitSha,
@@ -288,8 +287,8 @@ function evidenceBlockers(entries) {
     }));
 }
 
-function gitRevParse(rootDir) {
-  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim();
+function requiredGitSha() {
+  fail("--git-sha or GITHUB_SHA is required");
 }
 
 function fail(message) {
