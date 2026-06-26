@@ -32,8 +32,16 @@ class DataPackUpdater {
       return const [];
     }
 
+    final preUpdateCurrentPointer = await installer.readCurrentPointer();
     final override = manifest.emergencyOverride;
     final protectedVersionsByPackId = <String, Set<String>>{};
+    if (preUpdateCurrentPointer != null) {
+      _protectVersion(
+        protectedVersionsByPackId,
+        id: preUpdateCurrentPointer.id,
+        version: preUpdateCurrentPointer.version,
+      );
+    }
     if (override != null) {
       _protectVersion(
         protectedVersionsByPackId,
@@ -118,34 +126,28 @@ class DataPackUpdater {
   List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
     final activePack = manifest.activePack;
     final override = manifest.emergencyOverride;
-    if (activePack != null) {
-      final activeDependencies = manifest.packs
-          .where(
-            (pack) =>
-                pack.id == activePack.id &&
-                _versionNumber(pack.version) ==
-                    _versionNumber(activePack.version),
-          )
-          .expand((pack) => pack.dependencies)
-          .toList(growable: false);
-      return manifest.packs
-          .where(
-            (pack) =>
-                pack.id == activePack.id ||
-                _matchesOverride(pack, override) ||
-                activeDependencies.any(
-                  (dependency) =>
-                      dependency.id == pack.id &&
-                      _versionNumber(dependency.version) ==
-                          _versionNumber(pack.version),
-                ),
-          )
-          .toList(growable: false);
-    }
+    final selectedPacks = manifest.packs
+        .where((pack) {
+          final selectedActiveId = activePack?.id ?? activePackId;
+          return pack.id == selectedActiveId ||
+              _matchesOverride(pack, override);
+        })
+        .toList(growable: false);
+    final selectedDependencies = selectedPacks
+        .expand((pack) => pack.dependencies)
+        .toList(growable: false);
     return manifest.packs
-        .where(
-          (pack) => pack.id == activePackId || _matchesOverride(pack, override),
-        )
+        .where((pack) {
+          if (selectedPacks.contains(pack)) {
+            return true;
+          }
+          return selectedDependencies.any(
+            (dependency) =>
+                dependency.id == pack.id &&
+                _versionNumber(dependency.version) ==
+                    _versionNumber(pack.version),
+          );
+        })
         .toList(growable: false);
   }
 
