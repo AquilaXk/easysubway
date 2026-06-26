@@ -64,11 +64,14 @@
       "play-installed-build-logcat-no-crash"
     ],
     "androidAccessibilityQa": [
+      "android-release-quality-gate-manifest",
       "talkback-rc-build-notes",
       "font-scale-150-200-screenshots",
       "small-screen-layout-screenshots",
+      "local-emulator-ui-tree-screenshots",
       "location-permission-denied-recovery",
-      "network-server-error-recovery"
+      "network-server-error-recovery",
+      "route-map-performance-summary"
     ],
     "playConsoleSubmission": [
       "account-type-production-access-record",

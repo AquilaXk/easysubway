@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "android-release-ux-accessibility-performance",
+  "issue": 917,
+  "releaseBlockerPolicy": true,
+  "scope": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "distribution": "google-play",
+    "primaryLocale": "ko-KR",
+    "targetUsers": [
+      "older-adults",
+      "wheelchair-users",
+      "stroller-users",
+      "pregnant-riders",
+      "temporary-injury-riders",
+      "riders-with-large-baggage"
+    ]
+  },
+  "routeSafetyContract": "#901",
+  "routeSafetyStatusEnum": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
+  "deviceEvidencePolicy": {
+    "codexQaDevice": "local_android_emulator_only",
+    "physicalDeviceEvidence": "not_used_for_codex_pr_evidence",
+    "releaseRcEvidence": "play_installed_or_exact_rc_required_before_go",
+    "minimumAndroidApi": 35,
+    "fontScales": [1.5, 2.0],
+    "smallScreenViewport": "compact_phone_portrait"
+  },
+  "requiredChecks": [
+    {
+      "id": "route_safety_status_copy",
+      "releaseBlocker": true,
+      "states": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
+      "evidence": ["screenshots", "ui-tree", "copy-review-notes"],
+      "passCriteriaKo": "FOUND는 검증된 접근성 edge가 있을 때만 안전하게 표현하고, 정보 부족은 UNKNOWN 또는 확인 필요 문구로 표시한다."
+    },
+    {
+      "id": "talkback_primary_journey",
+      "releaseBlocker": true,
+      "journeys": ["home", "station-search", "route-result", "facility-report", "support-info"],
+      "evidence": ["ui-tree", "talkback-notes", "screen-recording-or-screenshot-sequence"],
+      "passCriteriaKo": "focus order, role, state, action, dynamic update가 이동 흐름을 이해할 수 있게 읽힌다."
+    },
+    {
+      "id": "font_scale_150_200_small_screen",
+      "releaseBlocker": true,
+      "settings": ["font_scale_1_5", "font_scale_2_0", "compact_phone_portrait"],
+      "evidence": ["screenshots", "ui-tree", "font-scale-value"],
+      "passCriteriaKo": "주요 CTA와 경고 문구가 overflow, clipping, hidden 상태가 아니다."
+    },
+    {
+      "id": "high_contrast_state_visibility",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "contrast-notes"],
+      "passCriteriaKo": "상태 배지, 오류 안내, 다음 행동, 안전 고지가 색상만으로 전달되지 않는다."
+    },
+    {
+      "id": "location_permission_denied_recovery",
+      "releaseBlocker": true,
+      "states": ["denied", "permanently_denied", "settings_return"],
+      "evidence": ["screenshots", "permission-state", "logcat-summary"],
+      "passCriteriaKo": "현재 위치만 제한되고 역 검색, 정적 경로, 역 상세는 계속 사용할 수 있다."
+    },
+    {
+      "id": "network_server_upload_error_recovery",
+      "releaseBlocker": true,
+      "states": ["airplane", "timeout", "backend_down", "upload_failure"],
+      "evidence": ["screenshots", "logcat-summary", "request-response-summary"],
+      "passCriteriaKo": "오류 이유와 다음 행동을 쉬운 한국어로 안내하고 로컬 기능을 차단하지 않는다."
+    },
+    {
+      "id": "route_map_fallback_zoom_help",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "ui-tree", "gesture-notes"],
+      "passCriteriaKo": "노선도 렌더링 실패 또는 접근성 사용 시 대체 목록, 확대, 도움말 흐름이 제공된다."
+    },
+    {
+      "id": "route_map_performance_budget",
+      "releaseBlocker": true,
+      "budgets": {
+        "maxJankyPercent": 5,
+        "maxP95FrameMs": 32,
+        "maxP99FrameMs": 48,
+        "maxCameraLatencyP95Ms": 120,
+        "maxTotalPssKb": 250000
+      },
+      "measurementSource": {
+        "releaseOrPlayInstalled": ["gfxinfo-framestats", "meminfo", "screen-recording-or-screenshot-sequence"],
+        "matchedProfileInstrumentation": ["tools/mobile/run-route-map-android-evidence.sh", "tools/mobile/analyze-route-map-android-evidence.mjs"]
+      },
+      "evidence": [
+        "play-installed-route-map-gfxinfo-framestats-summary",
+        "play-installed-route-map-meminfo-summary",
+        "matched-profile-route-map-camera-latency-summary"
+      ],
+      "passCriteriaKo": "RC 또는 Play-installed build의 frame/memory 예산 초과와 동일 git SHA profile instrumentation의 camera latency 예산 초과는 해당 RC의 P0 blocker로 승격한다."
+    },
+    {
+      "id": "scope_source_realtime_support_ui",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "ui-tree", "store-listing-copy-comparison"],
+      "passCriteriaKo": "지원 지역, 데이터 기준일, 출처, 실시간 지원 범위가 앱 안에서 확인 가능하고 Play listing과 모순되지 않는다."
+    },
+    {
+      "id": "crash_anr_privacy_safe_reporting",
+      "releaseBlocker": true,
+      "evidence": ["logcat-summary", "privacy-review-notes"],
+      "passCriteriaKo": "crash/ANR reporting은 민감 위치, 신고 사진, receipt token, signing/credential 값을 노출하지 않는다."
+    }
+  ],
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/android-quality/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-link",
+    "sensitiveEvidence": [
+      "screen recordings with personal data",
+      "logcat containing device identifiers",
+      "network traces",
+      "Play-installed APK or AAB binaries",
+      "location coordinates",
+      "receipt tokens",
+      "facility report photos"
+    ],
+    "summaryRequiredKo": "PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 링크만 기록한다."
+  }
+}
