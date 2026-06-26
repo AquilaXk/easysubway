@@ -5468,6 +5468,104 @@ test("모바일 접근성 출시 QA 기준선은 Android와 iOS 제출 전 확�
   assert.match(checks.get("ios_safe_area_small_screen_tap_targets").passCriteriaKo, /터치|safe area/);
 });
 
+test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 blocker 기준을 고정한다", () => {
+  const gate = readJson("apps/mobile/release/android-release-quality-gate.json");
+  const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
+  const governance = readJson("apps/mobile/release/release-governance-gate.json");
+  const readme = read("README.md");
+  const smokeScript = read("tools/mobile/run-android-release-quality-emulator-smoke.sh");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.androidApplicationId, "com.easysubway.app");
+  assert.equal(gate.releaseGate, "android-release-ux-accessibility-performance");
+  assert.equal(gate.issue, 917);
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.equal(gate.scope.platform.android, "RELEASE_REQUIRED");
+  assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
+  assert.deepEqual(gate.routeSafetyStatusEnum, ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"]);
+  assert.equal(gate.routeSafetyContract, "#901");
+  assert.equal(gate.deviceEvidencePolicy.codexQaDevice, "local_android_emulator_only");
+  assert.equal(gate.deviceEvidencePolicy.physicalDeviceEvidence, "not_used_for_codex_pr_evidence");
+  assert.equal(gate.deviceEvidencePolicy.releaseRcEvidence, "play_installed_or_exact_rc_required_before_go");
+  assert.equal(gate.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/android-quality/<rc-or-run>/");
+
+  const requiredChecks = new Map(gate.requiredChecks.map((check) => [check.id, check]));
+  for (const id of [
+    "route_safety_status_copy",
+    "talkback_primary_journey",
+    "font_scale_150_200_small_screen",
+    "high_contrast_state_visibility",
+    "location_permission_denied_recovery",
+    "network_server_upload_error_recovery",
+    "route_map_fallback_zoom_help",
+    "route_map_performance_budget",
+    "scope_source_realtime_support_ui",
+    "crash_anr_privacy_safe_reporting",
+  ]) {
+    assert.ok(requiredChecks.has(id), `${id} must be tracked`);
+    assert.equal(requiredChecks.get(id).releaseBlocker, true, `${id} must block release`);
+  }
+  assert.deepEqual(requiredChecks.get("route_map_performance_budget").budgets, {
+    maxJankyPercent: 5,
+    maxP95FrameMs: 32,
+    maxP99FrameMs: 48,
+    maxCameraLatencyP95Ms: 120,
+    maxTotalPssKb: 250000,
+  });
+  assert.deepEqual(requiredChecks.get("route_map_performance_budget").measurementSource.releaseOrPlayInstalled, [
+    "gfxinfo-framestats",
+    "meminfo",
+    "screen-recording-or-screenshot-sequence",
+  ]);
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .measurementSource.matchedProfileInstrumentation.includes("tools/mobile/run-route-map-android-evidence.sh"),
+  );
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .evidence.includes("play-installed-route-map-gfxinfo-framestats-summary"),
+  );
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .evidence.includes("matched-profile-route-map-camera-latency-summary"),
+  );
+
+  assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
+  assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
+  assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("route-map-performance-summary"));
+  assert.ok(governance.childIssueLinks.includes(917));
+  assert.match(readme, /Android 출시 UX·접근성·성능 gate/);
+  assert.match(readme, /local Android emulator evidence/);
+  assert.match(smokeScript, /ro\.kernel\.qemu/);
+  assert.match(smokeScript, /--expected-font-scale/);
+  assert.match(smokeScript, /MIN_ANDROID_API=35/);
+  assert.match(smokeScript, /MAX_COMPACT_WIDTH_DP=599/);
+  assert.match(smokeScript, /width_dp=\$\(\(width_px \* 160 \/ density_dpi\)\)/);
+  assert.match(smokeScript, /"\$width_px" -ge "\$height_px"/);
+  assert.match(smokeScript, /viewport_orientation=portrait/);
+  assert.match(smokeScript, /dumpsys input/);
+  assert.match(smokeScript, /orientation=\\\(\[0-3\]\\\)/);
+  assert.match(smokeScript, /screen_rotation_source=/);
+  assert.match(smokeScript, /screen_rotation=/);
+  assert.match(smokeScript, /"\$screen_rotation" != "0"/);
+  assert.match(smokeScript, /wm_size_raw=/);
+  assert.match(smokeScript, /Override size:/);
+  assert.match(smokeScript, /wm_size_source="override"/);
+  assert.match(smokeScript, /pm path "\$PACKAGE"/);
+  assert.match(smokeScript, /android\.intent\.action\.MAIN/);
+  assert.match(smokeScript, /android\.intent\.category\.LAUNCHER/);
+  assert.match(smokeScript, /-p "\$PACKAGE"/);
+  assert.match(smokeScript, /am start -n "\$launch_activity"/);
+  assert.match(smokeScript, /current-focus\.txt/);
+  assert.match(smokeScript, /font_scale/);
+  assert.match(smokeScript, /uiautomator dump/);
+  assert.match(smokeScript, /dumpsys gfxinfo/);
+});
+
 test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을 고정한다", () => {
   const readinessPath = "apps/mobile/release/store-submission-readiness.json";
   assert.ok(existsSync(path.join(root, readinessPath)));
