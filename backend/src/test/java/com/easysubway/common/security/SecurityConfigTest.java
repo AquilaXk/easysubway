@@ -3,19 +3,27 @@ package com.easysubway.common.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.easysubway.admin.identity.adapter.out.persistence.InMemoryAdminIdentityRepository;
+import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
+import com.easysubway.admin.identity.domain.AdminIdentityAuthMethod;
+import com.easysubway.admin.identity.domain.AdminIdentityRole;
+import com.easysubway.admin.identity.domain.AdminIdentityStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.context.annotation.Bean;
 
 @DisplayName("보안 설정")
 class SecurityConfigTest {
@@ -25,7 +33,7 @@ class SecurityConfigTest {
 			SecurityAutoConfiguration.class,
 			WebMvcAutoConfiguration.class
 		))
-		.withUserConfiguration(SecurityConfig.class);
+		.withUserConfiguration(SecurityConfig.class, TestAdminIdentityRepositoryConfig.class);
 
 	@Test
 	@DisplayName("운영 프로필은 관리자 계정 설정이 없으면 시작하지 않는다")
@@ -107,6 +115,28 @@ class SecurityConfigTest {
 				assertThat(userDetailsService.loadUserByUsername("operator-user").getAuthorities())
 					.extracting(GrantedAuthority::getAuthority)
 					.containsExactly("ROLE_OPERATOR_ADMIN");
+				AdminIdentityRepository repository = context.getBean(AdminIdentityRepository.class);
+				assertThat(repository.findByLoginId("operator-user").orElseThrow().role())
+					.isEqualTo(AdminIdentityRole.OPERATOR_ADMIN);
+			});
+	}
+
+	@Test
+	@DisplayName("관리자 계정 설정이 있으면 영속 identity 저장소에 bootstrap한다")
+	void adminCredentialsBootstrapPersistentIdentity() {
+		contextRunner
+			.withPropertyValues(
+				"easysubway.admin.username=admin-user",
+				"easysubway.admin.password=admin-password"
+			)
+			.run(context -> {
+				assertThat(context).hasNotFailed();
+				AdminIdentityRepository repository = context.getBean(AdminIdentityRepository.class);
+
+				var identity = repository.findByLoginId("admin-user").orElseThrow();
+				assertThat(identity.authMethod()).isEqualTo(AdminIdentityAuthMethod.LOCAL);
+				assertThat(identity.role()).isEqualTo(AdminIdentityRole.ADMIN);
+				assertThat(identity.status()).isEqualTo(AdminIdentityStatus.ACTIVE);
 			});
 	}
 
@@ -127,6 +157,21 @@ class SecurityConfigTest {
 				assertThat(context).hasFailed();
 				assertThat(context.getStartupFailure())
 					.hasMessageContaining("운영기관 관리자 계정 설정은 아이디와 비밀번호를 함께 입력해야 합니다.");
+			});
+	}
+
+	@Test
+	@DisplayName("break-glass 계정은 아이디, 비밀번호, 사유를 함께 설정해야 한다")
+	void breakGlassCredentialsFailWhenPartiallyConfigured() {
+		contextRunner
+			.withPropertyValues(
+				"easysubway.admin.break-glass.username=break-glass",
+				"easysubway.admin.break-glass.password=break-password"
+			)
+			.run(context -> {
+				assertThat(context).hasFailed();
+				assertThat(context.getStartupFailure())
+					.hasMessageContaining("break-glass 계정 설정은 아이디, 비밀번호, 사유를 함께 입력해야 합니다.");
 			});
 	}
 
@@ -181,6 +226,40 @@ class SecurityConfigTest {
 			});
 	}
 
+	@Test
+	@DisplayName("break-glass Basic auth 성공은 감사 사유를 남기고 credential rotation을 요구한다")
+	void breakGlassAuthRecordsReasonAndRequiresCredentialRotation() {
+		contextRunner
+			.withPropertyValues(
+				"easysubway.admin.username=admin-user",
+				"easysubway.admin.password=admin-password",
+				"easysubway.admin.break-glass.username=break-glass",
+				"easysubway.admin.break-glass.password=break-password",
+				"easysubway.admin.break-glass.reason=정기 관리자 계정 접근 장애 대응"
+			)
+			.run(context -> {
+				assertThat(context).hasNotFailed();
+				AuthenticationManager authenticationManager = context.getBean(AuthenticationConfiguration.class)
+					.getAuthenticationManager();
+				InMemoryAdminIdentityRepository repository = context.getBean(InMemoryAdminIdentityRepository.class);
+
+				assertThat(authenticate(authenticationManager, "break-glass", "break-password").isAuthenticated())
+					.isTrue();
+				assertThat(repository.findByLoginId("break-glass").orElseThrow().status())
+					.isEqualTo(AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED);
+				assertThat(repository.audits())
+					.anySatisfy(audit -> {
+						assertThat(audit.loginId()).isEqualTo("break-glass");
+						assertThat(audit.authMethod()).isEqualTo(AdminIdentityAuthMethod.BREAK_GLASS);
+						assertThat(audit.outcome()).isEqualTo("SUCCESS");
+						assertThat(audit.reason()).isEqualTo("정기 관리자 계정 접근 장애 대응");
+					});
+
+				assertThatThrownBy(() -> authenticate(authenticationManager, "break-glass", "break-password"))
+					.isInstanceOf(DisabledException.class);
+			});
+	}
+
 	private org.springframework.security.core.Authentication authenticate(
 		AuthenticationManager authenticationManager,
 		String username,
@@ -189,6 +268,15 @@ class SecurityConfigTest {
 		return authenticationManager.authenticate(
 			UsernamePasswordAuthenticationToken.unauthenticated(username, password)
 		);
+	}
+
+	@TestConfiguration
+	static class TestAdminIdentityRepositoryConfig {
+
+		@Bean
+		InMemoryAdminIdentityRepository adminIdentityRepository() {
+			return new InMemoryAdminIdentityRepository();
+		}
 	}
 
 }

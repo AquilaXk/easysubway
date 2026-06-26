@@ -3,11 +3,18 @@ package com.easysubway.common.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.easysubway.admin.identity.adapter.out.persistence.InMemoryAdminIdentityRepository;
+import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
+import com.easysubway.admin.identity.application.service.AdminIdentityUserDetailsService;
+import com.easysubway.admin.identity.domain.AdminIdentity;
+import com.easysubway.admin.identity.domain.AdminIdentityAuthMethod;
+import com.easysubway.admin.identity.domain.AdminIdentityRole;
+import com.easysubway.admin.identity.domain.AdminIdentityStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -24,7 +31,8 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 	@DisplayName("잠금 기간이 지나면 올바른 비밀번호 인증을 다시 허용한다")
 	void lockoutExpiresAfterDuration() {
 		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
-		var provider = provider(clock, List.of("admin-user"), 2, Duration.ofMinutes(5));
+		var repository = new InMemoryAdminIdentityRepository();
+		var provider = provider(clock, repository, 2, Duration.ofMinutes(5));
 
 		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "bad-password")))
 			.isInstanceOf(BadCredentialsException.class);
@@ -37,13 +45,19 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 
 		assertThat(provider.authenticate(token("admin-user", "admin-password")).isAuthenticated())
 			.isTrue();
+		assertThat(repository.findByLoginId("admin-user").orElseThrow().failedLoginCount())
+			.isZero();
 	}
 
 	@Test
-	@DisplayName("보호 대상이 아닌 사용자는 실패 누적으로 잠기지 않는다")
-	void nonProtectedUserDoesNotLock() {
-		var provider = provider(new MutableClock(Instant.parse("2026-06-22T00:00:00Z")), List.of("admin-user"), 2,
-			Duration.ofMinutes(5));
+	@DisplayName("관리자 identity가 아닌 fallback 사용자는 실패 누적으로 잠기지 않는다")
+	void fallbackUserDoesNotLock() {
+		var provider = provider(
+			new MutableClock(Instant.parse("2026-06-22T00:00:00Z")),
+			new InMemoryAdminIdentityRepository(),
+			2,
+			Duration.ofMinutes(5)
+		);
 
 		assertThatThrownBy(() -> provider.authenticate(token("app-user", "bad-password")))
 			.isInstanceOf(BadCredentialsException.class);
@@ -56,12 +70,29 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 
 	private AdminOperatorLockoutAuthenticationProvider provider(
 		Clock clock,
-		List<String> protectedUsernames,
+		AdminIdentityRepository adminIdentityRepository,
 		int maxFailures,
 		Duration lockoutDuration
 	) {
-		var users = new ConcurrentUserDetailsManager();
 		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		adminIdentityRepository.upsertBootstrap(new AdminIdentity(
+			"admin-user",
+			"관리자",
+			null,
+			passwordEncoder.encode("admin-password"),
+			AdminIdentityAuthMethod.LOCAL,
+			AdminIdentityRole.ADMIN,
+			AdminIdentityStatus.ACTIVE,
+			0,
+			null,
+			LocalDateTime.now(clock),
+			null,
+			false,
+			null,
+			LocalDateTime.now(clock),
+			LocalDateTime.now(clock)
+		));
+		var users = new ConcurrentUserDetailsManager();
 		users.createUser(User.withUsername("admin-user")
 			.password(passwordEncoder.encode("admin-password"))
 			.roles("ADMIN")
@@ -70,10 +101,11 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 			.password(passwordEncoder.encode("app-password"))
 			.roles("USER")
 			.build());
+		var userDetailsService = new AdminIdentityUserDetailsService(adminIdentityRepository, users, clock);
 		return new AdminOperatorLockoutAuthenticationProvider(
-			users,
+			userDetailsService,
 			passwordEncoder,
-			protectedUsernames,
+			adminIdentityRepository,
 			maxFailures,
 			lockoutDuration,
 			clock
