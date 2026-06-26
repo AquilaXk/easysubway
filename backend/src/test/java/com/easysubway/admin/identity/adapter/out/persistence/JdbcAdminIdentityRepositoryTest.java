@@ -34,8 +34,7 @@ class JdbcAdminIdentityRepositoryTest {
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
 
 		repository.save(localIdentity("admin-user", now));
-		repository.save(repository.findByLoginId("admin-user").orElseThrow()
-			.recordFailure(now.plusMinutes(1), 1, Duration.ofMinutes(15)));
+		repository.recordLoginFailure("admin-user", now.plusMinutes(1), 1, Duration.ofMinutes(15));
 		repository.recordLoginAudit(new AdminLoginAudit(
 			"admin-user",
 			AdminIdentityAuthMethod.LOCAL,

@@ -76,7 +76,12 @@ public class AdminOperatorLockoutAuthenticationProvider implements Authenticatio
 
 	private void recordFailure(AdminIdentity identity) {
 		LocalDateTime now = LocalDateTime.now(clock);
-		AdminIdentity saved = adminIdentityRepository.save(identity.recordFailure(now, maxFailures, lockoutDuration));
+		AdminIdentity saved = adminIdentityRepository.recordLoginFailure(
+			identity.loginId(),
+			now,
+			maxFailures,
+			lockoutDuration
+		);
 		adminIdentityRepository.recordLoginAudit(new AdminLoginAudit(
 			saved.loginId(),
 			saved.authMethod(),

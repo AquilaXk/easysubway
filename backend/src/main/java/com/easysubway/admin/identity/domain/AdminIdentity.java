@@ -70,8 +70,11 @@ public record AdminIdentity(
 	}
 
 	public AdminIdentity recordFailure(LocalDateTime now, int maxFailures, Duration lockoutDuration) {
-		int failures = failedLoginCount + 1;
-		LocalDateTime nextLockedUntil = failures >= maxFailures ? now.plus(lockoutDuration) : lockedUntil;
+		boolean lockoutExpired = lockedUntil != null && !lockedUntil.isAfter(now);
+		int baselineFailures = lockoutExpired ? 0 : failedLoginCount;
+		LocalDateTime baselineLockedUntil = lockoutExpired ? null : lockedUntil;
+		int failures = baselineFailures + 1;
+		LocalDateTime nextLockedUntil = failures >= maxFailures ? now.plus(lockoutDuration) : baselineLockedUntil;
 		return withLoginPolicy(failures, nextLockedUntil, status, credentialRotationRequired, now);
 	}
 

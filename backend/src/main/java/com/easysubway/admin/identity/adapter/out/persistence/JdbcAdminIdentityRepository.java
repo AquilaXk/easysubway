@@ -9,6 +9,8 @@ import com.easysubway.admin.identity.domain.AdminLoginAudit;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -94,11 +96,53 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 
 	@Override
 	public AdminIdentity upsertBootstrap(AdminIdentity identity) {
-		if (findByLoginId(identity.loginId()).isPresent()) {
-			return findByLoginId(identity.loginId()).orElseThrow();
+		var current = findByLoginId(identity.loginId());
+		if (current.isPresent()) {
+			return current.orElseThrow();
 		}
 		insert(identity);
 		return identity;
+	}
+
+	@Override
+	public AdminIdentity recordLoginFailure(
+		String loginId,
+		LocalDateTime now,
+		int maxFailures,
+		Duration lockoutDuration
+	) {
+		String normalizedLoginId = normalize(loginId);
+		int updated = jdbcTemplate.update("""
+			UPDATE admin_users
+			SET failed_login_count = CASE
+					WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1
+					ELSE failed_login_count + 1
+				END,
+				locked_until = CASE
+					WHEN (
+						CASE
+							WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1
+							ELSE failed_login_count + 1
+						END
+					) >= ? THEN ?
+					WHEN locked_until IS NOT NULL AND locked_until <= ? THEN NULL
+					ELSE locked_until
+				END,
+				updated_at = ?
+			WHERE login_id = ?
+			""",
+			now,
+			now,
+			maxFailures,
+			now.plus(lockoutDuration),
+			now,
+			now,
+			normalizedLoginId
+		);
+		if (updated == 0) {
+			throw new IllegalStateException("관리자 identity를 찾을 수 없습니다.");
+		}
+		return findByLoginId(normalizedLoginId).orElseThrow();
 	}
 
 	@Override

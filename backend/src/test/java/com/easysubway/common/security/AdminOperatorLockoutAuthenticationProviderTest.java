@@ -50,6 +50,28 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 	}
 
 	@Test
+	@DisplayName("잠금 기간이 지난 뒤 첫 실패는 이전 실패 횟수를 이어받지 않는다")
+	void expiredLockoutResetsFailureCounterBeforeNextFailure() {
+		var clock = new MutableClock(Instant.parse("2026-06-22T00:00:00Z"));
+		var repository = new InMemoryAdminIdentityRepository();
+		var provider = provider(clock, repository, 2, Duration.ofMinutes(5));
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "bad-password")))
+			.isInstanceOf(BadCredentialsException.class);
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "bad-password")))
+			.isInstanceOf(BadCredentialsException.class);
+		clock.advance(Duration.ofMinutes(5).plusSeconds(1));
+
+		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "bad-password")))
+			.isInstanceOf(BadCredentialsException.class);
+
+		assertThat(provider.authenticate(token("admin-user", "admin-password")).isAuthenticated())
+			.isTrue();
+		assertThat(repository.findByLoginId("admin-user").orElseThrow().failedLoginCount())
+			.isZero();
+	}
+
+	@Test
 	@DisplayName("관리자 identity가 아닌 fallback 사용자는 실패 누적으로 잠기지 않는다")
 	void fallbackUserDoesNotLock() {
 		var provider = provider(

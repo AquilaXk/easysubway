@@ -3,10 +3,13 @@ package com.easysubway.admin.identity.adapter.out.persistence;
 import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
 import com.easysubway.admin.identity.domain.AdminIdentity;
 import com.easysubway.admin.identity.domain.AdminLoginAudit;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.context.annotation.Profile;
@@ -33,6 +36,25 @@ public class InMemoryAdminIdentityRepository implements AdminIdentityRepository 
 	@Override
 	public AdminIdentity upsertBootstrap(AdminIdentity identity) {
 		return identitiesByLoginId.compute(normalize(identity.loginId()), (key, current) -> current == null ? identity : current);
+	}
+
+	@Override
+	public AdminIdentity recordLoginFailure(
+		String loginId,
+		LocalDateTime now,
+		int maxFailures,
+		Duration lockoutDuration
+	) {
+		var saved = new AtomicReference<AdminIdentity>();
+		identitiesByLoginId.compute(normalize(loginId), (key, current) -> {
+			if (current == null) {
+				throw new IllegalStateException("관리자 identity를 찾을 수 없습니다.");
+			}
+			AdminIdentity next = current.recordFailure(now, maxFailures, lockoutDuration);
+			saved.set(next);
+			return next;
+		});
+		return saved.get();
 	}
 
 	@Override
