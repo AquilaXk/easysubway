@@ -2601,11 +2601,12 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
       return _RouteBlockedWorkflow(result: result);
     }
 
+    final canUseRouteActions = _isRecommendedRoute(result);
     final canUseApiActions = !result.isLocalResult;
     final canSaveRoute =
         canUseApiActions &&
         widget.favoriteRouteRepository != null &&
-        !result.isBlocked;
+        canUseRouteActions;
     final canOpenFeedback =
         canUseApiActions && widget.routeFeedbackRepository != null;
 
@@ -2617,8 +2618,9 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
       _RouteWorkflowView.detail => _RouteDetailWorkflowView(
         result: result,
         onBack: () => setState(() => _view = _RouteWorkflowView.list),
-        onStartGuidance: () =>
-            setState(() => _view = _RouteWorkflowView.guidance),
+        onStartGuidance: !canUseRouteActions
+            ? null
+            : () => setState(() => _view = _RouteWorkflowView.guidance),
         onOpenFeedback: !canOpenFeedback
             ? null
             : () => setState(() => _view = _RouteWorkflowView.feedback),
@@ -2699,7 +2701,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
 
   final RouteSearchResult result;
   final VoidCallback onBack;
-  final VoidCallback onStartGuidance;
+  final VoidCallback? onStartGuidance;
   final VoidCallback? onOpenFeedback;
   final Widget? favoriteSaveButton;
 
@@ -2740,12 +2742,14 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         ?favoriteSaveButton,
-        const SizedBox(height: 10),
-        FilledButton(
-          key: const Key('routeStartGuidanceButton'),
-          onPressed: onStartGuidance,
-          child: const Text('안내 시작'),
-        ),
+        if (onStartGuidance != null) ...[
+          const SizedBox(height: 10),
+          FilledButton(
+            key: const Key('routeStartGuidanceButton'),
+            onPressed: onStartGuidance,
+            child: const Text('안내 시작'),
+          ),
+        ],
         if (onOpenFeedback != null) ...[
           const SizedBox(height: 8),
           TextButton(
