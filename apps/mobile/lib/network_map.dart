@@ -1109,7 +1109,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               : now.difference(_lastRendererCameraRequestAt!),
         );
     if (!shouldCommit) {
-      return _requestedRendererCamera ?? requestedCamera;
+      final skippedCommitCamera = networkMapRendererCameraForSkippedCommit(
+        requestedCamera: _requestedRendererCamera,
+        candidateCamera: requestedCamera,
+        visualCamera: pendingCamera,
+      );
+      if (!identical(skippedCommitCamera, _requestedRendererCamera)) {
+        _lastRendererCameraRequestAt = now;
+      }
+      return skippedCommitCamera;
     }
     _lastRendererCameraRequestAt = now;
     return requestedCamera;
@@ -1693,6 +1701,22 @@ MapCameraState? networkMapRendererCommitBasisCamera({
     return requestedCamera;
   }
   return presentedCamera ?? requestedCamera;
+}
+
+@visibleForTesting
+MapCameraState networkMapRendererCameraForSkippedCommit({
+  required MapCameraState? requestedCamera,
+  required MapCameraState candidateCamera,
+  required MapCameraState visualCamera,
+}) {
+  if (requestedCamera != null &&
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: requestedCamera,
+        visualCamera: visualCamera,
+      )) {
+    return requestedCamera;
+  }
+  return candidateCamera;
 }
 
 @visibleForTesting
