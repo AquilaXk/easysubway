@@ -1078,6 +1078,40 @@ void main() {
     );
   });
 
+  test('노선도 renderer는 pan reversal 때 stale requested camera를 교체한다', () {
+    const visualCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final staleRequestedCamera = networkMapOverscannedRendererCamera(
+      visualCamera.copyWith(center: const Offset(880, 250), revision: 4),
+    );
+    final candidateCamera = networkMapOverscannedRendererCamera(
+      visualCamera.copyWith(revision: 5),
+    );
+
+    expect(
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: staleRequestedCamera,
+        visualCamera: visualCamera,
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapRendererCameraForSkippedCommit(
+        requestedCamera: staleRequestedCamera,
+        candidateCamera: candidateCamera,
+        visualCamera: visualCamera,
+      ),
+      same(candidateCamera),
+    );
+  });
+
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
     final manifestFile = File('assets/datapacks/metro_map_pack/manifest.json');
     final manifest =
