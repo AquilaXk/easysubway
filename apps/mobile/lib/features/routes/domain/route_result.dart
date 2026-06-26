@@ -50,7 +50,7 @@ class LocalRouteResult {
     if (status != RouteStatus.found) {
       return 0;
     }
-    return (100 - (generalizedCost / 10).round()).clamp(0, 100);
+    return (100 - (generalizedCost / 10).round()).clamp(0, 100).toInt();
   }
 
   List<String> get edgeIds => steps.map((step) => step.edgeId).toList();
