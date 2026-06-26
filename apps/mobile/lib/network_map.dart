@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'accessible_design.dart';
 import 'features/network_map/domain/map_camera.dart';
@@ -750,6 +751,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
   MapCameraState? _camera;
+  MapCameraState? _pendingCamera;
+  bool _cameraFrameCallbackScheduled = false;
+  bool _gestureActive = false;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
   RouteMapRendererHealthMonitor? _rendererMonitor;
@@ -764,6 +768,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pendingCamera = null;
     _releaseRenderer(disposeRenderer: true);
     super.dispose();
   }
@@ -830,6 +835,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
+            _pendingCamera = null;
+            _gestureActive = false;
             _camera = _cameraForBounds(
               geometry.initialBounds,
               constraints,
@@ -877,6 +884,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onScaleStart: (details) {
+                    if (!_gestureActive) {
+                      setState(() {
+                        _gestureActive = true;
+                      });
+                    }
                     _gestureStartCamera = camera;
                     _gestureStartFocalPoint = details.localFocalPoint;
                   },
@@ -884,6 +896,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     _updateCameraForGesture(details);
                   },
                   onScaleEnd: (_) {
+                    _scheduleCameraCommit();
+                    if (_gestureActive) {
+                      setState(() {
+                        _gestureActive = false;
+                      });
+                    }
                     _gestureStartCamera = null;
                     _gestureStartFocalPoint = null;
                   },
@@ -898,32 +916,32 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   },
                 ),
               ),
-              for (final station in widget.data.stations)
-                if (_stationHitRect(
-                  station,
-                  geometry,
-                ).overlaps(camera.visibleSourceRect.inflate(96 / camera.scale)))
-                  Positioned.fromRect(
-                    rect: _sourceRectToViewport(
-                      _stationHitRect(
-                        station,
-                        geometry,
-                        nodeRadius: 24 / camera.scale,
-                        labelHeight: 40 / camera.scale,
+              if (!_gestureActive)
+                for (final station in widget.data.stations)
+                  if (_stationHitRect(station, geometry).overlaps(
+                    camera.visibleSourceRect.inflate(96 / camera.scale),
+                  ))
+                    Positioned.fromRect(
+                      rect: _sourceRectToViewport(
+                        _stationHitRect(
+                          station,
+                          geometry,
+                          nodeRadius: 24 / camera.scale,
+                          labelHeight: 40 / camera.scale,
+                        ),
+                        camera,
                       ),
-                      camera,
+                      child: _StationHitTarget(
+                        key: Key(
+                          'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+                        ),
+                        station: station,
+                        onTap: () => widget.onStationTap(
+                          station,
+                          stationLinesById[station.id] ?? const [],
+                        ),
+                      ),
                     ),
-                    child: _StationHitTarget(
-                      key: Key(
-                        'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
-                      ),
-                      station: station,
-                      onTap: () => widget.onStationTap(
-                        station,
-                        stationLinesById[station.id] ?? const [],
-                      ),
-                    ),
-                  ),
               Positioned(
                 right: 14,
                 top: 12,
@@ -963,7 +981,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _scaleMap(double factor) {
-    final camera = _camera;
+    final camera = _pendingCamera ?? _camera;
     if (camera == null || camera.viewportSize == Size.zero) {
       return;
     }
@@ -999,18 +1017,42 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _setCamera(MapCameraState camera) {
-    final currentCamera = _camera;
+    final currentCamera = _pendingCamera ?? _camera;
     final nextCamera = currentCamera == null
         ? camera
         : networkMapCameraWithMonotonicRevision(
             current: currentCamera,
             next: camera,
           );
-    if (_camera == nextCamera) {
+    if (identical(_pendingCamera, nextCamera) ||
+        (_pendingCamera == null && identical(_camera, nextCamera))) {
       return;
     }
-    setState(() {
-      _camera = nextCamera;
+    _pendingCamera = nextCamera;
+    _scheduleCameraCommit();
+  }
+
+  void _scheduleCameraCommit() {
+    if (_pendingCamera == null) {
+      return;
+    }
+    if (_cameraFrameCallbackScheduled) {
+      return;
+    }
+    _cameraFrameCallbackScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _cameraFrameCallbackScheduled = false;
+      final pendingCamera = _pendingCamera;
+      _pendingCamera = null;
+      if (!mounted || pendingCamera == null) {
+        return;
+      }
+      if (identical(_camera, pendingCamera)) {
+        return;
+      }
+      setState(() {
+        _camera = pendingCamera;
+      });
     });
   }
 
