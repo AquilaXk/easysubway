@@ -143,7 +143,10 @@ compose() {
 
 compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" config --quiet
 
-timeout 600 compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" up -d --no-build postgres object-storage
+EASYSUBWAY_BACKEND_ENV_FILE="${BACKEND_ENV}" \
+EASYSUBWAY_BACKEND_IMAGE_TAG="${DEPLOY_SHA}" \
+EASYSUBWAY_BACKEND_JAR_SHA256="${jar_sha}" \
+	timeout 600 docker compose --project-name "${DEPLOY_COMPOSE_PROJECT}" --env-file "${COMPOSE_ENV}" -f infra/docker-compose.yml up -d --no-build postgres object-storage
 
 wait_stateful_service() {
 	local service="$1"
@@ -223,7 +226,10 @@ if [[ "${current_sha}" == "${DEPLOY_SHA}" ]]; then
 fi
 
 if [[ "${needs_build}" -eq 1 ]]; then
-	timeout 900 compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" build backend
+	EASYSUBWAY_BACKEND_ENV_FILE="${BACKEND_ENV}" \
+	EASYSUBWAY_BACKEND_IMAGE_TAG="${DEPLOY_SHA}" \
+	EASYSUBWAY_BACKEND_JAR_SHA256="${jar_sha}" \
+		timeout 900 docker compose --project-name "${DEPLOY_COMPOSE_PROJECT}" --env-file "${COMPOSE_ENV}" -f infra/docker-compose.yml build backend
 fi
 
 needs_backup=0
