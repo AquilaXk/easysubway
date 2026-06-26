@@ -22,8 +22,20 @@ has_non_empty_env_value() {
   grep -Eq "^${name}=.+" "${env_file}"
 }
 
+env_value() {
+  local name="$1"
+  local value
+  value="$(sed -nE "s/^${name}=(.*)$/\\1/p" "${env_file}" | tail -n 1)"
+  case "${value}" in
+    \"*\"|\'*\')
+      value="${value:1:${#value}-2}"
+      ;;
+  esac
+  printf '%s' "${value}"
+}
+
 is_admin_basic_auth_enabled() {
-  grep -Eq "^EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=true$" "${env_file}"
+  [[ "$(env_value EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)" == "true" ]]
 }
 
 is_satisfied_by_runtime_fallback() {
