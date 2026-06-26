@@ -14,7 +14,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {
 	"spring.flyway.enabled=false",
 	"spring.datasource.url=jdbc:h2:mem:realtime-controller;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-	"spring.datasource.driver-class-name=org.h2.Driver"
+	"spring.datasource.driver-class-name=org.h2.Driver",
+	"EASYSUBWAY_SEOUL_TOPIS_FIXTURE_ENABLED=true"
 })
 @AutoConfigureMockMvc
 @DisplayName("서울 실시간 gateway API")

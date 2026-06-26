@@ -28,17 +28,20 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 	private final ObjectMapper objectMapper;
 	private final HttpClient httpClient;
 	private final RealtimeProvider fallbackProvider;
+	private final boolean fixtureEnabled;
 
 	@Autowired
 	TopisRealtimeProvider(
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY:}") String serviceKey,
-		ObjectMapper objectMapper
+		ObjectMapper objectMapper,
+		@Value("${EASYSUBWAY_SEOUL_TOPIS_FIXTURE_ENABLED:false}") boolean fixtureEnabled
 	) {
 		this(
 			serviceKey,
 			objectMapper,
 			HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build(),
-			new FixtureRealtimeProvider()
+			new FixtureRealtimeProvider(),
+			fixtureEnabled
 		);
 	}
 
@@ -48,15 +51,29 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 		HttpClient httpClient,
 		RealtimeProvider fallbackProvider
 	) {
+		this(serviceKey, objectMapper, httpClient, fallbackProvider, false);
+	}
+
+	TopisRealtimeProvider(
+		String serviceKey,
+		ObjectMapper objectMapper,
+		HttpClient httpClient,
+		RealtimeProvider fallbackProvider,
+		boolean fixtureEnabled
+	) {
 		this.serviceKey = serviceKey == null ? "" : serviceKey.trim();
 		this.objectMapper = objectMapper;
 		this.httpClient = httpClient;
 		this.fallbackProvider = fallbackProvider;
+		this.fixtureEnabled = fixtureEnabled;
 	}
 
 	@Override
 	public List<RealtimeArrival> arrivals(RealtimeQuery query) {
 		if (serviceKey.isBlank()) {
+			if (!fixtureEnabled) {
+				throw new RealtimeProviderException("PROVIDER_UNAVAILABLE");
+			}
 			return fallbackProvider.arrivals(query);
 		}
 		JsonNode payload = request("realtimeStationArrival/0/5/%s".formatted(pathSegment(query.stationQueryName())));
@@ -88,6 +105,9 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 	@Override
 	public List<RealtimeTrainPosition> trainPositions(RealtimeQuery query) {
 		if (serviceKey.isBlank()) {
+			if (!fixtureEnabled) {
+				throw new RealtimeProviderException("PROVIDER_UNAVAILABLE");
+			}
 			return fallbackProvider.trainPositions(query);
 		}
 		JsonNode payload = request("realtimePosition/0/10/%s".formatted(pathSegment(query.lineName())));
@@ -137,13 +157,13 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 		}
 	}
 
-	private void validateTopisStatus(JsonNode payload) {
+	void validateTopisStatus(JsonNode payload) {
 		String code = stringOrEmpty(payload.path("errorMessage"), "code");
 		if (code.isBlank() || "INFO-000".equals(code)) {
 			return;
 		}
 		if ("INFO-200".equals(code)) {
-			throw new RealtimeProviderException("PROVIDER_QUOTA_EXCEEDED");
+			return;
 		}
 		throw new RealtimeProviderException("PROVIDER_UNAVAILABLE");
 	}

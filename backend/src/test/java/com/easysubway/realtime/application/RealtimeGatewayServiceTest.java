@@ -1,6 +1,7 @@
 package com.easysubway.realtime.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
@@ -76,7 +77,7 @@ class RealtimeGatewayServiceTest {
 		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
 		CountingProvider provider = new CountingProvider();
 		RealtimeGatewayService service = new RealtimeGatewayService(provider, clock);
-		RealtimeQuery query = sangnoksuQuery();
+		RealtimeQuery query = line4Query();
 		provider.failureCode = "PROVIDER_QUOTA_EXCEEDED";
 
 		RealtimeTrainPositionResult first = service.trainPositions(query);
@@ -111,8 +112,72 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
-	@DisplayName("TOPIS provider는 backend service key가 없으면 fixture로 안전하게 동작한다")
-	void topisProviderUsesFixtureWhenBackendServiceKeyIsNotConfigured() {
+	@DisplayName("불일치한 역 query 조합은 provider를 호출하지 않고 unsupported로 끝난다")
+	void mismatchedArrivalQuerySkipsProviderCall() {
+		CountingProvider provider = new CountingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+
+		RealtimeArrivalResult result = service.arrivals(new RealtimeQuery(
+			"station-sangnoksu",
+			"4",
+			"1004",
+			"서울",
+			null
+		));
+
+		assertThat(result.status()).hasToString("UNSUPPORTED");
+		assertThat(result.fallbackCode()).isEqualTo("UNSUPPORTED_REGION");
+		assertThat(provider.arrivalCalls).hasValue(0);
+	}
+
+	@Test
+	@DisplayName("불일치한 열차 위치 query 조합은 provider를 호출하지 않고 unsupported로 끝난다")
+	void mismatchedTrainPositionQuerySkipsProviderCall() {
+		CountingProvider provider = new CountingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+
+		RealtimeTrainPositionResult result = service.trainPositions(new RealtimeQuery(
+			null,
+			"4",
+			"1004",
+			null,
+			"1호선"
+		));
+
+		assertThat(result.status()).hasToString("UNSUPPORTED");
+		assertThat(result.fallbackCode()).isEqualTo("UNSUPPORTED_REGION");
+		assertThat(provider.trainPositionCalls).hasValue(0);
+	}
+
+	@Test
+	@DisplayName("provider empty 결과는 quota circuit을 열지 않는다")
+	void emptyProviderResultDoesNotOpenQuotaCircuit() {
+		CountingProvider provider = new CountingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+		provider.emptyArrivals = true;
+
+		RealtimeArrivalResult empty = service.arrivals(sangnoksuQuery());
+		provider.emptyArrivals = false;
+		RealtimeArrivalResult fresh = service.arrivals(sangnoksuQuery());
+
+		assertThat(empty.status()).hasToString("UNAVAILABLE");
+		assertThat(empty.fallbackCode()).isEqualTo("EMPTY_PROVIDER_RESULT");
+		assertThat(fresh.status()).hasToString("FRESH");
+		assertThat(provider.arrivalCalls).hasValue(2);
+	}
+
+	@Test
+	@DisplayName("TOPIS provider는 backend service key가 없으면 unavailable로 낮춘다")
+	void topisProviderWithoutBackendServiceKeyIsUnavailableByDefault() {
 		TopisRealtimeProvider provider = new TopisRealtimeProvider(
 			"",
 			new ObjectMapper(),
@@ -120,11 +185,45 @@ class RealtimeGatewayServiceTest {
 			new FixtureRealtimeProvider()
 		);
 
+		assertThatThrownBy(() -> provider.arrivals(sangnoksuQuery()))
+			.isInstanceOf(RealtimeProviderException.class)
+			.hasMessage("PROVIDER_UNAVAILABLE");
+	}
+
+	@Test
+	@DisplayName("TOPIS provider fixture는 명시적으로 켠 테스트 경로에서만 동작한다")
+	void topisProviderUsesFixtureOnlyWhenExplicitlyEnabled() {
+		TopisRealtimeProvider provider = new TopisRealtimeProvider(
+			"",
+			new ObjectMapper(),
+			java.net.http.HttpClient.newHttpClient(),
+			new FixtureRealtimeProvider(),
+			true
+		);
+
 		List<RealtimeArrival> arrivals = provider.arrivals(sangnoksuQuery());
 
 		assertThat(arrivals).hasSize(1);
 		assertThat(arrivals.get(0).stationName()).isEqualTo("상록수");
 		assertThat(arrivals.get(0).message()).isEqualTo("3분 후");
+	}
+
+	@Test
+	@DisplayName("TOPIS INFO-200 empty result는 quota exception으로 처리하지 않는다")
+	void topisInfo200DoesNotOpenQuotaCircuit() throws Exception {
+		ObjectMapper objectMapper = new ObjectMapper();
+		TopisRealtimeProvider provider = new TopisRealtimeProvider(
+			"backend-key",
+			objectMapper,
+			java.net.http.HttpClient.newHttpClient(),
+			new FixtureRealtimeProvider()
+		);
+
+		provider.validateTopisStatus(objectMapper.readTree("""
+			{
+			  "errorMessage": {"code": "INFO-200", "message": "해당하는 데이터가 없습니다."}
+			}
+			"""));
 	}
 
 	@Test
@@ -166,16 +265,24 @@ class RealtimeGatewayServiceTest {
 		return new RealtimeQuery("station-sangnoksu", "4", "1004", "상록수", null);
 	}
 
+	private RealtimeQuery line4Query() {
+		return new RealtimeQuery(null, "4", "1004", null, "4호선");
+	}
+
 	private static final class CountingProvider implements RealtimeProvider {
 		private final AtomicInteger arrivalCalls = new AtomicInteger();
 		private final AtomicInteger trainPositionCalls = new AtomicInteger();
 		private String failureCode;
+		private boolean emptyArrivals;
 
 		@Override
 		public List<RealtimeArrival> arrivals(RealtimeQuery query) {
 			arrivalCalls.incrementAndGet();
 			if (failureCode != null) {
 				throw new RealtimeProviderException(failureCode);
+			}
+			if (emptyArrivals) {
+				return List.of();
 			}
 			return List.of(new RealtimeArrival(
 				"4",
