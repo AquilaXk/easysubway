@@ -175,7 +175,15 @@ if [[ -n "${current_sha}" ]]; then
 	fi
 fi
 
-target_env_hash="$(sha256sum "${COMPOSE_ENV}" "${BACKEND_ENV}" | sha256sum | cut -d ' ' -f 1)"
+target_env_hash="$(
+	{
+		printf 'compose.env\0'
+		sha256sum "${COMPOSE_ENV}" | cut -d ' ' -f 1
+		printf '\nbackend.env\0'
+		sha256sum "${BACKEND_ENV}" | cut -d ' ' -f 1
+		printf '\n'
+	} | sha256sum | cut -d ' ' -f 1
+)"
 current_env_hash=""
 if [[ -f "${SHARED_DIR}/current-env/metadata.env" ]]; then
 	current_env_hash="$(sed -n 's/^env_hash=//p' "${SHARED_DIR}/current-env/metadata.env")"

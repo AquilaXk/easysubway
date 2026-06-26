@@ -282,5 +282,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f "${RUNNER_TEMP}/backend.jar" "${RUNNER_TEMP}/backend.jar.sha256" "${EASYSUBWAY_ENV_FILE:-/dev/null}"
+          rm -f "${RUNNER_TEMP}/backend.jar" "${RUNNER_TEMP}/backend.jar.sha256"
+          if [[ -n "${EASYSUBWAY_ENV_FILE:-}" ]]; then
+            rm -f "${EASYSUBWAY_ENV_FILE}"
+          fi
           rm -rf "${RUNNER_TEMP}/deploy-env" "${RUNNER_TEMP}/ssh"
