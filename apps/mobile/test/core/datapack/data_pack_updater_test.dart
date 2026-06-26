@@ -262,6 +262,118 @@ void main() {
     ]);
   });
 
+  test('updater는 active pack history와 명시 dependency만 다운로드한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-active-only-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final activeSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final activeCompressedBytes = gzip.encode(activeSqliteBytes);
+    final dependencySqliteBytes = await _validCatalogSqliteBytes(directory);
+    final dependencyCompressedBytes = gzip.encode(dependencySqliteBytes);
+    final inactiveSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final inactiveCompressedBytes = gzip.encode(inactiveSqliteBytes);
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '19'},
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '19',
+                    url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: activeCompressedBytes,
+                    sqliteBytes: activeSqliteBytes,
+                    dependencies: const [
+                      {'id': 'common', 'version': '1'},
+                    ],
+                  ),
+                  _packJson(
+                    id: 'common',
+                    version: '1',
+                    url: 'catalog/common-v1.sqlite.gz',
+                    compressedBytes: dependencyCompressedBytes,
+                    sqliteBytes: dependencySqliteBytes,
+                  ),
+                  _packJson(
+                    id: 'busan',
+                    version: '9',
+                    url: 'catalog/busan-v9.sqlite.gz',
+                    compressedBytes: inactiveCompressedBytes,
+                    sqliteBytes: inactiveSqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(activeCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/common-v1.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(dependencyCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/busan-v9.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.internalServerError
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 25, 10),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+    final pointer = await updater.installer.readCurrentPointer();
+
+    expect(results, hasLength(2));
+    expect(
+      results.every(
+        (result) => result.status == DataPackInstallStatus.installed,
+      ),
+      isTrue,
+    );
+    expect(pointer?.id, 'capital');
+    expect(pointer?.version, '19');
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v19.sqlite.gz',
+      '/datapacks/catalog/common-v1.sqlite.gz',
+    ]);
+  });
+
   test('updater는 multi-pack 실패 시 기존 current pointer를 유지한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-updater-partial-',
@@ -868,21 +980,24 @@ void main() {
 }
 
 Map<String, Object?> _packJson({
+  String id = 'capital',
   required String version,
   required String url,
   required List<int> compressedBytes,
   required List<int> sqliteBytes,
+  List<Map<String, String>> dependencies = const [],
 }) {
   final compressedSha256 = sha256.convert(compressedBytes).toString();
   final sqliteSha256 = sha256.convert(sqliteBytes).toString();
   return {
-    'id': 'capital',
+    'id': id,
     'version': version,
     'url': url,
     'sha256': compressedSha256,
     'sqliteSha256': sqliteSha256,
     'sizeBytes': compressedBytes.length,
     ..._fixtureManifestMetadata(
+      id: id,
       version: version,
       compressedSha256: compressedSha256,
       sqliteSha256: sqliteSha256,
@@ -890,10 +1005,12 @@ Map<String, Object?> _packJson({
     ),
     'schemaVersion': '1',
     'requiredTables': ['catalog_metadata'],
+    if (dependencies.isNotEmpty) 'dependencies': dependencies,
   };
 }
 
 Map<String, Object?> _fixtureManifestMetadata({
+  String id = 'capital',
   required String version,
   required String compressedSha256,
   required String sqliteSha256,
@@ -905,7 +1022,7 @@ Map<String, Object?> _fixtureManifestMetadata({
     'representativeRouteRegressionSignature': {
       'algorithm': 'sha256-route-regression-v1',
       'value': _routeRegressionSignatureValue(
-        'capital',
+        id,
         version,
         compressedSha256,
         sqliteSha256,
@@ -915,7 +1032,7 @@ Map<String, Object?> _fixtureManifestMetadata({
     'signature': {
       'algorithm': 'sha256-pack-manifest-v1',
       'value': _signatureValue(
-        'capital',
+        id,
         version,
         compressedSha256,
         sqliteSha256,
