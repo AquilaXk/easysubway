@@ -84,6 +84,15 @@ function normalizedText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizedStationLabel(value) {
+  return normalizedText(value)
+    .normalize("NFKC")
+    .replace(/\([^)]*\)/gu, "")
+    .replace(/\[[^\]]*\]/gu, "")
+    .replace(/[·ㆍ･.\s]/gu, "")
+    .replace(/역$/u, "");
+}
+
 function addFinding(findings, finding) {
   findings.push({
     severity: finding.severity,
@@ -112,6 +121,22 @@ function polygonArea(points) {
     area += current.x * next.y - next.x * current.y;
   }
   return Math.abs(area / 2);
+}
+
+function polygonBounds(points) {
+  return points.reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxX: Math.max(bounds.maxX, point.x),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+  );
+}
+
+function boundsOverlap(a, b) {
+  return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
 }
 
 function labelPolygonError(value) {
@@ -196,6 +221,12 @@ function parseReviewedAmbiguities(raw) {
 
 function auditPack(pack, reviewedAmbiguities) {
   const findings = [];
+  const stationsById = new Map(
+    (Array.isArray(pack.stations) ? pack.stations : []).map((station) => [
+      normalizedText(station.id),
+      station,
+    ]),
+  );
   const stationLines = Array.isArray(pack.stationLines) ? pack.stationLines : [];
   const positions = Array.isArray(pack.routeMapPositions)
     ? pack.routeMapPositions
@@ -204,6 +235,7 @@ function auditPack(pack, reviewedAmbiguities) {
   const positionKeys = new Set();
   const positionedStationLineKeys = new Set();
   const coordinateGroups = new Map();
+  const labelPolygons = [];
 
   for (const position of positions) {
     const key = routeMapPositionKeyFor(position);
@@ -244,6 +276,11 @@ function auditPack(pack, reviewedAmbiguities) {
         lineId: position.lineId,
         stationId: position.stationId,
         message: polygonError,
+      });
+    } else if (Array.isArray(position.labelPolygon) && position.labelPolygon.length >= 3) {
+      labelPolygons.push({
+        position,
+        bounds: polygonBounds(position.labelPolygon),
       });
     }
 
@@ -305,6 +342,26 @@ function auditPack(pack, reviewedAmbiguities) {
       });
     }
 
+    const sourceLabel = normalizedText(position.sourceLabel);
+    if (sourceLabel !== "") {
+      const stationName = stationsById.get(normalizedText(position.stationId))?.nameKo;
+      if (
+        normalizedStationLabel(sourceLabel) !==
+        normalizedStationLabel(stationName)
+      ) {
+        addFinding(findings, {
+          severity: "HIGH",
+          code: "ROUTE_MAP_SOURCE_LABEL_MISMATCH",
+          packId: pack.id,
+          region: position.region,
+          lineId: position.lineId,
+          stationId: position.stationId,
+          message:
+            "routeMapPositions sourceLabel does not match the station name.",
+        });
+      }
+    }
+
     const coordinateKey = [
       normalizedText(position.region),
       normalizedText(position.lineId),
@@ -314,6 +371,28 @@ function auditPack(pack, reviewedAmbiguities) {
     const group = coordinateGroups.get(coordinateKey) ?? [];
     group.push(position);
     coordinateGroups.set(coordinateKey, group);
+  }
+
+  for (let leftIndex = 0; leftIndex < labelPolygons.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < labelPolygons.length; rightIndex += 1) {
+      const left = labelPolygons[leftIndex];
+      const right = labelPolygons[rightIndex];
+      if (normalizedText(left.position.region) !== normalizedText(right.position.region)) {
+        continue;
+      }
+      if (!boundsOverlap(left.bounds, right.bounds)) {
+        continue;
+      }
+      addFinding(findings, {
+        severity: "MEDIUM",
+        code: "OVERLAPPING_ROUTE_MAP_LABEL_POLYGON",
+        packId: pack.id,
+        region: left.position.region,
+        lineId: left.position.lineId,
+        stationId: `${left.position.stationId},${right.position.stationId}`,
+        message: "routeMapPositions labelPolygon bounding boxes overlap.",
+      });
+    }
   }
 
   for (const membership of stationLines) {
