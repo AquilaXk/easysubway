@@ -44,8 +44,32 @@ env_value() {
   trim_blank "${value}"
 }
 
+normalized_env_value() {
+  local name="$1"
+  env_value "${name}" | tr '[:upper:]' '[:lower:]'
+}
+
+is_bool_env_value() {
+  local name="$1"
+  case "$(normalized_env_value "${name}")" in
+    true|false|on|off|yes|no|1|0)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
 is_admin_basic_auth_enabled() {
-  [[ "$(env_value EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)" == "true" ]]
+  case "$(normalized_env_value EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)" in
+    true|on|yes|1)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
 }
 
 is_satisfied_by_runtime_fallback() {
@@ -84,6 +108,13 @@ is_satisfied_by_runtime_fallback() {
 is_required_env_satisfied() {
   local name="$1"
   case "${name}" in
+    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
+      if has_env_name "${name}"; then
+        is_bool_env_value "${name}"
+      else
+        is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER|EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT)
       if is_admin_basic_auth_enabled; then
         has_non_empty_env_value "${name}"

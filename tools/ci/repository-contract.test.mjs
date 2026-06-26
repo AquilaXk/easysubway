@@ -615,6 +615,26 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
 
   await writeFile(envFile, [
     ...deploymentEnvLines,
+    "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=TRUE",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER[\s\S]*EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=maybe",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED/
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
     "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=true",
     "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=   ",
     "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=   ",
