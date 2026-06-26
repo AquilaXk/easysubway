@@ -72,8 +72,8 @@
       "severity": "release-blocker",
       "titleKo": "관리자 Basic auth 운영 전환 기준",
       "ownerKo": "백엔드/운영 담당",
-      "readyWhenKo": "현재 Basic auth는 임시 운영 보호 수단이며, 상용 출시 전에는 관리자와 운영기관 인증 실패 lockout 정책 또는 OIDC/MFA/SSO 전환 결정과 구현 증거가 PR 검증 증거에 남아야 한다.",
-      "evidence": ["admin-auth-transition-decision-record", "lockout-or-oidc-mfa-implementation-evidence", "admin-basic-auth-lockout-tests", "admin-security-config-review"],
+      "readyWhenKo": "운영 프로필은 Basic auth를 기본 비활성화하고, 예외적으로 켤 때는 owner와 만료일을 명시한 승인 기록, 관리자와 운영기관 인증 실패 lockout 검증, OIDC/MFA/SSO 전환 결정 증거가 PR 검증 증거에 남아야 한다.",
+      "evidence": ["admin-auth-transition-decision-record", "basic-auth-prod-disable-test", "basic-auth-exception-expiry-record", "admin-basic-auth-lockout-tests", "admin-security-config-review"],
       "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java", "backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java", ".github/pull_request_template.md", "tools/ci/repository-contract.test.mjs"]
     },
     {
@@ -95,6 +95,16 @@
       "readyWhenKo": "시설 신고 사진은 허용 MIME type과 최대 크기를 검증하고, Base64 디코딩 실패나 크기 초과는 안전한 사용자 메시지로 거절한다.",
       "evidence": ["facility-report-service-tests", "upload-limit-review"],
       "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/test/java/com/easysubway/report/application/service/FacilityReportServiceTest.java", "apps/mobile/lib/facility_report.dart"]
+    },
+    {
+      "id": "backend_report_abuse_control_release_gate",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "신고 abuse control 운영 store 경계",
+      "ownerKo": "백엔드/운영 담당",
+      "readyWhenKo": "사진 업로드 intent, claim, 신고 제출, 상태 조회, 확인 API는 운영 공유 store 또는 동등한 분산 제한 증거를 갖추고, local store 모드는 단일 노드 검증용 release blocker로 기록한다.",
+      "evidence": ["facility-report-abuse-control-tests", "abuse-store-mode-release-blocker-record", "deployment-env-contract"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControlTest.java", "backend/src/main/resources/application-prod.yml", "tools/deploy/backend-app-env.allowlist"]
     },
     {
       "id": "backend_error_response_sanitized",

@@ -426,6 +426,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_ABUSE_STORE_MODE=local$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=http:\/\/localhost:9000$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/localhost:9000$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=easysubway_local$/m);
@@ -442,6 +443,9 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=$/m);
   assert.match(envExample, /^EASYSUBWAY_SECURITY_EMAIL=$/m);
   assert.doesNotMatch(envExample, /prod|production/i);
   assert.doesNotMatch(
@@ -555,6 +559,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
     "EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900",
+    "EASYSUBWAY_REPORT_ABUSE_STORE_MODE=local",
     "EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https://uploads.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
     "EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://object-storage:9000",
@@ -570,6 +575,9 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
     "EASYSUBWAY_ADMIN_USERNAME=admin",
     "EASYSUBWAY_ADMIN_PASSWORD=secret",
+    "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false",
+    "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=",
+    "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
@@ -3268,7 +3276,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.status-limit/);
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.confirm-limit/);
   assert.match(abuseControl, /easysubway\.report\.abuse-control\.max-counter-keys/);
+  assert.match(abuseControl, /easysubway\.report\.abuse-control\.store-mode/);
   assert.match(abuseControl, /maxCounterKeys/);
+  assert.match(abuseControl, /usesReleaseBlockingLocalStore/);
   assert.match(abuseControl, /ReportAbuseGroup\.values\(\)/);
   assert.match(abuseControl, /easysubway\.auth\.client-ip\.trusted-proxies/);
   assert.match(abuseControl, /X-Forwarded-For/);
@@ -3283,6 +3293,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_STATUS_LIMIT:120/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_CONFIRM_LIMIT:30/);
   assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_MAX_COUNTER_KEYS:4096/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_STORE_MODE:local/);
   assert.match(adminPageController, /REPORT_SURGE_ALERT_THRESHOLD = 10/);
   assert.match(adminPageController, /REPORT_SURGE_LOOKBACK_HOURS = 24/);
   assert.match(adminPageController, /ReportSurgeAlertView/);
@@ -3304,12 +3315,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("ADMIN"\)/);
-  assert.match(security, /adminSecurityFilterChain\(HttpSecurity http, AdminOperatorAuditFilter auditFilter\)/);
+  assert.match(security, /adminSecurityFilterChain\([\s\S]*HttpSecurity http,[\s\S]*AdminOperatorAuditFilter auditFilter,[\s\S]*basicAuthEnabled/);
   assert.match(security, /adminSecurityFilterChain[\s\S]*addFilterAfter\(auditFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /@Order\(2\)[\s\S]*?securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/operator\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasRole\("OPERATOR_ADMIN"\)/);
-  assert.match(security, /operatorSecurityFilterChain\(HttpSecurity http, AdminOperatorAuditFilter auditFilter\)/);
+  assert.match(security, /operatorSecurityFilterChain\([\s\S]*HttpSecurity http,[\s\S]*AdminOperatorAuditFilter auditFilter,[\s\S]*basicAuthEnabled/);
   assert.match(security, /operatorSecurityFilterChain[\s\S]*addFilterAfter\(auditFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /@Order\(3\)[\s\S]*?reportSecurityFilterChain/);
   assert.doesNotMatch(security, /"\/api\/v1\/me"/);
@@ -3335,7 +3346,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminOperatorAuditFilter, /extends OncePerRequestFilter/);
   assert.match(adminOperatorAuditFilter, /MUTATING_METHODS = Set\.of\("POST", "PUT", "PATCH", "DELETE"\)/);
   assert.match(adminOperatorAuditFilter, /path\.startsWith\("\/admin\/"\) \|\| path\.startsWith\("\/operator\/"\)/);
-  assert.match(adminOperatorAuditFilter, /admin_operator_state_change_audit method=\{\} path=\{\} principal=\{\} roles=\{\} status=\{\}/);
+  assert.match(
+    adminOperatorAuditFilter,
+    /admin_operator_state_change_audit method=\{\} path=\{\} principal=\{\} roles=\{\} tenant=\{\} status=\{\} outcome=\{\} correlation_id=\{\}/,
+  );
+  assert.match(adminOperatorAuditFilter, /ROLE_OPERATOR_ADMIN/);
+  assert.match(adminOperatorAuditFilter, /X-Correlation-Id/);
+  assert.match(adminOperatorAuditFilter, /SUCCESS/);
+  assert.match(adminOperatorAuditFilter, /FAILURE/);
   assert.match(adminOperatorAuditFilter, /HandlerMapping\.BEST_MATCHING_PATTERN_ATTRIBUTE/);
   assert.doesNotMatch(adminOperatorAuditFilter, /getQueryString|getParameter|getParameterMap|getInputStream|getReader/);
   assert.doesNotMatch(adminOperatorAuditFilter, /receiptToken|uploadUrl|privateNote|latitude|longitude/);
@@ -5329,12 +5347,18 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const commonExceptionHandler = read("backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java");
   const messages = read("backend/src/main/resources/messages.properties");
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const adminOperatorAuditFilter = read("backend/src/main/java/com/easysubway/common/security/AdminOperatorAuditFilter.java");
   const adminOperatorLockoutProvider = read(
     "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java",
+  );
+  const facilityReportAbuseControl = read(
+    "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
   );
   const facilityReportPhotoProcessor = read(
     "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
   );
+  const prodConfig = read("backend/src/main/resources/application-prod.yml");
+  const backendAppEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -5356,6 +5380,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "backend_admin_basic_auth_transition_gate",
     "backend_role_authorization",
     "backend_report_photo_upload_limits",
+    "backend_report_abuse_control_release_gate",
     "backend_error_response_sanitized",
     "backend_api_traffic_monitoring",
     "backend_sensitive_log_minimization",
@@ -5398,11 +5423,24 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(securityConfig, /hasRole\("ADMIN"\)/);
   assert.match(securityConfig, /hasRole\("OPERATOR_ADMIN"\)/);
   assert.match(securityConfig, /validateProdAdminCredentials/);
+  assert.match(securityConfig, /validateProdBasicAuthPolicy/);
+  assert.match(securityConfig, /easysubway\.admin\.basic-auth\.enabled/);
+  assert.match(securityConfig, /easysubway\.admin\.basic-auth\.exception-owner/);
+  assert.match(securityConfig, /easysubway\.admin\.basic-auth\.exception-expires-at/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED:false/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
+  assert.match(prodConfig, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
+  assert.match(adminOperatorAuditFilter, /tenant=\{\}/);
+  assert.match(adminOperatorAuditFilter, /outcome=\{\}/);
+  assert.match(adminOperatorAuditFilter, /correlation_id=\{\}/);
+  assert.doesNotMatch(adminOperatorAuditFilter, /getQueryString|getParameter|getParameterMap|getInputStream|getReader/);
   const adminBasicAuthGate = items.get("backend_admin_basic_auth_transition_gate");
   assert.match(adminBasicAuthGate.readyWhenKo, /lockout|OIDC|MFA|SSO/i);
   assert.match(adminBasicAuthGate.readyWhenKo, /Basic auth/);
+  assert.match(adminBasicAuthGate.readyWhenKo, /owner|만료일/);
   assert.ok(adminBasicAuthGate.evidence.includes("admin-auth-transition-decision-record"));
-  assert.ok(adminBasicAuthGate.evidence.includes("lockout-or-oidc-mfa-implementation-evidence"));
+  assert.ok(adminBasicAuthGate.evidence.includes("basic-auth-prod-disable-test"));
+  assert.ok(adminBasicAuthGate.evidence.includes("basic-auth-exception-expiry-record"));
   assert.ok(adminBasicAuthGate.evidence.includes("admin-basic-auth-lockout-tests"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java"));
@@ -5411,6 +5449,15 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminOperatorLockoutProvider, /LockedException/);
   assert.match(adminOperatorLockoutProvider, /BadCredentialsException/);
   assert.match(adminOperatorLockoutProvider, /lockedUntil/);
+  const abuseControlGate = items.get("backend_report_abuse_control_release_gate");
+  assert.match(abuseControlGate.readyWhenKo, /local store|release blocker|분산/);
+  assert.ok(abuseControlGate.evidence.includes("facility-report-abuse-control-tests"));
+  assert.ok(abuseControlGate.evidence.includes("abuse-store-mode-release-blocker-record"));
+  assert.ok(abuseControlGate.evidence.includes("deployment-env-contract"));
+  assert.match(facilityReportAbuseControl, /easysubway\.report\.abuse-control\.store-mode/);
+  assert.match(facilityReportAbuseControl, /usesReleaseBlockingLocalStore/);
+  assert.match(prodConfig, /EASYSUBWAY_REPORT_ABUSE_STORE_MODE:local/);
+  assert.match(backendAppEnvAllowlist, /^EASYSUBWAY_REPORT_ABUSE_STORE_MODE$/m);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_BYTES = 900 \* 1024/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_WIDTH = 4_096/);
   assert.match(facilityReportPhotoProcessor, /MAX_PHOTO_PIXELS = 12_000_000/);
