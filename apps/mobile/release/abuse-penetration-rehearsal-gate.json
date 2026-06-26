@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "abuse-penetration-rehearsal",
+  "issue": 925,
+  "status": "BLOCKED_ABUSE_REHEARSAL_EVIDENCE_MISSING",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
+  "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
+  "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<rc-or-run>/",
+  "artifactSecretAndEndpointScan": {
+    "requiredArtifacts": [
+      "Android AAB or Play-generated APK",
+      "release merged manifest",
+      "release network endpoint trace",
+      "dependency vulnerability scan result"
+    ],
+    "forbiddenFindings": [
+      "provider secret",
+      "object storage credential",
+      "production password",
+      "signing private key",
+      "receipt token",
+      "signed upload URL",
+      "local or internal endpoint"
+    ],
+    "requiredEvidence": [
+      "android-aab-or-play-apk-secret-scan-output",
+      "release-endpoint-allowlist-diff",
+      "network-trace-redaction-summary"
+    ]
+  },
+  "abuseScenarios": [
+    {
+      "id": "report_photo_upload_abuse",
+      "area": "report-photo",
+      "severity": "release-blocker",
+      "targetKo": "MIME/extension/magic bytes mismatch, oversized image, decompression bomb, duplicate claim, failed claim orphan cleanup",
+      "requiredEvidence": ["malicious-photo-upload-test-output", "orphan-cleanup-request-response-summary"]
+    },
+    {
+      "id": "receipt_token_replay_and_status_abuse",
+      "area": "report-receipt",
+      "severity": "release-blocker",
+      "targetKo": "receipt token guessing, replay, URL/log exposure, cross-report status lookup, confirm endpoint abuse",
+      "requiredEvidence": ["receipt-token-negative-tests", "redacted-request-response-summary", "log-redaction-check"]
+    },
+    {
+      "id": "signed_url_lifecycle_abuse",
+      "area": "object-storage",
+      "severity": "release-blocker",
+      "targetKo": "signed URL reuse, expiry bypass, object key traversal, orphan object persistence, lifecycle cleanup failure",
+      "requiredEvidence": ["signed-url-expiry-test", "object-lifecycle-cleanup-summary", "storage-log-redaction-check"]
+    },
+    {
+      "id": "admin_operator_auth_session_csrf",
+      "area": "admin",
+      "severity": "release-blocker",
+      "targetKo": "admin/operator auth bypass, weak Basic auth exception, session fixation, CSRF on mutating form, tenant authorization confusion",
+      "requiredEvidence": ["admin-auth-tests", "operator-role-negative-tests", "csrf-negative-test-summary"]
+    },
+    {
+      "id": "distributed_rate_limit_abuse",
+      "area": "backend",
+      "severity": "release-blocker",
+      "targetKo": "multi-node report upload/claim/submit/status/confirm flooding and trusted proxy spoofing",
+      "requiredEvidence": ["distributed-abuse-control-test-output", "trusted-proxy-negative-test", "abuse-store-mode-record"]
+    },
+    {
+      "id": "provider_and_release_secret_exposure",
+      "area": "release",
+      "severity": "release-blocker",
+      "targetKo": "provider key, object credential, production password, local/internal endpoint exposure in app artifact, backend image, logs, PR evidence",
+      "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
+    }
+  ],
+  "manualRehearsalPolicy": {
+    "redactionRequired": true,
+    "requestResponseSummaryOnly": true,
+    "forbiddenInEvidence": [
+      "raw receipt token",
+      "raw signed URL",
+      "photo binary",
+      "provider credential",
+      "operator password",
+      "session cookie"
+    ],
+    "localAndroidEmulatorRequiredForMobileEvidence": true
+  },
+  "findingPolicy": {
+    "criticalHighAllowed": 0,
+    "mediumAllowedOnlyWithOwnerAndFixPlan": true,
+    "waiverIssue": 900,
+    "waiverRequiredFields": ["severity", "owner", "expiry", "compensating-control", "fix-plan"],
+    "goNoGoKo": "critical/high finding이 1건이라도 남아 있으면 release blocker이며, 예외는 #900 waiver와 fix plan이 있어야 한다."
+  },
+  "linkedReleaseGates": [
+    "apps/mobile/release/security-privacy-release-evidence.json",
+    "apps/mobile/release/release-security-gate.json",
+    "apps/mobile/release/signed-release-artifact-gate.json",
+    "apps/mobile/release/android-rc-store-evidence.json"
+  ],
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "githubUploadPolicy": "summary-only",
+    "summaryRequiredKo": "abuse rehearsal 증거는 민감값을 제거한 command, request/response summary, finding count, local-only evidence path만 PR에 적는다."
+  }
+}
