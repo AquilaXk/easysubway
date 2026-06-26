@@ -32,6 +32,18 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL)
       true
       ;;
+    EASYSUBWAY_REPORT_ABUSE_STORE_MODE)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT)
+      true
+      ;;
     *)
       false
       ;;

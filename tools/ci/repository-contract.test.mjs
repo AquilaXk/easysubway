@@ -559,7 +559,6 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
     "EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900",
-    "EASYSUBWAY_REPORT_ABUSE_STORE_MODE=local",
     "EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https://uploads.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
     "EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://object-storage:9000",
@@ -575,9 +574,6 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
     "EASYSUBWAY_ADMIN_USERNAME=admin",
     "EASYSUBWAY_ADMIN_PASSWORD=secret",
-    "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false",
-    "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=",
-    "EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
@@ -589,6 +585,11 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "",
   ].join("\n"));
 
+  const validator = read("tools/ci/validate-deployment-env.sh");
+  assert.match(validator, /EASYSUBWAY_REPORT_ABUSE_STORE_MODE/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, "EASYSUBWAY_POSTGRES_DB=easysubway\n");
