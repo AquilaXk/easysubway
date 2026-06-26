@@ -746,13 +746,19 @@ class _NetworkMapCanvas extends StatefulWidget {
 
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
+const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 160);
+const _routeMapGestureMaxTranslationDriftFraction = 0.2;
+const _routeMapGestureMaxScaleRatio = 1.25;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
   MapCameraState? _camera;
   MapCameraState? _pendingCamera;
+  MapCameraState? _rendererCamera;
+  DateTime? _lastRendererCameraCommitAt;
   bool _cameraFrameCallbackScheduled = false;
+  bool _forceRendererCameraCommit = false;
   bool _gestureActive = false;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
@@ -769,6 +775,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pendingCamera = null;
+    _rendererCamera = null;
     _releaseRenderer(disposeRenderer: true);
     super.dispose();
   }
@@ -836,13 +843,17 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
+            _rendererCamera = null;
+            _lastRendererCameraCommitAt = null;
             _gestureActive = false;
-            _camera = _cameraForBounds(
+            final initialCamera = _cameraForBounds(
               geometry.initialBounds,
               constraints,
               sourceBounds: fullBounds,
               minScale: minScale,
             );
+            _camera = initialCamera;
+            _rendererCamera = initialCamera;
           }
           final camera =
               _camera ??
@@ -859,7 +870,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     ? const _OriginalRouteMapUnavailable()
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
-                        camera: camera,
+                        camera: _rendererCamera ?? camera,
+                        visualCamera: camera,
                         onControllerCreated: _attachRendererController,
                       ),
               ),
@@ -1013,6 +1025,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _endScaleGesture() {
+    _forceRendererCameraCommit = true;
+    if (_pendingCamera == null && _camera != null) {
+      _pendingCamera = _camera;
+    }
     _scheduleCameraCommit();
     _gestureStartCamera = null;
     _gestureStartFocalPoint = null;
@@ -1055,17 +1071,49 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     SchedulerBinding.instance.scheduleFrameCallback((_) {
       _cameraFrameCallbackScheduled = false;
       final pendingCamera = _pendingCamera;
+      final forceRendererCameraCommit = _forceRendererCameraCommit;
       _pendingCamera = null;
+      _forceRendererCameraCommit = false;
       if (!mounted || pendingCamera == null) {
         return;
       }
-      if (identical(_camera, pendingCamera)) {
+      final rendererCamera = _rendererCameraFor(
+        pendingCamera,
+        forceCommit: forceRendererCameraCommit,
+      );
+      if (identical(_camera, pendingCamera) &&
+          identical(_rendererCamera, rendererCamera)) {
         return;
       }
       setState(() {
         _camera = pendingCamera;
+        _rendererCamera = rendererCamera;
       });
     });
+  }
+
+  MapCameraState _rendererCameraFor(
+    MapCameraState pendingCamera, {
+    required bool forceCommit,
+  }) {
+    final committedCamera = _rendererCamera;
+    final now = DateTime.now();
+    final shouldCommit =
+        forceCommit ||
+        !_gestureActive ||
+        committedCamera == null ||
+        networkMapShouldCommitRendererCamera(
+          committed: committedCamera,
+          candidate: pendingCamera,
+          elapsedSinceLastCommit: _lastRendererCameraCommitAt == null
+              ? _routeMapGestureRendererCommitInterval
+              : now.difference(_lastRendererCameraCommitAt!),
+        );
+    if (!shouldCommit) {
+      return committedCamera;
+    }
+    _lastRendererCameraCommitAt = now;
+    return pendingCamera;
   }
 
   void _openNearestStation(
@@ -1415,11 +1463,13 @@ class _RouteMapViewportRenderer extends StatelessWidget {
   const _RouteMapViewportRenderer({
     required this.asset,
     required this.camera,
+    required this.visualCamera,
     required this.onControllerCreated,
   });
 
   final _RouteMapAsset asset;
   final MapCameraState camera;
+  final MapCameraState visualCamera;
   final ValueChanged<RouteMapRendererController> onControllerCreated;
 
   @override
@@ -1445,9 +1495,17 @@ class _RouteMapViewportRenderer extends StatelessWidget {
       ),
       _ => const ColoredBox(color: Colors.white),
     };
-    return KeyedSubtree(
-      key: const Key('routeMapViewportRenderer'),
-      child: renderer,
+    return ClipRect(
+      child: Transform(
+        transform: networkMapRendererFrameTransform(
+          rendererCamera: camera,
+          visualCamera: visualCamera,
+        ),
+        child: KeyedSubtree(
+          key: const Key('routeMapViewportRenderer'),
+          child: renderer,
+        ),
+      ),
     );
   }
 }
@@ -1541,6 +1599,42 @@ MapCameraState networkMapCameraWithMonotonicRevision({
     return next;
   }
   return next.copyWith(revision: current.revision + 1);
+}
+
+@visibleForTesting
+bool networkMapShouldCommitRendererCamera({
+  required MapCameraState committed,
+  required MapCameraState candidate,
+  required Duration elapsedSinceLastCommit,
+}) {
+  if (elapsedSinceLastCommit >= _routeMapGestureRendererCommitInterval) {
+    return true;
+  }
+  final scaleRatio = candidate.scale / committed.scale;
+  if (scaleRatio >= _routeMapGestureMaxScaleRatio ||
+      scaleRatio <= 1 / _routeMapGestureMaxScaleRatio) {
+    return true;
+  }
+  final viewportCenter = candidate.viewportSize.center(Offset.zero);
+  final committedCandidateCenter = committed.sourceToViewportPoint(
+    candidate.center,
+  );
+  final drift = committedCandidateCenter - viewportCenter;
+  return drift.dx.abs() >=
+          candidate.viewportSize.width *
+              _routeMapGestureMaxTranslationDriftFraction ||
+      drift.dy.abs() >=
+          candidate.viewportSize.height *
+              _routeMapGestureMaxTranslationDriftFraction;
+}
+
+@visibleForTesting
+Matrix4 networkMapRendererFrameTransform({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  return visualCamera.sourceToViewport
+    ..multiply(rendererCamera.viewportToSource);
 }
 
 Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
