@@ -1920,7 +1920,9 @@ _StationTapScore? _stationTapScore(
     height: _maximumStationHitDistance * 2,
   );
   final containsNode = nodeHitRect.contains(viewportPosition);
-  var bestDistance = containsNode ? 0.0 : double.infinity;
+  final nodeDistance = (viewportPosition - nodeCenter).distance;
+  var bestHitDistance = containsNode ? 0.0 : double.infinity;
+  var bestSelectionDistance = containsNode ? nodeDistance : double.infinity;
   var containsShape = containsNode;
   final labelPolygon = _labelPolygonFor(station, geometry);
   if (labelPolygon != null) {
@@ -1930,26 +1932,35 @@ _StationTapScore? _stationTapScore(
     final polygonDistance = math.sqrt(
       _distanceSquaredToPolygon(viewportPosition, viewportPolygon),
     );
-    bestDistance = math.min(bestDistance, polygonDistance);
+    bestHitDistance = math.min(bestHitDistance, polygonDistance);
+    if (polygonDistance <= _maximumStationHitDistance) {
+      bestSelectionDistance = math.min(bestSelectionDistance, polygonDistance);
+    }
     containsShape = containsShape || polygonDistance == 0;
   } else {
-    final labelDistance = _distanceToRect(
-      viewportPosition,
-      _sourceRectToViewport(
-        _stationLabelRect(station, geometry, labelHeight: 40 / safeScale),
-        camera,
-      ),
+    final labelRect = _sourceRectToViewport(
+      _stationLabelRect(station, geometry, labelHeight: 40 / safeScale),
+      camera,
     );
-    bestDistance = math.min(bestDistance, labelDistance);
+    final labelDistance = _distanceToRect(viewportPosition, labelRect);
+    bestHitDistance = math.min(bestHitDistance, labelDistance);
+    if (labelDistance <= _maximumStationHitDistance) {
+      bestSelectionDistance = math.min(
+        bestSelectionDistance,
+        (viewportPosition - labelRect.center).distance,
+      );
+    }
     containsShape = containsShape || labelDistance == 0;
   }
-  if (bestDistance > _maximumStationHitDistance) {
+  if (bestHitDistance > _maximumStationHitDistance) {
     return null;
   }
   return _StationTapScore(
     containsNode: containsNode,
     containsShape: containsShape,
-    screenDistance: bestDistance,
+    screenDistance: bestSelectionDistance.isFinite
+        ? bestSelectionDistance
+        : bestHitDistance,
     stableKey: _stationGeometryKey(station),
   );
 }
