@@ -5357,8 +5357,15 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const facilityReportPhotoProcessor = read(
     "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
   );
+  const userDataDeletionService = read(
+    "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java",
+  );
+  const userDataDeletionTest = read(
+    "backend/src/test/java/com/easysubway/user/application/service/UserDataDeletionServiceTest.java",
+  );
   const prodConfig = read("backend/src/main/resources/application-prod.yml");
   const backendAppEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
+  const securityPrivacyEvidence = readJson("apps/mobile/release/security-privacy-release-evidence.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -5374,16 +5381,20 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "mobile_cleartext_disabled",
     "mobile_debug_network_overrides_limited",
     "mobile_release_signing_externalized",
+    "datapack_signing_key_lifecycle",
     "mobile_test_credentials_absent",
+    "mobile_release_artifact_secret_trace_scan",
     "mobile_error_stacktrace_sanitized",
     "backend_admin_auth_required",
     "backend_admin_basic_auth_transition_gate",
     "backend_role_authorization",
     "backend_report_photo_upload_limits",
+    "backend_report_photo_malicious_upload_defense",
     "backend_report_abuse_control_release_gate",
     "backend_error_response_sanitized",
     "backend_api_traffic_monitoring",
     "backend_sensitive_log_minimization",
+    "user_data_deletion_retention_e2e",
     "repository_secrets_not_tracked",
     "repository_provider_storage_exposure_guard",
     "repository_dependency_review",
@@ -5393,11 +5404,11 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.deepEqual([...items.keys()].sort(), requiredIds.toSorted());
 
   const areas = new Set(gate.items.map((item) => item.area));
-  assert.deepEqual([...areas].sort(), ["backend", "cross-store", "mobile", "repository"]);
+  assert.deepEqual([...areas].sort(), ["backend", "cross-store", "mobile", "repository", "user-data"]);
 
   for (const id of requiredIds) {
     const item = items.get(id);
-    assert.match(item.area, /^(mobile|backend|repository|cross-store)$/);
+    assert.match(item.area, /^(mobile|backend|repository|cross-store|user-data)$/);
     assert.equal(item.severity, "release-blocker", `${id} must be release-blocker`);
     assert.equal(typeof item.titleKo, "string", `${id} must have Korean title`);
     assert.ok(item.titleKo.length > 0, `${id} title must not be empty`);
@@ -5416,6 +5427,17 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(androidProfileManifest, /android:usesCleartextTraffic="true"/);
   assert.match(androidBuildGradle, /throw GradleException\([\s\S]*Android release signing values are missing:/);
   assert.doesNotMatch(androidBuildGradle, /signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)/);
+  const datapackSigningGate = items.get("datapack_signing_key_lifecycle");
+  assert.match(datapackSigningGate.readyWhenKo, /public keyring|rotation|revocation|rollback/i);
+  assert.ok(datapackSigningGate.evidence.includes("manifest-signature-test-vector"));
+  assert.ok(datapackSigningGate.evidence.includes("key-rotation-revocation-record"));
+  assert.ok(datapackSigningGate.linkedArtifacts.includes("apps/mobile/release/security-privacy-release-evidence.json"));
+  const releaseArtifactScanGate = items.get("mobile_release_artifact_secret_trace_scan");
+  assert.match(releaseArtifactScanGate.readyWhenKo, /provider key|signing private key|upload URL|receipt token|placeholder endpoint/i);
+  assert.ok(releaseArtifactScanGate.evidence.includes("release-artifact-secret-scan-output"));
+  assert.ok(releaseArtifactScanGate.evidence.includes("release-network-trace-review"));
+  assert.ok(releaseArtifactScanGate.linkedArtifacts.includes(".github/workflows/release-artifacts.yml"));
+  assert.ok(releaseArtifactScanGate.linkedArtifacts.includes("apps/mobile/release/security-privacy-release-evidence.json"));
   assert.match(commonExceptionHandler, /messages\.message\("common\.error\.invalid-parameter"\)/);
   assert.match(messages, /^common\.error\.invalid-parameter=요청 값을 확인해야 합니다\.$/m);
   assert.doesNotMatch(commonExceptionHandler, /StackTrace|printStackTrace|getStackTrace/);
@@ -5467,6 +5489,25 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(facilityReportPhotoProcessor, /requireSupportedMagic/);
   assert.match(facilityReportPhotoProcessor, /readDimensions/);
   assert.match(facilityReportPhotoProcessor, /ImageIO\.read/);
+  const maliciousUploadGate = items.get("backend_report_photo_malicious_upload_defense");
+  assert.match(maliciousUploadGate.readyWhenKo, /MIME|extension|magic bytes|checksum|image decode|thumbnail|orphan cleanup/i);
+  assert.ok(maliciousUploadGate.evidence.includes("malicious-photo-upload-tests"));
+  assert.ok(maliciousUploadGate.evidence.includes("orphan-cleanup-failure-path-test"));
+  assert.ok(maliciousUploadGate.linkedArtifacts.includes("backend/src/test/java/com/easysubway/report/application/service/FacilityReportPhotoProcessorTest.java"));
+  assert.ok(maliciousUploadGate.linkedArtifacts.includes("backend/src/test/java/com/easysubway/report/application/service/FacilityReportServiceTest.java"));
+  const deletionGate = items.get("user_data_deletion_retention_e2e");
+  assert.match(deletionGate.readyWhenKo, /local data|report link|photo object|notification|favorite|search|profile/i);
+  assert.ok(deletionGate.evidence.includes("backend-user-data-deletion-service-test"));
+  assert.ok(deletionGate.evidence.includes("mobile-user-data-deletion-local-test"));
+  assert.ok(deletionGate.evidence.includes("android-emulator-deletion-ui-evidence"));
+  assert.ok(deletionGate.linkedArtifacts.includes("apps/mobile/test/user_data_deletion_test.dart"));
+  assert.match(userDataDeletionService, /deleteUserFavoriteStationPort\.deleteFavoriteStationsByUserId\(normalizedUserId\)/);
+  assert.match(userDataDeletionService, /deleteUserNotificationPreferencePort\.deleteNotificationSettings\(normalizedUserId\)/);
+  assert.match(userDataDeletionService, /deleteUserMobilityProfilePort\.deleteMobilityProfile\(normalizedUserId\)/);
+  assert.match(userDataDeletionService, /anonymizeUserFacilityReportPort\.anonymizeFacilityReportsByUserId\(normalizedUserId\)/);
+  assert.match(userDataDeletionTest, /favoriteFacilities\.requestedUserId/);
+  assert.match(userDataDeletionTest, /notificationPreferences\.settingsRequestedUserId/);
+  assert.match(userDataDeletionTest, /mobilityProfile\.requestedUserId/);
   assert.match(gitignore, /^\*.pem$/m);
   assert.match(gitignore, /^\*.key$/m);
   assert.match(gitignore, /^google-services\.json$/m);
@@ -5493,6 +5534,14 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(dependencyReview.linkedArtifacts.includes("apps/mobile/android/build.gradle.kts"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("cross_store_privacy_security_consistency").linkedArtifacts.includes("apps/mobile/release/store-submission-readiness.json"));
+  assert.match(items.get("cross_store_privacy_security_consistency").readyWhenKo, /network trace|Data safety|App Privacy|PrivacyInfo/i);
+  assert.equal(securityPrivacyEvidence.releaseBlockerPolicy, true);
+  assert.ok(securityPrivacyEvidence.sensitiveEvidenceLocalOnlyPath.startsWith(".codex/evidence/"));
+  assert.deepEqual(
+    securityPrivacyEvidence.releaseArtifactSecretScan.forbiddenClasses.toSorted(),
+    ["local-placeholder-endpoint", "provider-key", "receipt-token", "signing-private-key", "upload-url"].toSorted(),
+  );
+  assert.ok(securityPrivacyEvidence.userDataDeletionE2E.targets.includes("report photo object 삭제"));
 });
 
 test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
