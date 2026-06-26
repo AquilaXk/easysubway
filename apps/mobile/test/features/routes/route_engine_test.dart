@@ -141,7 +141,7 @@ void main() {
         ),
       );
 
-      expect(result.status, RouteStatus.blocked);
+      expect(result.status, RouteStatus.unknown);
       expect(result.edgeIds, isEmpty);
       expect(result.blockedReasonCodes, ['ACCESSIBILITY_STATE_UNKNOWN']);
       expect(result.warningCodes, isEmpty);
@@ -158,7 +158,7 @@ void main() {
         ),
       );
 
-      expect(result.status, RouteStatus.blocked);
+      expect(result.status, RouteStatus.unknown);
       expect(result.edgeIds, isEmpty);
       expect(result.includesStairs, isFalse);
       expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS_UNKNOWN']);
@@ -176,7 +176,7 @@ void main() {
         ),
       );
 
-      expect(result.status, RouteStatus.blocked);
+      expect(result.status, RouteStatus.unknown);
       expect(result.edgeIds, isEmpty);
       expect(result.includesStairs, isFalse);
       expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS_UNKNOWN']);
@@ -334,7 +334,7 @@ void main() {
         ),
       );
 
-      expect(result.status, RouteStatus.blocked);
+      expect(result.status, RouteStatus.unknown);
       expect(result.blockedReasonCodes, ['GENERATED_CONNECTOR_UNVERIFIED']);
     });
   });

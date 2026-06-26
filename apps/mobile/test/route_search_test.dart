@@ -416,6 +416,7 @@ void main() {
       'status': 'FOUND',
       'lineId': 'seoul-4',
       'lineName': '수도권 4호선',
+      'accessibilityScore': 88,
       'burdenCost': 31,
       'estimatedDurationSeconds': 420,
       'walkingDistanceMeters': 250,
@@ -445,7 +446,8 @@ void main() {
       'createdAt': '2026-06-13T04:20:00',
     });
 
-    expect(newContractResult.score, 31);
+    expect(newContractResult.score, 88);
+    expect(newContractResult.accessibilityScore, 88);
     expect(newContractResult.burdenCost, 31);
     expect(newContractResult.estimatedDurationSeconds, 420);
     expect(newContractResult.walkingDistanceMeters, 250);
@@ -455,7 +457,31 @@ void main() {
       'DISTANCE_MEASURED',
     ]);
     expect(legacyResult.score, 92);
+    expect(legacyResult.accessibilityScore, 92);
     expect(legacyResult.burdenCost, 92);
+  });
+
+  test('경로 contract는 accessibilityScore만으로 이동 비용을 대체하지 않는다', () {
+    expect(
+      () => RouteSearchResult.fromJson({
+        'routeSearchId': 'route-score-only',
+        'originStationId': 'station-sangnoksu',
+        'originStationName': '상록수',
+        'destinationStationId': 'station-sadang',
+        'destinationStationName': '사당',
+        'mobilityType': 'SENIOR',
+        'status': 'FOUND',
+        'lineId': 'seoul-4',
+        'lineName': '수도권 4호선',
+        'accessibilityScore': 88,
+        'steps': <Object?>[],
+        'warnings': <Object?>[],
+        'recommendationReasons': <Object?>[],
+        'blockedReasons': <Object?>[],
+        'createdAt': '2026-06-13T04:20:00',
+      }),
+      throwsFormatException,
+    );
   });
 
   test('경로 이동 부담은 warning 없음만으로 낮음이 되지 않는다', () {
