@@ -72,13 +72,21 @@ class DataPackUpdater {
         );
       }
       if (override != null) {
-        await emergencyOverrideRepository?.saveOverride(
-          EmergencyDataPackOverride(
-            id: override.id,
-            version: override.version,
-            reason: override.reason,
-          ),
+        final installedOverride = await installer.readInstalledPointer(
+          id: override.id,
+          version: override.version,
         );
+        if (installedOverride != null) {
+          await emergencyOverrideRepository?.saveOverride(
+            EmergencyDataPackOverride(
+              id: override.id,
+              version: override.version,
+              reason: override.reason,
+            ),
+          );
+        } else {
+          await emergencyOverrideRepository?.clearOverride();
+        }
       } else {
         await emergencyOverrideRepository?.clearOverride();
       }
@@ -89,6 +97,7 @@ class DataPackUpdater {
 
   List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
     final activePack = manifest.activePack;
+    final override = manifest.emergencyOverride;
     if (activePack != null) {
       final activeDependencies = manifest.packs
           .where(
@@ -103,6 +112,7 @@ class DataPackUpdater {
           .where(
             (pack) =>
                 pack.id == activePack.id ||
+                _matchesOverride(pack, override) ||
                 activeDependencies.any(
                   (dependency) =>
                       dependency.id == pack.id &&
@@ -113,7 +123,9 @@ class DataPackUpdater {
           .toList(growable: false);
     }
     return manifest.packs
-        .where((pack) => pack.id == activePackId)
+        .where(
+          (pack) => pack.id == activePackId || _matchesOverride(pack, override),
+        )
         .toList(growable: false);
   }
 
@@ -223,6 +235,15 @@ Future<void> _deleteIfExists(File file) async {
 
 int _versionNumber(String version) {
   return int.tryParse(version) ?? 0;
+}
+
+bool _matchesOverride(
+  DataPackManifestEntry pack,
+  EmergencyOverrideManifest? override,
+) {
+  return override != null &&
+      pack.id == override.id &&
+      _versionNumber(pack.version) == _versionNumber(override.version);
 }
 
 String _normalizedVersion(String version) {

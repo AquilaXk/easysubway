@@ -429,6 +429,109 @@ void main() {
     ]);
   });
 
+  test('updater는 active pack과 별도 emergency override pack을 다운로드한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-override-pack-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final activeSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final activeCompressedBytes = gzip.encode(activeSqliteBytes);
+    final overrideSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final overrideCompressedBytes = gzip.encode(overrideSqliteBytes);
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '19'},
+                'emergencyOverride': {
+                  'id': 'capital-emergency',
+                  'version': '7',
+                  'reason': '시설 상태 긴급 정정',
+                },
+                'packs': [
+                  _packJson(
+                    id: 'capital',
+                    version: '19',
+                    url: 'catalog/capital-v19.sqlite.gz',
+                    compressedBytes: activeCompressedBytes,
+                    sqliteBytes: activeSqliteBytes,
+                  ),
+                  _packJson(
+                    id: 'capital-emergency',
+                    version: '7',
+                    url: 'catalog/capital-emergency-v7.sqlite.gz',
+                    compressedBytes: overrideCompressedBytes,
+                    sqliteBytes: overrideSqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v19.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(activeCompressedBytes)
+            ..close();
+        case '/datapacks/catalog/capital-emergency-v7.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(overrideCompressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 6, 19, 16),
+        ),
+      ),
+      installer: installer,
+      emergencyOverrideRepository: overrideRepository,
+    );
+
+    final results = await updater.checkForUpdates();
+    final override = await overrideRepository.readOverride();
+
+    expect(
+      results.map((result) => result.pointer?.id).whereType<String>().toList(),
+      ['capital', 'capital-emergency'],
+    );
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v19.sqlite.gz',
+      '/datapacks/catalog/capital-emergency-v7.sqlite.gz',
+    ]);
+    expect(override?.id, 'capital-emergency');
+    expect(override?.version, '7');
+  });
+
   test('updater는 multi-pack 실패 시 기존 current pointer를 유지한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-updater-partial-',
