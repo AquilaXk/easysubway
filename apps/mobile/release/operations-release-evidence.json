@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "operations-release-evidence",
+  "releaseBlockerPolicy": true,
+  "evidenceRoot": ".codex/evidence/operations-release/<rc-or-run>",
+  "deploymentWorkflow": {
+    "requiredEvidence": [
+      "cd-workflow-run-url",
+      "backend-release-artifact-sha",
+      "deployment-target-sha",
+      "readiness-check-result",
+      "rollback-drill-result"
+    ],
+    "blockedWhenKo": "CD run이 preflight만 수행했거나 deploy target, backend artifact, readiness, rollback 결과 중 하나라도 없으면 production release evidence로 인정하지 않는다."
+  },
+  "migrationPolicy": {
+    "strategy": "expand-contract-or-backup-before-migration",
+    "blockedIfMissingBackupBeforeMigration": true,
+    "requiredEvidence": [
+      "migration-diff-summary",
+      "postgres-backup-before-migration",
+      "restore-rehearsal-after-backup",
+      "rollback-or-forward-fix-decision"
+    ],
+    "policyKo": "schema migration 변경이 있으면 expand/contract 호환성을 설명하거나 배포 전 PostgreSQL dump와 restore rehearsal 결과를 RC evidence에 남긴다."
+  },
+  "restoreRehearsal": {
+    "requiredChecks": [
+      "postgresql-restore-rehearsal",
+      "facility-report-photo-restore-check",
+      "datapack-source-inventory-validation",
+      "datapack-release-manifest-restore"
+    ],
+    "blockedWhenKo": "database dump, object manifest, data source archive, datapack manifest history 중 하나라도 복구 검증이 없으면 release blocker로 처리한다."
+  },
+  "observability": {
+    "requiredResolutionKinds": [
+      "dashboard-url",
+      "alert-route",
+      "runbook"
+    ],
+    "allowedFallbackKinds": [
+      "external-blocker-record"
+    ],
+    "blockedWhenKo": "각 operations signal에 dashboard, alert route, runbook 또는 외부 blocker 기록이 없으면 운영 관측성 gate를 닫지 않는다."
+  },
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "forbiddenInPullRequest": [
+      "database dump",
+      "photo object",
+      "signed URL",
+      "credential",
+      "receipt token"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로만 적는다."
+  }
+}
