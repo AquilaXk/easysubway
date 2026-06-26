@@ -1,6 +1,6 @@
 import 'route_step.dart';
 
-enum RouteStatus { found, blocked }
+enum RouteStatus { found, blocked, unknown, unsupported, error }
 
 class RouteWarning {
   const RouteWarning({required this.code, required this.message});
@@ -28,11 +28,30 @@ class LocalRouteResult {
     );
   }
 
+  factory LocalRouteResult.unknown(List<String> blockedReasonCodes) {
+    return LocalRouteResult(
+      status: RouteStatus.unknown,
+      totalCost: 0,
+      steps: const [],
+      warnings: const [],
+      blockedReasonCodes: blockedReasonCodes,
+    );
+  }
+
   final RouteStatus status;
   final int totalCost;
   final List<RouteStep> steps;
   final List<RouteWarning> warnings;
   final List<String> blockedReasonCodes;
+
+  int get generalizedCost => totalCost;
+
+  int get accessibilityScore {
+    if (status != RouteStatus.found) {
+      return 0;
+    }
+    return (100 - (generalizedCost / 10).round()).clamp(0, 100).toInt();
+  }
 
   List<String> get edgeIds => steps.map((step) => step.edgeId).toList();
 
