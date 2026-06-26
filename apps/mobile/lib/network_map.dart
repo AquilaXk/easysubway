@@ -288,21 +288,15 @@ class NetworkMapScreen extends StatefulWidget {
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
-  String? _selectedLineId;
   late Future<NetworkMapData> _future = _loadMap();
 
   Future<NetworkMapData> _loadMap() {
-    return widget.repository.getNetworkMap(
-      region: _selectedRegion,
-      lineId: _selectedLineId,
-    );
+    return widget.repository.getNetworkMap(region: _selectedRegion);
   }
 
-  void _reload({String? region, String? lineId}) {
+  void _reload({String? region}) {
     setState(() {
-      final isChangingRegion = region != null && region != _selectedRegion;
       _selectedRegion = region ?? _selectedRegion;
-      _selectedLineId = isChangingRegion ? null : lineId;
       _future = _loadMap();
     });
   }
@@ -336,7 +330,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 Positioned.fill(
                   child: _NetworkMapCanvas(
                     data: data,
-                    selectedLineId: _selectedLineId,
                     onStationTap: _showStationSheet,
                   ),
                 ),
@@ -350,12 +343,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                         regions: data.regions,
                         selectedRegion: data.selectedRegion,
                         onSelected: (region) => _reload(region: region),
-                      ),
-                      const SizedBox(height: 8),
-                      _LineFilterMenu(
-                        lines: data.lines,
-                        selectedLineId: _selectedLineId,
-                        onSelected: (lineId) => _reload(lineId: lineId),
                       ),
                     ],
                   ),
@@ -430,46 +417,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           },
         );
       },
-    );
-  }
-}
-
-class _LineFilterMenu extends StatelessWidget {
-  const _LineFilterMenu({
-    required this.lines,
-    required this.selectedLineId,
-    required this.onSelected,
-  });
-
-  final List<NetworkMapLine> lines;
-  final String? selectedLineId;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    NetworkMapLine? selectedLine;
-    for (final line in lines) {
-      if (line.id == selectedLineId) {
-        selectedLine = line;
-        break;
-      }
-    }
-    final label = selectedLine?.shortName ?? '전체 노선';
-    return SizedBox(
-      key: const Key('networkMapLineFilter'),
-      width: 142,
-      height: EasySubwayTouchTarget.general,
-      child: PopupMenuButton<String>(
-        padding: EdgeInsets.zero,
-        initialValue: selectedLineId ?? '',
-        onSelected: (lineId) => onSelected(lineId.isEmpty ? null : lineId),
-        itemBuilder: (context) => [
-          const PopupMenuItem<String>(value: '', child: Text('전체 노선')),
-          for (final line in lines)
-            PopupMenuItem<String>(value: line.id, child: Text(line.shortName)),
-        ],
-        child: _RegionMenuButton(label: label, semanticLabel: '노선: $label'),
-      ),
     );
   }
 }
@@ -698,14 +645,9 @@ _RouteMapAsset? _routeMapAssetForRegion(String region) {
 }
 
 class _NetworkMapCanvas extends StatefulWidget {
-  const _NetworkMapCanvas({
-    required this.data,
-    required this.selectedLineId,
-    required this.onStationTap,
-  });
+  const _NetworkMapCanvas({required this.data, required this.onStationTap});
 
   final NetworkMapData data;
-  final String? selectedLineId;
   final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
   onStationTap;
 
@@ -715,10 +657,10 @@ class _NetworkMapCanvas extends StatefulWidget {
 
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
-const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 160);
-const _routeMapGestureMaxTranslationDriftFraction = 0.2;
-const _routeMapGestureMaxScaleRatio = 1.25;
-const _routeMapGestureRendererOverscanFactor = 1.5;
+const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 700);
+const _routeMapGestureMaxTranslationDriftFraction = 0.85;
+const _routeMapGestureMaxScaleRatio = 2.4;
+const _routeMapGestureRendererOverscanFactor = 3.25;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
@@ -780,21 +722,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _releaseRenderer({required bool disposeRenderer}) {
     final monitor = _rendererMonitor;
-    _rendererMonitor = null;
     _rendererController = null;
+    if (monitor == null) {
+      return;
+    }
+    if (!disposeRenderer) {
+      _rendererMonitor = null;
+    }
     _ignoreRendererLifecycleFailure(
-      monitor?.close(disposeRenderer: disposeRenderer),
+      monitor.close(disposeRenderer: disposeRenderer).whenComplete(() {
+        if (identical(_rendererMonitor, monitor)) {
+          _rendererMonitor = null;
+        }
+      }),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final linesById = {for (final line in widget.data.lines) line.id: line};
-    final stationsById = <String, NetworkMapStation>{};
-    for (final station in widget.data.stations) {
-      stationsById[_mapStationKey(station)] = station;
-      stationsById.putIfAbsent(station.id, () => station);
-    }
     final stationLinesById = _stationLinesById(widget.data);
     final mapAsset = _routeMapAssetForRegion(widget.data.selectedRegion);
     return Container(
@@ -861,23 +806,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         onControllerCreated: _attachRendererController,
                       ),
               ),
-              if (widget.selectedLineId != null)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      key: const Key('networkMapSelectedLineOverlay'),
-                      painter: _SelectedLineOverlayPainter(
-                        lineId: widget.selectedLineId!,
-                        linesById: linesById,
-                        stationsById: stationsById,
-                        edges: widget.data.edges,
-                        geometry: geometry,
-                        camera: camera,
-                        styleScale: geometry.overlayStyleScale,
-                      ),
-                    ),
-                  ),
-                ),
               Positioned.fill(
                 child: Listener(
                   onPointerCancel: (_) => _endScaleGesture(),
@@ -1135,7 +1063,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       stations,
       geometry,
       sceneHitRadius: 24 / (camera.scale > 0 ? camera.scale : 1),
-      selectedLineId: widget.selectedLineId,
     );
     if (station == null) {
       return;
@@ -1228,200 +1155,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 }
 
-class _SelectedLineOverlayPainter extends CustomPainter {
-  const _SelectedLineOverlayPainter({
-    required this.lineId,
-    required this.linesById,
-    required this.stationsById,
-    required this.edges,
-    required this.geometry,
-    required this.camera,
-    required this.styleScale,
-  });
-
-  final String lineId;
-  final Map<String, NetworkMapLine> linesById;
-  final Map<String, NetworkMapStation> stationsById;
-  final List<NetworkMapEdge> edges;
-  final _MapGeometry geometry;
-  final MapCameraState camera;
-  final double styleScale;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final line = linesById[lineId];
-    if (line == null) {
-      return;
-    }
-    final lineColor = _colorFromHex(line.color);
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = Colors.white.withValues(alpha: 0.58),
-    );
-    canvas
-      ..save()
-      ..transform(camera.sourceToViewport.storage);
-    final pathPaint = Paint()
-      ..color = lineColor
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 14 * styleScale
-      ..style = PaintingStyle.stroke;
-    for (final edge in _visibleEdges) {
-      final from = edge.from;
-      final to = edge.to;
-      final segmentPath = edge.segmentPath;
-      if (segmentPath == null) {
-        canvas.drawLine(
-          Offset(geometry.x(from), geometry.y(from)),
-          Offset(geometry.x(to), geometry.y(to)),
-          pathPaint,
-        );
-      } else {
-        _drawScaledPath(canvas, segmentPath, pathPaint, geometry);
-      }
-    }
-    final stationBorderPaint = Paint()..color = lineColor;
-    final stationFillPaint = Paint()..color = Colors.white;
-    for (final station in _visibleStations) {
-      final center = Offset(geometry.x(station), geometry.y(station));
-      canvas.drawCircle(center, 13 * styleScale, stationBorderPaint);
-      canvas.drawCircle(center, 7 * styleScale, stationFillPaint);
-    }
-    canvas.restore();
-  }
-
-  int get visibleEdgeCount => _visibleEdges.length;
-
-  int get visibleStationCount => _visibleStations.length;
-
-  Rect get _visibleSourceBounds =>
-      camera.visibleSourceRect.inflate(96 / camera.scale);
-
-  List<_SelectedLineVisibleEdge> get _visibleEdges {
-    final visibleBounds = _visibleSourceBounds;
-    final visibleEdges = <_SelectedLineVisibleEdge>[];
-    for (final edge in edges) {
-      if (edge.lineId != lineId) {
-        continue;
-      }
-      final from = stationsById[edge.fromStationId];
-      final to = stationsById[edge.toStationId];
-      if (from == null || to == null) {
-        continue;
-      }
-      final segmentPath = _segmentPath(from, to);
-      final bounds = _edgeSourceBounds(from, to, segmentPath);
-      if (!bounds.overlaps(visibleBounds)) {
-        continue;
-      }
-      visibleEdges.add(
-        _SelectedLineVisibleEdge(from: from, to: to, segmentPath: segmentPath),
-      );
-    }
-    return visibleEdges;
-  }
-
-  List<NetworkMapStation> get _visibleStations {
-    final visibleBounds = _visibleSourceBounds;
-    return [
-      for (final station in stationsById.values.toSet())
-        if (station.lineId == lineId &&
-            _stationOverlayBounds(station).overlaps(visibleBounds))
-          station,
-    ];
-  }
-
-  Rect _edgeSourceBounds(
-    NetworkMapStation from,
-    NetworkMapStation to,
-    Path? segmentPath,
-  ) {
-    final bounds = segmentPath == null
-        ? Rect.fromPoints(
-            Offset(geometry.x(from), geometry.y(from)),
-            Offset(geometry.x(to), geometry.y(to)),
-          )
-        : segmentPath.getBounds().shift(-geometry.origin);
-    return bounds.inflate(16 * styleScale);
-  }
-
-  Rect _stationOverlayBounds(NetworkMapStation station) {
-    return Rect.fromCircle(
-      center: Offset(geometry.x(station), geometry.y(station)),
-      radius: 13 * styleScale,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SelectedLineOverlayPainter oldDelegate) {
-    return oldDelegate.lineId != lineId ||
-        oldDelegate.linesById != linesById ||
-        oldDelegate.stationsById != stationsById ||
-        oldDelegate.edges != edges ||
-        oldDelegate.geometry != geometry ||
-        oldDelegate.camera != camera ||
-        oldDelegate.styleScale != styleScale;
-  }
-}
-
-class _SelectedLineVisibleEdge {
-  const _SelectedLineVisibleEdge({
-    required this.from,
-    required this.to,
-    required this.segmentPath,
-  });
-
-  final NetworkMapStation from;
-  final NetworkMapStation to;
-  final Path? segmentPath;
-}
-
-Path? _segmentPath(NetworkMapStation from, NetworkMapStation to) {
-  for (final pathData in [
-    from.position.downPath,
-    to.position.upPath,
-    from.position.upPath,
-    to.position.downPath,
-  ]) {
-    if (pathData.trim().isEmpty) {
-      continue;
-    }
-    final path = _pathFromSvg(pathData);
-    final bounds = path.getBounds().inflate(2);
-    final fromPoint = Offset(
-      from.position.x.toDouble(),
-      from.position.y.toDouble(),
-    );
-    final toPoint = Offset(to.position.x.toDouble(), to.position.y.toDouble());
-    if (bounds.contains(fromPoint) && bounds.contains(toPoint)) {
-      return path;
-    }
-  }
-  return null;
-}
-
-void _drawScaledPath(
-  Canvas canvas,
-  Path path,
-  Paint paint,
-  _MapGeometry geometry,
-) {
-  canvas
-    ..save()
-    ..translate(-geometry.origin.dx, -geometry.origin.dy);
-  canvas.drawPath(
-    path,
-    Paint()
-      ..color = paint.color
-      ..strokeCap = paint.strokeCap
-      ..strokeJoin = paint.strokeJoin
-      ..strokeWidth = paint.strokeWidth
-      ..style = paint.style,
-  );
-  canvas.restore();
-}
-
 class _MapControls extends StatelessWidget {
   const _MapControls({
     required this.onZoomIn,
@@ -1455,7 +1188,7 @@ class _MapControls extends StatelessWidget {
         const SizedBox(height: 8),
         _MapControlButton(
           key: const Key('networkMapOverviewButton'),
-          tooltip: '전체 노선도',
+          tooltip: '지도 전체 보기',
           icon: Icons.fit_screen,
           onPressed: onOverview,
         ),
@@ -1965,7 +1698,6 @@ NetworkMapStation? _stationAtMapPosition(
   List<NetworkMapStation> stations,
   _MapGeometry geometry, {
   required double sceneHitRadius,
-  String? selectedLineId,
 }) {
   NetworkMapStation? bestStation;
   var bestScore = double.infinity;
@@ -1978,11 +1710,7 @@ NetworkMapStation? _stationAtMapPosition(
     )) {
       continue;
     }
-    final score =
-        _stationTapScore(position, station, geometry) +
-        (selectedLineId != null && station.lineId != selectedLineId
-            ? 1000000
-            : 0);
+    final score = _stationTapScore(position, station, geometry);
     if (score < bestScore) {
       bestScore = score;
       bestStation = station;
@@ -2205,9 +1933,6 @@ Offset _labelOffsetFor(NetworkMapStation station) {
   }
   return const Offset(8, -8);
 }
-
-String _mapStationKey(NetworkMapStation station) =>
-    '${station.id}:${station.lineId}';
 
 class _StationHitTarget extends StatelessWidget {
   const _StationHitTarget({
