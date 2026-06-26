@@ -678,6 +678,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Offset? _gestureStartFocalPoint;
   RouteMapRendererHealthMonitor? _rendererMonitor;
   RouteMapRendererController? _rendererController;
+  String? _geometryCacheKey;
+  _MapGeometry? _geometryCache;
 
   @override
   void initState() {
@@ -747,9 +749,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       decoration: const BoxDecoration(color: Colors.white),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final geometry = mapAsset == null
-              ? _MapGeometry.fromStations(widget.data.stations)
-              : _MapGeometry.fromOriginalAsset(mapAsset);
+          final geometry = _geometryFor(mapAsset, widget.data);
           final fullBounds = Rect.fromLTWH(
             0,
             0,
@@ -828,8 +828,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     },
                     onTapUp: (details) {
                       _openNearestStation(
-                        camera.viewportToSourcePoint(details.localPosition),
-                        widget.data.stations,
+                        details.localPosition,
                         stationLinesById,
                         geometry,
                         camera,
@@ -839,31 +838,31 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 ),
               ),
               if (!_gestureActive)
-                for (final station in widget.data.stations)
-                  if (_stationHitRect(station, geometry).overlaps(
-                    camera.visibleSourceRect.inflate(96 / camera.scale),
-                  ))
-                    Positioned.fromRect(
-                      rect: _sourceRectToViewport(
-                        _stationHitRect(
-                          station,
-                          geometry,
-                          nodeRadius: 24 / camera.scale,
-                          labelHeight: 40 / camera.scale,
-                        ),
-                        camera,
+                for (final station in _visibleCanonicalStations(
+                  geometry: geometry,
+                  camera: camera,
+                ))
+                  Positioned.fromRect(
+                    rect: _sourceRectToViewport(
+                      _stationHitRect(
+                        station,
+                        geometry,
+                        nodeRadius: 24 / camera.scale,
+                        labelHeight: 40 / camera.scale,
                       ),
-                      child: _StationHitTarget(
-                        key: Key(
-                          'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
-                        ),
-                        station: station,
-                        onTap: () => widget.onStationTap(
-                          station,
-                          stationLinesById[station.id] ?? const [],
-                        ),
+                      camera,
+                    ),
+                    child: _StationHitTarget(
+                      key: Key(
+                        'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+                      ),
+                      station: station,
+                      onTap: () => widget.onStationTap(
+                        station,
+                        stationLinesById[station.id] ?? const [],
                       ),
                     ),
+                  ),
               Positioned(
                 right: 14,
                 top: 12,
@@ -912,6 +911,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           .zoomBy(factor, focalPoint: camera.viewportSize.center(Offset.zero))
           .clamped(viewportMargin: 220),
     );
+  }
+
+  _MapGeometry _geometryFor(_RouteMapAsset? mapAsset, NetworkMapData data) {
+    final assetKey = mapAsset == null
+        ? 'generated'
+        : '${mapAsset.path}:${mapAsset.coordinateWidth}:${mapAsset.coordinateHeight}';
+    final cacheKey =
+        '$assetKey:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
+    final cached = _geometryCache;
+    if (_geometryCacheKey == cacheKey && cached != null) {
+      return cached;
+    }
+    final geometry = mapAsset == null
+        ? _MapGeometry.fromStations(data.stations)
+        : _MapGeometry.fromOriginalAsset(mapAsset, data.stations);
+    _geometryCacheKey = cacheKey;
+    _geometryCache = geometry;
+    return geometry;
   }
 
   void _updateCameraForGesture(ScaleUpdateDetails details) {
@@ -1052,17 +1069,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _openNearestStation(
-    Offset sourcePosition,
-    List<NetworkMapStation> stations,
+    Offset viewportPosition,
     Map<String, List<NetworkMapLine>> stationLinesById,
     _MapGeometry geometry,
     MapCameraState camera,
   ) {
-    final station = _stationAtMapPosition(
-      sourcePosition,
-      stations,
+    final station = _stationAtViewportPosition(
+      viewportPosition,
       geometry,
-      sceneHitRadius: 24 / (camera.scale > 0 ? camera.scale : 1),
+      camera: camera,
     );
     if (station == null) {
       return;
@@ -1555,7 +1570,9 @@ class _MapGeometry {
     required this.height,
     Rect? initialBounds,
     this.overlayStyleScale = 1.0,
-  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height);
+    _StationSpatialIndex? stationIndex,
+  }) : initialBounds = initialBounds ?? Rect.fromLTWH(0, 0, width, height),
+       stationIndex = stationIndex ?? _StationSpatialIndex.empty;
 
   final Offset origin;
   final Offset focus;
@@ -1563,15 +1580,19 @@ class _MapGeometry {
   final double height;
   final Rect initialBounds;
   final double overlayStyleScale;
+  final _StationSpatialIndex stationIndex;
 
-  factory _MapGeometry.fromOriginalAsset(_RouteMapAsset asset) {
+  factory _MapGeometry.fromOriginalAsset(
+    _RouteMapAsset asset,
+    List<NetworkMapStation> stations,
+  ) {
     final sourceWidth = asset.coordinateWidth;
     final sourceHeight = asset.coordinateHeight;
     final overlayStyleScale = math.min(
       sourceWidth / asset.width,
       sourceHeight / asset.height,
     );
-    return _MapGeometry(
+    final geometry = _MapGeometry(
       origin: Offset.zero,
       focus: Offset(sourceWidth / 2, sourceHeight / 2),
       width: sourceWidth,
@@ -1587,6 +1608,9 @@ class _MapGeometry {
       overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
           ? overlayStyleScale
           : 1.0,
+    );
+    return geometry.copyWith(
+      stationIndex: _StationSpatialIndex.fromStations(stations, geometry),
     );
   }
 
@@ -1651,18 +1675,179 @@ class _MapGeometry {
       width: math.max(860, maxX - minX + margin * 2),
       height: math.max(560, maxY - minY + margin * 2),
     );
-    return _MapGeometry(
+    final result = _MapGeometry(
       origin: geometry.origin,
       focus: geometry.focus,
       width: geometry.width,
       height: geometry.height,
       initialBounds: _readableBoundsFor(geometry),
     );
+    return result.copyWith(
+      stationIndex: _StationSpatialIndex.fromStations(stations, result),
+    );
   }
 
   double x(NetworkMapStation station) => station.position.x - origin.dx;
 
   double y(NetworkMapStation station) => station.position.y - origin.dy;
+
+  _MapGeometry copyWith({_StationSpatialIndex? stationIndex}) {
+    return _MapGeometry(
+      origin: origin,
+      focus: focus,
+      width: width,
+      height: height,
+      initialBounds: initialBounds,
+      overlayStyleScale: overlayStyleScale,
+      stationIndex: stationIndex ?? this.stationIndex,
+    );
+  }
+}
+
+class _StationSpatialIndex {
+  _StationSpatialIndex._({
+    required Map<_StationSpatialCell, List<NetworkMapStation>> buckets,
+    required Map<String, int> stationOrder,
+  }) : _buckets = buckets, // ignore: prefer_initializing_formals
+       // ignore: prefer_initializing_formals
+       _stationOrder = stationOrder;
+
+  static final empty = _StationSpatialIndex._(
+    buckets: const {},
+    stationOrder: const {},
+  );
+
+  static const _cellSize = 256.0;
+
+  final Map<_StationSpatialCell, List<NetworkMapStation>> _buckets;
+  final Map<String, int> _stationOrder;
+
+  factory _StationSpatialIndex.fromStations(
+    List<NetworkMapStation> stations,
+    _MapGeometry geometry,
+  ) {
+    final buckets = <_StationSpatialCell, List<NetworkMapStation>>{};
+    final stationOrder = <String, int>{};
+    for (var index = 0; index < stations.length; index += 1) {
+      final station = stations[index];
+      final key = _stationGeometryKey(station);
+      stationOrder[key] = index;
+      final bounds = _stationHitRect(station, geometry);
+      for (final cell in _cellsFor(bounds)) {
+        buckets.putIfAbsent(cell, () => []).add(station);
+      }
+    }
+    return _StationSpatialIndex._(buckets: buckets, stationOrder: stationOrder);
+  }
+
+  List<NetworkMapStation> query(Rect sourceBounds) {
+    if (_buckets.isEmpty || sourceBounds.isEmpty) {
+      return const [];
+    }
+    final byKey = <String, NetworkMapStation>{};
+    for (final cell in _cellsFor(sourceBounds)) {
+      for (final station in _buckets[cell] ?? const <NetworkMapStation>[]) {
+        byKey[_stationGeometryKey(station)] = station;
+      }
+    }
+    final result = byKey.values.toList(growable: false);
+    result.sort((a, b) {
+      final aOrder = _stationOrder[_stationGeometryKey(a)] ?? 0;
+      final bOrder = _stationOrder[_stationGeometryKey(b)] ?? 0;
+      return aOrder.compareTo(bOrder);
+    });
+    return result;
+  }
+
+  static Iterable<_StationSpatialCell> _cellsFor(Rect bounds) sync* {
+    final left = _cellFor(bounds.left);
+    final right = _cellFor(bounds.right);
+    final top = _cellFor(bounds.top);
+    final bottom = _cellFor(bounds.bottom);
+    for (var x = left; x <= right; x += 1) {
+      for (var y = top; y <= bottom; y += 1) {
+        yield _StationSpatialCell(x, y);
+      }
+    }
+  }
+
+  static int _cellFor(double value) => (value / _cellSize).floor();
+}
+
+@immutable
+class _StationSpatialCell {
+  const _StationSpatialCell(this.x, this.y);
+
+  final int x;
+  final int y;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _StationSpatialCell && other.x == x && other.y == y;
+  }
+
+  @override
+  int get hashCode => Object.hash(x, y);
+}
+
+const _maximumStationHitDistance = 24.0;
+
+List<NetworkMapStation> _canonicalStations(
+  Iterable<NetworkMapStation> stations,
+  _MapGeometry geometry,
+) {
+  final canonicalStations = <NetworkMapStation>[];
+  for (final station in stations) {
+    final existingIndex = canonicalStations.indexWhere((existing) {
+      return existing.id == station.id &&
+          _isOverlappingStationGeometry(existing, station, geometry);
+    });
+    if (existingIndex == -1) {
+      canonicalStations.add(station);
+      continue;
+    }
+    final existing = canonicalStations[existingIndex];
+    if (_stationGeometryPriority(station) >
+        _stationGeometryPriority(existing)) {
+      canonicalStations[existingIndex] = station;
+    }
+  }
+  return canonicalStations;
+}
+
+bool _isOverlappingStationGeometry(
+  NetworkMapStation a,
+  NetworkMapStation b,
+  _MapGeometry geometry,
+) {
+  return _stationHitRect(
+    a,
+    geometry,
+  ).inflate(8).overlaps(_stationHitRect(b, geometry).inflate(8));
+}
+
+List<NetworkMapStation> _visibleCanonicalStations({
+  required _MapGeometry geometry,
+  required MapCameraState camera,
+}) {
+  final visibleSourceRect = camera.visibleSourceRect.inflate(96 / camera.scale);
+  return _canonicalStations(
+    geometry.stationIndex.query(visibleSourceRect).where((station) {
+      return _stationHitRect(station, geometry).overlaps(visibleSourceRect);
+    }),
+    geometry,
+  );
+}
+
+int _stationGeometryPriority(NetworkMapStation station) {
+  if (station.position.labelPolygon.isNotEmpty) {
+    return 3;
+  }
+  if (station.position.upPath.isNotEmpty ||
+      station.position.downPath.isNotEmpty) {
+    return 2;
+  }
+  return 1;
 }
 
 Rect _stationHitRect(
@@ -1693,25 +1878,25 @@ Rect _stationHitRect(
   return node.expandToInclude(label);
 }
 
-NetworkMapStation? _stationAtMapPosition(
-  Offset position,
-  List<NetworkMapStation> stations,
+NetworkMapStation? _stationAtViewportPosition(
+  Offset viewportPosition,
   _MapGeometry geometry, {
-  required double sceneHitRadius,
+  required MapCameraState camera,
 }) {
+  final safeScale = camera.scale > 0 ? camera.scale : 1.0;
+  final sourcePosition = camera.viewportToSourcePoint(viewportPosition);
+  final sourceQuery = Rect.fromCircle(
+    center: sourcePosition,
+    radius: _maximumStationHitDistance / safeScale,
+  );
   NetworkMapStation? bestStation;
-  var bestScore = double.infinity;
-  for (final station in stations) {
-    if (!_stationHitTestContains(
-      position,
-      station,
-      geometry,
-      sceneHitRadius: sceneHitRadius,
-    )) {
+  _StationTapScore? bestScore;
+  for (final station in geometry.stationIndex.query(sourceQuery)) {
+    final score = _stationTapScore(viewportPosition, station, geometry, camera);
+    if (score == null) {
       continue;
     }
-    final score = _stationTapScore(position, station, geometry);
-    if (score < bestScore) {
+    if (bestScore == null || score.compareTo(bestScore) < 0) {
       bestScore = score;
       bestStation = station;
     }
@@ -1719,56 +1904,140 @@ NetworkMapStation? _stationAtMapPosition(
   return bestStation;
 }
 
-double _stationTapScore(
-  Offset position,
+_StationTapScore? _stationTapScore(
+  Offset viewportPosition,
   NetworkMapStation station,
   _MapGeometry geometry,
+  MapCameraState camera,
 ) {
-  final nodeCenter = Offset(geometry.x(station), geometry.y(station));
+  final safeScale = camera.scale > 0 ? camera.scale : 1.0;
+  final nodeCenter = camera.sourceToViewportPoint(
+    Offset(geometry.x(station), geometry.y(station)),
+  );
+  final nodeHitRect = Rect.fromCenter(
+    center: nodeCenter,
+    width: _maximumStationHitDistance * 2,
+    height: _maximumStationHitDistance * 2,
+  );
+  final containsNode = nodeHitRect.contains(viewportPosition);
+  final nodeDistance = (viewportPosition - nodeCenter).distance;
+  var bestHitDistance = containsNode ? 0.0 : double.infinity;
+  var bestSelectionDistance = containsNode ? nodeDistance : double.infinity;
+  var containsShape = containsNode;
   final labelPolygon = _labelPolygonFor(station, geometry);
   if (labelPolygon != null) {
-    return math.min(
-      (position - nodeCenter).distanceSquared,
-      _distanceSquaredToPolygon(position, labelPolygon),
+    final viewportPolygon = [
+      for (final point in labelPolygon) camera.sourceToViewportPoint(point),
+    ];
+    final polygonDistance = math.sqrt(
+      _distanceSquaredToPolygon(viewportPosition, viewportPolygon),
     );
+    bestHitDistance = math.min(bestHitDistance, polygonDistance);
+    if (polygonDistance <= _maximumStationHitDistance) {
+      bestSelectionDistance = math.min(bestSelectionDistance, polygonDistance);
+    }
+    containsShape = containsShape || polygonDistance == 0;
+  } else {
+    final labelRect = _sourceRectToViewport(
+      _stationLabelRect(station, geometry, labelHeight: 40 / safeScale),
+      camera,
+    );
+    final labelDistance = _distanceToRect(viewportPosition, labelRect);
+    bestHitDistance = math.min(bestHitDistance, labelDistance);
+    if (labelDistance <= _maximumStationHitDistance) {
+      bestSelectionDistance = math.min(
+        bestSelectionDistance,
+        (viewportPosition - labelRect.center).distance,
+      );
+    }
+    containsShape = containsShape || labelDistance == 0;
   }
-  final labelOffset = _labelOffsetFor(station);
-  final labelCenter = Offset(
-    nodeCenter.dx + labelOffset.dx,
-    nodeCenter.dy + labelOffset.dy,
-  );
-  return math.min(
-    (position - nodeCenter).distanceSquared,
-    (position - labelCenter).distanceSquared,
+  if (bestHitDistance > _maximumStationHitDistance) {
+    return null;
+  }
+  return _StationTapScore(
+    containsNode: containsNode,
+    containsShape: containsShape,
+    screenDistance: bestSelectionDistance.isFinite
+        ? bestSelectionDistance
+        : bestHitDistance,
+    stableKey: _stationGeometryKey(station),
   );
 }
 
-bool _stationHitTestContains(
-  Offset position,
+Rect _stationLabelRect(
   NetworkMapStation station,
   _MapGeometry geometry, {
-  required double sceneHitRadius,
+  double labelHeight = 40,
 }) {
-  final nodeCenter = Offset(geometry.x(station), geometry.y(station));
-  final nodeRect = Rect.fromCenter(
-    center: nodeCenter,
-    width: sceneHitRadius * 2,
-    height: sceneHitRadius * 2,
+  final labelOffset = _labelOffsetFor(station);
+  final labelCenter = Offset(
+    geometry.x(station) + labelOffset.dx,
+    geometry.y(station) + labelOffset.dy,
   );
-  if (nodeRect.contains(position)) {
-    return true;
+  return Rect.fromCenter(
+    center: labelCenter,
+    width: math.max(64, station.nameKo.characters.length * 18 + 32),
+    height: labelHeight,
+  );
+}
+
+double _distanceToRect(Offset point, Rect rect) {
+  if (rect.contains(point)) {
+    return 0;
   }
-  final labelPolygon = _labelPolygonFor(station, geometry);
-  if (labelPolygon != null) {
-    return _distanceSquaredToPolygon(position, labelPolygon) <=
-        sceneHitRadius * sceneHitRadius;
+  final dx = point.dx < rect.left
+      ? rect.left - point.dx
+      : point.dx > rect.right
+      ? point.dx - rect.right
+      : 0.0;
+  final dy = point.dy < rect.top
+      ? rect.top - point.dy
+      : point.dy > rect.bottom
+      ? point.dy - rect.bottom
+      : 0.0;
+  return math.sqrt(dx * dx + dy * dy);
+}
+
+class _StationTapScore implements Comparable<_StationTapScore> {
+  const _StationTapScore({
+    required this.containsNode,
+    required this.containsShape,
+    required this.screenDistance,
+    required this.stableKey,
+  });
+
+  final bool containsNode;
+  final bool containsShape;
+  final double screenDistance;
+  final String stableKey;
+
+  @override
+  int compareTo(_StationTapScore other) {
+    final nodeComparison = _scoreBool(
+      containsNode,
+    ).compareTo(_scoreBool(other.containsNode));
+    if (nodeComparison != 0) {
+      return nodeComparison;
+    }
+    final containsComparison = _scoreBool(
+      containsShape,
+    ).compareTo(_scoreBool(other.containsShape));
+    if (containsComparison != 0) {
+      return containsComparison;
+    }
+    final distanceComparison = screenDistance.compareTo(other.screenDistance);
+    if (distanceComparison != 0) {
+      return distanceComparison;
+    }
+    return stableKey.compareTo(other.stableKey);
   }
-  return _stationHitRect(
-    station,
-    geometry,
-    nodeRadius: sceneHitRadius,
-    labelHeight: sceneHitRadius * 2,
-  ).contains(position);
+
+  static int _scoreBool(bool value) => value ? 0 : 1;
+}
+
+String _stationGeometryKey(NetworkMapStation station) {
+  return '${station.id}:${station.lineId}';
 }
 
 Rect? _labelPolygonBoundsFor(NetworkMapStation station) {

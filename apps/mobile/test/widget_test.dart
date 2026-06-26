@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:easysubway_mobile/accessible_design.dart';
@@ -1257,6 +1258,12 @@ void main() {
           color: '#00A5DE',
           region: '테스트권',
         ),
+        NetworkMapLine(
+          id: 'seoul-2',
+          name: '수도권 2호선',
+          color: '#00A84D',
+          region: '테스트권',
+        ),
       ],
       stations: [
         NetworkMapStation(
@@ -1278,6 +1285,26 @@ void main() {
           ),
         ),
         NetworkMapStation(
+          id: 'station-visible-a',
+          nameKo: '보이는역A',
+          nameEn: 'Visible A',
+          region: '테스트권',
+          lineId: 'seoul-2',
+          stationCode: '201',
+          sequence: 1,
+          position: NetworkMapPosition(
+            x: 7550,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            labelPolygon:
+                '[{"x":7550,"y":80},{"x":7650,"y":80},{"x":7650,"y":120},{"x":7550,"y":120}]',
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
           id: 'station-geometry-left',
           nameKo: '왼쪽기준',
           nameEn: 'Geometry Left',
@@ -1287,6 +1314,24 @@ void main() {
           sequence: 0,
           position: NetworkMapPosition(
             x: 0,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
+          id: 'station-geometry-left-b',
+          nameKo: '왼쪽기준B',
+          nameEn: 'Geometry Left B',
+          region: '테스트권',
+          lineId: 'geometry-helper',
+          stationCode: '001',
+          sequence: 0,
+          position: NetworkMapPosition(
+            x: 100,
             y: 100,
             labelDx: 0,
             labelDy: 0,
@@ -1328,6 +1373,10 @@ void main() {
           lineId: 'seoul-4',
         ),
         NetworkMapStationLineMembership(
+          stationId: 'station-visible-a',
+          lineId: 'seoul-2',
+        ),
+        NetworkMapStationLineMembership(
           stationId: 'station-far-a',
           lineId: 'seoul-4',
         ),
@@ -1358,6 +1407,10 @@ void main() {
       expect(visibleStation, findsOneWidget);
       expect(
         find.byKey(const Key('networkMapStation-far-a-seoul-4')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('networkMapStation-visible-a-seoul-2')),
         findsNothing,
       );
       expect(find.bySemanticsLabel('먼역A역'), findsNothing);
@@ -1742,6 +1795,622 @@ void main() {
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.text('다각형역'), findsOneWidget);
+  });
+
+  testWidgets('노선도 배경을 탭하면 가까운 역 sheet를 열지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-near',
+            nameKo: '가까운역',
+            nameEn: 'Near',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '401',
+            sequence: 1,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              labelPolygon:
+                  '[{"x":300,"y":100},{"x":360,"y":100},{"x":360,"y":140},{"x":300,"y":140}]',
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-near',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+
+    final stationRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-near-seoul-4')),
+    );
+    final nodeCenter = stationRect.topLeft + const Offset(24, 24);
+    await tester.tapAt(nodeCenter + const Offset(32, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('가까운역'), findsNothing);
+
+    final surfaceRect = tester.getRect(
+      find.byKey(const Key('networkMapSurface')),
+    );
+    await tester.tapAt(surfaceRect.bottomRight - const Offset(24, 24));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('가까운역'), findsNothing);
+  });
+
+  testWidgets('노선도 확대 상태에서도 label 바깥 배경 tap은 sheet를 열지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-label',
+            nameKo: '라벨역',
+            nameEn: 'Label',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '402',
+            sequence: 2,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-label',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 3; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomInButton')));
+      await tester.pumpAndSettle();
+    }
+
+    final stationRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-label-seoul-4')),
+    );
+    await tester.tapAt(stationRect.bottomCenter + const Offset(0, 30));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('라벨역'), findsNothing);
+  });
+
+  testWidgets('노선도 label과 marker가 겹치면 marker tap 역을 우선 선택한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-a-label',
+            nameKo: '가라벨',
+            nameEn: 'Label A',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '403',
+            sequence: 3,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-b-node',
+            nameKo: '나마커',
+            nameEn: 'Marker B',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '404',
+            sequence: 4,
+            position: NetworkMapPosition(
+              x: 150,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-a-label',
+            lineId: 'seoul-4',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-b-node',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const Key('networkMapStation-b-node-seoul-4')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('나마커역'), findsOneWidget);
+    expect(find.text('가라벨역'), findsNothing);
+  });
+
+  testWidgets('노선도 label끼리 겹치면 tap 위치에 가까운 역을 선택한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-a-far',
+            nameKo: '먼역',
+            nameEn: 'Far',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '405',
+            sequence: 5,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 60,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-z-near',
+            nameKo: '가까운',
+            nameEn: 'Near',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '406',
+            sequence: 6,
+            position: NetworkMapPosition(
+              x: 150,
+              y: 120,
+              labelDx: 0,
+              labelDy: 60,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-a-far',
+            lineId: 'seoul-4',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-z-near',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+
+    final farRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-a-far-seoul-4')),
+    );
+    final nearRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-z-near-seoul-4')),
+    );
+    await tester.tapAt(
+      Offset(farRect.right - 2, math.min(farRect.bottom, nearRect.bottom) - 20),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.text('가까운역'), findsOneWidget);
+    expect(find.text('먼역역'), findsNothing);
+  });
+
+  testWidgets('노선도 동일 station의 여러 line geometry는 visible semantics를 하나로 묶는다', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-2',
+            name: '수도권 2호선',
+            color: '#00A84D',
+            region: '테스트권',
+          ),
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-transfer',
+            nameKo: '환승',
+            nameEn: 'Transfer',
+            region: '테스트권',
+            lineId: 'seoul-2',
+            stationCode: '201',
+            sequence: 1,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-transfer',
+            nameKo: '환승',
+            nameEn: 'Transfer',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '401',
+            sequence: 2,
+            position: NetworkMapPosition(
+              x: 180,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-transfer',
+            lineId: 'seoul-2',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-transfer',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+
+      final canonicalStation = find.byKey(
+        const Key('networkMapStation-transfer-seoul-2'),
+      );
+      expect(canonicalStation, findsOneWidget);
+      expect(
+        find.byKey(const Key('networkMapStation-transfer-seoul-4')),
+        findsNothing,
+      );
+      expect(find.bySemanticsLabel('환승역'), findsOneWidget);
+
+      final stationSemantics = tester.getSemantics(canonicalStation);
+      expect(
+        stationSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('노선도 동일 station이라도 떨어진 line geometry는 각각 표시한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-2',
+            name: '수도권 2호선',
+            color: '#00A84D',
+            region: '테스트권',
+          ),
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-transfer',
+            nameKo: '환승',
+            nameEn: 'Transfer',
+            region: '테스트권',
+            lineId: 'seoul-2',
+            stationCode: '201',
+            sequence: 1,
+            position: NetworkMapPosition(
+              x: 160,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-center',
+            nameKo: '중앙',
+            nameEn: 'Center',
+            region: '테스트권',
+            lineId: 'seoul-2',
+            stationCode: '202',
+            sequence: 2,
+            position: NetworkMapPosition(
+              x: 260,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+          NetworkMapStation(
+            id: 'station-transfer',
+            nameKo: '환승',
+            nameEn: 'Transfer',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '401',
+            sequence: 3,
+            position: NetworkMapPosition(
+              x: 360,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-transfer',
+            lineId: 'seoul-2',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-transfer',
+            lineId: 'seoul-4',
+          ),
+          NetworkMapStationLineMembership(
+            stationId: 'station-center',
+            lineId: 'seoul-2',
+          ),
+        ],
+      ),
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+
+      final firstGeometry = find.byKey(
+        const Key('networkMapStation-transfer-seoul-2'),
+      );
+      final secondGeometry = find.byKey(
+        const Key('networkMapStation-transfer-seoul-4'),
+      );
+      expect(firstGeometry, findsOneWidget);
+      expect(secondGeometry, findsOneWidget);
+      expect(find.bySemanticsLabel('환승역'), findsNWidgets(2));
+
+      await tester.tapAt(tester.getCenter(secondGeometry));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      expect(find.text('환승역'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('홈 화면은 v3 기준 큰 행동과 짧은 상태 카드로 구성된다', (tester) async {
