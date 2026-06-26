@@ -248,6 +248,25 @@ void main() {
     expect(controller.trimMemoryCalls, 0);
   });
 
+  test('health monitor close only disposes once when calls overlap', () async {
+    final controller = _FakeRouteMapRendererController()
+      ..disposeCompleter = Completer<void>();
+    final monitor = RouteMapRendererHealthMonitor(controller)..start();
+    addTearDown(monitor.stop);
+
+    final firstClose = monitor.close(disposeRenderer: true);
+    final secondClose = monitor.close(disposeRenderer: true);
+    await pumpEventQueue();
+
+    expect(controller.disposeCalls, 1);
+
+    controller.disposeCompleter!.complete();
+    await Future.wait(<Future<void>>[firstClose, secondClose]);
+    await monitor.disposeRenderer();
+
+    expect(controller.disposeCalls, 1);
+  });
+
   test('health monitor close stops after renderer dispose failure', () async {
     final controller = _FakeRouteMapRendererController()
       ..disposeError = StateError('dispose failed');
@@ -303,6 +322,7 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
   final _pendingCameraFrames = <int, Stopwatch>{};
   Object? retryError;
   Object? disposeError;
+  Completer<void>? disposeCompleter;
   int retryCalls = 0;
   int trimMemoryCalls = 0;
   int disposeCalls = 0;
@@ -350,6 +370,7 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
   @override
   Future<void> dispose() async {
     disposeCalls += 1;
+    await disposeCompleter?.future;
     final error = disposeError;
     if (error != null) {
       throw error;

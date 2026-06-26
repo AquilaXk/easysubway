@@ -128,6 +128,7 @@ final class RouteMapRendererHealthMonitor {
     if (_closed) {
       return;
     }
+    _closed = true;
     try {
       if (disposeRenderer) {
         await _controller.dispose();
