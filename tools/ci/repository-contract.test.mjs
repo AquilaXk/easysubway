@@ -3174,6 +3174,7 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
   assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
   assert.doesNotMatch(build, /id ['"]jacoco['"]/);
+  assert.match(sonar, /sonar\.exclusions=[\s\S]*backend\/src\/main\/resources\/db\/migration\/\*\*\/\*\.sql/);
   assert.match(sonar, /sonar\.cpd\.exclusions=\\\n\s+backend\/src\/main\/resources\/db\/migration\/\*\*\/\*\.sql/);
   assert.doesNotMatch(build, /com\.tngtech\.archunit/);
 
