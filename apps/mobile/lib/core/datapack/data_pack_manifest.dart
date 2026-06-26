@@ -149,6 +149,7 @@ class DataPackManifestEntry {
     required this.requiredTables,
     this.manifestVersion = 1,
     this.minimumTableRows = const {},
+    this.dependencies = const [],
   });
 
   factory DataPackManifestEntry.fromJson(
@@ -159,6 +160,7 @@ class DataPackManifestEntry {
     final id = _readPackId(json['id']);
     final version = _readPackVersion(json['version']);
     final url = _parsePackUrl(_requiredString(json, 'url'));
+    _validatePayloadKind(json['payloadKind']);
     final artifactKind = _parseArtifactKind(json['artifactKind'], url);
     final requiredTables = json['requiredTables'];
     final minimumTableRows = json['minimumTableRows'];
@@ -200,6 +202,7 @@ class DataPackManifestEntry {
           })
           .toList(growable: false),
       minimumTableRows: _parseMinimumTableRows(minimumTableRows),
+      dependencies: _parsePackDependencies(json['dependencies']),
     ).._validateManifestContract(productionSigningPublicKey);
   }
 
@@ -220,6 +223,7 @@ class DataPackManifestEntry {
   final String schemaVersion;
   final List<String> requiredTables;
   final Map<String, int> minimumTableRows;
+  final List<ActiveDataPackManifest> dependencies;
 
   void _validateManifestContract(
     DataPackSigningPublicKey? productionSigningPublicKey,
@@ -355,6 +359,15 @@ class DataPackManifestEntry {
           .map((route) => route.toSignatureJson())
           .toList(growable: false),
     );
+  }
+}
+
+void _validatePayloadKind(Object? rawPayloadKind) {
+  if (rawPayloadKind == null) {
+    return;
+  }
+  if (rawPayloadKind != 'sqlite_catalog') {
+    throw const FormatException('Invalid data pack payload kind.');
   }
 }
 
@@ -716,6 +729,26 @@ ActiveDataPackManifest? _parseActivePack(Object? rawActivePack) {
     id: _readPackId(rawActivePack['id']),
     version: _readPackVersion(rawActivePack['version']),
   );
+}
+
+List<ActiveDataPackManifest> _parsePackDependencies(Object? rawDependencies) {
+  if (rawDependencies == null) {
+    return const [];
+  }
+  if (rawDependencies is! List<Object?>) {
+    throw const FormatException('Invalid data pack dependencies.');
+  }
+  return rawDependencies
+      .map((rawDependency) {
+        if (rawDependency is! Map<String, Object?>) {
+          throw const FormatException('Invalid data pack dependencies.');
+        }
+        return ActiveDataPackManifest(
+          id: _readPackId(rawDependency['id']),
+          version: _readPackVersion(rawDependency['version']),
+        );
+      })
+      .toList(growable: false);
 }
 
 EmergencyOverrideManifest? _parseOverride(Object? rawOverride) {

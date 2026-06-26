@@ -238,6 +238,75 @@ void main() {
     expect(result.pointer?.version, '18');
   });
 
+  test('installer는 gzip pack file을 streaming으로 검증하고 설치한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-streaming-install-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final compressedFile = File('${directory.path}/capital-v18.sqlite.gz');
+    await compressedFile.writeAsBytes(compressedBytes, flush: true);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.installFromCompressedFile(
+      pack: _pack(
+        version: '18',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
+      ),
+      compressedFile: compressedFile,
+    );
+
+    expect(result.status, DataPackInstallStatus.installed);
+    expect(result.pointer?.version, '18');
+    expect(await compressedFile.exists(), isFalse);
+  });
+
+  test('installer는 설치 journal의 완성 candidate를 current로 복구한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-journal-recover-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final installedPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await installedPack.writeAsBytes(sqliteBytes, flush: true);
+    await File(
+      '${catalogDirectory.path}/current.json.installing',
+    ).writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': installedPack.path,
+        'sha256': sha256.convert(sqliteBytes).toString(),
+      }),
+      flush: true,
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+
+    await installer.recoverInstallJournal();
+    final pointer = await installer.readCurrentPointer();
+
+    expect(pointer?.version, '18');
+    expect(
+      await File('${catalogDirectory.path}/current.json.installing').exists(),
+      isFalse,
+    );
+  });
+
   test('installer는 새 pack 설치 후 같은 pack의 오래된 버전을 정리한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-prune-',
