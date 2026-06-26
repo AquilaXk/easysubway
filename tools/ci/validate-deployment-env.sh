@@ -17,6 +17,15 @@ has_env_name() {
   grep -Eq "^${name}=" "${env_file}"
 }
 
+has_non_empty_env_value() {
+  local name="$1"
+  grep -Eq "^${name}=.+" "${env_file}"
+}
+
+is_admin_basic_auth_enabled() {
+  grep -Eq "^EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=true$" "${env_file}"
+}
+
 is_satisfied_by_runtime_fallback() {
   local name="$1"
   case "${name}" in
@@ -39,10 +48,10 @@ is_satisfied_by_runtime_fallback() {
       true
       ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER)
-      true
+      ! is_admin_basic_auth_enabled
       ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT)
-      true
+      ! is_admin_basic_auth_enabled
       ;;
     *)
       false
@@ -50,9 +59,25 @@ is_satisfied_by_runtime_fallback() {
   esac
 }
 
+is_required_env_satisfied() {
+  local name="$1"
+  case "${name}" in
+    EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER|EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT)
+      if is_admin_basic_auth_enabled; then
+        has_non_empty_env_value "${name}"
+      else
+        has_env_name "${name}" || is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
+    *)
+      has_env_name "${name}" || is_satisfied_by_runtime_fallback "${name}"
+      ;;
+  esac
+}
+
 missing_names=()
 while IFS= read -r name; do
-  if [[ -n "${name}" ]] && ! has_env_name "${name}" && ! is_satisfied_by_runtime_fallback "${name}"; then
+  if [[ -n "${name}" ]] && ! is_required_env_satisfied "${name}"; then
     missing_names+=("${name}")
   fi
 done < <(sed -nE 's/^([A-Z0-9_]+)=.*/\1/p' .env.example)
