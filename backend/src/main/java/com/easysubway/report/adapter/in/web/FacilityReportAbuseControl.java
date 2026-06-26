@@ -123,8 +123,8 @@ record FacilityReportAbuseControlPolicy(
 		if (maxCounterKeys < 1) {
 			throw new IllegalArgumentException("report abuse control max counter keys must be positive");
 		}
-		if (!"local".equals(storeMode) && !"distributed".equals(storeMode)) {
-			throw new IllegalArgumentException("report abuse control store mode must be local or distributed");
+		if (!"local".equals(storeMode)) {
+			throw new IllegalArgumentException("report abuse control store mode must be local until distributed store is implemented");
 		}
 		for (ReportAbuseGroup group : ReportAbuseGroup.values()) {
 			Integer limit = limits.get(group);

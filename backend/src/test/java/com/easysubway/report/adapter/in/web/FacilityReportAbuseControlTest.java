@@ -181,11 +181,14 @@ class FacilityReportAbuseControlTest {
 	}
 
 	@Test
-	@DisplayName("abuse control policy는 명시된 store mode만 허용한다")
-	void policyRejectsUnknownStoreMode() {
+	@DisplayName("abuse control policy는 실제 분산 store 구현 전까지 local mode만 허용한다")
+	void policyRejectsNonLocalStoreMode() {
 		assertThatThrownBy(() -> new FacilityReportAbuseControlPolicy(60, 10, "memory", completeLimits(1)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("store mode");
+		assertThatThrownBy(() -> new FacilityReportAbuseControlPolicy(60, 10, "distributed", completeLimits(1)))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("distributed store");
 	}
 
 	@Test
