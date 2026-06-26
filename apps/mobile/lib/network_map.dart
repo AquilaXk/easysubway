@@ -1202,6 +1202,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _markRendererFramePresented(int revision) {
+    if (!networkMapShouldAcceptPresentedRendererRevision(
+      revision: revision,
+      presentedCamera: _presentedRendererCamera,
+      requestedCamera: _requestedRendererCamera,
+    )) {
+      _requestedRendererCamerasByRevision.remove(revision);
+      return;
+    }
     final camera =
         _requestedRendererCamerasByRevision.remove(revision) ??
         (_requestedRendererCamera?.revision == revision
@@ -1717,6 +1725,23 @@ MapCameraState networkMapRendererCameraForSkippedCommit({
     return requestedCamera;
   }
   return candidateCamera;
+}
+
+@visibleForTesting
+bool networkMapShouldAcceptPresentedRendererRevision({
+  required int revision,
+  required MapCameraState? presentedCamera,
+  required MapCameraState? requestedCamera,
+}) {
+  final presentedRevision = presentedCamera?.revision;
+  if (presentedRevision != null && revision < presentedRevision) {
+    return false;
+  }
+  final requestedRevision = requestedCamera?.revision;
+  if (requestedRevision != null && revision < requestedRevision) {
+    return false;
+  }
+  return true;
 }
 
 @visibleForTesting

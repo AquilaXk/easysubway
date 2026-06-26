@@ -1112,6 +1112,47 @@ void main() {
     );
   });
 
+  test('노선도 renderer는 out-of-order presented revision을 무시한다', () {
+    const presentedCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final requestedCamera = presentedCamera.copyWith(
+      center: const Offset(560, 250),
+      revision: 5,
+    );
+
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 4,
+        presentedCamera: presentedCamera,
+        requestedCamera: requestedCamera,
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 5,
+        presentedCamera: presentedCamera,
+        requestedCamera: requestedCamera,
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 2,
+        presentedCamera: presentedCamera,
+        requestedCamera: null,
+      ),
+      isFalse,
+    );
+  });
+
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
     final manifestFile = File('assets/datapacks/metro_map_pack/manifest.json');
     final manifest =
