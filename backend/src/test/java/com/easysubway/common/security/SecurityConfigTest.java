@@ -454,6 +454,54 @@ class SecurityConfigTest {
 	}
 
 	@Test
+	@DisplayName("break-glass bootstrap은 사용 전에는 비밀번호 만료 시각을 저장하지 않는다")
+	void breakGlassBootstrapDoesNotExpireBeforeFirstUse() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		var breakGlass = repository.findByLoginId("break-glass").orElseThrow();
+		assertThat(breakGlass.status()).isEqualTo(AdminIdentityStatus.ACTIVE);
+		assertThat(breakGlass.passwordExpiresAt()).isNull();
+	}
+
+	@Test
 	@DisplayName("break-glass bootstrap은 같은 비밀번호면 reason 변경만으로 rotation 요구를 해제하지 않는다")
 	void breakGlassBootstrapKeepsRotationRequirementWhenSecretDidNotChange() {
 		var securityConfig = new SecurityConfig();
