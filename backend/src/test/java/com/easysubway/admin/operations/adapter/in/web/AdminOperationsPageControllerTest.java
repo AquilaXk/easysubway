@@ -59,7 +59,7 @@ class AdminOperationsPageControllerTest {
 				.with(csrf())
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("groupCode", "REPORT_REJECTION_REASON")
-				.param("code", "OUT_OF_SCOPE")
+				.param("code", "PROVIDER_SECRET_MISSING")
 				.param("displayName", "처리 범위 아님")
 				.param("description", "앱 처리 범위 밖의 제보")
 				.param("sortOrder", "30")
@@ -71,8 +71,11 @@ class AdminOperationsPageControllerTest {
 			.singleElement()
 			.satisfies(event -> {
 				assertThat(event.actor()).isEqualTo("admin-user");
-				assertThat(event.targetId()).isEqualTo("REPORT_REJECTION_REASON:OUT_OF_SCOPE");
+				assertThat(event.targetId())
+					.startsWith("REPORT_REJECTION_REASON:code-")
+					.doesNotContain("SECRET");
 				assertThat(event.action()).isEqualTo("UPSERT_COMMON_CODE");
+				assertThat(event.reason()).isEqualTo("enabled=true");
 			});
 	}
 
@@ -118,7 +121,7 @@ class AdminOperationsPageControllerTest {
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-				.param("resolution", "DB connection restored"))
+				.param("resolution", "provider secret upload url rotated"))
 			.andExpect(status().is3xxRedirection())
 			.andExpect(header().string("Location", "/admin/incidents/page"));
 
@@ -132,6 +135,8 @@ class AdminOperationsPageControllerTest {
 				assertThat(event.actor()).isEqualTo("admin-user");
 				assertThat(event.targetId()).isEqualTo(incidentId);
 				assertThat(event.action()).isEqualTo("RESOLVE_INCIDENT");
+				assertThat(event.reason()).startsWith("resolutionLength=");
+				assertThat(event.reason()).doesNotContain("secret");
 			});
 	}
 }

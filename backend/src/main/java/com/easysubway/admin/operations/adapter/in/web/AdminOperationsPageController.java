@@ -77,7 +77,7 @@ class AdminOperationsPageController {
 		auditWriter.commonCodeChange(
 			authentication,
 			request,
-			saved.groupCode() + ":" + saved.code(),
+			auditCodeTarget(saved),
 			"UPSERT_COMMON_CODE",
 			AdminAuditOutcome.SUCCESS,
 			"enabled=%s".formatted(saved.enabled())
@@ -96,7 +96,7 @@ class AdminOperationsPageController {
 		auditWriter.commonCodeChange(
 			authentication,
 			request,
-			disabled.groupCode() + ":" + disabled.code(),
+			auditCodeTarget(disabled),
 			"DISABLE_COMMON_CODE",
 			AdminAuditOutcome.SUCCESS,
 			"disabled for new selections"
@@ -142,7 +142,7 @@ class AdminOperationsPageController {
 			incident.incidentId(),
 			"OPEN_INCIDENT",
 			AdminAuditOutcome.SUCCESS,
-			incident.source() + ":" + incident.severity()
+			"incident opened"
 		);
 		return "redirect:/admin/incidents/page";
 	}
@@ -156,7 +156,7 @@ class AdminOperationsPageController {
 			incident.incidentId(),
 			"OPEN_HEALTH_INCIDENT",
 			AdminAuditOutcome.SUCCESS,
-			incident.summary()
+			"health incident opened"
 		);
 		return "redirect:/admin/incidents/page";
 	}
@@ -175,7 +175,7 @@ class AdminOperationsPageController {
 			incident.incidentId(),
 			"RESOLVE_INCIDENT",
 			AdminAuditOutcome.SUCCESS,
-			incident.resolution()
+			"resolutionLength=%d".formatted(incident.resolution().length())
 		);
 		return "redirect:/admin/incidents/page";
 	}
@@ -193,6 +193,10 @@ class AdminOperationsPageController {
 
 	private static String ownerOrPrincipal(String owner, Principal principal) {
 		return owner == null || owner.isBlank() ? principal.getName() : owner;
+	}
+
+	private static String auditCodeTarget(AdminCommonCode code) {
+		return "%s:code-%s".formatted(code.groupCode(), Integer.toUnsignedString(code.code().hashCode(), 16));
 	}
 
 	record CodeGroupRow(String groupCode, String displayName, String description, boolean enabled) {
