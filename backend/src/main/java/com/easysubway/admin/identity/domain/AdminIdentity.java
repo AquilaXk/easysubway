@@ -86,6 +86,26 @@ public record AdminIdentity(
 		return withLoginPolicy(0, null, AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED, true, now);
 	}
 
+	public AdminIdentity refreshBootstrap(AdminIdentity bootstrap, LocalDateTime now) {
+		return new AdminIdentity(
+			loginId,
+			bootstrap.displayName(),
+			bootstrap.email(),
+			bootstrap.passwordHash(),
+			bootstrap.authMethod(),
+			bootstrap.role(),
+			bootstrap.status(),
+			0,
+			null,
+			now,
+			bootstrap.passwordExpiresAt(),
+			bootstrap.credentialRotationRequired(),
+			bootstrap.breakGlassReason(),
+			createdAt,
+			now
+		);
+	}
+
 	private AdminIdentity withLoginPolicy(
 		int failures,
 		LocalDateTime nextLockedUntil,

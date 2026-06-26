@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -185,30 +186,30 @@ public class SecurityConfig {
 
 		LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
 		if (!adminUsername.isBlank() && !adminPassword.isBlank()) {
-			adminIdentityRepository.upsertBootstrap(localIdentity(
+			bootstrapIdentity(adminIdentityRepository, passwordEncoder, adminPassword, localIdentity(
 				adminUsername,
 				"관리자",
 				passwordEncoder.encode(adminPassword),
 				AdminIdentityRole.ADMIN,
 				now
-			));
+			), now);
 		}
 		if (!operatorUsername.isBlank() && !operatorPassword.isBlank()) {
-			adminIdentityRepository.upsertBootstrap(localIdentity(
+			bootstrapIdentity(adminIdentityRepository, passwordEncoder, operatorPassword, localIdentity(
 				operatorUsername,
 				"운영기관 관리자",
 				passwordEncoder.encode(operatorPassword),
 				AdminIdentityRole.OPERATOR_ADMIN,
 				now
-			));
+			), now);
 		}
 		if (!breakGlassUsername.isBlank() && !breakGlassPassword.isBlank()) {
-			adminIdentityRepository.upsertBootstrap(breakGlassIdentity(
+			bootstrapIdentity(adminIdentityRepository, passwordEncoder, breakGlassPassword, breakGlassIdentity(
 				breakGlassUsername,
 				passwordEncoder.encode(breakGlassPassword),
 				breakGlassReason,
 				now
-			));
+			), now);
 		}
 		var users = new ConcurrentUserDetailsManager();
 		if (!userUsername.isBlank() && !userPassword.isBlank()) {
@@ -254,6 +255,39 @@ public class SecurityConfig {
 			return;
 		}
 		http.httpBasic(AbstractHttpConfigurer::disable);
+	}
+
+	private void bootstrapIdentity(
+		AdminIdentityRepository adminIdentityRepository,
+		PasswordEncoder passwordEncoder,
+		String rawPassword,
+		AdminIdentity bootstrap,
+		LocalDateTime now
+	) {
+		var current = adminIdentityRepository.findByLoginId(bootstrap.loginId());
+		if (current.isEmpty()) {
+			adminIdentityRepository.upsertBootstrap(bootstrap);
+			return;
+		}
+		AdminIdentity existing = current.orElseThrow();
+		if (sameBootstrapSecret(existing, bootstrap, rawPassword, passwordEncoder)) {
+			return;
+		}
+		adminIdentityRepository.save(existing.refreshBootstrap(bootstrap, now));
+	}
+
+	private boolean sameBootstrapSecret(
+		AdminIdentity existing,
+		AdminIdentity bootstrap,
+		String rawPassword,
+		PasswordEncoder passwordEncoder
+	) {
+		return existing.authMethod() == bootstrap.authMethod()
+			&& existing.role() == bootstrap.role()
+			&& Objects.equals(existing.displayName(), bootstrap.displayName())
+			&& Objects.equals(existing.email(), bootstrap.email())
+			&& Objects.equals(existing.breakGlassReason(), bootstrap.breakGlassReason())
+			&& passwordEncoder.matches(rawPassword, existing.passwordHash());
 	}
 
 	private AdminIdentity localIdentity(

@@ -8,6 +8,7 @@ import com.easysubway.admin.identity.application.port.out.AdminIdentityRepositor
 import com.easysubway.admin.identity.domain.AdminIdentityAuthMethod;
 import com.easysubway.admin.identity.domain.AdminIdentityRole;
 import com.easysubway.admin.identity.domain.AdminIdentityStatus;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -15,6 +16,8 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -23,7 +26,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.context.annotation.Bean;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 
 @DisplayName("보안 설정")
 class SecurityConfigTest {
@@ -258,6 +261,108 @@ class SecurityConfigTest {
 				assertThatThrownBy(() -> authenticate(authenticationManager, "break-glass", "break-password"))
 					.isInstanceOf(DisabledException.class);
 			});
+	}
+
+	@Test
+	@DisplayName("관리자 bootstrap은 배포 secret이 바뀌면 기존 identity 비밀번호 해시를 갱신한다")
+	void adminBootstrapUpdatesStoredPasswordWhenDeploymentSecretRotates() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"old-admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"new-admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		var identity = repository.findByLoginId("admin-user").orElseThrow();
+		assertThat(passwordEncoder.matches("new-admin-password", identity.passwordHash())).isTrue();
+		assertThat(passwordEncoder.matches("old-admin-password", identity.passwordHash())).isFalse();
+		assertThat(identity.failedLoginCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("break-glass bootstrap은 같은 secret 재기동만으로 rotation 요구를 해제하지 않는다")
+	void breakGlassBootstrapKeepsRotationRequirementWhenSecretDidNotChange() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		var usedBreakGlass = repository.findByLoginId("break-glass")
+			.orElseThrow()
+			.recordBreakGlassSuccess(LocalDateTime.of(2026, 6, 27, 0, 0));
+		repository.save(usedBreakGlass);
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		assertThat(repository.findByLoginId("break-glass").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED);
 	}
 
 	private org.springframework.security.core.Authentication authenticate(
