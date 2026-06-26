@@ -234,6 +234,56 @@ void main() {
     expect(controller.disposeCalls, 0);
   });
 
+  test('health monitor close disposes renderer and stops delegation', () async {
+    final controller = _FakeRouteMapRendererController();
+    final monitor = RouteMapRendererHealthMonitor(controller)..start();
+    addTearDown(monitor.stop);
+
+    await monitor.close(disposeRenderer: true);
+    await monitor.trimMemory();
+    await monitor.disposeRenderer();
+    await monitor.close(disposeRenderer: true);
+
+    expect(controller.disposeCalls, 1);
+    expect(controller.trimMemoryCalls, 0);
+  });
+
+  test('health monitor close only disposes once when calls overlap', () async {
+    final controller = _FakeRouteMapRendererController()
+      ..disposeCompleter = Completer<void>();
+    final monitor = RouteMapRendererHealthMonitor(controller)..start();
+    addTearDown(monitor.stop);
+
+    final firstClose = monitor.close(disposeRenderer: true);
+    final secondClose = monitor.close(disposeRenderer: true);
+    await pumpEventQueue();
+
+    expect(controller.disposeCalls, 1);
+
+    controller.disposeCompleter!.complete();
+    await Future.wait(<Future<void>>[firstClose, secondClose]);
+    await monitor.disposeRenderer();
+
+    expect(controller.disposeCalls, 1);
+  });
+
+  test('health monitor close stops after renderer dispose failure', () async {
+    final controller = _FakeRouteMapRendererController()
+      ..disposeError = StateError('dispose failed');
+    final monitor = RouteMapRendererHealthMonitor(controller)..start();
+    addTearDown(monitor.stop);
+
+    await expectLater(
+      monitor.close(disposeRenderer: true),
+      throwsA(isA<StateError>()),
+    );
+    await monitor.trimMemory();
+    await monitor.disposeRenderer();
+
+    expect(controller.disposeCalls, 1);
+    expect(controller.trimMemoryCalls, 0);
+  });
+
   test('fake controller mirrors camera request and latency events', () async {
     final controller = _FakeRouteMapRendererController();
     final observed = <RouteMapRendererEvent>[];
@@ -271,6 +321,8 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
   final _events = StreamController<RouteMapRendererEvent>.broadcast();
   final _pendingCameraFrames = <int, Stopwatch>{};
   Object? retryError;
+  Object? disposeError;
+  Completer<void>? disposeCompleter;
   int retryCalls = 0;
   int trimMemoryCalls = 0;
   int disposeCalls = 0;
@@ -318,6 +370,11 @@ class _FakeRouteMapRendererController implements RouteMapRendererController {
   @override
   Future<void> dispose() async {
     disposeCalls += 1;
+    await disposeCompleter?.future;
+    final error = disposeError;
+    if (error != null) {
+      throw error;
+    }
     await _events.close();
   }
 }
