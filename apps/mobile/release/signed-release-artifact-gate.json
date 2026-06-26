@@ -4,6 +4,7 @@
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "mobile-signed-release-artifacts",
   "storeReadyStatus": "blocked_external_distribution_evidence_missing",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "officialRequirements": {
     "android": {
       "targetApiLevelMinimum": 35,
@@ -27,7 +28,8 @@
       "storeReadyRequires": [
         "production signing key material",
         "Play App Signing enrollment",
-        "Play internal track upload or pre-launch report evidence"
+        "Play internal track upload or pre-launch report evidence",
+        "Play-generated APK or Play-installed build smoke evidence"
       ]
     },
     "ios": {

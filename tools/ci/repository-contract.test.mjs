@@ -843,6 +843,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(existsSync(path.join(root, gatePath)), true, "signed release artifact gate must exist");
 
   const gate = readJson(gatePath);
+  const androidRcEvidencePath = "apps/mobile/release/android-rc-store-evidence.json";
+  const androidRcEvidence = readJson(androidRcEvidencePath);
   const workflow = read(".github/workflows/release-artifacts.yml");
   const readme = read("README.md");
 
@@ -851,6 +853,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "mobile-signed-release-artifacts");
   assert.equal(gate.storeReadyStatus, "blocked_external_distribution_evidence_missing");
+  assert.equal(gate.androidRcEvidenceManifest, androidRcEvidencePath);
 
   assert.equal(gate.officialRequirements.android.targetApiLevelMinimum, 35);
   assert.equal(gate.officialRequirements.android.requiredFrom, "2025-08-31");
@@ -867,6 +870,28 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.artifacts.android.symbolRetentionDays, 90);
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("production signing key material"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play internal track upload or pre-launch report evidence"));
+  assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK or Play-installed build smoke evidence"));
+  assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
+  assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
+  assert.equal(androidRcEvidence.scope.platform.android, "RELEASE_REQUIRED");
+  assert.equal(androidRcEvidence.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
+  assert.deepEqual(androidRcEvidence.scope.distributionFlow, [
+    "internal-test",
+    "closed-test",
+    "production-access",
+    "rc-freeze",
+    "go-no-go",
+    "production-submission",
+    "post-release-monitoring",
+  ]);
+  assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("play-app-signing-enrollment"));
+  assert.ok(androidRcEvidence.requiredEvidence.aabInspection.includes("bundletool-manifest-dump"));
+  assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-15-or-16-page-size-smoke"));
+  assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-generated-apk-or-installed-build-smoke"));
+  assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("talkback-rc-build-notes"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("data-safety-binary-network-trace-match"));
+  assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-crash-0"));
+  assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
 
   assert.equal(gate.artifacts.ios.format, "Runner.app.zip");
   assert.equal(gate.artifacts.ios.ciArtifactStoreReady, false);
@@ -1477,9 +1502,51 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_APPLE_ID/);
+  assert.match(preflight, /DEFERRED_OUT_OF_SCOPE/);
+  assert.match(preflight, /releaseBlocker: false/);
   assert.match(preflight, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED/);
   assert.match(preflight, /EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL/);
   assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
+});
+
+test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker로 보지 않는다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-env-android-only-"));
+  const envFile = path.join(dir, "deploy.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
+      "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+      "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
+      "",
+    ].join("\n"),
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/ci/check-store-distribution-evidence-env.mjs",
+      "--env-file",
+      envFile,
+      "--github-output",
+      outputFile,
+      "--report",
+      reportFile,
+    ],
+    { cwd: root },
+  );
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^android_play_internal_track_ready=true$/m);
+  assert.match(output, /^ios_testflight_ready=false$/m);
+  assert.match(output, /^datapack_object_storage_publish_ready=true$/m);
+  assert.match(report, /^ios_testflight.release_blocker=false$/m);
+  assert.match(report, /^ios_testflight.status=DEFERRED_OUT_OF_SCOPE$/m);
 });
 
 test("스토어 배포 증거 preflight는 legacy S3와 PAR 데이터팩 publish env를 모두 허용한다", async () => {
@@ -5361,11 +5428,13 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(existsSync(path.join(root, readinessPath)));
 
   const readiness = readJson(readinessPath);
+  const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
 
   assert.equal(readiness.schemaVersion, 1);
   assert.equal(readiness.applicationId, "easysubway");
   assert.equal(readiness.androidApplicationId, "com.easysubway.app");
   assert.equal(readiness.releaseGate, "store-submission-readiness");
+  assert.equal(readiness.androidRcEvidenceManifest, "apps/mobile/release/android-rc-store-evidence.json");
   assert.equal(readiness.appNameKo, "쉬운 지하철");
   assert.equal(readiness.appNameEn, "easysubway");
   assert.ok(readiness.appNameKo.length <= readiness.appNameLengthLimits.googlePlay);
@@ -5430,6 +5499,8 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_target_audience").readyWhenKo, /전체 사용자|어린이 대상 아님/);
   assert.match(items.get("play_permissions_declaration").readyWhenKo, /위치|권한/);
   assert.match(items.get("play_account_data_deletion").configurationSources.join("\n"), /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("app-content-declarations"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("store-listing-scope-copy-review"));
   assert.ok(items.get("appstore_app_privacy").linkedArtifacts.includes("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy"));
   assert.match(items.get("appstore_review_notes_or_demo_access").readyWhenKo, /심사 메모|데모|로그인 없음/);
   assert.match(items.get("appstore_backend_api_availability").readyWhenKo, /심사 기간|API/);

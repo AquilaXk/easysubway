@@ -3,6 +3,7 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "store-submission-readiness",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "appNameKo": "쉬운 지하철",
   "appNameEn": "easysubway",
   "appNameLengthLimits": {
