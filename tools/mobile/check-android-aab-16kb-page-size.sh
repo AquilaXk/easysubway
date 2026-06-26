@@ -73,10 +73,13 @@ summary="$ARTIFACT_DIR/native-alignment-summary.tsv"
 printf 'library\tload_alignments\tstatus\n' > "$summary"
 while IFS= read -r library; do
   out="$tmp_dir/$(basename "$library")"
-  unzip -p "$AAB" "$library" > "$out"
   align_out="$ARTIFACT_DIR/$(echo "$library" | tr '/:' '__').load-alignments.txt"
   lib_status="pass"
-  if ! node "$SCRIPT_DIR/check-elf-load-alignment.mjs" --min-align "$MIN_ALIGN" "$out" > "$align_out"; then
+  if ! unzip -p "$AAB" "$library" > "$out"; then
+    echo "extract_failed" > "$align_out"
+    lib_status="fail"
+    status=1
+  elif ! node "$SCRIPT_DIR/check-elf-load-alignment.mjs" --min-align "$MIN_ALIGN" "$out" > "$align_out"; then
     lib_status="fail"
     status=1
   fi

@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 
 const minIndex = process.argv.indexOf("--min-align");
-const minAlign = BigInt(minIndex === -1 ? 16384 : process.argv[minIndex + 1]);
 const file = process.argv.at(-1);
-if (!file || file === "--min-align") {
+if (!file || file === "--min-align" || (minIndex !== -1 && (!process.argv[minIndex + 1] || process.argv[minIndex + 1].startsWith("--")))) {
   throw new Error("Usage: check-elf-load-alignment.mjs [--min-align 16384] <lib.so>");
 }
+const minAlign = BigInt(minIndex === -1 ? 16384 : process.argv[minIndex + 1]);
 
 const data = readFileSync(file);
 if (data[0] !== 0x7f || data[1] !== 0x45 || data[2] !== 0x4c || data[3] !== 0x46) {
@@ -33,7 +33,7 @@ for (let index = 0; index < phnum; index += 1) {
   }
 }
 
-let ok = true;
+let ok = loadAlignments.length > 0;
 for (const align of loadAlignments) {
   if (align < minAlign) {
     ok = false;

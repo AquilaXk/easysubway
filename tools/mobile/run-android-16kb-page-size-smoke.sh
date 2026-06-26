@@ -103,12 +103,14 @@ if grep -E "FATAL EXCEPTION| [EF] AndroidRuntime:|Fatal signal|Abort message|tom
   echo "Launch logcat contains crash markers. See crash-excerpt.txt." >&2
   exit 1
 fi
-foreground_package="$(grep -E "mResumedActivity|topResumedActivity" "$ARTIFACT_DIR/current-focus.txt" | head -n 1 | grep -o "$PACKAGE" || true)"
+foreground_package="$(grep -E "mResumedActivity|topResumedActivity" "$ARTIFACT_DIR/current-focus.txt" | head -n 1 | grep -oF "$PACKAGE" || true)"
 if [[ "$foreground_package" != "$PACKAGE" ]]; then
   echo "App is not foreground after launch: $PACKAGE" >&2
   exit 1
 fi
-echo "foreground_package_verified=true" >> "$ARTIFACT_DIR/summary.txt"
-echo "logcat_no_crash=true" >> "$ARTIFACT_DIR/summary.txt"
-echo "screenshot=current-screen.png" >> "$ARTIFACT_DIR/summary.txt"
-echo "ui_tree=current-screen.xml" >> "$ARTIFACT_DIR/summary.txt"
+{
+  echo "foreground_package_verified=true"
+  echo "logcat_no_crash=true"
+  echo "screenshot=current-screen.png"
+  echo "ui_tree=current-screen.xml"
+} >> "$ARTIFACT_DIR/summary.txt"
