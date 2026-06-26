@@ -36,11 +36,14 @@ async function main() {
     label: "android_play_internal_track",
     requiredAll: androidRequiredAll,
     requiredAny: androidRequiredAny,
+    releaseBlocker: true,
   });
   const ios = credentialGroupStatus(env, {
     label: "ios_testflight",
     requiredAll: iosRequiredAll,
     requiredAny: [],
+    releaseBlocker: false,
+    deferredStatus: "DEFERRED_OUT_OF_SCOPE",
   });
   const datapack = datapackStatus(env);
   const groups = [android, ios, datapack];
@@ -48,7 +51,7 @@ async function main() {
   await appendFile(githubOutput, groups.map((group) => `${group.outputName}=${group.ready}`).join("\n") + "\n");
   await writeFile(reportPath, renderReport(groups));
 
-  const notReady = groups.filter((group) => !group.ready);
+  const notReady = groups.filter((group) => group.releaseBlocker && !group.ready);
   if (notReady.length > 0) {
     throw new Error(`store distribution evidence preflight failed: ${notReady.map((group) => group.label).join(", ")}`);
   }
@@ -61,6 +64,8 @@ function credentialGroupStatus(env, group) {
     label: group.label,
     outputName: outputName(group.label),
     ready: missingAll.length === 0 && anySatisfied,
+    releaseBlocker: group.releaseBlocker,
+    status: missingAll.length === 0 && anySatisfied ? "READY" : (group.deferredStatus ?? "BLOCKED"),
     missing: [
       ...missingAll,
       ...(anySatisfied ? [] : [`one_of:${group.requiredAny.join("|")}`]),
@@ -99,6 +104,8 @@ function datapackStatus(env) {
     label: "datapack_object_storage_publish",
     outputName: outputName("datapack_object_storage_publish"),
     ready: missing.length === 0,
+    releaseBlocker: true,
+    status: missing.length === 0 ? "READY" : "BLOCKED",
     missing,
     present,
   };
@@ -109,6 +116,8 @@ function renderReport(groups) {
     "store_distribution_evidence_preflight",
     ...groups.flatMap((group) => [
       `${group.label}.ready=${group.ready}`,
+      `${group.label}.release_blocker=${group.releaseBlocker}`,
+      `${group.label}.status=${group.status}`,
       `${group.label}.present=${group.present.toSorted().join(",") || "none"}`,
       `${group.label}.missing=${group.missing.toSorted().join(",") || "none"}`,
     ]),
