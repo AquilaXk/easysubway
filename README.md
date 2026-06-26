@@ -58,6 +58,8 @@ CD는 `main`의 CI가 성공한 뒤 `workflow_run`으로 자동 실행됩니다.
 
 Android 출시 100% 범위와 Go/No-Go 계약은 `apps/mobile/release/release-governance-gate.json`으로 검증합니다. 이번 release blocker는 Android Google Play v1이며 iOS는 `DEFERRED_OUT_OF_SCOPE`로 기록해 Android 출시 완료를 차단하지 않습니다. open Android P0가 있거나 RC evidence의 git SHA, AAB hash, backend artifact, data pack manifest, route/realtime contract가 서로 맞지 않으면 최종 Go 판단을 하지 않습니다.
 
+Android 출시 UX·접근성·성능 gate는 `apps/mobile/release/android-release-quality-gate.json`으로 검증합니다. PR 증거는 local Android emulator evidence를 우선 사용하며, 물리 기기 증거는 Codex PR 증거로 사용하지 않습니다. 실제 Google Play Go 판단 전에는 #907의 exact RC 또는 Play-installed build에서 TalkBack, 150%/200% 글자 크기, 작은 화면, 권한/네트워크/업로드 오류 복구, 노선도 fallback과 성능, 지원 범위/출처 화면, crash/ANR privacy-safe reporting 증거를 다시 수집해야 합니다.
+
 ## Privacy Policy
 
 EasySubway collects and stores only the data needed to provide subway accessibility guidance, local route search, favorites, app settings, diagnostics, and facility report submission.
