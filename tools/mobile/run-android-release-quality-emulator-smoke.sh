@@ -114,6 +114,20 @@ current_focus() {
   adb_device shell dumpsys activity activities | grep -E "topResumedActivity|ResumedActivity" | tr -d '\r' || true
 }
 
+read_screen_rotation() {
+  local rotation
+  rotation="$(adb_device shell dumpsys input | tr -d '\r' |
+    sed -n 's/.*Viewport INTERNAL: displayId=0,.*orientation=\([0-3]\).*/\1/p' |
+    head -n 1)"
+  if [[ -n "$rotation" ]]; then
+    echo "dumpsys_input_viewport:$rotation"
+    return 0
+  fi
+
+  rotation="$(adb_device shell settings get system user_rotation | tr -d '\r' || true)"
+  echo "system_user_rotation:$rotation"
+}
+
 resolve_launch_activity() {
   adb_device shell cmd package resolve-activity \
     --brief \
@@ -146,6 +160,9 @@ font_scale="$(adb_device shell settings get system font_scale | tr -d '\r')"
 high_text_contrast="$(adb_device shell settings get secure high_text_contrast_enabled | tr -d '\r' || true)"
 page_size="$(adb_device shell getconf PAGE_SIZE | tr -d '\r' || true)"
 sdk="$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')"
+rotation_reading="$(read_screen_rotation)"
+screen_rotation_source="${rotation_reading%%:*}"
+screen_rotation="${rotation_reading#*:}"
 
 if [[ ! "$sdk" =~ ^[0-9]+$ || "$sdk" -lt "$MIN_ANDROID_API" ]]; then
   echo "Android SDK $sdk does not satisfy minimum API $MIN_ANDROID_API." >&2
@@ -170,6 +187,10 @@ if [[ "$width_px" -ge "$height_px" ]]; then
   echo "Emulator viewport must be compact phone portrait: ${width_px}x${height_px}px." >&2
   exit 1
 fi
+if [[ ! "$screen_rotation" =~ ^[0-3]$ || "$screen_rotation" != "0" ]]; then
+  echo "Emulator screen rotation must be portrait before evidence capture: $screen_rotation." >&2
+  exit 1
+fi
 if [[ "$width_dp" -gt "$MAX_COMPACT_WIDTH_DP" ]]; then
   echo "Emulator width ${width_dp}dp is not compact phone width." >&2
   exit 1
@@ -191,6 +212,8 @@ fi
   echo "width_dp=$width_dp"
   echo "height_dp=$height_dp"
   echo "viewport_orientation=portrait"
+  echo "screen_rotation=$screen_rotation"
+  echo "screen_rotation_source=$screen_rotation_source"
   echo "font_scale=${font_scale:-unknown}"
   echo "expected_font_scale=$EXPECTED_FONT_SCALE"
   echo "high_text_contrast_enabled=${high_text_contrast:-unknown}"

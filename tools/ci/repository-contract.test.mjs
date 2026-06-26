@@ -5527,6 +5527,11 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.match(smokeScript, /width_dp=\$\(\(width_px \* 160 \/ density_dpi\)\)/);
   assert.match(smokeScript, /"\$width_px" -ge "\$height_px"/);
   assert.match(smokeScript, /viewport_orientation=portrait/);
+  assert.match(smokeScript, /dumpsys input/);
+  assert.match(smokeScript, /orientation=\\\(\[0-3\]\\\)/);
+  assert.match(smokeScript, /screen_rotation_source=/);
+  assert.match(smokeScript, /screen_rotation=/);
+  assert.match(smokeScript, /"\$screen_rotation" != "0"/);
   assert.match(smokeScript, /wm_size_raw=/);
   assert.match(smokeScript, /Override size:/);
   assert.match(smokeScript, /wm_size_source="override"/);
