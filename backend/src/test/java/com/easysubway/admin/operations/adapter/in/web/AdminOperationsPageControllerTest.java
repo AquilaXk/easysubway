@@ -108,11 +108,30 @@ class AdminOperationsPageControllerTest {
 			.andExpect(status().is3xxRedirection())
 			.andExpect(header().string("Location", "/admin/incidents/page"));
 
+		String incidentId = auditEventRepository.findRecent(AdminAuditEventType.INCIDENT_CHANGE, 1)
+			.get(0)
+			.targetId();
+
+		assertThat(incidentId).startsWith("INC-");
+
+		mockMvc.perform(post("/admin/incidents/{incidentId}/resolve", incidentId)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("resolution", "DB connection restored"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/incidents/page"));
+
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.INCIDENT_CHANGE, 2))
+			.extracting(event -> event.action())
+			.containsExactly("RESOLVE_INCIDENT", "OPEN_INCIDENT");
+
 		assertThat(auditEventRepository.findRecent(AdminAuditEventType.INCIDENT_CHANGE, 1))
 			.singleElement()
 			.satisfies(event -> {
 				assertThat(event.actor()).isEqualTo("admin-user");
-				assertThat(event.action()).isEqualTo("OPEN_INCIDENT");
+				assertThat(event.targetId()).isEqualTo(incidentId);
+				assertThat(event.action()).isEqualTo("RESOLVE_INCIDENT");
 			});
 	}
 }

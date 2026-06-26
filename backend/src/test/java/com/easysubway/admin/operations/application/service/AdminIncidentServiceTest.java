@@ -1,12 +1,14 @@
 package com.easysubway.admin.operations.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.admin.code.adapter.out.persistence.InMemoryAdminCommonCodeRepository;
 import com.easysubway.admin.code.application.service.AdminCommonCodeService;
 import com.easysubway.admin.operations.adapter.out.persistence.InMemoryAdminIncidentRepository;
 import com.easysubway.admin.operations.application.service.AdminIncidentService.OpenAdminIncidentCommand;
 import com.easysubway.admin.operations.domain.AdminIncident;
+import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.health.domain.HealthComponent;
 import com.easysubway.health.domain.HealthStatus;
 import java.util.List;
@@ -38,6 +40,19 @@ class AdminIncidentServiceTest {
 		assertThat(resolved.status()).isEqualTo("RESOLVED");
 		assertThat(resolved.resolvedAt()).isNotNull();
 		assertThat(resolved.resolution()).isEqualTo("DB connection restored");
+	}
+
+	@Test
+	@DisplayName("새 incident는 OPEN 상태로만 생성할 수 있다")
+	void openRejectsResolvedStatus() {
+		assertThatThrownBy(() -> service.open(new OpenAdminIncidentCommand(
+			"MAJOR",
+			"RESOLVED",
+			"HEALTH",
+			"database restored",
+			"ops"
+		))).isInstanceOf(InvalidRequestException.class)
+			.hasMessageContaining("OPEN");
 	}
 
 	@Test

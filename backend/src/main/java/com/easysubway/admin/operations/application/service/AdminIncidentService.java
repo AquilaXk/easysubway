@@ -42,6 +42,9 @@ public class AdminIncidentService {
 		requireEnabled(AdminCommonCodeGroups.INCIDENT_SEVERITY, command.severity());
 		requireEnabled(AdminCommonCodeGroups.INCIDENT_STATUS, command.status());
 		requireEnabled(AdminCommonCodeGroups.INCIDENT_SOURCE, command.source());
+		if (!"OPEN".equals(command.status())) {
+			throw new InvalidRequestException("새 incident는 OPEN 상태로만 생성할 수 있습니다.");
+		}
 		LocalDateTime now = LocalDateTime.now(clock);
 		return repository.save(new AdminIncident(
 			nextId(),
