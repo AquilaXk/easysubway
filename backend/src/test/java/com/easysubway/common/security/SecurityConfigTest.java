@@ -314,7 +314,7 @@ class SecurityConfigTest {
 	}
 
 	@Test
-	@DisplayName("break-glass bootstrap은 같은 secret 재기동만으로 rotation 요구를 해제하지 않는다")
+	@DisplayName("break-glass bootstrap은 같은 비밀번호면 reason 변경만으로 rotation 요구를 해제하지 않는다")
 	void breakGlassBootstrapKeepsRotationRequirementWhenSecretDidNotChange() {
 		var securityConfig = new SecurityConfig();
 		var repository = new InMemoryAdminIdentityRepository();
@@ -326,7 +326,7 @@ class SecurityConfigTest {
 			"admin-password",
 			"break-glass",
 			"break-password",
-			"운영 장애 대응",
+			"운영 장애 후속 기록 변경",
 			"",
 			"",
 			"",

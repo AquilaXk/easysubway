@@ -270,6 +270,9 @@ public class SecurityConfig {
 			return;
 		}
 		AdminIdentity existing = current.orElseThrow();
+		if (breakGlassRotationRequiredWithSamePassword(existing, rawPassword, passwordEncoder)) {
+			return;
+		}
 		if (sameBootstrapSecret(existing, bootstrap, rawPassword, passwordEncoder)) {
 			return;
 		}
@@ -287,6 +290,16 @@ public class SecurityConfig {
 			&& Objects.equals(existing.displayName(), bootstrap.displayName())
 			&& Objects.equals(existing.email(), bootstrap.email())
 			&& Objects.equals(existing.breakGlassReason(), bootstrap.breakGlassReason())
+			&& passwordEncoder.matches(rawPassword, existing.passwordHash());
+	}
+
+	private boolean breakGlassRotationRequiredWithSamePassword(
+		AdminIdentity existing,
+		String rawPassword,
+		PasswordEncoder passwordEncoder
+	) {
+		return existing.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS
+			&& existing.status() == AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED
 			&& passwordEncoder.matches(rawPassword, existing.passwordHash());
 	}
 
