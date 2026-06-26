@@ -193,6 +193,33 @@ void main() {
     expect(() => DataPackManifest.fromJson(json), throwsFormatException);
   });
 
+  test('manifest는 SQLite catalog 외 self-update payload를 거부한다', () {
+    final json = _fixturePack();
+    json['payloadKind'] = 'flutter_dart_code';
+    json['signature'] = {
+      'algorithm': 'sha256-pack-manifest-v1',
+      'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
+    };
+    json['representativeRouteRegressionSignature'] = {
+      'algorithm': 'sha256-route-regression-v1',
+      'value': _routeRegressionSignatureValue(
+        'capital',
+        '18',
+        'a' * 64,
+        'b' * 64,
+        1024,
+      ),
+    };
+
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [json],
+      }),
+      throwsFormatException,
+    );
+  });
+
   test('production 데이터팩 manifest는 HTTPS URL과 source inventory가 필요하다', () {
     expect(
       () => DataPackManifest.fromJson({
