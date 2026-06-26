@@ -1154,10 +1154,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     RouteMapRendererHealthMonitor monitor,
     RouteMapRendererEvent event,
   ) {
-    if (event is RouteMapRendererDisposed &&
-        identical(_rendererMonitor, monitor)) {
+    final isCurrentMonitor = identical(_rendererMonitor, monitor);
+    if (event is RouteMapRendererDisposed && isCurrentMonitor) {
       _rendererMonitor = null;
       _rendererController = null;
+    }
+    if (!isCurrentMonitor) {
+      return;
     }
     if (event is RouteMapRendererFramePresented) {
       _markRendererFramePresented(event.revision);
