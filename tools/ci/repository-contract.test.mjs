@@ -3969,8 +3969,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /PasswordEncoder/);
   assert.match(security, /passwordEncoder\.encode\(adminPassword\)/);
   assert.match(security, /passwordEncoder\.encode\(operatorPassword\)/);
-  assert.match(security, /AdminOperatorAuditFilter adminOperatorAuditFilter\(\)/);
-  assert.match(security, /return new AdminOperatorAuditFilter\(\)/);
+  assert.match(security, /AdminOperatorAuditFilter adminOperatorAuditFilter\(AdminAuditEventRepository auditEventRepository\)/);
+  assert.match(security, /return new AdminOperatorAuditFilter\(auditEventRepository\)/);
   assert.match(adminOperatorAuditFilter, /extends OncePerRequestFilter/);
   assert.match(adminOperatorAuditFilter, /MUTATING_METHODS = Set\.of\("POST", "PUT", "PATCH", "DELETE"\)/);
   assert.match(adminOperatorAuditFilter, /path\.startsWith\("\/admin\/"\) \|\| path\.startsWith\("\/operator\/"\)/);
@@ -6141,8 +6141,14 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java",
   );
   const adminIdentityPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V9__admin_identity.sql");
-  const adminRbacPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql");
-  const adminRbacH2Schema = read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql");
+  const adminRbacPostgresSchema = [
+    read("backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V11__admin_audit_events.sql"),
+  ].join("\n");
+  const adminRbacH2Schema = [
+    read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
+    read("backend/src/main/resources/db/migration/h2/V11__admin_audit_events.sql"),
+  ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
   const adminRbacRole = read("backend/src/main/java/com/easysubway/admin/authorization/AdminRbacRole.java");
@@ -6343,11 +6349,17 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.data.operate",
     "admin.security.audit",
     "admin.security.admin",
+    "admin.audit.read",
+    "admin.privacy-log.read",
   ]);
   for (const adminRbacSchema of [adminRbacPostgresSchema, adminRbacH2Schema]) {
     assert.match(adminRbacSchema, /CREATE TABLE admin_role_permissions/);
     assert.match(adminRbacSchema, /CREATE TABLE admin_user_roles/);
     assert.match(adminRbacSchema, /CREATE TABLE admin_menu_items/);
+    assert.match(adminRbacSchema, /CREATE TABLE admin_audit_events/);
+    assert.match(adminRbacSchema, /event_type IN \('LOGIN', 'LOGIN_FAILURE', 'LOGOUT', 'ADMIN_ACTION', 'PRIVACY_READ', 'SYSTEM_CHANGE', 'BATCH_OPERATION', 'MASTER_DATA_CHANGE'\)/);
+    assert.match(adminRbacSchema, /outcome IN \('SUCCESS', 'FAILURE'\)/);
+    assert.match(adminRbacSchema, /idx_admin_audit_events_type_occurred_at/);
     assert.ok(adminRbacSchema.includes(adminRbacRoleConstraint));
     assert.ok(adminRbacSchema.includes(adminRbacPermissionConstraint));
     assert.match(adminRbacSchema, /login_id = LOWER\(TRIM\(login_id\)\)/);
