@@ -78,6 +78,10 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
     prepare(fixtureEnv().replace("https://uploads.easysubway.example", "http://object-storage:9000")),
     /public upload URL must be an HTTPS origin/,
   );
+  await assert.rejects(
+    prepare(fixtureEnv().replace("https://uploads.easysubway.example", "https://LOCALHOST")),
+    /public upload URL must not be internal/,
+  );
 });
 
 test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤백 계약을 포함한다", async () => {

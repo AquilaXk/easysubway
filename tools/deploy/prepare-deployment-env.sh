@@ -153,7 +153,8 @@ if [[ ! "${public_upload_url}" =~ ^https://[^/@\?#:]+(:[0-9]+)?/?$ ]]; then
 	printf 'public upload URL must be an HTTPS origin\n' >&2
 	exit 1
 fi
-case "${public_upload_url}" in
+public_upload_url_normalized="$(printf '%s' "${public_upload_url}" | tr '[:upper:]' '[:lower:]')"
+case "${public_upload_url_normalized}" in
 	*localhost*|*127.*|*::1*|*object-storage*) printf 'public upload URL must not be internal\n' >&2; exit 1 ;;
 esac
 
