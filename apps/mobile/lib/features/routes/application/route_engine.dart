@@ -23,11 +23,13 @@ class LocalRouteEngine {
       blockedReasonCodes,
     );
     if (path == null) {
-      return LocalRouteResult.blocked(
-        blockedReasonCodes.isEmpty
-            ? const ['STAIR_ONLY_ACCESS']
-            : blockedReasonCodes.toList(growable: false),
-      );
+      final reasonCodes = blockedReasonCodes.isEmpty
+          ? const ['ROUTE_GRAPH_UNKNOWN']
+          : blockedReasonCodes.toList(growable: false);
+      if (_hasUnknownRouteReason(reasonCodes)) {
+        return LocalRouteResult.unknown(reasonCodes);
+      }
+      return LocalRouteResult.blocked(reasonCodes);
     }
 
     final weight = RouteWeight.from(request.mobilityType);
@@ -73,6 +75,20 @@ class LocalRouteEngine {
       warnings: List.unmodifiable(warnings.values),
       blockedReasonCodes: const [],
     );
+  }
+
+  bool _hasUnknownRouteReason(List<String> reasonCodes) {
+    if (reasonCodes.contains('FACILITY_UNAVAILABLE')) {
+      return false;
+    }
+    const unknownCodes = {
+      'ACCESSIBILITY_STATE_UNKNOWN',
+      'STAIR_ONLY_ACCESS_UNKNOWN',
+      'GENERATED_CONNECTOR_UNVERIFIED',
+      'ROUTE_GRAPH_UNKNOWN',
+    };
+    return reasonCodes.isNotEmpty &&
+        reasonCodes.any((code) => unknownCodes.contains(code));
   }
 
   List<RouteEdge>? _findLowestCostPath(
@@ -218,6 +234,7 @@ class LocalRouteEngine {
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+      'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };
   }

@@ -6752,6 +6752,42 @@ void main() {
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
   });
 
+  testWidgets('경로 검색 UNKNOWN 결과는 저장과 안내 시작 행동을 숨긴다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(status: 'UNKNOWN'),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: favoriteRouteRepository,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 26),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    expect(find.byKey(const Key('routeFavoriteSaveButton')), findsNothing);
+    expect(find.bySemanticsLabel('자주 쓰는 경로 저장'), findsNothing);
+    expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);
+    expect(favoriteRouteRepository.savedRouteSearchIds, isEmpty);
+  });
+
   testWidgets('즐겨찾기 경로 저장 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
@@ -7393,16 +7429,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeResultListItem')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('routeStartGuidanceButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
-    await tester.pumpAndSettle();
 
-    expect(find.text('확인이 필요합니다'), findsWidgets);
-    expect(find.text('이 경로는 이동 전 확인이 필요합니다'), findsOneWidget);
-    expect(find.text('추천 경로'), findsNothing);
+    expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);
   });
 
   testWidgets('경로 검색은 입력만 하고 선택하지 않은 역을 쉬운 문구로 안내한다', (tester) async {
