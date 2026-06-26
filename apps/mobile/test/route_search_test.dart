@@ -379,6 +379,20 @@ void main() {
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
   });
 
+  test('경로 검색 UNKNOWN 상태는 reason이 있어도 blocked workflow로 분기하지 않는다', () {
+    final result = _sampleRouteSearchResult(
+      status: 'UNKNOWN',
+      blockedReasons: const ['ROUTE_GRAPH_UNKNOWN'],
+    );
+
+    expect(result.isBlocked, isFalse);
+    expect(result.statusLabel, '확인이 필요합니다');
+    expect(result.guidanceLabel, '확인 후 이동');
+    expect(result.guidanceIcon, Icons.warning_amber);
+    expect(result.semanticLabel, contains('안내 불가 이유 경로 연결 정보를 확인할 수 없습니다.'));
+    expect(result.semanticLabel, isNot(contains('다음 행동')));
+  });
+
   test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {
     final result = RouteSearchResult.fromJson({
       'routeSearchId': 'route-unknown-warning',
@@ -906,6 +920,7 @@ RouteSearchResult _sampleRouteSearchResult({
       message: '일부 시설 정보는 확인이 필요합니다.',
     ),
   ],
+  List<String> blockedReasons = const [],
 }) {
   return RouteSearchResult(
     routeSearchId: 'route-1',
@@ -921,7 +936,7 @@ RouteSearchResult _sampleRouteSearchResult({
     steps: steps,
     warnings: warnings,
     recommendationReasons: recommendationReasons,
-    blockedReasons: [],
+    blockedReasons: blockedReasons,
     createdAt: '2026-06-13T04:20:00',
   );
 }

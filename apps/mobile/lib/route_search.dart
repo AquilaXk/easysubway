@@ -746,7 +746,7 @@ class RouteSearchResult {
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
-  bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
+  bool get isBlocked => status == 'BLOCKED';
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
