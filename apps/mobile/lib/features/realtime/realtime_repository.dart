@@ -37,10 +37,10 @@ class RealtimeArrival {
       lineId: _string(json, 'lineId'),
       stationName: _string(json, 'stationName'),
       destination: _string(json, 'destination'),
-      direction: _string(json, 'direction'),
-      trainNo: _string(json, 'trainNo'),
+      direction: _stringOrEmpty(json, 'direction'),
+      trainNo: _stringOrEmpty(json, 'trainNo'),
       etaSeconds: _optionalInt(json, 'etaSeconds'),
-      message: _string(json, 'message'),
+      message: _stringOrEmpty(json, 'message'),
       positionMessage: _stringOrEmpty(json, 'positionMessage'),
       providerReceivedAt: _stringOrEmpty(json, 'providerReceivedAt'),
     );

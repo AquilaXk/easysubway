@@ -253,8 +253,7 @@ class EasySubwayApp extends StatelessWidget {
                searchHistoryRepository: searchHistoryRepository,
                internalRouteRepository: internalRouteRepository,
                networkMapRepository: networkMapRepository,
-               realtimeRepository:
-                   realtimeRepository ?? const UnavailableRealtimeRepository(),
+               realtimeRepository: realtimeRepository,
                notificationRepository: notificationRepository,
                notificationPermissionProvider: notificationPermissionProvider,
                locationProvider: locationProvider,
