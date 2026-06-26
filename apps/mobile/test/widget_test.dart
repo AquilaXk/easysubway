@@ -1257,6 +1257,12 @@ void main() {
           color: '#00A5DE',
           region: '테스트권',
         ),
+        NetworkMapLine(
+          id: 'seoul-2',
+          name: '수도권 2호선',
+          color: '#00A84D',
+          region: '테스트권',
+        ),
       ],
       stations: [
         NetworkMapStation(
@@ -1278,6 +1284,26 @@ void main() {
           ),
         ),
         NetworkMapStation(
+          id: 'station-visible-a',
+          nameKo: '보이는역A',
+          nameEn: 'Visible A',
+          region: '테스트권',
+          lineId: 'seoul-2',
+          stationCode: '201',
+          sequence: 1,
+          position: NetworkMapPosition(
+            x: 7550,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            labelPolygon:
+                '[{"x":7550,"y":80},{"x":7650,"y":80},{"x":7650,"y":120},{"x":7550,"y":120}]',
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
           id: 'station-geometry-left',
           nameKo: '왼쪽기준',
           nameEn: 'Geometry Left',
@@ -1287,6 +1313,24 @@ void main() {
           sequence: 0,
           position: NetworkMapPosition(
             x: 0,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
+          id: 'station-geometry-left-b',
+          nameKo: '왼쪽기준B',
+          nameEn: 'Geometry Left B',
+          region: '테스트권',
+          lineId: 'geometry-helper',
+          stationCode: '001',
+          sequence: 0,
+          position: NetworkMapPosition(
+            x: 100,
             y: 100,
             labelDx: 0,
             labelDy: 0,
@@ -1328,6 +1372,10 @@ void main() {
           lineId: 'seoul-4',
         ),
         NetworkMapStationLineMembership(
+          stationId: 'station-visible-a',
+          lineId: 'seoul-2',
+        ),
+        NetworkMapStationLineMembership(
           stationId: 'station-far-a',
           lineId: 'seoul-4',
         ),
@@ -1358,6 +1406,10 @@ void main() {
       expect(visibleStation, findsOneWidget);
       expect(
         find.byKey(const Key('networkMapStation-far-a-seoul-4')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('networkMapStation-visible-a-seoul-2')),
         findsNothing,
       );
       expect(find.bySemanticsLabel('먼역A역'), findsNothing);
