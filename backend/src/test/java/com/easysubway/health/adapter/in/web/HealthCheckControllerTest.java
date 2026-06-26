@@ -38,8 +38,7 @@ class HealthCheckControllerTest {
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.status").value("UP"))
 			.andExpect(jsonPath("$.data.service").value("easysubway-backend"))
-			.andExpect(jsonPath("$.data.components[0].name").value("application"))
-			.andExpect(jsonPath("$.data.components[0].status").value("UP"));
+			.andExpect(jsonPath("$.data.components").doesNotExist());
 	}
 
 	@Test
