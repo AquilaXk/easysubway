@@ -6144,10 +6144,12 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const adminRbacPostgresSchema = [
     read("backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V11__admin_audit_events.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
     read("backend/src/main/resources/db/migration/h2/V11__admin_audit_events.sql"),
+    read("backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -6351,6 +6353,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.retry",
   ]);
   for (const adminRbacSchema of [adminRbacPostgresSchema, adminRbacH2Schema]) {
     assert.match(adminRbacSchema, /CREATE TABLE admin_role_permissions/);
@@ -6369,6 +6372,8 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminProgramRegistry, /enum AdminProgram/);
   assert.match(adminProgramRegistry, /\/admin\/reports\/page/);
   assert.match(adminProgramRegistry, /AdminPermission\.REPORT_REVIEW/);
+  assert.match(adminProgramRegistry, /\/admin\/batches\/page/);
+  assert.match(adminProgramRegistry, /AdminPermission\.DATA_OPERATE/);
   assert.match(inMemoryAdminRbacAuthorityRepository, /AdminPermission\.values\(\)/);
   assert.match(inMemoryAdminRbacAuthorityRepository, /VALID_AUTHORITIES\.containsAll/);
   assert.match(jdbcAdminRbacAuthorityRepository, /JOIN admin_role_permissions/);
