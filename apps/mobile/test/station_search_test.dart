@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/station_api_repository.dart';
+import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/foundation.dart';
@@ -1153,11 +1154,105 @@ void main() {
 
     repository.completeAll();
     await loadFuture;
+    await waitForRealtimeSnapshotStatus(
+      controller,
+      RealtimeSnapshotStatus.unavailable,
+    );
 
     expect(controller.state.status, StationDetailStatus.success);
     expect(controller.state.detail?.nameKo, '상록수');
     expect(controller.state.exits.single.name, '1번 출구');
     expect(controller.state.facilities.single.name, '1번 출구 엘리베이터');
+  });
+
+  test('역 상세 컨트롤러는 실시간 도착 실패와 정적 역 정보를 분리한다', () async {
+    final repository = ControlledStationDetailRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: const FailingRealtimeRepository(),
+    );
+    addTearDown(controller.dispose);
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await loadFuture;
+
+    expect(controller.state.status, StationDetailStatus.success);
+    expect(controller.state.detail?.nameKo, '상록수');
+    expect(
+      controller.state.realtimeSnapshot.status,
+      RealtimeSnapshotStatus.unavailable,
+    );
+    expect(
+      controller.state.realtimeSnapshot.message,
+      contains('역 정보와 경로 검색은 계속 이용'),
+    );
+  });
+
+  test('역 상세 컨트롤러는 실시간 도착 요약을 성공 상태에 포함한다', () async {
+    final repository = ControlledStationDetailRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: const StaticRealtimeRepository(),
+    );
+    addTearDown(controller.dispose);
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await loadFuture;
+    await waitForRealtimeSnapshotStatus(
+      controller,
+      RealtimeSnapshotStatus.fresh,
+    );
+
+    expect(controller.state.status, StationDetailStatus.success);
+    expect(controller.state.realtimeSnapshot.summaryText, '상록수 3분 후');
+  });
+
+  test('역 상세 컨트롤러는 실시간 응답 전에도 정적 상세를 먼저 보여 준다', () async {
+    final repository = ControlledStationDetailRepository();
+    final realtimeRepository = DelayedRealtimeRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: realtimeRepository,
+    );
+    addTearDown(controller.dispose);
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await realtimeRepository.requestStarted.future;
+
+    expect(controller.state.status, StationDetailStatus.success);
+    expect(controller.state.detail?.nameKo, '상록수');
+    expect(
+      controller.state.realtimeSnapshot.status,
+      RealtimeSnapshotStatus.loading,
+    );
+
+    realtimeRepository.complete(const RealtimeSnapshot.unavailable());
+    await loadFuture;
+
+    expect(
+      controller.state.realtimeSnapshot.status,
+      RealtimeSnapshotStatus.unavailable,
+    );
+  });
+
+  test('역 상세 컨트롤러는 실시간 대기 중 dispose되면 늦은 응답을 알리지 않는다', () async {
+    final repository = ControlledStationDetailRepository();
+    final realtimeRepository = DelayedRealtimeRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: realtimeRepository,
+    );
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await realtimeRepository.requestStarted.future;
+
+    controller.dispose();
+    realtimeRepository.complete(const RealtimeSnapshot.unavailable());
+    await loadFuture;
   });
 
   test('역 상세 컨트롤러는 처리된 역 정보 실패를 오류 경계에 다시 보고하지 않는다', () async {
@@ -1672,6 +1767,33 @@ class ControlledNearbyStationSearchRepository
   }
 }
 
+Future<void> waitForRealtimeSnapshotStatus(
+  StationDetailController controller,
+  RealtimeSnapshotStatus status,
+) async {
+  if (controller.state.realtimeSnapshot.status == status) {
+    return;
+  }
+  final completer = Completer<void>();
+  void listener() {
+    if (controller.state.realtimeSnapshot.status == status) {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  controller.addListener(listener);
+  try {
+    await completer.future.timeout(
+      const Duration(seconds: 1),
+      onTimeout: () {},
+    );
+  } finally {
+    controller.removeListener(listener);
+  }
+}
+
 class ControlledStationDetailRepository implements StationSearchRepository {
   final requestedDetailStationIds = <String>[];
   final requestedExitStationIds = <String>[];
@@ -1751,6 +1873,55 @@ class FailingStationDetailRepository implements StationSearchRepository {
     String stationId,
   ) async {
     return const [];
+  }
+}
+
+class StaticRealtimeRepository implements RealtimeRepository {
+  const StaticRealtimeRepository();
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    return const RealtimeSnapshot(
+      status: RealtimeSnapshotStatus.fresh,
+      receivedAt: '2026-06-26T08:00:00Z',
+      arrivals: [
+        RealtimeArrival(
+          lineId: 'seoul-4',
+          stationName: '상록수',
+          destination: '오이도',
+          direction: '하행',
+          trainNo: '4001',
+          etaSeconds: 180,
+          message: '3분 후',
+        ),
+      ],
+    );
+  }
+}
+
+class DelayedRealtimeRepository implements RealtimeRepository {
+  final requestStarted = Completer<void>();
+  final _snapshotCompleter = Completer<RealtimeSnapshot>();
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    if (!requestStarted.isCompleted) {
+      requestStarted.complete();
+    }
+    return _snapshotCompleter.future;
+  }
+
+  void complete(RealtimeSnapshot snapshot) {
+    _snapshotCompleter.complete(snapshot);
+  }
+}
+
+class FailingRealtimeRepository implements RealtimeRepository {
+  const FailingRealtimeRepository();
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    throw const RealtimeException('실시간 정보를 불러오지 못했습니다.');
   }
 }
 

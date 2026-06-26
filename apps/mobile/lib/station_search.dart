@@ -10,6 +10,7 @@ import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/realtime/realtime_repository.dart';
 import 'features/stations/domain/station_line.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
@@ -1205,6 +1206,7 @@ class StationDetailState {
     this.detail,
     this.exits = const [],
     this.facilities = const [],
+    this.realtimeSnapshot = const RealtimeSnapshot.unavailable(),
     this.message = '',
   });
 
@@ -1213,12 +1215,14 @@ class StationDetailState {
       detail = null,
       exits = const [],
       facilities = const [],
+      realtimeSnapshot = const RealtimeSnapshot.unavailable(),
       message = '';
 
   final StationDetailStatus status;
   final StationDetail? detail;
   final List<StationExitInfo> exits;
   final List<StationFacilityInfo> facilities;
+  final RealtimeSnapshot realtimeSnapshot;
   final String message;
 
   List<StationFacilityInfo> get prioritizedFacilities {
@@ -1333,9 +1337,10 @@ class StationDetailState {
 }
 
 class StationDetailController extends ChangeNotifier {
-  StationDetailController({required this.repository});
+  StationDetailController({required this.repository, this.realtimeRepository});
 
   final StationSearchRepository repository;
+  final RealtimeRepository? realtimeRepository;
 
   StationDetailState _state = const StationDetailState.loading();
   bool _isDisposed = false;
@@ -1356,12 +1361,17 @@ class StationDetailController extends ChangeNotifier {
       if (_isDisposed) {
         return;
       }
+      final detail = responses[0] as StationDetail;
       _state = StationDetailState(
         status: StationDetailStatus.success,
-        detail: responses[0] as StationDetail,
+        detail: detail,
         exits: responses[1] as List<StationExitInfo>,
         facilities: responses[2] as List<StationFacilityInfo>,
+        realtimeSnapshot: const RealtimeSnapshot.loading(),
       );
+      notifyListeners();
+      await _refreshRealtimeSnapshot(detail);
+      return;
     } on StationSearchException {
       if (_isDisposed) {
         return;
@@ -1382,6 +1392,64 @@ class StationDetailController extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> _refreshRealtimeSnapshot(StationDetail detail) async {
+    final realtimeSnapshot = await _loadRealtimeSnapshot(detail);
+    if (_isDisposed || _state.detail?.id != detail.id) {
+      return;
+    }
+    _state = StationDetailState(
+      status: _state.status,
+      detail: _state.detail,
+      exits: _state.exits,
+      facilities: _state.facilities,
+      realtimeSnapshot: realtimeSnapshot,
+      message: _state.message,
+    );
+    notifyListeners();
+  }
+
+  Future<RealtimeSnapshot> _loadRealtimeSnapshot(StationDetail detail) async {
+    final repository = realtimeRepository;
+    if (repository == null) {
+      return const RealtimeSnapshot.unavailable();
+    }
+    final firstLine = detail.lines.isEmpty ? null : detail.lines.first;
+    if (firstLine == null) {
+      return const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.unsupported,
+        fallbackCode: 'LINE_MAPPING_MISSING',
+        message: '노선 정보가 없어 실시간 열차를 확인할 수 없습니다.',
+        receivedAt: '',
+        arrivals: [],
+      );
+    }
+    try {
+      return await repository.arrivals(
+        RealtimeStationQuery(
+          stationId: detail.id,
+          lineId: firstLine.id,
+          providerLineId: firstLine.stationCode.isEmpty
+              ? firstLine.id
+              : firstLine.stationCode,
+          stationQueryName: detail.nameKo,
+        ),
+      );
+    } on RealtimeException catch (error) {
+      return RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.unavailable,
+        fallbackCode: 'PROVIDER_ERROR',
+        message: '${error.message} 역 정보와 경로 검색은 계속 이용할 수 있습니다.',
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 상세 실시간 열차 조회 중 예외가 발생했습니다.',
+      );
+      return const RealtimeSnapshot.unavailable();
+    }
   }
 
   @override
@@ -1717,6 +1785,7 @@ class StationSearchScreen extends StatefulWidget {
     required this.locationProvider,
     this.favoriteRepository,
     this.searchHistoryRepository,
+    this.realtimeRepository,
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
@@ -1730,6 +1799,7 @@ class StationSearchScreen extends StatefulWidget {
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
   final SearchHistoryRepository? searchHistoryRepository;
+  final RealtimeRepository? realtimeRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
@@ -2043,6 +2113,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
           searchHistoryRepository: widget.searchHistoryRepository,
+          realtimeRepository: widget.realtimeRepository,
           routeDraftController: widget.routeDraftController,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
@@ -2238,6 +2309,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           repository: widget.repository,
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
+          realtimeRepository: widget.realtimeRepository,
           locationProvider: widget.locationProvider,
           stationId: result.id,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
@@ -3369,6 +3441,7 @@ class FavoriteStationListScreen extends StatefulWidget {
     required this.stationRepository,
     required this.reportRepository,
     this.locationProvider,
+    this.realtimeRepository,
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
@@ -3380,6 +3453,7 @@ class FavoriteStationListScreen extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
+  final RealtimeRepository? realtimeRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
@@ -3400,6 +3474,7 @@ class _FavoriteStationListScreenState extends State<FavoriteStationListScreen> {
         stationRepository: widget.stationRepository,
         reportRepository: widget.reportRepository,
         locationProvider: widget.locationProvider,
+        realtimeRepository: widget.realtimeRepository,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
         internalRouteRepository: widget.internalRouteRepository,
         internalRouteMobilityType: widget.internalRouteMobilityType,
@@ -3415,6 +3490,7 @@ class FavoriteStationListContent extends StatefulWidget {
     required this.stationRepository,
     required this.reportRepository,
     this.locationProvider,
+    this.realtimeRepository,
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
     this.internalRouteMobilityType = 'SENIOR',
@@ -3426,6 +3502,7 @@ class FavoriteStationListContent extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider? locationProvider;
+  final RealtimeRepository? realtimeRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
   final String internalRouteMobilityType;
@@ -3485,6 +3562,7 @@ class _FavoriteStationListContentState
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.repository,
           locationProvider: widget.locationProvider,
+          realtimeRepository: widget.realtimeRepository,
           stationId: favorite.stationId,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
@@ -3753,6 +3831,7 @@ class StationDetailScreen extends StatefulWidget {
     required this.reportRepository,
     required this.stationId,
     this.favoriteRepository,
+    this.realtimeRepository,
     this.locationProvider,
     this.initiallyFavorite,
     this.facilityReportDraftTargetStore,
@@ -3766,6 +3845,7 @@ class StationDetailScreen extends StatefulWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final RealtimeRepository? realtimeRepository;
   final CurrentLocationProvider? locationProvider;
   final String stationId;
   final bool? initiallyFavorite;
@@ -3787,7 +3867,10 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = StationDetailController(repository: widget.repository);
+    _controller = StationDetailController(
+      repository: widget.repository,
+      realtimeRepository: widget.realtimeRepository,
+    );
     final internalRouteRepository = widget.internalRouteRepository;
     final internalRouteRequest = widget.internalRouteRequest;
     if (internalRouteRepository != null) {
@@ -3891,6 +3974,7 @@ class _StationDetailBody extends StatelessWidget {
         facilityAttentionSemanticLabel: state.facilityAttentionSemanticLabel,
         layoutSummaryItems: state.layoutSummaryItems,
         layoutSummarySemanticLabel: state.layoutSummarySemanticLabel,
+        realtimeSnapshot: state.realtimeSnapshot,
         internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
@@ -3911,6 +3995,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.facilityAttentionSemanticLabel,
     required this.layoutSummaryItems,
     required this.layoutSummarySemanticLabel,
+    required this.realtimeSnapshot,
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
@@ -3926,6 +4011,7 @@ class _StationDetailContent extends StatelessWidget {
   final String facilityAttentionSemanticLabel;
   final List<StationLayoutSummaryItem> layoutSummaryItems;
   final String layoutSummarySemanticLabel;
+  final RealtimeSnapshot realtimeSnapshot;
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
@@ -4010,6 +4096,10 @@ class _StationDetailContent extends StatelessWidget {
               station: detail,
               onReportTap: () => _openFacilityReport(context, facility),
             ),
+        const SizedBox(height: 24),
+        const _StationDetailSectionTitle(title: '실시간 열차'),
+        const SizedBox(height: 12),
+        _StationRealtimeSummary(snapshot: realtimeSnapshot),
       ],
     );
   }
@@ -4102,6 +4192,101 @@ class _StationMapTextFallback extends StatelessWidget {
         for (final marker in markers)
           _StationMapTextFallbackItem(marker: marker),
       ],
+    );
+  }
+}
+
+class _StationRealtimeSummary extends StatelessWidget {
+  const _StationRealtimeSummary({required this.snapshot});
+
+  final RealtimeSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (snapshot.status) {
+      RealtimeSnapshotStatus.fresh => '도착 정보',
+      RealtimeSnapshotStatus.stale => '최근 도착 정보',
+      RealtimeSnapshotStatus.unsupported => '지원 준비 중',
+      RealtimeSnapshotStatus.unavailable => '실시간 정보 확인 불가',
+      RealtimeSnapshotStatus.loading => '실시간 정보 확인 중',
+    };
+    final summary = snapshot.summaryText.trim().isEmpty
+        ? '역 정보와 경로 검색은 계속 이용할 수 있습니다.'
+        : snapshot.summaryText.trim();
+    final updatedLabel = snapshot.receivedAt.trim().isEmpty
+        ? ''
+        : '마지막 갱신 ${snapshot.receivedAt}';
+    final semanticParts = [
+      '실시간 열차',
+      title,
+      summary,
+      if (updatedLabel.isNotEmpty) updatedLabel,
+      '열차 위치는 GPS가 아니라 운행 정보 기준 위치입니다.',
+    ];
+    return Semantics(
+      label: semanticParts.join(', '),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: EasySubwayAccessibleColors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.schedule,
+                  color: EasySubwayAccessibleColors.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              summary,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (updatedLabel.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                updatedLabel,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  height: 1.3,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              '열차 위치는 GPS가 아니라 운행 정보 기준 위치입니다.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
