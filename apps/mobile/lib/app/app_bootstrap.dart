@@ -37,11 +37,13 @@ class AppBootstrap {
     required this.dependencies,
     required this.catalogDatabase,
     required this.userDatabase,
+    required this.dataPackUpdate,
   });
 
   final AppDependencies dependencies;
   final CatalogDatabase catalogDatabase;
   final UserDatabase userDatabase;
+  final Future<void> dataPackUpdate;
 
   static Future<AppBootstrap> initialize({
     Directory? databaseDirectory,
@@ -71,17 +73,18 @@ class AppBootstrap {
       userDatabase: userDatabase,
     );
 
+    Future<void>? dataPackUpdate;
     try {
-      await _runDataPackUpdateSafely(
-        supportDirectory: supportDirectory,
-        userDatabase: userDatabase,
-        runner: dataPackUpdateRunner ?? _defaultDataPackUpdateRunner,
-      );
       final catalogDatabase = await CatalogDatabaseOpener(
         databaseDirectory: supportDirectory,
         assetBundle: assetBundle ?? rootBundle,
         emergencyOverrideRepository: emergencyOverrideRepository,
       ).open();
+      dataPackUpdate = _runDataPackUpdateSafely(
+        supportDirectory: supportDirectory,
+        userDatabase: userDatabase,
+        runner: dataPackUpdateRunner ?? _defaultDataPackUpdateRunner,
+      );
 
       final dependencies = AppDependencies.resolve(
         repository: repository,
@@ -106,14 +109,17 @@ class AppBootstrap {
         dependencies: dependencies,
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
+        dataPackUpdate: dataPackUpdate,
       );
     } catch (error, stackTrace) {
+      await dataPackUpdate;
       await userDatabase.close();
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
   Future<void> close() async {
+    await dataPackUpdate;
     await catalogDatabase.close();
     await userDatabase.close();
   }
