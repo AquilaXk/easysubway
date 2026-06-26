@@ -1709,7 +1709,12 @@ class _MapGeometry {
 }
 
 class _StationSpatialIndex {
-  _StationSpatialIndex._({required this._buckets, required this._stationOrder});
+  _StationSpatialIndex._({
+    required Map<_StationSpatialCell, List<NetworkMapStation>> buckets,
+    required Map<String, int> stationOrder,
+  }) : _buckets = buckets, // ignore: prefer_initializing_formals
+       // ignore: prefer_initializing_formals
+       _stationOrder = stationOrder;
 
   static final empty = _StationSpatialIndex._(
     buckets: const {},
