@@ -47,6 +47,17 @@ fi
 
 mkdir -p "$ARTIFACT_DIR"
 "$BUNDLETOOL" dump config --bundle="$AAB" > "$ARTIFACT_DIR/bundle-config.txt"
+if ! grep -q '"alignment": "PAGE_ALIGNMENT_16K"' "$ARTIFACT_DIR/bundle-config.txt"; then
+  {
+    echo "android_16kb_aab_page_size_check"
+    echo "aab=$AAB"
+    echo "minimum_load_segment_alignment=$MIN_ALIGN"
+    echo "bundle_config=bundle-config.txt"
+    echo "result=fail"
+    echo "reason=missing_PAGE_ALIGNMENT_16K_native_library_alignment"
+  } > "$ARTIFACT_DIR/summary.txt"
+  exit 1
+fi
 zipinfo -1 "$AAB" | grep -E '(^|/)lib/[^/]+/[^/]+\.so$' > "$ARTIFACT_DIR/native-libraries.txt" || true
 
 if [[ ! -s "$ARTIFACT_DIR/native-libraries.txt" ]]; then

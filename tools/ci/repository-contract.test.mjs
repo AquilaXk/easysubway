@@ -964,6 +964,8 @@ test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계�
   assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-16kb-page-size-gate-manifest"));
 
   assert.match(aabScript, /"\$BUNDLETOOL" dump config --bundle="\$AAB"/);
+  assert.match(aabScript, /PAGE_ALIGNMENT_16K/);
+  assert.match(aabScript, /missing_PAGE_ALIGNMENT_16K_native_library_alignment/);
   assert.match(aabScript, /zipinfo -1 "\$AAB"/);
   assert.match(aabScript, /MIN_ALIGN=16384/);
   assert.match(aabScript, /node "\$SCRIPT_DIR\/check-elf-load-alignment\.mjs" --min-align "\$MIN_ALIGN"/);
@@ -983,7 +985,10 @@ test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계�
   assert.match(runtimeScript, /current-focus\.txt/);
   assert.match(runtimeScript, /screencap -p/);
   assert.match(runtimeScript, /uiautomator dump/);
+  assert.match(runtimeScript, /FATAL EXCEPTION\| \[EF\] AndroidRuntime:\|Fatal signal\|Abort message\|tombstoned/);
+  assert.match(runtimeScript, /crash-excerpt\.txt/);
   assert.match(runtimeScript, /foreground_package_verified=true/);
+  assert.match(runtimeScript, /logcat_no_crash=true/);
   assert.match(runtimeScript, /logcat\.txt/);
   assert.match(runtimeScript, /summary\.txt/);
 });
