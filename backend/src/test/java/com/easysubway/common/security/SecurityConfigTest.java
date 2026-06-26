@@ -179,6 +179,23 @@ class SecurityConfigTest {
 	}
 
 	@Test
+	@DisplayName("일반 사용자 계정 ID는 관리자 계정 ID와 달라야 한다")
+	void userCredentialsFailWhenLoginIdCollidesWithAdminIdentity() {
+		contextRunner
+			.withPropertyValues(
+				"easysubway.admin.username=shared-user",
+				"easysubway.admin.password=admin-password",
+				"easysubway.user.username=shared-user",
+				"easysubway.user.password=user-password"
+			)
+			.run(context -> {
+				assertThat(context).hasFailed();
+				assertThat(context.getStartupFailure())
+					.hasMessageContaining("관리자, 운영기관, break-glass, 일반 사용자 계정 ID는 서로 달라야 합니다.");
+			});
+	}
+
+	@Test
 	@DisplayName("관리자 Basic auth는 연속 실패 후 잠금 기간 동안 올바른 비밀번호도 거절한다")
 	void adminBasicAuthLocksAfterConsecutiveFailures() {
 		contextRunner

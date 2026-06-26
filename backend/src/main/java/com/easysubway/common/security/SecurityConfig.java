@@ -184,7 +184,7 @@ public class SecurityConfig {
 		);
 		validateOperatorCredentials(operatorUsername, operatorPassword);
 		validateBreakGlassCredentials(breakGlassUsername, breakGlassPassword, breakGlassReason);
-		validateDistinctAdminLoginIds(adminUsername, operatorUsername, breakGlassUsername);
+		validateDistinctAdminLoginIds(adminUsername, operatorUsername, breakGlassUsername, userUsername);
 
 		LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
 		Set<String> activeBootstrapLoginIds = new LinkedHashSet<>();
@@ -392,14 +392,23 @@ public class SecurityConfig {
 		}
 	}
 
-	private void validateDistinctAdminLoginIds(String adminUsername, String operatorUsername, String breakGlassUsername) {
+	private void validateDistinctAdminLoginIds(
+		String adminUsername,
+		String operatorUsername,
+		String breakGlassUsername,
+		String userUsername
+	) {
 		String admin = normalizeLoginId(adminUsername);
 		String operator = normalizeLoginId(operatorUsername);
 		String breakGlass = normalizeLoginId(breakGlassUsername);
+		String user = normalizeLoginId(userUsername);
 		if ((!admin.isBlank() && admin.equals(operator))
 			|| (!admin.isBlank() && admin.equals(breakGlass))
-			|| (!operator.isBlank() && operator.equals(breakGlass))) {
-			throw new IllegalStateException("관리자, 운영기관, break-glass 계정 ID는 서로 달라야 합니다.");
+			|| (!admin.isBlank() && admin.equals(user))
+			|| (!operator.isBlank() && operator.equals(breakGlass))
+			|| (!operator.isBlank() && operator.equals(user))
+			|| (!breakGlass.isBlank() && breakGlass.equals(user))) {
+			throw new IllegalStateException("관리자, 운영기관, break-glass, 일반 사용자 계정 ID는 서로 달라야 합니다.");
 		}
 	}
 
