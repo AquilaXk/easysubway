@@ -1036,6 +1036,9 @@ void main() {
       center: const Offset(760, 250),
       revision: 5,
     );
+    final requestedRendererCamera = networkMapOverscannedRendererCamera(
+      uncoveredVisualCamera,
+    );
 
     expect(
       networkMapRendererCameraCoversVisual(
@@ -1064,6 +1067,14 @@ void main() {
         visualCamera: uncoveredVisualCamera,
       ),
       same(rendererCamera),
+    );
+    expect(
+      networkMapRendererCommitBasisCamera(
+        presentedCamera: rendererCamera,
+        requestedCamera: requestedRendererCamera,
+        visualCamera: uncoveredVisualCamera,
+      ),
+      same(requestedRendererCamera),
     );
   });
 
