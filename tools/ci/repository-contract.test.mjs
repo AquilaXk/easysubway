@@ -5524,6 +5524,9 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.match(smokeScript, /--expected-font-scale/);
   assert.match(smokeScript, /MIN_ANDROID_API=35/);
   assert.match(smokeScript, /MAX_COMPACT_WIDTH_DP=599/);
+  assert.match(smokeScript, /width_dp=\$\(\(width_px \* 160 \/ density_dpi\)\)/);
+  assert.match(smokeScript, /"\$width_px" -ge "\$height_px"/);
+  assert.match(smokeScript, /viewport_orientation=portrait/);
   assert.match(smokeScript, /pm path "\$PACKAGE"/);
   assert.match(smokeScript, /resolve-activity --brief "\$PACKAGE"/);
   assert.match(smokeScript, /am start -n "\$launch_activity"/);

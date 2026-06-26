@@ -153,13 +153,14 @@ if [[ ! "$wm_density" =~ ([0-9]+)$ ]]; then
   exit 1
 fi
 density_dpi="${BASH_REMATCH[1]}"
-short_px="$width_px"
-if [[ "$height_px" -lt "$short_px" ]]; then
-  short_px="$height_px"
+width_dp=$((width_px * 160 / density_dpi))
+height_dp=$((height_px * 160 / density_dpi))
+if [[ "$width_px" -ge "$height_px" ]]; then
+  echo "Emulator viewport must be compact phone portrait: ${width_px}x${height_px}px." >&2
+  exit 1
 fi
-short_width_dp=$((short_px * 160 / density_dpi))
-if [[ "$short_width_dp" -gt "$MAX_COMPACT_WIDTH_DP" ]]; then
-  echo "Emulator short width ${short_width_dp}dp is not compact phone width." >&2
+if [[ "$width_dp" -gt "$MAX_COMPACT_WIDTH_DP" ]]; then
+  echo "Emulator width ${width_dp}dp is not compact phone width." >&2
   exit 1
 fi
 
@@ -175,7 +176,9 @@ fi
   echo "android_sdk=$sdk"
   echo "wm_size=$wm_size"
   echo "wm_density=$wm_density"
-  echo "short_width_dp=$short_width_dp"
+  echo "width_dp=$width_dp"
+  echo "height_dp=$height_dp"
+  echo "viewport_orientation=portrait"
   echo "font_scale=${font_scale:-unknown}"
   echo "expected_font_scale=$EXPECTED_FONT_SCALE"
   echo "high_text_contrast_enabled=${high_text_contrast:-unknown}"
