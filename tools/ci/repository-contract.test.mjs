@@ -6142,8 +6142,13 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   );
   const adminIdentityPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V9__admin_identity.sql");
   const adminRbacPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql");
+  const adminRbacH2Schema = read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
+  const adminRbacRole = read("backend/src/main/java/com/easysubway/admin/authorization/AdminRbacRole.java");
+  const inMemoryAdminRbacAuthorityRepository = read(
+    "backend/src/main/java/com/easysubway/admin/authorization/adapter/out/persistence/InMemoryAdminRbacAuthorityRepository.java",
+  );
   const jdbcAdminRbacAuthorityRepository = read(
     "backend/src/main/java/com/easysubway/admin/authorization/adapter/out/persistence/JdbcAdminRbacAuthorityRepository.java",
   );
@@ -6316,16 +6321,44 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminIdentityPostgresSchema, /CREATE TABLE admin_login_audits/);
   assert.match(adminIdentityPostgresSchema, /outcome IN \('FAILED', 'LOCKED', 'DISABLED', 'PASSWORD_EXPIRED', 'CREDENTIAL_ROTATION_REQUIRED', 'SUCCESS'\)/);
   assert.match(adminIdentityPostgresSchema, /idx_admin_login_audits_login_occurred_at/);
-  assert.match(adminRbacPostgresSchema, /CREATE TABLE admin_role_permissions/);
-  assert.match(adminRbacPostgresSchema, /CREATE TABLE admin_user_roles/);
-  assert.match(adminRbacPostgresSchema, /CREATE TABLE admin_menu_items/);
-  assert.match(adminRbacPostgresSchema, /role_code IN \('ADMIN_VIEWER', 'REPORT_REVIEWER', 'MASTER_EDITOR', 'FIELD_OPERATOR', 'DATA_OPERATOR', 'SECURITY_ADMIN', 'SUPER_ADMIN'\)/);
-  assert.match(adminRbacPostgresSchema, /permission_code IN \('admin\.view', 'admin\.report\.review', 'admin\.master\.edit', 'admin\.field\.operate', 'admin\.data\.operate', 'admin\.security\.audit', 'admin\.security\.admin'\)/);
-  assert.doesNotMatch(adminRbacPostgresSchema, /\b(url|handler|controller|method)_/i);
+  const adminRbacRoleCodes = [...adminRbacRole.matchAll(/^\s*([A-Z_]+)\(/gm)].map((match) => match[1]);
+  const adminPermissionCodes = [...adminPermission.matchAll(/^\s*[A-Z_]+\("([^"]+)"\)/gm)].map((match) => match[1]);
+  const adminRbacRoleConstraint = `role_code IN (${adminRbacRoleCodes.map((role) => `'${role}'`).join(", ")})`;
+  const adminRbacPermissionConstraint =
+    `permission_code IN (${adminPermissionCodes.map((permission) => `'${permission}'`).join(", ")})`;
+  assert.deepEqual(adminRbacRoleCodes, [
+    "ADMIN_VIEWER",
+    "REPORT_REVIEWER",
+    "MASTER_EDITOR",
+    "FIELD_OPERATOR",
+    "DATA_OPERATOR",
+    "SECURITY_ADMIN",
+    "SUPER_ADMIN",
+  ]);
+  assert.deepEqual(adminPermissionCodes, [
+    "admin.view",
+    "admin.report.review",
+    "admin.master.edit",
+    "admin.field.operate",
+    "admin.data.operate",
+    "admin.security.audit",
+    "admin.security.admin",
+  ]);
+  for (const adminRbacSchema of [adminRbacPostgresSchema, adminRbacH2Schema]) {
+    assert.match(adminRbacSchema, /CREATE TABLE admin_role_permissions/);
+    assert.match(adminRbacSchema, /CREATE TABLE admin_user_roles/);
+    assert.match(adminRbacSchema, /CREATE TABLE admin_menu_items/);
+    assert.ok(adminRbacSchema.includes(adminRbacRoleConstraint));
+    assert.ok(adminRbacSchema.includes(adminRbacPermissionConstraint));
+    assert.match(adminRbacSchema, /login_id = LOWER\(TRIM\(login_id\)\)/);
+    assert.match(adminRbacSchema, /FOREIGN KEY \(parent_program_code\) REFERENCES admin_menu_items\(program_code\)/);
+    assert.doesNotMatch(adminRbacSchema, /\b(url|handler|controller|method)_/i);
+  }
   assert.match(adminProgramRegistry, /enum AdminProgram/);
   assert.match(adminProgramRegistry, /\/admin\/reports\/page/);
   assert.match(adminProgramRegistry, /AdminPermission\.REPORT_REVIEW/);
-  assert.match(adminPermission, /REPORT_REVIEW\("admin\.report\.review"\)/);
+  assert.match(inMemoryAdminRbacAuthorityRepository, /AdminPermission\.values\(\)/);
+  assert.match(inMemoryAdminRbacAuthorityRepository, /VALID_AUTHORITIES\.containsAll/);
   assert.match(jdbcAdminRbacAuthorityRepository, /JOIN admin_role_permissions/);
   assert.match(jdbcAdminRbacAuthorityRepository, /FROM admin_user_roles/);
   assert.match(adminIdentityUserDetailsService, /fallbackUserDetailsService/);
