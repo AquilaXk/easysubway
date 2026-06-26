@@ -124,6 +124,20 @@ final class RouteMapRendererHealthMonitor {
     return _controller.dispose();
   }
 
+  Future<void> close({bool disposeRenderer = false}) async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    try {
+      if (disposeRenderer) {
+        await _controller.dispose();
+      }
+    } finally {
+      await stop();
+    }
+  }
+
   Future<void> stop() async {
     _closed = true;
     _blankTimer?.cancel();

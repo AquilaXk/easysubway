@@ -764,7 +764,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_rendererMonitor?.stop());
+    _releaseRenderer(disposeRenderer: true);
     super.dispose();
   }
 
@@ -774,10 +774,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       case AppLifecycleState.inactive || AppLifecycleState.paused:
         _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
       case AppLifecycleState.detached:
-        final monitor = _rendererMonitor;
-        _rendererMonitor = null;
-        _rendererController = null;
-        _ignoreRendererLifecycleFailure(monitor?.disposeRenderer());
+        _releaseRenderer(disposeRenderer: true);
       case AppLifecycleState.resumed || AppLifecycleState.hidden:
         break;
     }
@@ -793,6 +790,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       return;
     }
     unawaited(future.catchError((Object _) {}));
+  }
+
+  void _releaseRenderer({required bool disposeRenderer}) {
+    final monitor = _rendererMonitor;
+    _rendererMonitor = null;
+    _rendererController = null;
+    _ignoreRendererLifecycleFailure(
+      monitor?.close(disposeRenderer: disposeRenderer),
+    );
   }
 
   @override
@@ -1032,7 +1038,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     if (identical(_rendererController, controller)) {
       return;
     }
-    unawaited(_rendererMonitor?.stop());
+    _releaseRenderer(disposeRenderer: true);
     _rendererController = controller;
     late final RouteMapRendererHealthMonitor monitor;
     monitor = RouteMapRendererHealthMonitor(
@@ -1068,13 +1074,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         debugPrint('routeMapRenderer processGone didCrash=$didCrash');
       case RouteMapRendererMemoryTrimmed():
         debugPrint('routeMapRenderer memoryTrimmed');
+      case RouteMapRendererDisposed():
+        debugPrint('routeMapRenderer disposed');
       case RouteMapRendererCreated() ||
           RouteMapRendererAssetLoading() ||
           RouteMapRendererAssetReady() ||
           RouteMapRendererCameraRequested() ||
           RouteMapRendererFramePresented() ||
-          RouteMapRendererFailed() ||
-          RouteMapRendererDisposed():
+          RouteMapRendererFailed():
         break;
     }
   }
