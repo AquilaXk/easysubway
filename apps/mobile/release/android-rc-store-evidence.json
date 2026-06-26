@@ -77,8 +77,11 @@
       "route-map-performance-summary"
     ],
     "playConsoleSubmission": [
+      "play-production-access-gate-manifest",
       "account-type-production-access-record",
       "tester-requirement-record",
+      "closed-test-12-testers-14-days-continuous-opt-in-record",
+      "production-access-application-response-record",
       "app-content-declarations",
       "data-safety-binary-network-trace-match",
       "privacy-policy-url-help-screen-match",

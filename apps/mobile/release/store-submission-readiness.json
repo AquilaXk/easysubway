@@ -52,6 +52,17 @@
       "configurationSources": ["no login or anonymous auth in MVP release path"]
     },
     {
+      "id": "play_production_access_closed_test",
+      "store": "google-play",
+      "category": "release-access",
+      "titleKo": "Play production access와 closed test",
+      "decisionOwnerKo": "운영/출시 담당",
+      "readyWhenKo": "Play Console 계정 유형과 생성일, identity verification, production access 상태를 확인하고, 신규 personal account testing requirement가 적용되면 12명 이상 tester와 14일 연속 opt-in 및 production access 신청/승인 증거를 수집한다.",
+      "evidence": ["production-access-status-summary", "closed-test-requirement-summary", "tester-roster-count-summary", "production-access-application-result"],
+      "linkedArtifacts": ["apps/mobile/release/play-production-access-gate.json", "apps/mobile/release/android-rc-store-evidence.json"],
+      "configurationSources": ["Google Play Console account details", "Google Play Console Testing and release"]
+    },
+    {
       "id": "play_content_rating",
       "store": "google-play",
       "category": "app-content",
