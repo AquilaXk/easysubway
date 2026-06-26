@@ -485,6 +485,24 @@ class FacilityReportUploadIntentsTest {
 		)))
 			.isInstanceOf(InvalidFacilityReportException.class)
 			.hasMessage("운영 report upload public base URL은 HTTPS origin이어야 합니다.");
+
+		assertThatThrownBy(() -> new ObjectStorageFacilityReportUploadUrlSigner(
+			"https://[::1]",
+			"easysubway-report-uploads",
+			"prod-object-storage-access-key",
+			"prod-object-storage-secret-key-with-enough-entropy",
+			"ap-northeast-2"
+		).sign(new FacilityReportUploadIntents.CreatedUploadIntent(
+			"upload-id-1",
+			"facility-reports/unclaimed/object-1.jpg",
+			"image/jpeg",
+			"a".repeat(64),
+			11L,
+			Instant.parse("2026-06-20T00:00:00Z"),
+			Instant.parse("2026-06-20T00:15:00Z")
+		)))
+			.isInstanceOf(InvalidFacilityReportException.class)
+			.hasMessage("운영 report upload public base URL은 HTTPS origin이어야 합니다.");
 	}
 
 	@Test

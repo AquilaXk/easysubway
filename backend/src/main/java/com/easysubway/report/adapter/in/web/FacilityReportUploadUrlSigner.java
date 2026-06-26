@@ -154,6 +154,9 @@ class ObjectStorageFacilityReportUploadUrlSigner implements FacilityReportUpload
 			throw invalidPublicBaseUrl();
 		}
 		String normalizedHost = host.toLowerCase(Locale.ROOT);
+		if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
+			normalizedHost = normalizedHost.substring(1, normalizedHost.length() - 1);
+		}
 		if ("localhost".equals(normalizedHost) || "object-storage".equals(normalizedHost)
 			|| normalizedHost.startsWith("127.") || "::1".equals(normalizedHost)) {
 			throw invalidPublicBaseUrl();
