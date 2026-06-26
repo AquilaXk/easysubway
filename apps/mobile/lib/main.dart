@@ -11,6 +11,7 @@ import 'app/app_dependencies.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
+import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
@@ -221,6 +222,7 @@ class EasySubwayApp extends StatelessWidget {
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NetworkMapRepository? networkMapRepository,
+    RealtimeRepository? realtimeRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
@@ -251,6 +253,7 @@ class EasySubwayApp extends StatelessWidget {
                searchHistoryRepository: searchHistoryRepository,
                internalRouteRepository: internalRouteRepository,
                networkMapRepository: networkMapRepository,
+               realtimeRepository: realtimeRepository,
                notificationRepository: notificationRepository,
                notificationPermissionProvider: notificationPermissionProvider,
                locationProvider: locationProvider,
@@ -295,6 +298,7 @@ class EasySubwayApp extends StatelessWidget {
        searchHistoryRepository = dependencies.searchHistoryRepository,
        internalRouteRepository = dependencies.internalRouteRepository,
        networkMapRepository = dependencies.networkMapRepository,
+       realtimeRepository = dependencies.realtimeRepository,
        notificationRepository = dependencies.notificationRepository,
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
@@ -311,6 +315,7 @@ class EasySubwayApp extends StatelessWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -380,6 +385,7 @@ class EasySubwayApp extends StatelessWidget {
         searchHistoryRepository: searchHistoryRepository,
         internalRouteRepository: internalRouteRepository,
         networkMapRepository: networkMapRepository,
+        realtimeRepository: realtimeRepository,
         notificationRepository: notificationRepository,
         notificationPermissionProvider: notificationPermissionProvider,
         locationProvider: locationProvider,
@@ -498,6 +504,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -522,6 +529,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -649,6 +657,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         searchHistoryRepository: widget.searchHistoryRepository,
         internalRouteRepository: widget.internalRouteRepository,
         networkMapRepository: widget.networkMapRepository,
+        realtimeRepository: widget.realtimeRepository,
         notificationRepository: widget.notificationRepository,
         notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
@@ -1046,6 +1055,7 @@ class HomeScreen extends StatefulWidget {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -1074,6 +1084,7 @@ class HomeScreen extends StatefulWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
@@ -1157,6 +1168,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final searchHistoryRepository = widget.searchHistoryRepository;
     final internalRouteRepository = widget.internalRouteRepository;
     final networkMapRepository = widget.networkMapRepository;
+    final realtimeRepository = widget.realtimeRepository;
     final routeFeedbackRepository = widget.routeFeedbackRepository;
     final notificationRepository = widget.notificationRepository;
     final notificationPermissionProvider =
@@ -1264,6 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> {
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
             internalRouteMobilityType: initialMobilityType,
+            realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             entryMode: entryMode,
           ),
@@ -1308,6 +1321,7 @@ class _HomeScreenState extends State<HomeScreen> {
             locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
+            realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             initialMobilityType: initialMobilityType,
             onOpenRouteSearch: openRouteSearch,
@@ -3263,6 +3277,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.locationProvider,
     required this.facilityReportDraftTargetStore,
     required this.internalRouteRepository,
+    required this.realtimeRepository,
     required this.routeDraftController,
     required this.initialMobilityType,
     this.onOpenRouteSearch,
@@ -3277,6 +3292,7 @@ class FavoriteHomeScreen extends StatefulWidget {
   final CurrentLocationProvider locationProvider;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository internalRouteRepository;
+  final RealtimeRepository realtimeRepository;
   final RouteDraftController routeDraftController;
   final String initialMobilityType;
   final Future<void> Function([String? mobilityType])? onOpenRouteSearch;
@@ -3455,6 +3471,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
           locationProvider: widget.locationProvider,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
+          realtimeRepository: widget.realtimeRepository,
           routeDraftController: widget.routeDraftController,
           internalRouteMobilityType: widget.initialMobilityType,
         ),

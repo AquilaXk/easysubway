@@ -75,6 +75,7 @@ Future<void> _openFavoriteList(
           locationProvider: home.locationProvider,
           facilityReportDraftTargetStore: home.facilityReportDraftTargetStore,
           internalRouteRepository: home.internalRouteRepository,
+          realtimeRepository: home.realtimeRepository,
           routeDraftController: draftController,
           initialMobilityType: home.initialMobilityType,
           onOpenRouteSearch: onOpenRouteSearch == null
