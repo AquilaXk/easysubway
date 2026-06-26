@@ -52,6 +52,8 @@ services:
       - ${EASYSUBWAY_BACKEND_ENV_FILE:-../.env.example}
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      EASYSUBWAY_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${EASYSUBWAY_POSTGRES_DB:-easysubway}
+      EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT: http://object-storage:9000
     ports:
       - "${EASYSUBWAY_BACKEND_BIND:-127.0.0.1}:${EASYSUBWAY_BACKEND_PORT:-8080}:8080"
     logging:

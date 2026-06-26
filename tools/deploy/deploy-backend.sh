@@ -281,8 +281,25 @@ fi
 ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"
 mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
 
+fail_backend_deployment() {
+	local detail="$1"
+	if [[ -n "${current_sha}" && -L "${SHARED_DIR}/previous-env" ]]; then
+		ln -sfn "$(readlink "${SHARED_DIR}/previous-env")" "${SHARED_DIR}/current-env.next"
+		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build backend || true
+		write_result "failed" "${detail}_rollback_attempted"
+	else
+		write_result "failed" "${detail}_rollback_unavailable"
+	fi
+	write_phase "completed"
+	printf '%s\n' "${DEPLOY_SHA}" > "${SHARED_DIR}/failed-sha"
+}
+
 write_phase "restarting"
-compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build backend
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build backend; then
+	fail_backend_deployment "backend_start_failed"
+	exit 1
+fi
 
 ready=0
 for _ in $(seq 1 60); do
@@ -297,16 +314,7 @@ if [[ "${ready}" -ne 1 ]]; then
 	diagnostic="${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-$(date -u +%Y%m%dT%H%M%SZ).log"
 	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" logs --no-color --tail=200 backend > "${diagnostic}" 2>&1 || true
 	chmod 600 "${diagnostic}"
-	if [[ -n "${current_sha}" && -L "${SHARED_DIR}/previous-env" ]]; then
-		ln -sfn "$(readlink "${SHARED_DIR}/previous-env")" "${SHARED_DIR}/current-env.next"
-		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
-		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build backend || true
-		write_result "failed" "readiness_failed_rollback_attempted"
-	else
-		write_result "failed" "readiness_failed_rollback_unavailable"
-	fi
-	write_phase "completed"
-	printf '%s\n' "${DEPLOY_SHA}" > "${SHARED_DIR}/failed-sha"
+	fail_backend_deployment "readiness_failed"
 	exit 1
 fi
 
