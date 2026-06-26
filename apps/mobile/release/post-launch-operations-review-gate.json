@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "post-launch-operations-review",
+  "issue": 923,
+  "status": "BLOCKED_POST_LAUNCH_EVIDENCE_MISSING",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "operationsEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
+  "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
+  "reviewWindows": [
+    {
+      "id": "first_2h",
+      "afterPublicRelease": "PT2H",
+      "ownerKo": "릴리즈 운영 담당자",
+      "requiredSignals": [
+        "play-review-status",
+        "crash-free-session-rate",
+        "android-vitals-anr-rate",
+        "backend-readiness",
+        "provider-quota-error-rate",
+        "support-intake-open"
+      ],
+      "decisionKo": "P0 crash, ANR 급증, Play rejection, backend readiness DOWN, provider quota exhaustion 중 하나라도 확인되면 공개 공지와 fixed release 판단을 시작한다."
+    },
+    {
+      "id": "first_24h",
+      "afterPublicRelease": "P1D",
+      "ownerKo": "모바일/운영 공동 담당자",
+      "requiredSignals": [
+        "crash-anr-summary",
+        "play-review-and-rating-summary",
+        "support-ticket-summary",
+        "data-error-report-backlog",
+        "facility-report-backlog",
+        "datapack-adoption-rate"
+      ],
+      "decisionKo": "치명 오류 0, 미응답 문의 0, 데이터 오류 P0 0, 신고 backlog owner 지정 완료를 만족하지 못하면 fixed release 또는 datapack rollback을 결정한다."
+    },
+    {
+      "id": "day_7",
+      "afterPublicRelease": "P7D",
+      "ownerKo": "제품/운영 담당자",
+      "requiredSignals": [
+        "retention-and-active-use-summary",
+        "route-search-success-blocked-unknown-distribution",
+        "accessibility-feedback-summary",
+        "support-sla-summary",
+        "provider-cost-and-quota-summary"
+      ],
+      "decisionKo": "고령자/임산부/장애인 사용 흐름의 반복 불편, provider quota 압박, UNKNOWN 경로 급증이 있으면 다음 patch scope와 owner를 확정한다."
+    },
+    {
+      "id": "day_30",
+      "afterPublicRelease": "P30D",
+      "ownerKo": "릴리즈 책임자",
+      "requiredSignals": [
+        "monthly-crash-anr-trend",
+        "support-data-error-trend",
+        "datapack-update-adoption-trend",
+        "provider-reliability-trend",
+        "next-release-go-no-go-notes"
+      ],
+      "decisionKo": "다음 정기 업데이트의 staged rollout, support capacity, data provider 계약, accessibility backlog 우선순위를 확정한다."
+    }
+  ],
+  "killSwitchAndRollbackOwners": [
+    {
+      "domain": "backend",
+      "ownerKo": "백엔드 운영 담당자",
+      "actionKo": "admin/report/realtime API 이상 시 backend feature flag, abuse control, CD rollback 또는 fixed release를 판단한다.",
+      "evidence": ["cd-run-url", "readiness-log", "rollback-decision-record"]
+    },
+    {
+      "domain": "datapack",
+      "ownerKo": "데이터팩 운영 담당자",
+      "actionKo": "데이터 오류 P0 또는 adoption 실패 시 active pack rollback, corrected pack publish, 앱 내 데이터 기준일 공지를 판단한다.",
+      "evidence": ["active-pack-version", "rollback-pack-version", "datapack-adoption-summary"]
+    },
+    {
+      "domain": "realtime",
+      "ownerKo": "실시간 정보 담당자",
+      "actionKo": "provider 장애, stale source, quota exhaustion 시 realtime fallback label 유지와 provider 요청 제한을 판단한다.",
+      "evidence": ["provider-status-summary", "quota-error-rate", "fallback-label-count"]
+    }
+  ],
+  "fixedReleaseProcedure": {
+    "initialReleaseKo": "Google Play 최초 공개는 staged rollout halt가 없으므로 P0 앱 문제는 새 versionCode의 fixed release로 제출한다.",
+    "requiredSteps": [
+      "incident-severity-and-owner-record",
+      "root-cause-summary",
+      "fix-branch-and-pr-link",
+      "local-emulator-regression-evidence",
+      "signed-rc-artifact-evidence",
+      "play-review-submission-record",
+      "post-fix-monitoring-window"
+    ],
+    "goNoGoKo": "local emulator regression, signed RC artifact, Play submission record, fixed release monitoring owner 중 하나라도 없으면 fixed release Go가 아니다."
+  },
+  "stagedRolloutPolicy": {
+    "initialProductionRelease": "not-available-for-first-public-release",
+    "secondAndLaterUpdates": [
+      "use-staged-rollout",
+      "monitor-crash-anr-support-data-provider-signals",
+      "halt-rollout-on-p0-or-policy-warning",
+      "resume-or-fixed-release-after-owner-approval"
+    ]
+  },
+  "dryRunRequiredEvidence": [
+    "monitoring-dashboard-or-console-access-summary",
+    "alert-route-dry-run-log",
+    "post-launch-review-checklist-dry-run",
+    "fixed-release-owner-acknowledgement"
+  ],
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "githubUploadPolicy": "summary-only",
+    "forbiddenInPullRequest": [
+      "Play Console screenshots with account data",
+      "device identifiers",
+      "support mailbox personal data",
+      "provider credential or quota token"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로만 적는다."
+  }
+}

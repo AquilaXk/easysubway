@@ -103,7 +103,13 @@
       "waiver-record-for-any-exception"
     ],
     "postReleaseReadiness": [
+      "post-launch-operations-review-gate-manifest",
+      "first-2h-monitoring-owner-schedule",
       "24h-7d-30d-review-owner-schedule",
+      "play-review-crash-anr-provider-quota-report-backlog-signals",
+      "backend-datapack-realtime-kill-switch-rollback-owner-record",
+      "fixed-release-submission-procedure-record",
+      "second-update-staged-rollout-halt-rollback-procedure",
       "customer-support-intake-ready",
       "data-error-response-ready",
       "incident-response-ready"
