@@ -5,6 +5,7 @@
   "releaseGate": "mobile-signed-release-artifacts",
   "storeReadyStatus": "blocked_external_distribution_evidence_missing",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
   "officialRequirements": {
     "android": {
       "targetApiLevelMinimum": 35,
@@ -29,7 +30,8 @@
         "production signing key material",
         "Play App Signing enrollment",
         "Play internal track upload or pre-launch report evidence",
-        "Play-generated APK or Play-installed build smoke evidence"
+        "Play-generated APK or Play-installed build smoke evidence",
+        "Android 16 KB page-size AAB and runtime smoke evidence"
       ]
     },
     "ios": {
