@@ -838,35 +838,31 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 ),
               ),
               if (!_gestureActive)
-                for (final station in _canonicalStations(
-                  geometry.stationIndex.query(
-                    camera.visibleSourceRect.inflate(96 / camera.scale),
-                  ),
+                for (final station in _visibleCanonicalStations(
+                  geometry: geometry,
+                  camera: camera,
                 ))
-                  if (_stationHitRect(station, geometry).overlaps(
-                    camera.visibleSourceRect.inflate(96 / camera.scale),
-                  ))
-                    Positioned.fromRect(
-                      rect: _sourceRectToViewport(
-                        _stationHitRect(
-                          station,
-                          geometry,
-                          nodeRadius: 24 / camera.scale,
-                          labelHeight: 40 / camera.scale,
-                        ),
-                        camera,
+                  Positioned.fromRect(
+                    rect: _sourceRectToViewport(
+                      _stationHitRect(
+                        station,
+                        geometry,
+                        nodeRadius: 24 / camera.scale,
+                        labelHeight: 40 / camera.scale,
                       ),
-                      child: _StationHitTarget(
-                        key: Key(
-                          'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
-                        ),
-                        station: station,
-                        onTap: () => widget.onStationTap(
-                          station,
-                          stationLinesById[station.id] ?? const [],
-                        ),
+                      camera,
+                    ),
+                    child: _StationHitTarget(
+                      key: Key(
+                        'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
+                      ),
+                      station: station,
+                      onTap: () => widget.onStationTap(
+                        station,
+                        stationLinesById[station.id] ?? const [],
                       ),
                     ),
+                  ),
               Positioned(
                 right: 14,
                 top: 12,
@@ -1809,6 +1805,18 @@ List<NetworkMapStation> _canonicalStations(
     }
   }
   return byStationId.values.toList(growable: false);
+}
+
+List<NetworkMapStation> _visibleCanonicalStations({
+  required _MapGeometry geometry,
+  required MapCameraState camera,
+}) {
+  final visibleSourceRect = camera.visibleSourceRect.inflate(96 / camera.scale);
+  return _canonicalStations(
+    geometry.stationIndex.query(visibleSourceRect).where((station) {
+      return _stationHitRect(station, geometry).overlaps(visibleSourceRect);
+    }),
+  );
 }
 
 int _stationGeometryPriority(NetworkMapStation station) {
