@@ -56,8 +56,8 @@ void main() {
     expect(result.lineId, 'seoul-4');
     expect(result.lineName, '수도권 4호선');
     expect(result.isLocalResult, isTrue);
-    expect(result.score, greaterThan(100));
-    expect(result.burdenCost, result.score);
+    expect(result.score, inInclusiveRange(0, 100));
+    expect(result.burdenCost, greaterThan(result.score));
     expect(
       result.estimatedDurationSeconds,
       result.steps.fold<int>(
@@ -307,7 +307,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.destinationStationName, '확인 필요 역');
     expect(result.isLocalResult, isTrue);
   });
@@ -326,7 +326,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.blockedReasons, isNotEmpty);
   });
 
@@ -358,7 +358,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
   });
 
@@ -425,7 +425,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
     expect(result.warnings, isEmpty);
@@ -468,7 +468,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
     expect(result.warnings, isEmpty);
@@ -515,7 +515,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
     expect(result.warnings, isEmpty);
@@ -622,7 +622,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
   });
@@ -692,7 +692,7 @@ void main() {
       ),
     );
 
-    expect(result.status, 'BLOCKED');
+    expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
   });
@@ -1331,7 +1331,7 @@ void main() {
     );
 
     expect(expressResult.status, 'FOUND');
-    expect(skippedStopResult.status, 'BLOCKED');
+    expect(skippedStopResult.status, 'UNKNOWN');
     expect(skippedStopResult.steps, isEmpty);
   });
 

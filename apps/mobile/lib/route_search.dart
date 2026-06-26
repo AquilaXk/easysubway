@@ -541,6 +541,7 @@ class RouteSearchResult {
     required this.lineId,
     required this.lineName,
     required this.score,
+    int? accessibilityScore,
     int? burdenCost,
     int? estimatedDurationSeconds,
     int? walkingDistanceMeters,
@@ -552,6 +553,8 @@ class RouteSearchResult {
     required this.blockedReasons,
     required this.createdAt,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 fallback용 private 값이다.
+       // ignore: prefer_initializing_formals
+       _accessibilityScore = accessibilityScore,
        // ignore: prefer_initializing_formals
        _burdenCost = burdenCost,
        // ignore: prefer_initializing_formals
@@ -567,6 +570,7 @@ class RouteSearchResult {
     final rawRecommendationReasons = json['recommendationReasons'];
     final rawBlockedReasons = json['blockedReasons'];
     final legacyScore = _optionalRouteInt(json, 'score');
+    final accessibilityScore = _optionalRouteInt(json, 'accessibilityScore');
     final burdenCost =
         _optionalRouteInt(json, 'burdenCost') ??
         legacyScore ??
@@ -594,7 +598,8 @@ class RouteSearchResult {
       status: _requiredRouteString(json, 'status'),
       lineId: _optionalRouteString(json, 'lineId'),
       lineName: _optionalRouteString(json, 'lineName'),
-      score: legacyScore ?? burdenCost,
+      score: accessibilityScore ?? legacyScore ?? burdenCost,
+      accessibilityScore: accessibilityScore ?? legacyScore,
       burdenCost: burdenCost,
       estimatedDurationSeconds: _optionalRouteInt(
         json,
@@ -648,6 +653,7 @@ class RouteSearchResult {
   final String lineId;
   final String lineName;
   final int score;
+  final int? _accessibilityScore;
   final int? _burdenCost;
   final int? _estimatedDurationSeconds;
   final int? _walkingDistanceMeters;
@@ -658,6 +664,8 @@ class RouteSearchResult {
   final List<String> recommendationReasons;
   final List<String> blockedReasons;
   final String createdAt;
+
+  int get accessibilityScore => _accessibilityScore ?? score;
 
   int get burdenCost => _burdenCost ?? score;
 
@@ -738,7 +746,9 @@ class RouteSearchResult {
 
   String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
 
-  bool get isBlocked => status == 'BLOCKED' || blockedReasons.isNotEmpty;
+  bool get isBlocked => status == 'BLOCKED';
+
+  bool get needsConfirmation => !isBlocked && status != 'FOUND';
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
@@ -793,6 +803,9 @@ class RouteSearchResult {
     if (isBlocked) {
       return '안내 불가 이유';
     }
+    if (needsConfirmation) {
+      return '확인 필요 이유';
+    }
     return warnings.isEmpty ? '주의 없음' : '주의 확인';
   }
 
@@ -820,7 +833,7 @@ class RouteSearchResult {
     }
     final safeBlockedReasons = blockedReasonLabels;
     if (safeBlockedReasons.isNotEmpty) {
-      parts.add('안내 불가 이유 ${safeBlockedReasons.join(', ')}');
+      parts.add('$attentionLabel ${safeBlockedReasons.join(', ')}');
     }
     if (isBlocked) {
       parts.add('다음 행동 $_routeSearchFailureNextAction');
@@ -1038,6 +1051,7 @@ String _routeWarningLabel(String code) {
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
     _ => '일부 이동 정보를 확인하지 못했어요.',
   };
@@ -1050,10 +1064,12 @@ String _routeBlockedReasonLabel(String reason) {
     'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+    'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
     '계단 없는 경로를 찾지 못했습니다.' => '계단 없는 경로를 찾지 못했습니다.',
     '계단 없는 동선 여부를 확인할 수 없습니다.' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     '필수 접근성 시설을 사용할 수 없습니다.' => '필수 접근성 시설을 사용할 수 없습니다.',
     '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+    '경로 연결 정보를 확인할 수 없습니다.' => '경로 연결 정보를 확인할 수 없습니다.',
     _ => '안내 가능한 경로를 찾지 못했습니다.',
   };
 }
@@ -2590,11 +2606,12 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
       return _RouteBlockedWorkflow(result: result);
     }
 
+    final canUseRouteActions = _isRecommendedRoute(result);
     final canUseApiActions = !result.isLocalResult;
     final canSaveRoute =
         canUseApiActions &&
         widget.favoriteRouteRepository != null &&
-        !result.isBlocked;
+        canUseRouteActions;
     final canOpenFeedback =
         canUseApiActions && widget.routeFeedbackRepository != null;
 
@@ -2606,8 +2623,9 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
       _RouteWorkflowView.detail => _RouteDetailWorkflowView(
         result: result,
         onBack: () => setState(() => _view = _RouteWorkflowView.list),
-        onStartGuidance: () =>
-            setState(() => _view = _RouteWorkflowView.guidance),
+        onStartGuidance: !canUseRouteActions
+            ? null
+            : () => setState(() => _view = _RouteWorkflowView.guidance),
         onOpenFeedback: !canOpenFeedback
             ? null
             : () => setState(() => _view = _RouteWorkflowView.feedback),
@@ -2688,7 +2706,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
 
   final RouteSearchResult result;
   final VoidCallback onBack;
-  final VoidCallback onStartGuidance;
+  final VoidCallback? onStartGuidance;
   final VoidCallback? onOpenFeedback;
   final Widget? favoriteSaveButton;
 
@@ -2729,12 +2747,14 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         ?favoriteSaveButton,
-        const SizedBox(height: 10),
-        FilledButton(
-          key: const Key('routeStartGuidanceButton'),
-          onPressed: onStartGuidance,
-          child: const Text('안내 시작'),
-        ),
+        if (onStartGuidance != null) ...[
+          const SizedBox(height: 10),
+          FilledButton(
+            key: const Key('routeStartGuidanceButton'),
+            onPressed: onStartGuidance,
+            child: const Text('안내 시작'),
+          ),
+        ],
         if (onOpenFeedback != null) ...[
           const SizedBox(height: 8),
           TextButton(
