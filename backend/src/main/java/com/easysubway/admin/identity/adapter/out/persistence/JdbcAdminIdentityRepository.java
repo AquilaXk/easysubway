@@ -11,8 +11,11 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -43,7 +46,7 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 				"""
 					SELECT login_id, display_name, email, password_hash, auth_method, role, status,
 						failed_login_count, locked_until, password_changed_at, password_expires_at,
-						credential_rotation_required, break_glass_reason, created_at, updated_at
+						credential_rotation_required, break_glass_reason, bootstrap_managed, created_at, updated_at
 					FROM admin_users
 					WHERE login_id = ?
 					""",
@@ -71,6 +74,7 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 				password_expires_at = ?,
 				credential_rotation_required = ?,
 				break_glass_reason = ?,
+				bootstrap_managed = ?,
 				updated_at = ?
 			WHERE login_id = ?
 			""",
@@ -86,6 +90,7 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 			identity.passwordExpiresAt(),
 			identity.credentialRotationRequired(),
 			identity.breakGlassReason(),
+			identity.bootstrapManaged(),
 			identity.updatedAt(),
 			normalize(identity.loginId())
 		);
@@ -107,6 +112,44 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 		} catch (DuplicateKeyException exception) {
 			return findByLoginId(identity.loginId()).orElseThrow(() -> exception);
 		}
+	}
+
+	@Override
+	public int disableStaleBootstrapIdentities(Set<String> activeLoginIds, LocalDateTime now) {
+		List<String> active = activeLoginIds.stream()
+			.map(JdbcAdminIdentityRepository::normalize)
+			.toList();
+		if (active.isEmpty()) {
+			return jdbcTemplate.update("""
+				UPDATE admin_users
+				SET status = ?,
+					failed_login_count = 0,
+					locked_until = NULL,
+					updated_at = ?
+				WHERE bootstrap_managed = TRUE
+					AND status <> ?
+				""",
+				AdminIdentityStatus.DISABLED.name(),
+				now,
+				AdminIdentityStatus.DISABLED.name()
+			);
+		}
+		String placeholders = String.join(", ", java.util.Collections.nCopies(active.size(), "?"));
+		List<Object> arguments = new ArrayList<>();
+		arguments.add(AdminIdentityStatus.DISABLED.name());
+		arguments.add(now);
+		arguments.add(AdminIdentityStatus.DISABLED.name());
+		arguments.addAll(active);
+		return jdbcTemplate.update("""
+			UPDATE admin_users
+			SET status = ?,
+				failed_login_count = 0,
+				locked_until = NULL,
+				updated_at = ?
+			WHERE bootstrap_managed = TRUE
+				AND status <> ?
+				AND login_id NOT IN (%s)
+			""".formatted(placeholders), arguments.toArray());
 	}
 
 	@Override
@@ -169,9 +212,9 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 			INSERT INTO admin_users (
 				login_id, display_name, email, password_hash, auth_method, role, status,
 				failed_login_count, locked_until, password_changed_at, password_expires_at,
-				credential_rotation_required, break_glass_reason, created_at, updated_at
+				credential_rotation_required, break_glass_reason, bootstrap_managed, created_at, updated_at
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			""",
 			normalize(identity.loginId()),
 			identity.displayName(),
@@ -186,6 +229,7 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 			identity.passwordExpiresAt(),
 			identity.credentialRotationRequired(),
 			identity.breakGlassReason(),
+			identity.bootstrapManaged(),
 			identity.createdAt(),
 			identity.updatedAt()
 		);
@@ -206,6 +250,7 @@ public class JdbcAdminIdentityRepository implements AdminIdentityRepository {
 			toLocalDateTime(resultSet.getTimestamp("password_expires_at")),
 			resultSet.getBoolean("credential_rotation_required"),
 			resultSet.getString("break_glass_reason"),
+			resultSet.getBoolean("bootstrap_managed"),
 			resultSet.getTimestamp("created_at").toLocalDateTime(),
 			resultSet.getTimestamp("updated_at").toLocalDateTime()
 		);

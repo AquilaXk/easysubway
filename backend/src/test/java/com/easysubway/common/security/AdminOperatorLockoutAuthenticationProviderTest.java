@@ -111,6 +111,7 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 			null,
 			false,
 			null,
+			true,
 			LocalDateTime.now(clock),
 			LocalDateTime.now(clock)
 		));

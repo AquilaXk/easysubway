@@ -12,8 +12,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -185,7 +187,9 @@ public class SecurityConfig {
 		validateDistinctAdminLoginIds(adminUsername, operatorUsername, breakGlassUsername);
 
 		LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
+		Set<String> activeBootstrapLoginIds = new LinkedHashSet<>();
 		if (!adminUsername.isBlank() && !adminPassword.isBlank()) {
+			activeBootstrapLoginIds.add(normalizeLoginId(adminUsername));
 			bootstrapIdentity(adminIdentityRepository, passwordEncoder, adminPassword, localIdentity(
 				adminUsername,
 				"관리자",
@@ -195,6 +199,7 @@ public class SecurityConfig {
 			), now);
 		}
 		if (!operatorUsername.isBlank() && !operatorPassword.isBlank()) {
+			activeBootstrapLoginIds.add(normalizeLoginId(operatorUsername));
 			bootstrapIdentity(adminIdentityRepository, passwordEncoder, operatorPassword, localIdentity(
 				operatorUsername,
 				"운영기관 관리자",
@@ -204,6 +209,7 @@ public class SecurityConfig {
 			), now);
 		}
 		if (!breakGlassUsername.isBlank() && !breakGlassPassword.isBlank()) {
+			activeBootstrapLoginIds.add(normalizeLoginId(breakGlassUsername));
 			bootstrapIdentity(adminIdentityRepository, passwordEncoder, breakGlassPassword, breakGlassIdentity(
 				breakGlassUsername,
 				passwordEncoder.encode(breakGlassPassword),
@@ -211,6 +217,7 @@ public class SecurityConfig {
 				now
 			), now);
 		}
+		adminIdentityRepository.disableStaleBootstrapIdentities(activeBootstrapLoginIds, now);
 		var users = new ConcurrentUserDetailsManager();
 		if (!userUsername.isBlank() && !userPassword.isBlank()) {
 			users.createUser(User.withUsername(userUsername)
@@ -290,6 +297,7 @@ public class SecurityConfig {
 			&& Objects.equals(existing.displayName(), bootstrap.displayName())
 			&& Objects.equals(existing.email(), bootstrap.email())
 			&& Objects.equals(existing.breakGlassReason(), bootstrap.breakGlassReason())
+			&& existing.bootstrapManaged() == bootstrap.bootstrapManaged()
 			&& passwordEncoder.matches(rawPassword, existing.passwordHash());
 	}
 
@@ -324,6 +332,7 @@ public class SecurityConfig {
 			null,
 			false,
 			null,
+			true,
 			now,
 			now
 		);
@@ -349,6 +358,7 @@ public class SecurityConfig {
 			now.plusDays(1),
 			false,
 			reason,
+			true,
 			now,
 			now
 		);

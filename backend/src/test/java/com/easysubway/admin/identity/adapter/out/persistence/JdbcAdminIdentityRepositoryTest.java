@@ -77,6 +77,30 @@ class JdbcAdminIdentityRepositoryTest {
 		);
 	}
 
+	@Test
+	@DisplayName("현재 bootstrap 설정에 없는 bootstrap-managed 계정만 비활성화한다")
+	void disableStaleBootstrapIdentitiesOnlyDisablesManagedRows() {
+		var dataSource = adminIdentityDataSource();
+		var repository = new JdbcAdminIdentityRepository(dataSource);
+		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
+		repository.save(localIdentity("active-admin", now));
+		repository.save(localIdentity("stale-admin", now));
+		repository.save(localIdentity("manual-admin", now, false));
+
+		int disabled = repository.disableStaleBootstrapIdentities(
+			java.util.Set.of("active-admin"),
+			now.plusMinutes(1)
+		);
+
+		assertThat(disabled).isEqualTo(1);
+		assertThat(repository.findByLoginId("active-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.ACTIVE);
+		assertThat(repository.findByLoginId("stale-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+		assertThat(repository.findByLoginId("manual-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.ACTIVE);
+	}
+
 	private DataSource adminIdentityDataSource() {
 		var dataSource = new EmbeddedDatabaseBuilder()
 			.setType(EmbeddedDatabaseType.H2)
@@ -88,6 +112,10 @@ class JdbcAdminIdentityRepositoryTest {
 	}
 
 	private AdminIdentity localIdentity(String loginId, LocalDateTime now) {
+		return localIdentity(loginId, now, true);
+	}
+
+	private AdminIdentity localIdentity(String loginId, LocalDateTime now, boolean bootstrapManaged) {
 		return new AdminIdentity(
 			loginId,
 			"관리자",
@@ -102,6 +130,7 @@ class JdbcAdminIdentityRepositoryTest {
 			null,
 			false,
 			null,
+			bootstrapManaged,
 			now,
 			now
 		);

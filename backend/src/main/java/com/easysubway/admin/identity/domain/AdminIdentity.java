@@ -17,6 +17,7 @@ public record AdminIdentity(
 	LocalDateTime passwordExpiresAt,
 	boolean credentialRotationRequired,
 	String breakGlassReason,
+	boolean bootstrapManaged,
 	LocalDateTime createdAt,
 	LocalDateTime updatedAt
 ) {
@@ -101,6 +102,28 @@ public record AdminIdentity(
 			bootstrap.passwordExpiresAt(),
 			bootstrap.credentialRotationRequired(),
 			bootstrap.breakGlassReason(),
+			bootstrap.bootstrapManaged(),
+			createdAt,
+			now
+		);
+	}
+
+	public AdminIdentity disable(LocalDateTime now) {
+		return new AdminIdentity(
+			loginId,
+			displayName,
+			email,
+			passwordHash,
+			authMethod,
+			role,
+			AdminIdentityStatus.DISABLED,
+			0,
+			null,
+			passwordChangedAt,
+			passwordExpiresAt,
+			credentialRotationRequired,
+			breakGlassReason,
+			bootstrapManaged,
 			createdAt,
 			now
 		);
@@ -127,6 +150,7 @@ public record AdminIdentity(
 			passwordExpiresAt,
 			nextCredentialRotationRequired,
 			breakGlassReason,
+			bootstrapManaged,
 			createdAt,
 			now
 		);

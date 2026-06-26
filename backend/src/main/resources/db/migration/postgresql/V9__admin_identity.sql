@@ -12,6 +12,7 @@ CREATE TABLE admin_users (
     password_expires_at TIMESTAMP,
     credential_rotation_required BOOLEAN NOT NULL DEFAULT FALSE,
     break_glass_reason VARCHAR(500),
+    bootstrap_managed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );

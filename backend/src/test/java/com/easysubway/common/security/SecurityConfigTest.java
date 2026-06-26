@@ -314,6 +314,60 @@ class SecurityConfigTest {
 	}
 
 	@Test
+	@DisplayName("bootstrap 설정에서 제거된 영속 관리자 계정은 시작 시 비활성화한다")
+	void removedBootstrapIdentitiesAreDisabledOnStartup() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"old-admin",
+			"old-admin-password",
+			"old-break-glass",
+			"old-break-password",
+			"운영 장애 대응",
+			"old-operator",
+			"old-operator-password",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		securityConfig.userDetailsService(
+			"new-admin",
+			"new-admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		assertThat(repository.findByLoginId("old-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+		assertThat(repository.findByLoginId("old-operator").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+		assertThat(repository.findByLoginId("old-break-glass").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+		assertThat(repository.findByLoginId("new-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.ACTIVE);
+	}
+
+	@Test
 	@DisplayName("break-glass bootstrap은 같은 비밀번호면 reason 변경만으로 rotation 요구를 해제하지 않는다")
 	void breakGlassBootstrapKeepsRotationRequirementWhenSecretDidNotChange() {
 		var securityConfig = new SecurityConfig();

@@ -2,6 +2,7 @@ package com.easysubway.admin.identity.adapter.out.persistence;
 
 import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
 import com.easysubway.admin.identity.domain.AdminIdentity;
+import com.easysubway.admin.identity.domain.AdminIdentityStatus;
 import com.easysubway.admin.identity.domain.AdminLoginAudit;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -9,9 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
@@ -36,6 +39,24 @@ public class InMemoryAdminIdentityRepository implements AdminIdentityRepository 
 	@Override
 	public AdminIdentity upsertBootstrap(AdminIdentity identity) {
 		return identitiesByLoginId.compute(normalize(identity.loginId()), (key, current) -> current == null ? identity : current);
+	}
+
+	@Override
+	public int disableStaleBootstrapIdentities(Set<String> activeLoginIds, LocalDateTime now) {
+		Set<String> active = activeLoginIds.stream()
+			.map(InMemoryAdminIdentityRepository::normalize)
+			.collect(java.util.stream.Collectors.toUnmodifiableSet());
+		AtomicInteger disabledCount = new AtomicInteger();
+		identitiesByLoginId.replaceAll((loginId, identity) -> {
+			if (!identity.bootstrapManaged()
+				|| active.contains(loginId)
+				|| identity.status() == AdminIdentityStatus.DISABLED) {
+				return identity;
+			}
+			disabledCount.incrementAndGet();
+			return identity.disable(now);
+		});
+		return disabledCount.get();
 	}
 
 	@Override
