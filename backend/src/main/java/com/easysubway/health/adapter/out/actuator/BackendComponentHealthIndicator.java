@@ -19,7 +19,7 @@ class BackendComponentHealthIndicator implements HealthIndicator {
 	@Override
 	public Health health() {
 		HealthStatus health = checkHealthUseCase.checkHealth();
-		return Health.status(actuatorStatus(health.status()))
+		return Health.status(health.status())
 			.withDetail("summaryStatus", health.status())
 			.withDetail("components", health.components().stream()
 				.map(component -> Map.of(
@@ -29,9 +29,5 @@ class BackendComponentHealthIndicator implements HealthIndicator {
 				))
 				.toList())
 			.build();
-	}
-
-	private static String actuatorStatus(String status) {
-		return "DOWN".equals(status) ? "DOWN" : "UP";
 	}
 }

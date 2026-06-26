@@ -56,7 +56,7 @@ public class HealthCheckService implements CheckHealthUseCase {
 
 	private HealthComponent databaseHealth() {
 		if (dataSource == null) {
-			return unknown("database", "데이터베이스", "DataSource가 구성되지 않았습니다.");
+			return new HealthComponent("database", "DOWN", "데이터베이스", "DataSource가 구성되지 않았습니다.");
 		}
 		try (Connection connection = dataSource.getConnection()) {
 			boolean valid = connection.isValid(2);
@@ -73,7 +73,7 @@ public class HealthCheckService implements CheckHealthUseCase {
 
 	private HealthComponent masterDataHealth() {
 		if (loadTransitMasterPort == null) {
-			return unknown("masterData", "마스터 데이터", "마스터 데이터 port가 구성되지 않았습니다.");
+			return new HealthComponent("masterData", "DOWN", "마스터 데이터", "마스터 데이터 port가 구성되지 않았습니다.");
 		}
 		try {
 			boolean hasMasterData = !loadTransitMasterPort.loadOperators().isEmpty()
