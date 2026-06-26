@@ -47,6 +47,13 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/postgres:5432\/easysubway$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS=45$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_UPLOAD_INTENT_LIMIT=30$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_UPLOAD_CLAIM_LIMIT=45$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_REPORT_SUBMIT_LIMIT=12$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_STATUS_LIMIT=90$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_CONFIRM_LIMIT=15$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_MAX_COUNTER_KEYS=2048$/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_POSTGRES_PASSWORD=/m);
   assert.equal(composeMode, 0o600);
