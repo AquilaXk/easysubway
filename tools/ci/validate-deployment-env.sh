@@ -19,19 +19,29 @@ has_env_name() {
 
 has_non_empty_env_value() {
   local name="$1"
-  grep -Eq "^${name}=.+" "${env_file}"
+  [[ -n "$(env_value "${name}")" ]]
+}
+
+trim_blank() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "${value}"
 }
 
 env_value() {
   local name="$1"
   local value
   value="$(sed -nE "s/^${name}=(.*)$/\\1/p" "${env_file}" | tail -n 1)"
+  value="$(trim_blank "${value}")"
   case "${value}" in
     \"*\"|\'*\')
-      value="${value:1:${#value}-2}"
+      if (( ${#value} >= 2 )); then
+        value="${value:1:${#value}-2}"
+      fi
       ;;
   esac
-  printf '%s' "${value}"
+  trim_blank "${value}"
 }
 
 is_admin_basic_auth_enabled() {
