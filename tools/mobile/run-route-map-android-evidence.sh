@@ -11,14 +11,17 @@ Options:
   --artifact-dir <dir>      Required output directory for screenshots, UI trees, logs, and summaries.
   --package <package>       App package. Defaults to com.easysubway.app.
   --adb <path>              adb executable. Defaults to $ADB or PATH lookup.
+  --build-mode <mode>       Installed APK mode: debug or profile. Defaults to debug.
   --pan-count <count>       Number of map pan gestures after route map entry. Defaults to 5.
   --settle-seconds <sec>    Wait after app launch and tab changes. Defaults to 3.
   -h, --help                Show this help.
 
-The script installs nothing. Install the target debug/profile/release APK first,
-then run this against the same device. It fails when the device is unavailable,
-the route map flow cannot be driven, evidence files are empty, or the renderer
-dispose log is not observed after leaving the route map.
+The script installs nothing. Install a debug or profile APK first, then run this
+against the same device. Release APKs are not supported because the renderer
+dispose signal is intentionally emitted only in debug/profile builds. It fails
+when the device is unavailable, the route map flow cannot be driven, evidence
+files are empty, or the renderer dispose log is not observed after leaving the
+route map.
 USAGE
 }
 
@@ -26,6 +29,7 @@ SERIAL=""
 ARTIFACT_DIR=""
 PACKAGE="com.easysubway.app"
 ADB="${ADB:-}"
+BUILD_MODE="debug"
 PAN_COUNT=5
 SETTLE_SECONDS=3
 
@@ -45,6 +49,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --adb)
       ADB="${2:-}"
+      shift 2
+      ;;
+    --build-mode)
+      BUILD_MODE="${2:-}"
       shift 2
       ;;
     --pan-count)
@@ -71,6 +79,15 @@ if [[ -z "$SERIAL" || -z "$ARTIFACT_DIR" ]]; then
   usage >&2
   exit 2
 fi
+
+case "$BUILD_MODE" in
+  debug|profile)
+    ;;
+  *)
+    echo "Unsupported build mode: $BUILD_MODE. Use debug or profile." >&2
+    exit 2
+    ;;
+esac
 
 if [[ -z "$ADB" ]]; then
   ADB="$(command -v adb || true)"
@@ -134,6 +151,7 @@ PAN_RIGHT_X=$((WIDTH * 7 / 10))
   echo "package=$PACKAGE"
   echo "width=$WIDTH"
   echo "height=$HEIGHT"
+  echo "build_mode=$BUILD_MODE"
   echo "pan_count=$PAN_COUNT"
   echo "settle_seconds=$SETTLE_SECONDS"
   echo "adb=$ADB"
@@ -193,6 +211,7 @@ fi
   echo "- serial: $SERIAL"
   echo "- package: $PACKAGE"
   echo "- viewport: ${WIDTH}x${HEIGHT}"
+  echo "- build_mode: $BUILD_MODE"
   echo "- pan_count: $PAN_COUNT"
   echo
   echo "## Renderer logs"
