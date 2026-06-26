@@ -580,6 +580,7 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'lineId': result.lineId,
     'lineName': result.lineName,
     'score': result.score,
+    'accessibilityScore': result.accessibilityScore,
     'burdenCost': result.burdenCost,
     'estimatedDurationSeconds': result.estimatedDurationSeconds,
     'walkingDistanceMeters': result.walkingDistanceMeters,

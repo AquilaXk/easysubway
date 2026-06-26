@@ -52,11 +52,11 @@ class LocalRouteRepository implements RouteSearchRepository {
       destinationStationId: request.destinationStationId,
       destinationStationName: destinationName,
       mobilityType: request.mobilityType,
-      status: result.status == local.RouteStatus.found ? 'FOUND' : 'BLOCKED',
+      status: _routeStatus(result.status),
       lineId: primaryLineId,
       lineName: primaryLineName,
-      score: result.totalCost,
-      burdenCost: result.totalCost,
+      score: result.accessibilityScore,
+      burdenCost: result.generalizedCost,
       estimatedDurationSeconds: _estimatedDurationSeconds(steps),
       walkingDistanceMeters: _walkingDistanceMeters(steps),
       transferCount: _transferCount(steps),
@@ -76,6 +76,16 @@ class LocalRouteRepository implements RouteSearchRepository {
           .toList(growable: false),
       createdAt: DateTime.now().toIso8601String(),
     );
+  }
+
+  String _routeStatus(local.RouteStatus status) {
+    return switch (status) {
+      local.RouteStatus.found => 'FOUND',
+      local.RouteStatus.blocked => 'BLOCKED',
+      local.RouteStatus.unknown => 'UNKNOWN',
+      local.RouteStatus.unsupported => 'UNSUPPORTED',
+      local.RouteStatus.error => 'ERROR',
+    };
   }
 
   List<RouteSearchStep> _toSteps(
@@ -256,6 +266,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+      'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
       _ => '안내 가능한 경로를 찾지 못했습니다.',
     };
   }

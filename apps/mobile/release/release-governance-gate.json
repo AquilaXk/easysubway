@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "android-release-100-governance",
+  "releaseTarget": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "distribution": "google-play",
+    "packageId": "com.easysubway.app",
+    "primaryLocale": "ko-KR",
+    "initialCountries": ["KR"],
+    "supportScope": "national_metro_android_v1",
+    "unsupportedRegionStatus": "UNSUPPORTED_REGION",
+    "devicePolicy": {
+      "phone": "supported",
+      "tablet": "compatible_until_tablet_specific_ui_gate",
+      "foldable": "compatible_until_foldable_specific_ui_gate",
+      "chromebook": "excluded_until_keyboard_and_windowing_qa"
+    },
+    "minimumAndroidVersion": "flutter.minSdkVersion",
+    "targetApiMinimum": 35,
+    "appAccountCreation": false,
+    "ads": false,
+    "payment": false
+  },
+  "gateStatusEnum": [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "BLOCKED_EXTERNAL",
+    "BLOCKED_TECHNICAL",
+    "SATISFIED",
+    "DEFERRED_OUT_OF_SCOPE",
+    "WAIVED_UNTIL",
+    "INVALIDATED"
+  ],
+  "requiredRcEvidenceFields": [
+    "gitSha",
+    "appVersionName",
+    "versionCode",
+    "aabSha256",
+    "backendArtifactSha256",
+    "dataPackManifestSha256",
+    "releaseSequence",
+    "routeContractVersion",
+    "realtimeContractVersion",
+    "device",
+    "androidVersion",
+    "testedAt",
+    "evidencePaths",
+    "expiresWhen"
+  ],
+  "releaseReadiness": {
+    "openAndroidP0BlocksGo": true,
+    "iosBlocksAndroidRelease": false,
+    "completionAxes": [
+      "scope_completeness",
+      "implementation_completeness",
+      "automated_verification_completeness",
+      "manual_rc_verification_completeness",
+      "production_operations_completeness",
+      "google_play_submission_completeness"
+    ],
+    "p0EscalationRules": [
+      "measured_performance_budget_failure",
+      "play_prelaunch_crash",
+      "critical_accessibility_flow_failure",
+      "store_description_scope_mismatch",
+      "privacy_declaration_mismatch",
+      "backup_restore_failure",
+      "missing_alert_route",
+      "production_data_coverage_shortfall",
+      "app_start_or_core_route_crash",
+      "install_update_rollback_failure"
+    ]
+  },
+  "releaseControl": {
+    "raciRequired": true,
+    "freezeRequired": true,
+    "hotfixPolicyRequired": true,
+    "waiverRequiresUntilDate": true,
+    "finalGoNoGoOwnerRequired": true
+  },
+  "gates": [
+    {
+      "id": "G0_GOVERNANCE",
+      "issue": 900,
+      "priority": "P0",
+      "status": "IN_PROGRESS"
+    },
+    {
+      "id": "G1_PRODUCTION_DATAPACK",
+      "issue": 547,
+      "priority": "P0",
+      "status": "IN_PROGRESS"
+    },
+    {
+      "id": "G2_ROUTE_SAFETY",
+      "issue": 901,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G3_DATAPACK_UPDATER",
+      "issue": 902,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G4_REALTIME",
+      "issue": 903,
+      "priority": "P0_IF_INCLUDED_IN_STORE_COPY",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G5_BACKEND_CONTROL_PLANE",
+      "issue": 904,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G6_SECURITY_PRIVACY",
+      "issue": 905,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G7_ANDROID_QUALITY",
+      "issue": 917,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G8_OPERATIONS",
+      "issue": 906,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "G9_GOOGLE_PLAY",
+      "issue": 907,
+      "priority": "P0",
+      "status": "NOT_STARTED"
+    }
+  ],
+  "childIssueLinks": [571, 836, 909, 911, 915, 919, 920, 921, 922, 923, 924, 925, 926],
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/android-release-100/",
+    "githubEvidencePolicy": "summary_or_public_link",
+    "sensitiveEvidencePolicy": "local_path_with_reason"
+  }
+}

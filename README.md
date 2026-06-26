@@ -56,6 +56,8 @@ CD는 `main`의 CI가 성공한 뒤 `workflow_run`으로 자동 실행됩니다.
 
 모바일 signed release artifact gate는 `apps/mobile/release/signed-release-artifact-gate.json`으로 검증합니다. Android-first 배포 파이프라인은 Android AAB와 backend image만 생성하며, CI의 Android AAB는 임시 self-signed keystore로 생성하므로 store-ready가 아닙니다. iOS artifact와 dSYM 보관은 iOS 출시 준비 단계까지 deferred 상태로 두고 현재 workflow에서는 생성하지 않습니다. Android 제출 준비 상태는 Android 15 (API 35) target requirement, production signing key material, Play App Signing, Play internal track 업로드 또는 pre-launch report 증거가 있어야 합니다. iOS 제출 준비 상태는 Xcode 26 및 iOS 26 SDK 기준, Apple distribution signing, export archive, TestFlight 또는 signed-device install 증거와 dSYM 90일 보관 workflow가 있어야 합니다. 민감한 설치/스토어 콘솔 증거는 GitHub에 파일로 올리지 않고 `.codex/evidence/release/mobile-signed-artifacts/` 아래 로컬 전용 경로에 보관한 뒤 PR에는 요약만 남깁니다.
 
+Android 출시 100% 범위와 Go/No-Go 계약은 `apps/mobile/release/release-governance-gate.json`으로 검증합니다. 이번 release blocker는 Android Google Play v1이며 iOS는 `DEFERRED_OUT_OF_SCOPE`로 기록해 Android 출시 완료를 차단하지 않습니다. open Android P0가 있거나 RC evidence의 git SHA, AAB hash, backend artifact, data pack manifest, route/realtime contract가 서로 맞지 않으면 최종 Go 판단을 하지 않습니다.
+
 ## Privacy Policy
 
 EasySubway collects and stores only the data needed to provide subway accessibility guidance, local route search, favorites, app settings, diagnostics, and facility report submission.
