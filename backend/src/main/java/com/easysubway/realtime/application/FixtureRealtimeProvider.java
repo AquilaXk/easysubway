@@ -2,11 +2,10 @@ package com.easysubway.realtime.application;
 
 import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
+import java.time.Instant;
 import java.util.List;
 
 final class FixtureRealtimeProvider implements RealtimeProvider {
-
-	private static final String PROVIDER_RECEIVED_AT = "2026-06-26T08:00:00Z";
 
 	@Override
 	public List<RealtimeArrival> arrivals(RealtimeQuery query) {
@@ -19,7 +18,7 @@ final class FixtureRealtimeProvider implements RealtimeProvider {
 			180,
 			"3분 후",
 			"전역 출발",
-			PROVIDER_RECEIVED_AT
+			Instant.now().toString()
 		));
 	}
 
@@ -32,7 +31,7 @@ final class FixtureRealtimeProvider implements RealtimeProvider {
 			"운행중",
 			"상행",
 			"당고개",
-			PROVIDER_RECEIVED_AT
+			Instant.now().toString()
 		));
 	}
 }

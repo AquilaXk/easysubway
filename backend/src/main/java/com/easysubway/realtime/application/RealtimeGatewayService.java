@@ -4,6 +4,12 @@ import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -17,7 +23,11 @@ public class RealtimeGatewayService {
 
 	private static final Duration CACHE_TTL = Duration.ofSeconds(20);
 	private static final Duration STALE_TTL = Duration.ofSeconds(120);
+	private static final Duration PROVIDER_FRESHNESS_TTL = Duration.ofSeconds(90);
 	private static final Duration QUOTA_CIRCUIT_OPEN = Duration.ofSeconds(60);
+	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
+	private static final DateTimeFormatter PROVIDER_TIMESTAMP_FORMATTER =
+		DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 	private static final String SANGNOKSU_STATION_ID = "station-sangnoksu";
 	private static final String SANGNOKSU_STATION_NAME = "상록수";
 	private static final String LINE_ID = "4";
@@ -87,18 +97,20 @@ public class RealtimeGatewayService {
 			if (arrivals.isEmpty()) {
 				return RealtimeArrivalResult.unavailable("EMPTY_PROVIDER_RESULT");
 			}
+			Instant receivedAt = clock.instant();
+			List<RealtimeArrival> freshArrivals = freshArrivals(arrivals, receivedAt);
+			if (freshArrivals.isEmpty()) {
+				return staleArrivalOrUnavailable(cached, "PROVIDER_ERROR");
+			}
 			RealtimeArrivalResult result = RealtimeArrivalResult.fresh(
-				clock.instant().toString(),
-				arrivals
+				receivedAt.toString(),
+				freshArrivals
 			);
-			arrivalCache.put(cacheKey, new CachedArrival(result, clock.instant()));
+			arrivalCache.put(cacheKey, new CachedArrival(result, receivedAt));
 			return result;
 		} catch (RealtimeProviderException exception) {
 			openQuotaCircuitIfNeeded(exception);
-			if (cached != null && isStaleUsable(cached.cachedAt())) {
-				return cached.result().stale();
-			}
-			return RealtimeArrivalResult.unavailable(exception.fallbackCode());
+			return staleArrivalOrUnavailable(cached, exception.fallbackCode());
 		}
 	}
 
@@ -147,18 +159,115 @@ public class RealtimeGatewayService {
 			if (trainPositions.isEmpty()) {
 				return RealtimeTrainPositionResult.unavailable("EMPTY_PROVIDER_RESULT");
 			}
+			Instant receivedAt = clock.instant();
+			List<RealtimeTrainPosition> freshTrainPositions = freshTrainPositions(trainPositions, receivedAt);
+			if (freshTrainPositions.isEmpty()) {
+				return staleTrainPositionOrUnavailable(cached, "PROVIDER_ERROR");
+			}
 			RealtimeTrainPositionResult result = RealtimeTrainPositionResult.fresh(
-				clock.instant().toString(),
-				trainPositions
+				receivedAt.toString(),
+				freshTrainPositions
 			);
-			trainPositionCache.put(cacheKey, new CachedTrainPosition(result, clock.instant()));
+			trainPositionCache.put(cacheKey, new CachedTrainPosition(result, receivedAt));
 			return result;
 		} catch (RealtimeProviderException exception) {
 			openQuotaCircuitIfNeeded(exception);
-			if (cached != null && isStaleUsable(cached.cachedAt())) {
-				return cached.result().stale();
+			return staleTrainPositionOrUnavailable(cached, exception.fallbackCode());
+		}
+	}
+
+	private RealtimeArrivalResult staleArrivalOrUnavailable(CachedArrival cached, String fallbackCode) {
+		if (cached != null && isStaleUsable(cached.cachedAt())) {
+			return cached.result().stale();
+		}
+		return RealtimeArrivalResult.unavailable(fallbackCode);
+	}
+
+	private RealtimeTrainPositionResult staleTrainPositionOrUnavailable(
+		CachedTrainPosition cached,
+		String fallbackCode
+	) {
+		if (cached != null && isStaleUsable(cached.cachedAt())) {
+			return cached.result().stale();
+		}
+		return RealtimeTrainPositionResult.unavailable(fallbackCode);
+	}
+
+	private List<RealtimeArrival> freshArrivals(List<RealtimeArrival> arrivals, Instant receivedAt) {
+		List<RealtimeArrival> freshArrivals = new ArrayList<>();
+		for (RealtimeArrival arrival : arrivals) {
+			Instant providerReceivedAt = parseProviderReceivedAt(arrival.providerReceivedAt());
+			if (providerReceivedAt == null || !isProviderFresh(providerReceivedAt, receivedAt)) {
+				continue;
 			}
-			return RealtimeTrainPositionResult.unavailable(exception.fallbackCode());
+			freshArrivals.add(adjustArrivalEta(arrival, providerReceivedAt, receivedAt));
+		}
+		return List.copyOf(freshArrivals);
+	}
+
+	private List<RealtimeTrainPosition> freshTrainPositions(
+		List<RealtimeTrainPosition> trainPositions,
+		Instant receivedAt
+	) {
+		List<RealtimeTrainPosition> freshTrainPositions = new ArrayList<>();
+		for (RealtimeTrainPosition trainPosition : trainPositions) {
+			Instant providerReceivedAt = parseProviderReceivedAt(trainPosition.providerReceivedAt());
+			if (providerReceivedAt == null || !isProviderFresh(providerReceivedAt, receivedAt)) {
+				continue;
+			}
+			freshTrainPositions.add(trainPosition);
+		}
+		return List.copyOf(freshTrainPositions);
+	}
+
+	private RealtimeArrival adjustArrivalEta(RealtimeArrival arrival, Instant providerReceivedAt, Instant receivedAt) {
+		Integer etaSeconds = arrival.etaSeconds();
+		if (etaSeconds == null) {
+			return arrival;
+		}
+		long delaySeconds = Math.max(0, Duration.between(providerReceivedAt, receivedAt).toSeconds());
+		int adjustedEtaSeconds = (int) Math.max(0, etaSeconds - delaySeconds);
+		return new RealtimeArrival(
+			arrival.lineId(),
+			arrival.stationName(),
+			arrival.destination(),
+			arrival.direction(),
+			arrival.trainNo(),
+			adjustedEtaSeconds,
+			arrivalMessage(adjustedEtaSeconds),
+			arrival.positionMessage(),
+			arrival.providerReceivedAt()
+		);
+	}
+
+	private String arrivalMessage(int etaSeconds) {
+		if (etaSeconds <= 0) {
+			return "곧 도착";
+		}
+		if (etaSeconds < 60) {
+			return "1분 이내";
+		}
+		return "%d분 후".formatted((etaSeconds + 59) / 60);
+	}
+
+	private boolean isProviderFresh(Instant providerReceivedAt, Instant receivedAt) {
+		return Duration.between(providerReceivedAt, receivedAt).compareTo(PROVIDER_FRESHNESS_TTL) <= 0;
+	}
+
+	private Instant parseProviderReceivedAt(String providerReceivedAt) {
+		if (providerReceivedAt == null || providerReceivedAt.isBlank()) {
+			return null;
+		}
+		try {
+			return Instant.parse(providerReceivedAt);
+		} catch (DateTimeParseException ignored) {
+			try {
+				return LocalDateTime.parse(providerReceivedAt, PROVIDER_TIMESTAMP_FORMATTER)
+					.atZone(PROVIDER_ZONE)
+					.toInstant();
+			} catch (DateTimeParseException exception) {
+				return null;
+			}
 		}
 	}
 

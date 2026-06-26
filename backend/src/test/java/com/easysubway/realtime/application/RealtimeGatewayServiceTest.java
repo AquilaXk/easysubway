@@ -126,6 +126,40 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("provider timestamp가 오래된 도착 정보는 fresh로 승격하지 않는다")
+	void staleProviderTimestampDoesNotReturnFreshArrivals() {
+		CountingProvider provider = new CountingProvider();
+		provider.providerReceivedAt = "2026-06-26T07:58:00Z";
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+
+		RealtimeArrivalResult result = service.arrivals(sangnoksuQuery());
+
+		assertThat(result.status()).hasToString("UNAVAILABLE");
+		assertThat(result.fallbackCode()).isEqualTo("PROVIDER_ERROR");
+		assertThat(provider.arrivalCalls).hasValue(1);
+	}
+
+	@Test
+	@DisplayName("provider timestamp 지연은 도착 ETA와 메시지에 반영한다")
+	void providerTimestampDelayAdjustsArrivalEta() {
+		CountingProvider provider = new CountingProvider();
+		provider.providerReceivedAt = "2026-06-26T07:59:30Z";
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+
+		RealtimeArrivalResult result = service.arrivals(sangnoksuQuery());
+
+		assertThat(result.status()).hasToString("FRESH");
+		assertThat(result.arrivals().get(0).etaSeconds()).isEqualTo(150);
+		assertThat(result.arrivals().get(0).message()).isEqualTo("3분 후");
+	}
+
+	@Test
 	@DisplayName("quota 초과는 circuit을 열고 다음 요청에서 provider를 호출하지 않는다")
 	void quotaExhaustionOpensCircuit() {
 		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
@@ -370,6 +404,7 @@ class RealtimeGatewayServiceTest {
 		private final AtomicInteger trainPositionCalls = new AtomicInteger();
 		private String failureCode;
 		private boolean emptyArrivals;
+		private String providerReceivedAt = "2026-06-26T08:00:00Z";
 
 		@Override
 		public List<RealtimeArrival> arrivals(RealtimeQuery query) {
@@ -389,7 +424,7 @@ class RealtimeGatewayServiceTest {
 				180,
 				"3분 후",
 				"전역 출발",
-				"2026-06-26T08:00:00Z"
+				providerReceivedAt
 			));
 		}
 
@@ -406,7 +441,7 @@ class RealtimeGatewayServiceTest {
 				"운행중",
 				"상행",
 				"당고개",
-				"2026-06-26T08:00:00Z"
+				providerReceivedAt
 			));
 		}
 	}
