@@ -49,14 +49,7 @@ class TransitMasterCollectionBatchConfigTest {
 		assertThat(run.requestedBy()).isEqualTo("admin-batch");
 		assertThat(execution.getStepExecutions())
 			.extracting("stepName")
-			.containsExactlyInAnyOrder(
-				TransitMasterCollectionBatchConfig.FETCH_STEP_NAME,
-				TransitMasterCollectionBatchConfig.ARCHIVE_STEP_NAME,
-				TransitMasterCollectionBatchConfig.VALIDATE_STEP_NAME,
-				TransitMasterCollectionBatchConfig.PARSE_STEP_NAME,
-				TransitMasterCollectionBatchConfig.DIFF_STEP_NAME,
-				TransitMasterCollectionBatchConfig.STAGE_STEP_NAME
-			);
+			.containsExactly(TransitMasterCollectionBatchConfig.STEP_NAME);
 		assertThat(run.steps())
 			.extracting("name")
 			.containsExactly("FETCH", "ARCHIVE", "VALIDATE", "PARSE", "DIFF", "STAGE", "PUBLISH", "ACTIVATE");

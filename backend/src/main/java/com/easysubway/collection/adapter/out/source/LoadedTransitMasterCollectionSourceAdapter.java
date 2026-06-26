@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,20 +21,45 @@ class LoadedTransitMasterCollectionSourceAdapter implements FetchTransitMasterCo
 
 	@Override
 	public TransitMasterCollectionSnapshot fetch() {
-		int operators = loadTransitMasterPort.loadOperators().size();
-		int lines = loadTransitMasterPort.loadLines().size();
-		int stations = loadTransitMasterPort.loadStations().size();
-		int stationLines = loadTransitMasterPort.loadStationLines().size();
-		int exits = loadTransitMasterPort.loadStationExits().size();
-		int facilities = loadTransitMasterPort.loadAccessibilityFacilities().size();
-		String payload = "operators=%d;lines=%d;stations=%d;stationLines=%d;exits=%d;facilities=%d"
-			.formatted(operators, lines, stations, stationLines, exits, facilities);
+		var operators = loadTransitMasterPort.loadOperators();
+		var lines = loadTransitMasterPort.loadLines();
+		var stations = loadTransitMasterPort.loadStations();
+		var stationLines = loadTransitMasterPort.loadStationLines();
+		var exits = loadTransitMasterPort.loadStationExits();
+		var facilities = loadTransitMasterPort.loadAccessibilityFacilities();
+		String payload = checksumPayload(operators, lines, stations, stationLines, exits, facilities);
 		return new TransitMasterCollectionSnapshot(
 			"load-transit-master-port://official-current",
 			"transit-master://loaded-current",
 			sha256(payload),
-			operators + lines + stations + stationLines + exits + facilities
+			operators.size() + lines.size() + stations.size() + stationLines.size() + exits.size() + facilities.size()
 		);
+	}
+
+	private static String checksumPayload(
+		List<?> operators,
+		List<?> lines,
+		List<?> stations,
+		List<?> stationLines,
+		List<?> exits,
+		List<?> facilities
+	) {
+		var payload = new StringBuilder();
+		appendRecords(payload, "operators", operators);
+		appendRecords(payload, "lines", lines);
+		appendRecords(payload, "stations", stations);
+		appendRecords(payload, "stationLines", stationLines);
+		appendRecords(payload, "exits", exits);
+		appendRecords(payload, "facilities", facilities);
+		return payload.toString();
+	}
+
+	private static void appendRecords(StringBuilder payload, String section, List<?> records) {
+		payload.append(section).append('=').append(records.size()).append('\n');
+		records.stream()
+			.map(String::valueOf)
+			.sorted()
+			.forEach(record -> payload.append(record).append('\n'));
 	}
 
 	private static String sha256(String payload) {
