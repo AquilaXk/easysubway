@@ -786,9 +786,8 @@ void main() {
       enablePushNotifications: false,
     );
     await updateStarted.future;
-    bootstrap = await bootstrapFuture.timeout(
-      const Duration(milliseconds: 100),
-    );
+    bootstrap = await bootstrapFuture.timeout(const Duration(seconds: 5));
+    expect(finishUpdate.isCompleted, isFalse);
 
     final metadata = await bootstrap.catalogDatabase.customSelect('''
           SELECT value
