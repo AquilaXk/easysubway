@@ -1465,8 +1465,35 @@ void main() {
         isTrue,
       );
 
-      visibleSemantics.owner!.performAction(
-        visibleSemantics.id,
+      final surfaceCenter = tester.getCenter(
+        find.byKey(const Key('networkMapSurface')),
+      );
+      final firstGesture = await tester.startGesture(
+        surfaceCenter - const Offset(24, 0),
+        pointer: 1,
+      );
+      final secondGesture = await tester.startGesture(
+        surfaceCenter + const Offset(24, 0),
+        pointer: 2,
+      );
+      await firstGesture.moveBy(const Offset(-80, 0));
+      await secondGesture.moveBy(const Offset(80, 0));
+      await tester.pump();
+      expect(visibleStation, findsNothing);
+
+      await firstGesture.cancel();
+      await secondGesture.cancel();
+      await tester.pumpAndSettle();
+      expect(visibleStation, findsOneWidget);
+
+      final restoredSemantics = tester.getSemantics(visibleStation);
+      expect(
+        restoredSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      restoredSemantics.owner!.performAction(
+        restoredSemantics.id,
         SemanticsAction.tap,
       );
       await tester.pumpAndSettle();

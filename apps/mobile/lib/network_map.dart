@@ -881,39 +881,35 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   ),
                 ),
               Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onScaleStart: (details) {
-                    if (!_gestureActive) {
-                      setState(() {
-                        _gestureActive = true;
-                      });
-                    }
-                    _gestureStartCamera = camera;
-                    _gestureStartFocalPoint = details.localFocalPoint;
-                  },
-                  onScaleUpdate: (details) {
-                    _updateCameraForGesture(details);
-                  },
-                  onScaleEnd: (_) {
-                    _scheduleCameraCommit();
-                    if (_gestureActive) {
-                      setState(() {
-                        _gestureActive = false;
-                      });
-                    }
-                    _gestureStartCamera = null;
-                    _gestureStartFocalPoint = null;
-                  },
-                  onTapUp: (details) {
-                    _openNearestStation(
-                      camera.viewportToSourcePoint(details.localPosition),
-                      widget.data.stations,
-                      stationLinesById,
-                      geometry,
-                      camera,
-                    );
-                  },
+                child: Listener(
+                  onPointerCancel: (_) => _endScaleGesture(),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onScaleStart: (details) {
+                      if (!_gestureActive) {
+                        setState(() {
+                          _gestureActive = true;
+                        });
+                      }
+                      _gestureStartCamera = camera;
+                      _gestureStartFocalPoint = details.localFocalPoint;
+                    },
+                    onScaleUpdate: (details) {
+                      _updateCameraForGesture(details);
+                    },
+                    onScaleEnd: (_) {
+                      _endScaleGesture();
+                    },
+                    onTapUp: (details) {
+                      _openNearestStation(
+                        camera.viewportToSourcePoint(details.localPosition),
+                        widget.data.stations,
+                        stationLinesById,
+                        geometry,
+                        camera,
+                      );
+                    },
+                  ),
                 ),
               ),
               if (!_gestureActive)
@@ -1014,6 +1010,22 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           )
           .clamped(viewportMargin: 220),
     );
+  }
+
+  void _endScaleGesture() {
+    _scheduleCameraCommit();
+    _gestureStartCamera = null;
+    _gestureStartFocalPoint = null;
+    if (!_gestureActive) {
+      return;
+    }
+    if (!mounted) {
+      _gestureActive = false;
+      return;
+    }
+    setState(() {
+      _gestureActive = false;
+    });
   }
 
   void _setCamera(MapCameraState camera) {
