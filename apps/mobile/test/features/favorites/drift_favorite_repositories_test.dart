@@ -177,6 +177,7 @@ void main() {
         jsonDecode(snapshotRows.single.read<String>('value'))
             as Map<String, Object?>;
     expect(snapshot['burdenCost'], 44);
+    expect(snapshot['accessibilityScore'], 92);
     expect(snapshot['estimatedDurationSeconds'], 600);
     expect(snapshot['walkingDistanceMeters'], 120);
     expect(snapshot['transferCount'], 1);
