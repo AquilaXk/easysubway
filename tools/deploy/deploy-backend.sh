@@ -129,6 +129,11 @@ read_env_value() {
 }
 backend_port="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_BACKEND_PORT)"
 backend_port="${backend_port:-8080}"
+report_upload_bucket="$(read_env_value "${BACKEND_ENV}" EASYSUBWAY_REPORT_UPLOAD_BUCKET)"
+if [[ -z "${report_upload_bucket}" ]]; then
+	write_result "blocked" "missing_report_upload_bucket"
+	exit 1
+fi
 
 compose() {
 	local backend_env="$1"
@@ -177,6 +182,13 @@ wait_stateful_service() {
 for service in postgres object-storage; do
 	wait_stateful_service "${service}"
 done
+
+if ! compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" exec -T \
+	-e REPORT_UPLOAD_BUCKET="${report_upload_bucket}" \
+	object-storage sh -lc 'mc mb --ignore-existing "local/${REPORT_UPLOAD_BUCKET}" >/dev/null'; then
+	write_result "failed" "report_upload_bucket_init_failed"
+	exit 1
+fi
 
 backend_id="$(compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" ps -q backend || true)"
 if [[ -z "${current_sha}" && -n "${backend_id}" ]]; then
