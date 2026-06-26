@@ -15,7 +15,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+	webEnvironment = WebEnvironment.RANDOM_PORT,
+	properties = "management.endpoint.health.show-details=always"
+)
 @AutoConfigureObservability
 @AutoConfigureMockMvc
 @DisplayName("헬스체크 API")
@@ -34,7 +37,9 @@ class HealthCheckControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data.status").value("UP"))
-			.andExpect(jsonPath("$.data.service").value("easysubway-backend"));
+			.andExpect(jsonPath("$.data.service").value("easysubway-backend"))
+			.andExpect(jsonPath("$.data.components[0].name").value("application"))
+			.andExpect(jsonPath("$.data.components[0].status").value("UP"));
 	}
 
 	@Test
@@ -51,6 +56,17 @@ class HealthCheckControllerTest {
 		mockMvc.perform(get("/actuator/health/readiness"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("UP"));
+	}
+
+	@Test
+	@DisplayName("액추에이터는 backend component health detail을 노출한다")
+	void actuatorBackendComponentHealthIsAvailable() throws Exception {
+		mockMvc.perform(get("/actuator/health"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("UP"))
+			.andExpect(jsonPath("$.components.backendComponent.status").value("UP"))
+			.andExpect(jsonPath("$.components.backendComponent.details.summaryStatus").value("UP"))
+			.andExpect(jsonPath("$.components.backendComponent.details.components[0].name").value("application"));
 	}
 
 	@Test
