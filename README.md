@@ -68,6 +68,8 @@ Android 출시 후 2시간/24시간/7일/30일 운영 검토는 `apps/mobile/rel
 
 사용자 지원, 데이터 오류, 장애 대응 gate는 `apps/mobile/release/support-incident-response-gate.json`으로 검증합니다. support email/site, FAQ, 장애 공지 문구, 문의 분류 기준, P0 안전 오류 triage, 운영기관 연락 경로, emergency datapack release/rollback, 오래된 신고 retention, duplicate 처리, 잘못된 override 회수 절차가 준비되어야 합니다. 도움말/공지 화면 증거는 로컬 Android emulator에서 screenshot 또는 UI tree로 수집하고, support mailbox 개인 정보, receipt token, 운영기관 private contact, provider credential은 GitHub에 올리지 않습니다.
 
+Abuse-case와 penetration rehearsal gate는 `apps/mobile/release/abuse-penetration-rehearsal-gate.json`으로 검증합니다. Android AAB 또는 Play-generated APK secret/endpoint scan, report photo upload, receipt token, signed URL lifecycle, admin/operator auth, session/CSRF, tenant authorization, distributed rate limit, object storage lifecycle abuse를 확인해야 합니다. rehearsal 증거는 raw receipt token, signed URL, photo binary, provider credential, operator password, session cookie를 제거한 local-only summary로 보관하고 critical/high finding은 0이거나 #900 waiver와 fix plan이 있어야 합니다.
+
 Android 출시 100% 범위와 Go/No-Go 계약은 `apps/mobile/release/release-governance-gate.json`으로 검증합니다. 이번 release blocker는 Android Google Play v1이며 iOS는 `DEFERRED_OUT_OF_SCOPE`로 기록해 Android 출시 완료를 차단하지 않습니다. open Android P0가 있거나 RC evidence의 git SHA, AAB hash, backend artifact, data pack manifest, route/realtime contract가 서로 맞지 않으면 최종 Go 판단을 하지 않습니다.
 
 Android 출시 UX·접근성·성능 gate는 `apps/mobile/release/android-release-quality-gate.json`으로 검증합니다. PR 증거는 local Android emulator evidence를 우선 사용하며, 물리 기기 증거는 Codex PR 증거로 사용하지 않습니다. 실제 Google Play Go 판단 전에는 #907의 exact RC 또는 Play-installed build에서 TalkBack, 150%/200% 글자 크기, 작은 화면, 권한/네트워크/업로드 오류 복구, 노선도 fallback과 성능, 지원 범위/출처 화면, crash/ANR privacy-safe reporting 증거를 다시 수집해야 합니다.

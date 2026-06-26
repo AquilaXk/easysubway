@@ -97,6 +97,11 @@
       "support-channel-release-notes-review"
     ],
     "preReviewPreLaunch": [
+      "abuse-penetration-rehearsal-gate-manifest",
+      "android-aab-or-play-apk-secret-scan-output",
+      "report-photo-receipt-signed-url-abuse-summary",
+      "admin-operator-session-csrf-rate-limit-abuse-summary",
+      "critical-high-finding-zero-or-waiver-record",
       "pre-review-critical-issue-0",
       "pre-launch-report-crash-0",
       "policy-warning-0",

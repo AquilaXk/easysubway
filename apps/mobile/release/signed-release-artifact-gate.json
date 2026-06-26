@@ -10,6 +10,7 @@
   "playGeneratedApkDeviceMatrixGate": "apps/mobile/release/play-generated-apk-device-matrix-gate.json",
   "postLaunchOperationsReviewGate": "apps/mobile/release/post-launch-operations-review-gate.json",
   "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
+  "abusePenetrationRehearsalGate": "apps/mobile/release/abuse-penetration-rehearsal-gate.json",
   "officialRequirements": {
     "android": {
       "targetApiLevelMinimum": 35,
@@ -39,7 +40,8 @@
         "Play production access or closed test requirement satisfaction evidence",
         "Play-generated APK device compatibility matrix evidence",
         "Post-launch 2h/24h/7d/30d operations review evidence",
-        "Support, data correction, incident notice, emergency datapack response evidence"
+        "Support, data correction, incident notice, emergency datapack response evidence",
+        "Abuse-case and penetration rehearsal evidence"
       ]
     },
     "ios": {

@@ -28,6 +28,25 @@
     ],
     "androidEvidenceSourceKo": "QA 요청에 따라 실기기가 아니라 로컬 Android emulator에서 앱 실행, UI tree, logcat, network endpoint trace 요약을 수집한다."
   },
+  "abusePenetrationRehearsalGate": "apps/mobile/release/abuse-penetration-rehearsal-gate.json",
+  "abusePenetrationRehearsal": {
+    "requiredScenarios": [
+      "report_photo_upload_abuse",
+      "receipt_token_replay_and_status_abuse",
+      "signed_url_lifecycle_abuse",
+      "admin_operator_auth_session_csrf",
+      "distributed_rate_limit_abuse",
+      "provider_and_release_secret_exposure"
+    ],
+    "criticalHighAllowed": 0,
+    "requiredEvidence": [
+      "android-aab-or-play-apk-secret-scan-output",
+      "redacted-request-response-summary",
+      "admin-auth-csrf-rate-limit-negative-test-output",
+      "object-storage-lifecycle-abuse-summary",
+      "finding-triage-zero-critical-high-or-waiver"
+    ]
+  },
   "maliciousPhotoUploadDefense": {
     "requiredChecks": [
       "MIME type allowlist",
