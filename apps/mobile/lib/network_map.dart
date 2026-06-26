@@ -360,20 +360,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     ],
                   ),
                 ),
-                Positioned(
-                  left: 14,
-                  bottom: 14,
-                  child: SizedBox(
-                    width: 180,
-                    height: 48,
-                    child: FilledButton.icon(
-                      key: const Key('networkMapListButton'),
-                      onPressed: () => _showMapList(data),
-                      icon: const Icon(Icons.list_alt),
-                      label: const Text('노선별로 보기'),
-                    ),
-                  ),
-                ),
               ],
             );
           },
@@ -411,23 +397,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           NavigationDestination(icon: Icon(Icons.more_horiz), label: '더보기'),
         ],
       ),
-    );
-  }
-
-  void _showMapList(NetworkMapData data) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return _NetworkMapListSheet(
-          data: data,
-          onStationTap: (station, lines) {
-            Navigator.of(context).pop();
-            _showStationSheet(station, lines);
-          },
-        );
-      },
     );
   }
 
@@ -2097,72 +2066,6 @@ class _StationHitTarget extends StatelessWidget {
       label: station.displayName,
       onTap: onTap,
       child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _NetworkMapListSheet extends StatelessWidget {
-  const _NetworkMapListSheet({required this.data, required this.onStationTap});
-
-  final NetworkMapData data;
-  final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
-  onStationTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final stationsByLine = <String, List<NetworkMapStation>>{};
-    for (final station in data.stations) {
-      stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
-    }
-    final stationLinesById = _stationLinesById(data);
-    return SafeArea(
-      key: const Key('networkMapListSheet'),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-        children: [
-          const Text(
-            '노선별 역 보기',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '노선별 목록에서 역을 선택하세요.',
-            style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
-          ),
-          const SizedBox(height: 14),
-          if (data.stations.isEmpty)
-            const Text(
-              '선택한 노선에 표시할 역이 없습니다.',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            )
-          else
-            for (final line in data.lines)
-              if (stationsByLine[line.id]?.isNotEmpty ?? false)
-                ExpansionTile(
-                  key: Key('networkMapListLine-${line.id}'),
-                  initiallyExpanded: true,
-                  leading: _LineCircleBadge(line: line, size: 34),
-                  title: Text(
-                    line.shortName,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  children: [
-                    for (final station in stationsByLine[line.id]!)
-                      ListTile(
-                        key: Key(
-                          'networkMapListStation-${station.id}-${station.lineId}',
-                        ),
-                        title: Text(station.displayName),
-                        subtitle: Text(line.shortName),
-                        onTap: () => onStationTap(
-                          station,
-                          stationLinesById[station.id] ?? const [],
-                        ),
-                      ),
-                  ],
-                ),
-        ],
-      ),
     );
   }
 }
