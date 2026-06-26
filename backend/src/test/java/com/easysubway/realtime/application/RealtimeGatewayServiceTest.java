@@ -6,11 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -270,6 +272,21 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("TOPIS provider timeout 예외는 realtime timeout fallback 코드로 변환한다")
+	void topisProviderMapsHttpTimeoutToProviderTimeout() {
+		TopisRealtimeProvider provider = new TopisRealtimeProvider(
+			"backend-key",
+			new ObjectMapper(),
+			new TimeoutHttpClient(),
+			new FixtureRealtimeProvider()
+		);
+
+		assertThatThrownBy(() -> provider.arrivals(sangnoksuQuery()))
+			.isInstanceOf(RealtimeProviderException.class)
+			.hasMessage("PROVIDER_TIMEOUT");
+	}
+
+	@Test
 	@DisplayName("TOPIS provider fixture는 명시적으로 켠 테스트 경로에서만 동작한다")
 	void topisProviderUsesFixtureOnlyWhenExplicitlyEnabled() {
 		TopisRealtimeProvider provider = new TopisRealtimeProvider(
@@ -445,6 +462,78 @@ class RealtimeGatewayServiceTest {
 				Thread.currentThread().interrupt();
 				throw new IllegalStateException("Provider wait interrupted.", exception);
 			}
+		}
+	}
+
+	private static final class TimeoutHttpClient extends java.net.http.HttpClient {
+		@Override
+		public Optional<java.net.CookieHandler> cookieHandler() {
+			return Optional.empty();
+		}
+
+		@Override
+		public Optional<Duration> connectTimeout() {
+			return Optional.empty();
+		}
+
+		@Override
+		public Redirect followRedirects() {
+			return Redirect.NEVER;
+		}
+
+		@Override
+		public Optional<java.net.ProxySelector> proxy() {
+			return Optional.empty();
+		}
+
+		@Override
+		public javax.net.ssl.SSLContext sslContext() {
+			return null;
+		}
+
+		@Override
+		public javax.net.ssl.SSLParameters sslParameters() {
+			return null;
+		}
+
+		@Override
+		public Optional<java.net.Authenticator> authenticator() {
+			return Optional.empty();
+		}
+
+		@Override
+		public Version version() {
+			return Version.HTTP_2;
+		}
+
+		@Override
+		public Optional<java.util.concurrent.Executor> executor() {
+			return Optional.empty();
+		}
+
+		@Override
+		public <T> java.net.http.HttpResponse<T> send(
+			java.net.http.HttpRequest request,
+			java.net.http.HttpResponse.BodyHandler<T> responseBodyHandler
+		) throws IOException {
+			throw new java.net.http.HttpTimeoutException("timeout");
+		}
+
+		@Override
+		public <T> CompletableFuture<java.net.http.HttpResponse<T>> sendAsync(
+			java.net.http.HttpRequest request,
+			java.net.http.HttpResponse.BodyHandler<T> responseBodyHandler
+		) {
+			return CompletableFuture.failedFuture(new java.net.http.HttpTimeoutException("timeout"));
+		}
+
+		@Override
+		public <T> CompletableFuture<java.net.http.HttpResponse<T>> sendAsync(
+			java.net.http.HttpRequest request,
+			java.net.http.HttpResponse.BodyHandler<T> responseBodyHandler,
+			java.net.http.HttpResponse.PushPromiseHandler<T> pushPromiseHandler
+		) {
+			return CompletableFuture.failedFuture(new java.net.http.HttpTimeoutException("timeout"));
 		}
 	}
 

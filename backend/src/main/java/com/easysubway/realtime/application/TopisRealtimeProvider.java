@@ -10,6 +10,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -149,6 +150,8 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			return payload;
 		} catch (RealtimeProviderException exception) {
 			throw exception;
+		} catch (HttpTimeoutException exception) {
+			throw new RealtimeProviderException("PROVIDER_TIMEOUT");
 		} catch (IOException exception) {
 			throw new RealtimeProviderException("PROVIDER_UNAVAILABLE");
 		} catch (InterruptedException exception) {
