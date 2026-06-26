@@ -55,19 +55,49 @@ class CatalogDatabaseOpener {
     try {
       final decoded = jsonDecode(await pointer.readAsString());
       if (decoded is! Map<String, Object?>) {
-        return null;
+        return _openKnownGoodInstalledDataPack();
       }
       final file = _currentDataPackFile(decoded);
       if (file == null) {
-        return null;
+        return _openKnownGoodInstalledDataPack();
       }
       if (!await file.exists()) {
-        return null;
+        return _openKnownGoodInstalledDataPack();
       }
-      return await _openUsableCatalogDatabase(file);
+      return await _openUsableCatalogDatabase(file) ??
+          _openKnownGoodInstalledDataPack();
     } on Object {
+      return _openKnownGoodInstalledDataPack();
+    }
+  }
+
+  Future<CatalogDatabase?> _openKnownGoodInstalledDataPack() async {
+    final catalogDirectory = Directory(
+      p.join(databaseDirectory.path, 'catalog'),
+    );
+    if (!await catalogDirectory.exists()) {
       return null;
     }
+    final candidates = await catalogDirectory
+        .list()
+        .where((entity) => entity is File)
+        .cast<File>()
+        .where(
+          (file) => RegExp(r'-v\d+\.sqlite$').hasMatch(p.basename(file.path)),
+        )
+        .toList();
+    candidates.sort((left, right) {
+      return _installedPackVersion(
+        right,
+      ).compareTo(_installedPackVersion(left));
+    });
+    for (final candidate in candidates) {
+      final database = await _openUsableCatalogDatabase(candidate);
+      if (database != null) {
+        return database;
+      }
+    }
+    return null;
   }
 
   File? _currentDataPackFile(Map<String, Object?> pointer) {
@@ -232,4 +262,12 @@ class CatalogDatabaseOpener {
       await temporary.rename(target.path);
     }
   }
+}
+
+int _installedPackVersion(File file) {
+  final match = RegExp(r'-v(\d+)\.sqlite$').firstMatch(p.basename(file.path));
+  if (match == null) {
+    return 0;
+  }
+  return int.tryParse(match.group(1)!) ?? 0;
 }

@@ -1479,6 +1479,11 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   assert.equal(fixture.packs[0].artifactKind, "fixture");
   assert.match(fixture.packs[0].sourceInventory[0].url, /^https:\/\/easysubway\.local\/fixtures\//);
   assert.match(manifestSchema.$id, /^https:\/\/easysubway\.local\/schema\//);
+  assert.deepEqual(manifestSchema.properties.packs.items.properties.payloadKind.enum, ["sqlite_catalog"]);
+  assert.equal(
+    manifestSchema.properties.packs.items.properties.dependencies.items.$ref,
+    "#/$defs/packIdentity",
+  );
   assert.match(builder, /production pack url must not use a local placeholder host/);
   assert.match(builder, /production sourceInventory\.url must not use a local placeholder host/);
   assert.match(validator, /production pack url must not use a local placeholder host/);
@@ -1490,8 +1495,11 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
 
 test("모바일 데이터팩 updater는 published manifest rollback 검증을 유지한다", () => {
   const updaterTest = read("apps/mobile/test/core/datapack/data_pack_updater_test.dart");
+  const manifestTest = read("apps/mobile/test/core/datapack/data_pack_manifest_test.dart");
 
   assert.match(updaterTest, /rollback manifest가 이미 설치된 이전 pack을 current로 활성화한다/);
+  assert.match(updaterTest, /active pack history와 명시 dependency만 다운로드한다/);
+  assert.match(manifestTest, /SQLite catalog 외 self-update payload를 거부한다/);
   assert.match(updaterTest, /\/datapacks\/catalog\/current\.json/);
   assert.match(updaterTest, /'activePack': \{'id': 'capital', 'version': '18'\}/);
   assert.match(updaterTest, /'packs': const \[\]/);

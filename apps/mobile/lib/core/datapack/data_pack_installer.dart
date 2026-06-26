@@ -31,46 +31,73 @@ class DataPackInstaller {
     bool activateCurrent = true,
   }) async {
     await catalogDirectory.create(recursive: true);
+    final compressedFile = File(
+      p.join(
+        catalogDirectory.path,
+        '${pack.id}-v${pack.version}.sqlite.gz.tmp',
+      ),
+    );
+    await compressedFile.writeAsBytes(compressedBytes, flush: true);
+    return installFromCompressedFile(
+      pack: pack,
+      compressedFile: compressedFile,
+      protectedVersions: protectedVersions,
+      activateCurrent: activateCurrent,
+    );
+  }
+
+  Future<DataPackInstallResult> installFromCompressedFile({
+    required DataPackManifestEntry pack,
+    required File compressedFile,
+    Set<String> protectedVersions = const {},
+    bool activateCurrent = true,
+  }) async {
+    await catalogDirectory.create(recursive: true);
     final expectedSizeBytes = pack.sizeBytes;
-    if (expectedSizeBytes != null &&
-        compressedBytes.length != expectedSizeBytes) {
+    final compressedLength = await compressedFile.length();
+    if (expectedSizeBytes != null && compressedLength != expectedSizeBytes) {
+      await _deleteIfExists(compressedFile);
       return const DataPackInstallResult(
         status: DataPackInstallStatus.rejected,
         reason: DataPackInstallRejectionReason.sizeBytesMismatch,
       );
     }
-    final compressedHash = sha256.convert(compressedBytes).toString();
+    final compressedHash = await _sha256File(compressedFile);
     if (compressedHash != pack.compressedSha256) {
+      await _deleteIfExists(compressedFile);
       return const DataPackInstallResult(
         status: DataPackInstallStatus.rejected,
         reason: DataPackInstallRejectionReason.sha256Mismatch,
       );
     }
 
-    late final List<int> sqliteBytes;
-    try {
-      sqliteBytes = gzip.decode(compressedBytes);
-    } on FormatException {
+    final temporary = File(
+      p.join(catalogDirectory.path, '${pack.id}-v${pack.version}.sqlite.tmp'),
+    );
+    final sqliteHash = await _inflateGzipToFile(
+      compressedFile: compressedFile,
+      targetFile: temporary,
+    );
+    await _deleteIfExists(compressedFile);
+    if (sqliteHash == null) {
+      await _deleteIfExists(temporary);
       return const DataPackInstallResult(
         status: DataPackInstallStatus.rejected,
         reason: DataPackInstallRejectionReason.invalidArchive,
       );
     }
 
-    if (sha256.convert(sqliteBytes).toString() != pack.sqliteSha256) {
+    if (sqliteHash != pack.sqliteSha256) {
+      await _deleteIfExists(temporary);
       return const DataPackInstallResult(
         status: DataPackInstallStatus.rejected,
         reason: DataPackInstallRejectionReason.sqliteSha256Mismatch,
       );
     }
 
-    final temporary = File(
-      p.join(catalogDirectory.path, '${pack.id}-v${pack.version}.sqlite.tmp'),
-    );
     final target = File(
       p.join(catalogDirectory.path, '${pack.id}-v${pack.version}.sqlite'),
     );
-    await temporary.writeAsBytes(sqliteBytes, flush: true);
     final rejection = await _validateSqlite(temporary, pack);
     if (rejection != null) {
       await _deleteIfExists(temporary);
@@ -114,6 +141,7 @@ class DataPackInstaller {
   }
 
   Future<InstalledDataPackPointer?> readCurrentPointer() async {
+    await recoverInstallJournal();
     final file = File(p.join(catalogDirectory.path, 'current.json'));
     if (!await file.exists()) {
       return null;
@@ -184,6 +212,39 @@ class DataPackInstaller {
 
   Future<void> activateCurrentPointer(InstalledDataPackPointer pointer) async {
     await _writeCurrentPointer(pointer);
+  }
+
+  Future<void> recoverInstallJournal() async {
+    final journal = File(
+      p.join(catalogDirectory.path, 'current.json.installing'),
+    );
+    if (!await journal.exists()) {
+      return;
+    }
+    try {
+      final decoded = jsonDecode(await journal.readAsString());
+      if (decoded is! Map<String, Object?>) {
+        await _deleteIfExists(journal);
+        return;
+      }
+      final pointer = InstalledDataPackPointer.fromJson(decoded);
+      final file = File(pointer.path);
+      if (!await file.exists()) {
+        await _deleteIfExists(journal);
+        return;
+      }
+      final expectedSha256 = pointer.sha256;
+      if (expectedSha256 != null && expectedSha256 != await _sha256File(file)) {
+        await _deleteIfExists(journal);
+        return;
+      }
+      await _replaceFile(
+        journal,
+        File(p.join(catalogDirectory.path, 'current.json')),
+      );
+    } on Object {
+      await _deleteIfExists(journal);
+    }
   }
 
   Future<void> pruneObsoletePacks(
@@ -295,6 +356,60 @@ class DataPackInstaller {
       await temporary.rename(target.path);
     }
   }
+}
+
+Future<String> _sha256File(File file) async {
+  final output = _DigestSink();
+  final input = sha256.startChunkedConversion(output);
+  await for (final chunk in file.openRead()) {
+    input.add(chunk);
+  }
+  input.close();
+  return output.value.toString();
+}
+
+Future<String?> _inflateGzipToFile({
+  required File compressedFile,
+  required File targetFile,
+}) async {
+  final output = _DigestSink();
+  final input = sha256.startChunkedConversion(output);
+  final sink = targetFile.openWrite();
+  try {
+    await for (final chunk in compressedFile.openRead().transform(
+      gzip.decoder,
+    )) {
+      input.add(chunk);
+      sink.add(chunk);
+    }
+    await sink.flush();
+    await sink.close();
+    input.close();
+    return output.value.toString();
+  } on FormatException {
+    await sink.close();
+    return null;
+  }
+}
+
+class _DigestSink implements Sink<Digest> {
+  Digest? _value;
+
+  Digest get value {
+    final digest = _value;
+    if (digest == null) {
+      throw const FormatException('Missing digest.');
+    }
+    return digest;
+  }
+
+  @override
+  void add(Digest data) {
+    _value = data;
+  }
+
+  @override
+  void close() {}
 }
 
 class DataPackInstallResult {

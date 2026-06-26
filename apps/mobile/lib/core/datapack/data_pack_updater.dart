@@ -7,6 +7,7 @@ import 'data_pack_manifest.dart';
 import 'emergency_override_repository.dart';
 
 const _dataPackDownloadTimeout = Duration(seconds: 20);
+const _maxDataPackDownloadBytes = 250 * 1024 * 1024;
 
 class DataPackUpdater {
   DataPackUpdater({
@@ -37,14 +38,16 @@ class DataPackUpdater {
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
+    await installer.recoverInstallJournal();
+    final packs = _packsToInstall(manifest);
     final results = <DataPackInstallResult>[];
-    for (final pack in manifest.packs) {
+    for (final pack in packs) {
       final uri = packBaseUri.resolve(pack.url.toString());
-      final compressedBytes = await _download(uri);
+      final compressedFile = await _downloadToTemporaryFile(uri, pack);
       results.add(
-        await installer.install(
+        await installer.installFromCompressedFile(
           pack: pack,
-          compressedBytes: compressedBytes,
+          compressedFile: compressedFile,
           protectedVersions: protectedVersions,
           activateCurrent: false,
         ),
@@ -61,7 +64,7 @@ class DataPackUpdater {
         await installer.activateCurrentPointer(currentPointer);
         protectedVersions.add(_normalizedVersion(currentPointer.version));
       }
-      for (final packId in manifest.packs.map((pack) => pack.id).toSet()) {
+      for (final packId in packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
           packId,
           keepVersionCount: 2,
@@ -82,6 +85,36 @@ class DataPackUpdater {
       await client.saveManifestCache(manifestResult);
     }
     return results;
+  }
+
+  List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
+    final activePack = manifest.activePack;
+    if (activePack != null) {
+      final activeDependencies = manifest.packs
+          .where(
+            (pack) =>
+                pack.id == activePack.id &&
+                _versionNumber(pack.version) ==
+                    _versionNumber(activePack.version),
+          )
+          .expand((pack) => pack.dependencies)
+          .toList(growable: false);
+      return manifest.packs
+          .where(
+            (pack) =>
+                pack.id == activePack.id ||
+                activeDependencies.any(
+                  (dependency) =>
+                      dependency.id == pack.id &&
+                      _versionNumber(dependency.version) ==
+                          _versionNumber(pack.version),
+                ),
+          )
+          .toList(growable: false);
+    }
+    return manifest.packs
+        .where((pack) => pack.id == activePackId)
+        .toList(growable: false);
   }
 
   Future<InstalledDataPackPointer?> _currentPointerForManifest({
@@ -140,7 +173,10 @@ class DataPackUpdater {
     return manifestDirectory;
   }
 
-  Future<List<int>> _download(Uri uri) async {
+  Future<File> _downloadToTemporaryFile(
+    Uri uri,
+    DataPackManifestEntry pack,
+  ) async {
     final request = await _httpClient
         .getUrl(uri)
         .timeout(_dataPackDownloadTimeout);
@@ -148,11 +184,40 @@ class DataPackUpdater {
     if (response.statusCode != HttpStatus.ok) {
       throw const DataPackClientException('데이터팩을 내려받지 못했습니다.');
     }
-    final bytes = <int>[];
-    await for (final chunk in response.timeout(_dataPackDownloadTimeout)) {
-      bytes.addAll(chunk);
+    final expectedSizeBytes = pack.sizeBytes;
+    final contentLength = response.contentLength;
+    final maxBytes = expectedSizeBytes ?? _maxDataPackDownloadBytes;
+    if (contentLength > maxBytes || contentLength > _maxDataPackDownloadBytes) {
+      throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
     }
-    return bytes;
+    final directory = await installer.catalogDirectory.create(recursive: true);
+    final temporary = File(
+      '${directory.path}/${pack.id}-v${pack.version}.sqlite.gz.downloading',
+    );
+    final sink = temporary.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response.timeout(_dataPackDownloadTimeout)) {
+        received += chunk.length;
+        if (received > maxBytes || received > _maxDataPackDownloadBytes) {
+          throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
+        }
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
+      return temporary;
+    } on Object {
+      await sink.close();
+      await _deleteIfExists(temporary);
+      rethrow;
+    }
+  }
+}
+
+Future<void> _deleteIfExists(File file) async {
+  if (await file.exists()) {
+    await file.delete();
   }
 }
 

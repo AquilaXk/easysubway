@@ -742,38 +742,38 @@ void main() {
     expect(metadata.read<String>('value'), 'capital-v17');
   });
 
-  test('앱 부트스트랩은 데이터팩 업데이트 후 current pointer로 catalog를 연다', () async {
+  test('앱 부트스트랩은 데이터팩 업데이트를 기다리지 않고 catalog를 연다', () async {
     final directory = await Directory.systemTemp.createTemp(
-      'easysubway-bootstrap-current-',
+      'easysubway-bootstrap-nonblocking-update-',
     );
     addTearDown(() => directory.delete(recursive: true));
+    final updateStarted = Completer<void>();
+    final finishUpdate = Completer<void>();
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final updatedPack = File('${catalogDirectory.path}/capital-v19.sqlite');
+    final updatedDatabase = CatalogDatabase.file(updatedPack);
+    await updatedDatabase.seedBaselineIfEmpty();
+    await updatedDatabase
+        .into(updatedDatabase.catalogMetadata)
+        .insertOnConflictUpdate(
+          CatalogMetadataCompanion.insert(
+            key: 'activePack',
+            value: 'capital-v19',
+            updatedAt: Value(DateTime.utc(2026, 6, 19, 13)),
+          ),
+        );
+    await updatedDatabase.close();
 
     AppBootstrap? bootstrap;
     addTearDown(() => bootstrap?.close());
-    bootstrap = await AppBootstrap.initialize(
+    final bootstrapFuture = AppBootstrap.initialize(
       databaseDirectory: directory,
       assetBundle: rootBundle,
       dataPackUpdateRunner:
           ({required supportDirectory, required userDatabase}) async {
-            final catalogDirectory = Directory(
-              '${supportDirectory.path}/catalog',
-            );
-            await catalogDirectory.create(recursive: true);
-            final updatedPack = File(
-              '${catalogDirectory.path}/capital-v19.sqlite',
-            );
-            final updatedDatabase = CatalogDatabase.file(updatedPack);
-            await updatedDatabase.seedBaselineIfEmpty();
-            await updatedDatabase
-                .into(updatedDatabase.catalogMetadata)
-                .insertOnConflictUpdate(
-                  CatalogMetadataCompanion.insert(
-                    key: 'activePack',
-                    value: 'capital-v19',
-                    updatedAt: Value(DateTime.utc(2026, 6, 19, 13)),
-                  ),
-                );
-            await updatedDatabase.close();
+            updateStarted.complete();
+            await finishUpdate.future;
             await File('${catalogDirectory.path}/current.json').writeAsString(
               jsonEncode({
                 'id': 'capital',
@@ -785,15 +785,69 @@ void main() {
           },
       enablePushNotifications: false,
     );
+    await updateStarted.future;
+    bootstrap = await bootstrapFuture.timeout(
+      const Duration(milliseconds: 100),
+    );
 
     final metadata = await bootstrap.catalogDatabase.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'schemaVersion'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), '1');
+    finishUpdate.complete();
+  });
+
+  test(
+    'catalog opener는 current pointer가 깨지면 최신 known-good pack으로 복구한다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-known-good-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      final stalePack = File('${catalogDirectory.path}/capital-v17.sqlite');
+      await stalePack.writeAsString('missing current target');
+      final knownGoodPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+      final knownGoodDatabase = CatalogDatabase.file(knownGoodPack);
+      await knownGoodDatabase.seedBaselineIfEmpty();
+      await knownGoodDatabase
+          .into(knownGoodDatabase.catalogMetadata)
+          .insertOnConflictUpdate(
+            CatalogMetadataCompanion.insert(
+              key: 'activePack',
+              value: 'capital-v18',
+              updatedAt: Value(DateTime.utc(2026, 6, 19, 14)),
+            ),
+          );
+      await knownGoodDatabase.close();
+      await File('${catalogDirectory.path}/current.json').writeAsString(
+        jsonEncode({
+          'id': 'capital',
+          'version': '19',
+          'path': '${catalogDirectory.path}/capital-v19.sqlite',
+          'sha256': 'missing',
+        }),
+      );
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+
+      final metadata = await database.customSelect('''
           SELECT value
           FROM catalog_metadata
           WHERE key = 'activePack'
           ''').getSingle();
 
-    expect(metadata.read<String>('value'), 'capital-v19');
-  });
+      expect(metadata.read<String>('value'), 'capital-v18');
+    },
+  );
 
   test('앱 부트스트랩은 데이터팩 업데이트 실패 시 내장 catalog로 계속 시작한다', () async {
     final directory = await Directory.systemTemp.createTemp(
