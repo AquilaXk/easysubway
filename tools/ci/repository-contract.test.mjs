@@ -5723,6 +5723,9 @@ test("노선도 Android 실기기 evidence runner는 frame, memory, renderer rec
   assert.match(script, /^Usage:/m);
   assert.match(script, /--serial <adb-serial>/);
   assert.match(script, /--artifact-dir <dir>/);
+  assert.match(script, /--build-mode <mode>/);
+  assert.match(script, /Install a debug or profile APK first/);
+  assert.match(script, /Unsupported build mode/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" reset/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" > "\$ARTIFACT_DIR\/gfxinfo\.txt"/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" framestats > "\$ARTIFACT_DIR\/gfxinfo-framestats\.txt"/);
