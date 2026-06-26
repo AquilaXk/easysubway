@@ -3,6 +3,7 @@ package com.easysubway.realtime.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.easysubway.realtime.domain.RealtimeArrival;
+import com.easysubway.realtime.domain.RealtimeTrainPosition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,6 +71,24 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("열차 위치 quota 초과도 circuit을 열고 다음 요청에서 provider를 호출하지 않는다")
+	void trainPositionQuotaExhaustionOpensCircuit() {
+		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
+		CountingProvider provider = new CountingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(provider, clock);
+		RealtimeQuery query = sangnoksuQuery();
+		provider.failureCode = "PROVIDER_QUOTA_EXCEEDED";
+
+		RealtimeTrainPositionResult first = service.trainPositions(query);
+		RealtimeTrainPositionResult second = service.trainPositions(query);
+
+		assertThat(first.status()).hasToString("UNAVAILABLE");
+		assertThat(second.status()).hasToString("UNAVAILABLE");
+		assertThat(second.fallbackCode()).isEqualTo("PROVIDER_QUOTA_EXCEEDED");
+		assertThat(provider.trainPositionCalls).hasValue(1);
+	}
+
+	@Test
 	@DisplayName("지원 범위 밖 역은 provider를 호출하지 않고 unsupported로 끝난다")
 	void unsupportedSkipsProviderCall() {
 		CountingProvider provider = new CountingProvider();
@@ -114,6 +133,7 @@ class RealtimeGatewayServiceTest {
 
 	private static final class CountingProvider implements RealtimeProvider {
 		private final AtomicInteger arrivalCalls = new AtomicInteger();
+		private final AtomicInteger trainPositionCalls = new AtomicInteger();
 		private String failureCode;
 
 		@Override
@@ -131,6 +151,23 @@ class RealtimeGatewayServiceTest {
 				180,
 				"3분 후",
 				"전역 출발",
+				"2026-06-26T08:00:00Z"
+			));
+		}
+
+		@Override
+		public List<RealtimeTrainPosition> trainPositions(RealtimeQuery query) {
+			trainPositionCalls.incrementAndGet();
+			if (failureCode != null) {
+				throw new RealtimeProviderException(failureCode);
+			}
+			return List.of(new RealtimeTrainPosition(
+				"4",
+				"상록수",
+				"4123",
+				"운행중",
+				"상행",
+				"당고개",
 				"2026-06-26T08:00:00Z"
 			));
 		}

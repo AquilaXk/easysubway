@@ -77,6 +77,11 @@ public class RealtimeGatewayService {
 		if (cached != null && isFresh(cached.cachedAt())) {
 			return cached.result();
 		}
+		if (isQuotaCircuitOpen()) {
+			return cached != null && isStaleUsable(cached.cachedAt())
+				? cached.result().stale()
+				: RealtimeTrainPositionResult.unavailable("PROVIDER_QUOTA_EXCEEDED");
+		}
 		try {
 			RealtimeTrainPositionResult result = RealtimeTrainPositionResult.fresh(
 				clock.instant().toString(),
@@ -85,6 +90,7 @@ public class RealtimeGatewayService {
 			trainPositionCache.put(cacheKey, new CachedTrainPosition(result, clock.instant()));
 			return result;
 		} catch (RealtimeProviderException exception) {
+			openQuotaCircuitIfNeeded(exception);
 			if (cached != null && isStaleUsable(cached.cachedAt())) {
 				return cached.result().stale();
 			}

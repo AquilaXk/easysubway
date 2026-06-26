@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
@@ -30,10 +33,6 @@ void main() {
     expect(
       dependencies.reportRepository,
       isA<UnavailableFacilityReportRepository>(),
-    );
-    expect(
-      dependencies.realtimeRepository,
-      isA<UnavailableRealtimeRepository>(),
     );
 
     final routeResult = await dependencies.routeRepository.searchRoute(
@@ -73,10 +72,53 @@ void main() {
 
     expect(apiBaseReads, 0);
     expect(dependencies.repository, isA<DriftStationRepository>());
-    expect(
-      dependencies.realtimeRepository,
-      isA<UnavailableRealtimeRepository>(),
+  });
+
+  test('로컬 데이터베이스와 API 주소가 있으면 실시간은 API를 호출한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'status': 'FRESH',
+              'receivedAt': '2026-06-26T08:00:00Z',
+              'arrivals': <Object?>[],
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      apiBaseUri: () =>
+          Uri.parse('http://${server.address.host}:${server.port}'),
+      enablePushNotifications: false,
     );
+
+    await dependencies.realtimeRepository.arrivals(
+      const RealtimeStationQuery(
+        stationId: 'station-sangnoksu',
+        lineId: '4',
+        stationQueryName: '상록수',
+      ),
+    );
+
+    expect(requestedUri.path, '/api/v1/realtime/arrivals');
+    expect(requestedUri.queryParameters['stationId'], 'station-sangnoksu');
   });
 
   test('시설 신고 기본 의존성은 API 주소가 없으면 호출 시점에 unavailable로 동작한다', () async {

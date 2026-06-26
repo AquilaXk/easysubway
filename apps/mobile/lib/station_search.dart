@@ -1361,14 +1361,17 @@ class StationDetailController extends ChangeNotifier {
       if (_isDisposed) {
         return;
       }
+      final detail = responses[0] as StationDetail;
+      final realtimeSnapshot = await _loadRealtimeSnapshot(detail);
+      if (_isDisposed) {
+        return;
+      }
       _state = StationDetailState(
         status: StationDetailStatus.success,
-        detail: responses[0] as StationDetail,
+        detail: detail,
         exits: responses[1] as List<StationExitInfo>,
         facilities: responses[2] as List<StationFacilityInfo>,
-        realtimeSnapshot: await _loadRealtimeSnapshot(
-          responses[0] as StationDetail,
-        ),
+        realtimeSnapshot: realtimeSnapshot,
       );
     } on StationSearchException {
       if (_isDisposed) {

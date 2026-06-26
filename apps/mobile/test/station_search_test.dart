@@ -1201,6 +1201,23 @@ void main() {
     expect(controller.state.realtimeSnapshot.summaryText, '상록수 3분 후');
   });
 
+  test('역 상세 컨트롤러는 실시간 대기 중 dispose되면 늦은 응답을 알리지 않는다', () async {
+    final repository = ControlledStationDetailRepository();
+    final realtimeRepository = DelayedRealtimeRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: realtimeRepository,
+    );
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await realtimeRepository.requestStarted.future;
+
+    controller.dispose();
+    realtimeRepository.complete(const RealtimeSnapshot.unavailable());
+    await loadFuture;
+  });
+
   test('역 상세 컨트롤러는 처리된 역 정보 실패를 오류 경계에 다시 보고하지 않는다', () async {
     final reportedErrors = _captureReportedErrors();
     final repository = FailingStationDetailRepository();
@@ -1815,6 +1832,23 @@ class StaticRealtimeRepository implements RealtimeRepository {
         ),
       ],
     );
+  }
+}
+
+class DelayedRealtimeRepository implements RealtimeRepository {
+  final requestStarted = Completer<void>();
+  final _snapshotCompleter = Completer<RealtimeSnapshot>();
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    if (!requestStarted.isCompleted) {
+      requestStarted.complete();
+    }
+    return _snapshotCompleter.future;
+  }
+
+  void complete(RealtimeSnapshot snapshot) {
+    _snapshotCompleter.complete(snapshot);
   }
 }
 

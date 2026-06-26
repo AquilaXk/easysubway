@@ -114,9 +114,7 @@ class AppDependencies {
 
     final resolvedRealtimeRepository =
         realtimeRepository ??
-        (catalogDatabase == null
-            ? _defaultRealtimeRepository(baseUri: optionalBaseUri)
-            : const UnavailableRealtimeRepository());
+        _defaultRealtimeRepository(baseUri: optionalBaseUri);
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -224,11 +222,32 @@ class AppDependencies {
 RealtimeRepository _defaultRealtimeRepository({
   required Uri? Function() baseUri,
 }) {
-  final uri = baseUri();
-  if (uri == null) {
-    return const UnavailableRealtimeRepository();
+  return _LazyDefaultRealtimeRepository(baseUri);
+}
+
+class _LazyDefaultRealtimeRepository implements RealtimeRepository {
+  _LazyDefaultRealtimeRepository(this._baseUri);
+
+  final Uri? Function() _baseUri;
+  RealtimeRepository? _delegate;
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    return _resolveDelegate().arrivals(query);
   }
-  return RealtimeApiRepository(baseUri: uri);
+
+  RealtimeRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) {
+      return cachedDelegate;
+    }
+    final resolvedBaseUri = _baseUri();
+    final resolvedDelegate = resolvedBaseUri == null
+        ? const UnavailableRealtimeRepository()
+        : RealtimeApiRepository(baseUri: resolvedBaseUri);
+    _delegate = resolvedDelegate;
+    return resolvedDelegate;
+  }
 }
 
 class _UnavailableNetworkMapRepository implements NetworkMapRepository {
