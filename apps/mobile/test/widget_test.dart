@@ -1882,6 +1882,84 @@ void main() {
     expect(find.text('가까운역'), findsNothing);
   });
 
+  testWidgets('노선도 확대 상태에서도 label 바깥 배경 tap은 sheet를 열지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-label',
+            nameKo: '라벨역',
+            nameEn: 'Label',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '402',
+            sequence: 2,
+            position: NetworkMapPosition(
+              x: 120,
+              y: 120,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '수도권 노선도 fixture 좌표 검수',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        stationLineMemberships: [
+          NetworkMapStationLineMembership(
+            stationId: 'station-label',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 3; index += 1) {
+      await tester.tap(find.byKey(const Key('networkMapZoomInButton')));
+      await tester.pumpAndSettle();
+    }
+
+    final stationRect = tester.getRect(
+      find.byKey(const Key('networkMapStation-label-seoul-4')),
+    );
+    await tester.tapAt(stationRect.bottomCenter + const Offset(0, 30));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('라벨역'), findsNothing);
+  });
+
   testWidgets('노선도 동일 station의 여러 line geometry는 visible semantics를 하나로 묶는다', (
     tester,
   ) async {
