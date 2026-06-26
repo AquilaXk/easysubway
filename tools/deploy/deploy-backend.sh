@@ -221,6 +221,7 @@ if [[ "${needs_backup}" -eq 1 ]]; then
 	EASYSUBWAY_ENV_FILE="${COMPOSE_ENV}" \
 	EASYSUBWAY_COMPOSE_FILE="${REPOSITORY_DIR}/infra/docker-compose.yml" \
 	EASYSUBWAY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT}" \
+	EASYSUBWAY_BACKEND_ENV_FILE="${BACKEND_ENV}" \
 	EASYSUBWAY_BACKUP_DIR="${BACKUP_DIR}" \
 		timeout 300 tools/ops/postgres-backup.sh
 fi
