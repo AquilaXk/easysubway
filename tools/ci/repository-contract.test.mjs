@@ -5521,6 +5521,13 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.match(readme, /Android 출시 UX·접근성·성능 gate/);
   assert.match(readme, /local Android emulator evidence/);
   assert.match(smokeScript, /ro\.kernel\.qemu/);
+  assert.match(smokeScript, /--expected-font-scale/);
+  assert.match(smokeScript, /MIN_ANDROID_API=35/);
+  assert.match(smokeScript, /MAX_COMPACT_WIDTH_DP=599/);
+  assert.match(smokeScript, /pm path "\$PACKAGE"/);
+  assert.match(smokeScript, /resolve-activity --brief "\$PACKAGE"/);
+  assert.match(smokeScript, /am start -n "\$launch_activity"/);
+  assert.match(smokeScript, /current-focus\.txt/);
   assert.match(smokeScript, /font_scale/);
   assert.match(smokeScript, /uiautomator dump/);
   assert.match(smokeScript, /dumpsys gfxinfo/);
