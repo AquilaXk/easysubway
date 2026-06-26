@@ -111,9 +111,6 @@ public class HealthCheckService implements CheckHealthUseCase {
 		if (hasStatus(components, "STALE")) {
 			return "STALE";
 		}
-		if (hasStatus(components, "READ_ONLY")) {
-			return "READ_ONLY";
-		}
 		return "UP";
 	}
 

@@ -25,11 +25,11 @@ class HealthCheckServiceTest {
 	}
 
 	@Test
-	@DisplayName("읽기 전용 마스터 데이터는 health summary와 component 상태에 반영된다")
+	@DisplayName("읽기 전용 마스터 데이터는 top-level UP과 component READ_ONLY로 반영된다")
 	void checkHealthReportsReadOnlyMasterData() {
 		HealthStatus status = new HealthCheckService(null, new UnavailableTransitMasterRepository()).checkHealth();
 
-		assertThat(status.status()).isEqualTo("READ_ONLY");
+		assertThat(status.status()).isEqualTo("UP");
 		assertThat(status.components())
 			.filteredOn(component -> component.name().equals("masterData"))
 			.singleElement()
