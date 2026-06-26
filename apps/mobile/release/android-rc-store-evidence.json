@@ -82,9 +82,13 @@
       "tester-requirement-record",
       "closed-test-12-testers-14-days-continuous-opt-in-record",
       "production-access-application-response-record",
+      "play-store-submission-content-manifest",
       "app-content-declarations",
+      "data-safety-answer-contract",
       "data-safety-binary-network-trace-match",
       "privacy-policy-url-help-screen-match",
+      "korean-store-listing-contract",
+      "store-graphic-screenshot-asset-record",
       "store-listing-scope-copy-review",
       "support-channel-release-notes-review"
     ],

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "play-store-submission-content",
+  "issue": 921,
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "storePrivacyInventory": "apps/mobile/release/store-privacy-inventory.json",
+  "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
+  "status": "BLOCKED_CONSOLE_PREVIEW_AND_ASSET_EVIDENCE_MISSING",
+  "appContentDeclarations": {
+    "ads": false,
+    "appAccessRequiresSignIn": false,
+    "publicUserSignIn": false,
+    "accountCreation": false,
+    "backgroundLocation": false,
+    "preciseLocation": "optional_user_triggered_nearby_station_and_report_location_only",
+    "cameraOrPhoto": "optional_user_triggered_report_attachment_only",
+    "restrictedContent": false,
+    "targetAudience": "all_users_not_child_directed",
+    "reviewerAccessNotesKo": "로그인 없는 앱입니다. 위치 권한은 주변 역 찾기와 신고 위치 확인에서만 선택적으로 사용합니다."
+  },
+  "dataSafetyDeclarations": {
+    "tracking": false,
+    "sharesDataWithThirdParties": false,
+    "dataEncryptedInTransit": true,
+    "dataDeletionRequestSupported": true,
+    "requiredCollectedDataTypes": [
+      "Location",
+      "App activity",
+      "Personal info",
+      "User-generated content",
+      "Photos and videos",
+      "Diagnostics"
+    ],
+    "optionalUserTriggeredData": [
+      "precise location for nearby station search",
+      "facility report photo",
+      "facility report location",
+      "mobility profile",
+      "favorites"
+    ],
+    "binaryTraceMatchRequired": true,
+    "linkedInventory": "apps/mobile/release/store-privacy-inventory.json"
+  },
+  "koreanListing": {
+    "appName": "쉬운 지하철",
+    "shortDescription": "교통약자를 위한 지하철 이동 안내",
+    "fullDescriptionKo": "쉬운 지하철은 고령자, 임산부, 장애인 등 이동과 정보 접근에 제약이 있는 사용자가 지하철 역과 시설 정보를 더 쉽게 확인하도록 돕는 앱입니다. 엘리베이터, 에스컬레이터, 출구, 환승 동선, 즐겨찾기, 시설 신고 흐름을 제공하며 일부 기능은 로컬 데이터팩으로 오프라인에서도 확인할 수 있습니다. 정보는 데이터 기준일과 공식 출처를 함께 표시하고, 현장 상황이나 실시간 정보는 운영기관 제공 범위와 갱신 상태에 따라 달라질 수 있음을 안내합니다.",
+    "releaseNotesKo": "접근성 이동 정보, 시설 신고, 도움말과 개인정보 안내를 포함한 Android 출시 후보입니다.",
+    "supportRegionKo": "대한민국 도시철도 우선 지원",
+    "dataBaselineRequired": true,
+    "realtimeSupportScopeKo": "실시간 도착과 열차 위치는 지원 노선과 제공기관 상태가 확인된 범위에서만 표시",
+    "confirmationCopyKo": "경로와 시설 정보는 현장 상황과 다를 수 있어 이동 전 역무원 또는 운영기관 안내 확인이 필요합니다."
+  },
+  "prohibitedClaims": [
+    "반드시 이동 가능",
+    "100% 안전",
+    "모든 역 완벽 지원",
+    "실시간 위치 정확",
+    "휠체어 경로 보장"
+  ],
+  "assetEvidence": {
+    "appIcon": "required_play_console_preview_or_asset_record",
+    "featureGraphic": "required_play_console_preview_or_asset_record",
+    "phoneScreenshots": "required_release_build_screenshots",
+    "tabletPolicy": "tablet_compatible_until_tablet_specific_ui_gate",
+    "listingPreview": "required_play_console_preview_summary"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/play-store-submission/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-console-link",
+    "sensitiveEvidence": [
+      "Google Play Console screenshots",
+      "network trace",
+      "release build screenshots before publication",
+      "support mailbox headers"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 파일로 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 Console 링크만 적는다."
+  }
+}
