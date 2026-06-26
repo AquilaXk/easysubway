@@ -104,6 +104,7 @@
     ],
     "postReleaseReadiness": [
       "post-launch-operations-review-gate-manifest",
+      "support-incident-response-gate-manifest",
       "first-2h-monitoring-owner-schedule",
       "24h-7d-30d-review-owner-schedule",
       "play-review-crash-anr-provider-quota-report-backlog-signals",
@@ -111,6 +112,11 @@
       "fixed-release-submission-procedure-record",
       "second-update-staged-rollout-halt-rollback-procedure",
       "customer-support-intake-ready",
+      "support-faq-and-incident-notice-copy-review",
+      "data-error-triage-dry-run",
+      "operator-contact-route-record",
+      "emergency-datapack-release-rollback-runbook-match",
+      "retention-duplicate-override-recovery-policy",
       "data-error-response-ready",
       "incident-response-ready"
     ]
