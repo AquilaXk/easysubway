@@ -33,9 +33,13 @@ class DataPackUpdater {
     }
 
     final override = manifest.emergencyOverride;
-    final protectedVersions = <String>{};
+    final protectedVersionsByPackId = <String, Set<String>>{};
     if (override != null) {
-      protectedVersions.add(_normalizedVersion(override.version));
+      _protectVersion(
+        protectedVersionsByPackId,
+        id: override.id,
+        version: override.version,
+      );
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
@@ -48,7 +52,8 @@ class DataPackUpdater {
         await installer.installFromCompressedFile(
           pack: pack,
           compressedFile: compressedFile,
-          protectedVersions: protectedVersions,
+          protectedVersions:
+              protectedVersionsByPackId[pack.id] ?? const <String>{},
           activateCurrent: false,
         ),
       );
@@ -62,13 +67,28 @@ class DataPackUpdater {
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
-        protectedVersions.add(_normalizedVersion(currentPointer.version));
+        _protectVersion(
+          protectedVersionsByPackId,
+          id: currentPointer.id,
+          version: currentPointer.version,
+        );
+      }
+      for (final result in results) {
+        final pointer = result.pointer;
+        if (pointer != null) {
+          _protectVersion(
+            protectedVersionsByPackId,
+            id: pointer.id,
+            version: pointer.version,
+          );
+        }
       }
       for (final packId in packs.map((pack) => pack.id).toSet()) {
         await installer.pruneObsoletePacks(
           packId,
           keepVersionCount: 2,
-          protectedVersions: protectedVersions,
+          protectedVersions:
+              protectedVersionsByPackId[packId] ?? const <String>{},
         );
       }
       if (override != null) {
@@ -244,6 +264,16 @@ bool _matchesOverride(
   return override != null &&
       pack.id == override.id &&
       _versionNumber(pack.version) == _versionNumber(override.version);
+}
+
+void _protectVersion(
+  Map<String, Set<String>> protectedVersionsByPackId, {
+  required String id,
+  required String version,
+}) {
+  protectedVersionsByPackId
+      .putIfAbsent(id, () => <String>{})
+      .add(_normalizedVersion(version));
 }
 
 String _normalizedVersion(String version) {

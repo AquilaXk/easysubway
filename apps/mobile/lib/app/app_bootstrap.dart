@@ -73,18 +73,18 @@ class AppBootstrap {
       userDatabase: userDatabase,
     );
 
-    final dataPackUpdate = _runDataPackUpdateSafely(
-      supportDirectory: supportDirectory,
-      userDatabase: userDatabase,
-      runner: dataPackUpdateRunner ?? _defaultDataPackUpdateRunner,
-    );
-
+    Future<void>? dataPackUpdate;
     try {
       final catalogDatabase = await CatalogDatabaseOpener(
         databaseDirectory: supportDirectory,
         assetBundle: assetBundle ?? rootBundle,
         emergencyOverrideRepository: emergencyOverrideRepository,
       ).open();
+      dataPackUpdate = _runDataPackUpdateSafely(
+        supportDirectory: supportDirectory,
+        userDatabase: userDatabase,
+        runner: dataPackUpdateRunner ?? _defaultDataPackUpdateRunner,
+      );
 
       final dependencies = AppDependencies.resolve(
         repository: repository,
