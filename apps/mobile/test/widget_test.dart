@@ -759,10 +759,11 @@ void main() {
     expect(find.byKey(const Key('networkMapZoomOutButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapOverviewButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapLocateButton')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapListButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapListButton')), findsNothing);
     expect(find.byTooltip('전체 노선도'), findsOneWidget);
     expect(find.byTooltip('처음 위치로'), findsOneWidget);
-    expect(find.text('노선별로 보기'), findsOneWidget);
+    expect(find.text('노선별로 보기'), findsNothing);
+    expect(find.text('노선도별로 보기'), findsNothing);
     expect(find.byTooltip('전체 보기'), findsNothing);
     expect(find.byTooltip('중심 보기'), findsNothing);
     expect(find.text('노선 목록으로 보기'), findsNothing);
@@ -876,7 +877,7 @@ void main() {
     expect(find.text('4호선'), findsWidgets);
   });
 
-  testWidgets('노선도 노선별 보기 화면에서 역을 선택할 수 있다', (tester) async {
+  testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -890,22 +891,13 @@ void main() {
 
     await tester.tap(find.byKey(const Key('bottomNavMap')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapListButton')));
-    await tester.pumpAndSettle();
 
-    expect(find.text('노선별로 보기'), findsOneWidget);
-    expect(find.byKey(const Key('networkMapListSheet')), findsOneWidget);
-    expect(find.text('노선별 역 보기'), findsOneWidget);
-    expect(find.text('노선별 목록에서 역을 선택하세요.'), findsOneWidget);
-    await tester.tap(
-      find.byKey(const Key('networkMapListStation-station-sadang-seoul-4')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('사당역'), findsOneWidget);
-    expect(find.text('2호선'), findsOneWidget);
-    expect(find.text('4호선'), findsOneWidget);
+    expect(find.byKey(const Key('networkMapListButton')), findsNothing);
+    expect(find.byKey(const Key('networkMapListSheet')), findsNothing);
+    expect(find.text('노선별로 보기'), findsNothing);
+    expect(find.text('노선도별로 보기'), findsNothing);
+    expect(find.text('노선별 역 보기'), findsNothing);
+    expect(find.text('노선별 목록에서 역을 선택하세요.'), findsNothing);
   });
 
   test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {
@@ -930,6 +922,235 @@ void main() {
 
     expect(first.revision, 4);
     expect(second.revision, 5);
+  });
+
+  test('노선도 gesture renderer commit은 interval, drift, scale 기준으로 제한한다', () {
+    const committed = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(center: const Offset(580, 250)),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: networkMapOverscannedRendererCamera(committed),
+        candidate: networkMapOverscannedRendererCamera(
+          committed.copyWith(center: const Offset(560, 250), revision: 4),
+        ),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(center: const Offset(620, 250)),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(scale: 0.66),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed,
+        elapsedSinceLastCommit: const Duration(milliseconds: 80),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed,
+        elapsedSinceLastCommit: const Duration(milliseconds: 160),
+      ),
+      isTrue,
+    );
+  });
+
+  test('노선도 renderer transform은 stale viewBox frame을 최신 camera 위치로 보정한다', () {
+    const rendererCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final visualCamera = rendererCamera.copyWith(
+      center: const Offset(550, 250),
+      revision: 4,
+    );
+
+    final rendererPoint = rendererCamera.sourceToViewportPoint(
+      visualCamera.center,
+    );
+    final transformed = MatrixUtils.transformPoint(
+      networkMapRendererFrameTransform(
+        rendererCamera: rendererCamera,
+        visualCamera: visualCamera,
+      ),
+      rendererPoint,
+    );
+
+    expect(transformed.dx, moreOrLessEquals(125));
+    expect(transformed.dy, moreOrLessEquals(62.5));
+  });
+
+  test('노선도 renderer transform은 overscan 범위 밖 edge 노출을 피한다', () {
+    const visualCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final rendererCamera = networkMapOverscannedRendererCamera(visualCamera);
+    final coveredVisualCamera = visualCamera.copyWith(
+      center: const Offset(560, 250),
+      revision: 4,
+    );
+    final uncoveredVisualCamera = visualCamera.copyWith(
+      center: const Offset(760, 250),
+      revision: 5,
+    );
+    final requestedRendererCamera = networkMapOverscannedRendererCamera(
+      uncoveredVisualCamera,
+    );
+
+    expect(
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: rendererCamera,
+        visualCamera: coveredVisualCamera,
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapRendererTransformVisualCamera(
+        rendererCamera: rendererCamera,
+        visualCamera: coveredVisualCamera,
+      ),
+      same(coveredVisualCamera),
+    );
+    expect(
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: rendererCamera,
+        visualCamera: uncoveredVisualCamera,
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapRendererTransformVisualCamera(
+        rendererCamera: rendererCamera,
+        visualCamera: uncoveredVisualCamera,
+      ),
+      same(rendererCamera),
+    );
+    expect(
+      networkMapRendererCommitBasisCamera(
+        presentedCamera: rendererCamera,
+        requestedCamera: requestedRendererCamera,
+        visualCamera: uncoveredVisualCamera,
+      ),
+      same(requestedRendererCamera),
+    );
+  });
+
+  test('노선도 renderer는 pan reversal 때 stale requested camera를 교체한다', () {
+    const visualCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final staleRequestedCamera = networkMapOverscannedRendererCamera(
+      visualCamera.copyWith(center: const Offset(880, 250), revision: 4),
+    );
+    final candidateCamera = networkMapOverscannedRendererCamera(
+      visualCamera.copyWith(revision: 5),
+    );
+
+    expect(
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: staleRequestedCamera,
+        visualCamera: visualCamera,
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapRendererCameraForSkippedCommit(
+        requestedCamera: staleRequestedCamera,
+        candidateCamera: candidateCamera,
+        visualCamera: visualCamera,
+      ),
+      same(candidateCamera),
+    );
+  });
+
+  test('노선도 renderer는 out-of-order presented revision을 무시한다', () {
+    const presentedCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final requestedCamera = presentedCamera.copyWith(
+      center: const Offset(560, 250),
+      revision: 5,
+    );
+
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 4,
+        presentedCamera: presentedCamera,
+        requestedCamera: requestedCamera,
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 5,
+        presentedCamera: presentedCamera,
+        requestedCamera: requestedCamera,
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldAcceptPresentedRendererRevision(
+        revision: 2,
+        presentedCamera: presentedCamera,
+        requestedCamera: null,
+      ),
+      isFalse,
+    );
   });
 
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {

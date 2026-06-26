@@ -360,20 +360,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     ],
                   ),
                 ),
-                Positioned(
-                  left: 14,
-                  bottom: 14,
-                  child: SizedBox(
-                    width: 180,
-                    height: 48,
-                    child: FilledButton.icon(
-                      key: const Key('networkMapListButton'),
-                      onPressed: () => _showMapList(data),
-                      icon: const Icon(Icons.list_alt),
-                      label: const Text('노선별로 보기'),
-                    ),
-                  ),
-                ),
               ],
             );
           },
@@ -411,23 +397,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           NavigationDestination(icon: Icon(Icons.more_horiz), label: '더보기'),
         ],
       ),
-    );
-  }
-
-  void _showMapList(NetworkMapData data) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return _NetworkMapListSheet(
-          data: data,
-          onStationTap: (station, lines) {
-            Navigator.of(context).pop();
-            _showStationSheet(station, lines);
-          },
-        );
-      },
     );
   }
 
@@ -746,13 +715,22 @@ class _NetworkMapCanvas extends StatefulWidget {
 
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
+const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 160);
+const _routeMapGestureMaxTranslationDriftFraction = 0.2;
+const _routeMapGestureMaxScaleRatio = 1.25;
+const _routeMapGestureRendererOverscanFactor = 1.5;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
   MapCameraState? _camera;
   MapCameraState? _pendingCamera;
+  MapCameraState? _requestedRendererCamera;
+  MapCameraState? _presentedRendererCamera;
+  final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
+  DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
+  bool _forceRendererCameraCommit = false;
   bool _gestureActive = false;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
@@ -769,6 +747,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pendingCamera = null;
+    _requestedRendererCamera = null;
+    _presentedRendererCamera = null;
+    _requestedRendererCamerasByRevision.clear();
     _releaseRenderer(disposeRenderer: true);
     super.dispose();
   }
@@ -836,13 +817,23 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
+            _requestedRendererCamera = null;
+            _presentedRendererCamera = null;
+            _requestedRendererCamerasByRevision.clear();
+            _lastRendererCameraRequestAt = null;
             _gestureActive = false;
-            _camera = _cameraForBounds(
+            final initialCamera = _cameraForBounds(
               geometry.initialBounds,
               constraints,
               sourceBounds: fullBounds,
               minScale: minScale,
             );
+            final initialRendererCamera = networkMapOverscannedRendererCamera(
+              initialCamera,
+            );
+            _camera = initialCamera;
+            _requestedRendererCamera = initialRendererCamera;
+            _presentedRendererCamera = initialRendererCamera;
           }
           final camera =
               _camera ??
@@ -859,7 +850,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     ? const _OriginalRouteMapUnavailable()
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
-                        camera: camera,
+                        camera:
+                            _requestedRendererCamera ??
+                            networkMapOverscannedRendererCamera(camera),
+                        presentedCamera:
+                            _presentedRendererCamera ??
+                            _requestedRendererCamera ??
+                            networkMapOverscannedRendererCamera(camera),
+                        visualCamera: camera,
                         onControllerCreated: _attachRendererController,
                       ),
               ),
@@ -1013,6 +1011,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _endScaleGesture() {
+    _forceRendererCameraCommit = true;
+    if (_pendingCamera == null && _camera != null) {
+      _pendingCamera = _camera;
+    }
     _scheduleCameraCommit();
     _gestureStartCamera = null;
     _gestureStartFocalPoint = null;
@@ -1055,17 +1057,70 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     SchedulerBinding.instance.scheduleFrameCallback((_) {
       _cameraFrameCallbackScheduled = false;
       final pendingCamera = _pendingCamera;
+      final forceRendererCameraCommit = _forceRendererCameraCommit;
       _pendingCamera = null;
+      _forceRendererCameraCommit = false;
       if (!mounted || pendingCamera == null) {
         return;
       }
-      if (identical(_camera, pendingCamera)) {
+      final rendererCamera = _requestedRendererCameraFor(
+        pendingCamera,
+        forceCommit: forceRendererCameraCommit,
+      );
+      if (identical(_camera, pendingCamera) &&
+          identical(_requestedRendererCamera, rendererCamera)) {
         return;
       }
       setState(() {
         _camera = pendingCamera;
+        if (!identical(_requestedRendererCamera, rendererCamera)) {
+          _requestedRendererCamerasByRevision[rendererCamera.revision] =
+              rendererCamera;
+        }
+        _requestedRendererCamera = rendererCamera;
       });
     });
+  }
+
+  MapCameraState _requestedRendererCameraFor(
+    MapCameraState pendingCamera, {
+    required bool forceCommit,
+  }) {
+    final committedCamera = networkMapRendererCommitBasisCamera(
+      presentedCamera: _presentedRendererCamera,
+      requestedCamera: _requestedRendererCamera,
+      visualCamera: pendingCamera,
+    );
+    final requestedCamera = networkMapOverscannedRendererCamera(pendingCamera);
+    final now = DateTime.now();
+    final shouldCommit =
+        forceCommit ||
+        !_gestureActive ||
+        committedCamera == null ||
+        !networkMapRendererCameraCoversVisual(
+          rendererCamera: committedCamera,
+          visualCamera: pendingCamera,
+        ) ||
+        networkMapShouldCommitRendererCamera(
+          committed: committedCamera,
+          candidate: requestedCamera,
+          elapsedSinceLastCommit: _lastRendererCameraRequestAt == null
+              ? _routeMapGestureRendererCommitInterval
+              : now.difference(_lastRendererCameraRequestAt!),
+        );
+    if (!shouldCommit) {
+      final skippedCommitCamera = networkMapRendererCameraForSkippedCommit(
+        requestedCamera: _requestedRendererCamera,
+        candidateCamera: requestedCamera,
+        visualCamera: pendingCamera,
+      );
+      if (!identical(skippedCommitCamera, _requestedRendererCamera)) {
+        _lastRendererCameraRequestAt = now;
+      }
+      return skippedCommitCamera;
+    }
+    _lastRendererCameraRequestAt = now;
+    return requestedCamera;
   }
 
   void _openNearestStation(
@@ -1107,10 +1162,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     RouteMapRendererHealthMonitor monitor,
     RouteMapRendererEvent event,
   ) {
-    if (event is RouteMapRendererDisposed &&
-        identical(_rendererMonitor, monitor)) {
+    final isCurrentMonitor = identical(_rendererMonitor, monitor);
+    if (event is RouteMapRendererDisposed && isCurrentMonitor) {
       _rendererMonitor = null;
       _rendererController = null;
+    }
+    if (!isCurrentMonitor) {
+      return;
+    }
+    if (event is RouteMapRendererFramePresented) {
+      _markRendererFramePresented(event.revision);
     }
     if (!kDebugMode && !kProfileMode) {
       return;
@@ -1138,6 +1199,32 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           RouteMapRendererFailed():
         break;
     }
+  }
+
+  void _markRendererFramePresented(int revision) {
+    if (!networkMapShouldAcceptPresentedRendererRevision(
+      revision: revision,
+      presentedCamera: _presentedRendererCamera,
+      requestedCamera: _requestedRendererCamera,
+    )) {
+      _requestedRendererCamerasByRevision.remove(revision);
+      return;
+    }
+    final camera =
+        _requestedRendererCamerasByRevision.remove(revision) ??
+        (_requestedRendererCamera?.revision == revision
+            ? _requestedRendererCamera
+            : null);
+    if (camera == null || identical(_presentedRendererCamera, camera)) {
+      return;
+    }
+    if (!mounted) {
+      _presentedRendererCamera = camera;
+      return;
+    }
+    setState(() {
+      _presentedRendererCamera = camera;
+    });
   }
 }
 
@@ -1415,11 +1502,15 @@ class _RouteMapViewportRenderer extends StatelessWidget {
   const _RouteMapViewportRenderer({
     required this.asset,
     required this.camera,
+    required this.presentedCamera,
+    required this.visualCamera,
     required this.onControllerCreated,
   });
 
   final _RouteMapAsset asset;
   final MapCameraState camera;
+  final MapCameraState presentedCamera;
+  final MapCameraState visualCamera;
   final ValueChanged<RouteMapRendererController> onControllerCreated;
 
   @override
@@ -1445,9 +1536,20 @@ class _RouteMapViewportRenderer extends StatelessWidget {
       ),
       _ => const ColoredBox(color: Colors.white),
     };
-    return KeyedSubtree(
-      key: const Key('routeMapViewportRenderer'),
-      child: renderer,
+    return ClipRect(
+      child: Transform(
+        transform: networkMapRendererFrameTransform(
+          rendererCamera: presentedCamera,
+          visualCamera: networkMapRendererTransformVisualCamera(
+            rendererCamera: presentedCamera,
+            visualCamera: visualCamera,
+          ),
+        ),
+        child: KeyedSubtree(
+          key: const Key('routeMapViewportRenderer'),
+          child: renderer,
+        ),
+      ),
     );
   }
 }
@@ -1541,6 +1643,127 @@ MapCameraState networkMapCameraWithMonotonicRevision({
     return next;
   }
   return next.copyWith(revision: current.revision + 1);
+}
+
+@visibleForTesting
+bool networkMapShouldCommitRendererCamera({
+  required MapCameraState committed,
+  required MapCameraState candidate,
+  required Duration elapsedSinceLastCommit,
+}) {
+  if (elapsedSinceLastCommit >= _routeMapGestureRendererCommitInterval) {
+    return true;
+  }
+  final scaleRatio = candidate.scale / committed.scale;
+  if (scaleRatio >= _routeMapGestureMaxScaleRatio ||
+      scaleRatio <= 1 / _routeMapGestureMaxScaleRatio) {
+    return true;
+  }
+  final viewportCenter = candidate.viewportSize.center(Offset.zero);
+  final committedCandidateCenter = committed.sourceToViewportPoint(
+    candidate.center,
+  );
+  final drift = committedCandidateCenter - viewportCenter;
+  return drift.dx.abs() >=
+          candidate.viewportSize.width *
+              _routeMapGestureMaxTranslationDriftFraction ||
+      drift.dy.abs() >=
+          candidate.viewportSize.height *
+              _routeMapGestureMaxTranslationDriftFraction;
+}
+
+@visibleForTesting
+MapCameraState networkMapOverscannedRendererCamera(MapCameraState camera) {
+  final overscanScale = math.max(
+    camera.minScale,
+    camera.scale / _routeMapGestureRendererOverscanFactor,
+  );
+  return camera.copyWith(scale: overscanScale).clamped(viewportMargin: 220);
+}
+
+@visibleForTesting
+bool networkMapRendererCameraCoversVisual({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  const tolerance = 0.001;
+  final rendererRect = rendererCamera.visibleSourceRect;
+  final visualRect = visualCamera.visibleSourceRect;
+  return rendererRect.left <= visualRect.left + tolerance &&
+      rendererRect.top <= visualRect.top + tolerance &&
+      rendererRect.right >= visualRect.right - tolerance &&
+      rendererRect.bottom >= visualRect.bottom - tolerance;
+}
+
+@visibleForTesting
+MapCameraState? networkMapRendererCommitBasisCamera({
+  required MapCameraState? presentedCamera,
+  required MapCameraState? requestedCamera,
+  required MapCameraState visualCamera,
+}) {
+  if (requestedCamera != null &&
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: requestedCamera,
+        visualCamera: visualCamera,
+      )) {
+    return requestedCamera;
+  }
+  return presentedCamera ?? requestedCamera;
+}
+
+@visibleForTesting
+MapCameraState networkMapRendererCameraForSkippedCommit({
+  required MapCameraState? requestedCamera,
+  required MapCameraState candidateCamera,
+  required MapCameraState visualCamera,
+}) {
+  if (requestedCamera != null &&
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: requestedCamera,
+        visualCamera: visualCamera,
+      )) {
+    return requestedCamera;
+  }
+  return candidateCamera;
+}
+
+@visibleForTesting
+bool networkMapShouldAcceptPresentedRendererRevision({
+  required int revision,
+  required MapCameraState? presentedCamera,
+  required MapCameraState? requestedCamera,
+}) {
+  final presentedRevision = presentedCamera?.revision;
+  if (presentedRevision != null && revision < presentedRevision) {
+    return false;
+  }
+  final requestedRevision = requestedCamera?.revision;
+  if (requestedRevision != null && revision < requestedRevision) {
+    return false;
+  }
+  return true;
+}
+
+@visibleForTesting
+MapCameraState networkMapRendererTransformVisualCamera({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  return networkMapRendererCameraCoversVisual(
+        rendererCamera: rendererCamera,
+        visualCamera: visualCamera,
+      )
+      ? visualCamera
+      : rendererCamera;
+}
+
+@visibleForTesting
+Matrix4 networkMapRendererFrameTransform({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  return visualCamera.sourceToViewport
+    ..multiply(rendererCamera.viewportToSource);
 }
 
 Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
@@ -2003,72 +2226,6 @@ class _StationHitTarget extends StatelessWidget {
       label: station.displayName,
       onTap: onTap,
       child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _NetworkMapListSheet extends StatelessWidget {
-  const _NetworkMapListSheet({required this.data, required this.onStationTap});
-
-  final NetworkMapData data;
-  final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
-  onStationTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final stationsByLine = <String, List<NetworkMapStation>>{};
-    for (final station in data.stations) {
-      stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
-    }
-    final stationLinesById = _stationLinesById(data);
-    return SafeArea(
-      key: const Key('networkMapListSheet'),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-        children: [
-          const Text(
-            '노선별 역 보기',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '노선별 목록에서 역을 선택하세요.',
-            style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
-          ),
-          const SizedBox(height: 14),
-          if (data.stations.isEmpty)
-            const Text(
-              '선택한 노선에 표시할 역이 없습니다.',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            )
-          else
-            for (final line in data.lines)
-              if (stationsByLine[line.id]?.isNotEmpty ?? false)
-                ExpansionTile(
-                  key: Key('networkMapListLine-${line.id}'),
-                  initiallyExpanded: true,
-                  leading: _LineCircleBadge(line: line, size: 34),
-                  title: Text(
-                    line.shortName,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  children: [
-                    for (final station in stationsByLine[line.id]!)
-                      ListTile(
-                        key: Key(
-                          'networkMapListStation-${station.id}-${station.lineId}',
-                        ),
-                        title: Text(station.displayName),
-                        subtitle: Text(line.shortName),
-                        onTap: () => onStationTap(
-                          station,
-                          stationLinesById[station.id] ?? const [],
-                        ),
-                      ),
-                  ],
-                ),
-        ],
-      ),
     );
   }
 }
