@@ -20,7 +20,8 @@
 	<section>
 		<h2>Group</h2>
 		<form method="get" th:action="@{/admin/codes/page}">
-			<select name="groupCode">
+			<label for="code-group-filter">Group</label>
+			<select id="code-group-filter" name="groupCode">
 				<option th:each="group : ${groups}"
 				        th:value="${group.groupCode}"
 				        th:selected="${group.groupCode == selectedGroup}"

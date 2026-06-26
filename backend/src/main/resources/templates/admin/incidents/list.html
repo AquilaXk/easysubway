@@ -83,7 +83,8 @@
 				<td>
 					<form th:if="${incident.open}" th:action="@{'/admin/incidents/' + ${incident.incidentId} + '/resolve'}" method="post">
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-						<input name="resolution" required placeholder="해결 기록">
+						<label th:for="${'incident-resolution-' + incident.incidentId}">해결 기록</label>
+						<input th:id="${'incident-resolution-' + incident.incidentId}" name="resolution" required placeholder="해결 기록">
 						<button type="submit">해결</button>
 					</form>
 					<span th:unless="${incident.open}" th:text="${incident.resolution}">해결됨</span>
