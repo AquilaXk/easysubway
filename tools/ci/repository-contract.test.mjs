@@ -854,6 +854,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.releaseGate, "mobile-signed-release-artifacts");
   assert.equal(gate.storeReadyStatus, "blocked_external_distribution_evidence_missing");
   assert.equal(gate.androidRcEvidenceManifest, androidRcEvidencePath);
+  assert.equal(gate.androidPageSize16kbGate, "apps/mobile/release/android-16kb-page-size-gate.json");
 
   assert.equal(gate.officialRequirements.android.targetApiLevelMinimum, 35);
   assert.equal(gate.officialRequirements.android.requiredFrom, "2025-08-31");
@@ -871,6 +872,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("production signing key material"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play internal track upload or pre-launch report evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK or Play-installed build smoke evidence"));
+  assert.ok(gate.artifacts.android.storeReadyRequires.includes("Android 16 KB page-size AAB and runtime smoke evidence"));
   assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
   assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
   assert.equal(androidRcEvidence.scope.platform.android, "RELEASE_REQUIRED");
@@ -886,6 +888,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   ]);
   assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("play-app-signing-enrollment"));
   assert.ok(androidRcEvidence.requiredEvidence.aabInspection.includes("bundletool-manifest-dump"));
+  assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-16kb-page-size-gate-manifest"));
+  assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("bundletool-config-dump"));
+  assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("adb-getconf-page-size-16384"));
   assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-15-or-16-page-size-smoke"));
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-generated-apk-or-installed-build-smoke"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("talkback-rc-build-notes"));
@@ -909,6 +914,10 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /store_ready=false/);
   assert.match(workflow, /signing_key_type=temporary-self-signed/);
   assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
+  assert.match(workflow, /cp release\/android-16kb-page-size-gate\.json release-artifacts\/android\/android-16kb-page-size-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
+  assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
+  assert.match(workflow, /page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
   assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
@@ -921,6 +930,67 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /TestFlight/);
   assert.match(readme, /dSYM 90일 보관 workflow/);
   assert.match(readme, /Play internal track/);
+  assert.match(readme, /Android 16 KB page-size gate/);
+});
+
+test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
+  const gatePath = "apps/mobile/release/android-16kb-page-size-gate.json";
+  assert.equal(existsSync(path.join(root, gatePath)), true, "Android 16 KB page-size gate must exist");
+
+  const gate = readJson(gatePath);
+  const aabScript = read("tools/mobile/check-android-aab-16kb-page-size.sh");
+  const elfScript = read("tools/mobile/check-elf-load-alignment.mjs");
+  const runtimeScript = read("tools/mobile/run-android-16kb-page-size-smoke.sh");
+  const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.androidApplicationId, "com.easysubway.app");
+  assert.equal(gate.releaseGate, "android-16kb-page-size");
+  assert.equal(gate.issue, 919);
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.equal(gate.scope.platform.android, "RELEASE_REQUIRED");
+  assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
+  assert.equal(gate.scope.artifact, "android-aab");
+  assert.equal(gate.scope.minimumPageSizeBytes, 16384);
+  assert.equal(gate.aabInspection.script, "tools/mobile/check-android-aab-16kb-page-size.sh");
+  assert.equal(gate.runtimeSmoke.script, "tools/mobile/run-android-16kb-page-size-smoke.sh");
+  assert.equal(gate.runtimeSmoke.requiredDevice, "local_android_emulator_with_getconf_PAGE_SIZE_16384");
+  assert.ok(gate.aabInspection.requiredEvidence.includes("bundletool-config-dump"));
+  assert.ok(gate.aabInspection.requiredTools.includes("node"));
+  assert.ok(gate.aabInspection.requiredEvidence.includes("native-library-load-segment-alignment"));
+  assert.ok(gate.runtimeSmoke.requiredEvidence.includes("adb-getconf-page-size-16384"));
+  assert.ok(gate.runtimeSmoke.requiredEvidence.includes("sqlite-gzip-datapack-smoke"));
+  assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-16kb-page-size-gate-manifest"));
+
+  assert.match(aabScript, /"\$BUNDLETOOL" dump config --bundle="\$AAB"/);
+  assert.match(aabScript, /PAGE_ALIGNMENT_16K/);
+  assert.match(aabScript, /missing_PAGE_ALIGNMENT_16K_native_library_alignment/);
+  assert.match(aabScript, /zipinfo -1 "\$AAB"/);
+  assert.match(aabScript, /MIN_ALIGN=16384/);
+  assert.match(aabScript, /node "\$SCRIPT_DIR\/check-elf-load-alignment\.mjs" --min-align "\$MIN_ALIGN"/);
+  assert.match(aabScript, /native-alignment-summary\.tsv/);
+  assert.match(elfScript, /readBigUInt64LE/);
+  assert.match(elfScript, /u32\(base\) === 1/);
+  assert.match(elfScript, /align < minAlign/);
+
+  assert.match(runtimeScript, /EXPECTED_PAGE_SIZE=16384/);
+  assert.match(runtimeScript, /ro\.kernel\.qemu/);
+  assert.match(runtimeScript, /getconf PAGE_SIZE/);
+  assert.match(runtimeScript, /"\$page_size" != "\$EXPECTED_PAGE_SIZE"/);
+  assert.match(runtimeScript, /pm path "\$PACKAGE"/);
+  assert.match(runtimeScript, /android\.intent\.action\.MAIN/);
+  assert.match(runtimeScript, /android\.intent\.category\.LAUNCHER/);
+  assert.match(runtimeScript, /am start -n "\$launch_activity"/);
+  assert.match(runtimeScript, /current-focus\.txt/);
+  assert.match(runtimeScript, /screencap -p/);
+  assert.match(runtimeScript, /uiautomator dump/);
+  assert.match(runtimeScript, /FATAL EXCEPTION\| \[EF\] AndroidRuntime:\|Fatal signal\|Abort message\|tombstoned/);
+  assert.match(runtimeScript, /crash-excerpt\.txt/);
+  assert.match(runtimeScript, /foreground_package_verified=true/);
+  assert.match(runtimeScript, /logcat_no_crash=true/);
+  assert.match(runtimeScript, /logcat\.txt/);
+  assert.match(runtimeScript, /summary\.txt/);
 });
 
 test("Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {

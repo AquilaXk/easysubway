@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "android-16kb-page-size",
+  "issue": 919,
+  "releaseBlockerPolicy": true,
+  "scope": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "artifact": "android-aab",
+    "minimumPageSizeBytes": 16384
+  },
+  "aabInspection": {
+    "requiredTools": [
+      "bundletool",
+      "unzip",
+      "node"
+    ],
+    "requiredEvidence": [
+      "bundletool-config-dump",
+      "native-library-list",
+      "native-library-load-segment-alignment",
+      "flutter-engine-plugin-native-library-compatibility"
+    ],
+    "script": "tools/mobile/check-android-aab-16kb-page-size.sh",
+    "passCriteriaKo": "AAB 안의 모든 native .so LOAD segment alignment가 16384 bytes 이상이어야 한다."
+  },
+  "runtimeSmoke": {
+    "script": "tools/mobile/run-android-16kb-page-size-smoke.sh",
+    "requiredDevice": "local_android_emulator_with_getconf_PAGE_SIZE_16384",
+    "requiredEvidence": [
+      "adb-getconf-page-size-16384",
+      "app-launch-logcat-no-crash",
+      "sqlite-gzip-datapack-smoke",
+      "photo-picker-route-map-report-upload-smoke"
+    ],
+    "passCriteriaKo": "로컬 Android emulator의 `adb shell getconf PAGE_SIZE`가 16384이고 RC 또는 Play-installed build 핵심 smoke가 통과해야 한다."
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/android-16kb-page-size/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-only",
+    "sensitiveEvidence": [
+      "AAB binary",
+      "APK binary",
+      "logcat",
+      "screenshots",
+      "tester personal data"
+    ]
+  }
+}

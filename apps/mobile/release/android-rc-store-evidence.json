@@ -51,8 +51,11 @@
       "supported-abi-device-catalog-review"
     ],
     "pageSize16kb": [
+      "android-16kb-page-size-gate-manifest",
+      "bundletool-config-dump",
       "native-library-page-size-scan",
       "flutter-engine-plugin-native-library-compatibility",
+      "adb-getconf-page-size-16384",
       "android-15-or-16-page-size-smoke",
       "sqlite-gzip-datapack-smoke",
       "photo-picker-route-map-report-upload-smoke"
