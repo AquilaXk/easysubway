@@ -138,6 +138,9 @@ function analyzeRun(artifactDir) {
     serial: metadata.serial ?? "",
     package: metadata.package ?? "",
     buildMode: metadata.build_mode ?? "",
+    measurementScope: metadata.measurement_scope ?? "route_map_entry_and_pan",
+    gfxinfoResetAfterRouteMapSettle:
+      metadata.gfxinfo_reset_after_route_map_settle === "true",
     viewport: `${metadata.width ?? ""}x${metadata.height ?? ""}`,
     capturedAtUtc: metadata.captured_at_utc ?? "",
     panCount: Number.parseInt(metadata.pan_count ?? "0", 10),
@@ -150,7 +153,9 @@ function analyzeRun(artifactDir) {
 function aggregate(runs) {
   return {
     runCount: runs.length,
+    measurementScopes: [...new Set(runs.map((run) => run.measurementScope))],
     maxJankyPercent: Math.max(...runs.map((run) => run.gfxinfo.jankyPercent ?? 0)),
+    maxP95FrameMs: Math.max(...runs.map((run) => run.gfxinfo.p95Ms ?? 0)),
     maxP99FrameMs: Math.max(...runs.map((run) => run.gfxinfo.p99Ms ?? 0)),
     maxCameraLatencyP95Ms: Math.max(...runs.map((run) => run.renderer.cameraLatencyP95Ms ?? 0)),
     maxTotalPssKb: Math.max(...runs.map((run) => run.meminfo.totalPssKb ?? 0)),
@@ -163,18 +168,21 @@ function markdownReport(result) {
     "# Android route map profile evidence summary",
     "",
     `- runs: ${result.aggregate.runCount}`,
+    `- measurement_scopes: ${result.aggregate.measurementScopes.join(", ")}`,
     `- max_janky_percent: ${result.aggregate.maxJankyPercent}`,
+    `- max_p95_frame_ms: ${result.aggregate.maxP95FrameMs}`,
     `- max_p99_frame_ms: ${result.aggregate.maxP99FrameMs}`,
     `- max_camera_latency_p95_ms: ${result.aggregate.maxCameraLatencyP95Ms}`,
     `- max_total_pss_kb: ${result.aggregate.maxTotalPssKb}`,
     `- dispose_observed_in_all_runs: ${result.aggregate.disposeObservedInAllRuns}`,
     "",
-    "| run | build | viewport | frames | janky | p95 frame | p99 frame | camera p95 | total PSS | dispose | evidence |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| run | scope | build | viewport | frames | janky | p95 frame | p99 frame | camera p95 | total PSS | dispose | evidence |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const [index, run] of result.runs.entries()) {
     const cells = [
       index + 1,
+      run.measurementScope,
       run.buildMode,
       run.viewport,
       run.gfxinfo.totalFrames ?? "",

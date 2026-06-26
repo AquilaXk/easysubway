@@ -5724,8 +5724,11 @@ test("노선도 Android 실기기 evidence runner는 frame, memory, renderer rec
   assert.match(script, /--serial <adb-serial>/);
   assert.match(script, /--artifact-dir <dir>/);
   assert.match(script, /--build-mode <mode>/);
+  assert.match(script, /--measure-after-route-map-settle/);
   assert.match(script, /Install a debug or profile APK first/);
   assert.match(script, /Unsupported build mode/);
+  assert.match(script, /measurement_scope=/);
+  assert.match(script, /gfxinfo_reset_after_route_map_settle=/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" reset/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" > "\$ARTIFACT_DIR\/gfxinfo\.txt"/);
   assert.match(script, /dumpsys gfxinfo "\$PACKAGE" framestats > "\$ARTIFACT_DIR\/gfxinfo-framestats\.txt"/);
@@ -5754,6 +5757,8 @@ test("노선도 Android evidence analyzer는 profile frame, memory, camera laten
       "height=2340",
       "build_mode=profile",
       "pan_count=3",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfo_reset_after_route_map_settle=true",
       "captured_at_utc=2026-06-26T01:00:00Z",
     ].join("\n"),
   );
@@ -5801,10 +5806,14 @@ test("노선도 Android evidence analyzer는 profile frame, memory, camera laten
 
   assert.equal(output.artifactKind, "route-map-android-evidence-summary");
   assert.equal(output.runs[0].buildMode, "profile");
+  assert.equal(output.runs[0].measurementScope, "gesture_after_route_map_settle");
+  assert.equal(output.runs[0].gfxinfoResetAfterRouteMapSettle, true);
   assert.equal(output.runs[0].gfxinfo.jankyPercent, 5.36);
   assert.equal(output.runs[0].gfxinfo.p99Ms, 33);
   assert.equal(output.runs[0].meminfo.totalPssKb, 591090);
   assert.equal(output.runs[0].renderer.cameraLatencyP95Ms, 48);
+  assert.deepEqual(output.aggregate.measurementScopes, ["gesture_after_route_map_settle"]);
+  assert.equal(output.aggregate.maxP95FrameMs, 25);
   assert.equal(output.aggregate.disposeObservedInAllRuns, true);
 });
 

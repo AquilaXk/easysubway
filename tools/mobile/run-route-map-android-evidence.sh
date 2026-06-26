@@ -14,6 +14,9 @@ Options:
   --build-mode <mode>       Installed APK mode: debug or profile. Defaults to debug.
   --pan-count <count>       Number of map pan gestures after route map entry. Defaults to 5.
   --settle-seconds <sec>    Wait after app launch and tab changes. Defaults to 3.
+  --measure-after-route-map-settle
+                            Reset frame/log evidence after route map settles, so gfxinfo and
+                            renderer latency focus on gestures instead of initial map entry.
   -h, --help                Show this help.
 
 The script installs nothing. Install a debug or profile APK first, then run this
@@ -32,6 +35,7 @@ ADB="${ADB:-}"
 BUILD_MODE="debug"
 PAN_COUNT=5
 SETTLE_SECONDS=3
+MEASURE_AFTER_ROUTE_MAP_SETTLE="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -63,6 +67,10 @@ while [[ $# -gt 0 ]]; do
       SETTLE_SECONDS="${2:-}"
       shift 2
       ;;
+    --measure-after-route-map-settle)
+      MEASURE_AFTER_ROUTE_MAP_SETTLE="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -78,6 +86,12 @@ done
 if [[ -z "$SERIAL" || -z "$ARTIFACT_DIR" ]]; then
   usage >&2
   exit 2
+fi
+
+if [[ "$MEASURE_AFTER_ROUTE_MAP_SETTLE" == "true" ]]; then
+  MEASUREMENT_SCOPE="gesture_after_route_map_settle"
+else
+  MEASUREMENT_SCOPE="route_map_entry_and_pan"
 fi
 
 case "$BUILD_MODE" in
@@ -154,6 +168,8 @@ PAN_RIGHT_X=$((WIDTH * 7 / 10))
   echo "build_mode=$BUILD_MODE"
   echo "pan_count=$PAN_COUNT"
   echo "settle_seconds=$SETTLE_SECONDS"
+  echo "measurement_scope=$MEASUREMENT_SCOPE"
+  echo "gfxinfo_reset_after_route_map_settle=$MEASURE_AFTER_ROUTE_MAP_SETTLE"
   echo "adb=$ADB"
   date -u +"captured_at_utc=%Y-%m-%dT%H:%M:%SZ"
 } > "$ARTIFACT_DIR/metadata.env"
@@ -169,12 +185,19 @@ sleep "$SETTLE_SECONDS"
 capture_screen "home"
 capture_ui_tree "home"
 
-adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null
+if [[ "$MEASURE_AFTER_ROUTE_MAP_SETTLE" != "true" ]]; then
+  adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null
+fi
 adb_device shell input tap "$ROUTE_TAB_X" "$BOTTOM_NAV_Y"
 sleep "$SETTLE_SECONDS"
 
 capture_screen "route-map"
 capture_ui_tree "route-map"
+
+if [[ "$MEASURE_AFTER_ROUTE_MAP_SETTLE" == "true" ]]; then
+  adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null
+  adb_device logcat -c
+fi
 
 for ((i = 0; i < PAN_COUNT; i += 1)); do
   adb_device shell input swipe "$PAN_RIGHT_X" "$PAN_Y" "$PAN_LEFT_X" "$PAN_Y" 350
@@ -213,6 +236,7 @@ fi
   echo "- viewport: ${WIDTH}x${HEIGHT}"
   echo "- build_mode: $BUILD_MODE"
   echo "- pan_count: $PAN_COUNT"
+  echo "- measurement_scope: $MEASUREMENT_SCOPE"
   echo
   echo "## Renderer logs"
   grep "routeMapRenderer" "$ARTIFACT_DIR/route-map-renderer.log" || true
