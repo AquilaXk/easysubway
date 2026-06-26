@@ -79,6 +79,8 @@ The local-first mobile runtime is the default user path. Station search, route s
 
 The backend control-plane runtime is kept for report intake, report review, admin/operator pages, data-pack source control, and release operations. Removed mobile station, route, account, profile, notification, and favorite APIs must not become required for ordinary app launch or offline route guidance.
 
+eGovFrame은 backend control-plane에만 선택 적용한다. 현재 production 허용 영역은 admin/operator pagination, data collection batch control-plane, 운영 logging/property/id 후보 검증이며, Flutter mobile runtime, ordinary mobile API, realtime hot path, token/crypto boundary, domain/application/public JSON contracts에는 eGovFrame type이나 starter를 흘리지 않는다. 이 기준은 `backend/quality/egovframe-control-plane-gate.json`과 repository contract test로 검증한다.
+
 The receipt-token report boundary lets a user check or confirm a submitted report without an account. The plain receipt token is issued once, stored on the device, and must not be logged, returned again, or used in URLs after issuance; the backend stores only a peppered hash.
 
 The data-pack pointer contract is atomic: an installed pack becomes current only after size, hash, gzip, SQLite quick check, schema, table, and production signature validation. Failed updates keep the previous `current.json` pointer and preserve user-owned data.
