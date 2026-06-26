@@ -48,13 +48,13 @@ public class DataCollectionRunRecorder {
 		try {
 			TransitMasterCollectionSnapshot snapshot = fetchTransitMasterCollectionSourcePort.fetch();
 			steps.add(completedStep("FETCH", snapshot.inputSource(), snapshot.artifactReference(), snapshot.checksum(), snapshot.recordCount()));
-			steps.add(completedStep("ARCHIVE", snapshot.artifactReference(), "raw-archive://%s/transit-master".formatted(runId), snapshot.checksum(), snapshot.recordCount()));
+			steps.add(skippedStep("ARCHIVE", snapshot.artifactReference(), snapshot.checksum()));
 			validate(snapshot, steps);
-			steps.add(completedStep("PARSE", snapshot.artifactReference(), "parsed-transit-master://%s".formatted(runId), snapshot.checksum(), snapshot.recordCount()));
-			steps.add(completedStep("DIFF", "parsed-transit-master://%s".formatted(runId), "diff-transit-master://%s".formatted(runId), snapshot.checksum(), 0));
-			steps.add(completedStep("STAGE", "diff-transit-master://%s".formatted(runId), "stage-transit-master://%s".formatted(runId), snapshot.checksum(), snapshot.recordCount()));
-			steps.add(manualStep("PUBLISH", "stage-transit-master://%s".formatted(runId), snapshot.checksum()));
-			steps.add(manualStep("ACTIVATE", "stage-transit-master://%s".formatted(runId), snapshot.checksum()));
+			steps.add(skippedStep("PARSE", snapshot.artifactReference(), snapshot.checksum()));
+			steps.add(skippedStep("DIFF", snapshot.artifactReference(), snapshot.checksum()));
+			steps.add(skippedStep("STAGE", snapshot.artifactReference(), snapshot.checksum()));
+			steps.add(manualStep("PUBLISH", snapshot.artifactReference(), snapshot.checksum()));
+			steps.add(manualStep("ACTIVATE", snapshot.artifactReference(), snapshot.checksum()));
 			LocalDateTime completedAt = LocalDateTime.now(clock);
 			var run = new DataCollectionRun(
 				runId,
@@ -155,6 +155,18 @@ public class DataCollectionRunRecorder {
 			DataCollectionStepStatus.MANUAL_REQUIRED,
 			inputSource,
 			"manual-required://%s".formatted(name.toLowerCase()),
+			checksum,
+			0,
+			null
+		);
+	}
+
+	private static DataCollectionRunStep skippedStep(String name, String inputSource, String checksum) {
+		return new DataCollectionRunStep(
+			name,
+			DataCollectionStepStatus.SKIPPED,
+			inputSource,
+			null,
 			checksum,
 			0,
 			null

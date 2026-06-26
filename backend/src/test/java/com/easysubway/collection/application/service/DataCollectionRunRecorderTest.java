@@ -59,11 +59,11 @@ class DataCollectionRunRecorderTest {
 			.extracting("status")
 			.containsExactly(
 				DataCollectionStepStatus.COMPLETED,
+				DataCollectionStepStatus.SKIPPED,
 				DataCollectionStepStatus.COMPLETED,
-				DataCollectionStepStatus.COMPLETED,
-				DataCollectionStepStatus.COMPLETED,
-				DataCollectionStepStatus.COMPLETED,
-				DataCollectionStepStatus.COMPLETED,
+				DataCollectionStepStatus.SKIPPED,
+				DataCollectionStepStatus.SKIPPED,
+				DataCollectionStepStatus.SKIPPED,
 				DataCollectionStepStatus.MANUAL_REQUIRED,
 				DataCollectionStepStatus.MANUAL_REQUIRED
 			);
@@ -155,7 +155,7 @@ class DataCollectionRunRecorderTest {
 			.extracting("name", "status", "failureMessage")
 			.containsExactly(
 				tuple("FETCH", DataCollectionStepStatus.COMPLETED, null),
-				tuple("ARCHIVE", DataCollectionStepStatus.COMPLETED, null),
+				tuple("ARCHIVE", DataCollectionStepStatus.SKIPPED, null),
 				tuple("VALIDATE", DataCollectionStepStatus.FAILED, "공식 출처 수집 결과가 비어 있습니다.")
 			);
 	}

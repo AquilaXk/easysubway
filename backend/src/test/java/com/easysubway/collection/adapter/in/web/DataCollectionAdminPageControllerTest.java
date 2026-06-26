@@ -54,6 +54,7 @@ class DataCollectionAdminPageControllerTest {
 			.contains("FETCH")
 			.contains("STAGE")
 			.contains("PUBLISH")
+			.contains("건너뜀")
 			.contains("수동 필요")
 			.contains("admin-user")
 			.contains(">14<")
