@@ -1362,17 +1362,16 @@ class StationDetailController extends ChangeNotifier {
         return;
       }
       final detail = responses[0] as StationDetail;
-      final realtimeSnapshot = await _loadRealtimeSnapshot(detail);
-      if (_isDisposed) {
-        return;
-      }
       _state = StationDetailState(
         status: StationDetailStatus.success,
         detail: detail,
         exits: responses[1] as List<StationExitInfo>,
         facilities: responses[2] as List<StationFacilityInfo>,
-        realtimeSnapshot: realtimeSnapshot,
+        realtimeSnapshot: const RealtimeSnapshot.loading(),
       );
+      notifyListeners();
+      await _refreshRealtimeSnapshot(detail);
+      return;
     } on StationSearchException {
       if (_isDisposed) {
         return;
@@ -1392,6 +1391,22 @@ class StationDetailController extends ChangeNotifier {
       );
     }
 
+    notifyListeners();
+  }
+
+  Future<void> _refreshRealtimeSnapshot(StationDetail detail) async {
+    final realtimeSnapshot = await _loadRealtimeSnapshot(detail);
+    if (_isDisposed || _state.detail?.id != detail.id) {
+      return;
+    }
+    _state = StationDetailState(
+      status: _state.status,
+      detail: _state.detail,
+      exits: _state.exits,
+      facilities: _state.facilities,
+      realtimeSnapshot: realtimeSnapshot,
+      message: _state.message,
+    );
     notifyListeners();
   }
 

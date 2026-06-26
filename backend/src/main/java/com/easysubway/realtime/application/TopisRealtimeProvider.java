@@ -60,6 +60,10 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			return fallbackProvider.arrivals(query);
 		}
 		JsonNode payload = request("realtimeStationArrival/0/5/%s".formatted(pathSegment(query.stationQueryName())));
+		return arrivalsFromPayload(payload, query);
+	}
+
+	List<RealtimeArrival> arrivalsFromPayload(JsonNode payload, RealtimeQuery query) {
 		JsonNode items = payload.path("realtimeArrivalList");
 		if (!items.isArray()) {
 			return List.of();
@@ -69,7 +73,7 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			arrivals.add(new RealtimeArrival(
 				stringOrFallback(item, "subwayId", query.lineId()),
 				stringOrFallback(item, "statnNm", query.stationQueryName()),
-				stringOrEmpty(item, "bstatnNm"),
+				destination(item),
 				stringOrEmpty(item, "updnLine"),
 				stringOrEmpty(item, "btrainNo"),
 				optionalInt(item, "barvlDt"),
@@ -151,6 +155,11 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 	private String stringOrFallback(JsonNode node, String fieldName, String fallback) {
 		String value = stringOrEmpty(node, fieldName);
 		return value.isBlank() ? fallback : value;
+	}
+
+	private String destination(JsonNode node) {
+		String destination = stringOrEmpty(node, "bstatnNm");
+		return destination.isBlank() ? stringOrEmpty(node, "trainLineNm") : destination;
 	}
 
 	private String stringOrEmpty(JsonNode node, String fieldName) {

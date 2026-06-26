@@ -127,6 +127,41 @@ class RealtimeGatewayServiceTest {
 		assertThat(arrivals.get(0).message()).isEqualTo("3분 후");
 	}
 
+	@Test
+	@DisplayName("TOPIS 도착 payload는 bstatnNm이 없으면 trainLineNm을 목적지 fallback으로 사용한다")
+	void topisArrivalPayloadUsesTrainLineNameWhenDestinationNameIsMissing() throws Exception {
+		ObjectMapper objectMapper = new ObjectMapper();
+		TopisRealtimeProvider provider = new TopisRealtimeProvider(
+			"backend-key",
+			objectMapper,
+			java.net.http.HttpClient.newHttpClient(),
+			new FixtureRealtimeProvider()
+		);
+
+		List<RealtimeArrival> arrivals = provider.arrivalsFromPayload(
+			objectMapper.readTree("""
+				{
+				  "errorMessage": {"code": "INFO-000"},
+				  "realtimeArrivalList": [
+				    {
+				      "subwayId": "1004",
+				      "statnNm": "상록수",
+				      "trainLineNm": "오이도행 - 중앙방면",
+				      "updnLine": "하행",
+				      "btrainNo": "4001",
+				      "barvlDt": "180",
+				      "arvlMsg2": "3분 후"
+				    }
+				  ]
+				}
+				"""),
+			sangnoksuQuery()
+		);
+
+		assertThat(arrivals).hasSize(1);
+		assertThat(arrivals.get(0).destination()).isEqualTo("오이도행 - 중앙방면");
+	}
+
 	private RealtimeQuery sangnoksuQuery() {
 		return new RealtimeQuery("station-sangnoksu", "4", "1004", "상록수", null);
 	}

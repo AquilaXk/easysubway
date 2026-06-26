@@ -1154,6 +1154,10 @@ void main() {
 
     repository.completeAll();
     await loadFuture;
+    await waitForRealtimeSnapshotStatus(
+      controller,
+      RealtimeSnapshotStatus.unavailable,
+    );
 
     expect(controller.state.status, StationDetailStatus.success);
     expect(controller.state.detail?.nameKo, '상록수');
@@ -1196,9 +1200,42 @@ void main() {
     final loadFuture = controller.load('station-sangnoksu');
     repository.completeAll();
     await loadFuture;
+    await waitForRealtimeSnapshotStatus(
+      controller,
+      RealtimeSnapshotStatus.fresh,
+    );
 
     expect(controller.state.status, StationDetailStatus.success);
     expect(controller.state.realtimeSnapshot.summaryText, '상록수 3분 후');
+  });
+
+  test('역 상세 컨트롤러는 실시간 응답 전에도 정적 상세를 먼저 보여 준다', () async {
+    final repository = ControlledStationDetailRepository();
+    final realtimeRepository = DelayedRealtimeRepository();
+    final controller = StationDetailController(
+      repository: repository,
+      realtimeRepository: realtimeRepository,
+    );
+    addTearDown(controller.dispose);
+
+    final loadFuture = controller.load('station-sangnoksu');
+    repository.completeAll();
+    await realtimeRepository.requestStarted.future;
+
+    expect(controller.state.status, StationDetailStatus.success);
+    expect(controller.state.detail?.nameKo, '상록수');
+    expect(
+      controller.state.realtimeSnapshot.status,
+      RealtimeSnapshotStatus.loading,
+    );
+
+    realtimeRepository.complete(const RealtimeSnapshot.unavailable());
+    await loadFuture;
+
+    expect(
+      controller.state.realtimeSnapshot.status,
+      RealtimeSnapshotStatus.unavailable,
+    );
   });
 
   test('역 상세 컨트롤러는 실시간 대기 중 dispose되면 늦은 응답을 알리지 않는다', () async {
@@ -1727,6 +1764,33 @@ class ControlledNearbyStationSearchRepository
 
   void complete(List<StationSearchResult> results) {
     _nearbyCompleter.complete(results);
+  }
+}
+
+Future<void> waitForRealtimeSnapshotStatus(
+  StationDetailController controller,
+  RealtimeSnapshotStatus status,
+) async {
+  if (controller.state.realtimeSnapshot.status == status) {
+    return;
+  }
+  final completer = Completer<void>();
+  void listener() {
+    if (controller.state.realtimeSnapshot.status == status) {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  controller.addListener(listener);
+  try {
+    await completer.future.timeout(
+      const Duration(seconds: 1),
+      onTimeout: () {},
+    );
+  } finally {
+    controller.removeListener(listener);
   }
 }
 
