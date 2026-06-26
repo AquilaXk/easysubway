@@ -7,6 +7,7 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
   "playProductionAccessGate": "apps/mobile/release/play-production-access-gate.json",
+  "playGeneratedApkDeviceMatrixGate": "apps/mobile/release/play-generated-apk-device-matrix-gate.json",
   "officialRequirements": {
     "android": {
       "targetApiLevelMinimum": 35,
@@ -33,7 +34,8 @@
         "Play internal track upload or pre-launch report evidence",
         "Play-generated APK or Play-installed build smoke evidence",
         "Android 16 KB page-size AAB and runtime smoke evidence",
-        "Play production access or closed test requirement satisfaction evidence"
+        "Play production access or closed test requirement satisfaction evidence",
+        "Play-generated APK device compatibility matrix evidence"
       ]
     },
     "ios": {
