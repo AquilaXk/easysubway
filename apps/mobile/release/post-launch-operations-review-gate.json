@@ -7,6 +7,7 @@
   "status": "BLOCKED_POST_LAUNCH_EVIDENCE_MISSING",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "operationsEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
+  "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
   "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
   "reviewWindows": [
     {
@@ -19,7 +20,8 @@
         "android-vitals-anr-rate",
         "backend-readiness",
         "provider-quota-error-rate",
-        "support-intake-open"
+        "support-intake-open",
+        "support-incident-response-gate-ready"
       ],
       "decisionKo": "P0 crash, ANR 급증, Play rejection, backend readiness DOWN, provider quota exhaustion 중 하나라도 확인되면 공개 공지와 fixed release 판단을 시작한다."
     },
@@ -33,7 +35,8 @@
         "support-ticket-summary",
         "data-error-report-backlog",
         "facility-report-backlog",
-        "datapack-adoption-rate"
+        "datapack-adoption-rate",
+        "incident-notice-and-faq-readiness"
       ],
       "decisionKo": "치명 오류 0, 미응답 문의 0, 데이터 오류 P0 0, 신고 backlog owner 지정 완료를 만족하지 못하면 fixed release 또는 datapack rollback을 결정한다."
     },

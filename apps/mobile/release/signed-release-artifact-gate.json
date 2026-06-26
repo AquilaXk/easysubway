@@ -9,6 +9,7 @@
   "playProductionAccessGate": "apps/mobile/release/play-production-access-gate.json",
   "playGeneratedApkDeviceMatrixGate": "apps/mobile/release/play-generated-apk-device-matrix-gate.json",
   "postLaunchOperationsReviewGate": "apps/mobile/release/post-launch-operations-review-gate.json",
+  "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
   "officialRequirements": {
     "android": {
       "targetApiLevelMinimum": 35,
@@ -37,7 +38,8 @@
         "Android 16 KB page-size AAB and runtime smoke evidence",
         "Play production access or closed test requirement satisfaction evidence",
         "Play-generated APK device compatibility matrix evidence",
-        "Post-launch 2h/24h/7d/30d operations review evidence"
+        "Post-launch 2h/24h/7d/30d operations review evidence",
+        "Support, data correction, incident notice, emergency datapack response evidence"
       ]
     },
     "ios": {
