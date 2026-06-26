@@ -393,6 +393,17 @@ void main() {
     expect(result.semanticLabel, isNot(contains('다음 행동')));
   });
 
+  test('경로 검색 UNKNOWN localized reason은 구체 안내 문구를 유지한다', () {
+    final result = _sampleRouteSearchResult(
+      status: 'UNKNOWN',
+      blockedReasons: const ['경로 연결 정보를 확인할 수 없습니다.'],
+    );
+
+    expect(result.isBlocked, isFalse);
+    expect(result.blockedReasonLabels, ['경로 연결 정보를 확인할 수 없습니다.']);
+    expect(result.semanticLabel, contains('경로 연결 정보를 확인할 수 없습니다.'));
+  });
+
   test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {
     final result = RouteSearchResult.fromJson({
       'routeSearchId': 'route-unknown-warning',
