@@ -22,7 +22,7 @@
 
 `.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-GitHub Actions에는 개별 환경변수를 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다.
+GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다.
 
 ```bash
 scripts/github/sync-actions-env-secret.sh .env
@@ -30,7 +30,14 @@ scripts/github/sync-actions-env-secret.sh .env
 
 워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
 
-CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고, 아직 secret이 없으면 `.env.example`로 배포 설정 양식만 확인합니다.
+CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. 아직 secret이나 SSH 접속 정보가 없으면 bootJar와 설정 검증까지만 수행하고, 원격 배포는 `not_started`로 기록합니다.
+
+운영 SSH 배포에는 애플리케이션 환경값과 별개로 production environment에 아래 값을 둡니다.
+
+- Secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_PRIVATE_KEY`
+- Variables: `DEPLOY_ROOT`, `DEPLOY_COMPOSE_PROJECT`, 선택 값 `DEPLOY_PUBLIC_API_BASE_URL`
+
+CD는 `main`의 CI가 성공한 뒤 `workflow_run`으로 자동 실행됩니다. 수동 실행은 대상 SHA가 `main`에 있고 해당 SHA의 CI 성공 기록이 있을 때만 배포할 수 있습니다. `preflight` 모드는 dotenv 검증, Compose config, backend bootJar 생성까지만 확인합니다.
 
 `EASYSUBWAY_TRUSTED_PROXY_CIDRS`는 ALB, Nginx, API Gateway처럼 애플리케이션 앞단에 있는 신뢰 가능한 프록시 IP 또는 CIDR 목록입니다. 예: `10.0.0.0/8,192.168.0.10`. 운영에서는 누락 시 시작 단계에서 설정 오류가 드러나도록 기본값을 두지 않습니다. 개발 환경은 프록시 없이도 로컬 실행할 수 있도록 빈 기본값을 허용하며, 이 경우 전달 헤더를 익명 인증 발급 제한 키로 사용하지 않습니다.
 
@@ -93,6 +100,8 @@ production data pack의 pack URL과 sourceInventory URL은 공개 HTTPS host만 
 ## Operations
 
 운영 관측성과 알림 기준선은 `apps/mobile/release/operations-observability-gate.json`을 기준으로 검증합니다. 이 gate는 release blocker이며, PR에서는 `node --test tools/ci/*.test.mjs`로 필수 신호와 artifact 보관 계약을 확인합니다.
+
+백엔드 CD는 서버의 기존 PostgreSQL과 object-storage 컨테이너를 보존한 상태에서 backend 서비스만 교체합니다. 배포 스크립트는 배포 lock, main ancestry, 이전 배포 SHA, image drift, JAR checksum, env hash, migration 변경 시 PostgreSQL dump 검증, readiness, 실패 시 이전 backend image 재기동을 확인합니다. readiness 실패 로그와 백업 산출물은 서버의 `DEPLOY_ROOT` 아래에 보관하고 GitHub에는 민감값을 올리지 않습니다.
 
 필수 운영 신호 ID:
 

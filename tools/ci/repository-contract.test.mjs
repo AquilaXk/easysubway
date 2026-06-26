@@ -336,19 +336,40 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   const workflow = read(".github/workflows/cd.yml");
 
   assert.match(workflow, /name: CD/);
-  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*-\s*main/);
+  assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*CI[\s\S]*types:\s*\n\s*-\s*completed/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
-  assert.match(workflow, /name: CD Readiness/);
+  assert.match(workflow, /permissions:[\s\S]*actions:\s*read[\s\S]*contents:\s*read/);
+  assert.match(workflow, /group: cd-production-deploy/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /environment: production/);
+  assert.match(workflow, /name: CD Deploy/);
   assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
-  assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret/);
-  assert.match(workflow, /CD Readiness \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.match(workflow, /CD Deploy \/ Validate manual dispatch CI/);
+  assert.match(workflow, /manual deployment requires a successful CI workflow/);
+  assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret/);
+  assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
-  assert.match(workflow, /CD Readiness \/ Validate deployment dotenv contract/);
-  assert.match(workflow, /CD Readiness \/ Validate Docker Compose deployment config/);
-  assert.match(workflow, /docker compose --env-file "\$\{EASYSUBWAY_ENV_FILE\}" -f infra\/docker-compose\.yml config --quiet/);
-  assert.match(workflow, /EASYSUBWAY_ENV secret is not configured/);
+  assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
+  assert.match(workflow, /CD Deploy \/ Prepare split deployment env files/);
+  assert.match(workflow, /tools\/deploy\/prepare-deployment-env\.sh/);
+  assert.match(workflow, /tools\/deploy\/compose-server-env\.allowlist/);
+  assert.match(workflow, /tools\/deploy\/backend-app-env\.allowlist/);
+  assert.match(workflow, /CD Deploy \/ Validate Docker Compose deployment config/);
+  assert.match(workflow, /docker compose --env-file "\$\{PREPARED_ENV_DIR\}\/compose\.env" -f infra\/docker-compose\.yml config --quiet/);
+  assert.match(workflow, /CD Deploy \/ Build backend bootJar/);
+  assert.match(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
+  assert.match(workflow, /CD Deploy \/ Upload and run SSH deployment/);
+  assert.match(workflow, /DEPLOY_HOST: \$\{\{ secrets\.DEPLOY_HOST \}\}/);
+  assert.match(workflow, /DEPLOY_USER: \$\{\{ secrets\.DEPLOY_USER \}\}/);
+  assert.match(workflow, /DEPLOY_SSH_PRIVATE_KEY: \$\{\{ secrets\.DEPLOY_SSH_PRIVATE_KEY \}\}/);
+  assert.match(workflow, /DEPLOY_ROOT: \$\{\{ vars\.DEPLOY_ROOT \}\}/);
+  assert.match(workflow, /DEPLOY_COMPOSE_PROJECT: \$\{\{ vars\.DEPLOY_COMPOSE_PROJECT \}\}/);
+  assert.match(workflow, /missing_ssh_credentials/);
+  assert.match(workflow, /invalid_deploy_root/);
+  assert.match(workflow, /invalid_compose_project/);
+  assert.match(workflow, /remote deployment:[\s\S]*not_started/);
+  assert.match(workflow, /deploy-backend\.sh/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest\s*\n\s*env:\s*\n\s*EASYSUBWAY_ENV_SECRET/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
@@ -499,11 +520,11 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
 
-  assert.match(readme, /`EASYSUBWAY_ENV` secret 하나/);
-  assert.match(readme, /GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
+  assert.match(readme, /애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나/);
+  assert.match(readme, /애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
-  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증/);
+  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
@@ -533,6 +554,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
     "EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900",
+    "EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https://uploads.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
     "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
@@ -2031,11 +2053,16 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(backupScript, /mktemp "\$\{BACKUP_DIR\}\/easysubway-postgres-\$\{timestamp\}\.XXXXXX"/);
   assert.match(backupScript, /backup_file="\$\{temp_file\}\.dump"/);
   assert.match(backupScript, /trap cleanup EXIT/);
-  assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres sh -lc/);
+  assert.match(backupScript, /COMPOSE_PROJECT="\$\{EASYSUBWAY_COMPOSE_PROJECT:-\}"/);
+  assert.match(backupScript, /compose_args\+=\(--project-name "\$\{COMPOSE_PROJECT\}"\)/);
+  assert.match(backupScript, /compose_args\+=\(--env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}"\)/);
+  assert.match(backupScript, /docker compose "\$\{compose_args\[@\]\}" exec -T postgres sh -lc/);
   assert.match(backupScript, /pg_dump --format=custom --no-owner --no-privileges -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
   assert.match(backupScript, /> "\$\{temp_file\}"/);
   assert.match(backupScript, /test -s "\$\{temp_file\}"/);
+  assert.match(backupScript, /pg_restore --list "\$\{temp_file\}"/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
+  assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
   assert.match(backupScript, /trap - EXIT/);
 
   assert.match(restoreScript, /set -euo pipefail/);
