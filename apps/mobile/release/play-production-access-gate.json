@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "play-production-access-closed-test",
+  "issue": 920,
+  "parentEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
+  "status": "BLOCKED_EXTERNAL_CONSOLE_EVIDENCE_MISSING",
+  "officialPolicy": {
+    "source": "https://support.google.com/googleplay/android-developer/answer/14151465",
+    "appliesTo": "personal developer accounts created after 2023-11-13",
+    "closedTestMinimumOptedInTesters": 12,
+    "closedTestContinuousOptInDays": 14,
+    "productionAccessApplicationRequired": true,
+    "productionReviewTypicalDays": 7
+  },
+  "requiredConsoleEvidence": [
+    {
+      "id": "play_account_identity_status",
+      "category": "account",
+      "releaseBlocker": true,
+      "readyWhenKo": "Play Console 계정 유형, 계정 생성일, 신원 확인, 조직 확인 적용 여부, payments profile, developer contact, Console 사용자 권한, 2단계 인증 상태가 확인된다.",
+      "evidence": [
+        "account-type-and-created-at-summary",
+        "identity-verification-status-summary",
+        "developer-contact-and-payments-profile-summary",
+        "least-privilege-console-users-2fa-summary"
+      ]
+    },
+    {
+      "id": "play_production_access_status",
+      "category": "production-access",
+      "releaseBlocker": true,
+      "readyWhenKo": "Play Console Test and release > Production 접근 가능 여부와 production access 신청/승인/반려 상태가 기록된다.",
+      "evidence": [
+        "production-access-status-summary",
+        "production-menu-access-screenshot-or-summary",
+        "production-access-approval-or-rejection-record"
+      ]
+    },
+    {
+      "id": "play_closed_test_requirement",
+      "category": "closed-test",
+      "releaseBlocker": true,
+      "readyWhenKo": "신규 personal account testing requirement 적용 여부를 기록하고, 적용 시 12명 이상 tester가 14일 연속 opt-in 상태임을 확인한다.",
+      "evidence": [
+        "closed-test-requirement-applicability-record",
+        "closed-test-tester-roster-count-summary",
+        "closed-test-14-day-continuous-opt-in-summary",
+        "tester-feedback-and-issue-response-summary"
+      ]
+    },
+    {
+      "id": "play_production_access_application",
+      "category": "production-access",
+      "releaseBlocker": true,
+      "readyWhenKo": "closed test 경험, 앱 가치, production readiness 답변 초안과 제출/승인 결과를 보관한다.",
+      "evidence": [
+        "production-access-application-answer-draft",
+        "closed-test-engagement-and-feedback-summary",
+        "production-readiness-answer-summary",
+        "production-access-submission-result"
+      ]
+    }
+  ],
+  "goNoGoRules": {
+    "organizationAccountWithoutProductionBlocker": "account_identity_and_production_access_record_required",
+    "personalAccountCreatedOnOrBefore2023-11-13": "closed_test_requirement_may_not_apply_but_console_record_required",
+    "personalAccountCreatedAfter2023-11-13": "closed_test_12_testers_14_days_and_production_access_approval_required",
+    "productionAccessRejected": "BLOCKED_EXTERNAL",
+    "missingTesterPersonalDataProtectionSummary": "BLOCKED_EXTERNAL"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/play-production-access/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-only",
+    "sensitiveEvidence": [
+      "Google Play Console screenshots",
+      "tester email addresses",
+      "tester feedback containing personal data",
+      "payments profile",
+      "developer identity verification",
+      "Console user list"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 파일로 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 Console 링크만 적는다."
+  }
+}
