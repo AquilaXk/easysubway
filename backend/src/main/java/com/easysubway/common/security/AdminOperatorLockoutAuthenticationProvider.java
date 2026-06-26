@@ -59,7 +59,7 @@ public class AdminOperatorLockoutAuthenticationProvider implements Authenticatio
 			recordSuccess(identity.get());
 			return result;
 		} catch (AccountStatusException exception) {
-			recordBlocked(identity.get());
+			recordBlocked(identity.get(), exception);
 			throw exception;
 		} catch (BadCredentialsException exception) {
 			recordFailure(identity.get());
@@ -107,15 +107,31 @@ public class AdminOperatorLockoutAuthenticationProvider implements Authenticatio
 		));
 	}
 
-	private void recordBlocked(AdminIdentity identity) {
+	private void recordBlocked(AdminIdentity identity, AccountStatusException exception) {
 		LocalDateTime now = LocalDateTime.now(clock);
 		adminIdentityRepository.recordLoginAudit(new AdminLoginAudit(
 			identity.loginId(),
 			identity.authMethod(),
-			"LOCKED",
-			null,
+			blockedOutcome(identity, now),
+			exception.getClass().getSimpleName(),
 			now
 		));
+	}
+
+	private String blockedOutcome(AdminIdentity identity, LocalDateTime now) {
+		if (identity.lockedAt(now)) {
+			return "LOCKED";
+		}
+		if (identity.credentialRotationRequired()) {
+			return "CREDENTIAL_ROTATION_REQUIRED";
+		}
+		return switch (identity.status()) {
+			case DISABLED -> "DISABLED";
+			case PASSWORD_EXPIRED -> "PASSWORD_EXPIRED";
+			case CREDENTIAL_ROTATION_REQUIRED -> "CREDENTIAL_ROTATION_REQUIRED";
+			case LOCKED -> "LOCKED";
+			case ACTIVE -> identity.credentialsExpiredAt(now) ? "PASSWORD_EXPIRED" : "DISABLED";
+		};
 	}
 
 	private static String normalize(String username) {

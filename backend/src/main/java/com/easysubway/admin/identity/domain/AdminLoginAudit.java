@@ -17,7 +17,12 @@ public record AdminLoginAudit(
 		if (authMethod == null) {
 			throw new IllegalArgumentException("관리자 감사 인증 방식이 필요합니다.");
 		}
-		if (!"FAILED".equals(outcome) && !"LOCKED".equals(outcome) && !"SUCCESS".equals(outcome)) {
+		if (!"FAILED".equals(outcome)
+			&& !"LOCKED".equals(outcome)
+			&& !"DISABLED".equals(outcome)
+			&& !"PASSWORD_EXPIRED".equals(outcome)
+			&& !"CREDENTIAL_ROTATION_REQUIRED".equals(outcome)
+			&& !"SUCCESS".equals(outcome)) {
 			throw new IllegalArgumentException("관리자 감사 결과가 올바르지 않습니다.");
 		}
 		if (occurredAt == null) {

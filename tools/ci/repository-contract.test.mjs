@@ -6298,13 +6298,14 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminIdentityPostgresSchema, /password_hash VARCHAR\(255\) NOT NULL/);
   assert.match(adminIdentityPostgresSchema, /auth_method VARCHAR\(40\) NOT NULL/);
   assert.match(adminIdentityPostgresSchema, /auth_method IN \('LOCAL', 'BREAK_GLASS'\)/);
+  assert.match(adminIdentityPostgresSchema, /role IN \('ADMIN', 'OPERATOR_ADMIN'\)/);
   assert.match(adminIdentityPostgresSchema, /status IN \('ACTIVE', 'DISABLED', 'LOCKED', 'PASSWORD_EXPIRED', 'CREDENTIAL_ROTATION_REQUIRED'\)/);
   assert.match(adminIdentityPostgresSchema, /failed_login_count INTEGER NOT NULL DEFAULT 0/);
   assert.match(adminIdentityPostgresSchema, /failed_login_count >= 0/);
   assert.match(adminIdentityPostgresSchema, /locked_until TIMESTAMP/);
   assert.match(adminIdentityPostgresSchema, /credential_rotation_required BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(adminIdentityPostgresSchema, /CREATE TABLE admin_login_audits/);
-  assert.match(adminIdentityPostgresSchema, /outcome IN \('FAILED', 'LOCKED', 'SUCCESS'\)/);
+  assert.match(adminIdentityPostgresSchema, /outcome IN \('FAILED', 'LOCKED', 'DISABLED', 'PASSWORD_EXPIRED', 'CREDENTIAL_ROTATION_REQUIRED', 'SUCCESS'\)/);
   assert.match(adminIdentityPostgresSchema, /idx_admin_login_audits_login_occurred_at/);
   assert.match(adminIdentityUserDetailsService, /fallbackUserDetailsService/);
   assert.match(adminIdentityUserDetailsService, /credentialsExpired/);

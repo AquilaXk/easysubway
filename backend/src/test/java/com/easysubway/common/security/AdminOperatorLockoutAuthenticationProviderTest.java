@@ -102,7 +102,8 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 			.isInstanceOf(DisabledException.class);
 
 		assertThat(repository.audits()).hasSize(1);
-		assertThat(repository.audits().getFirst().outcome()).isEqualTo("LOCKED");
+		assertThat(repository.audits().getFirst().outcome()).isEqualTo("DISABLED");
+		assertThat(repository.audits().getFirst().reason()).isEqualTo("DisabledException");
 	}
 
 	@Test
@@ -133,6 +134,8 @@ class AdminOperatorLockoutAuthenticationProviderTest {
 
 		assertThatThrownBy(() -> provider.authenticate(token("admin-user", "admin-password")))
 			.isInstanceOf(DisabledException.class);
+		assertThat(repository.audits()).hasSize(1);
+		assertThat(repository.audits().getFirst().outcome()).isEqualTo("CREDENTIAL_ROTATION_REQUIRED");
 	}
 
 	@Test
