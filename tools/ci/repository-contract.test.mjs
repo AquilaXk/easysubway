@@ -2617,6 +2617,51 @@ test("eGovFrame pagination import는 common web pagination 경계에만 둔다",
   ]);
 });
 
+test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경계를 고정한다", () => {
+  const gate = readJson("backend/quality/egovframe-control-plane-gate.json");
+  const build = read("backend/build.gradle");
+  const lockfile = read("backend/gradle.lockfile");
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.gateId, "egovframe-control-plane-adoption");
+  assert.equal(gate.framework.egovFrame, "5.0.0");
+  assert.match(gate.framework.springBoot, /^3\.5\./);
+  assert.deepEqual(gate.allowedProductionSurface, [
+    "backend_admin_operator_pages",
+    "data_collection_batch_control_plane",
+    "operations_logging_properties_ids",
+  ]);
+  assert.deepEqual(gate.noGoSurface, [
+    "flutter_mobile_runtime",
+    "ordinary_mobile_api",
+    "realtime_hot_path",
+    "token_or_crypto_security_boundary",
+    "domain_application_public_json_contracts",
+  ]);
+  assert.equal(gate.pocDecision.egovframeBatCore.status, "deferred_until_dependency_convergence_and_local_mirror");
+  assert.equal(gate.pocDecision.egovframeBatCore.currentImplementation, "spring_batch_control_plane_job");
+  assert.equal(gate.pocDecision.fdlLogging.status, "classpath_verified_control_plane_only");
+  assert.equal(gate.pocDecision.fdlProperty.status, "not_enabled_for_production");
+  assert.equal(gate.pocDecision.fdlIdgnr.status, "not_enabled_for_production");
+  assert.equal(gate.pocDecision.pslDataaccess.status, "forbidden_until_poc_passes");
+  assert.equal(gate.pocDecision.fdlAccess.status, "forbidden_until_poc_passes");
+  assert.equal(gate.pocDecision.fdlExcel.status, "forbidden_until_poc_passes");
+
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
+  assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
+  assert.doesNotMatch(build, /egovframe-rte-bat-core/);
+  assert.doesNotMatch(build, /egovframe-rte-fdl-property/);
+  assert.doesNotMatch(build, /egovframe-rte-fdl-idgnr/);
+  assert.doesNotMatch(build, /egovframe-rte-psl-dataaccess/);
+  assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
+  assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
+
+  assert.match(readme, /eGovFrame은 backend control-plane에만 선택 적용한다/);
+  assert.match(readme, /Flutter mobile runtime, ordinary mobile API, realtime hot path, token\/crypto boundary/);
+});
+
 test("백엔드 web message source는 기본 한국어 bundle과 code 기반 validation을 사용한다", () => {
   const applicationYml = read("backend/src/main/resources/application.yml");
   const messages = read("backend/src/main/resources/messages.properties");
