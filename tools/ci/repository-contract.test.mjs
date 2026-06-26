@@ -3933,7 +3933,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminReportListTemplate, /page\.hasNext/);
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
-  assert.match(security, /anyRequest\(\)\.hasAnyAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\), "ROLE_ADMIN"\)/);
+  assert.match(security, /anyRequest\(\)\.hasAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\)\)/);
   assert.match(security, /adminSecurityFilterChain\([\s\S]*HttpSecurity http,[\s\S]*AdminOperatorAuditFilter auditFilter,[\s\S]*basicAuthEnabled/);
   assert.match(security, /adminSecurityFilterChain[\s\S]*addFilterAfter\(auditFilter, BasicAuthenticationFilter\.class\)/);
   assert.match(security, /@Order\(2\)[\s\S]*?securityMatcher\("\/operator\/\*\*"\)/);
@@ -6257,9 +6257,9 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(messages, /^common\.error\.invalid-parameter=요청 값을 확인해야 합니다\.$/m);
   assert.doesNotMatch(commonExceptionHandler, /StackTrace|printStackTrace|getStackTrace/);
   assert.match(securityConfig, /securityMatcher\("\/admin\/\*\*"\)/);
-  assert.match(securityConfig, /hasAnyAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\), "ROLE_ADMIN"\)/);
-  assert.match(securityConfig, /hasAnyAuthority\(AdminPermission\.REPORT_REVIEW\.authority\(\), "ROLE_ADMIN"\)/);
-  assert.match(securityConfig, /hasAnyAuthority\(AdminPermission\.DATA_OPERATE\.authority\(\), "ROLE_ADMIN"\)/);
+  assert.match(securityConfig, /hasAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\)\)/);
+  assert.match(securityConfig, /hasAuthority\(AdminPermission\.REPORT_REVIEW\.authority\(\)\)/);
+  assert.match(securityConfig, /hasAuthority\(AdminPermission\.DATA_OPERATE\.authority\(\)\)/);
   assert.match(securityConfig, /"\/admin\/notifications\/\*\*"/);
   assert.match(securityConfig, /hasRole\("OPERATOR_ADMIN"\)/);
   assert.match(securityConfig, /validateProdAdminCredentials/);
