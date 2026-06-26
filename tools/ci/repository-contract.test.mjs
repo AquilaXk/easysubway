@@ -5527,8 +5527,13 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.match(smokeScript, /width_dp=\$\(\(width_px \* 160 \/ density_dpi\)\)/);
   assert.match(smokeScript, /"\$width_px" -ge "\$height_px"/);
   assert.match(smokeScript, /viewport_orientation=portrait/);
+  assert.match(smokeScript, /wm_size_raw=/);
+  assert.match(smokeScript, /Override size:/);
+  assert.match(smokeScript, /wm_size_source="override"/);
   assert.match(smokeScript, /pm path "\$PACKAGE"/);
-  assert.match(smokeScript, /resolve-activity --brief "\$PACKAGE"/);
+  assert.match(smokeScript, /android\.intent\.action\.MAIN/);
+  assert.match(smokeScript, /android\.intent\.category\.LAUNCHER/);
+  assert.match(smokeScript, /-p "\$PACKAGE"/);
   assert.match(smokeScript, /am start -n "\$launch_activity"/);
   assert.match(smokeScript, /current-focus\.txt/);
   assert.match(smokeScript, /font_scale/);

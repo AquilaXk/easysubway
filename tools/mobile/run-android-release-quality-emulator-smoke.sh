@@ -115,7 +115,11 @@ current_focus() {
 }
 
 resolve_launch_activity() {
-  adb_device shell cmd package resolve-activity --brief "$PACKAGE" | tr -d '\r' | tail -n 1
+  adb_device shell cmd package resolve-activity \
+    --brief \
+    -a android.intent.action.MAIN \
+    -c android.intent.category.LAUNCHER \
+    -p "$PACKAGE" | tr -d '\r' | tail -n 1
 }
 
 if ! adb_device get-state | grep -qx "device"; then
@@ -129,7 +133,14 @@ if [[ "$kernel_qemu" != "1" ]]; then
   exit 1
 fi
 
-wm_size="$(adb_device shell wm size | tr -d '\r')"
+wm_size_raw="$(adb_device shell wm size | tr -d '\r')"
+wm_size_source="physical"
+wm_size="$(printf '%s\n' "$wm_size_raw" | sed -n 's/^Physical size: //p' | tail -n 1)"
+wm_size_override="$(printf '%s\n' "$wm_size_raw" | sed -n 's/^Override size: //p' | tail -n 1)"
+if [[ -n "$wm_size_override" ]]; then
+  wm_size="$wm_size_override"
+  wm_size_source="override"
+fi
 wm_density="$(adb_device shell wm density | tr -d '\r')"
 font_scale="$(adb_device shell settings get system font_scale | tr -d '\r')"
 high_text_contrast="$(adb_device shell settings get secure high_text_contrast_enabled | tr -d '\r' || true)"
@@ -175,6 +186,7 @@ fi
   echo "ro.kernel.qemu=$kernel_qemu"
   echo "android_sdk=$sdk"
   echo "wm_size=$wm_size"
+  echo "wm_size_source=$wm_size_source"
   echo "wm_density=$wm_density"
   echo "width_dp=$width_dp"
   echo "height_dp=$height_dp"
