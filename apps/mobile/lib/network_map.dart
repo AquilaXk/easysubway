@@ -1794,17 +1794,36 @@ const _maximumStationHitDistance = 24.0;
 
 List<NetworkMapStation> _canonicalStations(
   Iterable<NetworkMapStation> stations,
+  _MapGeometry geometry,
 ) {
-  final byStationId = <String, NetworkMapStation>{};
+  final canonicalStations = <NetworkMapStation>[];
   for (final station in stations) {
-    final existing = byStationId[station.id];
-    if (existing == null ||
-        _stationGeometryPriority(station) >
-            _stationGeometryPriority(existing)) {
-      byStationId[station.id] = station;
+    final existingIndex = canonicalStations.indexWhere((existing) {
+      return existing.id == station.id &&
+          _isOverlappingStationGeometry(existing, station, geometry);
+    });
+    if (existingIndex == -1) {
+      canonicalStations.add(station);
+      continue;
+    }
+    final existing = canonicalStations[existingIndex];
+    if (_stationGeometryPriority(station) >
+        _stationGeometryPriority(existing)) {
+      canonicalStations[existingIndex] = station;
     }
   }
-  return byStationId.values.toList(growable: false);
+  return canonicalStations;
+}
+
+bool _isOverlappingStationGeometry(
+  NetworkMapStation a,
+  NetworkMapStation b,
+  _MapGeometry geometry,
+) {
+  return _stationHitRect(
+    a,
+    geometry,
+  ).inflate(8).overlaps(_stationHitRect(b, geometry).inflate(8));
 }
 
 List<NetworkMapStation> _visibleCanonicalStations({
@@ -1816,6 +1835,7 @@ List<NetworkMapStation> _visibleCanonicalStations({
     geometry.stationIndex.query(visibleSourceRect).where((station) {
       return _stationHitRect(station, geometry).overlaps(visibleSourceRect);
     }),
+    geometry,
   );
 }
 
