@@ -6144,6 +6144,9 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   const adminRbacPostgresSchema = read("backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
+  const jdbcAdminRbacAuthorityRepository = read(
+    "backend/src/main/java/com/easysubway/admin/authorization/adapter/out/persistence/JdbcAdminRbacAuthorityRepository.java",
+  );
   const adminIdentityUserDetailsService = read(
     "backend/src/main/java/com/easysubway/admin/identity/application/service/AdminIdentityUserDetailsService.java",
   );
@@ -6323,6 +6326,8 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminProgramRegistry, /\/admin\/reports\/page/);
   assert.match(adminProgramRegistry, /AdminPermission\.REPORT_REVIEW/);
   assert.match(adminPermission, /REPORT_REVIEW\("admin\.report\.review"\)/);
+  assert.match(jdbcAdminRbacAuthorityRepository, /JOIN admin_role_permissions/);
+  assert.match(jdbcAdminRbacAuthorityRepository, /FROM admin_user_roles/);
   assert.match(adminIdentityUserDetailsService, /fallbackUserDetailsService/);
   assert.match(adminIdentityUserDetailsService, /credentialsExpired/);
   assert.match(adminIdentityUserDetailsService, /AdminAuthorization\.authoritiesFor/);
