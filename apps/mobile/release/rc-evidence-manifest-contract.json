@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "rc-evidence-manifest",
+  "issue": 926,
+  "parentIssues": [900, 907],
+  "linkedEvidenceIssues": [571, 907, 917],
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
+  "releaseGovernanceGate": "apps/mobile/release/release-governance-gate.json",
+  "generator": "tools/release/generate-rc-evidence-manifest.mjs",
+  "requiredRcIdentityFields": [
+    "gitSha",
+    "appVersionName",
+    "versionCode",
+    "aabSha256",
+    "dataPackManifestSha256",
+    "releaseSequence",
+    "routeContractVersion",
+    "realtimeContractVersion"
+  ],
+  "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
+  "requiredEvidenceEntryFields": [
+    "id",
+    "sourceIssue",
+    "device",
+    "androidVersion",
+    "testedAt",
+    "evidencePaths",
+    "expiresWhen"
+  ],
+  "requiredEvidenceEntries": [
+    {
+      "id": "rc_device_qa",
+      "sourceIssue": 571,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "signed_rc_store_submission",
+      "sourceIssue": 907,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "android_release_quality",
+      "sourceIssue": 917,
+      "expiresAfterDays": 14
+    }
+  ],
+  "readinessPolicy": {
+    "openAndroidP0BlocksGo": true,
+    "nonSatisfiedGateBlocksGo": true,
+    "identityMismatchBlocksGo": true,
+    "missingRequiredIdentityBlocksGo": true,
+    "missingRequiredEvidenceEntryBlocksGo": true,
+    "goStatus": "GO",
+    "noGoStatus": "NO_GO"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
+    "githubUploadPolicy": "summary-or-public-workflow-link",
+    "sensitiveEvidencePolicy": "local_path_with_reason",
+    "androidDeviceEvidence": "local_android_emulator_only_for_codex_pr_evidence"
+  }
+}
