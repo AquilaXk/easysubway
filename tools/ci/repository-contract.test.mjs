@@ -3146,6 +3146,7 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   const build = read("backend/build.gradle");
   const ci = read(".github/workflows/ci.yml");
   const readme = read("README.md");
+  const sonar = read("sonar-project.properties");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.gateId, "backend-static-analysis-feasibility");
@@ -3173,6 +3174,7 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
   assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
   assert.doesNotMatch(build, /id ['"]jacoco['"]/);
+  assert.match(sonar, /sonar\.cpd\.exclusions=\\\n\s+backend\/src\/main\/resources\/db\/migration\/\*\*\/\*\.sql/);
   assert.doesNotMatch(build, /com\.tngtech\.archunit/);
 
   assert.match(readme, /backend static analysis feasibility gate/);
