@@ -748,6 +748,8 @@ class RouteSearchResult {
 
   bool get isBlocked => status == 'BLOCKED';
 
+  bool get needsConfirmation => !isBlocked && status != 'FOUND';
+
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
   RouteSearchStep? get arrivalGuidanceStep {
@@ -801,6 +803,9 @@ class RouteSearchResult {
     if (isBlocked) {
       return '안내 불가 이유';
     }
+    if (needsConfirmation) {
+      return '확인 필요 이유';
+    }
     return warnings.isEmpty ? '주의 없음' : '주의 확인';
   }
 
@@ -828,7 +833,7 @@ class RouteSearchResult {
     }
     final safeBlockedReasons = blockedReasonLabels;
     if (safeBlockedReasons.isNotEmpty) {
-      parts.add('안내 불가 이유 ${safeBlockedReasons.join(', ')}');
+      parts.add('$attentionLabel ${safeBlockedReasons.join(', ')}');
     }
     if (isBlocked) {
       parts.add('다음 행동 $_routeSearchFailureNextAction');

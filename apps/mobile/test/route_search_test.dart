@@ -389,7 +389,10 @@ void main() {
     expect(result.statusLabel, '확인이 필요합니다');
     expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
-    expect(result.semanticLabel, contains('안내 불가 이유 경로 연결 정보를 확인할 수 없습니다.'));
+    expect(result.needsConfirmation, isTrue);
+    expect(result.attentionLabel, '확인 필요 이유');
+    expect(result.semanticLabel, contains('확인 필요 이유 경로 연결 정보를 확인할 수 없습니다.'));
+    expect(result.semanticLabel, isNot(contains('안내 불가 이유')));
     expect(result.semanticLabel, isNot(contains('다음 행동')));
   });
 
