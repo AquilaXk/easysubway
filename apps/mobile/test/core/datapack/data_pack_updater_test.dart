@@ -331,6 +331,13 @@ void main() {
     final dependencyCompressedBytes = gzip.encode(dependencySqliteBytes);
     final inactiveSqliteBytes = await _validCatalogSqliteBytes(directory);
     final inactiveCompressedBytes = gzip.encode(inactiveSqliteBytes);
+    await catalogDirectory.create(recursive: true);
+    await File(
+      '${catalogDirectory.path}/common-v2.sqlite',
+    ).writeAsString('old dependency v2');
+    await File(
+      '${catalogDirectory.path}/common-v3.sqlite',
+    ).writeAsString('old dependency v3');
     final requestedPaths = <String>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
@@ -427,6 +434,10 @@ void main() {
       '/datapacks/catalog/capital-v19.sqlite.gz',
       '/datapacks/catalog/common-v1.sqlite.gz',
     ]);
+    expect(
+      await File('${catalogDirectory.path}/common-v1.sqlite').exists(),
+      isTrue,
+    );
   });
 
   test('updater는 active pack과 별도 emergency override pack을 다운로드한다', () async {
