@@ -1342,6 +1342,142 @@ void main() {
     expect(painter.visibleStationCount as int, 3);
   });
 
+  testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    const map = NetworkMapData(
+      regions: [NetworkMapRegion(name: '테스트권')],
+      selectedRegion: '테스트권',
+      lines: [
+        NetworkMapLine(
+          id: 'seoul-4',
+          name: '수도권 4호선',
+          color: '#00A5DE',
+          region: '테스트권',
+        ),
+      ],
+      stations: [
+        NetworkMapStation(
+          id: 'station-visible-a',
+          nameKo: '보이는역A',
+          nameEn: 'Visible A',
+          region: '테스트권',
+          lineId: 'seoul-4',
+          stationCode: '401',
+          sequence: 1,
+          position: NetworkMapPosition(
+            x: 5000,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
+          id: 'station-geometry-left',
+          nameKo: '왼쪽기준',
+          nameEn: 'Geometry Left',
+          region: '테스트권',
+          lineId: 'geometry-helper',
+          stationCode: '000',
+          sequence: 0,
+          position: NetworkMapPosition(
+            x: 0,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+        NetworkMapStation(
+          id: 'station-far-a',
+          nameKo: '먼역A',
+          nameEn: 'Far A',
+          region: '테스트권',
+          lineId: 'seoul-4',
+          stationCode: '499',
+          sequence: 99,
+          position: NetworkMapPosition(
+            x: 10000,
+            y: 100,
+            labelDx: 0,
+            labelDy: 0,
+            upPath: '',
+            downPath: '',
+            sourceId: 'fixture-route-map-source-capital-review',
+          ),
+        ),
+      ],
+      edges: [],
+      positionSources: [
+        NetworkMapPositionSource(
+          id: 'fixture-route-map-source-capital-review',
+          name: '수도권 노선도 fixture 좌표 검수',
+          licenseStatus: 'fixture-only',
+        ),
+      ],
+      stationLineMemberships: [
+        NetworkMapStationLineMembership(
+          stationId: 'station-visible-a',
+          lineId: 'seoul-4',
+        ),
+        NetworkMapStationLineMembership(
+          stationId: 'station-far-a',
+          lineId: 'seoul-4',
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['테스트권'],
+            networkMapData: map,
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottomNavMap')));
+      await tester.pumpAndSettle();
+
+      final visibleStation = find.byKey(
+        const Key('networkMapStation-visible-a-seoul-4'),
+      );
+      expect(visibleStation, findsOneWidget);
+      expect(
+        find.byKey(const Key('networkMapStation-far-a-seoul-4')),
+        findsNothing,
+      );
+      expect(find.bySemanticsLabel('먼역A역'), findsNothing);
+
+      final visibleSemantics = tester.getSemantics(visibleStation);
+      expect(
+        visibleSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      visibleSemantics.owner!.performAction(
+        visibleSemantics.id,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      expect(find.text('보이는역A역'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('노선도 역을 누르면 출발 도착 설정 sheet를 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
