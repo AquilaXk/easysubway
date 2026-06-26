@@ -718,14 +718,17 @@ const _maxMapScale = 4.8;
 const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 160);
 const _routeMapGestureMaxTranslationDriftFraction = 0.2;
 const _routeMapGestureMaxScaleRatio = 1.25;
+const _routeMapGestureRendererOverscanFactor = 1.5;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
   MapCameraState? _camera;
   MapCameraState? _pendingCamera;
-  MapCameraState? _rendererCamera;
-  DateTime? _lastRendererCameraCommitAt;
+  MapCameraState? _requestedRendererCamera;
+  MapCameraState? _presentedRendererCamera;
+  final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
+  DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
   bool _gestureActive = false;
@@ -744,7 +747,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pendingCamera = null;
-    _rendererCamera = null;
+    _requestedRendererCamera = null;
+    _presentedRendererCamera = null;
+    _requestedRendererCamerasByRevision.clear();
     _releaseRenderer(disposeRenderer: true);
     super.dispose();
   }
@@ -812,8 +817,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
-            _rendererCamera = null;
-            _lastRendererCameraCommitAt = null;
+            _requestedRendererCamera = null;
+            _presentedRendererCamera = null;
+            _requestedRendererCamerasByRevision.clear();
+            _lastRendererCameraRequestAt = null;
             _gestureActive = false;
             final initialCamera = _cameraForBounds(
               geometry.initialBounds,
@@ -821,8 +828,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               sourceBounds: fullBounds,
               minScale: minScale,
             );
+            final initialRendererCamera = networkMapOverscannedRendererCamera(
+              initialCamera,
+            );
             _camera = initialCamera;
-            _rendererCamera = initialCamera;
+            _requestedRendererCamera = initialRendererCamera;
+            _presentedRendererCamera = initialRendererCamera;
           }
           final camera =
               _camera ??
@@ -839,7 +850,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     ? const _OriginalRouteMapUnavailable()
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
-                        camera: _rendererCamera ?? camera,
+                        camera:
+                            _requestedRendererCamera ??
+                            networkMapOverscannedRendererCamera(camera),
+                        presentedCamera:
+                            _presentedRendererCamera ??
+                            _requestedRendererCamera ??
+                            networkMapOverscannedRendererCamera(camera),
                         visualCamera: camera,
                         onControllerCreated: _attachRendererController,
                       ),
@@ -1046,43 +1063,53 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       if (!mounted || pendingCamera == null) {
         return;
       }
-      final rendererCamera = _rendererCameraFor(
+      final rendererCamera = _requestedRendererCameraFor(
         pendingCamera,
         forceCommit: forceRendererCameraCommit,
       );
       if (identical(_camera, pendingCamera) &&
-          identical(_rendererCamera, rendererCamera)) {
+          identical(_requestedRendererCamera, rendererCamera)) {
         return;
       }
       setState(() {
         _camera = pendingCamera;
-        _rendererCamera = rendererCamera;
+        if (!identical(_requestedRendererCamera, rendererCamera)) {
+          _requestedRendererCamerasByRevision[rendererCamera.revision] =
+              rendererCamera;
+        }
+        _requestedRendererCamera = rendererCamera;
       });
     });
   }
 
-  MapCameraState _rendererCameraFor(
+  MapCameraState _requestedRendererCameraFor(
     MapCameraState pendingCamera, {
     required bool forceCommit,
   }) {
-    final committedCamera = _rendererCamera;
+    final committedCamera =
+        _presentedRendererCamera ?? _requestedRendererCamera;
     final now = DateTime.now();
     final shouldCommit =
         forceCommit ||
         !_gestureActive ||
         committedCamera == null ||
+        !networkMapRendererCameraCoversVisual(
+          rendererCamera: committedCamera,
+          visualCamera: pendingCamera,
+        ) ||
         networkMapShouldCommitRendererCamera(
           committed: committedCamera,
           candidate: pendingCamera,
-          elapsedSinceLastCommit: _lastRendererCameraCommitAt == null
+          elapsedSinceLastCommit: _lastRendererCameraRequestAt == null
               ? _routeMapGestureRendererCommitInterval
-              : now.difference(_lastRendererCameraCommitAt!),
+              : now.difference(_lastRendererCameraRequestAt!),
         );
     if (!shouldCommit) {
-      return committedCamera;
+      return _requestedRendererCamera ??
+          networkMapOverscannedRendererCamera(pendingCamera);
     }
-    _lastRendererCameraCommitAt = now;
-    return pendingCamera;
+    _lastRendererCameraRequestAt = now;
+    return networkMapOverscannedRendererCamera(pendingCamera);
   }
 
   void _openNearestStation(
@@ -1129,6 +1156,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       _rendererMonitor = null;
       _rendererController = null;
     }
+    if (event is RouteMapRendererFramePresented) {
+      _markRendererFramePresented(event.revision);
+    }
     if (!kDebugMode && !kProfileMode) {
       return;
     }
@@ -1155,6 +1185,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           RouteMapRendererFailed():
         break;
     }
+  }
+
+  void _markRendererFramePresented(int revision) {
+    final camera =
+        _requestedRendererCamerasByRevision.remove(revision) ??
+        (_requestedRendererCamera?.revision == revision
+            ? _requestedRendererCamera
+            : null);
+    if (camera == null || identical(_presentedRendererCamera, camera)) {
+      return;
+    }
+    if (!mounted) {
+      _presentedRendererCamera = camera;
+      return;
+    }
+    setState(() {
+      _presentedRendererCamera = camera;
+    });
   }
 }
 
@@ -1432,12 +1480,14 @@ class _RouteMapViewportRenderer extends StatelessWidget {
   const _RouteMapViewportRenderer({
     required this.asset,
     required this.camera,
+    required this.presentedCamera,
     required this.visualCamera,
     required this.onControllerCreated,
   });
 
   final _RouteMapAsset asset;
   final MapCameraState camera;
+  final MapCameraState presentedCamera;
   final MapCameraState visualCamera;
   final ValueChanged<RouteMapRendererController> onControllerCreated;
 
@@ -1467,8 +1517,11 @@ class _RouteMapViewportRenderer extends StatelessWidget {
     return ClipRect(
       child: Transform(
         transform: networkMapRendererFrameTransform(
-          rendererCamera: camera,
-          visualCamera: visualCamera,
+          rendererCamera: presentedCamera,
+          visualCamera: networkMapRendererTransformVisualCamera(
+            rendererCamera: presentedCamera,
+            visualCamera: visualCamera,
+          ),
         ),
         child: KeyedSubtree(
           key: const Key('routeMapViewportRenderer'),
@@ -1595,6 +1648,42 @@ bool networkMapShouldCommitRendererCamera({
       drift.dy.abs() >=
           candidate.viewportSize.height *
               _routeMapGestureMaxTranslationDriftFraction;
+}
+
+@visibleForTesting
+MapCameraState networkMapOverscannedRendererCamera(MapCameraState camera) {
+  final overscanScale = math.max(
+    camera.minScale,
+    camera.scale / _routeMapGestureRendererOverscanFactor,
+  );
+  return camera.copyWith(scale: overscanScale).clamped(viewportMargin: 220);
+}
+
+@visibleForTesting
+bool networkMapRendererCameraCoversVisual({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  const tolerance = 0.001;
+  final rendererRect = rendererCamera.visibleSourceRect;
+  final visualRect = visualCamera.visibleSourceRect;
+  return rendererRect.left <= visualRect.left + tolerance &&
+      rendererRect.top <= visualRect.top + tolerance &&
+      rendererRect.right >= visualRect.right - tolerance &&
+      rendererRect.bottom >= visualRect.bottom - tolerance;
+}
+
+@visibleForTesting
+MapCameraState networkMapRendererTransformVisualCamera({
+  required MapCameraState rendererCamera,
+  required MapCameraState visualCamera,
+}) {
+  return networkMapRendererCameraCoversVisual(
+        rendererCamera: rendererCamera,
+        visualCamera: visualCamera,
+      )
+      ? visualCamera
+      : rendererCamera;
 }
 
 @visibleForTesting
