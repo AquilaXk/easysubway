@@ -32,7 +32,7 @@ class DataPackUpdater {
       return const [];
     }
 
-    final preUpdateCurrentPointer = await installer.readCurrentPointer();
+    final preUpdateCurrentPointer = await _readCurrentPointerSafely();
     final override = manifest.emergencyOverride;
     final protectedVersionsByPackId = <String, Set<String>>{};
     if (preUpdateCurrentPointer != null) {
@@ -121,6 +121,14 @@ class DataPackUpdater {
       await client.saveManifestCache(manifestResult);
     }
     return results;
+  }
+
+  Future<InstalledDataPackPointer?> _readCurrentPointerSafely() async {
+    try {
+      return await installer.readCurrentPointer();
+    } on Object {
+      return null;
+    }
   }
 
   List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
