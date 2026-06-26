@@ -40,6 +40,8 @@ env_value() {
         value="${value:1:${#value}-2}"
       fi
       ;;
+    *)
+      ;;
   esac
   trim_blank "${value}"
 }
