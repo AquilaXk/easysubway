@@ -1086,8 +1086,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     MapCameraState pendingCamera, {
     required bool forceCommit,
   }) {
-    final committedCamera =
-        _presentedRendererCamera ?? _requestedRendererCamera;
+    final committedCamera = networkMapRendererCommitBasisCamera(
+      presentedCamera: _presentedRendererCamera,
+      requestedCamera: _requestedRendererCamera,
+      visualCamera: pendingCamera,
+    );
     final requestedCamera = networkMapOverscannedRendererCamera(pendingCamera);
     final now = DateTime.now();
     final shouldCommit =
@@ -1671,6 +1674,22 @@ bool networkMapRendererCameraCoversVisual({
       rendererRect.top <= visualRect.top + tolerance &&
       rendererRect.right >= visualRect.right - tolerance &&
       rendererRect.bottom >= visualRect.bottom - tolerance;
+}
+
+@visibleForTesting
+MapCameraState? networkMapRendererCommitBasisCamera({
+  required MapCameraState? presentedCamera,
+  required MapCameraState? requestedCamera,
+  required MapCameraState visualCamera,
+}) {
+  if (requestedCamera != null &&
+      networkMapRendererCameraCoversVisual(
+        rendererCamera: requestedCamera,
+        visualCamera: visualCamera,
+      )) {
+    return requestedCamera;
+  }
+  return presentedCamera ?? requestedCamera;
 }
 
 @visibleForTesting
