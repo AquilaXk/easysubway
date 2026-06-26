@@ -1088,6 +1088,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }) {
     final committedCamera =
         _presentedRendererCamera ?? _requestedRendererCamera;
+    final requestedCamera = networkMapOverscannedRendererCamera(pendingCamera);
     final now = DateTime.now();
     final shouldCommit =
         forceCommit ||
@@ -1099,17 +1100,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         ) ||
         networkMapShouldCommitRendererCamera(
           committed: committedCamera,
-          candidate: pendingCamera,
+          candidate: requestedCamera,
           elapsedSinceLastCommit: _lastRendererCameraRequestAt == null
               ? _routeMapGestureRendererCommitInterval
               : now.difference(_lastRendererCameraRequestAt!),
         );
     if (!shouldCommit) {
-      return _requestedRendererCamera ??
-          networkMapOverscannedRendererCamera(pendingCamera);
+      return _requestedRendererCamera ?? requestedCamera;
     }
     _lastRendererCameraRequestAt = now;
-    return networkMapOverscannedRendererCamera(pendingCamera);
+    return requestedCamera;
   }
 
   void _openNearestStation(

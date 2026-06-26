@@ -945,6 +945,16 @@ void main() {
     );
     expect(
       networkMapShouldCommitRendererCamera(
+        committed: networkMapOverscannedRendererCamera(committed),
+        candidate: networkMapOverscannedRendererCamera(
+          committed.copyWith(center: const Offset(560, 250), revision: 4),
+        ),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
         committed: committed,
         candidate: committed.copyWith(center: const Offset(620, 250)),
         elapsedSinceLastCommit: const Duration(milliseconds: 40),
