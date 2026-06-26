@@ -606,6 +606,75 @@ class SecurityConfigTest {
 		assertThat(passwordEncoder.matches("new-break-password", breakGlass.passwordHash())).isTrue();
 	}
 
+	@Test
+	@DisplayName("사용 완료된 break-glass 계정은 제거 후 같은 비밀번호로 복구해도 재활성화하지 않는다")
+	void breakGlassBootstrapKeepsRotationRequirementAfterDisableWhenSecretDidNotChange() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		repository.save(repository.findByLoginId("break-glass")
+			.orElseThrow()
+			.recordBreakGlassSuccess(LocalDateTime.of(2026, 6, 27, 0, 0)));
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"break-glass",
+			"break-password",
+			"운영 장애 대응",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		var breakGlass = repository.findByLoginId("break-glass").orElseThrow();
+		assertThat(breakGlass.status()).isEqualTo(AdminIdentityStatus.DISABLED);
+		assertThat(breakGlass.credentialRotationRequired()).isTrue();
+	}
+
 	private org.springframework.security.core.Authentication authenticate(
 		AuthenticationManager authenticationManager,
 		String username,

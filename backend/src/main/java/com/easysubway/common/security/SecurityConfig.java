@@ -308,7 +308,7 @@ public class SecurityConfig {
 		PasswordEncoder passwordEncoder
 	) {
 		return existing.authMethod() == AdminIdentityAuthMethod.BREAK_GLASS
-			&& existing.status() == AdminIdentityStatus.CREDENTIAL_ROTATION_REQUIRED
+			&& existing.credentialRotationRequired()
 			&& passwordEncoder.matches(rawPassword, existing.passwordHash());
 	}
 
