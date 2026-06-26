@@ -789,6 +789,68 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /Play internal track/);
 });
 
+test("Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {
+  const gatePath = "apps/mobile/release/release-governance-gate.json";
+  assert.equal(existsSync(path.join(root, gatePath)), true, "release governance gate must exist");
+
+  const gate = readJson(gatePath);
+  const readme = read("README.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.releaseGate, "android-release-100-governance");
+  assert.equal(gate.releaseTarget.platform.android, "RELEASE_REQUIRED");
+  assert.equal(gate.releaseTarget.platform.ios, "DEFERRED_OUT_OF_SCOPE");
+  assert.equal(gate.releaseTarget.distribution, "google-play");
+  assert.equal(gate.releaseTarget.packageId, "com.easysubway.app");
+  assert.equal(gate.releaseTarget.primaryLocale, "ko-KR");
+  assert.deepEqual(gate.releaseTarget.initialCountries, ["KR"]);
+  assert.equal(gate.releaseTarget.targetApiMinimum, 35);
+  assert.equal(gate.releaseTarget.appAccountCreation, false);
+  assert.equal(gate.releaseTarget.ads, false);
+  assert.equal(gate.releaseTarget.payment, false);
+
+  assert.deepEqual(gate.gateStatusEnum, [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "BLOCKED_EXTERNAL",
+    "BLOCKED_TECHNICAL",
+    "SATISFIED",
+    "DEFERRED_OUT_OF_SCOPE",
+    "WAIVED_UNTIL",
+    "INVALIDATED",
+  ]);
+
+  assert.deepEqual(gate.requiredRcEvidenceFields, [
+    "gitSha",
+    "appVersionName",
+    "versionCode",
+    "aabSha256",
+    "backendArtifactSha256",
+    "dataPackManifestSha256",
+    "releaseSequence",
+    "routeContractVersion",
+    "realtimeContractVersion",
+    "device",
+    "androidVersion",
+    "testedAt",
+    "evidencePaths",
+    "expiresWhen",
+  ]);
+
+  assert.equal(gate.releaseReadiness.openAndroidP0BlocksGo, true);
+  assert.equal(gate.releaseReadiness.iosBlocksAndroidRelease, false);
+  assert.ok(gate.releaseReadiness.p0EscalationRules.includes("measured_performance_budget_failure"));
+  assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
+  assert.ok(gate.gates.some((item) => item.issue === 917 && item.id === "G7_ANDROID_QUALITY"));
+  assert.ok(gate.gates.some((item) => item.issue === 907 && item.id === "G9_GOOGLE_PLAY"));
+  assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
+
+  assert.match(readme, /release-governance-gate\.json/);
+  assert.match(readme, /Android Google Play v1/);
+  assert.match(readme, /iOS는 `DEFERRED_OUT_OF_SCOPE`/);
+});
+
 test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 산출물 빌드를 실행한다", async () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
   const detector = read("tools/ci/detect-changed-paths.sh");
