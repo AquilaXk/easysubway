@@ -59,6 +59,7 @@ class CatalogDatabaseOpener {
         return null;
       }
       final preferredPackId = _pointerPackId(decoded);
+      final preferredVersionLimit = _pointerVersionNumber(decoded);
       final file = _currentDataPackFile(decoded);
       if (file == null) {
         if (preferredPackId == null) {
@@ -66,6 +67,7 @@ class CatalogDatabaseOpener {
         }
         return _openKnownGoodInstalledDataPack(
           preferredPackId: preferredPackId,
+          maximumVersion: preferredVersionLimit,
         );
       }
       if (!await file.exists()) {
@@ -74,13 +76,17 @@ class CatalogDatabaseOpener {
         }
         return _openKnownGoodInstalledDataPack(
           preferredPackId: preferredPackId,
+          maximumVersion: preferredVersionLimit,
         );
       }
       final database = await _openUsableCatalogDatabase(file);
       if (database != null || preferredPackId == null) {
         return database;
       }
-      return _openKnownGoodInstalledDataPack(preferredPackId: preferredPackId);
+      return _openKnownGoodInstalledDataPack(
+        preferredPackId: preferredPackId,
+        maximumVersion: preferredVersionLimit,
+      );
     } on Object {
       return null;
     }
@@ -88,6 +94,7 @@ class CatalogDatabaseOpener {
 
   Future<CatalogDatabase?> _openKnownGoodInstalledDataPack({
     String? preferredPackId,
+    int? maximumVersion,
   }) async {
     final catalogDirectory = Directory(
       p.join(databaseDirectory.path, 'catalog'),
@@ -106,6 +113,11 @@ class CatalogDatabaseOpener {
           (file) =>
               preferredPackId == null ||
               p.basename(file.path).startsWith('$preferredPackId-v'),
+        )
+        .where(
+          (file) =>
+              maximumVersion == null ||
+              _installedPackVersion(file) <= maximumVersion,
         )
         .toList();
     candidates.sort((left, right) {
@@ -166,6 +178,14 @@ class CatalogDatabaseOpener {
       return id.trim();
     }
     return null;
+  }
+
+  int? _pointerVersionNumber(Map<String, Object?> pointer) {
+    final version = pointer['version'];
+    if (version is! String || version.trim().isEmpty) {
+      return null;
+    }
+    return int.tryParse(version.trim());
   }
 
   File? _currentDataPackFile(Map<String, Object?> pointer) {
