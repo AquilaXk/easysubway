@@ -55,6 +55,10 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_STATUS_LIMIT=90$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_CONFIRM_LIMIT=15$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_MAX_COUNTER_KEYS=2048$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_STORE_MODE=local$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=$/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_POSTGRES_PASSWORD=/m);
   assert.equal(composeMode, 0o600);
