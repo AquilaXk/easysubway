@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:easysubway_mobile/app/app_bootstrap.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
@@ -902,6 +903,103 @@ void main() {
           ''').getSingle();
 
       expect(metadata.read<String>('value'), 'capital-v18');
+    },
+  );
+
+  test('catalog opener는 설치 journal을 복구한 뒤 current pack을 연다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-journal-recovery-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final targetPack = File('${catalogDirectory.path}/capital-v19.sqlite');
+    final database = CatalogDatabase.file(targetPack);
+    await database.seedBaselineIfEmpty();
+    await database
+        .into(database.catalogMetadata)
+        .insertOnConflictUpdate(
+          CatalogMetadataCompanion.insert(
+            key: 'activePack',
+            value: 'capital-v19',
+            updatedAt: Value(DateTime.utc(2026, 6, 19, 14)),
+          ),
+        );
+    await database.close();
+    await File(
+      '${catalogDirectory.path}/current.json.installing',
+    ).writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '19',
+        'path': targetPack.path,
+        'sha256': sha256.convert(await targetPack.readAsBytes()).toString(),
+      }),
+      flush: true,
+    );
+
+    final opened = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    ).open();
+    addTearDown(opened.close);
+
+    final metadata = await opened.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+    expect(metadata.read<String>('value'), 'capital-v19');
+    expect(
+      await File('${catalogDirectory.path}/current.json').exists(),
+      isTrue,
+    );
+    expect(
+      await File('${catalogDirectory.path}/current.json.installing').exists(),
+      isFalse,
+    );
+  });
+
+  test(
+    'catalog opener는 malformed current에서 다른 id pack으로 fallback하지 않는다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-malformed-current-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      final otherPack = File('${catalogDirectory.path}/common-v99.sqlite');
+      final otherDatabase = CatalogDatabase.file(otherPack);
+      await otherDatabase.seedBaselineIfEmpty();
+      await otherDatabase
+          .into(otherDatabase.catalogMetadata)
+          .insertOnConflictUpdate(
+            CatalogMetadataCompanion.insert(
+              key: 'activePack',
+              value: 'common-v99',
+              updatedAt: Value(DateTime.utc(2026, 6, 19, 14)),
+            ),
+          );
+      await otherDatabase.close();
+      await File(
+        '${catalogDirectory.path}/current.json',
+      ).writeAsString(jsonEncode(['not-a-pointer']));
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+
+      final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingleOrNull();
+
+      expect(metadata?.read<String>('value'), isNot('common-v99'));
     },
   );
 
