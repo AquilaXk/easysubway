@@ -24,10 +24,6 @@ on:
       - "sonar-project.properties"
       - ".github/workflows/sonarcloud.yml"
 
-permissions:
-  contents: read
-  pull-requests: read
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -35,6 +31,7 @@ jobs:
   automatic-analysis:
     if: vars.SONARCLOUD_CI_ENABLED != 'true'
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Keep SonarCloud automatic analysis
         run: echo "SonarCloud CI scanner is skipped because SONARCLOUD_CI_ENABLED is not true."
@@ -42,6 +39,9 @@ jobs:
   sonarcloud:
     if: vars.SONARCLOUD_CI_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
