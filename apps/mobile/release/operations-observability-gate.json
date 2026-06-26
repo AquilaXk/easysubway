@@ -3,7 +3,17 @@
   "applicationId": "easysubway",
   "releaseGate": "operations-observability",
   "releaseBlockerPolicy": true,
+  "releaseEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
   "policyRefreshKo": "상용 배포 전 운영 관측성과 알림 기준을 최신 main 기준으로 확인한다.",
+  "signalEvidencePolicy": {
+    "allowedResolutionKinds": [
+      "dashboard-url",
+      "alert-route",
+      "runbook",
+      "external-blocker-record"
+    ],
+    "requiredPerSignalKo": "각 signal은 owner, threshold, first response와 함께 dashboard URL, alert route, runbook 또는 외부 blocker 기록 중 하나 이상을 RC evidence에 연결한다."
+  },
   "sensitiveLogPolicy": {
     "forbidReceiptTokens": true,
     "forbidUploadUrls": true,

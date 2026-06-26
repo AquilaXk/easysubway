@@ -3,6 +3,7 @@
   "applicationId": "easysubway",
   "releaseGate": "backup-restore-rehearsal",
   "releaseBlockerPolicy": true,
+  "rcEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
   "policyRefreshKo": "상용 배포 전 백업 대상과 복구 리허설 경로를 최신 main 기준으로 확인한다.",
   "backupTargets": [
     {
