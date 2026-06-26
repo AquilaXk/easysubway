@@ -89,8 +89,16 @@
         "maxCameraLatencyP95Ms": 120,
         "maxTotalPssKb": 250000
       },
-      "evidence": ["tools/mobile/run-route-map-android-evidence.sh", "tools/mobile/analyze-route-map-android-evidence.mjs", "summary-output"],
-      "passCriteriaKo": "예산 초과는 해당 RC의 P0 blocker로 승격한다."
+      "measurementSource": {
+        "releaseOrPlayInstalled": ["gfxinfo-framestats", "meminfo", "screen-recording-or-screenshot-sequence"],
+        "matchedProfileInstrumentation": ["tools/mobile/run-route-map-android-evidence.sh", "tools/mobile/analyze-route-map-android-evidence.mjs"]
+      },
+      "evidence": [
+        "play-installed-route-map-gfxinfo-framestats-summary",
+        "play-installed-route-map-meminfo-summary",
+        "matched-profile-route-map-camera-latency-summary"
+      ],
+      "passCriteriaKo": "RC 또는 Play-installed build의 frame/memory 예산 초과와 동일 git SHA profile instrumentation의 camera latency 예산 초과는 해당 RC의 P0 blocker로 승격한다."
     },
     {
       "id": "scope_source_realtime_support_ui",

@@ -5513,6 +5513,26 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     maxCameraLatencyP95Ms: 120,
     maxTotalPssKb: 250000,
   });
+  assert.deepEqual(requiredChecks.get("route_map_performance_budget").measurementSource.releaseOrPlayInstalled, [
+    "gfxinfo-framestats",
+    "meminfo",
+    "screen-recording-or-screenshot-sequence",
+  ]);
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .measurementSource.matchedProfileInstrumentation.includes("tools/mobile/run-route-map-android-evidence.sh"),
+  );
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .evidence.includes("play-installed-route-map-gfxinfo-framestats-summary"),
+  );
+  assert.ok(
+    requiredChecks
+      .get("route_map_performance_budget")
+      .evidence.includes("matched-profile-route-map-camera-latency-summary"),
+  );
 
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
