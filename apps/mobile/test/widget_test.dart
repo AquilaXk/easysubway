@@ -932,6 +932,89 @@ void main() {
     expect(second.revision, 5);
   });
 
+  test('노선도 gesture renderer commit은 interval, drift, scale 기준으로 제한한다', () {
+    const committed = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(center: const Offset(580, 250)),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(center: const Offset(620, 250)),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed.copyWith(scale: 0.66),
+        elapsedSinceLastCommit: const Duration(milliseconds: 40),
+      ),
+      isTrue,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed,
+        elapsedSinceLastCommit: const Duration(milliseconds: 80),
+      ),
+      isFalse,
+    );
+    expect(
+      networkMapShouldCommitRendererCamera(
+        committed: committed,
+        candidate: committed,
+        elapsedSinceLastCommit: const Duration(milliseconds: 160),
+      ),
+      isTrue,
+    );
+  });
+
+  test('노선도 renderer transform은 stale viewBox frame을 최신 camera 위치로 보정한다', () {
+    const rendererCamera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
+      viewportSize: Size(250, 125),
+      center: Offset(500, 250),
+      scale: 0.5,
+      minScale: 0.1,
+      maxScale: 4,
+      revision: 3,
+    );
+    final visualCamera = rendererCamera.copyWith(
+      center: const Offset(550, 250),
+      revision: 4,
+    );
+
+    final rendererPoint = rendererCamera.sourceToViewportPoint(
+      visualCamera.center,
+    );
+    final transformed = MatrixUtils.transformPoint(
+      networkMapRendererFrameTransform(
+        rendererCamera: rendererCamera,
+        visualCamera: visualCamera,
+      ),
+      rendererPoint,
+    );
+
+    expect(transformed.dx, moreOrLessEquals(125));
+    expect(transformed.dy, moreOrLessEquals(62.5));
+  });
+
   test('공식 노선도 데이터팩 manifest는 앱 번들 asset을 가리킨다', () {
     final manifestFile = File('assets/datapacks/metro_map_pack/manifest.json');
     final manifest =
