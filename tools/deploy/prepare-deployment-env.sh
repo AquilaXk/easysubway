@@ -110,6 +110,10 @@ require_port() {
 
 require_nonempty EASYSUBWAY_ADMIN_USERNAME
 require_nonempty EASYSUBWAY_ADMIN_PASSWORD
+require_nonempty EASYSUBWAY_POSTGRES_USER
+require_nonempty EASYSUBWAY_POSTGRES_PASSWORD
+require_nonempty EASYSUBWAY_DATASOURCE_USERNAME
+require_nonempty EASYSUBWAY_DATASOURCE_PASSWORD
 require_nonempty EASYSUBWAY_REPORT_UPLOAD_BUCKET
 require_nonempty EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY
 require_nonempty EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY
@@ -129,6 +133,14 @@ fi
 
 if [[ "$(value EASYSUBWAY_DATASOURCE_URL)" != jdbc:postgresql://postgres:5432/* ]]; then
 	printf 'datasource must target postgres:5432 inside Compose\n' >&2
+	exit 1
+fi
+if [[ "$(value EASYSUBWAY_DATASOURCE_USERNAME)" != "$(value EASYSUBWAY_POSTGRES_USER)" ]]; then
+	printf 'datasource username must match Compose postgres user\n' >&2
+	exit 1
+fi
+if [[ "$(value EASYSUBWAY_DATASOURCE_PASSWORD)" != "$(value EASYSUBWAY_POSTGRES_PASSWORD)" ]]; then
+	printf 'datasource password must match Compose postgres password\n' >&2
 	exit 1
 fi
 if [[ "$(value EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT)" != "http://object-storage:9000" ]]; then

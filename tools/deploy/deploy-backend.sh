@@ -289,6 +289,7 @@ fail_backend_deployment() {
 		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build backend || true
 		write_result "failed" "${detail}_rollback_attempted"
 	else
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" rm -f -s backend || true
 		write_result "failed" "${detail}_rollback_unavailable"
 	fi
 	write_phase "completed"
