@@ -3,6 +3,7 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +30,10 @@ void main() {
     expect(
       dependencies.reportRepository,
       isA<UnavailableFacilityReportRepository>(),
+    );
+    expect(
+      dependencies.realtimeRepository,
+      isA<UnavailableRealtimeRepository>(),
     );
 
     final routeResult = await dependencies.routeRepository.searchRoute(
@@ -68,6 +73,10 @@ void main() {
 
     expect(apiBaseReads, 0);
     expect(dependencies.repository, isA<DriftStationRepository>());
+    expect(
+      dependencies.realtimeRepository,
+      isA<UnavailableRealtimeRepository>(),
+    );
   });
 
   test('시설 신고 기본 의존성은 API 주소가 없으면 호출 시점에 unavailable로 동작한다', () async {
