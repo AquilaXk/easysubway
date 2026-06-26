@@ -45,8 +45,9 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.doesNotMatch(composeEnv, /^EASYSUBWAY_DATASOURCE_PASSWORD=/m);
   assert.doesNotMatch(composeEnv, /^EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=/m);
   assert.match(backendEnv, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/postgres:5432\/easysubway$/m);
-  assert.match(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=http:\/\/object-storage:9000$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
+  assert.doesNotMatch(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_POSTGRES_PASSWORD=/m);
   assert.equal(composeMode, 0o600);
   assert.equal(backendMode, 0o600);
@@ -64,6 +65,10 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
   await assert.rejects(
     prepare(fixtureEnv().replace("jdbc:postgresql://postgres:5432/easysubway", "jdbc:postgresql://localhost:5432/easysubway")),
     /datasource must target postgres:5432 inside Compose/,
+  );
+  await assert.rejects(
+    prepare(fixtureEnv().replace("EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://object-storage:9000", "EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=https://object-storage.easysubway.example")),
+    /report object storage internal endpoint must be http:\/\/object-storage:9000/,
   );
   await assert.rejects(
     prepare(fixtureEnv().replace("https://uploads.easysubway.example", "http://object-storage:9000")),

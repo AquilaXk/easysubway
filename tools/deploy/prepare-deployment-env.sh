@@ -131,8 +131,8 @@ if [[ "$(value EASYSUBWAY_DATASOURCE_URL)" != jdbc:postgresql://postgres:5432/* 
 	printf 'datasource must target postgres:5432 inside Compose\n' >&2
 	exit 1
 fi
-if [[ "$(value EASYSUBWAY_OBJECT_STORAGE_ENDPOINT)" != "http://object-storage:9000" ]]; then
-	printf 'internal object storage endpoint must be http://object-storage:9000\n' >&2
+if [[ "$(value EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT)" != "http://object-storage:9000" ]]; then
+	printf 'report object storage internal endpoint must be http://object-storage:9000\n' >&2
 	exit 1
 fi
 

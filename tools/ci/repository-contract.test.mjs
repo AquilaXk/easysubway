@@ -427,6 +427,7 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900$/m);
   assert.match(envExample, /^EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=http:\/\/localhost:9000$/m);
+  assert.match(envExample, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/localhost:9000$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=$/m);
   assert.match(envExample, /^EASYSUBWAY_OBJECT_STORAGE_REGION=us-east-1$/m);
@@ -556,6 +557,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_REPORT_UPLOAD_URL_TTL_SECONDS=900",
     "EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https://uploads.example.com",
     "EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https://object-storage.example.com",
+    "EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://object-storage:9000",
     "EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key",
     "EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key",
     "EASYSUBWAY_DATAPACK_BUCKET=easysubway-datapacks",
@@ -2060,7 +2062,7 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(backupScript, /pg_dump --format=custom --no-owner --no-privileges -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
   assert.match(backupScript, /> "\$\{temp_file\}"/);
   assert.match(backupScript, /test -s "\$\{temp_file\}"/);
-  assert.match(backupScript, /pg_restore --list "\$\{temp_file\}"/);
+  assert.match(backupScript, /docker compose "\$\{compose_args\[@\]\}" exec -T postgres sh -lc 'pg_restore --list - >\/dev\/null' < "\$\{temp_file\}"/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
   assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
   assert.match(backupScript, /trap - EXIT/);
@@ -3395,7 +3397,7 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(objectStorage, /HttpRequest signedRequest\(String method, String objectKey, String contentType, byte\[] body\)/);
   assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\$\{EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER:\}\}/);
   assert.match(applicationProd, /intent-signing-key: \$\{EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY:\$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\$\{EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER:\}\}\}/);
-  assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_OBJECT_STORAGE_ENDPOINT:\}/);
+  assert.match(applicationProd, /object-storage-endpoint: \$\{EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT:\}/);
   assert.match(applicationProd, /object-storage-access-key: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:\}/);
   assert.match(applicationProd, /object-storage-secret-key: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:\}/);
   assert.match(applicationProd, /object-storage-region: \$\{EASYSUBWAY_OBJECT_STORAGE_REGION:us-east-1\}/);
