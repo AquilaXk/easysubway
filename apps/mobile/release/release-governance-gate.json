@@ -40,7 +40,6 @@
     "appVersionName",
     "versionCode",
     "aabSha256",
-    "backendArtifactSha256",
     "dataPackManifestSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -51,6 +50,7 @@
     "evidencePaths",
     "expiresWhen"
   ],
+  "requiredRcEvidenceBackendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
   "rcEvidenceManifestContract": "apps/mobile/release/rc-evidence-manifest-contract.json",
   "releaseReadiness": {
     "openAndroidP0BlocksGo": true,

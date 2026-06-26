@@ -169,7 +169,7 @@ function readBackendIdentity(parsedArgs) {
   const repoDigest = firstImage?.RepoDigests?.find((digest) => digest.includes("@sha256:"));
   return {
     backendImageDigest: repoDigest?.split("@").at(-1) ?? null,
-    backendArtifactSha256: createHash("sha256").update(readFileSync(inspectPath)).digest("hex"),
+    backendArtifactSha256: null,
   };
 }
 

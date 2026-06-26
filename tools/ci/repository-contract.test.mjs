@@ -1120,8 +1120,14 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
   assert.match(workflow, /cp release\/abuse-penetration-rehearsal-gate\.json release-artifacts\/android\/abuse-penetration-rehearsal-gate\.json/);
   assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
-  assert.match(workflow, /node \.\.\/\.\.\/tools\/release\/generate-rc-evidence-manifest\.mjs/);
-  assert.match(workflow, /--output release-artifacts\/android\/rc-evidence-manifest\.json/);
+  assert.match(workflow, /rc-evidence-manifest:/);
+  assert.match(workflow, /name: RC Evidence Manifest/);
+  assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
+  assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs "\$\{generator_args\[@\]\}"/);
+  assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
+  assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
@@ -1132,7 +1138,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /post_launch_operations_review_evidence=blocked_until_post_launch_operations_review_gate_is_satisfied/);
   assert.match(workflow, /support_incident_response_evidence=blocked_until_support_incident_response_gate_is_satisfied/);
   assert.match(workflow, /abuse_penetration_rehearsal_evidence=blocked_until_abuse_penetration_rehearsal_gate_is_satisfied/);
-  assert.match(workflow, /rc_evidence_manifest=release-artifacts\/android\/rc-evidence-manifest\.json/);
+  assert.match(workflow, /rc_evidence_manifest=easysubway-rc-evidence-manifest-\$\{GITHUB_SHA\}/);
+  assert.match(workflow, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
   assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
@@ -1175,6 +1182,8 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const aabPath = path.join(tempDir, "app-release.aab");
   const backendInspectPath = path.join(tempDir, "image-inspect.json");
   const outputPath = path.join(tempDir, "rc-evidence-manifest.json");
+  const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
+  assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
   await writeFile(aabPath, "fake-aab");
   await writeFile(
@@ -1212,11 +1221,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
   assert.equal(manifest.issue, 926);
   assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
-  assert.equal(manifest.appVersionName, "1.0.0");
-  assert.equal(manifest.versionCode, "1");
+  assert.equal(manifest.appVersionName, appVersion[1]);
+  assert.equal(manifest.versionCode, appVersion[2]);
   assert.match(manifest.aabSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.backendImageDigest, "sha256:abcdef");
-  assert.match(manifest.backendArtifactSha256, /^[a-f0-9]{64}$/);
+  assert.equal(manifest.backendArtifactSha256, null);
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.routeContractVersion, "route-map-contract-v1");
   assert.equal(manifest.realtimeContractVersion, "seoul-topis-schema-v1");
@@ -1354,7 +1363,6 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "appVersionName",
     "versionCode",
     "aabSha256",
-    "backendArtifactSha256",
     "dataPackManifestSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -1365,6 +1373,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "evidencePaths",
     "expiresWhen",
   ]);
+  assert.deepEqual(gate.requiredRcEvidenceBackendIdentityFieldsAnyOf, ["backendImageDigest", "backendArtifactSha256"]);
 
   assert.equal(gate.releaseReadiness.openAndroidP0BlocksGo, true);
   assert.equal(gate.releaseReadiness.iosBlocksAndroidRelease, false);
