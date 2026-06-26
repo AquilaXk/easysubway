@@ -78,4 +78,16 @@ class AppEndpoints {
     final trimmed = dataPackChannel.trim();
     return trimmed.isEmpty ? 'production' : trimmed;
   }
+
+  Uri? get realtimeApiBaseUri {
+    final trimmed = reportApiBaseUrl.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final base = Uri.tryParse(trimmed.endsWith('/') ? trimmed : '$trimmed/');
+    if (base == null || !base.hasScheme || base.host.isEmpty) {
+      return null;
+    }
+    return base;
+  }
 }
