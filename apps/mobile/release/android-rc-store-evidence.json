@@ -34,6 +34,7 @@
   },
   "requiredEvidence": {
     "signingAndIdentity": [
+      "rc-evidence-manifest",
       "package-id-app-name-versionName-versionCode-record",
       "production-upload-key-material-owner-record",
       "play-app-signing-enrollment",

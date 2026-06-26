@@ -72,6 +72,8 @@ Abuse-case와 penetration rehearsal gate는 `apps/mobile/release/abuse-penetrati
 
 Android 출시 100% 범위와 Go/No-Go 계약은 `apps/mobile/release/release-governance-gate.json`으로 검증합니다. 이번 release blocker는 Android Google Play v1이며 iOS는 `DEFERRED_OUT_OF_SCOPE`로 기록해 Android 출시 완료를 차단하지 않습니다. open Android P0가 있거나 RC evidence의 git SHA, AAB hash, backend artifact, data pack manifest, route/realtime contract가 서로 맞지 않으면 최종 Go 판단을 하지 않습니다.
 
+RC evidence manifest는 `apps/mobile/release/rc-evidence-manifest-contract.json`과 `tools/release/generate-rc-evidence-manifest.mjs`로 생성합니다. manifest는 git SHA, app version, versionCode, AAB SHA-256, backend image digest 또는 artifact SHA-256, data pack manifest SHA-256, release sequence, route/realtime contract version, #571/#907/#917 evidence entry를 같은 RC 식별자로 묶습니다. open Android P0, gate status, identity mismatch, evidence entry 누락이 있으면 readiness는 `NO_GO`로 계산되며, Android PR evidence는 물리 기기 대신 로컬 Android emulator 기준으로 남깁니다.
+
 Android 출시 UX·접근성·성능 gate는 `apps/mobile/release/android-release-quality-gate.json`으로 검증합니다. PR 증거는 local Android emulator evidence를 우선 사용하며, 물리 기기 증거는 Codex PR 증거로 사용하지 않습니다. 실제 Google Play Go 판단 전에는 #907의 exact RC 또는 Play-installed build에서 TalkBack, 150%/200% 글자 크기, 작은 화면, 권한/네트워크/업로드 오류 복구, 노선도 fallback과 성능, 지원 범위/출처 화면, crash/ANR privacy-safe reporting 증거를 다시 수집해야 합니다.
 
 ## Privacy Policy
