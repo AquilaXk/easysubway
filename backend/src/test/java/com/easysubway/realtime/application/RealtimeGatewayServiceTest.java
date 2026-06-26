@@ -7,9 +7,15 @@ import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +39,70 @@ class RealtimeGatewayServiceTest {
 		assertThat(first.status()).hasToString("FRESH");
 		assertThat(second.status()).hasToString("FRESH");
 		assertThat(provider.arrivalCalls).hasValue(1);
+	}
+
+	@Test
+	@DisplayName("같은 도착 요청의 동시 cache miss는 provider 호출을 공유한다")
+	void concurrentArrivalMissesShareProviderCall() throws Exception {
+		BlockingProvider provider = new BlockingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			CompletableFuture<RealtimeArrivalResult> first = CompletableFuture.supplyAsync(
+				() -> service.arrivals(sangnoksuQuery()),
+				executor
+			);
+			assertThat(provider.arrivalEntered.await(1, TimeUnit.SECONDS)).isTrue();
+			CompletableFuture<RealtimeArrivalResult> second = CompletableFuture.supplyAsync(
+				() -> service.arrivals(sangnoksuQuery()),
+				executor
+			);
+			Thread.sleep(100);
+
+			assertThat(provider.arrivalCalls).hasValue(1);
+			provider.releaseArrivals.countDown();
+
+			assertThat(first.get(1, TimeUnit.SECONDS).status()).hasToString("FRESH");
+			assertThat(second.get(1, TimeUnit.SECONDS).status()).hasToString("FRESH");
+			assertThat(provider.arrivalCalls).hasValue(1);
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
+	@Test
+	@DisplayName("같은 열차 위치 요청의 동시 cache miss는 provider 호출을 공유한다")
+	void concurrentTrainPositionMissesShareProviderCall() throws Exception {
+		BlockingProvider provider = new BlockingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
+		);
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			CompletableFuture<RealtimeTrainPositionResult> first = CompletableFuture.supplyAsync(
+				() -> service.trainPositions(line4Query()),
+				executor
+			);
+			assertThat(provider.trainPositionEntered.await(1, TimeUnit.SECONDS)).isTrue();
+			CompletableFuture<RealtimeTrainPositionResult> second = CompletableFuture.supplyAsync(
+				() -> service.trainPositions(line4Query()),
+				executor
+			);
+			Thread.sleep(100);
+
+			assertThat(provider.trainPositionCalls).hasValue(1);
+			provider.releaseTrainPositions.countDown();
+
+			assertThat(first.get(1, TimeUnit.SECONDS).status()).hasToString("FRESH");
+			assertThat(second.get(1, TimeUnit.SECONDS).status()).hasToString("FRESH");
+			assertThat(provider.trainPositionCalls).hasValue(1);
+		} finally {
+			executor.shutdownNow();
+		}
 	}
 
 	@Test
@@ -191,6 +261,15 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("TOPIS provider timeout은 realtime contract 값과 일치한다")
+	void topisProviderTimeoutMatchesContract() throws Exception {
+		java.lang.reflect.Field timeoutField = TopisRealtimeProvider.class.getDeclaredField("REQUEST_TIMEOUT");
+		timeoutField.setAccessible(true);
+
+		assertThat(timeoutField.get(null)).isEqualTo(Duration.ofMillis(1500));
+	}
+
+	@Test
 	@DisplayName("TOPIS provider fixture는 명시적으로 켠 테스트 경로에서만 동작한다")
 	void topisProviderUsesFixtureOnlyWhenExplicitlyEnabled() {
 		TopisRealtimeProvider provider = new TopisRealtimeProvider(
@@ -312,6 +391,60 @@ class RealtimeGatewayServiceTest {
 				"당고개",
 				"2026-06-26T08:00:00Z"
 			));
+		}
+	}
+
+	private static final class BlockingProvider implements RealtimeProvider {
+		private final AtomicInteger arrivalCalls = new AtomicInteger();
+		private final AtomicInteger trainPositionCalls = new AtomicInteger();
+		private final CountDownLatch arrivalEntered = new CountDownLatch(1);
+		private final CountDownLatch trainPositionEntered = new CountDownLatch(1);
+		private final CountDownLatch releaseArrivals = new CountDownLatch(1);
+		private final CountDownLatch releaseTrainPositions = new CountDownLatch(1);
+
+		@Override
+		public List<RealtimeArrival> arrivals(RealtimeQuery query) {
+			arrivalCalls.incrementAndGet();
+			arrivalEntered.countDown();
+			awaitRelease(releaseArrivals);
+			return List.of(new RealtimeArrival(
+				"4",
+				"상록수",
+				"당고개",
+				"상행",
+				"4123",
+				180,
+				"3분 후",
+				"전역 출발",
+				"2026-06-26T08:00:00Z"
+			));
+		}
+
+		@Override
+		public List<RealtimeTrainPosition> trainPositions(RealtimeQuery query) {
+			trainPositionCalls.incrementAndGet();
+			trainPositionEntered.countDown();
+			awaitRelease(releaseTrainPositions);
+			return List.of(new RealtimeTrainPosition(
+				"4",
+				"상록수",
+				"4123",
+				"운행중",
+				"상행",
+				"당고개",
+				"2026-06-26T08:00:00Z"
+			));
+		}
+
+		private void awaitRelease(CountDownLatch latch) {
+			try {
+				if (!latch.await(1, TimeUnit.SECONDS)) {
+					throw new IllegalStateException("Provider release latch timed out.");
+				}
+			} catch (InterruptedException exception) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Provider wait interrupted.", exception);
+			}
 		}
 	}
 

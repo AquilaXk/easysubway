@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 final class TopisRealtimeProvider implements RealtimeProvider {
 
 	private static final URI TOPIS_BASE_URI = URI.create("http://swopenapi.seoul.go.kr/api/subway/");
-	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(3);
+	private static final Duration REQUEST_TIMEOUT = Duration.ofMillis(1500);
 
 	private final String serviceKey;
 	private final ObjectMapper objectMapper;

@@ -6,6 +6,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class RealtimeGatewayService {
 	private final Clock clock;
 	private final Map<String, CachedArrival> arrivalCache = new ConcurrentHashMap<>();
 	private final Map<String, CachedTrainPosition> trainPositionCache = new ConcurrentHashMap<>();
+	private final Map<String, CompletableFuture<RealtimeArrivalResult>> arrivalRequests = new ConcurrentHashMap<>();
+	private final Map<String, CompletableFuture<RealtimeTrainPositionResult>> trainPositionRequests = new ConcurrentHashMap<>();
 	private volatile java.time.Instant quotaCircuitOpenUntil;
 
 	@Autowired
@@ -60,6 +64,24 @@ public class RealtimeGatewayService {
 				? cached.result().stale()
 				: RealtimeArrivalResult.unavailable("PROVIDER_QUOTA_EXCEEDED");
 		}
+		CompletableFuture<RealtimeArrivalResult> request = new CompletableFuture<>();
+		CompletableFuture<RealtimeArrivalResult> existing = arrivalRequests.putIfAbsent(cacheKey, request);
+		if (existing != null) {
+			return joinArrival(existing);
+		}
+		try {
+			RealtimeArrivalResult result = fetchArrivals(normalizedQuery, cacheKey, cached);
+			request.complete(result);
+			return result;
+		} catch (RuntimeException exception) {
+			request.completeExceptionally(exception);
+			throw exception;
+		} finally {
+			arrivalRequests.remove(cacheKey, request);
+		}
+	}
+
+	private RealtimeArrivalResult fetchArrivals(RealtimeQuery normalizedQuery, String cacheKey, CachedArrival cached) {
 		try {
 			List<RealtimeArrival> arrivals = provider.arrivals(normalizedQuery);
 			if (arrivals.isEmpty()) {
@@ -98,6 +120,28 @@ public class RealtimeGatewayService {
 				? cached.result().stale()
 				: RealtimeTrainPositionResult.unavailable("PROVIDER_QUOTA_EXCEEDED");
 		}
+		CompletableFuture<RealtimeTrainPositionResult> request = new CompletableFuture<>();
+		CompletableFuture<RealtimeTrainPositionResult> existing = trainPositionRequests.putIfAbsent(cacheKey, request);
+		if (existing != null) {
+			return joinTrainPosition(existing);
+		}
+		try {
+			RealtimeTrainPositionResult result = fetchTrainPositions(normalizedQuery, cacheKey, cached);
+			request.complete(result);
+			return result;
+		} catch (RuntimeException exception) {
+			request.completeExceptionally(exception);
+			throw exception;
+		} finally {
+			trainPositionRequests.remove(cacheKey, request);
+		}
+	}
+
+	private RealtimeTrainPositionResult fetchTrainPositions(
+		RealtimeQuery normalizedQuery,
+		String cacheKey,
+		CachedTrainPosition cached
+	) {
 		try {
 			List<RealtimeTrainPosition> trainPositions = provider.trainPositions(normalizedQuery);
 			if (trainPositions.isEmpty()) {
@@ -116,6 +160,30 @@ public class RealtimeGatewayService {
 			}
 			return RealtimeTrainPositionResult.unavailable(exception.fallbackCode());
 		}
+	}
+
+	private RealtimeArrivalResult joinArrival(CompletableFuture<RealtimeArrivalResult> request) {
+		try {
+			return request.join();
+		} catch (CompletionException exception) {
+			throw unwrapCompletionException(exception);
+		}
+	}
+
+	private RealtimeTrainPositionResult joinTrainPosition(CompletableFuture<RealtimeTrainPositionResult> request) {
+		try {
+			return request.join();
+		} catch (CompletionException exception) {
+			throw unwrapCompletionException(exception);
+		}
+	}
+
+	private RuntimeException unwrapCompletionException(CompletionException exception) {
+		Throwable cause = exception.getCause();
+		if (cause instanceof RuntimeException runtimeException) {
+			return runtimeException;
+		}
+		return exception;
 	}
 
 	private RealtimeQuery normalizeArrivalQuery(RealtimeQuery query) {
