@@ -5,8 +5,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.actuate.health.StatusAggregator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
@@ -29,6 +32,9 @@ class HealthCheckControllerTest {
 
 	@Autowired
 	private WebEndpointsSupplier webEndpointsSupplier;
+
+	@Autowired
+	private StatusAggregator statusAggregator;
 
 	@Test
 	@DisplayName("공통 응답 형식으로 API 헬스체크를 반환한다")
@@ -66,6 +72,15 @@ class HealthCheckControllerTest {
 			.andExpect(jsonPath("$.components.backendComponent.status").value("UP"))
 			.andExpect(jsonPath("$.components.backendComponent.details.summaryStatus").value("UP"))
 			.andExpect(jsonPath("$.components.backendComponent.details.components[0].name").value("application"));
+	}
+
+	@Test
+	@DisplayName("액추에이터 status aggregator는 degraded와 stale을 UP보다 우선한다")
+	void actuatorStatusAggregatorPrioritizesCustomSummaryStates() {
+		assertThat(statusAggregator.getAggregateStatus(Set.of(Status.UP, new Status("DEGRADED"))).getCode())
+			.isEqualTo("DEGRADED");
+		assertThat(statusAggregator.getAggregateStatus(Set.of(Status.UP, new Status("STALE"))).getCode())
+			.isEqualTo("STALE");
 	}
 
 	@Test
