@@ -1910,6 +1910,7 @@ _StationTapScore? _stationTapScore(
   _MapGeometry geometry,
   MapCameraState camera,
 ) {
+  final safeScale = camera.scale > 0 ? camera.scale : 1.0;
   final nodeCenter = camera.sourceToViewportPoint(
     Offset(geometry.x(station), geometry.y(station)),
   );
@@ -1934,7 +1935,10 @@ _StationTapScore? _stationTapScore(
   } else {
     final labelDistance = _distanceToRect(
       viewportPosition,
-      _sourceRectToViewport(_stationLabelRect(station, geometry), camera),
+      _sourceRectToViewport(
+        _stationLabelRect(station, geometry, labelHeight: 40 / safeScale),
+        camera,
+      ),
     );
     bestDistance = math.min(bestDistance, labelDistance);
     containsShape = containsShape || labelDistance == 0;
