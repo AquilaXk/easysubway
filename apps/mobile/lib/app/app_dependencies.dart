@@ -6,6 +6,7 @@ import '../facility_report.dart';
 import '../favorite_facility.dart';
 import '../features/favorites/data/drift_favorite_repositories.dart';
 import '../features/preferences/data/drift_notification_settings_repository.dart';
+import '../features/realtime/realtime_repository.dart';
 import '../features/search_history/data/drift_search_history_repository.dart';
 import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
@@ -31,6 +32,7 @@ class AppDependencies {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
@@ -48,6 +50,7 @@ class AppDependencies {
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NetworkMapRepository? networkMapRepository,
+    RealtimeRepository? realtimeRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
@@ -108,6 +111,10 @@ class AppDependencies {
         (catalogDatabase != null
             ? DriftStationRepository(database: catalogDatabase)
             : const _UnavailableNetworkMapRepository());
+
+    final resolvedRealtimeRepository =
+        realtimeRepository ??
+        _defaultRealtimeRepository(baseUri: optionalBaseUri);
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -180,6 +187,7 @@ class AppDependencies {
                   ),
                 )),
       networkMapRepository: resolvedNetworkMapRepository,
+      realtimeRepository: resolvedRealtimeRepository,
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
@@ -204,10 +212,42 @@ class AppDependencies {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
+}
+
+RealtimeRepository _defaultRealtimeRepository({
+  required Uri? Function() baseUri,
+}) {
+  return _LazyDefaultRealtimeRepository(baseUri);
+}
+
+class _LazyDefaultRealtimeRepository implements RealtimeRepository {
+  _LazyDefaultRealtimeRepository(this._baseUri);
+
+  final Uri? Function() _baseUri;
+  RealtimeRepository? _delegate;
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    return _resolveDelegate().arrivals(query);
+  }
+
+  RealtimeRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) {
+      return cachedDelegate;
+    }
+    final resolvedBaseUri = _baseUri();
+    final resolvedDelegate = resolvedBaseUri == null
+        ? const UnavailableRealtimeRepository()
+        : RealtimeApiRepository(baseUri: resolvedBaseUri);
+    _delegate = resolvedDelegate;
+    return resolvedDelegate;
+  }
 }
 
 class _UnavailableNetworkMapRepository implements NetworkMapRepository {

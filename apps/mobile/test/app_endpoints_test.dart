@@ -31,6 +31,10 @@ void main() {
       'production-v2',
     );
     expect(endpoints.expectedDataPackChannel, 'production');
+    expect(
+      endpoints.realtimeApiBaseUri,
+      Uri.parse('https://api.easysubway.example/'),
+    );
   });
 
   test('앱 endpoint는 slash가 없는 데이터팩 base URL도 directory로 처리한다', () {
@@ -80,5 +84,16 @@ void main() {
     );
 
     expect(endpoints.expectedDataPackChannel, 'production');
+  });
+
+  test('앱 endpoint는 모바일 TOPIS service key 환경값을 노출하지 않는다', () {
+    const endpoints = AppEndpoints(
+      dataPackBaseUrl: '',
+      dataPackSigningPublicKeyModulus: '',
+      dataPackSigningPublicKeyExponent: '',
+      reportApiBaseUrl: '',
+    );
+
+    expect(endpoints.realtimeApiBaseUri, isNull);
   });
 }
