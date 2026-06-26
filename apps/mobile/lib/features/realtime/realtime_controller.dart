@@ -18,7 +18,15 @@ class RealtimeStationController extends ChangeNotifier {
       _emit(await repository.arrivals(query));
     } on RealtimeException {
       _emit(const RealtimeSnapshot.unavailable());
-    } catch (_) {
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'easysubway realtime',
+          context: ErrorDescription('실시간 열차 조회 중 예외가 발생했습니다.'),
+        ),
+      );
       _emit(const RealtimeSnapshot.unavailable());
     }
   }
