@@ -848,6 +848,63 @@ void main() {
     },
   );
 
+  test(
+    'catalog opener는 current id와 같은 known-good pack만 fallback으로 연다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-known-good-same-id-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      await catalogDirectory.create(recursive: true);
+      for (final entry in [
+        (
+          file: File('${catalogDirectory.path}/common-v99.sqlite'),
+          activePack: 'common-v99',
+        ),
+        (
+          file: File('${catalogDirectory.path}/capital-v18.sqlite'),
+          activePack: 'capital-v18',
+        ),
+      ]) {
+        final database = CatalogDatabase.file(entry.file);
+        await database.seedBaselineIfEmpty();
+        await database
+            .into(database.catalogMetadata)
+            .insertOnConflictUpdate(
+              CatalogMetadataCompanion.insert(
+                key: 'activePack',
+                value: entry.activePack,
+                updatedAt: Value(DateTime.utc(2026, 6, 19, 14)),
+              ),
+            );
+        await database.close();
+      }
+      await File('${catalogDirectory.path}/current.json').writeAsString(
+        jsonEncode({
+          'id': 'capital',
+          'version': '19',
+          'path': '${catalogDirectory.path}/capital-v19.sqlite',
+          'sha256': 'missing',
+        }),
+      );
+
+      final database = await CatalogDatabaseOpener(
+        databaseDirectory: directory,
+        assetBundle: rootBundle,
+      ).open();
+      addTearDown(database.close);
+
+      final metadata = await database.customSelect('''
+          SELECT value
+          FROM catalog_metadata
+          WHERE key = 'activePack'
+          ''').getSingle();
+
+      expect(metadata.read<String>('value'), 'capital-v18');
+    },
+  );
+
   test('앱 부트스트랩은 데이터팩 업데이트 실패 시 내장 catalog로 계속 시작한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-bootstrap-update-failure-',

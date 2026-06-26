@@ -262,6 +262,61 @@ void main() {
     ]);
   });
 
+  test('updater는 fresh cache여도 설치 journal을 먼저 복구한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-journal-fresh-cache-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final now = DateTime.utc(2026, 6, 19, 16);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => now,
+    );
+    await stateRepository.saveManifestCache(
+      etag: 'fresh-etag',
+      checkedAt: now,
+      ttl: const Duration(minutes: 10),
+    );
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final targetPack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await targetPack.writeAsBytes(sqliteBytes, flush: true);
+    final journal = File('${catalogDirectory.path}/current.json.installing');
+    await journal.writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': targetPack.path,
+        'sha256': sha256.convert(sqliteBytes).toString(),
+      }),
+      flush: true,
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse('http://127.0.0.1:9/catalog/current.json'),
+        stateRepository: stateRepository,
+      ),
+      installer: installer,
+    );
+
+    final results = await updater.checkForUpdates();
+
+    expect(results, isEmpty);
+    expect(await journal.exists(), isFalse);
+    expect(
+      await File('${catalogDirectory.path}/current.json').exists(),
+      isTrue,
+    );
+    expect((await installer.readCurrentPointer())?.version, '18');
+  });
+
   test('updater는 active pack history와 명시 dependency만 다운로드한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-updater-active-only-',

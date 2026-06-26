@@ -25,6 +25,7 @@ class DataPackUpdater {
   final HttpClient _httpClient;
 
   Future<List<DataPackInstallResult>> checkForUpdates() async {
+    await installer.recoverInstallJournal();
     final manifestResult = await client.fetchManifestIfNeeded();
     final manifest = manifestResult.manifest;
     if (manifest == null) {
@@ -38,7 +39,6 @@ class DataPackUpdater {
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
-    await installer.recoverInstallJournal();
     final packs = _packsToInstall(manifest);
     final results = <DataPackInstallResult>[];
     for (final pack in packs) {

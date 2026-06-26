@@ -57,21 +57,28 @@ class CatalogDatabaseOpener {
       if (decoded is! Map<String, Object?>) {
         return _openKnownGoodInstalledDataPack();
       }
+      final preferredPackId = _pointerPackId(decoded);
       final file = _currentDataPackFile(decoded);
       if (file == null) {
-        return _openKnownGoodInstalledDataPack();
+        return _openKnownGoodInstalledDataPack(
+          preferredPackId: preferredPackId,
+        );
       }
       if (!await file.exists()) {
-        return _openKnownGoodInstalledDataPack();
+        return _openKnownGoodInstalledDataPack(
+          preferredPackId: preferredPackId,
+        );
       }
       return await _openUsableCatalogDatabase(file) ??
-          _openKnownGoodInstalledDataPack();
+          _openKnownGoodInstalledDataPack(preferredPackId: preferredPackId);
     } on Object {
       return _openKnownGoodInstalledDataPack();
     }
   }
 
-  Future<CatalogDatabase?> _openKnownGoodInstalledDataPack() async {
+  Future<CatalogDatabase?> _openKnownGoodInstalledDataPack({
+    String? preferredPackId,
+  }) async {
     final catalogDirectory = Directory(
       p.join(databaseDirectory.path, 'catalog'),
     );
@@ -85,6 +92,11 @@ class CatalogDatabaseOpener {
         .where(
           (file) => RegExp(r'-v\d+\.sqlite$').hasMatch(p.basename(file.path)),
         )
+        .where(
+          (file) =>
+              preferredPackId == null ||
+              p.basename(file.path).startsWith('$preferredPackId-v'),
+        )
         .toList();
     candidates.sort((left, right) {
       return _installedPackVersion(
@@ -96,6 +108,14 @@ class CatalogDatabaseOpener {
       if (database != null) {
         return database;
       }
+    }
+    return null;
+  }
+
+  String? _pointerPackId(Map<String, Object?> pointer) {
+    final id = pointer['id'];
+    if (id is String && id.trim().isNotEmpty) {
+      return id.trim();
     }
     return null;
   }
