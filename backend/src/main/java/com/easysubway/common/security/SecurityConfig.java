@@ -294,6 +294,7 @@ public class SecurityConfig {
 	) {
 		return existing.authMethod() == bootstrap.authMethod()
 			&& existing.role() == bootstrap.role()
+			&& existing.status() == bootstrap.status()
 			&& Objects.equals(existing.displayName(), bootstrap.displayName())
 			&& Objects.equals(existing.email(), bootstrap.email())
 			&& Objects.equals(existing.breakGlassReason(), bootstrap.breakGlassReason())

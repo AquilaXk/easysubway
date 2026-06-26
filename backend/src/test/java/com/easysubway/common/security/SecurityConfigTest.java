@@ -368,6 +368,75 @@ class SecurityConfigTest {
 	}
 
 	@Test
+	@DisplayName("제거 후 같은 설정으로 복구된 bootstrap 계정은 다시 활성화한다")
+	void restoredBootstrapIdentityBecomesActiveAgain() {
+		var securityConfig = new SecurityConfig();
+		var repository = new InMemoryAdminIdentityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		securityConfig.userDetailsService(
+			"replacement-admin",
+			"replacement-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+		assertThat(repository.findByLoginId("admin-user").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+
+		securityConfig.userDetailsService(
+			"admin-user",
+			"admin-password",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			false,
+			"",
+			"",
+			repository,
+			passwordEncoder,
+			environment
+		);
+
+		assertThat(repository.findByLoginId("admin-user").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.ACTIVE);
+		assertThat(repository.findByLoginId("replacement-admin").orElseThrow().status())
+			.isEqualTo(AdminIdentityStatus.DISABLED);
+	}
+
+	@Test
 	@DisplayName("break-glass bootstrap은 같은 비밀번호면 reason 변경만으로 rotation 요구를 해제하지 않는다")
 	void breakGlassBootstrapKeepsRotationRequirementWhenSecretDidNotChange() {
 		var securityConfig = new SecurityConfig();
