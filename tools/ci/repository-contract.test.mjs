@@ -847,6 +847,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const androidRcEvidence = readJson(androidRcEvidencePath);
   const playProductionAccessPath = "apps/mobile/release/play-production-access-gate.json";
   const playProductionAccessGate = readJson(playProductionAccessPath);
+  const playStoreSubmissionContentPath = "apps/mobile/release/play-store-submission-content.json";
+  const playStoreSubmissionContent = readJson(playStoreSubmissionContentPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
   const readme = read("README.md");
 
@@ -887,6 +889,25 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_production_access_status"));
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_closed_test_requirement"));
   assert.match(playProductionAccessGate.evidencePolicy.localOnlyEvidenceRoot, /\.codex\/evidence\/release\/play-production-access/);
+  assert.equal(playStoreSubmissionContent.releaseGate, "play-store-submission-content");
+  assert.equal(playStoreSubmissionContent.issue, 921);
+  assert.equal(playStoreSubmissionContent.androidRcEvidenceManifest, androidRcEvidencePath);
+  assert.equal(playStoreSubmissionContent.storePrivacyInventory, "apps/mobile/release/store-privacy-inventory.json");
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, false);
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.publicUserSignIn, false);
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.accountCreation, false);
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.backgroundLocation, false);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.tracking, false);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.sharesDataWithThirdParties, false);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataEncryptedInTransit, true);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataDeletionRequestSupported, true);
+  assert.ok(playStoreSubmissionContent.dataSafetyDeclarations.requiredCollectedDataTypes.includes("Location"));
+  assert.ok(playStoreSubmissionContent.dataSafetyDeclarations.requiredCollectedDataTypes.includes("Photos and videos"));
+  assert.match(playStoreSubmissionContent.koreanListing.fullDescriptionKo, /데이터 기준일|공식 출처|현장 상황|실시간/);
+  for (const claim of playStoreSubmissionContent.prohibitedClaims) {
+    assert.doesNotMatch(playStoreSubmissionContent.koreanListing.fullDescriptionKo, new RegExp(claim));
+    assert.doesNotMatch(playStoreSubmissionContent.koreanListing.shortDescription, new RegExp(claim));
+  }
   assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
   assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
   assert.equal(androidRcEvidence.scope.platform.android, "RELEASE_REQUIRED");
@@ -911,6 +932,10 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("play-production-access-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("closed-test-12-testers-14-days-continuous-opt-in-record"));
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("production-access-application-response-record"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("play-store-submission-content-manifest"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("data-safety-answer-contract"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("korean-store-listing-contract"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("store-graphic-screenshot-asset-record"));
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("data-safety-binary-network-trace-match"));
   assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-crash-0"));
   assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
@@ -933,10 +958,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
   assert.match(workflow, /cp release\/android-16kb-page-size-gate\.json release-artifacts\/android\/android-16kb-page-size-gate\.json/);
   assert.match(workflow, /cp release\/play-production-access-gate\.json release-artifacts\/android\/play-production-access-gate\.json/);
+  assert.match(workflow, /cp release\/play-store-submission-content\.json release-artifacts\/android\/play-store-submission-content\.json/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
   assert.match(workflow, /page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes/);
   assert.match(workflow, /play_production_access_evidence=blocked_until_play_production_access_gate_console_summary_is_satisfied/);
+  assert.match(workflow, /play_app_content_data_safety_listing_evidence=blocked_until_play_store_submission_content_console_summary_is_satisfied/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
   assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
@@ -953,6 +980,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /Google Play production access/);
   assert.match(readme, /12명 이상/);
   assert.match(readme, /14일 연속 opt-in/);
+  assert.match(readme, /Google Play App Content, Data Safety, 한국어 listing gate/);
+  assert.match(readme, /store-privacy-inventory\.json/);
+  assert.match(readme, /휠체어 경로 보장/);
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
@@ -5729,6 +5759,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   }
 
   assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
+  assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_privacy_policy_url").configurationSources.join("\n"), /EASYSUBWAY_PRIVACY_POLICY_URL/);
   assert.match(items.get("play_app_access").readyWhenKo, /로그인 없음|제한 접근|심사 계정/);
   assert.ok(items.get("play_production_access_closed_test").linkedArtifacts.includes("apps/mobile/release/play-production-access-gate.json"));
@@ -5736,6 +5767,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_content_rating").readyWhenKo, /등급/);
   assert.match(items.get("play_target_audience").readyWhenKo, /전체 사용자|어린이 대상 아님/);
   assert.match(items.get("play_permissions_declaration").readyWhenKo, /위치|권한/);
+  assert.ok(items.get("play_listing_assets_truthfulness").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_account_data_deletion").configurationSources.join("\n"), /EASYSUBWAY_DATA_DELETION_EMAIL/);
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("app-content-declarations"));
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("store-listing-scope-copy-review"));
