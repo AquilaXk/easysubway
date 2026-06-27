@@ -30,6 +30,23 @@
       "format": "aab",
       "ciArtifactStoreReady": false,
       "ciSigningKeyType": "temporary-self-signed",
+      "productionRcArtifactStoreReadyCandidate": true,
+      "productionRcSigningKeyType": "production-upload-key",
+      "productionRcRequiredMetadata": [
+        "gitSha",
+        "versionName",
+        "versionCode",
+        "packageId",
+        "aabSha256",
+        "uploadKeySha256Fingerprint",
+        "appSigningKeySha256Fingerprint",
+        "dataPackManifestSha256",
+        "routeContractVersion",
+        "realtimeContractVersion",
+        "versionCodeMonotonicPolicy",
+        "failedRcVersionCodeReusePolicy",
+        "mappingRetentionDays"
+      ],
       "symbolArtifact": "mapping.txt",
       "symbolRetentionDays": 90,
       "storeReadyRequires": [
