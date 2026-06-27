@@ -155,7 +155,14 @@
       "retention-policy-review",
       "duplicate-report-triage-sample",
       "override-rollback-sample",
-      "audit-log-redaction-check"
+      "audit-log-redaction-check",
+      "intake-and-receipt-id-record",
+      "severity-triage",
+      "source-and-operator-contact-check",
+      "override-approval",
+      "emergency-datapack-release-or-rollback",
+      "user-notice-and-support-reply",
+      "post-release-verification"
     ],
     "forbiddenInGithubSummary": [
       "support mailbox personal data",
