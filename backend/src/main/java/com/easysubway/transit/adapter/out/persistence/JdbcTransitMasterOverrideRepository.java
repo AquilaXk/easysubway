@@ -28,6 +28,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod")
@@ -100,11 +101,13 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 	}
 
 	@Override
+	@Transactional
 	public void saveFacilityStatus(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt) {
 		saveFacilityStatus(facilityId, status, updatedAt, "admin");
 	}
 
 	@Override
+	@Transactional
 	public void saveFacilityStatus(
 		String facilityId,
 		AccessibilityFacilityStatus status,
@@ -130,26 +133,31 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 	}
 
 	@Override
+	@Transactional
 	public void saveAccessibilityFacility(AccessibilityFacility facility) {
 		saveAccessibilityFacility(facility, "admin");
 	}
 
 	@Override
+	@Transactional
 	public void saveAccessibilityFacility(AccessibilityFacility facility, String updatedBy) {
 		saveOverride(FACILITY, facility.id(), facility, updatedBy);
 	}
 
 	@Override
+	@Transactional
 	public void saveStationLayoutSource(StationLayoutSource source) {
 		saveStationLayoutSource(source, "admin");
 	}
 
 	@Override
+	@Transactional
 	public void saveStationLayoutSource(StationLayoutSource source, String updatedBy) {
 		saveOverride(LAYOUT_SOURCE, source.id(), source, updatedBy);
 	}
 
 	@Override
+	@Transactional
 	public void saveSimplifiedStationLayoutStatus(
 		String layoutId,
 		SimplifiedStationLayoutStatus status,
@@ -174,26 +182,31 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 	}
 
 	@Override
+	@Transactional
 	public void saveRouteNode(RouteNode routeNode) {
 		saveRouteNode(routeNode, "admin");
 	}
 
 	@Override
+	@Transactional
 	public void saveRouteNode(RouteNode routeNode, String updatedBy) {
 		saveOverride(ROUTE_NODE, routeNode.id(), routeNode, updatedBy);
 	}
 
 	@Override
+	@Transactional
 	public void saveRouteEdge(RouteEdge routeEdge) {
 		saveRouteEdge(routeEdge, "admin");
 	}
 
 	@Override
+	@Transactional
 	public void saveRouteEdge(RouteEdge routeEdge, String updatedBy) {
 		saveOverride(ROUTE_EDGE, routeEdge.id(), routeEdge, updatedBy);
 	}
 
 	@Override
+	@Transactional
 	public void rollbackMasterDataOverride(String entityType, String entityId, String updatedBy) {
 		String currentPayload = activePayload(entityType, entityId).orElse(null);
 		if (currentPayload == null) {

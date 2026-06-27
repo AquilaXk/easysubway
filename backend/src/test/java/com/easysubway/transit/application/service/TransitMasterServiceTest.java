@@ -494,6 +494,38 @@ class TransitMasterServiceTest {
 			Clock.fixed(Instant.parse("2026-06-14T00:00:00Z"), ZoneId.of("Asia/Seoul"))
 		);
 
+		service.createAccessibilityFacility(new CreateAccessibilityFacilityCommand(
+			"facility-sangnoksu-ramp-actor",
+			"station-sangnoksu",
+			"exit-sangnoksu-2",
+			AccessibilityFacilityType.RAMP,
+			"2번 출구 임시 경사로",
+			"지상",
+			"대합실",
+			new BigDecimal("37.303041"),
+			new BigDecimal("126.866768"),
+			"actor 전달 검증용 시설입니다.",
+			AccessibilityFacilityStatus.NORMAL,
+			DataConfidenceLevel.MEDIUM,
+			DataSourceType.ADMIN_VERIFIED,
+			"create-admin"
+		));
+		service.updateAccessibilityFacility(new UpdateAccessibilityFacilityCommand(
+			"facility-sangnoksu-elevator-1",
+			"station-sangnoksu",
+			"exit-sangnoksu-1",
+			AccessibilityFacilityType.ELEVATOR,
+			"1번 출구 엘리베이터 actor 검증",
+			"지상",
+			"대합실",
+			new BigDecimal("37.302430"),
+			new BigDecimal("126.866230"),
+			"actor 전달 검증용 수정입니다.",
+			AccessibilityFacilityStatus.UNDER_CONSTRUCTION,
+			DataConfidenceLevel.HIGH,
+			DataSourceType.ADMIN_VERIFIED,
+			"update-admin"
+		));
 		service.updateFacilityStatus(new UpdateAccessibilityFacilityStatusCommand(
 			"facility-sangnoksu-elevator-1",
 			AccessibilityFacilityStatus.BROKEN,
@@ -537,7 +569,21 @@ class TransitMasterServiceTest {
 		));
 
 		assertThat(repository.updatedByValues)
-			.containsExactly("facility-admin", "source-admin", "node-admin", "edge-admin");
+			.containsExactly("create-admin", "update-admin", "facility-admin", "source-admin", "node-admin", "edge-admin");
+	}
+
+	@Test
+	@DisplayName("마스터 데이터 override rollback은 대상과 수정자 식별자를 요구한다")
+	void rollbackMasterDataOverrideRequiresTargetAndUpdater() {
+		assertThatThrownBy(() -> service.rollbackMasterDataOverride("", "facility-id", "admin-user"))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("롤백 대상 식별자가 필요합니다.");
+		assertThatThrownBy(() -> service.rollbackMasterDataOverride("ACCESSIBILITY_FACILITY", " ", "admin-user"))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("롤백 대상 식별자가 필요합니다.");
+		assertThatThrownBy(() -> service.rollbackMasterDataOverride("ACCESSIBILITY_FACILITY", "facility-id", ""))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("수정자 식별자가 필요합니다.");
 	}
 
 	@Test
@@ -1251,6 +1297,12 @@ class TransitMasterServiceTest {
 		) {
 			updatedByValues.add(updatedBy);
 			super.saveFacilityStatus(facilityId, status, updatedAt);
+		}
+
+		@Override
+		public void saveAccessibilityFacility(AccessibilityFacility facility, String updatedBy) {
+			updatedByValues.add(updatedBy);
+			super.saveAccessibilityFacility(facility);
 		}
 
 		@Override

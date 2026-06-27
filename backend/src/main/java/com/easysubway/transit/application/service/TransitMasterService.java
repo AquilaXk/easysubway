@@ -513,6 +513,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 
 	@Override
 	public void rollbackMasterDataOverride(String entityType, String entityId, String updatedBy) {
+		requireMasterDataOverrideMutation(entityType, entityId, updatedBy);
 		if (loadTransitMasterPort instanceof RollbackTransitMasterOverridePort rollbackPort) {
 			requireWritableMasterData();
 			rollbackPort.rollbackMasterDataOverride(entityType, entityId, updatedBy);
@@ -736,6 +737,15 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 	private void requireUpdater(UpdateAccessibilityFacilityStatusCommand command) {
 		if (command.updatedBy() == null || command.updatedBy().isBlank()) {
 			throw new InvalidAccessibilityFacilityException("수정자 식별자가 필요합니다.");
+		}
+	}
+
+	private void requireMasterDataOverrideMutation(String entityType, String entityId, String updatedBy) {
+		if (entityType == null || entityType.isBlank() || entityId == null || entityId.isBlank()) {
+			throw new IllegalArgumentException("롤백 대상 식별자가 필요합니다.");
+		}
+		if (updatedBy == null || updatedBy.isBlank()) {
+			throw new IllegalArgumentException("수정자 식별자가 필요합니다.");
 		}
 	}
 
