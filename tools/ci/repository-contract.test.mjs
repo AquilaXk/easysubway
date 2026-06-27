@@ -6793,6 +6793,20 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
   assert.deepEqual(gate.routeSafetyStatusEnum, ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"]);
   assert.equal(gate.routeSafetyContract, "#571");
+  assert.deepEqual(gate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020"]);
+  assert.deepEqual(gate.buildIdentityPolicy.acceptedBuildSources, [
+    "rc-aab",
+    "play-generated-apk",
+    "play-installed-build",
+  ]);
+  assert.deepEqual(gate.buildIdentityPolicy.requiredIdentityFields, [
+    "gitSha",
+    "versionCode",
+    "aabSha256",
+    "dataPackManifestSha256",
+    "androidApplicationId",
+  ]);
+  assert.equal(gate.buildIdentityPolicy.mismatchDisposition, "NO_GO");
   assert.equal(gate.deviceEvidencePolicy.codexQaDevice, "local_android_emulator_only");
   assert.equal(gate.deviceEvidencePolicy.physicalDeviceEvidence, "not_used_for_codex_pr_evidence");
   assert.equal(gate.deviceEvidencePolicy.releaseRcEvidence, "play_installed_or_exact_rc_required_before_go");
@@ -6841,6 +6855,26 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
       .get("route_map_performance_budget")
       .evidence.includes("matched-profile-route-map-camera-latency-summary"),
   );
+
+  const evidenceSet = new Map(gate.requiredEvidenceSet.map((item) => [item.id, item]));
+  for (const id of [
+    "home_support_scope",
+    "station_search",
+    "station_detail_facility_status",
+    "route_result_found_unknown_unavailable",
+    "route_map_fallback",
+    "facility_report_recovery",
+    "help_privacy_data_deletion",
+    "data_baseline_source_realtime_scope",
+  ]) {
+    const item = evidenceSet.get(id);
+    assert.ok(item, `${id} must be required Android QA evidence`);
+    assert.ok(item.evidence.includes("screenshot"), `${id} must require screenshot evidence`);
+    assert.ok(item.evidence.includes("ui-tree"), `${id} must require UI tree evidence`);
+    assert.equal(typeof item.provesKo, "string", `${id} must explain what evidence proves`);
+  }
+  assert.ok(evidenceSet.get("route_map_fallback").evidence.includes("performance-summary"));
+  assert.ok(evidenceSet.get("facility_report_recovery").evidence.includes("logcat-summary"));
 
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
