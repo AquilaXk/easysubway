@@ -3,6 +3,7 @@ package com.easysubway.admin.code.application.service;
 import com.easysubway.admin.code.application.port.out.AdminCommonCodeRepository;
 import com.easysubway.admin.code.domain.AdminCommonCode;
 import com.easysubway.admin.code.domain.AdminCommonCodeGroup;
+import com.easysubway.admin.code.domain.AdminCommonCodeGroups;
 import com.easysubway.common.error.InvalidRequestException;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -63,6 +64,9 @@ public class AdminCommonCodeService {
 	}
 
 	public AdminCommonCode disableCode(String groupCode, String code) {
+		if (AdminCommonCodeGroups.isRequiredIncidentCode(groupCode, code)) {
+			throw new InvalidRequestException("필수 incident 공통코드는 비활성화할 수 없습니다.");
+		}
 		AdminCommonCode existing = repository.findCode(groupCode, code)
 			.orElseThrow(() -> new InvalidRequestException("비활성화할 공통코드를 찾을 수 없습니다."));
 		return repository.saveCode(existing.withEnabled(false, LocalDateTime.now(clock)));

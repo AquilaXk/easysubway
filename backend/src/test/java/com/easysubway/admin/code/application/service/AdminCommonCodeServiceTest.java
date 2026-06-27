@@ -1,11 +1,13 @@
 package com.easysubway.admin.code.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.admin.code.adapter.out.persistence.InMemoryAdminCommonCodeRepository;
 import com.easysubway.admin.code.application.service.AdminCommonCodeService.SaveAdminCommonCodeCommand;
 import com.easysubway.admin.code.domain.AdminCommonCode;
 import com.easysubway.admin.code.domain.AdminCommonCodeGroups;
+import com.easysubway.common.error.InvalidRequestException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,5 +41,17 @@ class AdminCommonCodeServiceTest {
 		assertThat(service.listCodes(AdminCommonCodeGroups.REPORT_REJECTION_REASON, true))
 			.extracting(AdminCommonCode::code)
 			.contains("OUT_OF_SCOPE");
+	}
+
+	@Test
+	@DisplayName("incident lifecycle 필수 코드는 비활성화할 수 없다")
+	void requiredIncidentCodesCannotBeDisabled() {
+		assertThatThrownBy(() -> service.disableCode(AdminCommonCodeGroups.INCIDENT_STATUS, "OPEN"))
+			.isInstanceOf(InvalidRequestException.class)
+			.hasMessage("필수 incident 공통코드는 비활성화할 수 없습니다.");
+
+		assertThat(service.enabledCodes(AdminCommonCodeGroups.INCIDENT_STATUS))
+			.extracting(AdminCommonCode::code)
+			.contains("OPEN");
 	}
 }
