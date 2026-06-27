@@ -40,6 +40,8 @@
       "play-app-signing-enrollment",
       "upload-key-and-app-signing-key-sha256-fingerprints",
       "upload-key-backup-recovery-record",
+      "latest-play-uploaded-versioncode-comparison",
+      "failed-rc-versioncode-reuse-policy",
       "api-provider-fingerprint-registration",
       "play-console-least-privilege-2fa-check"
     ],
@@ -66,6 +68,8 @@
       "internal-app-sharing-or-track-upload-record",
       "app-bundle-explorer-generated-apk-record",
       "play-app-signing-certificate-record",
+      "play-generated-artifact-identity-match-record",
+      "rc-versioncode-greater-than-latest-play-artifact-record",
       "split-apk-manifest-permission-network-config-record",
       "device-matrix-smoke-summary",
       "play-generated-apk-or-installed-build-smoke",
@@ -105,7 +109,8 @@
       "critical-high-finding-zero-or-waiver-record",
       "pre-review-critical-issue-0",
       "pre-launch-report-crash-0",
-      "policy-warning-0",
+      "pre-launch-report-anr-0",
+      "pre-launch-report-policy-warning-0-or-triaged",
       "waiver-record-for-any-exception"
     ],
     "postReleaseReadiness": [

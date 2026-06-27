@@ -18,12 +18,28 @@
   "requiredArtifactEvidence": [
     "play-app-signing-certificate-record",
     "upload-key-vs-app-signing-key-separation-record",
+    "latest-play-uploaded-versioncode-record",
+    "rc-versioncode-greater-than-latest-play-artifact-record",
+    "play-generated-artifact-identity-match-record",
     "play-generated-split-apk-install-log",
     "device-specific-manifest-dump",
     "package-versioncode-minsdk-targetsdk-record",
     "permission-network-security-config-review",
-    "native-library-delivery-and-16kb-page-size-record"
+    "native-library-delivery-and-16kb-page-size-record",
+    "pre-launch-report-crash-anr-policy-warning-summary"
   ],
+  "requiredArtifactIdentityFields": [
+    "gitSha",
+    "packageId",
+    "versionName",
+    "versionCode",
+    "aabSha256",
+    "generatedApkSha256",
+    "appSigningKeySha256Fingerprint",
+    "dataPackManifestSha256"
+  ],
+  "identityMatchPolicy": "Play-generated APK 또는 Play-installed build evidence의 packageId, versionName, versionCode, appSigningKeySha256Fingerprint, dataPackManifestSha256는 RC evidence manifest와 일치해야 한다.",
+  "versionCodePolicy": "RC versionCode는 Play Console에 업로드된 최신 artifact보다 커야 하며 실패한 RC versionCode는 fixed release에서 재사용하지 않는다.",
   "deviceMatrix": [
     {
       "id": "android_15_phone_small_screen_large_font",
@@ -51,8 +67,12 @@
     "localAabOnly": "BLOCKED_EXTERNAL",
     "missingPlayGeneratedArtifact": "BLOCKED_EXTERNAL",
     "manifestMismatch": "BLOCKED_TECHNICAL",
+    "artifactIdentityMismatch": "BLOCKED_TECHNICAL",
+    "appSigningCertificateMismatch": "BLOCKED_TECHNICAL",
+    "versionCodeNotGreaterThanLatestPlayArtifact": "BLOCKED_EXTERNAL",
     "playInstalledSmokeCrash": "BLOCKED_TECHNICAL",
-    "deviceMatrixP0Failure": "BLOCKED_TECHNICAL"
+    "deviceMatrixP0Failure": "BLOCKED_TECHNICAL",
+    "preLaunchCrashAnrOrPolicyWarningUntriaged": "BLOCKED_TECHNICAL"
   },
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/play-generated-apk-device-matrix/<rc-or-run>/",
