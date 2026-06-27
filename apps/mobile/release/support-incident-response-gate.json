@@ -123,6 +123,55 @@
     "incident-notice-copy-review",
     "local-emulator-help-screen-screenshot-or-ui-tree"
   ],
+  "supportEvidenceSummaryPolicy": {
+    "githubSummaryFields": [
+      "channelId",
+      "redactedReceiptReference",
+      "receivedAt",
+      "owner",
+      "result",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "requiredEvidenceSet": [
+      "support-mailbox-receive-test",
+      "store-contact-preview",
+      "app-help-screen-contact-check",
+      "security-mailbox-test",
+      "data-deletion-mailbox-test",
+      "privacy-request-routing-check",
+      "faq-copy-review",
+      "support-channel-access-check",
+      "data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "official-contact-url-or-partner-contact-record",
+      "request-template",
+      "response-sla-note",
+      "source-owner-contact-record",
+      "license-and-correction-policy-note",
+      "emergency-source-archive",
+      "retention-policy-review",
+      "duplicate-report-triage-sample",
+      "override-rollback-sample",
+      "audit-log-redaction-check",
+      "intake-and-receipt-id-record",
+      "severity-triage",
+      "source-and-operator-contact-check",
+      "override-approval",
+      "emergency-datapack-release-or-rollback",
+      "user-notice-and-support-reply",
+      "post-release-verification"
+    ],
+    "forbiddenInGithubSummary": [
+      "support mailbox personal data",
+      "raw report receipt token",
+      "operator private contact",
+      "provider credential or quota token",
+      "photo metadata"
+    ]
+  },
   "sensitiveEvidencePolicy": {
     "localOnly": true,
     "githubUploadPolicy": "summary-only",

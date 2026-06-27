@@ -627,6 +627,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM=public-key-pem",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
     "EASYSUBWAY_TRUSTED_PROXY_CIDRS=",
     "EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false",
     "EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
@@ -642,6 +644,11 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ANDROID_STORE_PASSWORD=",
     "EASYSUBWAY_ANDROID_KEY_ALIAS=",
     "EASYSUBWAY_ANDROID_KEY_PASSWORD=",
+    "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+    "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
+    "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=0",
+    "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
     "",
   ];
   await writeFile(envFile, deploymentEnvLines.join("\n"));
@@ -1049,6 +1056,61 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(postLaunchOperationsReviewGate.stagedRolloutPolicy.initialProductionRelease, "not-available-for-first-public-release");
   assert.ok(postLaunchOperationsReviewGate.stagedRolloutPolicy.secondAndLaterUpdates.includes("halt-rollout-on-p0-or-policy-warning"));
   assert.ok(postLaunchOperationsReviewGate.dryRunRequiredEvidence.includes("alert-route-dry-run-log"));
+  assert.deepEqual(postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.githubSummaryFields, [
+    "reviewWindowId",
+    "artifactIdentity",
+    "signalSnapshot",
+    "owner",
+    "decision",
+    "goNoGoResult",
+    "redactionNotes",
+    "localEvidencePath",
+  ]);
+  for (const evidenceId of postLaunchOperationsReviewGate.dryRunRequiredEvidence) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of postLaunchOperationsReviewGate.fixedReleaseProcedure.requiredSteps) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of postLaunchOperationsReviewGate.reviewWindows.flatMap((window) => window.requiredSignals)) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of postLaunchOperationsReviewGate.killSwitchAndRollbackOwners.flatMap((owner) => owner.evidence)) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
+  assert.ok(
+    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "crash-anr-vitals-summary",
+    ),
+  );
+  assert.ok(
+    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "fixed-release-owner-acknowledgement",
+    ),
+  );
+  for (const forbiddenValue of [
+    "Play Console account data",
+    "support mailbox personal data",
+    "device identifiers",
+    "provider credential or quota token",
+  ]) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(forbiddenValue),
+      `${forbiddenValue} must be forbidden in post-launch GitHub summary`,
+    );
+  }
   assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
   assert.equal(supportIncidentResponseGate.issue, 1019);
   assert.equal(supportIncidentResponseGate.status, "BLOCKED_EXTERNAL");
@@ -1072,6 +1134,67 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence.includes("override-rollback-sample"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("data-error-triage-dry-run"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("local-emulator-help-screen-screenshot-or-ui-tree"));
+  assert.deepEqual(supportIncidentResponseGate.supportEvidenceSummaryPolicy.githubSummaryFields, [
+    "channelId",
+    "redactedReceiptReference",
+    "receivedAt",
+    "owner",
+    "result",
+    "redactionNotes",
+    "localEvidencePath",
+  ]);
+  for (const evidenceId of supportIncidentResponseGate.supportChannels.flatMap((channel) => channel.requiredEvidence)) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of supportIncidentResponseGate.dryRunRequiredEvidence) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of supportIncidentResponseGate.operatorContactRoutes.flatMap((route) => route.requiredEvidence)) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of supportIncidentResponseGate.dataCorrectionFlow.requiredSteps) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  assert.ok(
+    supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "support-mailbox-receive-test",
+    ),
+  );
+  assert.ok(
+    supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "data-error-triage-dry-run",
+    ),
+  );
+  for (const forbiddenValue of [
+    "support mailbox personal data",
+    "raw report receipt token",
+    "operator private contact",
+    "provider credential or quota token",
+    "photo metadata",
+  ]) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(forbiddenValue),
+      `${forbiddenValue} must be forbidden in support GitHub summary`,
+    );
+  }
   assert.equal(abusePenetrationRehearsalGate.releaseGate, "abuse-penetration-rehearsal");
   assert.equal(abusePenetrationRehearsalGate.issue, 1022);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
