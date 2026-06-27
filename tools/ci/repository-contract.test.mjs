@@ -1113,7 +1113,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   );
   assert.ok(
     supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
-      "p0-data-error-triage-dry-run",
+      "data-error-triage-dry-run",
     ),
   );
   assert.ok(
