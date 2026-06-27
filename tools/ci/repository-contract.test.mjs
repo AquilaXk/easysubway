@@ -3267,6 +3267,9 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   const unavailableTransitMaster = read(
     "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/UnavailableTransitMasterRepository.java",
   );
+  const jdbcTransitMasterOverride = read(
+    "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/JdbcTransitMasterOverrideRepository.java",
+  );
   const applicationYml = read("backend/src/main/resources/application.yml");
   const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
 
@@ -3283,7 +3286,8 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   assert.doesNotMatch(readinessConfiguration, /BeanFactoryPostProcessor/);
   assert.doesNotMatch(readinessConfiguration, /BeanCreationException/);
   assert.doesNotMatch(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
-  assert.match(unavailableTransitMaster, /@Profile\("prod"\)/);
+  assert.doesNotMatch(unavailableTransitMaster, /@Repository/);
+  assert.doesNotMatch(unavailableTransitMaster, /@Profile\("prod"\)/);
   assert.match(unavailableTransitMaster, /implements[\s\S]*LoadTransitMasterPort/);
   assert.match(
     unavailableTransitMaster,
@@ -3314,6 +3318,13 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   );
   assert.match(unavailableTransitMaster, /saveRouteNode[\s\S]*unsupportedWriteOperation\("saveRouteNode"\)/);
   assert.match(unavailableTransitMaster, /saveRouteEdge[\s\S]*unsupportedWriteOperation\("saveRouteEdge"\)/);
+  assert.match(jdbcTransitMasterOverride, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcTransitMasterOverride, /extends UnavailableTransitMasterRepository/);
+  assert.match(jdbcTransitMasterOverride, /implements[\s\S]*RollbackTransitMasterOverridePort/);
+  assert.match(jdbcTransitMasterOverride, /transit_master_overrides/);
+  assert.match(jdbcTransitMasterOverride, /transit_master_override_audits/);
+  assert.match(jdbcTransitMasterOverride, /MasterDataCapabilityStatus\.UP[\s\S]*true,[\s\S]*true/);
+  assert.match(jdbcTransitMasterOverride, /MasterDataCapabilityStatus\.READ_ONLY[\s\S]*true,[\s\S]*false/);
   for (const file of prodJdbcRepositoryFiles()) {
     const source = read(file);
     if (/JdbcTemplate jdbcTemplate/.test(source) && /public Jdbc[A-Za-z0-9]+Repository\(DataSource/.test(source)) {
