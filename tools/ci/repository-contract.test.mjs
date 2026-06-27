@@ -3937,7 +3937,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminPageController, /ReportProcessingTimeSummary/);
   assert.match(adminReportListTemplate, /신고 급증/);
   assert.doesNotMatch(adminReportDetailTemplate, /data:\s*'\s*\+|photoDataBase64/);
-  assert.match(adminReportDetailTemplate, /photoObjectKey/);
+  assert.doesNotMatch(adminReportDetailTemplate, /photoObjectKey|objectKey/);
+  assert.match(adminReportDetailTemplate, /\/admin\/reports\/\{reportId\}\/photo\/thumbnail/);
   assert.match(adminReportListTemplate, /최근 24시간 신고/);
   assert.match(adminReportListTemplate, /신고 처리 시간/);
   assert.match(adminReportListTemplate, /처리 완료 신고 없음/);
@@ -6158,12 +6159,14 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V11__admin_audit_events.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
     read("backend/src/main/resources/db/migration/h2/V11__admin_audit_events.sql"),
     read("backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql"),
+    read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -6286,6 +6289,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(securityConfig, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(securityConfig, /hasAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\)\)/);
   assert.match(securityConfig, /hasAuthority\(AdminPermission\.REPORT_REVIEW\.authority\(\)\)/);
+  assert.match(securityConfig, /hasAuthority\(AdminPermission\.REPORT_PHOTO_READ\.authority\(\)\)/);
   assert.match(securityConfig, /hasAuthority\(AdminPermission\.DATA_OPERATE\.authority\(\)\)/);
   assert.match(securityConfig, /"\/admin\/notifications\/\*\*"/);
   assert.match(securityConfig, /hasRole\("OPERATOR_ADMIN"\)/);
@@ -6360,6 +6364,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.deepEqual(adminPermissionCodes, [
     "admin.view",
     "admin.report.review",
+    "admin.report.photo.read",
     "admin.master.edit",
     "admin.field.operate",
     "admin.data.operate",
