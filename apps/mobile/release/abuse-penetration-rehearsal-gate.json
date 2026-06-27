@@ -90,6 +90,105 @@
       "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
     }
   ],
+  "rehearsalMatrices": {
+    "receiptTokenAbuse": {
+      "scenarioId": "receipt_token_replay_and_status_abuse",
+      "requiredEvidence": ["receipt-token-negative-tests", "redacted-request-response-summary", "log-redaction-check"],
+      "requiredCases": [
+        "brute_force_guessing",
+        "replay_after_status_lookup",
+        "cross_report_enumeration",
+        "confirm_endpoint_abuse",
+        "url_header_log_redaction"
+      ],
+      "summaryFields": ["caseId", "endpoint", "attemptCount", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["raw receipt token", "receipt token hash", "authorization header", "session cookie"]
+    },
+    "signedUploadUrlBoundary": {
+      "scenarioId": "signed_url_lifecycle_abuse",
+      "requiredEvidence": ["signed-url-expiry-test", "storage-log-redaction-check", "redacted-request-response-summary"],
+      "requiredCases": [
+        "method_mismatch",
+        "content_type_mismatch",
+        "size_limit_exceeded",
+        "ttl_expired",
+        "object_key_prefix_traversal",
+        "signed_url_reuse"
+      ],
+      "summaryFields": ["caseId", "method", "contentType", "sizeBytes", "ttlSeconds", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "object key with user identifier", "photo binary"]
+    },
+    "reportUploadLifecycle": {
+      "scenarioId": "report_photo_upload_abuse",
+      "requiredEvidence": ["malicious-photo-upload-test-output", "orphan-cleanup-request-response-summary", "redacted-request-response-summary"],
+      "requiredCases": [
+        "upload_intent_abuse",
+        "duplicate_claim",
+        "submit_without_valid_claim",
+        "status_lookup_without_valid_receipt",
+        "confirm_without_valid_receipt",
+        "orphan_cleanup_after_failed_claim",
+        "malicious_photo_upload"
+      ],
+      "summaryFields": ["caseId", "apiStep", "expectedStatus", "observedStatus", "cleanupResult", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["raw receipt token", "raw signed URL", "photo binary", "precise coordinates"]
+    },
+    "adminOperatorSecurity": {
+      "scenarioId": "admin_operator_auth_session_csrf",
+      "requiredEvidence": ["admin-auth-tests", "operator-role-negative-tests", "csrf-negative-test-summary", "admin-operator-lockout-test-output"],
+      "requiredCases": [
+        "login_failure_lockout",
+        "logout_session_invalidation",
+        "session_expiry",
+        "csrf_missing_mutation",
+        "role_denied_personal_data",
+        "role_denied_photo_read",
+        "tenant_authorization_bypass",
+        "break_glass_audit_redaction"
+      ],
+      "summaryFields": ["caseId", "role", "tenantScope", "endpoint", "expectedStatus", "observedStatus", "redactionResult", "auditRedactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["operator password", "session cookie", "csrf token", "raw personal data", "raw photo metadata"]
+    },
+    "objectStorageLifecycle": {
+      "scenarioId": "signed_url_lifecycle_abuse",
+      "requiredEvidence": ["object-lifecycle-cleanup-summary", "storage-log-redaction-check", "object-retention-delete-policy-summary"],
+      "requiredCases": [
+        "orphan_object_cleanup",
+        "retention_policy_record",
+        "delete_after_report_deletion",
+        "signed_url_expiry_enforced",
+        "storage_audit_redaction"
+      ],
+      "summaryFields": ["caseId", "bucketOrPolicyAlias", "retentionRule", "deleteOrCleanupResult", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "photo binary", "full object key"]
+    },
+    "distributedRateLimitAbuse": {
+      "scenarioId": "distributed_rate_limit_abuse",
+      "requiredEvidence": ["distributed-abuse-control-test-output", "trusted-proxy-negative-test", "abuse-store-mode-record"],
+      "requiredCases": [
+        "multi_node_upload_intent_flooding",
+        "claim_submit_status_confirm_flooding",
+        "trusted_proxy_spoofing",
+        "abuse_store_mode_record",
+        "single_instance_exception_link"
+      ],
+      "summaryFields": ["caseId", "nodeOrStoreMode", "endpoint", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["raw receipt token", "raw signed URL", "client IP full address", "trusted proxy credential"]
+    },
+    "providerReleaseSecretExposure": {
+      "scenarioId": "provider_and_release_secret_exposure",
+      "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"],
+      "requiredCases": [
+        "tracked_secret_search",
+        "android_artifact_secret_scan",
+        "backend_image_env_redaction",
+        "release_endpoint_allowlist_diff",
+        "pr_evidence_redaction"
+      ],
+      "summaryFields": ["caseId", "artifactType", "scanTarget", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "forbiddenSummaryValues": ["provider secret", "object storage credential", "production password", "signing private key", "local or internal endpoint"]
+    }
+  },
   "manualRehearsalPolicy": {
     "redactionRequired": true,
     "requestResponseSummaryOnly": true,
@@ -102,6 +201,8 @@
       "redactionNotes",
       "localEvidencePath"
     ],
+    "perCaseSummaryRequired": true,
+    "minimumSummaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
     "forbiddenInEvidence": [
       "raw receipt token",
       "raw signed URL",
