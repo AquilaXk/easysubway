@@ -7375,6 +7375,12 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   const expectedPlayDataTypes = [
     ...new Set(storePrivacyInventory.dataTypes.map((item) => item.googlePlayDataSafety.dataType)),
   ].sort();
+  const expectedInventoryIdsByDataType = new Map();
+  for (const item of storePrivacyInventory.dataTypes) {
+    const dataType = item.googlePlayDataSafety.dataType;
+    const existingIds = expectedInventoryIdsByDataType.get(dataType) ?? [];
+    expectedInventoryIdsByDataType.set(dataType, [...existingIds, item.id]);
+  }
   assert.deepEqual(playStoreContent.dataSafetyDeclarations.requiredCollectedDataTypes.toSorted(), expectedPlayDataTypes);
   const dataSafetyAnswerMatrix = new Map(
     playStoreContent.dataSafetyDeclarations.answerMatrix.map((item) => [item.dataType, item]),
@@ -7384,6 +7390,16 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     const matrix = dataSafetyAnswerMatrix.get(dataType);
     assert.ok(Array.isArray(matrix.inventoryDataIds), `${dataType} matrix must list inventory IDs`);
     assert.ok(matrix.inventoryDataIds.length > 0, `${dataType} matrix must include at least one inventory ID`);
+    assert.equal(
+      new Set(matrix.inventoryDataIds).size,
+      matrix.inventoryDataIds.length,
+      `${dataType} matrix must not duplicate inventory IDs`,
+    );
+    assert.deepEqual(
+      matrix.inventoryDataIds.toSorted(),
+      expectedInventoryIdsByDataType.get(dataType).toSorted(),
+      `${dataType} matrix must cover every inventory ID for the Play data type`,
+    );
     assert.deepEqual(
       matrix.requiredConsoleFields,
       playStoreContent.dataSafetyDeclarations.requiredFieldsPerDataType,
