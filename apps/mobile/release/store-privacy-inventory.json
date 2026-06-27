@@ -19,7 +19,7 @@
   "crashAnrProviderDecision": {
     "separateCrashProvider": false,
     "sourceOfTruth": ["Android vitals", "Google Play pre-launch report", "mobile runtime error reporter"],
-    "requiredEvidence": ["no-crash-sdk-dependency-scan", "android-vitals-or-pre-launch-report-export"],
+    "requiredEvidence": ["no-crash-sdk-dependency-scan", "android-vitals-or-play-pre-launch-report-export"],
     "privacyAnswerKo": "Android v1은 별도 crash SDK를 사용하지 않고 Android vitals와 Play pre-launch report를 충돌/ANR 기준 증거로 삼는다."
   },
   "dataTypes": [
