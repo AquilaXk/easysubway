@@ -3,11 +3,11 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "play-store-submission-content",
-  "issue": 921,
+  "issue": 1018,
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "storePrivacyInventory": "apps/mobile/release/store-privacy-inventory.json",
   "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
-  "status": "BLOCKED_CONSOLE_PREVIEW_AND_ASSET_EVIDENCE_MISSING",
+  "status": "BLOCKED_EXTERNAL",
   "appContentDeclarations": {
     "ads": false,
     "appAccessRequiresSignIn": false,

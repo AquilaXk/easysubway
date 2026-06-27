@@ -3,11 +3,11 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "play-generated-apk-device-matrix",
-  "issue": 922,
+  "issue": 1016,
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "androidReleaseQualityGate": "apps/mobile/release/android-release-quality-gate.json",
   "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
-  "status": "BLOCKED_PLAY_GENERATED_ARTIFACT_EVIDENCE_MISSING",
+  "status": "BLOCKED_EXTERNAL",
   "acceptedArtifactSources": [
     "internal-app-sharing",
     "internal-testing-track",
