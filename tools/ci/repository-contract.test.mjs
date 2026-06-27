@@ -1902,6 +1902,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const datapackWorkflow = read(".github/workflows/datapack-release.yml");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
+  const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -1961,6 +1962,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(readme, /## Operations/);
   assert.match(readme, /operations-observability-gate\.json/);
   assert.match(readme, /operations-release-evidence\.json/);
+  assert.match(readme, /backend control-plane/);
+  assert.match(readme, /public API surface/);
+  assert.match(readme, /single-instance/);
   assert.match(readme, /backend_health_readiness_storage_datapack_report/);
   assert.match(readme, /realtime_provider_success_stale_timeout_latency_eta_error/);
   assert.match(readme, /receipt token|upload URL|photo metadata/i);
@@ -1977,6 +1981,106 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.equal(operationsEvidence.migrationPolicy.blockedIfMissingBackupBeforeMigration, true);
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("postgresql-restore-rehearsal"));
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("facility-report-photo-restore-check"));
+  assert.equal(operationsEvidence.backendControlPlane.issue, 1017);
+  assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.inventoryRequired, true);
+  assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.defaultDenyRequired, true);
+  assert.equal(
+    operationsEvidence.backendControlPlane.publicApiSurface.newApiOrAdminEndpointWithoutMatcherBlocksRelease,
+    true,
+  );
+  assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.securityMatcherComparisonRequired, true);
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicEndpoints,
+    [
+      "/api/health",
+      "/actuator/health",
+      "/actuator/health/liveness",
+      "/actuator/health/readiness",
+      "/actuator/prometheus",
+      "/api/v1/report-uploads",
+      "/api/v1/report-uploads/{uploadId}",
+      "/api/v1/reports",
+      "/api/v1/reports/{reportId}",
+      "/api/v1/reports/{reportId}/confirm",
+      "/api/v1/realtime/arrivals",
+      "/api/v1/realtime/train-positions",
+    ],
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
+    [
+      "/api/v1/report-uploads",
+      "/api/v1/report-uploads/*",
+      "/api/v1/reports",
+      "/api/v1/reports/*",
+      "/api/v1/reports/*/confirm",
+      "/api/health",
+      "/actuator/health",
+      "/actuator/health/liveness",
+      "/actuator/health/readiness",
+      "/actuator/prometheus",
+      "/api/v1/realtime/**",
+    ],
+  );
+  const publicApiMatcherScope = securityConfig.match(
+    /reportSecurityFilterChain[\s\S]*?publicSecurityFilterChain[\s\S]*?\.anyRequest\(\)\.denyAll\(\)/,
+  );
+  assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
+  const publicApiMatchers = Array.from(publicApiMatcherScope[0].matchAll(/"([^"]+)"/g), (match) => match[1]).filter(
+    (matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"),
+  );
+  assert.deepEqual(
+    publicApiMatchers,
+    operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.publicApiSurface.requiredEvidence.includes(
+      "security-matcher-contract-test-output",
+    ),
+  );
+  assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.basicAuthDefaultInProd, "disabled");
+  assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.oidcMfaSsoDeferredExceptionRequired, true);
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.adminAuthTransition.temporaryExceptionRequiredFields,
+    ["owner", "untilDate", "risk", "mitigation", "followUpIssue"],
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.adminAuthTransition.requiredEvidence.includes(
+      "break-glass-rotation-drill-record",
+    ),
+  );
+  assert.equal(operationsEvidence.backendControlPlane.abuseControlReleaseException.distributedStorePreferred, true);
+  assert.ok(
+    operationsEvidence.backendControlPlane.abuseControlReleaseException.singleInstanceExceptionRequiredFields.includes(
+      "backendReplicaCountOneEvidence",
+    ),
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.abuseControlReleaseException.singleInstanceExceptionRequiredFields.includes(
+      "distributedLimiterFollowUpIssue",
+    ),
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.abuseControlReleaseException.requiredEvidence.includes(
+      "trusted-proxy-negative-test-output",
+    ),
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.environmentProtection.productionRequiredReviewerRequired,
+    true,
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.environmentProtection.repositoryWideProductionSecretsOnlyBlocksRelease,
+    true,
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.environmentProtection.requiredEvidence.includes(
+      "github-production-environment-required-reviewer-summary",
+    ),
+  );
+  assert.ok(operationsEvidence.backendControlPlane.auditRedaction.requiredEvidence.includes("privacy-read-audit-sample"));
+  assert.ok(operationsEvidence.backendControlPlane.auditRedaction.forbiddenInEvidence.includes("signed URL"));
+  assert.ok(operationsEvidence.backendControlPlane.auditRedaction.forbiddenInEvidence.includes("raw request body"));
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("dashboard-url"));
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("alert-route"));
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("runbook"));
@@ -4652,7 +4756,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(4\)[\s\S]*?publicSecurityFilterChain/);
   assert.match(
     security,
-    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/\*\*"[\s\S]*"\/actuator\/prometheus"[\s\S]*\)\.permitAll\(\)/,
+    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/liveness"[\s\S]*"\/actuator\/health\/readiness"[\s\S]*"\/actuator\/prometheus"[\s\S]*\)\.permitAll\(\)/,
   );
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
