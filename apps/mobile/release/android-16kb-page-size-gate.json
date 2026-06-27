@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "android-16kb-page-size",
-  "issue": 919,
+  "issue": 1015,
   "releaseBlockerPolicy": true,
   "scope": {
     "platform": {

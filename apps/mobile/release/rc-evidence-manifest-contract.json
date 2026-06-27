@@ -3,9 +3,9 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "rc-evidence-manifest",
-  "issue": 926,
-  "parentIssues": [900, 907],
-  "linkedEvidenceIssues": [571, 907, 917],
+  "issue": 1020,
+  "parentIssues": [1014, 1020],
+  "linkedEvidenceIssues": [571, 1015, 1016, 1018, 1021, 1022],
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
   "releaseGovernanceGate": "apps/mobile/release/release-governance-gate.json",
@@ -38,12 +38,27 @@
     },
     {
       "id": "signed_rc_store_submission",
-      "sourceIssue": 907,
+      "sourceIssue": 1015,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "play_generated_install",
+      "sourceIssue": 1016,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "store_privacy_submission",
+      "sourceIssue": 1018,
       "expiresAfterDays": 14
     },
     {
       "id": "android_release_quality",
-      "sourceIssue": 917,
+      "sourceIssue": 1021,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "abuse_penetration_rehearsal",
+      "sourceIssue": 1022,
       "expiresAfterDays": 14
     }
   ],

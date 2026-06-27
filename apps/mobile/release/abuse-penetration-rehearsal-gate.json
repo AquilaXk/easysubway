@@ -3,8 +3,8 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "abuse-penetration-rehearsal",
-  "issue": 925,
-  "status": "BLOCKED_ABUSE_REHEARSAL_EVIDENCE_MISSING",
+  "issue": 1022,
+  "status": "BLOCKED_EXTERNAL",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
   "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
@@ -91,9 +91,9 @@
   "findingPolicy": {
     "criticalHighAllowed": 0,
     "mediumAllowedOnlyWithOwnerAndFixPlan": true,
-    "waiverIssue": 900,
-    "waiverRequiredFields": ["severity", "owner", "expiry", "compensating-control", "fix-plan"],
-    "goNoGoKo": "critical/high finding이 1건이라도 남아 있으면 release blocker이며, 예외는 #900 waiver와 fix plan이 있어야 한다."
+    "waiverIssue": 1020,
+    "waiverRequiredFields": ["owner", "untilDate", "reason", "risk", "mitigation", "followUpIssue"],
+    "goNoGoKo": "critical/high finding이 1건이라도 남아 있으면 release blocker이며, 예외는 #1020 waiver schema와 mitigation/follow-up issue가 있어야 한다."
   },
   "linkedReleaseGates": [
     "apps/mobile/release/security-privacy-release-evidence.json",

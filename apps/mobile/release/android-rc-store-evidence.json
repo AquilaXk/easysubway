@@ -22,14 +22,14 @@
     ],
     "issueMap": {
       "rcDeviceQa": 571,
-      "pageSize16kb": 919,
-      "productionAccessClosedTest": 920,
-      "playContentDataSafetyListing": 921,
-      "playGeneratedApkDeviceMatrix": 922,
-      "postReleaseOperationsReview": 923,
-      "supportDataIncidentResponse": 924,
-      "abusePenetrationRehearsal": 925,
-      "rcEvidenceManifestAutomation": 926
+      "pageSize16kb": 1015,
+      "productionAccessClosedTest": 1016,
+      "playContentDataSafetyListing": 1018,
+      "playGeneratedApkDeviceMatrix": 1016,
+      "postReleaseOperationsReview": 1019,
+      "supportDataIncidentResponse": 1019,
+      "abusePenetrationRehearsal": 1022,
+      "rcEvidenceManifestAutomation": 1020
     }
   },
   "requiredEvidence": {
@@ -133,7 +133,7 @@
     "missingPlayGeneratedArtifact": "blocked",
     "missingPreLaunchCrashZero": "blocked",
     "missingDataSafetyNetworkTraceMatch": "blocked",
-    "exceptionPath": "#900 waiver until-date and owner required"
+    "exceptionPath": "#1020 waiver until-date and owner required"
   },
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/android-rc-store/<rc-or-run>/",

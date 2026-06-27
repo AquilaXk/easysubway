@@ -3,10 +3,10 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "play-production-access-closed-test",
-  "issue": 920,
+  "issue": 1016,
   "parentEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
-  "status": "BLOCKED_EXTERNAL_CONSOLE_EVIDENCE_MISSING",
+  "status": "BLOCKED_EXTERNAL",
   "officialPolicy": {
     "source": "https://support.google.com/googleplay/android-developer/answer/14151465",
     "appliesTo": "personal developer accounts created after 2023-11-13",

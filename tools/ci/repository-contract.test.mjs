@@ -88,6 +88,26 @@ function assertMobileCatchPolicy(file, source) {
   }
 }
 
+function collectStatusValues(value, values = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStatusValues(item, values);
+    }
+    return values;
+  }
+
+  if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      if (key === "status" && typeof child === "string") {
+        values.push(child);
+      }
+      collectStatusValues(child, values);
+    }
+  }
+
+  return values;
+}
+
 function inMemoryRepositoryFiles() {
   return execFileSync("git", ["ls-files", "backend/src/main/java/**/InMemory*Repository.java"], {
     cwd: root,
@@ -299,6 +319,7 @@ test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추�
 
 test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
+  const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /name: Changes/);
@@ -306,18 +327,22 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
   assert.match(workflow, /name: Android CI/);
-  assert.doesNotMatch(workflow, /name: iOS CI/);
-  assert.doesNotMatch(workflow, /runs-on: macos-latest/);
+  assert.match(releaseGateJob, /name: Release Gate Consistency/);
+  assert.doesNotMatch(releaseGateJob, /name: iOS CI/);
+  assert.doesNotMatch(releaseGateJob, /runs-on: macos-latest/);
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Repository CI \/ Set up Chrome for route map tests/);
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
+  assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
+  assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
+  assert.doesNotMatch(releaseGateJob, /--test-name-pattern/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
   assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
-  assert.doesNotMatch(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
+  assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
@@ -867,6 +892,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const supportIncidentResponseGate = readJson(supportIncidentResponsePath);
   const abusePenetrationRehearsalPath = "apps/mobile/release/abuse-penetration-rehearsal-gate.json";
   const abusePenetrationRehearsalGate = readJson(abusePenetrationRehearsalPath);
+  const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
@@ -913,7 +939,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   );
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Abuse-case and penetration rehearsal evidence"));
   assert.equal(playProductionAccessGate.releaseGate, "play-production-access-closed-test");
-  assert.equal(playProductionAccessGate.issue, 920);
+  assert.equal(playProductionAccessGate.issue, 1016);
   assert.equal(playProductionAccessGate.parentEvidenceManifest, androidRcEvidencePath);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestMinimumOptedInTesters, 12);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestContinuousOptInDays, 14);
@@ -923,7 +949,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_closed_test_requirement"));
   assert.match(playProductionAccessGate.evidencePolicy.localOnlyEvidenceRoot, /\.codex\/evidence\/release\/play-production-access/);
   assert.equal(playStoreSubmissionContent.releaseGate, "play-store-submission-content");
-  assert.equal(playStoreSubmissionContent.issue, 921);
+  assert.equal(playStoreSubmissionContent.issue, 1018);
   assert.equal(playStoreSubmissionContent.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(playStoreSubmissionContent.storePrivacyInventory, "apps/mobile/release/store-privacy-inventory.json");
   assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, false);
@@ -942,7 +968,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     assert.doesNotMatch(playStoreSubmissionContent.koreanListing.shortDescription, new RegExp(claim));
   }
   assert.equal(playGeneratedApkDeviceMatrixGate.releaseGate, "play-generated-apk-device-matrix");
-  assert.equal(playGeneratedApkDeviceMatrixGate.issue, 922);
+  assert.equal(playGeneratedApkDeviceMatrixGate.issue, 1016);
   assert.equal(playGeneratedApkDeviceMatrixGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("internal-app-sharing"));
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("play-installed-build"));
@@ -953,8 +979,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playGeneratedApkDeviceMatrixGate.deviceMatrix.map((item) => item.id).includes("android_16_16kb_page_size"));
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.localAabOnly, "BLOCKED_EXTERNAL");
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
-  assert.equal(postLaunchOperationsReviewGate.issue, 923);
-  assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_POST_LAUNCH_EVIDENCE_MISSING");
+  assert.equal(postLaunchOperationsReviewGate.issue, 1019);
+  assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_EXTERNAL");
   assert.equal(postLaunchOperationsReviewGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "apps/mobile/release/operations-release-evidence.json");
   assert.equal(postLaunchOperationsReviewGate.supportIncidentResponseGate, supportIncidentResponsePath);
@@ -977,8 +1003,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(postLaunchOperationsReviewGate.stagedRolloutPolicy.secondAndLaterUpdates.includes("halt-rollout-on-p0-or-policy-warning"));
   assert.ok(postLaunchOperationsReviewGate.dryRunRequiredEvidence.includes("alert-route-dry-run-log"));
   assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
-  assert.equal(supportIncidentResponseGate.issue, 924);
-  assert.equal(supportIncidentResponseGate.status, "BLOCKED_SUPPORT_INCIDENT_EVIDENCE_MISSING");
+  assert.equal(supportIncidentResponseGate.issue, 1019);
+  assert.equal(supportIncidentResponseGate.status, "BLOCKED_EXTERNAL");
   assert.equal(supportIncidentResponseGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(supportIncidentResponseGate.postLaunchOperationsReviewGate, postLaunchOperationsReviewPath);
   assert.match(supportIncidentResponseGate.evidenceRoot, /\.codex\/evidence\/release\/support-incident-response\/<rc-or-run>/);
@@ -1000,8 +1026,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("data-error-triage-dry-run"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("local-emulator-help-screen-screenshot-or-ui-tree"));
   assert.equal(abusePenetrationRehearsalGate.releaseGate, "abuse-penetration-rehearsal");
-  assert.equal(abusePenetrationRehearsalGate.issue, 925);
-  assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_ABUSE_REHEARSAL_EVIDENCE_MISSING");
+  assert.equal(abusePenetrationRehearsalGate.issue, 1022);
+  assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
   assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
@@ -1020,7 +1046,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   );
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
-  assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 900);
+  assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 1020);
+  assert.deepEqual(
+    abusePenetrationRehearsalGate.findingPolicy.waiverRequiredFields,
+    releaseGovernanceGate.waiverSchema.requiredFields,
+  );
   assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
   assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
   assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("rc-evidence-manifest"));
@@ -1075,9 +1105,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("retention-duplicate-override-recovery-policy"));
   assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
-  assert.equal(rcEvidenceManifestContract.issue, 926);
-  assert.deepEqual(rcEvidenceManifestContract.parentIssues, [900, 907]);
-  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [571, 907, 917]);
+  assert.equal(rcEvidenceManifestContract.issue, 1020);
+  assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
+  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [571, 1015, 1016, 1018, 1021, 1022]);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -1099,8 +1129,15 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     assert.ok(rcEvidenceManifestContract.requiredEvidenceEntryFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(
-    rcEvidenceManifestContract.requiredEvidenceEntries.map((entry) => entry.sourceIssue).sort(),
-    [571, 907, 917],
+    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    [
+      { id: "rc_device_qa", sourceIssue: 571 },
+      { id: "signed_rc_store_submission", sourceIssue: 1015 },
+      { id: "play_generated_install", sourceIssue: 1016 },
+      { id: "store_privacy_submission", sourceIssue: 1018 },
+      { id: "android_release_quality", sourceIssue: 1021 },
+      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+    ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
   assert.equal(rcEvidenceManifestContract.readinessPolicy.identityMismatchBlocksGo, true);
@@ -1183,7 +1220,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /critical\/high finding/);
   assert.match(readme, /RC evidence manifest/);
   assert.match(readme, /generate-rc-evidence-manifest\.mjs/);
-  assert.match(readme, /#571\/#907\/#917 evidence entry/);
+  assert.match(readme, /#571\/#1015\/#1016\/#1018\/#1021\/#1022 evidence entry/);
   assert.match(readme, /로컬 Android emulator 기준/);
 });
 
@@ -1229,7 +1266,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
 
   const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
-  assert.equal(manifest.issue, 926);
+  assert.equal(manifest.issue, 1020);
   assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
   assert.equal(manifest.appVersionName, appVersion[1]);
   assert.equal(manifest.versionCode, appVersion[2]);
@@ -1242,8 +1279,15 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.readiness.status, "NO_GO");
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.deepEqual(
-    manifest.evidenceEntries.map((entry) => entry.sourceIssue).sort(),
-    [571, 907, 917],
+    manifest.evidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    [
+      { id: "rc_device_qa", sourceIssue: 571 },
+      { id: "signed_rc_store_submission", sourceIssue: 1015 },
+      { id: "play_generated_install", sourceIssue: 1016 },
+      { id: "store_privacy_submission", sourceIssue: 1018 },
+      { id: "android_release_quality", sourceIssue: 1021 },
+      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+    ],
   );
   assert.ok(manifest.evidenceEntries.every((entry) => entry.device === "local_android_emulator"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
@@ -1290,7 +1334,7 @@ test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계�
   assert.equal(gate.applicationId, "easysubway");
   assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "android-16kb-page-size");
-  assert.equal(gate.issue, 919);
+  assert.equal(gate.issue, 1015);
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.scope.platform.android, "RELEASE_REQUIRED");
   assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
@@ -1389,8 +1433,54 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(gate.releaseReadiness.iosBlocksAndroidRelease, false);
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("measured_performance_budget_failure"));
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
-  assert.ok(gate.gates.some((item) => item.issue === 917 && item.id === "G7_ANDROID_QUALITY"));
-  assert.ok(gate.gates.some((item) => item.issue === 907 && item.id === "G9_GOOGLE_PLAY"));
+  assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
+  assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
+  assert.deepEqual(
+    gate.gates.find((item) => item.issue === 1015),
+    {
+      id: "G3_ANDROID_16KB_PAGE_SIZE",
+      issue: 1015,
+      priority: "P0",
+      status: "IN_PROGRESS",
+      owner: "android-build",
+      nextAction: "16 KB page-size AAB alignment와 Android 15/16 runtime smoke evidence 수집",
+      evidenceReference: "apps/mobile/release/android-16kb-page-size-gate.json",
+    },
+  );
+  assert.equal(
+    gate.gates.find((item) => item.id === "G6_SECURITY_PRIVACY")?.status,
+    readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json").status,
+  );
+  assert.deepEqual(
+    gate.childIssueLinks,
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],
+  );
+  for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
+    assert.ok(item.owner, `${item.id} must define owner`);
+    assert.ok(item.nextAction, `${item.id} must define next action`);
+    assert.ok(item.evidenceReference, `${item.id} must define evidence reference`);
+  }
+  assert.deepEqual(gate.waiverSchema.requiredFields, [
+    "owner",
+    "untilDate",
+    "reason",
+    "risk",
+    "mitigation",
+    "followUpIssue",
+  ]);
+  assert.ok(gate.waiverSchema.nonWaivableP0Blockers.includes("play_prelaunch_crash"));
+  assert.ok(gate.requiredChecks.includes("CI / Repository CI"));
+  assert.ok(gate.requiredChecks.includes("CI / Release Gate Consistency"));
+  assert.ok(gate.releaseImpactPaths.includes("apps/mobile/release/**"));
+  const allowedStatuses = new Set(gate.gateStatusEnum);
+  for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean)) {
+    for (const status of collectStatusValues(readJson(releaseFile))) {
+      assert.ok(allowedStatuses.has(status), `${releaseFile} uses unsupported status ${status}`);
+    }
+  }
   assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
 
   assert.match(readme, /release-governance-gate\.json/);
@@ -6261,12 +6351,12 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.equal(gate.applicationId, "easysubway");
   assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "android-release-ux-accessibility-performance");
-  assert.equal(gate.issue, 917);
+  assert.equal(gate.issue, 1021);
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.scope.platform.android, "RELEASE_REQUIRED");
   assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
   assert.deepEqual(gate.routeSafetyStatusEnum, ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"]);
-  assert.equal(gate.routeSafetyContract, "#901");
+  assert.equal(gate.routeSafetyContract, "#571");
   assert.equal(gate.deviceEvidencePolicy.codexQaDevice, "local_android_emulator_only");
   assert.equal(gate.deviceEvidencePolicy.physicalDeviceEvidence, "not_used_for_codex_pr_evidence");
   assert.equal(gate.deviceEvidencePolicy.releaseRcEvidence, "play_installed_or_exact_rc_required_before_go");
@@ -6319,7 +6409,7 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("route-map-performance-summary"));
-  assert.ok(governance.childIssueLinks.includes(917));
+  assert.ok(governance.childIssueLinks.includes(1021));
   assert.match(readme, /Android 출시 UX·접근성·성능 gate/);
   assert.match(readme, /local Android emulator evidence/);
   assert.match(smokeScript, /ro\.kernel\.qemu/);
@@ -6576,7 +6666,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(releaseArtifactScanGate.linkedArtifacts.includes(".github/workflows/release-artifacts.yml"));
   assert.ok(releaseArtifactScanGate.linkedArtifacts.includes("apps/mobile/release/security-privacy-release-evidence.json"));
   const abuseRehearsalItem = items.get("repository_abuse_penetration_rehearsal");
-  assert.match(abuseRehearsalItem.readyWhenKo, /Android AAB|Play-generated APK|receipt|signed URL|CSRF|distributed rate limit|#900/i);
+  assert.match(abuseRehearsalItem.readyWhenKo, /Android AAB|Play-generated APK|receipt|signed URL|CSRF|distributed rate limit|#1020/i);
   assert.ok(abuseRehearsalItem.evidence.includes("abuse-penetration-rehearsal-gate-manifest"));
   assert.ok(abuseRehearsalItem.evidence.includes("critical-high-finding-zero-or-waiver"));
   assert.ok(abuseRehearsalItem.linkedArtifacts.includes("apps/mobile/release/abuse-penetration-rehearsal-gate.json"));
@@ -6585,7 +6675,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(securityPrivacyEvidence.abusePenetrationRehearsal.requiredScenarios.includes("receipt_token_replay_and_status_abuse"));
   assert.ok(securityPrivacyEvidence.abusePenetrationRehearsal.requiredScenarios.includes("distributed_rate_limit_abuse"));
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
-  assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 900);
+  assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 1020);
   assert.match(commonExceptionHandler, /messages\.message\("common\.error\.invalid-parameter"\)/);
   assert.match(messages, /^common\.error\.invalid-parameter=요청 값을 확인해야 합니다\.$/m);
   assert.doesNotMatch(commonExceptionHandler, /StackTrace|printStackTrace|getStackTrace/);

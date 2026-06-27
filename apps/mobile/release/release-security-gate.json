@@ -212,7 +212,7 @@
       "severity": "release-blocker",
       "titleKo": "출시 전 abuse-case와 penetration rehearsal",
       "ownerKo": "보안/릴리즈 담당",
-      "readyWhenKo": "Android AAB 또는 Play-generated APK secret scan, report photo/receipt/signed URL abuse, admin/operator auth/session/CSRF, tenant authorization, distributed rate limit, object lifecycle rehearsal 결과가 있고 critical/high finding이 0이거나 #900 waiver와 fix plan이 있다.",
+      "readyWhenKo": "Android AAB 또는 Play-generated APK secret scan, report photo/receipt/signed URL abuse, admin/operator auth/session/CSRF, tenant authorization, distributed rate limit, object lifecycle rehearsal 결과가 있고 critical/high finding이 0이거나 #1020 waiver와 fix plan이 있다.",
       "evidence": ["abuse-penetration-rehearsal-gate-manifest", "android-artifact-secret-scan-output", "redacted-abuse-request-response-summary", "critical-high-finding-zero-or-waiver"],
       "linkedArtifacts": ["apps/mobile/release/abuse-penetration-rehearsal-gate.json", "apps/mobile/release/security-privacy-release-evidence.json", "backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java"]
     },
