@@ -10,6 +10,10 @@ import { inflateSync } from "node:zlib";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const validDataPackPublicKeyModulus =
+  "itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w";
+const validPlayAppSigningFingerprint =
+  "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99";
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -1674,11 +1678,11 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
-    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
-    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
     "",
   ].join("\n"));
   const rcGithubEnv = path.join(dir, "android-rc-github.env");
@@ -1700,7 +1704,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/cdn\.easysubway\.app\/datapacks\/$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_CHANNEL=production$/m);
-  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC$/m);
+  assert.match(
+    rcGithubEnvOutput,
+    new RegExp(`^EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${escapeRegExp(validPlayAppSigningFingerprint)}$`, "m"),
+  );
 
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
@@ -1724,11 +1731,11 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
     "EASYSUBWAY_DATA_PACK_BASE_URL=http://localhost/datapacks/",
-    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=staging",
-    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
     "",
   ].join("\n"));
   await assert.rejects(
@@ -1741,6 +1748,58 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
       cwd: root,
     }),
     /EASYSUBWAY_DATA_PACK_BASE_URL must be a valid HTTPS URL|EASYSUBWAY_DATAPACK_CHANNEL must be production/,
+  );
+
+  const invalidRcKeyEnv = path.join(dir, "invalid-android-rc-key.env");
+  await writeFile(invalidRcKeyEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      invalidRcKeyEnv,
+      "--require-android-rc-production",
+    ], {
+      cwd: root,
+    }),
+    /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N must be a base64url RSA modulus of at least 2048 bits/,
+  );
+
+  const invalidRcFingerprintEnv = path.join(dir, "invalid-android-rc-fingerprint.env");
+  await writeFile(invalidRcFingerprintEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      invalidRcFingerprintEnv,
+      "--require-android-rc-production",
+    ], {
+      cwd: root,
+    }),
+    /EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256 must be a full SHA-256 fingerprint/,
   );
 });
 

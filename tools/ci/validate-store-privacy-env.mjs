@@ -137,17 +137,61 @@ function validateTokenValue(key, value) {
   assertNoPlaceholder(key, value);
 }
 
+function decodeBase64Url(key, value) {
+  assertNoPlaceholder(key, value);
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) {
+    throw new Error(`${key} must be base64url encoded`);
+  }
+
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+  const decoded = Buffer.from(`${normalized}${padding}`, "base64");
+  if (decoded.length === 0) {
+    throw new Error(`${key} must be base64url encoded`);
+  }
+
+  return decoded;
+}
+
+function unsignedBigInt(bytes) {
+  return bytes.reduce((value, byte) => (value << 8n) + BigInt(byte), 0n);
+}
+
+function validateRsaModulusBase64Url(key, value) {
+  const bytes = decodeBase64Url(key, value);
+  if (bytes.length < 256) {
+    throw new Error(`${key} must be a base64url RSA modulus of at least 2048 bits`);
+  }
+}
+
+function validateRsaExponentBase64Url(key, value) {
+  const bytes = decodeBase64Url(key, value);
+  const exponent = unsignedBigInt([...bytes]);
+  if (bytes.length > 8 || exponent <= 1n || exponent % 2n === 0n) {
+    throw new Error(`${key} must be a base64url RSA public exponent`);
+  }
+}
+
+function validateSha256Fingerprint(key, value) {
+  assertNoPlaceholder(key, value);
+  const colonSeparated = /^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/.test(value);
+  const compact = /^[0-9A-Fa-f]{64}$/.test(value);
+  if (!colonSeparated && !compact) {
+    throw new Error(`${key} must be a full SHA-256 fingerprint`);
+  }
+}
+
 function validateAndroidRcProduction(values, selected) {
   for (const key of androidRcProductionKeys) {
     selected.set(key, requireSingleLineValue(values, key));
   }
 
   validateHttpsUrl("EASYSUBWAY_DATA_PACK_BASE_URL", selected.get("EASYSUBWAY_DATA_PACK_BASE_URL"));
-  validateTokenValue(
+  validateRsaModulusBase64Url(
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N",
     selected.get("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N"),
   );
-  validateTokenValue(
+  validateRsaExponentBase64Url(
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E",
     selected.get("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E"),
   );
@@ -158,7 +202,7 @@ function validateAndroidRcProduction(values, selected) {
   if (selected.get("EASYSUBWAY_DATAPACK_CHANNEL") !== "production") {
     throw new Error("EASYSUBWAY_DATAPACK_CHANNEL must be production");
   }
-  validateTokenValue(
+  validateSha256Fingerprint(
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256",
     selected.get("EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256"),
   );
