@@ -136,7 +136,14 @@
       "data-error-backlog-summary",
       "datapack-adoption-summary",
       "provider-quota-summary",
-      "fixed-release-owner-acknowledgement"
+      "fixed-release-owner-acknowledgement",
+      "incident-severity-and-owner-record",
+      "root-cause-summary",
+      "fix-branch-and-pr-link",
+      "local-emulator-regression-evidence",
+      "signed-rc-artifact-evidence",
+      "play-review-submission-record",
+      "post-fix-monitoring-window"
     ],
     "forbiddenInGithubSummary": [
       "Play Console account data",
