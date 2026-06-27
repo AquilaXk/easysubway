@@ -377,7 +377,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 			command.dataSourceType(),
 			LocalDate.now(clock)
 		);
-		saveAccessibilityFacilityStatusPort.saveAccessibilityFacility(facility);
+		saveAccessibilityFacilityStatusPort.saveAccessibilityFacility(facility, command.updatedBy());
 		return facility;
 	}
 
@@ -415,7 +415,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 			command.dataSourceType(),
 			LocalDate.now(clock)
 		);
-		saveAccessibilityFacilityStatusPort.saveAccessibilityFacility(facility);
+		saveAccessibilityFacilityStatusPort.saveAccessibilityFacility(facility, command.updatedBy());
 		if (existing.status() != command.status()) {
 			facilityStatusAlertUseCase.alertFacilityStatusChanged(
 				new FacilityStatusChangedAlertCommand(facility.id(), facility.status())
@@ -433,7 +433,12 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 		LocalDate updatedAt = LocalDate.now(clock);
 		// 관리자 직접 수정은 역 상세와 경로 추천이 함께 사용하는 운영 상태의 기준값을 바꾼다.
 		requireWritableMasterData();
-		saveAccessibilityFacilityStatusPort.saveFacilityStatus(facility.id(), command.status(), updatedAt);
+		saveAccessibilityFacilityStatusPort.saveFacilityStatus(
+			facility.id(),
+			command.status(),
+			updatedAt,
+			command.updatedBy()
+		);
 		if (facility.status() != command.status()) {
 			facilityStatusAlertUseCase.alertFacilityStatusChanged(
 				new FacilityStatusChangedAlertCommand(facility.id(), command.status())
@@ -453,7 +458,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 
 		StationLayoutSource updated = withStationLayoutSource(source, command);
 		requireWritableMasterData();
-		saveStationLayoutSourcePort.saveStationLayoutSource(updated);
+		saveStationLayoutSourcePort.saveStationLayoutSource(updated, command.updatedBy());
 		return updated;
 	}
 
@@ -487,7 +492,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 
 		RouteNode updated = withRouteNodeDisplay(routeNode, command);
 		requireWritableMasterData();
-		saveRouteNodePort.saveRouteNode(updated);
+		saveRouteNodePort.saveRouteNode(updated, command.updatedBy());
 		return updated;
 	}
 
@@ -502,7 +507,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 
 		RouteEdge updated = withRouteEdge(routeEdge, command);
 		requireWritableMasterData();
-		saveRouteEdgePort.saveRouteEdge(updated);
+		saveRouteEdgePort.saveRouteEdge(updated, command.updatedBy());
 		return updated;
 	}
 

@@ -100,6 +100,16 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 
 	@Override
 	public void saveFacilityStatus(String facilityId, AccessibilityFacilityStatus status, LocalDate updatedAt) {
+		saveFacilityStatus(facilityId, status, updatedAt, "admin");
+	}
+
+	@Override
+	public void saveFacilityStatus(
+		String facilityId,
+		AccessibilityFacilityStatus status,
+		LocalDate updatedAt,
+		String updatedBy
+	) {
 		loadAccessibilityFacility(facilityId).ifPresent(facility -> saveOverride(FACILITY, facilityId, new AccessibilityFacility(
 			facility.id(),
 			facility.stationId(),
@@ -115,17 +125,27 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 			facility.dataConfidence(),
 			DataSourceType.ADMIN_VERIFIED,
 			updatedAt
-		), "admin"));
+		), updatedBy));
 	}
 
 	@Override
 	public void saveAccessibilityFacility(AccessibilityFacility facility) {
-		saveOverride(FACILITY, facility.id(), facility, "admin");
+		saveAccessibilityFacility(facility, "admin");
+	}
+
+	@Override
+	public void saveAccessibilityFacility(AccessibilityFacility facility, String updatedBy) {
+		saveOverride(FACILITY, facility.id(), facility, updatedBy);
 	}
 
 	@Override
 	public void saveStationLayoutSource(StationLayoutSource source) {
-		saveOverride(LAYOUT_SOURCE, source.id(), source, "admin");
+		saveStationLayoutSource(source, "admin");
+	}
+
+	@Override
+	public void saveStationLayoutSource(StationLayoutSource source, String updatedBy) {
+		saveOverride(LAYOUT_SOURCE, source.id(), source, updatedBy);
 	}
 
 	@Override
@@ -154,12 +174,22 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 
 	@Override
 	public void saveRouteNode(RouteNode routeNode) {
-		saveOverride(ROUTE_NODE, routeNode.id(), routeNode, "admin");
+		saveRouteNode(routeNode, "admin");
+	}
+
+	@Override
+	public void saveRouteNode(RouteNode routeNode, String updatedBy) {
+		saveOverride(ROUTE_NODE, routeNode.id(), routeNode, updatedBy);
 	}
 
 	@Override
 	public void saveRouteEdge(RouteEdge routeEdge) {
-		saveOverride(ROUTE_EDGE, routeEdge.id(), routeEdge, "admin");
+		saveRouteEdge(routeEdge, "admin");
+	}
+
+	@Override
+	public void saveRouteEdge(RouteEdge routeEdge, String updatedBy) {
+		saveOverride(ROUTE_EDGE, routeEdge.id(), routeEdge, updatedBy);
 	}
 
 	@Override
@@ -168,7 +198,7 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 		if (currentPayload == null) {
 			return;
 		}
-		String previousPayload = lastPreviousPayload(entityType, entityId).orElse(null);
+		String previousPayload = lastPreviousPayload(entityType, entityId, currentPayload).orElse(null);
 		if (previousPayload == null) {
 			jdbcTemplate.update("""
 				DELETE FROM transit_master_overrides
@@ -256,14 +286,14 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 		return payloads.stream().findFirst();
 	}
 
-	private Optional<String> lastPreviousPayload(String entityType, String entityId) {
+	private Optional<String> lastPreviousPayload(String entityType, String entityId, String currentPayload) {
 		List<String> payloads = jdbcTemplate.queryForList("""
 			SELECT previous_payload_json
 			FROM transit_master_override_audits
-			WHERE entity_type = ? AND entity_id = ?
+			WHERE entity_type = ? AND entity_id = ? AND action = 'UPSERT' AND payload_json = ?
 			ORDER BY audit_id DESC
 			LIMIT 1
-			""", String.class, entityType, entityId);
+			""", String.class, entityType, entityId, currentPayload);
 		if (payloads.isEmpty() || payloads.getFirst() == null) {
 			return Optional.empty();
 		}

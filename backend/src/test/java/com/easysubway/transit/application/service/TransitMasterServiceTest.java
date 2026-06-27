@@ -485,6 +485,62 @@ class TransitMasterServiceTest {
 	}
 
 	@Test
+	@DisplayName("운영 마스터 데이터 수정은 저장 port까지 관리자 식별자를 전달한다")
+	void adminMasterDataUpdatesPassActorToSavePorts() {
+		var repository = new RecordingActorTransitMasterRepository();
+		var service = new TransitMasterService(
+			repository,
+			repository,
+			Clock.fixed(Instant.parse("2026-06-14T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+		);
+
+		service.updateFacilityStatus(new UpdateAccessibilityFacilityStatusCommand(
+			"facility-sangnoksu-elevator-1",
+			AccessibilityFacilityStatus.BROKEN,
+			"facility-admin"
+		));
+		service.updateStationLayoutSource(new UpdateStationLayoutSourceCommand(
+			"station-sangnoksu",
+			"layout-source-sangnoksu-station-map",
+			StationLayoutSourceType.OPERATOR_PAGE,
+			"상록수역 운영기관 안내 페이지",
+			"https://www.seoulmetro.co.kr/station/sangnoksu",
+			"운영기관 페이지 확인용",
+			true,
+			false,
+			LocalDate.of(2026, 6, 13),
+			LocalDate.of(2026, 6, 14),
+			"source-admin"
+		));
+		service.updateRouteNodeDisplay(new UpdateRouteNodeDisplayCommand(
+			"station-sangnoksu",
+			"node-sangnoksu-elevator-1",
+			132,
+			256,
+			"1번 출구 승강기",
+			"휠체어와 유모차 이동 가능",
+			"node-admin"
+		));
+		service.updateRouteEdge(new UpdateRouteEdgeCommand(
+			"station-sangnoksu",
+			"edge-sangnoksu-elevator-to-faregate",
+			34,
+			90,
+			true,
+			false,
+			true,
+			2,
+			3,
+			76,
+			false,
+			"edge-admin"
+		));
+
+		assertThat(repository.updatedByValues)
+			.containsExactly("facility-admin", "source-admin", "node-admin", "edge-admin");
+	}
+
+	@Test
 	@DisplayName("마스터 데이터가 읽기 전용이면 서비스 직접 호출도 저장소 예외 전에 차단한다")
 	void updateFacilityStatusRejectsReadOnlyMasterDataBeforeSavePortException() {
 		var repository = new UnavailableTransitMasterRepository();
@@ -1179,6 +1235,40 @@ class TransitMasterServiceTest {
 		@Override
 		public void alertFacilityStatusChanged(FacilityStatusChangedAlertCommand command) {
 			commands.add(command);
+		}
+	}
+
+	private static class RecordingActorTransitMasterRepository extends InMemoryTransitMasterRepository {
+
+		private final java.util.List<String> updatedByValues = new java.util.ArrayList<>();
+
+		@Override
+		public void saveFacilityStatus(
+			String facilityId,
+			AccessibilityFacilityStatus status,
+			LocalDate updatedAt,
+			String updatedBy
+		) {
+			updatedByValues.add(updatedBy);
+			super.saveFacilityStatus(facilityId, status, updatedAt);
+		}
+
+		@Override
+		public void saveStationLayoutSource(StationLayoutSource source, String updatedBy) {
+			updatedByValues.add(updatedBy);
+			super.saveStationLayoutSource(source);
+		}
+
+		@Override
+		public void saveRouteNode(RouteNode routeNode, String updatedBy) {
+			updatedByValues.add(updatedBy);
+			super.saveRouteNode(routeNode);
+		}
+
+		@Override
+		public void saveRouteEdge(RouteEdge routeEdge, String updatedBy) {
+			updatedByValues.add(updatedBy);
+			super.saveRouteEdge(routeEdge);
 		}
 	}
 

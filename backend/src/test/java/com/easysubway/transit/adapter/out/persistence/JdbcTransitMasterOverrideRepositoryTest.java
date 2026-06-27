@@ -51,7 +51,8 @@ class JdbcTransitMasterOverrideRepositoryTest {
 		repository.saveFacilityStatus(
 			"facility-sangnoksu-elevator-1",
 			AccessibilityFacilityStatus.BROKEN,
-			LocalDate.of(2026, 6, 27)
+			LocalDate.of(2026, 6, 27),
+			"facility-admin"
 		);
 		repository.saveAccessibilityFacility(new AccessibilityFacility(
 			"facility-ops-new",
@@ -68,7 +69,7 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			DataConfidenceLevel.MEDIUM,
 			DataSourceType.ADMIN_VERIFIED,
 			LocalDate.of(2026, 6, 27)
-		));
+		), "metadata-admin");
 
 		var reloaded = new JdbcTransitMasterOverrideRepository(dataSource, objectMapper());
 		assertThat(reloaded.loadAccessibilityFacility("facility-sangnoksu-elevator-1")).hasValueSatisfying(facility -> {
@@ -83,6 +84,12 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			JdbcTransitMasterOverrideRepository.FACILITY,
 			"facility-sangnoksu-elevator-1"
 		)).hasSize(1);
+		assertThat(new JdbcTemplate(dataSource).queryForObject("""
+			SELECT updated_by
+			FROM transit_master_override_audits
+			WHERE entity_type = ? AND entity_id = ?
+			""", String.class, JdbcTransitMasterOverrideRepository.FACILITY, "facility-sangnoksu-elevator-1"))
+			.isEqualTo("facility-admin");
 	}
 
 	@Test
@@ -102,7 +109,7 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			false,
 			LocalDate.of(2026, 6, 20),
 			LocalDate.of(2026, 6, 27)
-		));
+		), "source-admin");
 		repository.saveSimplifiedStationLayoutStatus(
 			"layout-sangnoksu-draft",
 			SimplifiedStationLayoutStatus.PUBLISHED,
@@ -123,7 +130,7 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			260,
 			"운영 보정 엘리베이터",
 			"출입구 앞 점자블록 확인"
-		));
+		), "node-admin");
 		repository.saveRouteEdge(new RouteEdge(
 			"edge-sangnoksu-elevator-to-faregate",
 			"station-sangnoksu",
@@ -139,7 +146,7 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			3,
 			88,
 			true
-		));
+		), "edge-admin");
 
 		var reloaded = new JdbcTransitMasterOverrideRepository(dataSource, objectMapper());
 		assertThat(reloaded.loadStationLayoutSources()).anySatisfy(source -> {
@@ -162,6 +169,16 @@ class JdbcTransitMasterOverrideRepositoryTest {
 			assertThat(edge.distanceMeters()).isEqualTo(30);
 			assertThat(edge.widthLevel()).isEqualTo(3);
 		});
+		assertThat(new JdbcTemplate(dataSource).queryForList("""
+			SELECT updated_by
+			FROM transit_master_override_audits
+			WHERE entity_type IN (?, ?, ?)
+			ORDER BY audit_id
+			""", String.class,
+			JdbcTransitMasterOverrideRepository.LAYOUT_SOURCE,
+			JdbcTransitMasterOverrideRepository.ROUTE_NODE,
+			JdbcTransitMasterOverrideRepository.ROUTE_EDGE
+		)).containsExactly("source-admin", "node-admin", "edge-admin");
 	}
 
 	@Test
@@ -173,7 +190,8 @@ class JdbcTransitMasterOverrideRepositoryTest {
 		repository.saveFacilityStatus(
 			"facility-sangnoksu-elevator-1",
 			AccessibilityFacilityStatus.BROKEN,
-			LocalDate.of(2026, 6, 27)
+			LocalDate.of(2026, 6, 27),
+			"admin-user"
 		);
 		repository.rollbackMasterDataOverride(
 			JdbcTransitMasterOverrideRepository.FACILITY,
@@ -190,6 +208,50 @@ class JdbcTransitMasterOverrideRepositoryTest {
 		))
 			.extracting(com.easysubway.transit.application.port.out.TransitMasterOverrideAudit::action)
 			.containsExactly("ROLLBACK", "UPSERT");
+	}
+
+	@Test
+	@DisplayName("rollback은 rollback audit을 건너뛰고 여러 override를 단계적으로 되돌린다")
+	void repeatedRollbackUsesUpsertHistoryOnly() {
+		DataSource dataSource = overrideDataSource();
+		var repository = new JdbcTransitMasterOverrideRepository(dataSource, objectMapper());
+
+		repository.saveFacilityStatus(
+			"facility-sangnoksu-elevator-1",
+			AccessibilityFacilityStatus.BROKEN,
+			LocalDate.of(2026, 6, 27),
+			"first-admin"
+		);
+		repository.saveFacilityStatus(
+			"facility-sangnoksu-elevator-1",
+			AccessibilityFacilityStatus.CLOSED,
+			LocalDate.of(2026, 6, 28),
+			"second-admin"
+		);
+
+		repository.rollbackMasterDataOverride(
+			JdbcTransitMasterOverrideRepository.FACILITY,
+			"facility-sangnoksu-elevator-1",
+			"rollback-admin"
+		);
+		assertThat(repository.loadAccessibilityFacility("facility-sangnoksu-elevator-1")).hasValueSatisfying(facility ->
+			assertThat(facility.status()).isEqualTo(AccessibilityFacilityStatus.BROKEN)
+		);
+
+		repository.rollbackMasterDataOverride(
+			JdbcTransitMasterOverrideRepository.FACILITY,
+			"facility-sangnoksu-elevator-1",
+			"rollback-admin"
+		);
+		assertThat(repository.loadAccessibilityFacility("facility-sangnoksu-elevator-1")).hasValueSatisfying(facility ->
+			assertThat(facility.status()).isEqualTo(AccessibilityFacilityStatus.NORMAL)
+		);
+		assertThat(repository.listMasterDataOverrideAudits(
+			JdbcTransitMasterOverrideRepository.FACILITY,
+			"facility-sangnoksu-elevator-1"
+		))
+			.extracting(com.easysubway.transit.application.port.out.TransitMasterOverrideAudit::action)
+			.containsExactly("ROLLBACK", "ROLLBACK", "UPSERT", "UPSERT");
 	}
 
 	private DataSource overrideDataSource() {
