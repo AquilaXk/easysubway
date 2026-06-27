@@ -1235,11 +1235,19 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const rehearsalMatrices = abusePenetrationRehearsalGate.rehearsalMatrices;
   assert.deepEqual(Object.keys(rehearsalMatrices).sort(), [
     "adminOperatorSecurity",
+    "distributedRateLimitAbuse",
     "objectStorageLifecycle",
+    "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
     "signedUploadUrlBoundary",
   ]);
+  assert.deepEqual(
+    [...new Set(Object.values(rehearsalMatrices).map((matrix) => matrix.scenarioId))].sort(),
+    abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id).sort(),
+    "every #1022 abuse scenario must have per-case rehearsal matrix coverage",
+  );
+  const abuseScenarioIds = new Set(abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id));
   const requiredMatrixCases = {
     receiptTokenAbuse: [
       "brute_force_guessing",
@@ -1282,9 +1290,24 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       "signed_url_expiry_enforced",
       "storage_audit_redaction",
     ],
+    distributedRateLimitAbuse: [
+      "multi_node_upload_intent_flooding",
+      "claim_submit_status_confirm_flooding",
+      "trusted_proxy_spoofing",
+      "abuse_store_mode_record",
+      "single_instance_exception_link",
+    ],
+    providerReleaseSecretExposure: [
+      "tracked_secret_search",
+      "android_artifact_secret_scan",
+      "backend_image_env_redaction",
+      "release_endpoint_allowlist_diff",
+      "pr_evidence_redaction",
+    ],
   };
   for (const [matrixId, requiredCases] of Object.entries(requiredMatrixCases)) {
     const matrix = rehearsalMatrices[matrixId];
+    assert.ok(abuseScenarioIds.has(matrix.scenarioId), `${matrixId} must reference an existing #1022 scenario`);
     assert.deepEqual(matrix.requiredCases, requiredCases, `${matrixId} must require all #1022 abuse cases`);
     for (const field of ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]) {
       assert.ok(matrix.summaryFields.includes(field), `${matrixId} must include PR summary field ${field}`);
