@@ -108,7 +108,7 @@ public record EgovPaginationView(
 		query.put("size", size);
 		UriComponentsBuilder builder = UriComponentsBuilder.fromPath(path);
 		query.forEach(builder::queryParam);
-		return builder.build().toUriString();
+		return builder.build().encode().toUriString();
 	}
 
 	public record PaginationLinks(String previousHref, String nextHref, List<PageHref> pages) {

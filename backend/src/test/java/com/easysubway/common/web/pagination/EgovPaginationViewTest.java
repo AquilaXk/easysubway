@@ -109,6 +109,19 @@ class EgovPaginationViewTest {
 	}
 
 	@Test
+	@DisplayName("pagination link는 filter 값을 URL encode한다")
+	void encodesFilterValues() {
+		EgovPaginationView view = EgovPaginationView.from(0, 20, 21);
+
+		EgovPaginationView.PaginationLinks links = view.links(
+			"/admin/stations/page",
+			Collections.singletonMap("query", "A&B 역")
+		);
+
+		assertThat(links.nextHref()).isEqualTo("/admin/stations/page?query=A%26B%20%EC%97%AD&page=1&size=20");
+	}
+
+	@Test
 	@DisplayName("slice 조회는 size보다 많이 가져온 경우 다음 링크를 만든다")
 	void buildsSliceWithNextPage() {
 		EgovPaginationView view = EgovPaginationView.fromSlice(0, 20, 21);
