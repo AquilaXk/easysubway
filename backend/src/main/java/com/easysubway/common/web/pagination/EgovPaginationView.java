@@ -1,7 +1,10 @@
 package com.easysubway.common.web.pagination;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.egovframe.rte.ptl.mvc.tags.ui.pagination.PaginationInfo;
+import org.springframework.web.util.UriComponentsBuilder;
 
 public record EgovPaginationView(
 	int page,
@@ -59,6 +62,55 @@ public record EgovPaginationView(
 		);
 	}
 
+	public static EgovPaginationView fromSlice(int page, int size, int fetchedCount) {
+		long minimumTotal = (long) Math.max(page, 0) * Math.max(size, 1) + Math.max(fetchedCount, 0);
+		return from(page, size, minimumTotal);
+	}
+
+	public <T> List<T> visibleItems(List<T> fetchedItems) {
+		return fetchedItems.stream().limit(size).toList();
+	}
+
+	public <T> List<T> pageItems(List<T> allItems) {
+		return allItems.stream()
+			.skip((long) page * size)
+			.limit(size)
+			.toList();
+	}
+
 	public record PageLink(int page, String label, boolean current) {
+	}
+
+	public PaginationLinks links(String path, Map<String, ?> filters) {
+		return new PaginationLinks(
+			href(path, filters, previousPage),
+			href(path, filters, nextPage),
+			pageLinks.stream()
+				.map(link -> new PageHref(link.page(), link.label(), link.current(), href(path, filters, link.page())))
+				.toList()
+		);
+	}
+
+	private String href(String path, Map<String, ?> filters, int targetPage) {
+		Map<String, Object> query = new LinkedHashMap<>();
+		filters.forEach((key, value) -> {
+			if (value != null && !value.toString().isBlank()) {
+				query.put(key, value);
+			}
+		});
+		query.put("page", targetPage);
+		query.put("size", size);
+		UriComponentsBuilder builder = UriComponentsBuilder.fromPath(path);
+		query.forEach(builder::queryParam);
+		return builder.build().toUriString();
+	}
+
+	public record PaginationLinks(String previousHref, String nextHref, List<PageHref> pages) {
+		public PaginationLinks {
+			pages = List.copyOf(pages);
+		}
+	}
+
+	public record PageHref(int page, String label, boolean current, String href) {
 	}
 }
