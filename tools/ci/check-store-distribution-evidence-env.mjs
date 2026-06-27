@@ -6,6 +6,10 @@ const androidRequiredAny = [
   "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64",
 ];
 const androidRequiredAll = ["EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME"];
+const androidRequiredPlayEvidence = [
+  "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256",
+  "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE",
+];
 const iosRequiredAll = [
   "EASYSUBWAY_APP_STORE_CONNECT_KEY_ID",
   "EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID",
@@ -28,15 +32,22 @@ const datapackLegacyRequiredAll = [
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const envFile = requireArg(args, "env-file");
+  const mobilePubspec = args.get("mobile-pubspec");
   const githubOutput = requireArg(args, "github-output");
   const reportPath = requireArg(args, "report");
   const env = parseDotenv(await readFile(envFile, "utf8"));
+  const mobileVersionCode = mobilePubspec ? await readMobileVersionCode(mobilePubspec) : undefined;
 
   const android = credentialGroupStatus(env, {
     label: "android_play_internal_track",
-    requiredAll: androidRequiredAll,
+    requiredAll: [...androidRequiredAll, ...androidRequiredPlayEvidence],
     requiredAny: androidRequiredAny,
     releaseBlocker: true,
+    validators: [
+      validateSha256Fingerprint("EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256"),
+      validateNonNegativeInteger("EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE"),
+      validateMobileVersionCodeIsGreaterThanLatestPlayArtifact(mobileVersionCode),
+    ],
   });
   const ios = credentialGroupStatus(env, {
     label: "ios_testflight",
@@ -60,16 +71,19 @@ async function main() {
 function credentialGroupStatus(env, group) {
   const missingAll = group.requiredAll.filter((name) => !hasValue(env, name));
   const anySatisfied = group.requiredAny.length === 0 || group.requiredAny.some((name) => hasValue(env, name));
+  const invalid = (group.validators ?? []).flatMap((validate) => validate(env));
+  const missing = [
+    ...missingAll,
+    ...(anySatisfied ? [] : [`one_of:${group.requiredAny.join("|")}`]),
+    ...invalid,
+  ];
   return {
     label: group.label,
     outputName: outputName(group.label),
-    ready: missingAll.length === 0 && anySatisfied,
+    ready: missing.length === 0 && anySatisfied,
     releaseBlocker: group.releaseBlocker,
-    status: missingAll.length === 0 && anySatisfied ? "READY" : (group.deferredStatus ?? "BLOCKED"),
-    missing: [
-      ...missingAll,
-      ...(anySatisfied ? [] : [`one_of:${group.requiredAny.join("|")}`]),
-    ],
+    status: missing.length === 0 && anySatisfied ? "READY" : (group.deferredStatus ?? "BLOCKED"),
+    missing,
     present: [
       ...group.requiredAll.filter((name) => hasValue(env, name)),
       ...group.requiredAny.filter((name) => hasValue(env, name)),
@@ -153,6 +167,51 @@ function unquote(value) {
 
 function hasValue(env, name) {
   return typeof env[name] === "string" && env[name].trim().length > 0;
+}
+
+function validateSha256Fingerprint(name) {
+  return (env) => {
+    if (!hasValue(env, name)) {
+      return [];
+    }
+    const value = env[name].trim();
+    const compact = /^[0-9a-f]{64}$/i.test(value);
+    const colonSeparated = /^([0-9a-f]{2}:){31}[0-9a-f]{2}$/i.test(value);
+    return compact || colonSeparated ? [] : [`${name}:sha256_fingerprint`];
+  };
+}
+
+function validateNonNegativeInteger(name) {
+  return (env) => {
+    if (!hasValue(env, name)) {
+      return [];
+    }
+    return /^(0|[1-9]\d*)$/.test(env[name].trim()) ? [] : [`${name}:nonnegative_integer`];
+  };
+}
+
+function validateMobileVersionCodeIsGreaterThanLatestPlayArtifact(mobileVersionCode) {
+  return (env) => {
+    if (mobileVersionCode === undefined || !hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE")) {
+      return [];
+    }
+    const latestPlayVersionCode = env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE.trim();
+    if (!/^(0|[1-9]\d*)$/.test(latestPlayVersionCode)) {
+      return [];
+    }
+    return BigInt(mobileVersionCode) > BigInt(latestPlayVersionCode)
+      ? []
+      : [`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`];
+  };
+}
+
+async function readMobileVersionCode(pubspecPath) {
+  const pubspec = await readFile(pubspecPath, "utf8");
+  const match = pubspec.match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
+  if (!match) {
+    throw new Error(`mobile pubspec versionCode not found: ${pubspecPath}`);
+  }
+  return Number.parseInt(match[1], 10);
 }
 
 function isPublicHttps(value) {

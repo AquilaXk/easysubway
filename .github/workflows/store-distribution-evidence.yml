@@ -48,6 +48,7 @@ jobs:
           set -euo pipefail
           node tools/ci/check-store-distribution-evidence-env.mjs \
             --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --mobile-pubspec apps/mobile/pubspec.yaml \
             --github-output "${GITHUB_OUTPUT}" \
             --report "${RUNNER_TEMP}/store-distribution-evidence-preflight.txt"
 

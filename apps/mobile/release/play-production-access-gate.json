@@ -62,6 +62,30 @@
         "production-readiness-answer-summary",
         "production-access-submission-result"
       ]
+    },
+    {
+      "id": "play_app_signing_enrollment",
+      "category": "signing",
+      "releaseBlocker": true,
+      "readyWhenKo": "Play App Signing enrollment, upload key와 app signing key 분리, SHA-256 fingerprint, upload key backup/recovery owner와 절차가 확인된다.",
+      "evidence": [
+        "play-app-signing-enrollment-record",
+        "upload-key-sha256-fingerprint-record",
+        "app-signing-key-sha256-fingerprint-record",
+        "upload-key-backup-recovery-owner-and-procedure"
+      ]
+    },
+    {
+      "id": "play_version_code_monotonicity",
+      "category": "artifact-identity",
+      "releaseBlocker": true,
+      "readyWhenKo": "RC versionCode가 Play Console에 업로드된 최신 artifact보다 크고, 실패한 RC versionCode 재사용 금지 정책이 기록된다.",
+      "evidence": [
+        "latest-play-uploaded-versioncode-record",
+        "rc-versioncode-comparison-record",
+        "failed-rc-versioncode-reuse-policy",
+        "fixed-release-versioncode-increase-procedure"
+      ]
     }
   ],
   "goNoGoRules": {
@@ -69,7 +93,11 @@
     "personalAccountCreatedOnOrBefore2023-11-13": "closed_test_requirement_may_not_apply_but_console_record_required",
     "personalAccountCreatedAfter2023-11-13": "closed_test_12_testers_14_days_and_production_access_approval_required",
     "productionAccessRejected": "BLOCKED_EXTERNAL",
-    "missingTesterPersonalDataProtectionSummary": "BLOCKED_EXTERNAL"
+    "missingTesterPersonalDataProtectionSummary": "BLOCKED_EXTERNAL",
+    "missingPlayAppSigningEnrollment": "BLOCKED_EXTERNAL",
+    "missingUploadKeyOrAppSigningFingerprint": "BLOCKED_EXTERNAL",
+    "versionCodeNotGreaterThanLatestPlayArtifact": "BLOCKED_EXTERNAL",
+    "failedRcVersionCodeReuse": "BLOCKED_TECHNICAL"
   },
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/play-production-access/<rc-or-run>/",
