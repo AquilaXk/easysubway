@@ -54,4 +54,22 @@ class AdminCommonCodeServiceTest {
 			.extracting(AdminCommonCode::code)
 			.contains("OPEN");
 	}
+
+	@Test
+	@DisplayName("incident lifecycle 필수 코드는 저장 경로에서도 enabled 상태를 유지한다")
+	void requiredIncidentCodesRemainEnabledOnSave() {
+		AdminCommonCode saved = service.saveCode(new SaveAdminCommonCodeCommand(
+			AdminCommonCodeGroups.INCIDENT_STATUS,
+			"OPEN",
+			"Open",
+			"처리 전",
+			10,
+			false
+		));
+
+		assertThat(saved.enabled()).isTrue();
+		assertThat(service.enabledCodes(AdminCommonCodeGroups.INCIDENT_STATUS))
+			.extracting(AdminCommonCode::code)
+			.contains("OPEN");
+	}
 }

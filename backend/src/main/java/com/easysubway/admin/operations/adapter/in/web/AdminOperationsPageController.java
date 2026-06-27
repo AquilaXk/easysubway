@@ -213,6 +213,7 @@ class AdminOperationsPageController {
 		String description,
 		int sortOrder,
 		boolean enabled,
+		boolean requiredIncidentCode,
 		String enabledLabel
 	) {
 
@@ -224,6 +225,7 @@ class AdminOperationsPageController {
 				code.description(),
 				code.sortOrder(),
 				code.enabled(),
+				AdminCommonCodeGroups.isRequiredIncidentCode(code.groupCode(), code.code()),
 				code.enabled() ? "선택 가능" : "신규 선택 불가"
 			);
 		}

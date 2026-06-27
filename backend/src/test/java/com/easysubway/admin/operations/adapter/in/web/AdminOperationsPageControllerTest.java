@@ -53,6 +53,22 @@ class AdminOperationsPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("공통코드 화면은 필수 incident code 비활성화 버튼을 숨긴다")
+	void codesPageHidesRequiredIncidentDisableAction() throws Exception {
+		String html = mockMvc.perform(get("/admin/codes/page")
+				.param("groupCode", "INCIDENT_STATUS")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("OPEN")
+			.doesNotContain("/admin/codes/INCIDENT_STATUS/OPEN/disable");
+	}
+
+	@Test
 	@DisplayName("공통코드 변경은 audit을 남긴다")
 	void saveCodeWritesAudit() throws Exception {
 		mockMvc.perform(post("/admin/codes")
@@ -78,6 +94,34 @@ class AdminOperationsPageControllerTest {
 				assertThat(event.action()).isEqualTo("UPSERT_COMMON_CODE");
 				assertThat(event.reason()).isEqualTo("enabled=true");
 			});
+	}
+
+	@Test
+	@DisplayName("공통코드 저장은 필수 incident code를 disabled로 만들지 않는다")
+	void saveRequiredIncidentCodeKeepsEnabled() throws Exception {
+		mockMvc.perform(post("/admin/codes")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("groupCode", "INCIDENT_STATUS")
+				.param("code", "OPEN")
+				.param("displayName", "Open")
+				.param("description", "처리 전")
+				.param("sortOrder", "10"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/codes/page?groupCode=INCIDENT_STATUS"));
+
+		String html = mockMvc.perform(get("/admin/incidents/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html).contains("Open");
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.COMMON_CODE_CHANGE, 1))
+			.singleElement()
+			.satisfies(event -> assertThat(event.reason()).isEqualTo("enabled=true"));
 	}
 
 	@Test

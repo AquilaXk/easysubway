@@ -52,7 +52,7 @@
 				<td th:text="${code.sortOrder}">10</td>
 				<td th:text="${code.enabledLabel}">선택 가능</td>
 				<td>
-					<form th:if="${code.enabled}" th:action="@{'/admin/codes/' + ${code.groupCode} + '/' + ${code.code} + '/disable'}" method="post">
+					<form th:if="${code.enabled and !code.requiredIncidentCode}" th:action="@{'/admin/codes/' + ${code.groupCode} + '/' + ${code.code} + '/disable'}" method="post">
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 						<button type="submit">비활성화</button>
 					</form>

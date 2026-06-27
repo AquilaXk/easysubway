@@ -51,13 +51,15 @@ public class AdminCommonCodeService {
 		LocalDateTime now = LocalDateTime.now(clock);
 		AdminCommonCode existing = repository.findCode(command.groupCode(), command.code()).orElse(null);
 		LocalDateTime createdAt = existing == null ? now : existing.createdAt();
+		boolean enabled = AdminCommonCodeGroups.isRequiredIncidentCode(command.groupCode(), command.code())
+			|| command.enabled();
 		return repository.saveCode(new AdminCommonCode(
 			command.groupCode(),
 			command.code(),
 			command.displayName(),
 			command.description(),
 			command.sortOrder(),
-			command.enabled(),
+			enabled,
 			createdAt,
 			now
 		));
