@@ -1286,7 +1286,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   for (const [matrixId, requiredCases] of Object.entries(requiredMatrixCases)) {
     const matrix = rehearsalMatrices[matrixId];
     assert.deepEqual(matrix.requiredCases, requiredCases, `${matrixId} must require all #1022 abuse cases`);
-    for (const field of ["caseId", "expectedStatus", "observedStatus", "localEvidencePath"]) {
+    for (const field of ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]) {
       assert.ok(matrix.summaryFields.includes(field), `${matrixId} must include PR summary field ${field}`);
     }
     assert.ok(Array.isArray(matrix.requiredEvidence), `${matrixId} must define evidence`);

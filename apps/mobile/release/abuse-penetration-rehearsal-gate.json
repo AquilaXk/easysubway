@@ -113,7 +113,7 @@
         "object_key_prefix_traversal",
         "signed_url_reuse"
       ],
-      "summaryFields": ["caseId", "method", "contentType", "sizeBytes", "ttlSeconds", "expectedStatus", "observedStatus", "localEvidencePath"],
+      "summaryFields": ["caseId", "method", "contentType", "sizeBytes", "ttlSeconds", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
       "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "object key with user identifier", "photo binary"]
     },
     "reportUploadLifecycle": {
@@ -142,7 +142,7 @@
         "tenant_authorization_bypass",
         "break_glass_audit_redaction"
       ],
-      "summaryFields": ["caseId", "role", "tenantScope", "endpoint", "expectedStatus", "observedStatus", "auditRedactionResult", "localEvidencePath"],
+      "summaryFields": ["caseId", "role", "tenantScope", "endpoint", "expectedStatus", "observedStatus", "redactionResult", "auditRedactionResult", "localEvidencePath"],
       "forbiddenSummaryValues": ["operator password", "session cookie", "csrf token", "raw personal data", "raw photo metadata"]
     },
     "objectStorageLifecycle": {
@@ -154,7 +154,7 @@
         "signed_url_expiry_enforced",
         "storage_audit_redaction"
       ],
-      "summaryFields": ["caseId", "bucketOrPolicyAlias", "retentionRule", "deleteOrCleanupResult", "expectedStatus", "observedStatus", "localEvidencePath"],
+      "summaryFields": ["caseId", "bucketOrPolicyAlias", "retentionRule", "deleteOrCleanupResult", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
       "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "photo binary", "full object key"]
     }
   },
