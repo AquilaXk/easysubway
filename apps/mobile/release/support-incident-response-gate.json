@@ -123,6 +123,34 @@
     "incident-notice-copy-review",
     "local-emulator-help-screen-screenshot-or-ui-tree"
   ],
+  "supportEvidenceSummaryPolicy": {
+    "githubSummaryFields": [
+      "channelId",
+      "redactedReceiptReference",
+      "receivedAt",
+      "owner",
+      "result",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "requiredEvidenceSet": [
+      "support-mailbox-receive-test",
+      "security-mailbox-test",
+      "data-deletion-mailbox-test",
+      "privacy-request-routing-check",
+      "p0-data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree"
+    ],
+    "forbiddenInGithubSummary": [
+      "support mailbox personal data",
+      "raw report receipt token",
+      "operator private contact",
+      "provider credential or quota token",
+      "photo metadata"
+    ]
+  },
   "sensitiveEvidencePolicy": {
     "localOnly": true,
     "githubUploadPolicy": "summary-only",
