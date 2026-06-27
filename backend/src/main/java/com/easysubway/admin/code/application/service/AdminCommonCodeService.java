@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class AdminCommonCodeService {
 
+	private static final String KEY_PATTERN = "[A-Z0-9_]{1,64}";
+
 	private final AdminCommonCodeRepository repository;
 	private final Clock clock;
 
@@ -43,8 +45,8 @@ public class AdminCommonCodeService {
 	}
 
 	public AdminCommonCode saveCode(SaveAdminCommonCodeCommand command) {
-		String groupCode = normalizeKey(command.groupCode());
-		String code = normalizeKey(command.code());
+		String groupCode = normalizeKey(command.groupCode(), "공통코드 group");
+		String code = normalizeKey(command.code(), "공통코드 code");
 		AdminCommonCodeGroup group = repository.findGroup(groupCode)
 			.orElseThrow(() -> new InvalidRequestException("허용되지 않은 공통코드 group입니다."));
 		if (!group.enabled()) {
@@ -68,16 +70,22 @@ public class AdminCommonCodeService {
 	}
 
 	public AdminCommonCode disableCode(String groupCode, String code) {
-		if (AdminCommonCodeGroups.isRequiredIncidentCode(groupCode, code)) {
+		String normalizedGroupCode = normalizeKey(groupCode, "공통코드 group");
+		String normalizedCode = normalizeKey(code, "공통코드 code");
+		if (AdminCommonCodeGroups.isRequiredIncidentCode(normalizedGroupCode, normalizedCode)) {
 			throw new InvalidRequestException("필수 incident 공통코드는 비활성화할 수 없습니다.");
 		}
-		AdminCommonCode existing = repository.findCode(groupCode, code)
+		AdminCommonCode existing = repository.findCode(normalizedGroupCode, normalizedCode)
 			.orElseThrow(() -> new InvalidRequestException("비활성화할 공통코드를 찾을 수 없습니다."));
 		return repository.saveCode(existing.withEnabled(false, LocalDateTime.now(clock)));
 	}
 
-	private static String normalizeKey(String value) {
-		return value == null ? "" : value.trim();
+	private static String normalizeKey(String value, String label) {
+		String normalized = value == null ? "" : value.trim();
+		if (!normalized.matches(KEY_PATTERN)) {
+			throw new InvalidRequestException(label + "는 영문 대문자, 숫자, 밑줄만 1~64자까지 허용됩니다.");
+		}
+		return normalized;
 	}
 
 	public record SaveAdminCommonCodeCommand(

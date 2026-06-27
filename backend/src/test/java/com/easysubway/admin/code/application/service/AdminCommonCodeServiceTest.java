@@ -44,6 +44,21 @@ class AdminCommonCodeServiceTest {
 	}
 
 	@Test
+	@DisplayName("공통코드 식별자는 path-safe 문자만 허용한다")
+	void commonCodeIdentifierMustBePathSafe() {
+		assertThatThrownBy(() -> service.saveCode(new SaveAdminCommonCodeCommand(
+			AdminCommonCodeGroups.REPORT_REJECTION_REASON,
+			"BAD/CODE",
+			"잘못된 코드",
+			"disable URL path segment로 표현할 수 없는 코드",
+			40,
+			true
+		)))
+			.isInstanceOf(InvalidRequestException.class)
+			.hasMessage("공통코드 code는 영문 대문자, 숫자, 밑줄만 1~64자까지 허용됩니다.");
+	}
+
+	@Test
 	@DisplayName("incident lifecycle 필수 코드는 비활성화할 수 없다")
 	void requiredIncidentCodesCannotBeDisabled() {
 		assertThatThrownBy(() -> service.disableCode(AdminCommonCodeGroups.INCIDENT_STATUS, "OPEN"))

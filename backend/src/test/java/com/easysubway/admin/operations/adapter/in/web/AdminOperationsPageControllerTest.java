@@ -144,8 +144,8 @@ class AdminOperationsPageControllerTest {
 	@Test
 	@DisplayName("공통코드 audit target은 hashCode 충돌 code도 구분한다")
 	void commonCodeAuditTargetAvoidsHashCodeCollision() throws Exception {
-		saveCode("Aa");
-		saveCode("BB");
+		saveCode("AAO");
+		saveCode("AB0");
 
 		List<String> targetIds = auditEventRepository.findRecent(AdminAuditEventType.COMMON_CODE_CHANGE, 2)
 			.stream()
