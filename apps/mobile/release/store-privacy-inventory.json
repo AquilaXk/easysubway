@@ -6,6 +6,22 @@
   "encryptionInTransitRequired": true,
   "userDataDeletionSupported": true,
   "privacyPolicyUrlSource": "EASYSUBWAY_PRIVACY_POLICY_URL dart-define",
+  "googlePlayDataSafetyRequiredFields": [
+    "collected",
+    "collectionType",
+    "optional",
+    "required",
+    "purpose",
+    "linkedToUser",
+    "encryptedInTransit",
+    "deletionSupported"
+  ],
+  "crashAnrProviderDecision": {
+    "separateCrashProvider": false,
+    "sourceOfTruth": ["Android vitals", "Google Play pre-launch report", "mobile runtime error reporter"],
+    "requiredEvidence": ["no-crash-sdk-dependency-scan", "android-vitals-or-pre-launch-report-export"],
+    "privacyAnswerKo": "Android v1은 별도 crash SDK를 사용하지 않고 Android vitals와 Play pre-launch report를 충돌/ANR 기준 증거로 삼는다."
+  },
   "dataTypes": [
     {
       "id": "precise_location",
@@ -30,9 +46,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Location",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypePreciseLocation",
@@ -62,9 +83,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "App activity",
+        "collected": true,
+        "collectionType": "user-entered-request",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": false
+        "optional": false,
+        "required": true,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeSearchHistory",
@@ -96,9 +122,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "App activity",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
@@ -129,9 +160,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Personal info",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeSensitiveInfo",
@@ -162,9 +198,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "User-generated content",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
@@ -207,9 +248,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Photos and videos",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypePhotosorVideos",
@@ -240,9 +286,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Location",
+        "collected": true,
+        "collectionType": "user-triggered",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": true
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypePreciseLocation",
@@ -273,9 +324,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Diagnostics",
+        "collected": true,
+        "collectionType": "diagnostic-event",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": false
+        "optional": false,
+        "required": true,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeCrashData",
@@ -306,9 +362,14 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Diagnostics",
+        "collected": true,
+        "collectionType": "diagnostic-event",
         "purpose": "App functionality",
+        "linkedToUser": true,
         "encryptedInTransit": true,
-        "optional": false
+        "optional": false,
+        "required": true,
+        "deletionSupported": true
       },
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypePerformanceData",

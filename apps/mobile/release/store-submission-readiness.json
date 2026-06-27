@@ -24,7 +24,7 @@
       "category": "app-content",
       "titleKo": "Play Data safety 설문",
       "decisionOwnerKo": "개인정보/백엔드 담당",
-      "readyWhenKo": "스토어 개인정보 인벤토리의 수집 데이터, 암호화 전송, 삭제 지원, 제3자 공유 없음, tracking 없음 값이 Play Console Data safety 답변과 일치한다.",
+      "readyWhenKo": "스토어 개인정보 인벤토리의 각 데이터 타입별 collected, collection type, optional/required, purpose, linked to user, encrypted in transit, deletion support 값과 제3자 공유 없음, tracking 없음 값이 Play Console Data safety 답변과 일치한다.",
       "evidence": ["play-console-data-safety-preview", "privacy-inventory-review"],
       "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/play-store-submission-content.json", "apps/mobile/lib/main.dart"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL", "EASYSUBWAY_DATA_DELETION_EMAIL"]
@@ -35,7 +35,7 @@
       "category": "store-listing",
       "titleKo": "Play 개인정보처리방침 URL",
       "decisionOwnerKo": "운영/개인정보 담당",
-      "readyWhenKo": "HTTPS 개인정보처리방침 URL이 Play store listing과 앱 도움말 화면에 같은 값으로 공개된다.",
+      "readyWhenKo": "인증 없이 열리는 public HTTPS 개인정보처리방침 URL이 Play store listing, 앱 도움말, README 또는 공개 정책 페이지에 같은 값으로 공개되고 수집 항목, 목적, 보관, 삭제, 연락처, 제3자 공유 없음, tracking 없음, 사진/위치 선택 사용 조건을 포함한다.",
       "evidence": ["store-listing-url", "app-help-screen-url"],
       "linkedArtifacts": ["README.md", "apps/mobile/lib/main.dart"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL"]
@@ -101,7 +101,7 @@
       "category": "store-listing",
       "titleKo": "Play 앱 카테고리",
       "decisionOwnerKo": "제품/마케팅 담당",
-      "readyWhenKo": "쉬운 지하철의 핵심 목적이 대중교통 이동 보조임을 기준으로 Play 앱 카테고리와 태그를 제품 설명과 일치시킨다.",
+      "readyWhenKo": "쉬운 지하철의 핵심 목적이 대중교통 접근성 이동 보조임을 기준으로 Play 앱 카테고리와 대중교통, 접근성, 지하철, 경로 안내 태그를 제품 설명과 일치시킨다.",
       "evidence": ["store-category-selection", "listing-copy-review"],
       "linkedArtifacts": ["README.md", "apps/mobile/lib/main.dart"],
       "configurationSources": ["public transit accessibility helper"]
@@ -112,7 +112,7 @@
       "category": "store-settings",
       "titleKo": "Play 스토어 연락처",
       "decisionOwnerKo": "운영 담당",
-      "readyWhenKo": "스토어 공개 연락처와 앱 도움말의 고객지원 메일이 운영 수신함으로 연결되고 릴리즈 전 수신 테스트를 통과한다.",
+      "readyWhenKo": "스토어 공개 연락처 이메일과 앱 도움말의 고객지원 메일이 같은 운영 수신함으로 연결되고 릴리즈 전 수신 테스트를 통과한다.",
       "evidence": ["support-mailbox-test", "store-contact-preview"],
       "linkedArtifacts": ["README.md", "apps/mobile/lib/main.dart"],
       "configurationSources": ["EASYSUBWAY_SUPPORT_EMAIL"]
@@ -145,7 +145,7 @@
       "category": "store-listing",
       "titleKo": "Play 스토어 등록 정보와 스크린샷",
       "decisionOwnerKo": "제품/마케팅 담당",
-      "readyWhenKo": "설명, 스크린샷, 기능 문구가 실제 앱 화면과 일치하고 실시간 안전 경로 보장처럼 과장된 표현을 사용하지 않는다.",
+      "readyWhenKo": "설명, 고정 스크린샷 세트, 기능 문구가 실제 앱 화면과 일치하고 실시간 안전 경로 보장처럼 과장된 표현을 사용하지 않는다.",
       "evidence": ["screenshot-review", "copy-review"],
       "linkedArtifacts": ["README.md", "apps/mobile/lib/main.dart", "apps/mobile/release/accessibility-release-qa.json", "apps/mobile/release/play-store-submission-content.json"],
       "configurationSources": ["release build screenshots"]
