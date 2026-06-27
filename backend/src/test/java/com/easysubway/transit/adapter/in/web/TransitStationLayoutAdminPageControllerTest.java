@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.HttpSession;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
@@ -96,8 +98,30 @@ class TransitStationLayoutAdminPageControllerTest {
 			.contains("name=\"widthLevel\"")
 			.contains("name=\"reliabilityScore\"")
 			.contains("name=\"active\"")
-			.doesNotContain("{\"nodes\":[],\"edges\":[]}")
-			.doesNotContain("<img");
+				.doesNotContain("{\"nodes\":[],\"edges\":[]}")
+				.doesNotContain("<img");
+	}
+
+	@Test
+	@DisplayName("역 구조도 화면은 각 관리자 form마다 서로 다른 command token을 발급한다")
+	void stationLayoutPageIssuesDistinctCommandTokenPerForm() throws Exception {
+		String html = mockMvc.perform(get("/admin/stations/station-sangnoksu/layouts/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
+		Set<String> tokens = new HashSet<>();
+		int tokenCount = 0;
+		while (matcher.find()) {
+			tokenCount++;
+			tokens.add(matcher.group(1));
+		}
+
+		assertThat(tokenCount).isGreaterThan(1);
+		assertThat(tokens).hasSize(tokenCount);
 	}
 
 	@Test

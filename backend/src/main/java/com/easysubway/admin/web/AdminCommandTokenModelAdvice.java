@@ -18,7 +18,7 @@ class AdminCommandTokenModelAdvice {
 	@ModelAttribute
 	void exposeAdminCommandToken(HttpServletRequest request, Model model) {
 		if (isAdminHtmlPage(request)) {
-			model.addAttribute(AdminCommandTokenService.PARAMETER_NAME, commandTokenService.issue(request));
+			model.addAttribute("commandTokens", new AdminCommandTokens(commandTokenService, request));
 		}
 	}
 
@@ -26,6 +26,21 @@ class AdminCommandTokenModelAdvice {
 		String uri = request.getRequestURI();
 		return AdminHtmlRequest.matches(request)
 			&& !uri.startsWith("/admin/error")
-			&& !uri.equals("/admin/login");
+				&& !uri.equals("/admin/login");
+	}
+
+	static final class AdminCommandTokens {
+
+		private final AdminCommandTokenService commandTokenService;
+		private final HttpServletRequest request;
+
+		AdminCommandTokens(AdminCommandTokenService commandTokenService, HttpServletRequest request) {
+			this.commandTokenService = commandTokenService;
+			this.request = request;
+		}
+
+		public String next() {
+			return commandTokenService.issue(request);
+		}
 	}
 }
