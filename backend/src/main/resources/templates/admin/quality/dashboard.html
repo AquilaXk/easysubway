@@ -95,7 +95,8 @@
 <body class="admin-v3">
 <div class="admin-shell">
 <div th:replace="~{admin/fragments/shell :: sidebar('a-quality')}"></div>
-<main class="admin-main">
+<main id="admin-content" class="admin-main">
+	<div th:replace="~{admin/fragments/shell :: topbar}"></div>
 	<header class="admin-page-head">
 		<div>
 			<h1>데이터 품질</h1>

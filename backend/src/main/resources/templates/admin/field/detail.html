@@ -9,7 +9,8 @@
 <body class="admin-v3">
 <div class="admin-shell">
 <div th:replace="~{admin/fragments/shell :: sidebar('a-field-verifications')}"></div>
-<main class="admin-main">
+<main id="admin-content" class="admin-main">
+	<div th:replace="~{admin/fragments/shell :: topbar}"></div>
 	<header class="admin-page-head">
 		<div>
 			<h1>현장 검증 상세</h1>

@@ -284,6 +284,12 @@ class AdminV3PageSmokeTest {
 		assertThat(html)
 			.contains("통합 관리자")
 			.contains("admin-v3")
+			.contains("href=\"#admin-content\"")
+			.contains("class=\"admin-topbar-row\"")
+			.contains("DEV")
+			.contains("관리자 <strong>")
+			.contains("revision <strong>local</strong>")
+			.contains("master data <strong>unknown</strong>")
 			.contains(expectedText);
 	}
 }
