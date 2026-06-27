@@ -18,6 +18,9 @@ import com.easysubway.transit.domain.StationLayoutSourceType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -252,6 +255,74 @@ class JdbcTransitMasterOverrideRepositoryTest {
 		))
 			.extracting(com.easysubway.transit.application.port.out.TransitMasterOverrideAudit::action)
 			.containsExactly("ROLLBACK", "ROLLBACK", "UPSERT", "UPSERT");
+	}
+
+	@Test
+	@DisplayName("같은 entity 최초 override 저장이 겹쳐도 insert conflict를 update로 수렴한다")
+	void concurrentFirstOverrideWritesDoNotFail() throws Exception {
+		DataSource dataSource = overrideDataSource();
+		var executor = Executors.newFixedThreadPool(2);
+		var ready = new CountDownLatch(2);
+		var start = new CountDownLatch(1);
+
+		try {
+			var first = executor.submit(() -> {
+				saveFacilityStatusAfterStart(
+					dataSource,
+					ready,
+					start,
+					AccessibilityFacilityStatus.BROKEN,
+					"first-admin",
+					LocalDate.of(2026, 6, 27)
+				);
+				return null;
+			});
+			var second = executor.submit(() -> {
+				saveFacilityStatusAfterStart(
+					dataSource,
+					ready,
+					start,
+					AccessibilityFacilityStatus.CLOSED,
+					"second-admin",
+					LocalDate.of(2026, 6, 28)
+				);
+				return null;
+			});
+
+			assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+			start.countDown();
+			first.get(5, TimeUnit.SECONDS);
+			second.get(5, TimeUnit.SECONDS);
+		} finally {
+			executor.shutdownNow();
+		}
+
+		var repository = new JdbcTransitMasterOverrideRepository(dataSource, objectMapper());
+		assertThat(repository.loadAccessibilityFacility("facility-sangnoksu-elevator-1")).hasValueSatisfying(facility ->
+			assertThat(facility.status()).isIn(AccessibilityFacilityStatus.BROKEN, AccessibilityFacilityStatus.CLOSED)
+		);
+		assertThat(repository.listMasterDataOverrideAudits(
+			JdbcTransitMasterOverrideRepository.FACILITY,
+			"facility-sangnoksu-elevator-1"
+		)).hasSize(2);
+	}
+
+	private void saveFacilityStatusAfterStart(
+		DataSource dataSource,
+		CountDownLatch ready,
+		CountDownLatch start,
+		AccessibilityFacilityStatus status,
+		String updatedBy,
+		LocalDate updatedAt
+	) throws InterruptedException {
+		ready.countDown();
+		assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+		new JdbcTransitMasterOverrideRepository(dataSource, objectMapper()).saveFacilityStatus(
+			"facility-sangnoksu-elevator-1",
+			status,
+			updatedAt,
+			updatedBy
+		);
 	}
 
 	private DataSource overrideDataSource() {

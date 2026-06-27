@@ -25,6 +25,7 @@ import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -268,11 +269,23 @@ public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMaste
 			SET payload_json = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE entity_type = ? AND entity_id = ?
 			""", payload, updatedBy, entityType, entityId);
-		if (updated == 0) {
+		if (updated > 0) {
+			insertAudit(entityType, entityId, "UPSERT", updatedBy, previousPayload, payload);
+			return;
+		}
+
+		try {
 			jdbcTemplate.update("""
 				INSERT INTO transit_master_overrides (entity_type, entity_id, payload_json, updated_by, updated_at)
 				VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
 				""", entityType, entityId, payload, updatedBy);
+		} catch (DuplicateKeyException exception) {
+			previousPayload = activePayload(entityType, entityId).orElse(null);
+			jdbcTemplate.update("""
+				UPDATE transit_master_overrides
+				SET payload_json = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE entity_type = ? AND entity_id = ?
+				""", payload, updatedBy, entityType, entityId);
 		}
 		insertAudit(entityType, entityId, "UPSERT", updatedBy, previousPayload, payload);
 	}
