@@ -118,10 +118,12 @@ body.admin-v3 {
 }
 
 .admin-main {
+	min-width: 0;
 	width: 100%;
 	max-width: none;
 	margin: 0;
 	padding: 28px 30px 48px;
+	overflow-x: auto;
 }
 
 .admin-topbar {

@@ -95,6 +95,12 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
       true
       ;;
+    EASYSUBWAY_ADMIN_REVISION)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_MASTER_DATA_VERSION)
+      true
+      ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER)
       ! is_admin_basic_auth_enabled
       ;;
