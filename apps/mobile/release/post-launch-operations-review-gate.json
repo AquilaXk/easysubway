@@ -166,7 +166,15 @@
       "support-data-error-trend",
       "datapack-update-adoption-trend",
       "provider-reliability-trend",
-      "next-release-go-no-go-notes"
+      "next-release-go-no-go-notes",
+      "cd-run-url",
+      "readiness-log",
+      "rollback-decision-record",
+      "active-pack-version",
+      "rollback-pack-version",
+      "provider-status-summary",
+      "quota-error-rate",
+      "fallback-label-count"
     ],
     "forbiddenInGithubSummary": [
       "Play Console account data",

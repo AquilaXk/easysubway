@@ -1077,6 +1077,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       `${evidenceId} must be included in post-launch GitHub summary evidence`,
     );
   }
+  for (const evidenceId of postLaunchOperationsReviewGate.killSwitchAndRollbackOwners.flatMap((owner) => owner.evidence)) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
   assert.ok(
     postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
       "crash-anr-vitals-summary",
