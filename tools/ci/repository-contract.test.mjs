@@ -319,6 +319,7 @@ test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추�
 
 test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
+  const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /name: Changes/);
@@ -326,20 +327,22 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
   assert.match(workflow, /name: Android CI/);
-  assert.match(workflow, /name: Release Gate Consistency/);
-  assert.doesNotMatch(workflow, /name: iOS CI/);
-  assert.doesNotMatch(workflow, /runs-on: macos-latest/);
+  assert.match(releaseGateJob, /name: Release Gate Consistency/);
+  assert.doesNotMatch(releaseGateJob, /name: iOS CI/);
+  assert.doesNotMatch(releaseGateJob, /runs-on: macos-latest/);
   assert.match(workflow, /Repository CI \/ Run contract tests/);
   assert.match(workflow, /Repository CI \/ Set up Chrome for route map tests/);
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
-  assert.match(workflow, /Release Gate Consistency \/ Run release gate contract tests/);
+  assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
+  assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
+  assert.doesNotMatch(releaseGateJob, /--test-name-pattern/);
   assert.match(workflow, /Backend CI \/ Detect backend scaffold/);
   assert.match(workflow, /Mobile App CI \/ Run Flutter analyzer and tests/);
   assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
-  assert.doesNotMatch(workflow, /iOS CI \/ Build Flutter iOS simulator app/);
+  assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
@@ -889,6 +892,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const supportIncidentResponseGate = readJson(supportIncidentResponsePath);
   const abusePenetrationRehearsalPath = "apps/mobile/release/abuse-penetration-rehearsal-gate.json";
   const abusePenetrationRehearsalGate = readJson(abusePenetrationRehearsalPath);
+  const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
@@ -1043,6 +1047,10 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 1020);
+  assert.deepEqual(
+    abusePenetrationRehearsalGate.findingPolicy.waiverRequiredFields,
+    releaseGovernanceGate.waiverSchema.requiredFields,
+  );
   assert.equal(androidRcEvidence.releaseGate, "android-rc-store-evidence");
   assert.equal(androidRcEvidence.releaseBlockerPolicy, true);
   assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("rc-evidence-manifest"));
@@ -1121,8 +1129,15 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     assert.ok(rcEvidenceManifestContract.requiredEvidenceEntryFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(
-    rcEvidenceManifestContract.requiredEvidenceEntries.map((entry) => entry.sourceIssue).sort((a, b) => a - b),
-    [571, 1015, 1016, 1018, 1021, 1022],
+    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    [
+      { id: "rc_device_qa", sourceIssue: 571 },
+      { id: "signed_rc_store_submission", sourceIssue: 1015 },
+      { id: "play_generated_install", sourceIssue: 1016 },
+      { id: "store_privacy_submission", sourceIssue: 1018 },
+      { id: "android_release_quality", sourceIssue: 1021 },
+      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+    ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
   assert.equal(rcEvidenceManifestContract.readinessPolicy.identityMismatchBlocksGo, true);
@@ -1264,8 +1279,15 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.readiness.status, "NO_GO");
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.deepEqual(
-    manifest.evidenceEntries.map((entry) => entry.sourceIssue).sort((a, b) => a - b),
-    [571, 1015, 1016, 1018, 1021, 1022],
+    manifest.evidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    [
+      { id: "rc_device_qa", sourceIssue: 571 },
+      { id: "signed_rc_store_submission", sourceIssue: 1015 },
+      { id: "play_generated_install", sourceIssue: 1016 },
+      { id: "store_privacy_submission", sourceIssue: 1018 },
+      { id: "android_release_quality", sourceIssue: 1021 },
+      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+    ],
   );
   assert.ok(manifest.evidenceEntries.every((entry) => entry.device === "local_android_emulator"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
@@ -1413,6 +1435,22 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
+  assert.deepEqual(
+    gate.gates.find((item) => item.issue === 1015),
+    {
+      id: "G3_ANDROID_16KB_PAGE_SIZE",
+      issue: 1015,
+      priority: "P0",
+      status: "IN_PROGRESS",
+      owner: "android-build",
+      nextAction: "16 KB page-size AAB alignment와 Android 15/16 runtime smoke evidence 수집",
+      evidenceReference: "apps/mobile/release/android-16kb-page-size-gate.json",
+    },
+  );
+  assert.equal(
+    gate.gates.find((item) => item.id === "G6_SECURITY_PRIVACY")?.status,
+    readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json").status,
+  );
   assert.deepEqual(
     gate.childIssueLinks,
     [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],

@@ -153,13 +153,13 @@
       "evidenceReference": "apps/mobile/release/server-minimized-qa-gate.json"
     },
     {
-      "id": "G3_DATAPACK_UPDATER",
+      "id": "G3_ANDROID_16KB_PAGE_SIZE",
       "issue": 1015,
       "priority": "P0",
       "status": "IN_PROGRESS",
       "owner": "android-build",
-      "nextAction": "signed RC artifact와 bundled datapack fallback identity 검증",
-      "evidenceReference": "apps/mobile/release/signed-release-artifact-gate.json"
+      "nextAction": "16 KB page-size AAB alignment와 Android 15/16 runtime smoke evidence 수집",
+      "evidenceReference": "apps/mobile/release/android-16kb-page-size-gate.json"
     },
     {
       "id": "G4_REALTIME",
@@ -183,7 +183,7 @@
       "id": "G6_SECURITY_PRIVACY",
       "issue": 1022,
       "priority": "P0",
-      "status": "IN_PROGRESS",
+      "status": "BLOCKED_EXTERNAL",
       "owner": "security-privacy",
       "nextAction": "abuse-case, penetration rehearsal, crash/privacy evidence 수집",
       "evidenceReference": "apps/mobile/release/abuse-penetration-rehearsal-gate.json"

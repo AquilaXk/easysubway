@@ -97,7 +97,7 @@ jobs:
       - name: Release Gate Consistency / Run release gate contract tests
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test --test-name-pattern "모바일 signed release artifact gate|RC evidence manifest generator|Android 16 KB page-size gate|Android release 100 governance|Android 출시 UX 접근성 성능 gate|릴리즈 보안 기준선" tools/ci/repository-contract.test.mjs
+        run: node --test tools/ci/repository-contract.test.mjs
 
   repository-contracts:
     name: Repository CI
