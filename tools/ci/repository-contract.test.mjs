@@ -443,6 +443,8 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_USERNAME=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_PASSWORD=$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_REVISION=local$/m);
+  assert.match(envExample, /^EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=unknown$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER=$/m);
   assert.match(envExample, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=$/m);
@@ -574,6 +576,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
     "EASYSUBWAY_ADMIN_USERNAME=admin",
     "EASYSUBWAY_ADMIN_PASSWORD=secret",
+    "EASYSUBWAY_ADMIN_REVISION=main-20260627",
+    "EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=datapack-20260627",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
@@ -588,6 +592,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
 
   const validator = read("tools/ci/validate-deployment-env.sh");
   assert.match(validator, /EASYSUBWAY_REPORT_ABUSE_STORE_MODE/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_REVISION/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_MASTER_DATA_VERSION/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
@@ -3677,6 +3683,98 @@ test("데이터팩 release workflow는 관리자 검수 override를 다음 pack 
   assert.match(script, /facilityStatusUpdates\.facilityId was not found in fixture/);
   assert.match(script, /adminReviewOverrideCount/);
   assert.match(datapackTest, /승인된 관리자 검수 결과는 다음 data pack fixture 시설 상태에 반영된다/);
+});
+
+test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 유지한다", () => {
+  const shellFragment = read("backend/src/main/resources/templates/admin/fragments/shell.html");
+  const formErrorsFragment = read("backend/src/main/resources/templates/admin/fragments/form-errors.html");
+  const paginationFragment = read("backend/src/main/resources/templates/admin/fragments/pagination.html");
+  const adminCss = read("backend/src/main/resources/static/css/admin-v3.css");
+  const navigationAdvice = read("backend/src/main/java/com/easysubway/admin/navigation/AdminNavigationAdvice.java");
+  const envExample = read(".env.example");
+  const backendEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
+  const deployBackendScript = read("tools/deploy/deploy-backend.sh");
+  const adminTemplateFiles = execFileSync("git", [
+    "ls-files",
+    "backend/src/main/resources/templates/admin/*.html",
+    "backend/src/main/resources/templates/admin/**/*.html",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+
+  assert.match(shellFragment, /th:fragment="sidebar\(active\)"/);
+  assert.match(shellFragment, /th:fragment="skipLink"/);
+  assert.match(shellFragment, /th:fragment="topbar"/);
+  assert.match(shellFragment, /class="skip-link" href="#admin-content"/);
+  assert.match(shellFragment, /th:fragment="contentStart"/);
+  assert.match(shellFragment, /id="admin-content"/);
+  assert.match(shellFragment, /admin-env-badge/);
+  assert.match(shellFragment, /revision/);
+  assert.match(shellFragment, /master data/);
+  assert.match(shellFragment, /th:fragment="flash"/);
+  assert.match(shellFragment, /<output[\s\S]*th:fragment="flash"/);
+  assert.doesNotMatch(shellFragment, /role="status"/);
+  assert.match(shellFragment, /th:fragment="status\(text, tone\)"/);
+  assert.match(formErrorsFragment, /role="alert"/);
+  assert.match(formErrorsFragment, /aria-labelledby="form-error-summary-title"/);
+  assert.match(formErrorsFragment, /id="form-error-summary-title"/);
+  assert.match(paginationFragment, /aria-current=\$\{pageLink\.current \? 'page' : null\}/);
+  assert.match(adminCss, /\.admin-v3 a:focus-visible/);
+  assert.match(adminCss, /outline: 3px solid #ffbf47/);
+  assert.match(adminCss, /\.admin-topbar-row/);
+  assert.match(adminCss, /\.admin-main[\s\S]*min-width: 0[\s\S]*overflow-x: auto/);
+  assert.match(adminCss, /\.admin-sidebar[\s\S]*overflow-y: auto/);
+  assert.match(adminCss, /\.admin-v3 table[\s\S]*min-width: 620px/);
+  assert.match(adminCss, /\.admin-v3 section,[\s\S]*\.admin-card[\s\S]*overflow-x: auto/);
+  assert.match(navigationAdvice, /@ModelAttribute\("adminShell"\)/);
+  assert.match(navigationAdvice, /return "PRODUCTION"/);
+  assert.match(navigationAdvice, /return "STAGING"/);
+  assert.match(navigationAdvice, /environment\.getProperty\("easysubway\.admin\.revision", "local"\)/);
+  assert.match(navigationAdvice, /environment\.getProperty\("easysubway\.admin\.master-data-version", "unknown"\)/);
+  assert.match(envExample, /EASYSUBWAY_ADMIN_REVISION=local/);
+  assert.match(envExample, /EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=unknown/);
+  assert.match(backendEnvAllowlist, /^EASYSUBWAY_ADMIN_REVISION$/m);
+  assert.match(backendEnvAllowlist, /^EASYSUBWAY_ADMIN_MASTER_DATA_VERSION$/m);
+  assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_REVISION "\$\{DEPLOY_SHA\}"/);
+  assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_MASTER_DATA_VERSION "\$\{DEPLOY_SHA\}"/);
+
+  const adminPageFiles = adminTemplateFiles.filter((file) =>
+    !file.includes("/fragments/") && !file.endsWith("/login.html")
+  );
+
+  for (const file of adminPageFiles) {
+    const source = read(file);
+    assert.match(source, /class="admin-shell"/, `${file} must use the shared admin shell`);
+    assert.match(source, /<main class="admin-main">/, `${file} must keep the topbar and page content in main`);
+    assert.match(source, /admin\/fragments\/shell :: skipLink/, `${file} must render skip link before the shell`);
+    assert.match(source, /admin\/fragments\/shell :: topbar/, `${file} must render the common topbar`);
+    assert.match(source, /admin\/fragments\/shell :: contentStart/, `${file} must render a skip-link target after topbar`);
+    assert.ok(
+      source.indexOf("admin/fragments/shell :: skipLink") < source.indexOf("class=\"admin-shell\""),
+      `${file} must place the skip link before sidebar navigation`,
+    );
+    assert.ok(
+      source.indexOf("admin/fragments/shell :: topbar") < source.indexOf("admin/fragments/shell :: contentStart"),
+      `${file} must place the skip-link target after topbar`,
+    );
+  }
+
+  const inlineStyleFiles = adminTemplateFiles
+    .filter((file) => /<style\b/.test(read(file)))
+    .sort();
+  assert.deepEqual(inlineStyleFiles, [
+    "backend/src/main/resources/templates/admin/collections/list.html",
+    "backend/src/main/resources/templates/admin/facilities/list.html",
+    "backend/src/main/resources/templates/admin/notifications/push.html",
+    "backend/src/main/resources/templates/admin/quality/dashboard.html",
+    "backend/src/main/resources/templates/admin/reports/detail.html",
+    "backend/src/main/resources/templates/admin/reports/list.html",
+    "backend/src/main/resources/templates/admin/routes/feedback.html",
+    "backend/src/main/resources/templates/admin/routes/searches.html",
+    "backend/src/main/resources/templates/admin/stations/layouts.html",
+    "backend/src/main/resources/templates/admin/usage/activity.html",
+  ]);
 });
 
 test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
