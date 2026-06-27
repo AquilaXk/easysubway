@@ -131,6 +131,22 @@ class AdminBatchPageControllerTest {
 			.andExpect(status().isForbidden());
 	}
 
+	@Test
+	@DisplayName("관리자 HTML 예외 페이지는 지원하지 않는 method를 405로 표시한다")
+	void retryGetRendersMethodNotAllowedAdminHtml() throws Exception {
+		String html = mockMvc.perform(get("/admin/batches/transit-master-collection/runs/failed-run/retry")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isMethodNotAllowed())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("통합 관리자")
+			.contains("허용되지 않는 요청입니다")
+			.contains("상태 코드 405");
+	}
+
 	private DataCollectionRun failedRun(String runId) {
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
 		return new DataCollectionRun(
