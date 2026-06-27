@@ -1,5 +1,8 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<title>관리자 페이지네이션</title>
+</head>
 <body>
 <nav class="pagination" th:fragment="pager(label, page, links)" th:aria-label="${label}" th:if="${page.hasPages}">
 	<a th:if="${page.hasPrevious}" th:href="${links.previousHref}">이전</a>
