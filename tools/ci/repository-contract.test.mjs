@@ -1071,6 +1071,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       `${evidenceId} must be included in post-launch GitHub summary evidence`,
     );
   }
+  for (const evidenceId of postLaunchOperationsReviewGate.reviewWindows.flatMap((window) => window.requiredSignals)) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
   assert.ok(
     postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
       "crash-anr-vitals-summary",
@@ -1137,6 +1143,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     );
   }
   for (const evidenceId of supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
+  for (const evidenceId of supportIncidentResponseGate.dataCorrectionFlow.requiredSteps) {
     assert.ok(
       supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
       `${evidenceId} must be included in support GitHub summary evidence`,
