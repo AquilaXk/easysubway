@@ -17,6 +17,7 @@ import java.security.Principal;
 import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +57,7 @@ class AdminOperationsPageController {
 	}
 
 	@PostMapping("/admin/codes")
+	@Transactional
 	String saveCode(
 		@RequestParam String groupCode,
 		@RequestParam String code,
@@ -86,6 +88,7 @@ class AdminOperationsPageController {
 	}
 
 	@PostMapping("/admin/codes/{groupCode}/{code}/disable")
+	@Transactional
 	String disableCode(
 		@PathVariable String groupCode,
 		@PathVariable String code,
@@ -119,6 +122,7 @@ class AdminOperationsPageController {
 	}
 
 	@PostMapping("/admin/incidents")
+	@Transactional
 	String openIncident(
 		@RequestParam String severity,
 		@RequestParam String status,
@@ -148,6 +152,7 @@ class AdminOperationsPageController {
 	}
 
 	@PostMapping("/admin/incidents/health")
+	@Transactional
 	String openHealthIncident(Principal principal, Authentication authentication, HttpServletRequest request) {
 		AdminIncident incident = incidentService.openFromHealth(checkHealthUseCase.checkHealth(), principal.getName());
 		auditWriter.incidentChange(
@@ -162,6 +167,7 @@ class AdminOperationsPageController {
 	}
 
 	@PostMapping("/admin/incidents/{incidentId}/resolve")
+	@Transactional
 	String resolveIncident(
 		@PathVariable String incidentId,
 		@RequestParam String resolution,
@@ -226,7 +232,7 @@ class AdminOperationsPageController {
 				code.sortOrder(),
 				code.enabled(),
 				AdminCommonCodeGroups.isRequiredIncidentCode(code.groupCode(), code.code()),
-				code.enabled() ? "선택 가능" : "신규 선택 불가"
+				code.enabled() ? "신규 선택 가능" : "신규 선택 불가"
 			);
 		}
 	}

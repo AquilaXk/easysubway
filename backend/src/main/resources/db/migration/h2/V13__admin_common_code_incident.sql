@@ -12,7 +12,7 @@ CREATE TABLE admin_common_code_groups (group_code VARCHAR(80) NOT NULL PRIMARY K
 
 CREATE TABLE admin_common_codes (group_code VARCHAR(80) NOT NULL, code VARCHAR(80) NOT NULL, display_name VARCHAR(120) NOT NULL, description VARCHAR(500), sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0), enabled BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, PRIMARY KEY (group_code, code), FOREIGN KEY (group_code) REFERENCES admin_common_code_groups(group_code)); -- NOSONAR
 
-CREATE TABLE admin_incidents (incident_id VARCHAR(40) NOT NULL PRIMARY KEY, severity VARCHAR(40) NOT NULL, status VARCHAR(40) NOT NULL, source VARCHAR(40) NOT NULL, summary VARCHAR(300) NOT NULL, owner VARCHAR(120) NOT NULL, opened_at TIMESTAMP NOT NULL, resolved_at TIMESTAMP, resolution VARCHAR(500), created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, CHECK (status <> 'RESOLVED' OR (resolved_at IS NOT NULL AND resolution IS NOT NULL))); -- NOSONAR
+CREATE TABLE admin_incidents (incident_id VARCHAR(40) NOT NULL PRIMARY KEY, severity VARCHAR(40) NOT NULL, status VARCHAR(40) NOT NULL, source VARCHAR(40) NOT NULL, summary VARCHAR(300) NOT NULL, owner VARCHAR(120) NOT NULL, opened_at TIMESTAMP NOT NULL, resolved_at TIMESTAMP, resolution VARCHAR(500), created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, CHECK ((status = 'RESOLVED' AND resolved_at IS NOT NULL AND resolution IS NOT NULL) OR (status <> 'RESOLVED' AND resolved_at IS NULL AND resolution IS NULL))); -- NOSONAR
 
 CREATE INDEX idx_admin_common_codes_group_enabled ON admin_common_codes (group_code, enabled, sort_order);
 CREATE INDEX idx_admin_incidents_status_opened ON admin_incidents (status, opened_at);

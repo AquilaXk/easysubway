@@ -138,6 +138,7 @@ class AdminOperationsPageControllerTest {
 			.contains("장애관리")
 			.contains("Major")
 			.contains("Open")
+			.contains("name=\"status\" value=\"OPEN\"")
 			.doesNotContain("Health incident 생성");
 	}
 

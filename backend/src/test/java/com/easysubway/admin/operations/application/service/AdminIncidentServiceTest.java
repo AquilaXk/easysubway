@@ -11,6 +11,7 @@ import com.easysubway.admin.operations.domain.AdminIncident;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.health.domain.HealthComponent;
 import com.easysubway.health.domain.HealthStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,23 @@ class AdminIncidentServiceTest {
 		assertThat(resolved.status()).isEqualTo("RESOLVED");
 		assertThat(resolved.resolvedAt()).isNotNull();
 		assertThat(resolved.resolution()).isEqualTo("DB connection restored");
+	}
+
+	@Test
+	@DisplayName("미해결 incident는 해결 필드를 가질 수 없다")
+	void unresolvedIncidentCannotHaveResolutionFields() {
+		assertThatThrownBy(() -> new AdminIncident(
+			"INC-OPEN",
+			"MAJOR",
+			"OPEN",
+			"HEALTH",
+			"database DOWN",
+			"ops",
+			LocalDateTime.parse("2026-06-27T00:00:00"),
+			null,
+			"already fixed"
+		)).isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("열린 incident는 resolvedAt과 resolution을 가질 수 없습니다.");
 	}
 
 	@Test

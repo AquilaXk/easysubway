@@ -20,7 +20,9 @@ public class InMemoryAdminIncidentRepository implements AdminIncidentRepository 
 	public synchronized List<AdminIncident> findRecent(int limit) {
 		return incidents.values()
 			.stream()
-			.sorted(Comparator.comparing(AdminIncident::openedAt).reversed().thenComparing(AdminIncident::incidentId))
+			.sorted(Comparator.comparing(AdminIncident::openedAt)
+				.reversed()
+				.thenComparing(AdminIncident::incidentId, Comparator.reverseOrder()))
 			.limit(Math.max(0, limit))
 			.toList();
 	}

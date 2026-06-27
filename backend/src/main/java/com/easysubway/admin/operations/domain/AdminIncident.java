@@ -28,8 +28,8 @@ public record AdminIncident(
 		if ("RESOLVED".equals(status) && (resolvedAt == null || resolution == null)) {
 			throw new IllegalArgumentException("해결된 incident는 resolvedAt과 resolution이 필요합니다.");
 		}
-		if (!"RESOLVED".equals(status) && resolvedAt != null) {
-			throw new IllegalArgumentException("열린 incident는 resolvedAt을 가질 수 없습니다.");
+		if (!"RESOLVED".equals(status) && (resolvedAt != null || resolution != null)) {
+			throw new IllegalArgumentException("열린 incident는 resolvedAt과 resolution을 가질 수 없습니다.");
 		}
 	}
 

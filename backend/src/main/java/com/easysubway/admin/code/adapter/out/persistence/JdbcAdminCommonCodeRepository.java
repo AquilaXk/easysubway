@@ -10,6 +10,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -72,7 +73,18 @@ public class JdbcAdminCommonCodeRepository implements AdminCommonCodeRepository 
 
 	@Override
 	public AdminCommonCode saveCode(AdminCommonCode code) {
-		int updated = jdbcTemplate.update("""
+		if (updateCode(code) == 0) {
+			try {
+				insertCode(code);
+			} catch (DuplicateKeyException exception) {
+				updateCode(code);
+			}
+		}
+		return code;
+	}
+
+	private int updateCode(AdminCommonCode code) {
+		return jdbcTemplate.update("""
 			UPDATE admin_common_codes
 			SET display_name = ?, description = ?, sort_order = ?, enabled = ?, updated_at = ?
 			WHERE group_code = ? AND code = ?
@@ -85,24 +97,24 @@ public class JdbcAdminCommonCodeRepository implements AdminCommonCodeRepository 
 			code.groupCode(),
 			code.code()
 		);
-		if (updated == 0) {
-			jdbcTemplate.update("""
-				INSERT INTO admin_common_codes (
-					group_code, code, display_name, description, sort_order, enabled, created_at, updated_at
-				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-				""",
-				code.groupCode(),
-				code.code(),
-				code.displayName(),
-				code.description(),
-				code.sortOrder(),
-				code.enabled(),
-				code.createdAt(),
-				code.updatedAt()
-			);
-		}
-		return code;
+	}
+
+	private void insertCode(AdminCommonCode code) {
+		jdbcTemplate.update("""
+			INSERT INTO admin_common_codes (
+				group_code, code, display_name, description, sort_order, enabled, created_at, updated_at
+			)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			""",
+			code.groupCode(),
+			code.code(),
+			code.displayName(),
+			code.description(),
+			code.sortOrder(),
+			code.enabled(),
+			code.createdAt(),
+			code.updatedAt()
+		);
 	}
 
 	private AdminCommonCodeGroup mapGroup(ResultSet resultSet, int rowNumber) throws SQLException {

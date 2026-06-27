@@ -35,9 +35,10 @@
 					<option th:each="option : ${severityOptions}" th:value="${option.code}" th:text="${option.displayName}">Major</option>
 				</select>
 			</label>
+			<input type="hidden" name="status" value="OPEN">
 			<label>상태
-				<select name="status">
-					<option th:each="option : ${statusOptions}" th:value="${option.code}" th:text="${option.displayName}">Open</option>
+				<select disabled>
+					<option th:each="option : ${statusOptions}" th:if="${option.code == 'OPEN'}" th:text="${option.displayName}" selected>Open</option>
 				</select>
 			</label>
 			<label>출처
