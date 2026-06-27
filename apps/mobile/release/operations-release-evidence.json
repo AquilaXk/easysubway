@@ -44,6 +44,8 @@
       "allowedPublicEndpoints": [
         "/api/health",
         "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
         "/actuator/prometheus",
         "/api/v1/report-uploads",
         "/api/v1/report-uploads/{uploadId}",
@@ -61,7 +63,8 @@
         "/api/v1/reports/*/confirm",
         "/api/health",
         "/actuator/health",
-        "/actuator/health/**",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
         "/actuator/prometheus",
         "/api/v1/realtime/**"
       ],
