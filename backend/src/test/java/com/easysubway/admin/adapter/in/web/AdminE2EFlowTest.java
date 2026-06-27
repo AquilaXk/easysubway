@@ -84,11 +84,12 @@ class AdminE2EFlowTest {
 				.session(session))
 			.andExpect(status().isOk());
 
-		mockMvc.perform(post("/admin/logout")
+		mockMvc.perform(post("/console/admin/logout")
+				.contextPath("/console")
 				.session(session)
 				.with(csrf()))
 			.andExpect(status().is3xxRedirection())
-			.andExpect(redirectedUrl("/admin/login?logout"));
+			.andExpect(redirectedUrl("/console/admin/login?logout"));
 
 		mockMvc.perform(get("/admin/dashboard/page")
 				.session(session)

@@ -3922,7 +3922,9 @@ test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다"
 
   assert.match(e2eTest, /class AdminE2EFlowTest/);
   assert.match(e2eTest, /formLogin\("\/admin\/login"\)/);
-  assert.match(e2eTest, /post\("\/admin\/logout"\)/);
+  assert.match(e2eTest, /post\("\/console\/admin\/logout"\)/);
+  assert.match(e2eTest, /contextPath\("\/console"\)/);
+  assert.match(e2eTest, /redirectedUrl\("\/console\/admin\/login\?logout"\)/);
   assert.match(e2eTest, /adminLoginLockoutAndLogoutFlow/);
   assert.match(e2eTest, /adminCoreOperationFlow/);
   assert.match(e2eTest, /adminErrorShellCoversForbiddenConflictAndValidation/);
@@ -3938,7 +3940,7 @@ test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다"
   assert.match(accessibilityTest, /aria-label=\\"관리자 로그아웃\\"/);
   assert.match(accessibilityTest, /aria-labelledby=\\"form-error-summary-title\\"/);
   assert.match(securityConfig, /logoutUrl\("\/admin\/logout"\)/);
-  assert.match(securityConfig, /response\.sendRedirect\("\/admin\/login\?logout"\)/);
+  assert.match(securityConfig, /request\.getContextPath\(\) \+ "\/admin\/login\?logout"/);
   assert.match(readOnlyAdminTest, /masterDataWritable/);
   assert.match(readOnlyAdminTest, /운영 마스터 데이터가 읽기 전용입니다\./);
   assert.match(adminPageRequest, /MAX_SIZE = 50/);

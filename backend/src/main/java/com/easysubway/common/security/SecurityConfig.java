@@ -149,7 +149,7 @@ public class SecurityConfig {
 			.logout(logout -> logout
 				.logoutUrl("/admin/logout")
 				.logoutSuccessHandler((request, response, authentication) ->
-					response.sendRedirect("/admin/login?logout"))
+					response.sendRedirect(request.getContextPath() + "/admin/login?logout"))
 				.permitAll()
 			)
 			.addFilterAfter(auditFilter, BasicAuthenticationFilter.class);
