@@ -118,6 +118,18 @@ class EgovPaginationViewTest {
 	}
 
 	@Test
+	@DisplayName("slice 조회는 범위 밖 빈 page도 요청 page를 유지한다")
+	void keepsRequestedPageForEmptySlice() {
+		EgovPaginationView view = EgovPaginationView.fromSlice(3, 20, 0);
+
+		assertThat(view.page()).isEqualTo(3);
+		assertThat(view.hasPrevious()).isTrue();
+		assertThat(view.hasNext()).isFalse();
+		assertThat(view.previousPage()).isEqualTo(2);
+		assertThat(view.pageLinks().get(view.pageLinks().size() - 1).current()).isTrue();
+	}
+
+	@Test
 	@DisplayName("전체 목록에서 현재 page 항목만 반환한다")
 	void returnsCurrentPageItems() {
 		EgovPaginationView view = EgovPaginationView.from(1, 2, 5);

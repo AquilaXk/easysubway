@@ -63,7 +63,13 @@ public record EgovPaginationView(
 	}
 
 	public static EgovPaginationView fromSlice(int page, int size, int fetchedCount) {
-		long minimumTotal = (long) Math.max(page, 0) * Math.max(size, 1) + Math.max(fetchedCount, 0);
+		int safePage = Math.max(page, 0);
+		int safeSize = Math.max(size, 1);
+		int safeFetchedCount = Math.max(fetchedCount, 0);
+		long minimumTotal = (long) safePage * safeSize + safeFetchedCount;
+		if (safePage > 0 && safeFetchedCount == 0) {
+			minimumTotal++;
+		}
 		return from(page, size, minimumTotal);
 	}
 
