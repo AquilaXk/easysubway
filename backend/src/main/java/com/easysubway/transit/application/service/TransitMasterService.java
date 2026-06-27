@@ -18,11 +18,13 @@ import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.application.port.out.MasterDataCapability;
 import com.easysubway.transit.application.port.out.MasterDataCapabilityPort;
 import com.easysubway.transit.application.port.out.MasterDataCapabilityStatus;
+import com.easysubway.transit.application.port.out.RollbackTransitMasterOverridePort;
 import com.easysubway.transit.application.port.out.SaveAccessibilityFacilityStatusPort;
 import com.easysubway.transit.application.port.out.SaveRouteEdgePort;
 import com.easysubway.transit.application.port.out.SaveRouteNodePort;
 import com.easysubway.transit.application.port.out.SaveStationLayoutSourcePort;
 import com.easysubway.transit.application.port.out.SaveSimplifiedStationLayoutStatusPort;
+import com.easysubway.transit.application.port.out.TransitMasterOverrideAudit;
 import com.easysubway.transit.domain.AccessibilityFacility;
 import com.easysubway.transit.domain.AccessibilityFacilityNotFoundException;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
@@ -502,6 +504,22 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 		requireWritableMasterData();
 		saveRouteEdgePort.saveRouteEdge(updated);
 		return updated;
+	}
+
+	@Override
+	public void rollbackMasterDataOverride(String entityType, String entityId, String updatedBy) {
+		if (loadTransitMasterPort instanceof RollbackTransitMasterOverridePort rollbackPort) {
+			requireWritableMasterData();
+			rollbackPort.rollbackMasterDataOverride(entityType, entityId, updatedBy);
+		}
+	}
+
+	@Override
+	public List<TransitMasterOverrideAudit> listMasterDataOverrideAudits(String entityType, String entityId) {
+		if (loadTransitMasterPort instanceof RollbackTransitMasterOverridePort rollbackPort) {
+			return rollbackPort.listMasterDataOverrideAudits(entityType, entityId);
+		}
+		return List.of();
 	}
 
 	private TransitRegionSummary summarizeRegion(
