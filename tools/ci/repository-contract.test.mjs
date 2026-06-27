@@ -1100,11 +1100,17 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       "fixed-release-owner-acknowledgement",
     ),
   );
-  assert.ok(
-    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(
-      "Play Console account data",
-    ),
-  );
+  for (const forbiddenValue of [
+    "Play Console account data",
+    "support mailbox personal data",
+    "device identifiers",
+    "provider credential or quota token",
+  ]) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(forbiddenValue),
+      `${forbiddenValue} must be forbidden in post-launch GitHub summary`,
+    );
+  }
   assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
   assert.equal(supportIncidentResponseGate.issue, 1019);
   assert.equal(supportIncidentResponseGate.status, "BLOCKED_EXTERNAL");
@@ -1177,11 +1183,18 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       "data-error-triage-dry-run",
     ),
   );
-  assert.ok(
-    supportIncidentResponseGate.supportEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(
-      "raw report receipt token",
-    ),
-  );
+  for (const forbiddenValue of [
+    "support mailbox personal data",
+    "raw report receipt token",
+    "operator private contact",
+    "provider credential or quota token",
+    "photo metadata",
+  ]) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(forbiddenValue),
+      `${forbiddenValue} must be forbidden in support GitHub summary`,
+    );
+  }
   assert.equal(abusePenetrationRehearsalGate.releaseGate, "abuse-penetration-rehearsal");
   assert.equal(abusePenetrationRehearsalGate.issue, 1022);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
