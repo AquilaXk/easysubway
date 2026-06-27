@@ -7163,7 +7163,59 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.equal(gate.deviceEvidencePolicy.codexQaDevice, "local_android_emulator_only");
   assert.equal(gate.deviceEvidencePolicy.physicalDeviceEvidence, "not_used_for_codex_pr_evidence");
   assert.equal(gate.deviceEvidencePolicy.releaseRcEvidence, "play_installed_or_exact_rc_required_before_go");
+  assert.deepEqual(gate.deviceEvidencePolicy.requiredDeviceDiscoveryCommands, [
+    "flutter emulators",
+    "emulator -list-avds",
+    "ANDROID_HOME or ANDROID_SDK_ROOT emulator path check",
+    "flutter devices",
+    "adb devices",
+  ]);
+  assert.equal(gate.deviceEvidencePolicy.emptyAdbDevicesDisposition, "INSUFFICIENT_EVIDENCE");
   assert.equal(gate.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/android-quality/<rc-or-run>/");
+  assert.match(
+    gate.deviceEvidencePolicy.requiredDeviceDiscoveryCommands.join("\n"),
+    /ANDROID_HOME|ANDROID_SDK_ROOT/,
+  );
+  assert.deepEqual(gate.manualEvidenceSummaryPolicy.commonRequiredFields, [
+    "checkId",
+    "buildIdentity",
+    "evidencePaths",
+    "result",
+    "blockerDisposition",
+  ]);
+  assert.deepEqual(gate.manualEvidenceSummaryPolicy.requiredResultValues, [
+    "PASS",
+    "FAIL",
+    "BLOCKED_EXTERNAL",
+    "NOT_APPLICABLE_WITH_REASON",
+  ]);
+  for (const field of [
+    "checkId",
+    "buildIdentity",
+    "buildSource",
+    "deviceId",
+    "androidApi",
+    "fontScale",
+    "viewport",
+    "evidencePaths",
+    "uiTreePath",
+    "screenshotOrRecordingPath",
+    "logcatSummaryPath",
+    "result",
+    "blockerDisposition",
+  ]) {
+    assert.ok(
+      gate.manualEvidenceSummaryPolicy.allowedFields.includes(field),
+      `manual evidence summary must allow ${field}`,
+    );
+  }
+  assert.deepEqual(gate.manualEvidenceSummaryPolicy.forbiddenSummaryValues, [
+    "TBD",
+    "TODO",
+    "unknown",
+    "not checked",
+    "not captured",
+  ]);
 
   const requiredChecks = new Map(gate.requiredChecks.map((check) => [check.id, check]));
   for (const id of [
@@ -7228,6 +7280,54 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   }
   assert.ok(evidenceSet.get("route_map_fallback").evidence.includes("performance-summary"));
   assert.ok(evidenceSet.get("facility_report_recovery").evidence.includes("logcat-summary"));
+
+  const checkEvidenceMatrix = new Map(gate.checkEvidenceMatrix.map((item) => [item.checkId, item]));
+  assert.deepEqual([...checkEvidenceMatrix.keys()].sort(), [...requiredChecks.keys()].sort());
+  const requiredEvidenceIds = new Set(evidenceSet.keys());
+  for (const [checkId, matrix] of checkEvidenceMatrix) {
+    assert.ok(requiredChecks.has(checkId), `${checkId} matrix must reference a required check`);
+    assert.ok(Array.isArray(matrix.requiredEvidenceIds), `${checkId} matrix must list evidence IDs`);
+    assert.ok(matrix.requiredEvidenceIds.length > 0, `${checkId} matrix must require evidence IDs`);
+    assert.equal(
+      new Set(matrix.requiredEvidenceIds).size,
+      matrix.requiredEvidenceIds.length,
+      `${checkId} matrix must not duplicate evidence IDs`,
+    );
+    for (const evidenceId of matrix.requiredEvidenceIds) {
+      assert.ok(requiredEvidenceIds.has(evidenceId), `${checkId} matrix references unknown evidence ID: ${evidenceId}`);
+    }
+    for (const field of [
+      "checkId",
+      "buildIdentity",
+      "evidencePaths",
+      "result",
+      "blockerDisposition",
+    ]) {
+      assert.ok(matrix.requiredSummaryFields.includes(field), `${checkId} matrix must require summary field ${field}`);
+    }
+    for (const field of matrix.requiredSummaryFields) {
+      assert.ok(
+        gate.manualEvidenceSummaryPolicy.allowedFields.includes(field),
+        `${checkId} matrix summary field must be in allowed vocabulary: ${field}`,
+      );
+    }
+  }
+  assert.ok(
+    checkEvidenceMatrix.get("font_scale_150_200_small_screen").requiredSummaryFields.includes("fontScale"),
+    "font scale check must record the Android font scale",
+  );
+  assert.ok(
+    checkEvidenceMatrix.get("font_scale_150_200_small_screen").requiredSummaryFields.includes("viewport"),
+    "font scale check must record the viewport",
+  );
+  assert.ok(
+    checkEvidenceMatrix.get("route_map_performance_budget").requiredSummaryFields.includes("buildSource"),
+    "performance check must record RC or Play-installed build source",
+  );
+  assert.ok(
+    checkEvidenceMatrix.get("crash_anr_privacy_safe_reporting").requiredSummaryFields.includes("logcatSummaryPath"),
+    "crash/ANR privacy check must record logcat or crash summary path",
+  );
 
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
