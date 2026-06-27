@@ -23,6 +23,12 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function currentMobileVersionCode() {
+  const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
+  assert.ok(match, "mobile pubspec must contain versionName+versionCode");
+  return Number.parseInt(match[1], 10);
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -973,6 +979,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.every((item) => item.releaseBlocker === true));
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_production_access_status"));
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_closed_test_requirement"));
+  assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_app_signing_enrollment"));
+  assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_version_code_monotonicity"));
+  assert.equal(playProductionAccessGate.goNoGoRules.missingPlayAppSigningEnrollment, "BLOCKED_EXTERNAL");
+  assert.equal(playProductionAccessGate.goNoGoRules.versionCodeNotGreaterThanLatestPlayArtifact, "BLOCKED_EXTERNAL");
+  assert.equal(playProductionAccessGate.goNoGoRules.failedRcVersionCodeReuse, "BLOCKED_TECHNICAL");
   assert.match(playProductionAccessGate.evidencePolicy.localOnlyEvidenceRoot, /\.codex\/evidence\/release\/play-production-access/);
   assert.equal(playStoreSubmissionContent.releaseGate, "play-store-submission-content");
   assert.equal(playStoreSubmissionContent.issue, 1018);
@@ -999,11 +1010,21 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("internal-app-sharing"));
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("play-installed-build"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("play-generated-split-apk-install-log"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("latest-play-uploaded-versioncode-record"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("play-generated-artifact-identity-match-record"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("pre-launch-report-crash-anr-policy-warning-summary"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("device-specific-manifest-dump"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("native-library-delivery-and-16kb-page-size-record"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactIdentityFields.includes("appSigningKeySha256Fingerprint"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactIdentityFields.includes("dataPackManifestSha256"));
+  assert.match(playGeneratedApkDeviceMatrixGate.identityMatchPolicy, /RC evidence manifest/);
+  assert.match(playGeneratedApkDeviceMatrixGate.versionCodePolicy, /최신 artifact보다 커야/);
   assert.ok(playGeneratedApkDeviceMatrixGate.deviceMatrix.every((item) => item.releaseBlocker === true));
   assert.ok(playGeneratedApkDeviceMatrixGate.deviceMatrix.map((item) => item.id).includes("android_16_16kb_page_size"));
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.localAabOnly, "BLOCKED_EXTERNAL");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.artifactIdentityMismatch, "BLOCKED_TECHNICAL");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.appSigningCertificateMismatch, "BLOCKED_TECHNICAL");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.versionCodeNotGreaterThanLatestPlayArtifact, "BLOCKED_EXTERNAL");
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_EXTERNAL");
@@ -1092,6 +1113,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "post-release-monitoring",
   ]);
   assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("play-app-signing-enrollment"));
+  assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("latest-play-uploaded-versioncode-comparison"));
+  assert.ok(androidRcEvidence.requiredEvidence.signingAndIdentity.includes("failed-rc-versioncode-reuse-policy"));
   assert.ok(androidRcEvidence.requiredEvidence.aabInspection.includes("bundletool-manifest-dump"));
   assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("android-16kb-page-size-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.pageSize16kb.includes("bundletool-config-dump"));
@@ -1100,6 +1123,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-generated-apk-or-installed-build-smoke"));
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-generated-apk-device-matrix-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-app-signing-certificate-record"));
+  assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("play-generated-artifact-identity-match-record"));
+  assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("rc-versioncode-greater-than-latest-play-artifact-record"));
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("split-apk-manifest-permission-network-config-record"));
   assert.ok(androidRcEvidence.requiredEvidence.playGeneratedArtifact.includes("device-matrix-smoke-summary"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("talkback-rc-build-notes"));
@@ -1117,6 +1142,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("admin-operator-session-csrf-rate-limit-abuse-summary"));
   assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("critical-high-finding-zero-or-waiver-record"));
   assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-crash-0"));
+  assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-anr-0"));
+  assert.ok(androidRcEvidence.requiredEvidence.preReviewPreLaunch.includes("pre-launch-report-policy-warning-0-or-triaged"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("post-launch-operations-review-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("support-incident-response-gate-manifest"));
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("first-2h-monitoring-owner-schedule"));
@@ -2178,6 +2205,7 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
   assert.match(workflow, /node tools\/ci\/check-store-distribution-evidence-env\.mjs/);
   assert.match(workflow, /--env-file "\$\{EASYSUBWAY_ENV_FILE\}"/);
+  assert.match(workflow, /--mobile-pubspec apps\/mobile\/pubspec\.yaml/);
   assert.match(workflow, /--github-output "\$\{GITHUB_OUTPUT\}"/);
   assert.match(workflow, /--report "\$\{RUNNER_TEMP\}\/store-distribution-evidence-preflight\.txt"/);
   assert.match(workflow, /node tools\/datapack\/export-publish-env\.mjs/);
@@ -2186,6 +2214,11 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
 
   assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON/);
   assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME/);
+  assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256/);
+  assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE/);
+  assert.match(preflight, /sha256_fingerprint/);
+  assert.match(preflight, /nonnegative_integer/);
+  assert.match(preflight, /must_be_less_than_mobile_version_code/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_KEY_ID/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID/);
   assert.match(preflight, /EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM/);
@@ -2207,6 +2240,8 @@ test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker�
     [
       "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
       "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=0",
       "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
       "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
       "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
@@ -2220,6 +2255,8 @@ test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker�
       "tools/ci/check-store-distribution-evidence-env.mjs",
       "--env-file",
       envFile,
+      "--mobile-pubspec",
+      "apps/mobile/pubspec.yaml",
       "--github-output",
       outputFile,
       "--report",
@@ -2241,6 +2278,8 @@ test("스토어 배포 증거 preflight는 legacy S3와 PAR 데이터팩 publish
   const commonEnvLines = [
     "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
     "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+    "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=0",
     "EASYSUBWAY_APP_STORE_CONNECT_KEY_ID=key-id",
     "EASYSUBWAY_APP_STORE_CONNECT_ISSUER_ID=issuer-id",
     "EASYSUBWAY_APP_STORE_CONNECT_PRIVATE_KEY_PEM=private-key",
@@ -2281,6 +2320,8 @@ test("스토어 배포 증거 preflight는 legacy S3와 PAR 데이터팩 publish
         "tools/ci/check-store-distribution-evidence-env.mjs",
         "--env-file",
         envFile,
+        "--mobile-pubspec",
+        "apps/mobile/pubspec.yaml",
         "--github-output",
         outputFile,
         "--report",
@@ -2293,6 +2334,97 @@ test("스토어 배포 증거 preflight는 legacy S3와 PAR 데이터팩 publish
     assert.match(report, /^datapack_object_storage_publish\.ready=true$/m);
     assert.match(readFileSync(outputFile, "utf8"), /^datapack_object_storage_publish_ready=true$/m);
   }
+});
+
+test("스토어 배포 증거 preflight는 Play App Signing 지문과 versionCode 증가를 요구한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-env-play-identity-"));
+  const envFile = path.join(dir, "deploy.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  const mobileVersionCode = currentMobileVersionCode();
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=not-a-fingerprint",
+      `EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=${mobileVersionCode}`,
+      "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
+      "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+      "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/ci/check-store-distribution-evidence-env.mjs",
+        "--env-file",
+        envFile,
+        "--mobile-pubspec",
+        "apps/mobile/pubspec.yaml",
+        "--github-output",
+        outputFile,
+        "--report",
+        reportFile,
+      ],
+      { cwd: root },
+    ),
+  );
+
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(report, /^android_play_internal_track\.ready=false$/m);
+  assert.match(report, /EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256:sha256_fingerprint/);
+  assert.match(
+    report,
+    new RegExp(`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`),
+  );
+});
+
+test("스토어 배포 증거 preflight는 큰 Play versionCode가 비교를 우회하지 못하게 한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-env-play-versioncode-"));
+  const envFile = path.join(dir, "deploy.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  const mobileVersionCode = currentMobileVersionCode();
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      `EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=${validPlayAppSigningFingerprint}`,
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=900719925474099312345",
+      "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
+      "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+      "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/ci/check-store-distribution-evidence-env.mjs",
+        "--env-file",
+        envFile,
+        "--mobile-pubspec",
+        "apps/mobile/pubspec.yaml",
+        "--github-output",
+        outputFile,
+        "--report",
+        reportFile,
+      ],
+      { cwd: root },
+    ),
+  );
+
+  assert.match(
+    readFileSync(reportFile, "utf8"),
+    new RegExp(`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`),
+  );
 });
 
 test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고정한다", () => {
