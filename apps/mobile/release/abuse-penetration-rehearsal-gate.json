@@ -9,6 +9,19 @@
   "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
   "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
   "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<rc-or-run>/",
+  "buildIdentityPolicy": {
+    "requiredIssueLinks": ["#1015", "#1016", "#1020"],
+    "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],
+    "requiredIdentityFields": [
+      "gitSha",
+      "versionCode",
+      "androidApplicationId",
+      "aabOrApkSha256",
+      "backendArtifactDigest",
+      "dataPackManifestSha256"
+    ],
+    "mismatchDisposition": "NO_GO"
+  },
   "artifactSecretAndEndpointScan": {
     "requiredArtifacts": [
       "Android AAB or Play-generated APK",
@@ -78,6 +91,15 @@
   "manualRehearsalPolicy": {
     "redactionRequired": true,
     "requestResponseSummaryOnly": true,
+    "githubSummaryFields": [
+      "scenarioId",
+      "artifactIdentity",
+      "commandOrManualCheck",
+      "findingCounts",
+      "result",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
     "forbiddenInEvidence": [
       "raw receipt token",
       "raw signed URL",
