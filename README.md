@@ -123,7 +123,7 @@ production data pack의 pack URL과 sourceInventory URL은 공개 HTTPS host만 
 
 ## Operations
 
-운영 관측성과 알림 기준선은 `apps/mobile/release/operations-observability-gate.json`을 기준으로 검증합니다. 이 gate는 release blocker이며, PR에서는 `node --test tools/ci/*.test.mjs`로 필수 신호와 artifact 보관 계약을 확인합니다. 릴리즈 후보의 실제 CD, rollback, migration, restore rehearsal, alert routing 증거는 `apps/mobile/release/operations-release-evidence.json` 계약에 맞춰 `.codex/evidence/operations-release/<rc-or-run>/` 아래 로컬 전용으로 보관하고 PR에는 요약만 남깁니다.
+운영 관측성과 알림 기준선은 `apps/mobile/release/operations-observability-gate.json`을 기준으로 검증합니다. 이 gate는 release blocker이며, PR에서는 `node --test tools/ci/*.test.mjs`로 필수 신호와 artifact 보관 계약을 확인합니다. 릴리즈 후보의 실제 CD, rollback, migration, restore rehearsal, alert routing 증거는 `apps/mobile/release/operations-release-evidence.json` 계약에 맞춰 `.codex/evidence/operations-release/<rc-or-run>` 아래 로컬 전용으로 보관하고 PR에는 요약만 남깁니다. 같은 계약의 backend control-plane 섹션은 public API surface inventory, default-deny security matcher, Basic auth/OIDC/MFA/SSO 전환 예외, single-instance abuse-control exception, GitHub production environment protection, audit redaction evidence를 #1017 release blocker로 묶습니다.
 
 백엔드 CD는 서버의 기존 PostgreSQL과 object-storage 컨테이너를 보존한 상태에서 backend 서비스만 교체합니다. 배포 스크립트는 배포 lock, main ancestry, 이전 배포 SHA, image drift, JAR checksum, env hash, migration 변경 시 PostgreSQL dump 검증, readiness, 실패 시 이전 backend image 재기동을 확인합니다. readiness 실패 로그와 백업 산출물은 서버의 `DEPLOY_ROOT` 아래에 보관하고 GitHub에는 민감값을 올리지 않습니다.
 
