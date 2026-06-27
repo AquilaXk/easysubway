@@ -109,7 +109,7 @@
     "Release Artifacts / RC Evidence Manifest",
     "Data Pack Release / Data Pack Release",
     "Dependency Vulnerability Scan",
-    "Release Gate Consistency"
+    "CI / Release Gate Consistency"
   ],
   "releaseImpactPaths": [
     "apps/mobile/**",

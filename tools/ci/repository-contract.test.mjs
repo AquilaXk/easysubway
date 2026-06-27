@@ -1432,7 +1432,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   ]);
   assert.ok(gate.waiverSchema.nonWaivableP0Blockers.includes("play_prelaunch_crash"));
   assert.ok(gate.requiredChecks.includes("CI / Repository CI"));
-  assert.ok(gate.requiredChecks.includes("Release Gate Consistency"));
+  assert.ok(gate.requiredChecks.includes("CI / Release Gate Consistency"));
   assert.ok(gate.releaseImpactPaths.includes("apps/mobile/release/**"));
   const allowedStatuses = new Set(gate.gateStatusEnum);
   for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json"], {
