@@ -1178,6 +1178,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.evidencePolicy.githubUploadPolicy, "summary-only");
 
   assert.match(workflow, /toolchain_policy=apps\/mobile\/release\/signed-release-artifact-gate\.json/);
+  assert.match(workflow, /toolchainPolicy=apps\/mobile\/release\/signed-release-artifact-gate\.json/);
   assert.match(workflow, /android_rc_signing_mode:/);
   assert.match(workflow, /production-upload-key/);
   assert.match(workflow, /android-production-rc/);
@@ -1191,12 +1192,24 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /--require-android-rc-production/);
   assert.match(workflow, /base64 --decode > "\$\{EASYSUBWAY_ANDROID_KEYSTORE_PATH\}"/);
   assert.match(workflow, /rm -f "\$\{RUNNER_TEMP\}\/easysubway-ci-release\.jks" "\$\{RUNNER_TEMP\}\/easysubway-upload-key\.jks" "\$\{RUNNER_TEMP\}\/easysubway-release\.env"/);
-  assert.match(workflow, /store_ready_candidate=true/);
-  assert.match(workflow, /signing_key_type=production-upload-key/);
-  assert.match(workflow, /upload_key_sha256_fingerprint=\$\{EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256\}/);
-  assert.match(workflow, /app_signing_key_sha256_fingerprint=\$\{EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256\}/);
-  assert.match(workflow, /version_code_monotonic_policy=must_be_greater_than_latest_play_uploaded_artifact/);
-  assert.match(workflow, /failed_rc_version_code_reuse_policy=forbidden_without_1020_waiver/);
+  assert.match(workflow, /gitSha=\$\{GITHUB_SHA\}/);
+  assert.match(workflow, /storeReadyCandidate=true/);
+  assert.match(workflow, /signingKeyType=production-upload-key/);
+  assert.match(workflow, /uploadKeySha256Fingerprint=\$\{EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256\}/);
+  assert.match(workflow, /appSigningKeySha256Fingerprint=\$\{EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256\}/);
+  assert.match(workflow, /versionName=\$\{version_name\}/);
+  assert.match(workflow, /versionCode=\$\{version_code\}/);
+  assert.match(workflow, /packageId=com\.easysubway\.app/);
+  assert.match(workflow, /aabSha256=\$\{aab_sha256\}/);
+  assert.match(workflow, /dataPackManifestSha256=\$\{data_pack_manifest_sha256\}/);
+  assert.match(workflow, /routeContractVersion=route-map-contract-v1/);
+  assert.match(workflow, /realtimeContractVersion=seoul-topis-schema-v1/);
+  assert.match(workflow, /mappingRetentionDays=90/);
+  assert.match(workflow, /versionCodeMonotonicPolicy=must_be_greater_than_latest_play_uploaded_artifact/);
+  assert.match(workflow, /failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver/);
+  for (const key of gate.artifacts.android.productionRcRequiredMetadata) {
+    assert.match(workflow, new RegExp(`${key}=`), `${key} must be emitted in production RC metadata`);
+  }
   assert.match(workflow, /store_ready=false/);
   assert.match(workflow, /signing_key_type=temporary-self-signed/);
   assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
@@ -1212,11 +1225,16 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /name: RC Evidence Manifest/);
   assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs "\$\{generator_args\[@\]\}"/);
   assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
+  assert.match(workflow, /android_artifact_source="none"/);
+  assert.match(workflow, /android_artifact_source="easysubway-android-production-rc-\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /android_artifact_source="easysubway-android-release-\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /android_artifact_source=\$\{android_artifact_source\}/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
   assert.match(workflow, /page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes/);

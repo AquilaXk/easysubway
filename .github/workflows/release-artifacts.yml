@@ -369,26 +369,26 @@ jobs:
           aab_sha256="$(sha256sum release-artifacts/android/app-release.aab | awk '{print $1}')"
           data_pack_manifest_sha256="$(sha256sum assets/datapacks/metro_map_pack/manifest.json | awk '{print $1}')"
           {
-            echo "commit=${GITHUB_SHA}"
+            echo "gitSha=${GITHUB_SHA}"
             echo "artifact=app-release.aab"
-            echo "store_ready_candidate=true"
-            echo "signing_key_type=production-upload-key"
-            echo "upload_key_sha256_fingerprint=${EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256}"
-            echo "app_signing_key_sha256_fingerprint=${EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256}"
-            echo "version_name=${version_name}"
-            echo "version_code=${version_code}"
-            echo "package_id=com.easysubway.app"
-            echo "aab_sha256=${aab_sha256}"
-            echo "data_pack_manifest_sha256=${data_pack_manifest_sha256}"
-            echo "data_pack_channel=${EASYSUBWAY_DATAPACK_CHANNEL}"
-            echo "route_contract_version=route-map-contract-v1"
-            echo "realtime_contract_version=seoul-topis-schema-v1"
+            echo "storeReadyCandidate=true"
+            echo "signingKeyType=production-upload-key"
+            echo "uploadKeySha256Fingerprint=${EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256}"
+            echo "appSigningKeySha256Fingerprint=${EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256}"
+            echo "versionName=${version_name}"
+            echo "versionCode=${version_code}"
+            echo "packageId=com.easysubway.app"
+            echo "aabSha256=${aab_sha256}"
+            echo "dataPackManifestSha256=${data_pack_manifest_sha256}"
+            echo "dataPackChannel=${EASYSUBWAY_DATAPACK_CHANNEL}"
+            echo "routeContractVersion=route-map-contract-v1"
+            echo "realtimeContractVersion=seoul-topis-schema-v1"
             echo "mapping=build/app/outputs/mapping/release/mapping.txt"
-            echo "mapping_retention_days=90"
-            echo "version_code_monotonic_policy=must_be_greater_than_latest_play_uploaded_artifact"
-            echo "failed_rc_version_code_reuse_policy=forbidden_without_1020_waiver"
-            echo "page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes"
-            echo "toolchain_policy=apps/mobile/release/signed-release-artifact-gate.json"
+            echo "mappingRetentionDays=90"
+            echo "versionCodeMonotonicPolicy=must_be_greater_than_latest_play_uploaded_artifact"
+            echo "failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver"
+            echo "pageSize16kbEvidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes"
+            echo "toolchainPolicy=apps/mobile/release/signed-release-artifact-gate.json"
           } > release-artifacts/android/release-metadata.txt
 
       - name: Android Production RC Artifact / Upload app bundle
@@ -517,10 +517,13 @@ jobs:
             --gate-status androidReleaseQuality=BLOCKED_EXTERNAL
             --gate-status abusePenetrationRehearsal=BLOCKED_EXTERNAL
           )
+          android_artifact_source="none"
           if [[ -f release-artifacts/downloaded/android-production-rc/app-release.aab ]]; then
             generator_args+=(--aab release-artifacts/downloaded/android-production-rc/app-release.aab)
+            android_artifact_source="easysubway-android-production-rc-${GITHUB_SHA}"
           elif [[ -f release-artifacts/downloaded/android/app-release.aab ]]; then
             generator_args+=(--aab release-artifacts/downloaded/android/app-release.aab)
+            android_artifact_source="easysubway-android-release-${GITHUB_SHA}"
           fi
           if [[ -f release-artifacts/downloaded/backend/image-inspect.json ]]; then
             generator_args+=(--backend-image-inspect release-artifacts/downloaded/backend/image-inspect.json)
@@ -530,7 +533,7 @@ jobs:
           {
             echo "commit=${GITHUB_SHA}"
             echo "manifest=rc-evidence-manifest.json"
-            echo "android_artifact_source=easysubway-android-release-${GITHUB_SHA}"
+            echo "android_artifact_source=${android_artifact_source}"
             echo "backend_artifact_source=easysubway-backend-release-${GITHUB_SHA}"
           } > release-artifacts/rc/release-metadata.txt
 
