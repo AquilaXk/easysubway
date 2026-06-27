@@ -108,11 +108,13 @@
 				</label>
 				<label>
 					<span class="meta">위도</span>
-					<input name="latitude" inputmode="decimal" th:value="${facilityForm.latitude}">
+					<input name="latitude" inputmode="decimal"
+					       th:value="${facilityLatitudeValue != null ? facilityLatitudeValue : facilityForm.latitude}">
 				</label>
 				<label>
 					<span class="meta">경도</span>
-					<input name="longitude" inputmode="decimal" th:value="${facilityForm.longitude}">
+					<input name="longitude" inputmode="decimal"
+					       th:value="${facilityLongitudeValue != null ? facilityLongitudeValue : facilityForm.longitude}">
 				</label>
 				<label>
 					<span class="meta">현재 상태</span>

@@ -301,9 +301,9 @@ class TransitStationLayoutAdminPageController {
 		String sourceUrl,
 		@NotBlank(message = "{validation.transit.layout-source-license.required}")
 		String license,
-		@NotNull
+		@NotNull(message = "{validation.transit.layout-source-commercial-use.required}")
 		Boolean commercialUseAllowed,
-		@NotNull
+		@NotNull(message = "{validation.transit.layout-source-attribution.required}")
 		Boolean attributionRequired,
 		@NotNull(message = "{validation.transit.layout-source-captured-at.required}")
 		LocalDate capturedAt,
@@ -327,11 +327,11 @@ class TransitStationLayoutAdminPageController {
 		Integer distanceMeters,
 		@NotNull(message = "{validation.transit.route-edge-estimated-seconds.required}")
 		Integer estimatedSeconds,
-		@NotNull
+		@NotNull(message = "{validation.transit.route-edge-stairs.required}")
 		Boolean hasStairs,
-		@NotNull
+		@NotNull(message = "{validation.transit.route-edge-elevator.required}")
 		Boolean requiresElevator,
-		@NotNull
+		@NotNull(message = "{validation.transit.route-edge-escalator.required}")
 		Boolean requiresEscalator,
 		@NotNull(message = "{validation.transit.route-edge-slope.required}")
 		Integer slopeLevel,
@@ -339,7 +339,7 @@ class TransitStationLayoutAdminPageController {
 		Integer widthLevel,
 		@NotNull(message = "{validation.transit.route-edge-reliability.required}")
 		Integer reliabilityScore,
-		@NotNull
+		@NotNull(message = "{validation.transit.route-edge-active.required}")
 		Boolean active
 	) {
 	}

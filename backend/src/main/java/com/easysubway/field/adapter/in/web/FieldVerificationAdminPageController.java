@@ -9,6 +9,7 @@ import com.easysubway.field.domain.FieldVerificationSession;
 import com.easysubway.field.domain.FieldVerificationStatus;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.security.Principal;
 import java.time.LocalDate;
@@ -173,5 +174,12 @@ class FieldVerificationAdminPageController {
 		FieldVerificationStatus status,
 		String note
 	) {
+
+		@AssertTrue(message = "{validation.field-verification.status.allowed}")
+		public boolean isStatusAllowed() {
+			return status == null
+				|| status == FieldVerificationStatus.VERIFIED
+				|| status == FieldVerificationStatus.NEEDS_RECHECK;
+		}
 	}
 }

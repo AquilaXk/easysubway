@@ -142,6 +142,8 @@ class TransitStationAdminPageController {
 		if (bindingResult.hasErrors()) {
 			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 			populateFacilityEditorModel(model, form.stationId(), form.facilityId(), form);
+			model.addAttribute("facilityLatitudeValue", bindingResult.getFieldValue("latitude"));
+			model.addAttribute("facilityLongitudeValue", bindingResult.getFieldValue("longitude"));
 			AdminFormErrorView.expose(model, bindingResult);
 			return "admin/facilities/editor";
 		}

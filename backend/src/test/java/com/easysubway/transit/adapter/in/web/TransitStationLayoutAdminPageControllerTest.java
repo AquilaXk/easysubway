@@ -148,8 +148,31 @@ class TransitStationLayoutAdminPageControllerTest {
 			.contains("상록수역 운영기관 안내 페이지")
 			.contains("운영기관 페이지 확인용")
 			.contains("상업적 사용 가능")
-			.contains("출처 표시 불필요")
-			.contains("2026-06-14");
+				.contains("출처 표시 불필요")
+				.contains("2026-06-14");
+	}
+
+	@Test
+	@DisplayName("역 구조도 기준 자료 validation 실패는 boolean 선택 오류를 표시한다")
+	void stationLayoutSourceValidationErrorRendersBooleanMessage() throws Exception {
+		String html = mockMvc.perform(post("/admin/stations/station-sangnoksu/layout-sources/layout-source-sangnoksu-station-map/page")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("sourceType", "OPERATOR_PAGE")
+				.param("sourceName", "상록수역 운영기관 안내 페이지")
+				.param("sourceUrl", "https://www.seoulmetro.co.kr/station/sangnoksu")
+				.param("license", "운영기관 페이지 확인용")
+				.param("capturedAt", "2026-06-13"))
+			.andExpect(status().isBadRequest())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("입력값을 확인해 주세요")
+			.contains("상업적 이용 가능 여부를 선택해야 합니다.")
+			.contains("출처 표시 필요 여부를 선택해야 합니다.");
 	}
 
 	@Test
@@ -263,8 +286,33 @@ class TransitStationLayoutAdminPageControllerTest {
 			.contains("계단 포함")
 			.contains("엘리베이터 불필요")
 			.contains("에스컬레이터 필요")
-			.contains("신뢰도 76")
-			.contains("비활성");
+				.contains("신뢰도 76")
+				.contains("비활성");
+	}
+
+	@Test
+	@DisplayName("역 구조도 간선 validation 실패는 boolean 선택 오류를 표시한다")
+	void routeEdgeValidationErrorRendersBooleanMessage() throws Exception {
+		String html = mockMvc.perform(post("/admin/stations/station-sangnoksu/route-edges/edge-sangnoksu-elevator-to-faregate/page")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("distanceMeters", "34")
+				.param("estimatedSeconds", "90")
+				.param("slopeLevel", "1")
+				.param("widthLevel", "2")
+				.param("reliabilityScore", "92"))
+			.andExpect(status().isBadRequest())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("입력값을 확인해 주세요")
+			.contains("계단 포함 여부를 선택해야 합니다.")
+			.contains("엘리베이터 필요 여부를 선택해야 합니다.")
+			.contains("에스컬레이터 필요 여부를 선택해야 합니다.")
+			.contains("간선 활성 여부를 선택해야 합니다.");
 	}
 
 	@Test
