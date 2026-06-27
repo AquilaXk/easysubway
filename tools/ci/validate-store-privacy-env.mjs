@@ -8,16 +8,25 @@ const requiredKeys = [
   "EASYSUBWAY_DATA_DELETION_EMAIL",
 ];
 
+const androidRcProductionKeys = [
+  "EASYSUBWAY_DATA_PACK_BASE_URL",
+  "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N",
+  "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E",
+  "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+  "EASYSUBWAY_DATAPACK_CHANNEL",
+  "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256",
+];
+
 function usage() {
   return [
-    `Usage: node ${basename(process.argv[1])} --env-file <path> [--github-env <path>]`,
+    `Usage: node ${basename(process.argv[1])} --env-file <path> [--github-env <path>] [--require-android-rc-production]`,
     "",
     "Validates store privacy release values restored from EASYSUBWAY_ENV.",
   ].join("\n");
 }
 
 function parseArgs(argv) {
-  const args = { envFile: null, githubEnv: null };
+  const args = { envFile: null, githubEnv: null, requireAndroidRcProduction: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--env-file") {
@@ -26,6 +35,8 @@ function parseArgs(argv) {
     } else if (arg === "--github-env") {
       args.githubEnv = argv[index + 1];
       index += 1;
+    } else if (arg === "--require-android-rc-production") {
+      args.requireAndroidRcProduction = true;
     } else {
       throw new Error(`Unknown argument: ${arg}\n${usage()}`);
     }
@@ -109,25 +120,64 @@ function validateEmail(key, value) {
   assertNoPlaceholder(key, value, match[1]);
 }
 
-function validateEnv(values) {
+function requireSingleLineValue(values, key) {
+  const value = values.get(key);
+  if (!value) {
+    throw new Error(`${key} is required`);
+  }
+
+  if (/[\r\n\0]/.test(value)) {
+    throw new Error(`${key} must be a single-line value`);
+  }
+
+  return value;
+}
+
+function validateTokenValue(key, value) {
+  assertNoPlaceholder(key, value);
+}
+
+function validateAndroidRcProduction(values, selected) {
+  for (const key of androidRcProductionKeys) {
+    selected.set(key, requireSingleLineValue(values, key));
+  }
+
+  validateHttpsUrl("EASYSUBWAY_DATA_PACK_BASE_URL", selected.get("EASYSUBWAY_DATA_PACK_BASE_URL"));
+  validateTokenValue(
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N",
+    selected.get("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N"),
+  );
+  validateTokenValue(
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E",
+    selected.get("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E"),
+  );
+  validateTokenValue(
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+    selected.get("EASYSUBWAY_DATAPACK_SIGNING_KEY_ID"),
+  );
+  if (selected.get("EASYSUBWAY_DATAPACK_CHANNEL") !== "production") {
+    throw new Error("EASYSUBWAY_DATAPACK_CHANNEL must be production");
+  }
+  validateTokenValue(
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256",
+    selected.get("EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256"),
+  );
+}
+
+function validateEnv(values, options = {}) {
   const selected = new Map();
   for (const key of requiredKeys) {
-    const value = values.get(key);
-    if (!value) {
-      throw new Error(`${key} is required`);
-    }
-
-    if (/[\r\n\0]/.test(value)) {
-      throw new Error(`${key} must be a single-line value`);
-    }
-
-    selected.set(key, value);
+    selected.set(key, requireSingleLineValue(values, key));
   }
 
   validateHttpsUrl("EASYSUBWAY_PRIVACY_POLICY_URL", selected.get("EASYSUBWAY_PRIVACY_POLICY_URL"));
   validateEmail("EASYSUBWAY_SUPPORT_EMAIL", selected.get("EASYSUBWAY_SUPPORT_EMAIL"));
   validateEmail("EASYSUBWAY_SECURITY_EMAIL", selected.get("EASYSUBWAY_SECURITY_EMAIL"));
   validateEmail("EASYSUBWAY_DATA_DELETION_EMAIL", selected.get("EASYSUBWAY_DATA_DELETION_EMAIL"));
+
+  if (options.requireAndroidRcProduction) {
+    validateAndroidRcProduction(values, selected);
+  }
 
   return selected;
 }
@@ -142,7 +192,9 @@ function appendGitHubEnv(path, values) {
 
 try {
   const args = parseArgs(process.argv.slice(2));
-  const values = validateEnv(parseDotenv(readFileSync(args.envFile, "utf8")));
+  const values = validateEnv(parseDotenv(readFileSync(args.envFile, "utf8")), {
+    requireAndroidRcProduction: args.requireAndroidRcProduction,
+  });
   if (args.githubEnv) {
     appendGitHubEnv(args.githubEnv, values);
   }
