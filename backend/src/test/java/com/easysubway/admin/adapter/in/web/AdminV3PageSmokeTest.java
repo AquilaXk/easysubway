@@ -284,6 +284,7 @@ class AdminV3PageSmokeTest {
 		assertThat(html)
 			.contains("통합 관리자")
 			.contains("admin-v3")
+			.contains("class=\"admin-shell\"")
 			.contains("class=\"admin-topbar-row\"")
 			.contains("href=\"#admin-content\"")
 			.contains("id=\"admin-content\"")
@@ -294,6 +295,8 @@ class AdminV3PageSmokeTest {
 			.contains("master data <strong>unknown</strong>")
 			.contains(expectedText);
 		assertThat(html.indexOf("href=\"#admin-content\""))
+			.isLessThan(html.indexOf("class=\"admin-shell\""));
+		assertThat(html.indexOf("class=\"admin-topbar-row\""))
 			.isLessThan(html.indexOf("id=\"admin-content\""));
 		assertThat(html.indexOf("id=\"admin-content\""))
 			.isLessThan(html.indexOf("<header class=\"admin-page-head\">"));

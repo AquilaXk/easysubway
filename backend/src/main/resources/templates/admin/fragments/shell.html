@@ -17,8 +17,8 @@
 		   th:text="${program.label}">메뉴</a>
 	</div>
 </nav>
+<a th:fragment="skipLink" class="skip-link" href="#admin-content">본문으로 건너뛰기</a>
 <div th:fragment="topbar" class="admin-topbar">
-	<a class="skip-link" href="#admin-content">본문으로 건너뛰기</a>
 	<div class="admin-topbar-row" aria-label="관리자 실행 환경">
 		<div class="admin-topbar-meta">
 			<span class="admin-env-badge"

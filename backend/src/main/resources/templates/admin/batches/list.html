@@ -7,6 +7,7 @@
 	<link rel="stylesheet" th:href="@{/css/admin-v3.css}">
 </head>
 <body class="admin-v3">
+<a th:replace="~{admin/fragments/shell :: skipLink}"></a>
 <div class="admin-shell">
 <div th:replace="~{admin/fragments/shell :: sidebar('a-batches')}"></div>
 <main class="admin-main">
