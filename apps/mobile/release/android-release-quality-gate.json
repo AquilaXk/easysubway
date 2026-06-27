@@ -23,6 +23,18 @@
   },
   "routeSafetyContract": "#571",
   "routeSafetyStatusEnum": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
+  "buildIdentityPolicy": {
+    "requiredIssueLinks": ["#1015", "#1016", "#1020"],
+    "acceptedBuildSources": ["rc-aab", "play-generated-apk", "play-installed-build"],
+    "requiredIdentityFields": [
+      "gitSha",
+      "versionCode",
+      "aabSha256",
+      "dataPackManifestSha256",
+      "androidApplicationId"
+    ],
+    "mismatchDisposition": "NO_GO"
+  },
   "deviceEvidencePolicy": {
     "codexQaDevice": "local_android_emulator_only",
     "physicalDeviceEvidence": "not_used_for_codex_pr_evidence",
@@ -111,6 +123,48 @@
       "releaseBlocker": true,
       "evidence": ["logcat-summary", "privacy-review-notes"],
       "passCriteriaKo": "crash/ANR reporting은 민감 위치, 신고 사진, receipt token, signing/credential 값을 노출하지 않는다."
+    }
+  ],
+  "requiredEvidenceSet": [
+    {
+      "id": "home_support_scope",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "홈에서 지원 범위와 다음 행동을 확인할 수 있다."
+    },
+    {
+      "id": "station_search",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "역 검색이 큰 글자와 TalkBack 조건에서 탐색 가능하다."
+    },
+    {
+      "id": "station_detail_facility_status",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "역 상세와 시설 상태가 색상만으로 전달되지 않는다."
+    },
+    {
+      "id": "route_result_found_unknown_unavailable",
+      "evidence": ["screenshot", "ui-tree", "copy-review-notes"],
+      "provesKo": "경로 상태별 안전 문구와 다음 행동이 구분된다."
+    },
+    {
+      "id": "route_map_fallback",
+      "evidence": ["screenshot", "ui-tree", "performance-summary"],
+      "provesKo": "노선도 조작, fallback list, 성능 예산을 확인한다."
+    },
+    {
+      "id": "facility_report_recovery",
+      "evidence": ["screenshot", "ui-tree", "logcat-summary"],
+      "provesKo": "신고 작성과 upload 실패 복구가 데이터 손실 없이 동작한다."
+    },
+    {
+      "id": "help_privacy_data_deletion",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "도움말, 개인정보, 삭제 요청 경로를 확인할 수 있다."
+    },
+    {
+      "id": "data_baseline_source_realtime_scope",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "데이터 기준일, 출처, 실시간 범위가 앱과 Play listing copy에 모순되지 않는다."
     }
   ],
   "evidencePolicy": {
