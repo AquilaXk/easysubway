@@ -1078,6 +1078,22 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
   assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020"]);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.acceptedArtifactSources, [
+    "rc-aab",
+    "play-generated-apk",
+    "play-installed-build",
+    "backend-release-image",
+  ]);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIdentityFields, [
+    "gitSha",
+    "versionCode",
+    "androidApplicationId",
+    "aabOrApkSha256",
+    "backendArtifactDigest",
+    "dataPackManifestSha256",
+  ]);
+  assert.equal(abusePenetrationRehearsalGate.buildIdentityPolicy.mismatchDisposition, "NO_GO");
   assert.ok(abusePenetrationRehearsalGate.artifactSecretAndEndpointScan.forbiddenFindings.includes("provider secret"));
   assert.ok(abusePenetrationRehearsalGate.artifactSecretAndEndpointScan.forbiddenFindings.includes("receipt token"));
   assert.deepEqual(
@@ -1092,6 +1108,17 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     ],
   );
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
+  assert.deepEqual(abusePenetrationRehearsalGate.manualRehearsalPolicy.githubSummaryFields, [
+    "scenarioId",
+    "artifactIdentity",
+    "commandOrManualCheck",
+    "findingCounts",
+    "result",
+    "redactionNotes",
+    "localEvidencePath",
+  ]);
+  assert.ok(abusePenetrationRehearsalGate.manualRehearsalPolicy.forbiddenInEvidence.includes("raw receipt token"));
+  assert.ok(abusePenetrationRehearsalGate.manualRehearsalPolicy.forbiddenInEvidence.includes("raw signed URL"));
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.waiverIssue, 1020);
   assert.deepEqual(
