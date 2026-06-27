@@ -43,19 +43,21 @@ public class AdminCommonCodeService {
 	}
 
 	public AdminCommonCode saveCode(SaveAdminCommonCodeCommand command) {
-		AdminCommonCodeGroup group = repository.findGroup(command.groupCode())
+		String groupCode = normalizeKey(command.groupCode());
+		String code = normalizeKey(command.code());
+		AdminCommonCodeGroup group = repository.findGroup(groupCode)
 			.orElseThrow(() -> new InvalidRequestException("허용되지 않은 공통코드 group입니다."));
 		if (!group.enabled()) {
 			throw new InvalidRequestException("비활성 공통코드 group에는 code를 추가할 수 없습니다.");
 		}
 		LocalDateTime now = LocalDateTime.now(clock);
-		AdminCommonCode existing = repository.findCode(command.groupCode(), command.code()).orElse(null);
+		AdminCommonCode existing = repository.findCode(groupCode, code).orElse(null);
 		LocalDateTime createdAt = existing == null ? now : existing.createdAt();
-		boolean enabled = AdminCommonCodeGroups.isRequiredIncidentCode(command.groupCode(), command.code())
+		boolean enabled = AdminCommonCodeGroups.isRequiredIncidentCode(groupCode, code)
 			|| command.enabled();
 		return repository.saveCode(new AdminCommonCode(
-			command.groupCode(),
-			command.code(),
+			groupCode,
+			code,
 			command.displayName(),
 			command.description(),
 			command.sortOrder(),
@@ -72,6 +74,10 @@ public class AdminCommonCodeService {
 		AdminCommonCode existing = repository.findCode(groupCode, code)
 			.orElseThrow(() -> new InvalidRequestException("비활성화할 공통코드를 찾을 수 없습니다."));
 		return repository.saveCode(existing.withEnabled(false, LocalDateTime.now(clock)));
+	}
+
+	private static String normalizeKey(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	public record SaveAdminCommonCodeCommand(
