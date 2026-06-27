@@ -135,9 +135,12 @@
     ],
     "requiredEvidenceSet": [
       "support-mailbox-receive-test",
+      "store-contact-preview",
+      "app-help-screen-contact-check",
       "security-mailbox-test",
       "data-deletion-mailbox-test",
       "privacy-request-routing-check",
+      "faq-copy-review",
       "data-error-triage-dry-run",
       "emergency-datapack-release-rollback-runbook-match",
       "incident-notice-copy-review",

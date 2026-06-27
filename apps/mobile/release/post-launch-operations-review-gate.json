@@ -127,6 +127,9 @@
       "localEvidencePath"
     ],
     "requiredEvidenceSet": [
+      "monitoring-dashboard-or-console-access-summary",
+      "alert-route-dry-run-log",
+      "post-launch-review-checklist-dry-run",
       "play-review-status-summary",
       "crash-anr-vitals-summary",
       "support-ticket-summary",
