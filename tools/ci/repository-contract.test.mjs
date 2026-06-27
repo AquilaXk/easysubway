@@ -3346,6 +3346,96 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   assert.match(applicationProdYml, /external-enabled: \$\{EASYSUBWAY_PUSH_EXTERNAL_ENABLED:false\}/);
 });
 
+test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제거 조건을 고정한다", () => {
+  const applicationYml = read("backend/src/main/resources/application.yml");
+  const applicationProdYml = read("backend/src/main/resources/application-prod.yml");
+  const transitionProperties = read(
+    "backend/src/main/java/com/easysubway/admin/transition/AdminPlatformTransitionProperties.java",
+  );
+  const transitionConfiguration = read(
+    "backend/src/main/java/com/easysubway/admin/transition/AdminPlatformTransitionConfiguration.java",
+  );
+  const transitionTest = read(
+    "backend/src/test/java/com/easysubway/admin/transition/AdminPlatformTransitionPropertiesTest.java",
+  );
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const securityTest = read("backend/src/test/java/com/easysubway/common/security/SecurityConfigTest.java");
+  const postgresAdminMigrations = [
+    "backend/src/main/resources/db/migration/postgresql/V10__admin_rbac_menu.sql",
+    "backend/src/main/resources/db/migration/postgresql/V11__admin_audit_events.sql",
+    "backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql",
+    "backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql",
+    "backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql",
+  ].map(read).join("\n");
+  const h2AdminMigrations = [
+    "backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql",
+    "backend/src/main/resources/db/migration/h2/V11__admin_audit_events.sql",
+    "backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql",
+    "backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql",
+    "backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql",
+  ].map(read).join("\n");
+
+  assert.match(applicationYml, /platform-transition:\s*\n\s*stage: \$\{EASYSUBWAY_ADMIN_PLATFORM_TRANSITION_STAGE:shadow\}/);
+  assert.match(applicationYml, /identity-store: \$\{EASYSUBWAY_ADMIN_IDENTITY_STORE_ENABLED:true\}/);
+  assert.match(applicationYml, /rbac-shadow: \$\{EASYSUBWAY_ADMIN_RBAC_SHADOW_ENABLED:true\}/);
+  assert.match(applicationYml, /rbac-enforcement: \$\{EASYSUBWAY_ADMIN_RBAC_ENFORCEMENT_ENABLED:false\}/);
+  assert.match(applicationYml, /audit-shadow: \$\{EASYSUBWAY_ADMIN_AUDIT_SHADOW_ENABLED:true\}/);
+  assert.match(applicationYml, /audit-enforcement: \$\{EASYSUBWAY_ADMIN_AUDIT_ENFORCEMENT_ENABLED:false\}/);
+  assert.match(applicationYml, /legacy-env-admin-fallback: \$\{EASYSUBWAY_ADMIN_LEGACY_ENV_FALLBACK_ENABLED:true\}/);
+  assert.match(applicationYml, /break-glass-bootstrap: \$\{EASYSUBWAY_ADMIN_BREAK_GLASS_BOOTSTRAP_ENABLED:true\}/);
+  assert.match(applicationYml, /role-seed-required: \$\{EASYSUBWAY_ADMIN_ROLE_SEED_REQUIRED:true\}/);
+  assert.match(applicationYml, /admin_rbac_shadow_denial_total/);
+  assert.match(applicationYml, /admin_audit_shadow_missing_total/);
+  assert.match(applicationYml, /all production admins have admin_users rows with role seed/);
+  assert.match(applicationYml, /break-glass bootstrap account was rotated after first use/);
+  assert.match(applicationYml, /restore EASYSUBWAY_ADMIN_USERNAME and EASYSUBWAY_ADMIN_PASSWORD/);
+  assert.match(applicationYml, /CREDENTIAL_ROTATION_REQUIRED/);
+  assert.match(applicationYml, /admin_role_permissions first/);
+  assert.match(applicationYml, /persistent admin_users seed is verified/);
+  assert.match(applicationYml, /disable rbac-enforcement and audit-enforcement/);
+  assert.match(applicationYml, /RBAC shadow denials are untriaged/);
+  assert.match(applicationYml, /role or account seed is missing in prod/);
+  assert.match(applicationProdYml, /blocker-mode: \$\{EASYSUBWAY_ADMIN_PLATFORM_RELEASE_BLOCKER_MODE:fail\}/);
+
+  assert.match(transitionConfiguration, /@EnableConfigurationProperties\(AdminPlatformTransitionProperties\.class\)/);
+  assert.match(transitionProperties, /@ConfigurationProperties\(prefix = "easysubway\.admin\.platform-transition"\)/);
+  assert.match(transitionProperties, /enum Stage[\s\S]*SHADOW,[\s\S]*ENFORCE,[\s\S]*LEGACY_DISABLED/);
+  assert.match(transitionProperties, /enum BlockerMode[\s\S]*WARN,[\s\S]*FAIL/);
+  assert.match(transitionProperties, /new Flags\(true, true, false, true, false, true, true, true\)/);
+  assert.match(transitionProperties, /record LegacyEnvAdminFallback/);
+  assert.match(transitionProperties, /record BreakGlass/);
+  assert.match(transitionProperties, /record Seed/);
+  assert.match(transitionProperties, /record Rollback/);
+  assert.match(transitionProperties, /record ReleaseGate/);
+  assert.match(transitionTest, /defaultsKeepShadowModeAndLegacyFallback/);
+  assert.match(transitionTest, /transitionStageAndEnforcementFlagsCanBeOverridden/);
+
+  assert.match(security, /validateProdAdminCredentials/);
+  assert.match(security, /validateBreakGlassCredentials/);
+  assert.match(security, /disableStaleBootstrapIdentities/);
+  assert.match(securityTest, /prodProfileFailsWhenAdminCredentialsAreMissing/);
+  assert.match(securityTest, /removedBootstrapIdentitiesAreDisabledOnStartup/);
+  assert.match(securityTest, /breakGlassAuthRecordsReasonAndRequiresCredentialRotation/);
+
+  for (const permission of [
+    "admin.view",
+    "admin.report.review",
+    "admin.report.photo.read",
+    "admin.master.edit",
+    "admin.field.operate",
+    "admin.data.operate",
+    "admin.security.audit",
+    "admin.security.admin",
+    "admin.audit.read",
+    "admin.privacy-log.read",
+    "admin.batch.retry",
+    "admin.operations.manage",
+  ]) {
+    assert.match(postgresAdminMigrations, new RegExp(permission.replace(".", "\\.")));
+    assert.match(h2AdminMigrations, new RegExp(permission.replace(".", "\\.")));
+  }
+});
+
 test("백엔드 사용자 데이터 삭제는 헥사고날 API 경계를 따른다", () => {
   const result = read("backend/src/main/java/com/easysubway/user/domain/UserDataDeletionResult.java");
   const invalidDeletion = read("backend/src/main/java/com/easysubway/user/domain/InvalidUserDataDeletionException.java");
