@@ -1317,6 +1317,19 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     assert.ok(Array.isArray(matrix.forbiddenSummaryValues), `${matrixId} must forbid sensitive summary values`);
     assert.ok(matrix.forbiddenSummaryValues.length > 0, `${matrixId} must have forbidden summary values`);
   }
+  for (const scenario of abusePenetrationRehearsalGate.abuseScenarios) {
+    const matrixEvidence = new Set(
+      Object.values(rehearsalMatrices)
+        .filter((matrix) => matrix.scenarioId === scenario.id)
+        .flatMap((matrix) => matrix.requiredEvidence),
+    );
+    for (const evidenceId of scenario.requiredEvidence) {
+      assert.ok(
+        matrixEvidence.has(evidenceId),
+        `${scenario.id} rehearsal matrices must include scenario evidence ${evidenceId}`,
+      );
+    }
+  }
   assert.ok(
     rehearsalMatrices.receiptTokenAbuse.forbiddenSummaryValues.includes("raw receipt token"),
     "receipt token rehearsal summary must not expose raw tokens",
