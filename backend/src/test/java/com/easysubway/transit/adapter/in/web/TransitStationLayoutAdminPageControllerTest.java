@@ -9,12 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -116,6 +119,88 @@ class TransitStationLayoutAdminPageControllerTest {
 		assertThat(html)
 			.contains("layout-sangnoksu-draft")
 			.contains("READY_FOR_REVIEW");
+	}
+
+	@Test
+	@DisplayName("역 구조도 상태 변경 폼은 같은 command token 재전송을 409로 차단한다")
+	@DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+	void stationLayoutStatusRejectsRepeatedCommandToken() throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		String token = commandTokenFrom(getAdminHtml("/admin/stations/station-sangnoksu/layouts/page", session));
+
+		mockMvc.perform(post("/admin/stations/station-sangnoksu/layouts/layout-sangnoksu-draft/page/status")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", token)
+				.param("expectedVersion", "1")
+				.param("status", "READY_FOR_REVIEW"))
+			.andExpect(status().is3xxRedirection());
+
+		String conflictHtml = mockMvc.perform(post("/admin/stations/station-sangnoksu/layouts/layout-sangnoksu-draft/page/status")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", token)
+				.param("expectedVersion", "1")
+				.param("status", "PUBLISHED"))
+			.andExpect(status().isConflict())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String html = getAdminHtml("/admin/stations/station-sangnoksu/layouts/page", session);
+
+		assertThat(conflictHtml)
+			.contains("요청이 최신 상태와 충돌했습니다")
+			.contains("이미 처리되었거나 만료된 관리자 요청입니다");
+		assertThat(html)
+			.contains("READY_FOR_REVIEW")
+			.doesNotContain("option value=\"PUBLISHED\" selected");
+	}
+
+	@Test
+	@DisplayName("역 구조도 상태 변경은 오래된 version 제출을 409로 차단한다")
+	@DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+	void stationLayoutStatusRejectsStaleExpectedVersion() throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		String firstToken = commandTokenFrom(getAdminHtml("/admin/stations/station-sangnoksu/layouts/page", session));
+		String staleToken = commandTokenFrom(getAdminHtml("/admin/stations/station-sangnoksu/layouts/page", session));
+
+		mockMvc.perform(post("/admin/stations/station-sangnoksu/layouts/layout-sangnoksu-draft/page/status")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", firstToken)
+				.param("expectedVersion", "1")
+				.param("status", "READY_FOR_REVIEW"))
+			.andExpect(status().is3xxRedirection());
+
+		String conflictHtml = mockMvc.perform(post("/admin/stations/station-sangnoksu/layouts/layout-sangnoksu-draft/page/status")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", staleToken)
+				.param("expectedVersion", "1")
+				.param("status", "PUBLISHED"))
+			.andExpect(status().isConflict())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String html = getAdminHtml("/admin/stations/station-sangnoksu/layouts/page", session);
+
+		assertThat(conflictHtml)
+			.contains("요청이 최신 상태와 충돌했습니다")
+			.contains("역 구조도 정보가 이미 변경되었습니다.");
+		assertThat(html)
+			.contains("v2")
+			.contains("READY_FOR_REVIEW")
+			.doesNotContain("option value=\"PUBLISHED\" selected");
 	}
 
 	@Test
@@ -501,5 +586,21 @@ class TransitStationLayoutAdminPageControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data[0].id").value("layout-sangnoksu-draft"))
 			.andExpect(jsonPath("$.data[0].status").value("DRAFT"));
+	}
+
+	private String getAdminHtml(String path, MockHttpSession session) throws Exception {
+		return mockMvc.perform(get(path)
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+	}
+
+	private static String commandTokenFrom(String html) {
+		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
+		assertThat(matcher.find()).isTrue();
+		return matcher.group(1);
 	}
 }

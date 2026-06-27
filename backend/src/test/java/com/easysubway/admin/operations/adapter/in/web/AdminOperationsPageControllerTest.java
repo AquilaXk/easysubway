@@ -9,14 +9,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
+import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -243,6 +247,55 @@ class AdminOperationsPageControllerTest {
 			});
 	}
 
+	@Test
+	@DisplayName("incident 생성 폼은 같은 command token 재전송을 409로 차단한다")
+	void incidentOpenRejectsRepeatedCommandToken() throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		String token = commandTokenFrom(getAdminHtml("/admin/incidents/page", session));
+
+		mockMvc.perform(post("/admin/incidents")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", token)
+				.param("severity", "MAJOR")
+				.param("status", "OPEN")
+				.param("source", "HEALTH")
+				.param("summary", "database DOWN")
+				.param("owner", "ops"))
+			.andExpect(status().is3xxRedirection());
+
+		String conflictHtml = mockMvc.perform(post("/admin/incidents")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("commandToken", token)
+				.param("severity", "MAJOR")
+				.param("status", "OPEN")
+				.param("source", "HEALTH")
+				.param("summary", "database DOWN")
+				.param("owner", "ops"))
+			.andExpect(status().isConflict())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		String incidentsHtml = getAdminHtml("/admin/incidents/page", session);
+
+		assertThat(conflictHtml)
+			.contains("요청이 최신 상태와 충돌했습니다")
+			.contains("이미 처리되었거나 만료된 관리자 요청입니다");
+		assertThat(incidentsHtml).containsOnlyOnce("database DOWN");
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.ADMIN_ACTION, 1))
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.outcome()).isEqualTo(AdminAuditOutcome.FAILURE);
+				assertThat(event.action()).isEqualTo("POST /admin/incidents");
+			});
+	}
+
 	private void saveCode(String code) throws Exception {
 		mockMvc.perform(post("/admin/codes")
 				.with(httpBasic("admin-user", "admin-test-password"))
@@ -269,5 +322,21 @@ class AdminOperationsPageControllerTest {
 				.param("summary", summary)
 				.param("owner", "ops"))
 			.andExpect(status().is3xxRedirection());
+	}
+
+	private String getAdminHtml(String path, MockHttpSession session) throws Exception {
+		return mockMvc.perform(get(path)
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+	}
+
+	private static String commandTokenFrom(String html) {
+		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
+		assertThat(matcher.find()).isTrue();
+		return matcher.group(1);
 	}
 }
