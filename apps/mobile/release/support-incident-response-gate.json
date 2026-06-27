@@ -145,7 +145,17 @@
       "data-error-triage-dry-run",
       "emergency-datapack-release-rollback-runbook-match",
       "incident-notice-copy-review",
-      "local-emulator-help-screen-screenshot-or-ui-tree"
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "official-contact-url-or-partner-contact-record",
+      "request-template",
+      "response-sla-note",
+      "source-owner-contact-record",
+      "license-and-correction-policy-note",
+      "emergency-source-archive",
+      "retention-policy-review",
+      "duplicate-report-triage-sample",
+      "override-rollback-sample",
+      "audit-log-redaction-check"
     ],
     "forbiddenInGithubSummary": [
       "support mailbox personal data",
