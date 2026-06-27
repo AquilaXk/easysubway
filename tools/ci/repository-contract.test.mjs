@@ -3319,8 +3319,7 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   assert.match(unavailableTransitMaster, /saveRouteNode[\s\S]*unsupportedWriteOperation\("saveRouteNode"\)/);
   assert.match(unavailableTransitMaster, /saveRouteEdge[\s\S]*unsupportedWriteOperation\("saveRouteEdge"\)/);
   assert.match(jdbcTransitMasterOverride, /@Repository\s+@Profile\("prod"\)/);
-  assert.match(jdbcTransitMasterOverride, /implements[\s\S]*LoadTransitMasterPort/);
-  assert.match(jdbcTransitMasterOverride, /implements[\s\S]*MasterDataCapabilityPort/);
+  assert.match(jdbcTransitMasterOverride, /extends UnavailableTransitMasterRepository/);
   assert.match(jdbcTransitMasterOverride, /implements[\s\S]*RollbackTransitMasterOverridePort/);
   assert.match(jdbcTransitMasterOverride, /transit_master_overrides/);
   assert.match(jdbcTransitMasterOverride, /transit_master_override_audits/);

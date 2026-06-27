@@ -1,15 +1,8 @@
 package com.easysubway.transit.adapter.out.persistence;
 
-import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.application.port.out.MasterDataCapability;
-import com.easysubway.transit.application.port.out.MasterDataCapabilityPort;
 import com.easysubway.transit.application.port.out.MasterDataCapabilityStatus;
 import com.easysubway.transit.application.port.out.RollbackTransitMasterOverridePort;
-import com.easysubway.transit.application.port.out.SaveAccessibilityFacilityStatusPort;
-import com.easysubway.transit.application.port.out.SaveRouteEdgePort;
-import com.easysubway.transit.application.port.out.SaveRouteNodePort;
-import com.easysubway.transit.application.port.out.SaveSimplifiedStationLayoutStatusPort;
-import com.easysubway.transit.application.port.out.SaveStationLayoutSourcePort;
 import com.easysubway.transit.application.port.out.TransitMasterOverrideAudit;
 import com.easysubway.transit.domain.AccessibilityFacility;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
@@ -18,12 +11,7 @@ import com.easysubway.transit.domain.RouteEdge;
 import com.easysubway.transit.domain.RouteNode;
 import com.easysubway.transit.domain.SimplifiedStationLayout;
 import com.easysubway.transit.domain.SimplifiedStationLayoutStatus;
-import com.easysubway.transit.domain.Station;
-import com.easysubway.transit.domain.StationExit;
 import com.easysubway.transit.domain.StationLayoutSource;
-import com.easysubway.transit.domain.StationLine;
-import com.easysubway.transit.domain.SubwayLine;
-import com.easysubway.transit.domain.TransitOperator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -42,15 +30,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("prod")
-public class JdbcTransitMasterOverrideRepository implements
-	LoadTransitMasterPort,
-	MasterDataCapabilityPort,
-	SaveAccessibilityFacilityStatusPort,
-	SaveStationLayoutSourcePort,
-	SaveSimplifiedStationLayoutStatusPort,
-	SaveRouteNodePort,
-	SaveRouteEdgePort,
-	RollbackTransitMasterOverridePort {
+public class JdbcTransitMasterOverrideRepository extends UnavailableTransitMasterRepository
+	implements RollbackTransitMasterOverridePort {
 
 	public static final String FACILITY = "ACCESSIBILITY_FACILITY";
 	public static final String LAYOUT_SOURCE = "STATION_LAYOUT_SOURCE";
@@ -58,7 +39,6 @@ public class JdbcTransitMasterOverrideRepository implements
 	public static final String ROUTE_NODE = "ROUTE_NODE";
 	public static final String ROUTE_EDGE = "ROUTE_EDGE";
 
-	private final InMemoryTransitMasterRepository seedRepository = new InMemoryTransitMasterRepository();
 	private final JdbcTemplate jdbcTemplate;
 	private final ObjectMapper objectMapper;
 
@@ -94,53 +74,28 @@ public class JdbcTransitMasterOverrideRepository implements
 	}
 
 	@Override
-	public List<TransitOperator> loadOperators() {
-		return seedRepository.loadOperators();
-	}
-
-	@Override
-	public List<SubwayLine> loadLines() {
-		return seedRepository.loadLines();
-	}
-
-	@Override
-	public List<Station> loadStations() {
-		return seedRepository.loadStations();
-	}
-
-	@Override
-	public List<StationLine> loadStationLines() {
-		return seedRepository.loadStationLines();
-	}
-
-	@Override
-	public List<StationExit> loadStationExits() {
-		return seedRepository.loadStationExits();
-	}
-
-	@Override
 	public List<AccessibilityFacility> loadAccessibilityFacilities() {
-		return merge(seedRepository.loadAccessibilityFacilities(), AccessibilityFacility::id, FACILITY, AccessibilityFacility.class);
+		return merge(super.loadAccessibilityFacilities(), AccessibilityFacility::id, FACILITY, AccessibilityFacility.class);
 	}
 
 	@Override
 	public List<StationLayoutSource> loadStationLayoutSources() {
-		return merge(seedRepository.loadStationLayoutSources(), StationLayoutSource::id, LAYOUT_SOURCE, StationLayoutSource.class);
+		return merge(super.loadStationLayoutSources(), StationLayoutSource::id, LAYOUT_SOURCE, StationLayoutSource.class);
 	}
 
 	@Override
 	public List<SimplifiedStationLayout> loadSimplifiedStationLayouts() {
-		return merge(seedRepository.loadSimplifiedStationLayouts(), SimplifiedStationLayout::id, LAYOUT, SimplifiedStationLayout.class);
+		return merge(super.loadSimplifiedStationLayouts(), SimplifiedStationLayout::id, LAYOUT, SimplifiedStationLayout.class);
 	}
 
 	@Override
 	public List<RouteNode> loadRouteNodes() {
-		return merge(seedRepository.loadRouteNodes(), RouteNode::id, ROUTE_NODE, RouteNode.class);
+		return merge(super.loadRouteNodes(), RouteNode::id, ROUTE_NODE, RouteNode.class);
 	}
 
 	@Override
 	public List<RouteEdge> loadRouteEdges() {
-		return merge(seedRepository.loadRouteEdges(), RouteEdge::id, ROUTE_EDGE, RouteEdge.class);
+		return merge(super.loadRouteEdges(), RouteEdge::id, ROUTE_EDGE, RouteEdge.class);
 	}
 
 	@Override
