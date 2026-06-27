@@ -28,6 +28,24 @@
     ],
     "androidEvidenceSourceKo": "QA 요청에 따라 실기기가 아니라 로컬 Android emulator에서 앱 실행, UI tree, logcat, network endpoint trace 요약을 수집한다."
   },
+  "crashAnrPrivacyEvidence": {
+    "separateCrashProvider": false,
+    "sourceOfTruth": ["Android vitals", "Google Play pre-launch report"],
+    "requiredEvidence": [
+      "no-crash-sdk-dependency-scan",
+      "android-vitals-or-play-pre-launch-report-export",
+      "redacted-logcat-or-crash-summary"
+    ],
+    "forbiddenPayload": [
+      "precise coordinates",
+      "facility report photo",
+      "receipt token",
+      "signed upload URL",
+      "provider secret",
+      "object storage credential"
+    ],
+    "privacyAnswerKo": "Android v1은 별도 crash SDK를 사용하지 않으며 충돌/ANR 확인은 Android vitals와 Play pre-launch report를 기준으로 한다."
+  },
   "abusePenetrationRehearsalGate": "apps/mobile/release/abuse-penetration-rehearsal-gate.json",
   "abusePenetrationRehearsal": {
     "requiredScenarios": [
