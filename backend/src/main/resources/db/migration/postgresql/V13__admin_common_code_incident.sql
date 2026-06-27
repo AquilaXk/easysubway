@@ -43,7 +43,7 @@ CREATE TABLE admin_incidents (
     resolution CHARACTER VARYING(500),
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
-    CHECK (
+    CHECK ( -- NOSONAR
         (status = 'RESOLVED' AND resolved_at IS NOT NULL AND resolution IS NOT NULL)
         OR (status <> 'RESOLVED' AND resolved_at IS NULL AND resolution IS NULL)
     )
