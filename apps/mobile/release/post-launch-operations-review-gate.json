@@ -115,6 +115,33 @@
     "post-launch-review-checklist-dry-run",
     "fixed-release-owner-acknowledgement"
   ],
+  "releaseEvidenceSummaryPolicy": {
+    "githubSummaryFields": [
+      "reviewWindowId",
+      "artifactIdentity",
+      "signalSnapshot",
+      "owner",
+      "decision",
+      "goNoGoResult",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "requiredEvidenceSet": [
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "support-ticket-summary",
+      "data-error-backlog-summary",
+      "datapack-adoption-summary",
+      "provider-quota-summary",
+      "fixed-release-owner-acknowledgement"
+    ],
+    "forbiddenInGithubSummary": [
+      "Play Console account data",
+      "support mailbox personal data",
+      "device identifiers",
+      "provider credential or quota token"
+    ]
+  },
   "sensitiveEvidencePolicy": {
     "localOnly": true,
     "githubUploadPolicy": "summary-only",

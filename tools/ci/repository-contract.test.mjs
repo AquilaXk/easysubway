@@ -1049,6 +1049,31 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(postLaunchOperationsReviewGate.stagedRolloutPolicy.initialProductionRelease, "not-available-for-first-public-release");
   assert.ok(postLaunchOperationsReviewGate.stagedRolloutPolicy.secondAndLaterUpdates.includes("halt-rollout-on-p0-or-policy-warning"));
   assert.ok(postLaunchOperationsReviewGate.dryRunRequiredEvidence.includes("alert-route-dry-run-log"));
+  assert.deepEqual(postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.githubSummaryFields, [
+    "reviewWindowId",
+    "artifactIdentity",
+    "signalSnapshot",
+    "owner",
+    "decision",
+    "goNoGoResult",
+    "redactionNotes",
+    "localEvidencePath",
+  ]);
+  assert.ok(
+    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "crash-anr-vitals-summary",
+    ),
+  );
+  assert.ok(
+    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "fixed-release-owner-acknowledgement",
+    ),
+  );
+  assert.ok(
+    postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(
+      "Play Console account data",
+    ),
+  );
   assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
   assert.equal(supportIncidentResponseGate.issue, 1019);
   assert.equal(supportIncidentResponseGate.status, "BLOCKED_EXTERNAL");
@@ -1072,6 +1097,30 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence.includes("override-rollback-sample"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("data-error-triage-dry-run"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("local-emulator-help-screen-screenshot-or-ui-tree"));
+  assert.deepEqual(supportIncidentResponseGate.supportEvidenceSummaryPolicy.githubSummaryFields, [
+    "channelId",
+    "redactedReceiptReference",
+    "receivedAt",
+    "owner",
+    "result",
+    "redactionNotes",
+    "localEvidencePath",
+  ]);
+  assert.ok(
+    supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "support-mailbox-receive-test",
+    ),
+  );
+  assert.ok(
+    supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
+      "p0-data-error-triage-dry-run",
+    ),
+  );
+  assert.ok(
+    supportIncidentResponseGate.supportEvidenceSummaryPolicy.forbiddenInGithubSummary.includes(
+      "raw report receipt token",
+    ),
+  );
   assert.equal(abusePenetrationRehearsalGate.releaseGate, "abuse-penetration-rehearsal");
   assert.equal(abusePenetrationRehearsalGate.issue, 1022);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
