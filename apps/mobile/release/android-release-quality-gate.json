@@ -41,7 +41,42 @@
     "releaseRcEvidence": "play_installed_or_exact_rc_required_before_go",
     "minimumAndroidApi": 35,
     "fontScales": [1.5, 2.0],
-    "smallScreenViewport": "compact_phone_portrait"
+    "smallScreenViewport": "compact_phone_portrait",
+    "requiredDeviceDiscoveryCommands": [
+      "flutter emulators",
+      "emulator -list-avds",
+      "ANDROID_HOME or ANDROID_SDK_ROOT emulator path check",
+      "flutter devices",
+      "adb devices"
+    ],
+    "emptyAdbDevicesDisposition": "INSUFFICIENT_EVIDENCE"
+  },
+  "manualEvidenceSummaryPolicy": {
+    "commonRequiredFields": [
+      "checkId",
+      "buildIdentity",
+      "evidencePaths",
+      "result",
+      "blockerDisposition"
+    ],
+    "allowedFields": [
+      "checkId",
+      "buildIdentity",
+      "buildSource",
+      "deviceId",
+      "androidApi",
+      "fontScale",
+      "viewport",
+      "evidencePaths",
+      "uiTreePath",
+      "screenshotOrRecordingPath",
+      "logcatSummaryPath",
+      "result",
+      "blockerDisposition"
+    ],
+    "requiredResultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_APPLICABLE_WITH_REASON"],
+    "forbiddenSummaryValues": ["TBD", "TODO", "unknown", "not checked", "not captured"],
+    "summaryRequiredKo": "PR에는 checkId, build identity, device 조건, evidence path, 결과, blocker 판단을 민감정보 없이 요약하고 실제 파일은 local-only evidence root에 둔다."
   },
   "requiredChecks": [
     {
@@ -165,6 +200,58 @@
       "id": "data_baseline_source_realtime_scope",
       "evidence": ["screenshot", "ui-tree"],
       "provesKo": "데이터 기준일, 출처, 실시간 범위가 앱과 Play listing copy에 모순되지 않는다."
+    }
+  ],
+  "checkEvidenceMatrix": [
+    {
+      "checkId": "route_safety_status_copy",
+      "requiredEvidenceIds": ["route_result_found_unknown_unavailable"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "talkback_primary_journey",
+      "requiredEvidenceIds": ["home_support_scope", "station_search", "route_result_found_unknown_unavailable", "facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "font_scale_150_200_small_screen",
+      "requiredEvidenceIds": ["home_support_scope", "station_search", "route_result_found_unknown_unavailable", "facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "fontScale", "viewport", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "high_contrast_state_visibility",
+      "requiredEvidenceIds": ["station_detail_facility_status", "route_result_found_unknown_unavailable", "facility_report_recovery"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "location_permission_denied_recovery",
+      "requiredEvidenceIds": ["station_search", "route_result_found_unknown_unavailable"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "network_server_upload_error_recovery",
+      "requiredEvidenceIds": ["station_search", "route_result_found_unknown_unavailable", "facility_report_recovery"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "route_map_fallback_zoom_help",
+      "requiredEvidenceIds": ["route_map_fallback"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "route_map_performance_budget",
+      "requiredEvidenceIds": ["route_map_fallback"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "scope_source_realtime_support_ui",
+      "requiredEvidenceIds": ["home_support_scope", "data_baseline_source_realtime_scope"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "crash_anr_privacy_safe_reporting",
+      "requiredEvidenceIds": ["facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "result", "blockerDisposition"]
     }
   ],
   "evidencePolicy": {
