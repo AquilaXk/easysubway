@@ -167,9 +167,12 @@ function readBackendIdentity(parsedArgs) {
   const inspect = JSON.parse(readFileSync(inspectPath, "utf8"));
   const firstImage = Array.isArray(inspect) ? inspect[0] : inspect;
   const repoDigest = firstImage?.RepoDigests?.find((digest) => digest.includes("@sha256:"));
+  const imageId = typeof firstImage?.Id === "string" && firstImage.Id.startsWith("sha256:")
+    ? firstImage.Id
+    : null;
   return {
-    backendImageDigest: repoDigest?.split("@").at(-1) ?? null,
-    backendArtifactSha256: null,
+    backendImageDigest: repoDigest?.split("@").at(-1) ?? imageId,
+    backendArtifactSha256: repoDigest || imageId ? null : sha256FileIfExists(inspectPath),
   };
 }
 
