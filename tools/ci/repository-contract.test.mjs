@@ -1089,9 +1089,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "gitSha",
     "versionCode",
     "androidApplicationId",
-    "aabOrApkSha256",
-    "backendArtifactDigest",
     "dataPackManifestSha256",
+  ]);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIdentityAnyOf, [
+    ["aabSha256", "generatedApkSha256"],
+    ["backendImageDigest", "backendArtifactSha256"],
   ]);
   assert.equal(abusePenetrationRehearsalGate.buildIdentityPolicy.mismatchDisposition, "NO_GO");
   assert.ok(abusePenetrationRehearsalGate.artifactSecretAndEndpointScan.forbiddenFindings.includes("provider secret"));

@@ -16,9 +16,11 @@
       "gitSha",
       "versionCode",
       "androidApplicationId",
-      "aabOrApkSha256",
-      "backendArtifactDigest",
       "dataPackManifestSha256"
+    ],
+    "requiredIdentityAnyOf": [
+      ["aabSha256", "generatedApkSha256"],
+      ["backendImageDigest", "backendArtifactSha256"]
     ],
     "mismatchDisposition": "NO_GO"
   },
