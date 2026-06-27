@@ -141,6 +141,7 @@
       "data-deletion-mailbox-test",
       "privacy-request-routing-check",
       "faq-copy-review",
+      "support-channel-access-check",
       "data-error-triage-dry-run",
       "emergency-datapack-release-rollback-runbook-match",
       "incident-notice-copy-review",

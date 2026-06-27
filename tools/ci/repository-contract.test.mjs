@@ -1118,6 +1118,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       `${evidenceId} must be included in support GitHub summary evidence`,
     );
   }
+  for (const evidenceId of supportIncidentResponseGate.dryRunRequiredEvidence) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
   assert.ok(
     supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
       "support-mailbox-receive-test",
