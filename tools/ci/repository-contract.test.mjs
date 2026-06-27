@@ -10,6 +10,10 @@ import { inflateSync } from "node:zlib";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const validDataPackPublicKeyModulus =
+  "itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w";
+const validPlayAppSigningFingerprint =
+  "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99";
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -67,10 +71,27 @@ function workflowFiles() {
 }
 
 function assertActionsEnvSecretPolicy(file, source) {
-  const disallowedSecretAccess = /secrets(?:\.EASYSUBWAY_(?!ENV\b)[A-Z0-9_]+|\[['"]EASYSUBWAY_(?!ENV['"]?\])[A-Z0-9_]+['"]\])/;
+  const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
   const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
+  const allowedExtraSecrets = file === ".github/workflows/release-artifacts.yml"
+    ? new Set([
+        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+        "EASYSUBWAY_ANDROID_KEY_ALIAS",
+        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+      ])
+    : new Set();
 
-  assert.doesNotMatch(source, disallowedSecretAccess, `${file} must use only secrets.EASYSUBWAY_ENV`);
+  for (const match of source.matchAll(secretAccess)) {
+    const secretName = match[1] ?? match[2];
+    if (
+      secretName.startsWith("EASYSUBWAY_") &&
+      secretName !== "EASYSUBWAY_ENV" &&
+      !allowedExtraSecrets.has(secretName)
+    ) {
+      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved Android upload key secrets`);
+    }
+  }
   assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
 }
 
@@ -929,6 +950,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play internal track upload or pre-launch report evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK or Play-installed build smoke evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Android 16 KB page-size AAB and runtime smoke evidence"));
+  assert.equal(gate.artifacts.android.productionRcArtifactStoreReadyCandidate, true);
+  assert.equal(gate.artifacts.android.productionRcSigningKeyType, "production-upload-key");
+  assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("uploadKeySha256Fingerprint"));
+  assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("appSigningKeySha256Fingerprint"));
+  assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("versionCodeMonotonicPolicy"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play production access or closed test requirement satisfaction evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK device compatibility matrix evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Post-launch 2h/24h/7d/30d operations review evidence"));
@@ -1156,6 +1182,38 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(gate.evidencePolicy.githubUploadPolicy, "summary-only");
 
   assert.match(workflow, /toolchain_policy=apps\/mobile\/release\/signed-release-artifact-gate\.json/);
+  assert.match(workflow, /toolchainPolicy=apps\/mobile\/release\/signed-release-artifact-gate\.json/);
+  assert.match(workflow, /android_rc_signing_mode:/);
+  assert.match(workflow, /production-upload-key/);
+  assert.match(workflow, /android-production-rc/);
+  assert.match(workflow, /android-production-rc-release:/);
+  assert.match(workflow, /name: Android Production RC Artifact/);
+  assert.match(workflow, /if: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.android_rc_signing_mode == 'production-upload-key' \}\}/);
+  assert.match(workflow, /environment:\s*\n\s*name: android-production-rc/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64: \$\{\{ secrets\.EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64 \}\}/);
+  assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256/);
+  assert.match(workflow, /EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256/);
+  assert.match(workflow, /--require-android-rc-production/);
+  assert.match(workflow, /base64 --decode > "\$\{EASYSUBWAY_ANDROID_KEYSTORE_PATH\}"/);
+  assert.match(workflow, /rm -f "\$\{RUNNER_TEMP\}\/easysubway-ci-release\.jks" "\$\{RUNNER_TEMP\}\/easysubway-upload-key\.jks" "\$\{RUNNER_TEMP\}\/easysubway-release\.env"/);
+  assert.match(workflow, /gitSha=\$\{GITHUB_SHA\}/);
+  assert.match(workflow, /storeReadyCandidate=true/);
+  assert.match(workflow, /signingKeyType=production-upload-key/);
+  assert.match(workflow, /uploadKeySha256Fingerprint=\$\{EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256\}/);
+  assert.match(workflow, /appSigningKeySha256Fingerprint=\$\{EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256\}/);
+  assert.match(workflow, /versionName=\$\{version_name\}/);
+  assert.match(workflow, /versionCode=\$\{version_code\}/);
+  assert.match(workflow, /packageId=com\.easysubway\.app/);
+  assert.match(workflow, /aabSha256=\$\{aab_sha256\}/);
+  assert.match(workflow, /dataPackManifestSha256=\$\{data_pack_manifest_sha256\}/);
+  assert.match(workflow, /routeContractVersion=route-map-contract-v1/);
+  assert.match(workflow, /realtimeContractVersion=seoul-topis-schema-v1/);
+  assert.match(workflow, /mappingRetentionDays=90/);
+  assert.match(workflow, /versionCodeMonotonicPolicy=must_be_greater_than_latest_play_uploaded_artifact/);
+  assert.match(workflow, /failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver/);
+  for (const key of gate.artifacts.android.productionRcRequiredMetadata) {
+    assert.match(workflow, new RegExp(`${key}=`), `${key} must be emitted in production RC metadata`);
+  }
   assert.match(workflow, /store_ready=false/);
   assert.match(workflow, /signing_key_type=temporary-self-signed/);
   assert.match(workflow, /play_submission_evidence=blocked_missing_internal_track_or_prelaunch_report/);
@@ -1171,11 +1229,16 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /name: RC Evidence Manifest/);
   assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs "\$\{generator_args\[@\]\}"/);
   assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
+  assert.match(workflow, /android_artifact_source="none"/);
+  assert.match(workflow, /android_artifact_source="easysubway-android-production-rc-\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /android_artifact_source="easysubway-android-release-\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /android_artifact_source=\$\{android_artifact_source\}/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-android-aab-16kb-page-size\.sh release-artifacts\/android\/check-android-aab-16kb-page-size\.sh/);
   assert.match(workflow, /cp \.\.\/\.\.\/tools\/mobile\/check-elf-load-alignment\.mjs release-artifacts\/android\/check-elf-load-alignment\.mjs/);
   assert.match(workflow, /page_size_16kb_evidence=blocked_until_tools_mobile_check_android_aab_16kb_page_size_passes_and_runtime_PAGE_SIZE_16384_smoke_passes/);
@@ -1189,6 +1252,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(workflow, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/android\/signed-release-artifact-gate\.json/);
   assert.doesNotMatch(workflow, /signing_key_type=no-codesign/);
+  assert.doesNotMatch(workflow, /echo "\$\{EASYSUBWAY_ANDROID_STORE_PASSWORD\}"/);
+  assert.doesNotMatch(workflow, /echo "\$\{EASYSUBWAY_ANDROID_KEY_PASSWORD\}"/);
+  assert.doesNotMatch(workflow, /echo "\$\{EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64\}"/);
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
   assert.doesNotMatch(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
 
@@ -1199,6 +1265,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /TestFlight/);
   assert.match(readme, /dSYM 90일 보관 workflow/);
   assert.match(readme, /Play internal track/);
+  assert.match(readme, /production upload key/);
+  assert.match(readme, /android-production-rc/);
+  assert.match(readme, /versionCode/);
   assert.match(readme, /Android 16 KB page-size gate/);
   assert.match(readme, /Google Play production access/);
   assert.match(readme, /12명 이상/);
@@ -1602,6 +1671,44 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@easysubway\.app$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway\.app$/m);
 
+  const rcEnv = path.join(dir, "android-rc.env");
+  await writeFile(rcEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
+    `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "",
+  ].join("\n"));
+  const rcGithubEnv = path.join(dir, "android-rc-github.env");
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      rcEnv,
+      "--github-env",
+      rcGithubEnv,
+      "--require-android-rc-production",
+    ],
+    {
+      cwd: root,
+    },
+  );
+  const rcGithubEnvOutput = readFileSync(rcGithubEnv, "utf8");
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/cdn\.easysubway\.app\/datapacks\/$/m);
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1$/m);
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_CHANNEL=production$/m);
+  assert.match(
+    rcGithubEnvOutput,
+    new RegExp(`^EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${escapeRegExp(validPlayAppSigningFingerprint)}$`, "m"),
+  );
+
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.local/privacy",
@@ -1615,6 +1722,84 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
       cwd: root,
     }),
     /must not use local or placeholder values/,
+  );
+
+  const invalidRcEnv = path.join(dir, "invalid-android-rc.env");
+  await writeFile(invalidRcEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=http://localhost/datapacks/",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=staging",
+    `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      invalidRcEnv,
+      "--require-android-rc-production",
+    ], {
+      cwd: root,
+    }),
+    /EASYSUBWAY_DATA_PACK_BASE_URL must be a valid HTTPS URL|EASYSUBWAY_DATAPACK_CHANNEL must be production/,
+  );
+
+  const invalidRcKeyEnv = path.join(dir, "invalid-android-rc-key.env");
+  await writeFile(invalidRcKeyEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      invalidRcKeyEnv,
+      "--require-android-rc-production",
+    ], {
+      cwd: root,
+    }),
+    /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N must be a base64url RSA modulus of at least 2048 bits/,
+  );
+
+  const invalidRcFingerprintEnv = path.join(dir, "invalid-android-rc-fingerprint.env");
+  await writeFile(invalidRcFingerprintEnv, [
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.app/privacy",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.app",
+    "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.app",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.app",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.easysubway.app/datapacks/",
+    `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
+    "EASYSUBWAY_DATAPACK_CHANNEL=production",
+    "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      invalidRcFingerprintEnv,
+      "--require-android-rc-production",
+    ], {
+      cwd: root,
+    }),
+    /EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256 must be a full SHA-256 fingerprint/,
   );
 });
 
