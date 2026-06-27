@@ -40,17 +40,30 @@
       "inventoryRequired": true,
       "defaultDenyRequired": true,
       "newApiOrAdminEndpointWithoutMatcherBlocksRelease": true,
+      "securityMatcherComparisonRequired": true,
       "allowedPublicEndpoints": [
         "/api/health",
         "/actuator/health",
-        "/actuator/health/**",
+        "/actuator/prometheus",
+        "/api/v1/report-uploads",
+        "/api/v1/report-uploads/{uploadId}",
+        "/api/v1/reports",
+        "/api/v1/reports/{reportId}",
+        "/api/v1/reports/{reportId}/confirm",
+        "/api/v1/realtime/arrivals",
+        "/api/v1/realtime/train-positions"
+      ],
+      "allowedPublicSecurityMatchers": [
         "/api/v1/report-uploads",
         "/api/v1/report-uploads/*",
         "/api/v1/reports",
         "/api/v1/reports/*",
         "/api/v1/reports/*/confirm",
-        "/api/v1/realtime/arrivals",
-        "/api/v1/realtime/train-positions"
+        "/api/health",
+        "/actuator/health",
+        "/actuator/health/**",
+        "/actuator/prometheus",
+        "/api/v1/realtime/**"
       ],
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
