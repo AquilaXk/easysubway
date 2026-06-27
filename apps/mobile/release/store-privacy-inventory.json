@@ -324,13 +324,13 @@
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Diagnostics",
-        "collected": true,
-        "collectionType": "diagnostic-event",
+        "collected": false,
+        "collectionType": "local-only-diagnostic-event",
         "purpose": "App functionality",
-        "linkedToUser": true,
+        "linkedToUser": false,
         "encryptedInTransit": true,
         "optional": false,
-        "required": true,
+        "required": false,
         "deletionSupported": true
       },
       "appStorePrivacy": {

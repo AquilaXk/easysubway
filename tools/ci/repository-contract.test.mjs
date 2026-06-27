@@ -6966,8 +6966,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "home_support_scope",
     "station_search",
     "station_detail_facility_status",
-    "route_result_found",
-    "route_result_unknown_or_needs_confirmation",
+    "route_result_found_and_unknown_or_needs_confirmation",
     "facility_report_form",
     "report_receipt_status",
     "help_privacy_data_deletion",
@@ -7505,11 +7504,19 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(item.sharedWithThirdParties, false, `${id} must not be shared with third parties`);
     assert.equal(item.usedForTracking, false, `${id} must not be used for tracking`);
     assert.ok(item.googlePlayDataSafety?.dataType, `${id} must map to Play Data safety`);
-    assert.equal(item.googlePlayDataSafety.collected, true, `${id} must declare Play collection`);
+    assert.equal(typeof item.googlePlayDataSafety.collected, "boolean", `${id} must declare Play collection`);
+    assert.equal(
+      item.googlePlayDataSafety.collected,
+      item.implementationStatus !== "local-only",
+      `${id} Play collection must match release collection status`,
+    );
     assert.equal(typeof item.googlePlayDataSafety.collectionType, "string", `${id} must declare Play collection type`);
     assert.ok(item.googlePlayDataSafety.collectionType.length > 0, `${id} collection type must not be empty`);
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
-    assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} must declare Play linked-to-user value`);
+    assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
+    if (item.googlePlayDataSafety.collected) {
+      assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} collected Play data must be linked to user`);
+    }
     assert.equal(
       item.googlePlayDataSafety.encryptedInTransit,
       true,
@@ -7517,11 +7524,15 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     );
     assert.equal(typeof item.googlePlayDataSafety.optional, "boolean", `${id} must declare optional value`);
     assert.equal(typeof item.googlePlayDataSafety.required, "boolean", `${id} must declare required value`);
-    assert.equal(
-      item.googlePlayDataSafety.required,
-      !item.googlePlayDataSafety.optional,
-      `${id} Play required value must be the inverse of optional`,
-    );
+    if (item.googlePlayDataSafety.collected) {
+      assert.equal(
+        item.googlePlayDataSafety.required,
+        !item.googlePlayDataSafety.optional,
+        `${id} Play required value must be the inverse of optional`,
+      );
+    } else {
+      assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
+    }
     assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
   }
 
@@ -7558,7 +7569,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(items.get("facility_report_location").googlePlayDataSafety.optional, true);
   assert.equal(items.get("facility_report_location").googlePlayDataSafety.collectionType, "user-triggered");
   assert.equal(items.get("diagnostics_crash_logs").googlePlayDataSafety.dataType, "Diagnostics");
-  assert.equal(items.get("diagnostics_crash_logs").googlePlayDataSafety.collectionType, "diagnostic-event");
+  assert.equal(items.get("diagnostics_crash_logs").googlePlayDataSafety.collected, false);
+  assert.equal(items.get("diagnostics_crash_logs").googlePlayDataSafety.collectionType, "local-only-diagnostic-event");
+  assert.equal(items.get("diagnostics_crash_logs").googlePlayDataSafety.linkedToUser, false);
+  assert.equal(items.get("diagnostics_performance_logs").googlePlayDataSafety.collected, true);
+  assert.equal(items.get("diagnostics_performance_logs").googlePlayDataSafety.collectionType, "diagnostic-event");
   assert.ok(
     items.get("favorite_stations_routes_facilities").evidence.includes("apps/mobile/lib/station_search.dart"),
     "favorite station evidence must include the station search implementation",

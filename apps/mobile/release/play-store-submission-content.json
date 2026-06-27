@@ -34,12 +34,8 @@
       "titleKo": "역 상세와 시설 상태"
     },
     {
-      "id": "route_result_found",
-      "titleKo": "경로 검색 결과"
-    },
-    {
-      "id": "route_result_unknown_or_needs_confirmation",
-      "titleKo": "경로 확인 필요 안내"
+      "id": "route_result_found_and_unknown_or_needs_confirmation",
+      "titleKo": "경로 검색 결과와 확인 필요 상태"
     },
     {
       "id": "facility_report_form",
