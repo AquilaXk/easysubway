@@ -1,6 +1,7 @@
 package com.easysubway.report.adapter.in.web;
 
 import com.easysubway.admin.audit.application.service.AdminAuditWriter;
+import com.easysubway.admin.web.AdminFormErrorView;
 import com.easysubway.common.domain.PageResult;
 import com.easysubway.common.web.WebMessageResolver;
 import com.easysubway.common.web.pagination.EgovPaginationView;
@@ -16,6 +17,9 @@ import com.easysubway.report.domain.FacilityReportStatus;
 import com.easysubway.report.domain.ReportProcessingTimeSummary;
 import com.easysubway.transit.domain.MasterDataWriteNotAllowedException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.Clock;
@@ -31,7 +35,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -156,15 +162,7 @@ class FacilityReportAdminPageController {
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		model.addAttribute("report", FacilityReportDetailPageView.from(facilityReportUseCase.getReport(reportId), messages));
-		model.addAttribute(
-			"reviewAudits",
-			facilityReportUseCase.listReviewAudits(reportId)
-				.stream()
-				.map(audit -> FacilityReportReviewAuditPageRow.from(audit, messages))
-				.toList()
-		);
-		model.addAttribute("reviewActions", reviewActions());
+		populateReportDetailModel(reportId, model, null);
 		auditWriter.privacyRead(
 			authentication,
 			request,
@@ -174,6 +172,19 @@ class FacilityReportAdminPageController {
 			"업무 맥락: 신고 상세 조회"
 		);
 		return "admin/reports/detail";
+	}
+
+	private void populateReportDetailModel(String reportId, Model model, ReviewReportForm submittedForm) {
+		model.addAttribute("report", FacilityReportDetailPageView.from(facilityReportUseCase.getReport(reportId), messages));
+		model.addAttribute(
+			"reviewAudits",
+			facilityReportUseCase.listReviewAudits(reportId)
+				.stream()
+				.map(audit -> FacilityReportReviewAuditPageRow.from(audit, messages))
+				.toList()
+		);
+		model.addAttribute("reviewActions", reviewActions());
+		model.addAttribute("reviewForm", submittedForm == null ? new ReviewReportForm(null, "") : submittedForm);
 	}
 
 	@GetMapping("/admin/reports/photos")
@@ -203,14 +214,22 @@ class FacilityReportAdminPageController {
 	@PreAuthorize("hasAuthority('admin.report.review')")
 	String reviewReportFromPage(
 		@PathVariable String reportId,
-		@RequestParam FacilityReportReviewDecision decision,
-		@RequestParam(required = false) String duplicateOfReportId,
+		@Valid @ModelAttribute("reviewForm") ReviewReportForm form,
+		BindingResult bindingResult,
 		Principal principal,
-		RedirectAttributes redirectAttributes
+		RedirectAttributes redirectAttributes,
+		Model model,
+		HttpServletResponse response
 	) {
+		if (bindingResult.hasErrors()) {
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			populateReportDetailModel(reportId, model, form);
+			AdminFormErrorView.expose(model, bindingResult);
+			return "admin/reports/detail";
+		}
 		try {
 			facilityReportUseCase.reviewReport(
-				new ReviewFacilityReportCommand(reportId, decision, principal.getName(), duplicateOfReportId)
+				new ReviewFacilityReportCommand(reportId, form.decision(), principal.getName(), form.duplicateOfReportId())
 			);
 		} catch (MasterDataWriteNotAllowedException exception) {
 			redirectAttributes.addFlashAttribute("masterDataError", exception.getMessage());
@@ -409,6 +428,13 @@ class FacilityReportAdminPageController {
 	}
 
 	record ReviewAction(FacilityReportReviewDecision value, String label) {
+	}
+
+	record ReviewReportForm(
+		@NotNull(message = "{validation.report.review-decision.required}")
+		FacilityReportReviewDecision decision,
+		String duplicateOfReportId
+	) {
 	}
 
 	record FacilityReportReviewAuditPageRow(

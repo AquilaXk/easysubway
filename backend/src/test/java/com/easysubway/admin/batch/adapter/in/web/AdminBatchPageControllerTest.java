@@ -80,7 +80,8 @@ class AdminBatchPageControllerTest {
 		mockMvc.perform(post("/admin/batches/transit-master-collection/runs/failed-run/retry")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
-				.contentType(MediaType.APPLICATION_FORM_URLENCODED))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("retryRequested", "true"))
 			.andExpect(status().is3xxRedirection())
 			.andExpect(header().string("Location", "/admin/batches/page"));
 
@@ -103,7 +104,8 @@ class AdminBatchPageControllerTest {
 		mockMvc.perform(post("/admin/batches/transit-master-collection/runs/completed-run/retry")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
-				.contentType(MediaType.APPLICATION_FORM_URLENCODED))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("retryRequested", "true"))
 			.andExpect(status().isBadRequest());
 
 		assertThat(auditEventRepository.findRecent(AdminAuditEventType.BATCH_OPERATION, 1))
