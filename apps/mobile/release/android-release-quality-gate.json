@@ -45,13 +45,21 @@
     "requiredDeviceDiscoveryCommands": [
       "flutter emulators",
       "emulator -list-avds",
+      "ANDROID_HOME or ANDROID_SDK_ROOT emulator path check",
       "flutter devices",
       "adb devices"
     ],
     "emptyAdbDevicesDisposition": "INSUFFICIENT_EVIDENCE"
   },
   "manualEvidenceSummaryPolicy": {
-    "requiredFields": [
+    "commonRequiredFields": [
+      "checkId",
+      "buildIdentity",
+      "evidencePaths",
+      "result",
+      "blockerDisposition"
+    ],
+    "allowedFields": [
       "checkId",
       "buildIdentity",
       "buildSource",

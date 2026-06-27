@@ -7166,11 +7166,23 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.deepEqual(gate.deviceEvidencePolicy.requiredDeviceDiscoveryCommands, [
     "flutter emulators",
     "emulator -list-avds",
+    "ANDROID_HOME or ANDROID_SDK_ROOT emulator path check",
     "flutter devices",
     "adb devices",
   ]);
   assert.equal(gate.deviceEvidencePolicy.emptyAdbDevicesDisposition, "INSUFFICIENT_EVIDENCE");
   assert.equal(gate.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/android-quality/<rc-or-run>/");
+  assert.match(
+    gate.deviceEvidencePolicy.requiredDeviceDiscoveryCommands.join("\n"),
+    /ANDROID_HOME|ANDROID_SDK_ROOT/,
+  );
+  assert.deepEqual(gate.manualEvidenceSummaryPolicy.commonRequiredFields, [
+    "checkId",
+    "buildIdentity",
+    "evidencePaths",
+    "result",
+    "blockerDisposition",
+  ]);
   assert.deepEqual(gate.manualEvidenceSummaryPolicy.requiredResultValues, [
     "PASS",
     "FAIL",
@@ -7193,8 +7205,8 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     "blockerDisposition",
   ]) {
     assert.ok(
-      gate.manualEvidenceSummaryPolicy.requiredFields.includes(field),
-      `manual evidence summary must require ${field}`,
+      gate.manualEvidenceSummaryPolicy.allowedFields.includes(field),
+      `manual evidence summary must allow ${field}`,
     );
   }
   assert.deepEqual(gate.manualEvidenceSummaryPolicy.forbiddenSummaryValues, [
@@ -7292,6 +7304,12 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
       "blockerDisposition",
     ]) {
       assert.ok(matrix.requiredSummaryFields.includes(field), `${checkId} matrix must require summary field ${field}`);
+    }
+    for (const field of matrix.requiredSummaryFields) {
+      assert.ok(
+        gate.manualEvidenceSummaryPolicy.allowedFields.includes(field),
+        `${checkId} matrix summary field must be in allowed vocabulary: ${field}`,
+      );
     }
   }
   assert.ok(
