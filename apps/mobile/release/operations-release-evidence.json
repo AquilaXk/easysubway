@@ -34,6 +34,97 @@
     ],
     "blockedWhenKo": "database dump, object manifest, data source archive, datapack manifest history 중 하나라도 복구 검증이 없으면 release blocker로 처리한다."
   },
+  "backendControlPlane": {
+    "issue": 1017,
+    "publicApiSurface": {
+      "inventoryRequired": true,
+      "defaultDenyRequired": true,
+      "newApiOrAdminEndpointWithoutMatcherBlocksRelease": true,
+      "securityMatcherComparisonRequired": true,
+      "allowedPublicEndpoints": [
+        "/api/health",
+        "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
+        "/actuator/prometheus",
+        "/api/v1/report-uploads",
+        "/api/v1/report-uploads/{uploadId}",
+        "/api/v1/reports",
+        "/api/v1/reports/{reportId}",
+        "/api/v1/reports/{reportId}/confirm",
+        "/api/v1/realtime/arrivals",
+        "/api/v1/realtime/train-positions"
+      ],
+      "allowedPublicSecurityMatchers": [
+        "/api/v1/report-uploads",
+        "/api/v1/report-uploads/*",
+        "/api/v1/reports",
+        "/api/v1/reports/*",
+        "/api/v1/reports/*/confirm",
+        "/api/health",
+        "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
+        "/actuator/prometheus",
+        "/api/v1/realtime/**"
+      ],
+      "requiredEvidence": [
+        "backend-public-api-surface-inventory",
+        "default-deny-public-chain-test-output",
+        "security-matcher-contract-test-output"
+      ]
+    },
+    "adminAuthTransition": {
+      "basicAuthDefaultInProd": "disabled",
+      "oidcMfaSsoDeferredExceptionRequired": true,
+      "temporaryExceptionRequiredFields": ["owner", "untilDate", "risk", "mitigation", "followUpIssue"],
+      "requiredEvidence": [
+        "admin-auth-transition-decision-record",
+        "admin-basic-auth-prod-disabled-test-output",
+        "admin-operator-lockout-test-output",
+        "break-glass-rotation-drill-record"
+      ]
+    },
+    "abuseControlReleaseException": {
+      "distributedStorePreferred": true,
+      "singleInstanceExceptionRequiredFields": [
+        "backendReplicaCountOneEvidence",
+        "scaleOutProhibitedRunbook",
+        "owner",
+        "untilDate",
+        "postLaunchAbuseMonitoringThreshold",
+        "distributedLimiterFollowUpIssue"
+      ],
+      "requiredEvidence": [
+        "multi-instance-rate-limit-test-output-or-single-instance-exception",
+        "trusted-proxy-negative-test-output",
+        "abuse-store-mode-release-blocker-record"
+      ]
+    },
+    "environmentProtection": {
+      "productionRequiredReviewerRequired": true,
+      "repositoryWideProductionSecretsOnlyBlocksRelease": true,
+      "requiredEvidence": [
+        "github-production-environment-required-reviewer-summary",
+        "staging-prod-environment-separation-summary",
+        "production-secret-scope-review"
+      ]
+    },
+    "auditRedaction": {
+      "requiredEvidence": [
+        "admin-mutating-action-audit-sample",
+        "privacy-read-audit-sample",
+        "report-photo-read-audit-sample"
+      ],
+      "forbiddenInEvidence": [
+        "receipt token",
+        "signed URL",
+        "photo binary",
+        "object storage credential",
+        "raw request body"
+      ]
+    }
+  },
   "observability": {
     "requiredResolutionKinds": [
       "dashboard-url",
