@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1697,6 +1698,37 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(localImageManifest.backendArtifactSha256, null);
   assert.ok(
     !localImageManifest.readiness.blockers.map((blocker) => blocker.id).includes("missing_backend_identity"),
+  );
+
+  const metadataOnlyInspectPath = path.join(tempDir, "metadata-only-image-inspect.json");
+  const metadataOnlyManifestPath = path.join(tempDir, "metadata-only-rc-evidence-manifest.json");
+  const metadataOnlyInspect = JSON.stringify([{ RepoDigests: [], Size: 367184804 }]);
+  const metadataOnlyInspectSha256 = createHash("sha256").update(metadataOnlyInspect).digest("hex");
+  await writeFile(metadataOnlyInspectPath, metadataOnlyInspect);
+  await execFileAsync(process.execPath, [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root",
+    ".",
+    "--app-root",
+    "apps/mobile",
+    "--git-sha",
+    "0123456789abcdef0123456789abcdef01234567",
+    "--aab",
+    aabPath,
+    "--backend-image-inspect",
+    metadataOnlyInspectPath,
+    "--data-pack-manifest",
+    "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    "--output",
+    metadataOnlyManifestPath,
+    "--tested-at",
+    "2026-06-26T00:00:00.000Z",
+  ], { cwd: root });
+  const metadataOnlyManifest = JSON.parse(readFileSync(metadataOnlyManifestPath, "utf8"));
+  assert.equal(metadataOnlyManifest.backendImageDigest, null);
+  assert.equal(metadataOnlyManifest.backendArtifactSha256, metadataOnlyInspectSha256);
+  assert.ok(
+    !metadataOnlyManifest.readiness.blockers.map((blocker) => blocker.id).includes("missing_backend_identity"),
   );
 
   await assert.rejects(
