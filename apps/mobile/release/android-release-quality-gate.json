@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "android-release-ux-accessibility-performance",
-  "issue": 917,
+  "issue": 1021,
   "releaseBlockerPolicy": true,
   "scope": {
     "platform": {
@@ -21,7 +21,7 @@
       "riders-with-large-baggage"
     ]
   },
-  "routeSafetyContract": "#901",
+  "routeSafetyContract": "#571",
   "routeSafetyStatusEnum": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
   "deviceEvidencePolicy": {
     "codexQaDevice": "local_android_emulator_only",

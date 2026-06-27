@@ -83,69 +83,158 @@
     "waiverRequiresUntilDate": true,
     "finalGoNoGoOwnerRequired": true
   },
+  "waiverSchema": {
+    "requiredFields": [
+      "owner",
+      "untilDate",
+      "reason",
+      "risk",
+      "mitigation",
+      "followUpIssue"
+    ],
+    "nonWaivableP0Blockers": [
+      "p0_safety_failure",
+      "privacy_declaration_mismatch",
+      "play_prelaunch_crash",
+      "app_start_or_core_route_crash",
+      "production_data_coverage_shortfall"
+    ]
+  },
+  "requiredChecks": [
+    "CI / Repository CI",
+    "CI / Backend CI",
+    "CI / Mobile App CI",
+    "CI / Android CI",
+    "Release Artifacts / Android Release Artifact",
+    "Release Artifacts / RC Evidence Manifest",
+    "Data Pack Release / Data Pack Release",
+    "Dependency Vulnerability Scan",
+    "Release Gate Consistency"
+  ],
+  "releaseImpactPaths": [
+    "apps/mobile/**",
+    "backend/**",
+    "infra/**",
+    "tools/ci/**",
+    "tools/datapack/**",
+    "tools/mobile/**",
+    "tools/release/**",
+    ".github/workflows/**",
+    "apps/mobile/release/**",
+    ".env.example",
+    "README.md"
+  ],
   "gates": [
     {
       "id": "G0_GOVERNANCE",
-      "issue": 900,
+      "issue": 1014,
       "priority": "P0",
-      "status": "IN_PROGRESS"
+      "status": "IN_PROGRESS",
+      "owner": "release-governance",
+      "nextAction": "release gate vocabulary, required checks, RC identity contract 정합성 검증",
+      "evidenceReference": "apps/mobile/release/release-governance-gate.json"
     },
     {
       "id": "G1_PRODUCTION_DATAPACK",
       "issue": 547,
       "priority": "P0",
-      "status": "IN_PROGRESS"
+      "status": "IN_PROGRESS",
+      "owner": "datapack",
+      "nextAction": "운영 데이터팩 coverage, signing, publish evidence 수집",
+      "evidenceReference": "apps/mobile/release/server-minimized-qa-gate.json"
     },
     {
       "id": "G2_ROUTE_SAFETY",
-      "issue": 901,
+      "issue": 571,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "mobile-routing",
+      "nextAction": "server-minimized route/offline acceptance evidence 연결",
+      "evidenceReference": "apps/mobile/release/server-minimized-qa-gate.json"
     },
     {
       "id": "G3_DATAPACK_UPDATER",
-      "issue": 902,
+      "issue": 1015,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "android-build",
+      "nextAction": "signed RC artifact와 bundled datapack fallback identity 검증",
+      "evidenceReference": "apps/mobile/release/signed-release-artifact-gate.json"
     },
     {
       "id": "G4_REALTIME",
-      "issue": 903,
+      "issue": 1018,
       "priority": "P0_IF_INCLUDED_IN_STORE_COPY",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "store-privacy",
+      "nextAction": "store copy와 실시간 지원 범위 문구 일치 확인",
+      "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
     },
     {
       "id": "G5_BACKEND_CONTROL_PLANE",
-      "issue": 904,
+      "issue": 1017,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "backend-admin",
+      "nextAction": "admin/backend public API, RBAC, audit, restore evidence 수집",
+      "evidenceReference": "apps/mobile/release/operations-release-evidence.json"
     },
     {
       "id": "G6_SECURITY_PRIVACY",
-      "issue": 905,
+      "issue": 1022,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "security-privacy",
+      "nextAction": "abuse-case, penetration rehearsal, crash/privacy evidence 수집",
+      "evidenceReference": "apps/mobile/release/abuse-penetration-rehearsal-gate.json"
     },
     {
       "id": "G7_ANDROID_QUALITY",
-      "issue": 917,
+      "issue": 1021,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "android-qa",
+      "nextAction": "TalkBack, large text, route map performance evidence 수집",
+      "evidenceReference": "apps/mobile/release/android-release-quality-gate.json"
     },
     {
       "id": "G8_OPERATIONS",
-      "issue": 906,
+      "issue": 1019,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "operations",
+      "nextAction": "post-launch monitoring, support, incident response evidence 수집",
+      "evidenceReference": "apps/mobile/release/post-launch-operations-review-gate.json"
     },
     {
       "id": "G9_GOOGLE_PLAY",
-      "issue": 907,
+      "issue": 1018,
       "priority": "P0",
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS",
+      "owner": "play-console",
+      "nextAction": "Data Safety, listing, screenshot, privacy URL evidence 수집",
+      "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
+    },
+    {
+      "id": "G10_PLAY_INSTALL",
+      "issue": 1016,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "play-console",
+      "nextAction": "Play-generated APK 또는 Play-installed build evidence 수집",
+      "evidenceReference": "apps/mobile/release/play-generated-apk-device-matrix-gate.json"
+    },
+    {
+      "id": "G11_FINAL_GO_NO_GO",
+      "issue": 1020,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "release-owner",
+      "nextAction": "final RC evidence manifest identity와 waiver 판정 동결",
+      "evidenceReference": "apps/mobile/release/rc-evidence-manifest-contract.json"
     }
   ],
-  "childIssueLinks": [571, 836, 909, 911, 915, 917, 919, 920, 921, 922, 923, 924, 925, 926],
+  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/android-release-100/",
     "githubEvidencePolicy": "summary_or_public_link",

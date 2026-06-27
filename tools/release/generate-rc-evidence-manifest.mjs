@@ -53,7 +53,7 @@ const blockers = [
 const manifest = {
   schemaVersion: 1,
   releaseGate: "rc-evidence-manifest",
-  issue: 926,
+  issue: 1020,
   applicationId: "easysubway",
   androidApplicationId: "com.easysubway.app",
   generatedAt: new Date().toISOString(),
@@ -195,8 +195,11 @@ function parsePairs(value) {
 function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion) {
   const sourceEntries = [
     ["rc_device_qa", 571],
-    ["signed_rc_store_submission", 907],
-    ["android_release_quality", 917],
+    ["signed_rc_store_submission", 1015],
+    ["play_generated_install", 1016],
+    ["store_privacy_submission", 1018],
+    ["android_release_quality", 1021],
+    ["abuse_penetration_rehearsal", 1022],
   ];
   return sourceEntries.map(([id, sourceIssue]) => ({
     id,
