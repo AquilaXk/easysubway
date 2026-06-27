@@ -82,8 +82,21 @@
         "admin-auth-transition-decision-record",
         "admin-basic-auth-prod-disabled-test-output",
         "admin-operator-lockout-test-output",
-        "break-glass-rotation-drill-record"
+        "break-glass-rotation-drill-record",
+        "break-glass-use-immediate-rotation-record",
+        "admin-credential-rotation-cadence-record"
       ]
+    },
+    "operatorTenantScope": {
+      "temporaryScope": "operator-global",
+      "releaseExceptionRequired": true,
+      "requiredDecisionFields": ["owner", "untilDate", "risk", "mitigation", "followUpIssue"],
+      "requiredEvidence": [
+        "operator-tenant-scope-decision-record",
+        "operator-global-audit-sample",
+        "trusted-proxy-negative-test-output"
+      ],
+      "blockedWhenKo": "운영기관별 tenant 분리가 준비되지 않은 경우 operator-global 임시 scope의 owner, 만료일, risk, mitigation, follow-up issue와 audit sample이 없으면 release blocker로 처리한다."
     },
     "abuseControlReleaseException": {
       "distributedStorePreferred": true,
@@ -110,11 +123,50 @@
         "production-secret-scope-review"
       ]
     },
+    "adminPageSmoke": {
+      "requiredPages": [
+        "dashboard",
+        "stations",
+        "facilities",
+        "layout-editor",
+        "reports",
+        "quality",
+        "field-verifications",
+        "collections",
+        "batches",
+        "codes",
+        "incidents",
+        "route-searches",
+        "route-feedback",
+        "push",
+        "usage",
+        "system",
+        "audits",
+        "privacy-audits"
+      ],
+      "requiredChecks": [
+        "login-required",
+        "role-denied",
+        "keyboard-navigation",
+        "skip-link",
+        "focus-visible",
+        "csrf-token",
+        "error-flash",
+        "environment-badge",
+        "revision-master-data-version"
+      ],
+      "requiredEvidence": [
+        "admin-operator-page-smoke-output",
+        "admin-page-accessibility-smoke-output",
+        "admin-role-matrix-test-output"
+      ]
+    },
     "auditRedaction": {
       "requiredEvidence": [
         "admin-mutating-action-audit-sample",
         "privacy-read-audit-sample",
-        "report-photo-read-audit-sample"
+        "report-photo-read-audit-sample",
+        "break-glass-use-audit-sample"
       ],
       "forbiddenInEvidence": [
         "receipt token",
