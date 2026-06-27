@@ -3800,6 +3800,7 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   const shellFragment = read("backend/src/main/resources/templates/admin/fragments/shell.html");
   const formErrorsFragment = read("backend/src/main/resources/templates/admin/fragments/form-errors.html");
   const paginationFragment = read("backend/src/main/resources/templates/admin/fragments/pagination.html");
+  const errorTemplate = read("backend/src/main/resources/templates/admin/error.html");
   const adminCss = read("backend/src/main/resources/static/css/admin-v3.css");
   const navigationAdvice = read("backend/src/main/java/com/easysubway/admin/navigation/AdminNavigationAdvice.java");
   const envExample = read(".env.example");
@@ -3823,10 +3824,15 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(shellFragment, /admin-env-badge/);
   assert.match(shellFragment, /revision/);
   assert.match(shellFragment, /master data/);
+  assert.match(shellFragment, /th:action="@\{\/admin\/logout\}"/);
+  assert.match(shellFragment, /aria-label="관리자 로그아웃"/);
   assert.match(shellFragment, /th:fragment="flash"/);
   assert.match(shellFragment, /<output[\s\S]*th:fragment="flash"/);
   assert.doesNotMatch(shellFragment, /role="status"/);
   assert.match(shellFragment, /th:fragment="status\(text, tone\)"/);
+  assert.match(errorTemplate, /role="alert"/);
+  assert.match(errorTemplate, /aria-labelledby="admin-error-title"/);
+  assert.match(errorTemplate, /id="admin-error-title"/);
   assert.match(formErrorsFragment, /role="alert"/);
   assert.match(formErrorsFragment, /aria-labelledby="form-error-summary-title"/);
   assert.match(formErrorsFragment, /id="form-error-summary-title"/);
@@ -3886,6 +3892,75 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
     "backend/src/main/resources/templates/admin/stations/layouts.html",
     "backend/src/main/resources/templates/admin/usage/activity.html",
   ]);
+});
+
+test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다", () => {
+  const e2eTest = read("backend/src/test/java/com/easysubway/admin/adapter/in/web/AdminE2EFlowTest.java");
+  const accessibilityTest = read(
+    "backend/src/test/java/com/easysubway/admin/adapter/in/web/AdminAccessibilitySmokeTest.java",
+  );
+  const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const adminPageRequest = read("backend/src/main/java/com/easysubway/common/web/pagination/AdminPageRequest.java");
+  const reportPageRequest = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportPageRequest.java");
+  const paginationTest = read("backend/src/test/java/com/easysubway/common/web/pagination/EgovPaginationViewTest.java");
+  const readOnlyAdminTest = read(
+    "backend/src/test/java/com/easysubway/transit/adapter/in/web/TransitReadOnlyAdminPageModelTest.java",
+  );
+  const listControllers = [
+    "backend/src/main/java/com/easysubway/admin/audit/adapter/in/web/AdminAuditPageController.java",
+    "backend/src/main/java/com/easysubway/admin/batch/adapter/in/web/AdminBatchPageController.java",
+    "backend/src/main/java/com/easysubway/admin/operations/adapter/in/web/AdminOperationsPageController.java",
+    "backend/src/main/java/com/easysubway/collection/adapter/in/web/DataCollectionAdminPageController.java",
+    "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAdminPageController.java",
+  ];
+  const jdbcRepositories = [
+    "backend/src/main/java/com/easysubway/admin/audit/adapter/out/persistence/JdbcAdminAuditEventRepository.java",
+    "backend/src/main/java/com/easysubway/admin/operations/adapter/out/persistence/JdbcAdminIncidentRepository.java",
+    "backend/src/main/java/com/easysubway/collection/adapter/out/persistence/JdbcDataCollectionRunRepository.java",
+    "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepository.java",
+  ];
+
+  assert.match(e2eTest, /class AdminE2EFlowTest/);
+  assert.match(e2eTest, /formLogin\("\/admin\/login"\)/);
+  assert.match(e2eTest, /post\("\/console\/admin\/logout"\)/);
+  assert.match(e2eTest, /contextPath\("\/console"\)/);
+  assert.match(e2eTest, /redirectedUrl\("\/console\/admin\/login\?logout"\)/);
+  assert.match(e2eTest, /adminLoginLockoutAndLogoutFlow/);
+  assert.match(e2eTest, /adminCoreOperationFlow/);
+  assert.match(e2eTest, /adminErrorShellCoversForbiddenConflictAndValidation/);
+  assert.match(e2eTest, /\/admin\/reports\/\{reportId\}\/page\/review/);
+  assert.match(e2eTest, /\/admin\/facilities\/facility-sangnoksu-elevator-1\/page\/status/);
+  assert.match(e2eTest, /\/admin\/batches\/transit-master-collection\/runs\/admin-e2e-failed-run\/retry/);
+  assert.match(e2eTest, /\/admin\/audits\/privacy\/page/);
+  assert.match(e2eTest, /role=\\"alert\\"/);
+  assert.match(accessibilityTest, /class AdminAccessibilitySmokeTest/);
+  assert.match(accessibilityTest, /adminPagesKeepAccessibleShell/);
+  assert.match(accessibilityTest, /adminErrorAndValidationPagesExposeAlertSemantics/);
+  assert.match(accessibilityTest, /href=\\"#admin-content\\"/);
+  assert.match(accessibilityTest, /aria-label=\\"관리자 로그아웃\\"/);
+  assert.match(accessibilityTest, /aria-labelledby=\\"form-error-summary-title\\"/);
+  assert.match(securityConfig, /logoutUrl\("\/admin\/logout"\)/);
+  assert.match(securityConfig, /request\.getContextPath\(\) \+ "\/admin\/login\?logout"/);
+  assert.match(readOnlyAdminTest, /masterDataWritable/);
+  assert.match(readOnlyAdminTest, /운영 마스터 데이터가 읽기 전용입니다\./);
+  assert.match(adminPageRequest, /MAX_SIZE = 50/);
+  assert.match(adminPageRequest, /limitForHasNext\(\)/);
+  assert.match(reportPageRequest, /MAX_SIZE = 50/);
+  assert.match(reportPageRequest, /limitForHasNext\(\)/);
+  assert.match(paginationTest, /adminPageRequestCapsSizeAndOffset/);
+
+  for (const file of listControllers) {
+    const source = read(file);
+    assert.match(source, /EgovPaginationView/, `${file} must render paginated admin lists`);
+    assert.match(source, /(AdminPageRequest|FacilityReportPageRequest)\.of\(page, size\)/, `${file} must cap page size`);
+    assert.doesNotMatch(source, /listRecent\(\s*\)|loadRecentRuns\(\s*\)|loadReportSummaries\(\s*status\s*\)/, `${file} must not call unbounded list loaders`);
+  }
+
+  for (const file of jdbcRepositories) {
+    const source = read(file);
+    assert.match(source, /LIMIT \?/, `${file} must keep SQL limit placeholders`);
+    assert.match(source, /OFFSET \?/, `${file} must keep SQL offset placeholders`);
+  }
 });
 
 test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
