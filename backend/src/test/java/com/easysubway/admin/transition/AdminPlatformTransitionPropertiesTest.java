@@ -66,11 +66,16 @@ class AdminPlatformTransitionPropertiesTest {
 					context.getBean(AdminPlatformTransitionProperties.class);
 
 				assertThat(properties.stage()).isEqualTo(AdminPlatformTransitionProperties.Stage.ENFORCE);
+				assertThat(properties.flags().identityStore()).isTrue();
+				assertThat(properties.flags().rbacShadow()).isTrue();
 				assertThat(properties.flags().rbacEnforcement()).isTrue();
+				assertThat(properties.flags().auditShadow()).isTrue();
 				assertThat(properties.flags().auditEnforcement()).isTrue();
 				assertThat(properties.flags().legacyEnvAdminFallback()).isFalse();
 				assertThat(properties.releaseGate().blockerMode())
 					.isEqualTo(AdminPlatformTransitionProperties.BlockerMode.FAIL);
+				assertThat(properties.releaseGate().blockers())
+					.contains("role or account seed is missing in prod");
 			});
 	}
 }

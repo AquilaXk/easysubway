@@ -19,6 +19,10 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function ignoredVulnBlocks(osvConfig) {
   return osvConfig.split(/\[\[IgnoredVulns\]\]\n/).slice(1);
 }
@@ -3401,7 +3405,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
   assert.match(transitionProperties, /@ConfigurationProperties\(prefix = "easysubway\.admin\.platform-transition"\)/);
   assert.match(transitionProperties, /enum Stage[\s\S]*SHADOW,[\s\S]*ENFORCE,[\s\S]*LEGACY_DISABLED/);
   assert.match(transitionProperties, /enum BlockerMode[\s\S]*WARN,[\s\S]*FAIL/);
-  assert.match(transitionProperties, /new Flags\(true, true, false, true, false, true, true, true\)/);
+  assert.match(transitionProperties, /new Flags\(null, null, null, null, null, null, null, null\)/);
   assert.match(transitionProperties, /record LegacyEnvAdminFallback/);
   assert.match(transitionProperties, /record BreakGlass/);
   assert.match(transitionProperties, /record Seed/);
@@ -3431,8 +3435,8 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "admin.batch.retry",
     "admin.operations.manage",
   ]) {
-    assert.match(postgresAdminMigrations, new RegExp(permission.replace(".", "\\.")));
-    assert.match(h2AdminMigrations, new RegExp(permission.replace(".", "\\.")));
+    assert.match(postgresAdminMigrations, new RegExp(escapeRegExp(permission)));
+    assert.match(h2AdminMigrations, new RegExp(escapeRegExp(permission)));
   }
 });
 
