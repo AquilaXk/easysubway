@@ -21,9 +21,7 @@ class AdminCommandTokenInterceptor implements HandlerInterceptor {
 			return true;
 		}
 		String token = request.getParameter(AdminCommandTokenService.PARAMETER_NAME);
-		if (token != null) {
-			commandTokenService.consume(request, token);
-		}
+		commandTokenService.consume(request, token);
 		return true;
 	}
 

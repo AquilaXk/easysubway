@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.HttpSession;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
@@ -17,9 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
@@ -104,6 +107,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sangnoksu/layouts/layout-sangnoksu-draft/page/status")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("status", "READY_FOR_REVIEW"))
 			.andExpect(status().is3xxRedirection())
@@ -210,6 +214,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sangnoksu/layout-sources/layout-source-sangnoksu-station-map/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("sourceType", "OPERATOR_PAGE")
 				.param("sourceName", "상록수역 운영기관 안내 페이지")
@@ -243,6 +248,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		String html = mockMvc.perform(post("/admin/stations/station-sangnoksu/layout-sources/layout-source-sangnoksu-station-map/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("sourceType", "OPERATOR_PAGE")
 				.param("sourceName", "상록수역 운영기관 안내 페이지")
@@ -267,6 +273,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sangnoksu/route-nodes/node-sangnoksu-elevator-1/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("displayX", "132")
 				.param("displayY", "256")
@@ -295,6 +302,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sangnoksu/route-nodes/node-sangnoksu-faregate/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("displayX", "288")
 				.param("displayY", "244")
@@ -322,6 +330,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		String html = mockMvc.perform(post("/admin/stations/station-sangnoksu/route-nodes/node-sangnoksu-elevator-1/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("displayX", "132")
 				.param("displayY", "256")
@@ -345,6 +354,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sangnoksu/route-edges/edge-sangnoksu-elevator-to-faregate/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("distanceMeters", "34")
 				.param("estimatedSeconds", "90")
@@ -381,6 +391,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		String html = mockMvc.perform(post("/admin/stations/station-sangnoksu/route-edges/edge-sangnoksu-elevator-to-faregate/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("distanceMeters", "34")
 				.param("estimatedSeconds", "90")
@@ -519,6 +530,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sadang/route-nodes/node-sangnoksu-elevator-1/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("displayX", "132")
 				.param("displayY", "256")
@@ -534,6 +546,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sadang/layout-sources/layout-source-sangnoksu-station-map/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("sourceType", "OPERATOR_PAGE")
 				.param("sourceName", "상록수역 운영기관 안내 페이지")
@@ -554,6 +567,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sadang/route-edges/edge-sangnoksu-elevator-to-faregate/page")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("distanceMeters", "34")
 				.param("estimatedSeconds", "90")
@@ -575,6 +589,7 @@ class TransitStationLayoutAdminPageControllerTest {
 		mockMvc.perform(post("/admin/stations/station-sadang/layouts/layout-sangnoksu-draft/page/status")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/stations/station-sangnoksu/layouts/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("status", "READY_FOR_REVIEW"))
 			.andExpect(status().isNotFound())
@@ -602,5 +617,26 @@ class TransitStationLayoutAdminPageControllerTest {
 		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
 		assertThat(matcher.find()).isTrue();
 		return matcher.group(1);
+	}
+
+	private RequestPostProcessor commandToken(String pagePath) {
+		return request -> {
+			MockHttpSession session = sessionFrom(request);
+			try {
+				request.setSession(session);
+				request.addParameter("commandToken", commandTokenFrom(getAdminHtml(pagePath, session)));
+				return request;
+			} catch (Exception exception) {
+				throw new AssertionError(exception);
+			}
+		};
+	}
+
+	private static MockHttpSession sessionFrom(MockHttpServletRequest request) {
+		HttpSession session = request.getSession(false);
+		if (session instanceof MockHttpSession mockHttpSession) {
+			return mockHttpSession;
+		}
+		return new MockHttpSession();
 	}
 }

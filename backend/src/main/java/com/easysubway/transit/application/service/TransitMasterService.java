@@ -456,7 +456,7 @@ public class TransitMasterService implements TransitMasterQueryUseCase, TransitM
 	}
 
 	@Override
-	public SimplifiedStationLayout updateSimplifiedStationLayoutStatus(UpdateSimplifiedStationLayoutStatusCommand command) {
+	public synchronized SimplifiedStationLayout updateSimplifiedStationLayoutStatus(UpdateSimplifiedStationLayoutStatusCommand command) {
 		requireLayoutStatus(command);
 		requireReviewer(command);
 

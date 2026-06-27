@@ -18,6 +18,7 @@ import com.easysubway.collection.domain.DataCollectionRunStep;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.DataCollectionStepStatus;
+import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -28,10 +29,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
@@ -104,6 +107,7 @@ class AdminBatchPageControllerTest {
 		mockMvc.perform(post("/admin/batches/transit-master-collection/runs/failed-run/retry")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("retryRequested", "true"))
 			.andExpect(status().is3xxRedirection())
@@ -173,6 +177,7 @@ class AdminBatchPageControllerTest {
 		mockMvc.perform(post("/admin/batches/transit-master-collection/runs/completed-run/retry")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("retryRequested", "true"))
 			.andExpect(status().isBadRequest());
@@ -196,7 +201,8 @@ class AdminBatchPageControllerTest {
 
 		mockMvc.perform(post("/admin/batches/transit-master-collection/runs/failed-run/retry")
 				.with(user("operator").authorities(new SimpleGrantedAuthority("admin.data.operate")))
-				.with(csrf()))
+				.with(csrf())
+				.with(commandToken("/admin/batches/page")))
 			.andExpect(status().isForbidden());
 	}
 
@@ -302,5 +308,26 @@ class AdminBatchPageControllerTest {
 		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
 		assertThat(matcher.find()).isTrue();
 		return matcher.group(1);
+	}
+
+	private RequestPostProcessor commandToken(String pagePath) {
+		return request -> {
+			MockHttpSession session = sessionFrom(request);
+			try {
+				request.setSession(session);
+				request.addParameter("commandToken", commandTokenFrom(getAdminHtml(pagePath, session)));
+				return request;
+			} catch (Exception exception) {
+				throw new AssertionError(exception);
+			}
+		};
+	}
+
+	private static MockHttpSession sessionFrom(MockHttpServletRequest request) {
+		HttpSession session = request.getSession(false);
+		if (session instanceof MockHttpSession mockHttpSession) {
+			return mockHttpSession;
+		}
+		return new MockHttpSession();
 	}
 }

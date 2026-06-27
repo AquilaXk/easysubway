@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
+import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,9 +21,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
@@ -97,6 +100,7 @@ class AdminOperationsPageControllerTest {
 		mockMvc.perform(post("/admin/codes")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/codes/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("groupCode", "REPORT_REJECTION_REASON")
 				.param("code", "PROVIDER_SECRET_MISSING")
@@ -125,6 +129,7 @@ class AdminOperationsPageControllerTest {
 		mockMvc.perform(post("/admin/codes")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/codes/page?groupCode=INCIDENT_STATUS"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("groupCode", "INCIDENT_STATUS")
 				.param("code", "OPEN")
@@ -209,6 +214,7 @@ class AdminOperationsPageControllerTest {
 		mockMvc.perform(post("/admin/incidents")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("severity", "MAJOR")
 				.param("status", "OPEN")
@@ -227,6 +233,7 @@ class AdminOperationsPageControllerTest {
 		mockMvc.perform(post("/admin/incidents/{incidentId}/resolve", incidentId)
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("resolution", "provider secret upload url rotated"))
 			.andExpect(status().is3xxRedirection())
@@ -296,10 +303,33 @@ class AdminOperationsPageControllerTest {
 			});
 	}
 
+	@Test
+	@DisplayName("관리자 form POST는 command token 누락을 409로 차단한다")
+	void adminFormPostRejectsMissingCommandToken() throws Exception {
+		String html = mockMvc.perform(post("/admin/incidents")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("severity", "MAJOR")
+				.param("status", "OPEN")
+				.param("source", "HEALTH")
+				.param("summary", "database DOWN")
+				.param("owner", "ops"))
+			.andExpect(status().isConflict())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("요청이 최신 상태와 충돌했습니다")
+			.contains("이미 처리되었거나 만료된 관리자 요청입니다");
+	}
+
 	private void saveCode(String code) throws Exception {
 		mockMvc.perform(post("/admin/codes")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/codes/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("groupCode", "REPORT_REJECTION_REASON")
 				.param("code", code)
@@ -315,6 +345,7 @@ class AdminOperationsPageControllerTest {
 		mockMvc.perform(post("/admin/incidents")
 				.with(httpBasic("admin-user", "admin-test-password"))
 				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
 				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 				.param("severity", "MAJOR")
 				.param("status", "OPEN")
@@ -338,5 +369,26 @@ class AdminOperationsPageControllerTest {
 		Matcher matcher = Pattern.compile("name=\"commandToken\" value=\"([^\"]+)\"").matcher(html);
 		assertThat(matcher.find()).isTrue();
 		return matcher.group(1);
+	}
+
+	private RequestPostProcessor commandToken(String pagePath) {
+		return request -> {
+			MockHttpSession session = sessionFrom(request);
+			try {
+				request.setSession(session);
+				request.addParameter("commandToken", commandTokenFrom(getAdminHtml(pagePath, session)));
+				return request;
+			} catch (Exception exception) {
+				throw new AssertionError(exception);
+			}
+		};
+	}
+
+	private static MockHttpSession sessionFrom(MockHttpServletRequest request) {
+		HttpSession session = request.getSession(false);
+		if (session instanceof MockHttpSession mockHttpSession) {
+			return mockHttpSession;
+		}
+		return new MockHttpSession();
 	}
 }
