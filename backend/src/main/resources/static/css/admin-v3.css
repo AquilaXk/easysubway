@@ -128,6 +128,10 @@ body.admin-v3 {
 	margin-bottom: 16px;
 }
 
+.admin-content-anchor {
+	scroll-margin-top: 16px;
+}
+
 .admin-topbar-row {
 	display: flex;
 	flex-wrap: wrap;

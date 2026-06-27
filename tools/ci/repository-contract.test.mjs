@@ -3697,13 +3697,18 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(shellFragment, /th:fragment="sidebar\(active\)"/);
   assert.match(shellFragment, /th:fragment="topbar"/);
   assert.match(shellFragment, /class="skip-link" href="#admin-content"/);
+  assert.match(shellFragment, /th:fragment="contentStart"/);
+  assert.match(shellFragment, /id="admin-content"/);
   assert.match(shellFragment, /admin-env-badge/);
   assert.match(shellFragment, /revision/);
   assert.match(shellFragment, /master data/);
   assert.match(shellFragment, /th:fragment="flash"/);
+  assert.match(shellFragment, /<output[\s\S]*th:fragment="flash"/);
+  assert.doesNotMatch(shellFragment, /role="status"/);
   assert.match(shellFragment, /th:fragment="status\(text, tone\)"/);
   assert.match(formErrorsFragment, /role="alert"/);
   assert.match(formErrorsFragment, /aria-labelledby="form-error-summary-title"/);
+  assert.match(formErrorsFragment, /id="form-error-summary-title"/);
   assert.match(paginationFragment, /aria-current=\$\{pageLink\.current \? 'page' : null\}/);
   assert.match(adminCss, /\.admin-v3 a:focus-visible/);
   assert.match(adminCss, /outline: 3px solid #ffbf47/);
@@ -3717,13 +3722,20 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(navigationAdvice, /environment\.getProperty\("easysubway\.admin\.revision", "local"\)/);
   assert.match(navigationAdvice, /environment\.getProperty\("easysubway\.admin\.master-data-version", "unknown"\)/);
 
-  for (const file of adminTemplateFiles) {
+  const adminPageFiles = adminTemplateFiles.filter((file) =>
+    !file.includes("/fragments/") && !file.endsWith("/login.html")
+  );
+
+  for (const file of adminPageFiles) {
     const source = read(file);
-    if (!source.includes("class=\"admin-shell\"")) {
-      continue;
-    }
-    assert.match(source, /<main id="admin-content" class="admin-main">/, `${file} must expose a skip-link target`);
+    assert.match(source, /class="admin-shell"/, `${file} must use the shared admin shell`);
+    assert.match(source, /<main class="admin-main">/, `${file} must keep the topbar and page content in main`);
     assert.match(source, /admin\/fragments\/shell :: topbar/, `${file} must render the common topbar`);
+    assert.match(source, /admin\/fragments\/shell :: contentStart/, `${file} must render a skip-link target after topbar`);
+    assert.ok(
+      source.indexOf("admin/fragments/shell :: topbar") < source.indexOf("admin/fragments/shell :: contentStart"),
+      `${file} must place the skip-link target after topbar`,
+    );
   }
 
   const inlineStyleFiles = adminTemplateFiles

@@ -9,8 +9,9 @@
 <body class="admin-v3">
 <div class="admin-shell">
 <div th:replace="~{admin/fragments/shell :: sidebar('')}"></div>
-<main id="admin-content" class="admin-main">
+<main class="admin-main">
 	<div th:replace="~{admin/fragments/shell :: topbar}"></div>
+	<div th:replace="~{admin/fragments/shell :: contentStart}"></div>
 	<header class="admin-page-head">
 		<div>
 			<h1 th:text="${title}">요청을 처리하지 못했습니다</h1>

@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 
 @DisplayName("관리자 공통 shell 모델")
 class AdminNavigationAdviceTest {
@@ -49,6 +51,34 @@ class AdminNavigationAdviceTest {
 
 		assertThat(shell.environmentLabel()).isEqualTo("STAGING");
 		assertThat(shell.environmentTone()).isEqualTo("staging");
+		assertThat(shell.revision()).isEqualTo("local");
+		assertThat(shell.masterDataVersion()).isEqualTo("unknown");
+	}
+
+	@Test
+	@DisplayName("익명 인증은 anonymous 사용자와 권한 없음으로 표시한다")
+	void anonymousAuthenticationBuildsAnonymousShellMetadata() {
+		MockEnvironment environment = new MockEnvironment();
+		AnonymousAuthenticationToken authentication = new AnonymousAuthenticationToken(
+			"key",
+			"anonymousUser",
+			AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")
+		);
+
+		AdminNavigationAdvice.AdminShell shell = new AdminNavigationAdvice(environment).adminShell(authentication);
+
+		assertThat(shell.username()).isEqualTo("anonymous");
+		assertThat(shell.rolesLabel()).isEqualTo("권한 없음");
+		assertThat(shell.environmentLabel()).isEqualTo("DEV");
+	}
+
+	@Test
+	@DisplayName("인증 정보가 없으면 anonymous 사용자와 권한 없음으로 표시한다")
+	void nullAuthenticationBuildsAnonymousShellMetadata() {
+		AdminNavigationAdvice.AdminShell shell = new AdminNavigationAdvice(new MockEnvironment()).adminShell(null);
+
+		assertThat(shell.username()).isEqualTo("anonymous");
+		assertThat(shell.rolesLabel()).isEqualTo("권한 없음");
 		assertThat(shell.revision()).isEqualTo("local");
 		assertThat(shell.masterDataVersion()).isEqualTo("unknown");
 	}
