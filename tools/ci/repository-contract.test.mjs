@@ -1059,6 +1059,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "redactionNotes",
     "localEvidencePath",
   ]);
+  for (const evidenceId of postLaunchOperationsReviewGate.dryRunRequiredEvidence) {
+    assert.ok(
+      postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in post-launch GitHub summary evidence`,
+    );
+  }
   assert.ok(
     postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.requiredEvidenceSet.includes(
       "crash-anr-vitals-summary",
@@ -1106,6 +1112,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "redactionNotes",
     "localEvidencePath",
   ]);
+  for (const evidenceId of supportIncidentResponseGate.supportChannels.flatMap((channel) => channel.requiredEvidence)) {
+    assert.ok(
+      supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(evidenceId),
+      `${evidenceId} must be included in support GitHub summary evidence`,
+    );
+  }
   assert.ok(
     supportIncidentResponseGate.supportEvidenceSummaryPolicy.requiredEvidenceSet.includes(
       "support-mailbox-receive-test",
