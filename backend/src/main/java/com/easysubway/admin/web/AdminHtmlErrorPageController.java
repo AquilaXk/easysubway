@@ -3,12 +3,12 @@ package com.easysubway.admin.web;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 class AdminHtmlErrorPageController {
 
-	@GetMapping("/admin/error/page")
+	@RequestMapping("/admin/error/page")
 	String errorPage(HttpServletRequest request, Model model) {
 		model.addAttribute("status", request.getAttribute("adminErrorStatus"));
 		model.addAttribute("title", request.getAttribute("adminErrorTitle"));

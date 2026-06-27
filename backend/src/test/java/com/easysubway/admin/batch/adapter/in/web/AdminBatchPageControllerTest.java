@@ -147,6 +147,27 @@ class AdminBatchPageControllerTest {
 			.contains("상태 코드 405");
 	}
 
+	@Test
+	@DisplayName("관리자 HTML 예외 페이지는 POST forward도 렌더링한다")
+	void adminErrorPageRendersForwardedPost() throws Exception {
+		String html = mockMvc.perform(post("/admin/error/page")
+				.with(csrf())
+				.requestAttr("adminErrorStatus", 403)
+				.requestAttr("adminErrorTitle", "권한이 없습니다")
+				.requestAttr("adminErrorMessage", "이 관리자 기능을 사용할 권한이 없습니다.")
+				.requestAttr("adminErrorDetail", "필요한 역할과 권한을 확인해 주세요."))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("통합 관리자")
+			.contains("권한이 없습니다")
+			.contains("상태 코드 403")
+			.contains("이 관리자 기능을 사용할 권한이 없습니다.");
+	}
+
 	private DataCollectionRun failedRun(String runId) {
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
 		return new DataCollectionRun(
