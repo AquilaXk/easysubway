@@ -23,10 +23,10 @@ class AdminCommandTokenModelAdvice {
 	}
 
 	private static boolean isAdminHtmlPage(HttpServletRequest request) {
-		String uri = request.getRequestURI();
+		String path = AdminHtmlRequest.pathWithinApplication(request);
 		return AdminHtmlRequest.matches(request)
-			&& !uri.startsWith("/admin/error")
-				&& !uri.equals("/admin/login");
+			&& !path.startsWith("/admin/error")
+			&& !path.equals("/admin/login");
 	}
 
 	static final class AdminCommandTokens {

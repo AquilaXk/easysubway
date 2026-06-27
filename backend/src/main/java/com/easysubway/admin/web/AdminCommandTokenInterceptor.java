@@ -2,7 +2,6 @@ package com.easysubway.admin.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -26,13 +25,11 @@ class AdminCommandTokenInterceptor implements HandlerInterceptor {
 	}
 
 	private static boolean isAdminFormPost(HttpServletRequest request) {
-		String uri = request.getRequestURI();
-		String contentType = request.getContentType();
+		String path = AdminHtmlRequest.pathWithinApplication(request);
 		return "POST".equals(request.getMethod())
-			&& uri.startsWith("/admin/")
-			&& !uri.equals("/admin/login")
-			&& !uri.startsWith("/admin/error")
-			&& contentType != null
-			&& contentType.startsWith(MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+			&& path.startsWith("/admin/")
+			&& !path.equals("/admin/login")
+			&& !path.startsWith("/admin/error")
+			&& AdminHtmlRequest.isFormUrlEncoded(request);
 	}
 }
