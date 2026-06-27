@@ -235,6 +235,14 @@ class FacilityReportAdminPageControllerTest {
 			.contains("신고 판정 값을 선택해야 합니다.")
 			.contains("판정 누락 신고")
 			.contains("value=\"%s\"".formatted(originalReportId));
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.PRIVACY_READ, 1))
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.actor()).isEqualTo("admin-test");
+				assertThat(event.targetType()).isEqualTo("FACILITY_REPORT");
+				assertThat(event.targetId()).isEqualTo(reportId);
+				assertThat(event.action()).isEqualTo("VIEW_REPORT_DETAIL");
+			});
 	}
 
 	@Test

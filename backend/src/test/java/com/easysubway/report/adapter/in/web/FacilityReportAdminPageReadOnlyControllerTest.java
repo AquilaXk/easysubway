@@ -67,7 +67,9 @@ class FacilityReportAdminPageReadOnlyControllerTest {
 			ADMIN,
 			redirectAttributes,
 			new ExtendedModelMap(),
-			new MockHttpServletResponse()
+			new MockHttpServletResponse(),
+			null,
+			null
 		);
 
 		assertThat(viewName).isEqualTo("redirect:/admin/reports/%s/page".formatted(report.id()));

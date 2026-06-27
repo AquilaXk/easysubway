@@ -163,14 +163,7 @@ class FacilityReportAdminPageController {
 		HttpServletRequest request
 	) {
 		populateReportDetailModel(reportId, model, null);
-		auditWriter.privacyRead(
-			authentication,
-			request,
-			"FACILITY_REPORT",
-			reportId,
-			"VIEW_REPORT_DETAIL",
-			"업무 맥락: 신고 상세 조회"
-		);
+		auditReportDetailRead(authentication, request, reportId);
 		return "admin/reports/detail";
 	}
 
@@ -219,11 +212,14 @@ class FacilityReportAdminPageController {
 		Principal principal,
 		RedirectAttributes redirectAttributes,
 		Model model,
-		HttpServletResponse response
+		HttpServletResponse response,
+		Authentication authentication,
+		HttpServletRequest request
 	) {
 		if (bindingResult.hasErrors()) {
 			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 			populateReportDetailModel(reportId, model, form);
+			auditReportDetailRead(authentication, request, reportId);
 			AdminFormErrorView.expose(model, bindingResult);
 			return "admin/reports/detail";
 		}
@@ -235,6 +231,17 @@ class FacilityReportAdminPageController {
 			redirectAttributes.addFlashAttribute("masterDataError", exception.getMessage());
 		}
 		return "redirect:/admin/reports/%s/page".formatted(reportId);
+	}
+
+	private void auditReportDetailRead(Authentication authentication, HttpServletRequest request, String reportId) {
+		auditWriter.privacyRead(
+			authentication,
+			request,
+			"FACILITY_REPORT",
+			reportId,
+			"VIEW_REPORT_DETAIL",
+			"업무 맥락: 신고 상세 조회"
+		);
 	}
 
 	private List<ReviewAction> reviewActions() {
