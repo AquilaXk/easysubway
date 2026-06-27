@@ -7268,6 +7268,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   const readiness = readJson(readinessPath);
   const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const storePrivacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
 
   assert.equal(readiness.schemaVersion, 1);
   assert.equal(readiness.applicationId, "easysubway");
@@ -7370,6 +7371,63 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "encryptedInTransit",
     "deletionSupported",
   ]);
+  const inventoryDataTypesById = new Map(storePrivacyInventory.dataTypes.map((item) => [item.id, item]));
+  const expectedPlayDataTypes = [
+    ...new Set(storePrivacyInventory.dataTypes.map((item) => item.googlePlayDataSafety.dataType)),
+  ].sort();
+  assert.deepEqual(playStoreContent.dataSafetyDeclarations.requiredCollectedDataTypes.toSorted(), expectedPlayDataTypes);
+  const dataSafetyAnswerMatrix = new Map(
+    playStoreContent.dataSafetyDeclarations.answerMatrix.map((item) => [item.dataType, item]),
+  );
+  assert.deepEqual([...dataSafetyAnswerMatrix.keys()].sort(), expectedPlayDataTypes);
+  for (const dataType of expectedPlayDataTypes) {
+    const matrix = dataSafetyAnswerMatrix.get(dataType);
+    assert.ok(Array.isArray(matrix.inventoryDataIds), `${dataType} matrix must list inventory IDs`);
+    assert.ok(matrix.inventoryDataIds.length > 0, `${dataType} matrix must include at least one inventory ID`);
+    assert.deepEqual(
+      matrix.requiredConsoleFields,
+      playStoreContent.dataSafetyDeclarations.requiredFieldsPerDataType,
+      `${dataType} matrix must require every Play Console field`,
+    );
+    assert.ok(
+      matrix.evidenceSummaryFields.includes("consolePreviewEvidence"),
+      `${dataType} matrix must require Console preview evidence`,
+    );
+    assert.ok(
+      matrix.evidenceSummaryFields.includes("networkTraceMatchResult"),
+      `${dataType} matrix must require network trace matching result`,
+    );
+    assert.ok(
+      matrix.evidenceSummaryFields.includes("localEvidencePath"),
+      `${dataType} matrix must require local-only evidence path`,
+    );
+    for (const inventoryId of matrix.inventoryDataIds) {
+      const inventoryItem = inventoryDataTypesById.get(inventoryId);
+      assert.ok(inventoryItem, `${dataType} matrix references unknown inventory item: ${inventoryId}`);
+      assert.equal(
+        inventoryItem.googlePlayDataSafety.dataType,
+        dataType,
+        `${inventoryId} must map back to the same Play data type`,
+      );
+    }
+    const matrixItems = matrix.inventoryDataIds.map((id) => inventoryDataTypesById.get(id));
+    assert.equal(
+      matrix.containsCollectedData,
+      matrixItems.some((item) => item.googlePlayDataSafety.collected),
+      `${dataType} matrix collected flag must match inventory`,
+    );
+    assert.equal(
+      matrix.containsRequiredData,
+      matrixItems.some((item) => item.googlePlayDataSafety.required),
+      `${dataType} matrix required flag must match inventory`,
+    );
+    assert.equal(
+      matrix.containsOptionalData,
+      matrixItems.some((item) => item.googlePlayDataSafety.optional),
+      `${dataType} matrix optional flag must match inventory`,
+    );
+  }
+  assert.equal(dataSafetyAnswerMatrix.get("Diagnostics").containsLocalOnlyDiagnostics, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBePublicHttps, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBeUnauthenticated, true);
   assert.deepEqual(playStoreContent.privacyPolicyRequirements.sameUrlRequiredIn, [
@@ -7388,6 +7446,47 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
   assert.equal(playStoreContent.crashAnrProviderDecision.dependencyEvidenceRequired, "no-crash-sdk-dependency-scan");
+  assert.deepEqual(Object.keys(playStoreContent.evidenceSummarySchemas).sort(), [
+    "crashAnrPrivacySummary",
+    "dataSafetyConsoleSummary",
+    "mailboxReceiptSummary",
+    "networkTraceMatchSummary",
+    "privacyPolicyUrlSummary",
+    "storeScreenshotSummary",
+  ]);
+  for (const [schemaId, schema] of Object.entries(playStoreContent.evidenceSummarySchemas)) {
+    assert.ok(Array.isArray(schema.requiredFields), `${schemaId} must define required fields`);
+    assert.ok(schema.requiredFields.includes("localEvidencePath"), `${schemaId} must require local evidence path`);
+    assert.ok(schema.requiredFields.includes("result"), `${schemaId} must require an explicit result`);
+  }
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.dataSafetyConsoleSummary.requiredFields.includes("consolePreviewEvidence"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.dataSafetyConsoleSummary.requiredFields.includes("networkTraceMatchResult"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.privacyPolicyUrlSummary.requiredFields.includes("sameUrlResult"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.mailboxReceiptSummary.requiredFields.includes("redactionResult"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("forbiddenClaimsAbsent"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.crashAnrPrivacySummary.requiredFields.includes("forbiddenPayloadAbsent"),
+  );
+  assert.ok(
+    playStoreContent.evidenceSummarySchemas.networkTraceMatchSummary.requiredFields.includes("undeclaredDataTransferCount"),
+  );
+  assert.deepEqual(playStoreContent.forbiddenEvidenceSummaryValues, [
+    "TBD",
+    "TODO",
+    "unknown",
+    "not checked",
+    "not captured",
+  ]);
   assert.ok(items.get("appstore_app_privacy").linkedArtifacts.includes("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy"));
   assert.match(items.get("appstore_review_notes_or_demo_access").readyWhenKo, /심사 메모|데모|로그인 없음/);
   assert.match(items.get("appstore_backend_api_availability").readyWhenKo, /심사 기간|API/);

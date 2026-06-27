@@ -77,6 +77,117 @@
       "Photos and videos",
       "Diagnostics"
     ],
+    "answerMatrix": [
+      {
+        "dataType": "Location",
+        "inventoryDataIds": ["precise_location", "facility_report_location"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "App activity",
+        "inventoryDataIds": ["search_queries", "favorite_stations_routes_facilities"],
+        "containsCollectedData": true,
+        "containsRequiredData": true,
+        "containsOptionalData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Personal info",
+        "inventoryDataIds": ["mobility_profile"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "User-generated content",
+        "inventoryDataIds": ["facility_report_content"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Photos and videos",
+        "inventoryDataIds": ["facility_report_photo"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Diagnostics",
+        "inventoryDataIds": ["diagnostics_crash_logs", "diagnostics_performance_logs"],
+        "containsCollectedData": true,
+        "containsRequiredData": true,
+        "containsOptionalData": false,
+        "containsLocalOnlyDiagnostics": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      }
+    ],
     "optionalUserTriggeredData": [
       "precise location for nearby station search",
       "facility report photo",
@@ -87,6 +198,86 @@
     "binaryTraceMatchRequired": true,
     "linkedInventory": "apps/mobile/release/store-privacy-inventory.json"
   },
+  "evidenceSummarySchemas": {
+    "dataSafetyConsoleSummary": {
+      "requiredFields": [
+        "dataType",
+        "inventoryDataIds",
+        "collected",
+        "collectionType",
+        "optional",
+        "required",
+        "purpose",
+        "linkedToUser",
+        "encryptedInTransit",
+        "deletionSupported",
+        "consolePreviewEvidence",
+        "networkTraceMatchResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "privacyPolicyUrlSummary": {
+      "requiredFields": [
+        "url",
+        "publicHttpsResult",
+        "unauthenticatedResult",
+        "playConsoleUrl",
+        "appHelpUrl",
+        "readmeOrPublicPolicyUrl",
+        "sameUrlResult",
+        "requiredContentResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "mailboxReceiptSummary": {
+      "requiredFields": [
+        "mailbox",
+        "testMessageId",
+        "sentAt",
+        "receivedAt",
+        "deliveryResult",
+        "redactionResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "storeScreenshotSummary": {
+      "requiredFields": [
+        "screenshotId",
+        "buildIdentity",
+        "sourceBuildType",
+        "screenTitleKo",
+        "forbiddenClaimsAbsent",
+        "matchesFeatureScope",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "crashAnrPrivacySummary": {
+      "requiredFields": [
+        "separateCrashProvider",
+        "noCrashSdkDependencyScan",
+        "androidVitalsOrPrelaunchEvidence",
+        "redactedLogcatOrCrashSummary",
+        "forbiddenPayloadAbsent",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "networkTraceMatchSummary": {
+      "requiredFields": [
+        "traceTarget",
+        "declaredDataTypes",
+        "undeclaredDataTransferCount",
+        "sensitivePayloadAbsent",
+        "localEvidencePath",
+        "result"
+      ]
+    }
+  },
+  "forbiddenEvidenceSummaryValues": ["TBD", "TODO", "unknown", "not checked", "not captured"],
   "privacyPolicyRequirements": {
     "urlMustBePublicHttps": true,
     "urlMustBeUnauthenticated": true,
