@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,7 +73,7 @@ class AdminOperationsPageControllerTest {
 			.satisfies(event -> {
 				assertThat(event.actor()).isEqualTo("admin-user");
 				assertThat(event.targetId())
-					.startsWith("REPORT_REJECTION_REASON:code-")
+					.startsWith("code-")
 					.doesNotContain("SECRET");
 				assertThat(event.action()).isEqualTo("UPSERT_COMMON_CODE");
 				assertThat(event.reason()).isEqualTo("enabled=true");
@@ -93,7 +94,24 @@ class AdminOperationsPageControllerTest {
 			.contains("장애관리")
 			.contains("Major")
 			.contains("Open")
-			.contains("Health incident 생성");
+			.doesNotContain("Health incident 생성");
+	}
+
+	@Test
+	@DisplayName("공통코드 audit target은 hashCode 충돌 code도 구분한다")
+	void commonCodeAuditTargetAvoidsHashCodeCollision() throws Exception {
+		saveCode("Aa");
+		saveCode("BB");
+
+		List<String> targetIds = auditEventRepository.findRecent(AdminAuditEventType.COMMON_CODE_CHANGE, 2)
+			.stream()
+			.map(event -> event.targetId())
+			.toList();
+
+		assertThat(targetIds)
+			.hasSize(2)
+			.allSatisfy(targetId -> assertThat(targetId).startsWith("code-"))
+			.doesNotHaveDuplicates();
 	}
 
 	@Test
@@ -138,5 +156,20 @@ class AdminOperationsPageControllerTest {
 				assertThat(event.reason()).startsWith("resolutionLength=");
 				assertThat(event.reason()).doesNotContain("secret");
 			});
+	}
+
+	private void saveCode(String code) throws Exception {
+		mockMvc.perform(post("/admin/codes")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("groupCode", "REPORT_REJECTION_REASON")
+				.param("code", code)
+				.param("displayName", "코드 " + code)
+				.param("description", "충돌 검증")
+				.param("sortOrder", "30")
+				.param("enabled", "true"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/codes/page?groupCode=REPORT_REJECTION_REASON"));
 	}
 }

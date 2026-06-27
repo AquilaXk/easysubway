@@ -195,8 +195,8 @@ class AdminOperationsPageController {
 		return owner == null || owner.isBlank() ? principal.getName() : owner;
 	}
 
-	private static String auditCodeTarget(AdminCommonCode code) {
-		return "%s:code-%s".formatted(code.groupCode(), Integer.toUnsignedString(code.code().hashCode(), 16));
+	private String auditCodeTarget(AdminCommonCode code) {
+		return "code-" + auditWriter.sha256TargetId("%s:%s".formatted(code.groupCode(), code.code()));
 	}
 
 	record CodeGroupRow(String groupCode, String displayName, String description, boolean enabled) {
