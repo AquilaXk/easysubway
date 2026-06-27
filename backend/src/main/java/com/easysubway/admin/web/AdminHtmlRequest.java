@@ -15,6 +15,11 @@ public final class AdminHtmlRequest {
 		}
 		String accept = request.getHeader("Accept");
 		String contentType = request.getContentType();
+		if (accept != null
+			&& accept.contains(MediaType.APPLICATION_JSON_VALUE)
+			&& !accept.contains(MediaType.TEXT_HTML_VALUE)) {
+			return false;
+		}
 		return (accept != null && accept.contains(MediaType.TEXT_HTML_VALUE))
 			|| uri.contains("/page")
 			|| uri.startsWith("/admin/batches/")
