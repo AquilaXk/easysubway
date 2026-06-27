@@ -23,6 +23,12 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function currentMobileVersionCode() {
+  const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
+  assert.ok(match, "mobile pubspec must contain versionName+versionCode");
+  return Number.parseInt(match[1], 10);
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2335,13 +2341,14 @@ test("스토어 배포 증거 preflight는 Play App Signing 지문과 versionCod
   const envFile = path.join(dir, "deploy.env");
   const outputFile = path.join(dir, "github-output.txt");
   const reportFile = path.join(dir, "report.txt");
+  const mobileVersionCode = currentMobileVersionCode();
   await writeFile(
     envFile,
     [
       "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
       "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
       "EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=not-a-fingerprint",
-      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=1",
+      `EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=${mobileVersionCode}`,
       "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
       "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
       "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
@@ -2370,7 +2377,54 @@ test("스토어 배포 증거 preflight는 Play App Signing 지문과 versionCod
   const report = readFileSync(reportFile, "utf8");
   assert.match(report, /^android_play_internal_track\.ready=false$/m);
   assert.match(report, /EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256:sha256_fingerprint/);
-  assert.match(report, /EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_1/);
+  assert.match(
+    report,
+    new RegExp(`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`),
+  );
+});
+
+test("스토어 배포 증거 preflight는 큰 Play versionCode가 비교를 우회하지 못하게 한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-env-play-versioncode-"));
+  const envFile = path.join(dir, "deploy.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  const mobileVersionCode = currentMobileVersionCode();
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      `EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256=${validPlayAppSigningFingerprint}`,
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=900719925474099312345",
+      "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED=true",
+      "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+      "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https://objectstorage.example.com/p/token/n/ns/b/bucket/o/",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/ci/check-store-distribution-evidence-env.mjs",
+        "--env-file",
+        envFile,
+        "--mobile-pubspec",
+        "apps/mobile/pubspec.yaml",
+        "--github-output",
+        outputFile,
+        "--report",
+        reportFile,
+      ],
+      { cwd: root },
+    ),
+  );
+
+  assert.match(
+    readFileSync(reportFile, "utf8"),
+    new RegExp(`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`),
+  );
 });
 
 test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고정한다", () => {

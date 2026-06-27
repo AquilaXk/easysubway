@@ -186,7 +186,7 @@ function validateNonNegativeInteger(name) {
     if (!hasValue(env, name)) {
       return [];
     }
-    return /^(0|[1-9][0-9]*)$/.test(env[name].trim()) ? [] : [`${name}:nonnegative_integer`];
+    return /^(0|[1-9]\d*)$/.test(env[name].trim()) ? [] : [`${name}:nonnegative_integer`];
   };
 }
 
@@ -195,11 +195,11 @@ function validateMobileVersionCodeIsGreaterThanLatestPlayArtifact(mobileVersionC
     if (mobileVersionCode === undefined || !hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE")) {
       return [];
     }
-    const latestPlayVersionCode = Number.parseInt(env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE.trim(), 10);
-    if (!Number.isSafeInteger(latestPlayVersionCode)) {
+    const latestPlayVersionCode = env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE.trim();
+    if (!/^(0|[1-9]\d*)$/.test(latestPlayVersionCode)) {
       return [];
     }
-    return mobileVersionCode > latestPlayVersionCode
+    return BigInt(mobileVersionCode) > BigInt(latestPlayVersionCode)
       ? []
       : [`EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE:must_be_less_than_mobile_version_code_${mobileVersionCode}`];
   };
