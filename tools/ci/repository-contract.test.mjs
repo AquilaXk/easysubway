@@ -3753,6 +3753,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     "backend/src/main/resources/templates/operator/data-collection-failures.html",
   );
   const adminReportListTemplate = read("backend/src/main/resources/templates/admin/reports/list.html");
+  const adminPaginationFragment = read("backend/src/main/resources/templates/admin/fragments/pagination.html");
   const adminReportDetailTemplate = read("backend/src/main/resources/templates/admin/reports/detail.html");
 
   assert.match(report, /record FacilityReport/);
@@ -3930,7 +3931,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(adminReportListTemplate, /신고 처리 시간/);
   assert.match(adminReportListTemplate, /처리 완료 신고 없음/);
   assert.match(adminReportListTemplate, /신고 목록 페이지/);
-  assert.match(adminReportListTemplate, /page\.hasNext/);
+  assert.match(adminPaginationFragment, /page\.hasNext/);
   assert.match(security, /@Order\(1\)[\s\S]*?securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /securityMatcher\("\/admin\/\*\*"\)/);
   assert.match(security, /anyRequest\(\)\.hasAuthority\(AdminPermission\.ADMIN_VIEW\.authority\(\)\)/);
