@@ -1232,6 +1232,120 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
       "signed_url_lifecycle_abuse",
     ],
   );
+  const rehearsalMatrices = abusePenetrationRehearsalGate.rehearsalMatrices;
+  assert.deepEqual(Object.keys(rehearsalMatrices).sort(), [
+    "adminOperatorSecurity",
+    "distributedRateLimitAbuse",
+    "objectStorageLifecycle",
+    "providerReleaseSecretExposure",
+    "receiptTokenAbuse",
+    "reportUploadLifecycle",
+    "signedUploadUrlBoundary",
+  ]);
+  assert.deepEqual(
+    [...new Set(Object.values(rehearsalMatrices).map((matrix) => matrix.scenarioId))].sort(),
+    abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id).sort(),
+    "every #1022 abuse scenario must have per-case rehearsal matrix coverage",
+  );
+  const abuseScenarioIds = new Set(abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id));
+  const requiredMatrixCases = {
+    receiptTokenAbuse: [
+      "brute_force_guessing",
+      "replay_after_status_lookup",
+      "cross_report_enumeration",
+      "confirm_endpoint_abuse",
+      "url_header_log_redaction",
+    ],
+    signedUploadUrlBoundary: [
+      "method_mismatch",
+      "content_type_mismatch",
+      "size_limit_exceeded",
+      "ttl_expired",
+      "object_key_prefix_traversal",
+      "signed_url_reuse",
+    ],
+    reportUploadLifecycle: [
+      "upload_intent_abuse",
+      "duplicate_claim",
+      "submit_without_valid_claim",
+      "status_lookup_without_valid_receipt",
+      "confirm_without_valid_receipt",
+      "orphan_cleanup_after_failed_claim",
+      "malicious_photo_upload",
+    ],
+    adminOperatorSecurity: [
+      "login_failure_lockout",
+      "logout_session_invalidation",
+      "session_expiry",
+      "csrf_missing_mutation",
+      "role_denied_personal_data",
+      "role_denied_photo_read",
+      "tenant_authorization_bypass",
+      "break_glass_audit_redaction",
+    ],
+    objectStorageLifecycle: [
+      "orphan_object_cleanup",
+      "retention_policy_record",
+      "delete_after_report_deletion",
+      "signed_url_expiry_enforced",
+      "storage_audit_redaction",
+    ],
+    distributedRateLimitAbuse: [
+      "multi_node_upload_intent_flooding",
+      "claim_submit_status_confirm_flooding",
+      "trusted_proxy_spoofing",
+      "abuse_store_mode_record",
+      "single_instance_exception_link",
+    ],
+    providerReleaseSecretExposure: [
+      "tracked_secret_search",
+      "android_artifact_secret_scan",
+      "backend_image_env_redaction",
+      "release_endpoint_allowlist_diff",
+      "pr_evidence_redaction",
+    ],
+  };
+  for (const [matrixId, requiredCases] of Object.entries(requiredMatrixCases)) {
+    const matrix = rehearsalMatrices[matrixId];
+    assert.ok(abuseScenarioIds.has(matrix.scenarioId), `${matrixId} must reference an existing #1022 scenario`);
+    assert.deepEqual(matrix.requiredCases, requiredCases, `${matrixId} must require all #1022 abuse cases`);
+    for (const field of ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]) {
+      assert.ok(matrix.summaryFields.includes(field), `${matrixId} must include PR summary field ${field}`);
+    }
+    assert.ok(Array.isArray(matrix.requiredEvidence), `${matrixId} must define evidence`);
+    assert.ok(matrix.requiredEvidence.length > 0, `${matrixId} must require evidence`);
+    assert.ok(Array.isArray(matrix.forbiddenSummaryValues), `${matrixId} must forbid sensitive summary values`);
+    assert.ok(matrix.forbiddenSummaryValues.length > 0, `${matrixId} must have forbidden summary values`);
+  }
+  for (const scenario of abusePenetrationRehearsalGate.abuseScenarios) {
+    const matrixEvidence = new Set(
+      Object.values(rehearsalMatrices)
+        .filter((matrix) => matrix.scenarioId === scenario.id)
+        .flatMap((matrix) => matrix.requiredEvidence),
+    );
+    for (const evidenceId of scenario.requiredEvidence) {
+      assert.ok(
+        matrixEvidence.has(evidenceId),
+        `${scenario.id} rehearsal matrices must include scenario evidence ${evidenceId}`,
+      );
+    }
+  }
+  assert.ok(
+    rehearsalMatrices.receiptTokenAbuse.forbiddenSummaryValues.includes("raw receipt token"),
+    "receipt token rehearsal summary must not expose raw tokens",
+  );
+  assert.ok(
+    rehearsalMatrices.signedUploadUrlBoundary.forbiddenSummaryValues.includes("raw signed URL"),
+    "signed URL rehearsal summary must not expose raw URLs",
+  );
+  assert.ok(
+    rehearsalMatrices.adminOperatorSecurity.forbiddenSummaryValues.includes("session cookie"),
+    "admin/operator rehearsal summary must not expose session cookies",
+  );
+  assert.ok(
+    rehearsalMatrices.objectStorageLifecycle.requiredEvidence.includes("object-retention-delete-policy-summary"),
+    "storage lifecycle rehearsal must require retention/delete evidence",
+  );
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
   assert.deepEqual(abusePenetrationRehearsalGate.manualRehearsalPolicy.githubSummaryFields, [
     "scenarioId",
@@ -1240,6 +1354,14 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "findingCounts",
     "result",
     "redactionNotes",
+    "localEvidencePath",
+  ]);
+  assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.perCaseSummaryRequired, true);
+  assert.deepEqual(abusePenetrationRehearsalGate.manualRehearsalPolicy.minimumSummaryFields, [
+    "caseId",
+    "expectedStatus",
+    "observedStatus",
+    "redactionResult",
     "localEvidencePath",
   ]);
   assert.ok(abusePenetrationRehearsalGate.manualRehearsalPolicy.forbiddenInEvidence.includes("raw receipt token"));
