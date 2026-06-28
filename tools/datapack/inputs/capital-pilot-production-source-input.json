@@ -330,6 +330,12 @@
       "region": "수도권",
       "x": 420,
       "y": 250,
+      "labelPolygon": [
+        { "x": 430, "y": 226 },
+        { "x": 478, "y": 226 },
+        { "x": 478, "y": 246 },
+        { "x": 430, "y": 246 }
+      ],
       "sourceName": "서울교통공사 사이버스테이션 노선도",
       "sourceUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
       "sourceSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

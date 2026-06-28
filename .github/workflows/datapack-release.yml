@@ -76,8 +76,7 @@ jobs:
           node tools/datapack/export-publish-env.mjs \
             --env-file "${EASYSUBWAY_ENV_FILE}" \
             --github-env "${GITHUB_ENV}" \
-            --github-output "${GITHUB_OUTPUT}" \
-            --allow-invalid-disabled
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Data Pack Release / Prepare release fixture
         run: |

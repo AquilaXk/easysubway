@@ -5297,7 +5297,7 @@ test("수도권 pilot production source input은 production manifest v2 pack으�
   );
   assert.equal(
     routeMapRecords.filter((record) => record.field === "route_map_label_polygon").length,
-    1,
+    2,
   );
 
   const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");
