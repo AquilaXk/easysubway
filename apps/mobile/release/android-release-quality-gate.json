@@ -35,6 +35,25 @@
     ],
     "mismatchDisposition": "NO_GO"
   },
+  "playConsoleEvidencePolicy": {
+    "requiredBeforeGo": true,
+    "requiredSummaryFields": [
+      "playPreLaunchReportResult",
+      "playPreLaunchCrashCount",
+      "playPreLaunchAnrCount",
+      "playPolicyWarningStatus",
+      "androidVitalsCrashAnrSummary",
+      "triageDisposition",
+      "capturedAtUtc"
+    ],
+    "goNoGoRules": {
+      "missingConsoleSummary": "BLOCKED_EXTERNAL",
+      "preLaunchCrashOrAnr": "BLOCKED_TECHNICAL",
+      "untriagedPolicyWarning": "BLOCKED_TECHNICAL",
+      "privacyUnsafeCrashLog": "BLOCKED_TECHNICAL"
+    },
+    "summaryRequiredKo": "Play Console pre-launch report와 Android vitals의 crash, ANR, policy warning 상태를 민감정보 없이 요약한다."
+  },
   "deviceEvidencePolicy": {
     "codexQaDevice": "local_android_emulator_only",
     "physicalDeviceEvidence": "not_used_for_codex_pr_evidence",
@@ -71,6 +90,8 @@
       "uiTreePath",
       "screenshotOrRecordingPath",
       "logcatSummaryPath",
+      "talkbackNotesPath",
+      "playConsoleSummaryPath",
       "result",
       "blockerDisposition"
     ],
@@ -90,7 +111,7 @@
       "id": "talkback_primary_journey",
       "releaseBlocker": true,
       "journeys": ["home", "station-search", "route-result", "facility-report", "support-info"],
-      "evidence": ["ui-tree", "talkback-notes", "screen-recording-or-screenshot-sequence"],
+      "evidence": ["ui-tree", "talkback-reading-order-notes", "screen-recording-or-screenshot-sequence"],
       "passCriteriaKo": "focus order, role, state, action, dynamic update가 이동 흐름을 이해할 수 있게 읽힌다."
     },
     {
@@ -156,7 +177,7 @@
     {
       "id": "crash_anr_privacy_safe_reporting",
       "releaseBlocker": true,
-      "evidence": ["logcat-summary", "privacy-review-notes"],
+      "evidence": ["logcat-summary", "play-console-pre-launch-report-summary", "android-vitals-summary", "privacy-review-notes"],
       "passCriteriaKo": "crash/ANR reporting은 민감 위치, 신고 사진, receipt token, signing/credential 값을 노출하지 않는다."
     }
   ],
@@ -211,7 +232,7 @@
     {
       "checkId": "talkback_primary_journey",
       "requiredEvidenceIds": ["home_support_scope", "station_search", "route_result_found_unknown_unavailable", "facility_report_recovery", "help_privacy_data_deletion"],
-      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "talkbackNotesPath", "result", "blockerDisposition"]
     },
     {
       "checkId": "font_scale_150_200_small_screen",
@@ -251,7 +272,7 @@
     {
       "checkId": "crash_anr_privacy_safe_reporting",
       "requiredEvidenceIds": ["facility_report_recovery", "help_privacy_data_deletion"],
-      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "result", "blockerDisposition"]
+      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "playConsoleSummaryPath", "result", "blockerDisposition"]
     }
   ],
   "evidencePolicy": {
