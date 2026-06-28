@@ -11,9 +11,6 @@
   "manifest": {
     "manifestVersion": 2,
     "channel": "production",
-    "releaseSequence": 1,
-    "publishedAt": "2026-06-28T00:00:00.000Z",
-    "expiresAt": "2026-07-28T00:00:00.000Z",
     "keyId": "production-v1",
     "ttlSeconds": 3600,
     "activePack": {
