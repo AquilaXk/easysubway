@@ -3,6 +3,7 @@ package com.easysubway.report.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -23,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -219,6 +221,22 @@ class FacilityReportAdminPageControllerTest {
 				"VIEW_REPORT_PHOTO_ORIGINAL:FACILITY_REPORT_PHOTO:" + reportId + ":업무 맥락: 신고 원본 사진 조회",
 				"VIEW_REPORT_PHOTO_THUMBNAIL:FACILITY_REPORT_PHOTO:" + reportId + ":업무 맥락: 신고 사진 미리보기 조회"
 			);
+	}
+
+	@Test
+	@DisplayName("신고 검수 권한만 있는 관리자는 신고 사진 endpoint에 접근할 수 없다")
+	void adminReportPhotoEndpointsRequirePhotoReadPermission() throws Exception {
+		String reportId = createReportWithPhotoAndLocation("사진 권한 경계를 확인할 신고");
+		RequestPostProcessor reportReviewer = user("report-reviewer")
+			.authorities(new SimpleGrantedAuthority("admin.report.review"));
+
+		mockMvc.perform(get("/admin/reports/{reportId}/photo/thumbnail", reportId)
+				.with(reportReviewer))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/admin/reports/{reportId}/photo/original", reportId)
+				.with(reportReviewer))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test
