@@ -2656,7 +2656,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   );
 
   const workflow = read(".github/workflows/datapack-release.yml");
-  const overrideIndex = workflow.indexOf("Data Pack Release / Apply admin review overrides");
+  const prepareIndex = workflow.indexOf("Data Pack Release / Prepare release fixture");
   const routeMapAuditIndex = workflow.indexOf("Data Pack Release / Audit route map coordinate coverage");
   const buildIndex = workflow.indexOf("Data Pack Release / Build data packs");
   const validateIndex = workflow.indexOf("Data Pack Release / Validate generated data packs");
@@ -2681,7 +2681,16 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /EASYSUBWAY_DATAPACK_OUTPUT=\$\{\{ runner\.temp \}\}\/easysubway-datapacks/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_STAGE=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_PUBLISH_PLAN=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage\/publish-plan\.json/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE=\$\{\{ runner\.temp \}\}\/easysubway-production-source-fixture\.json/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE=\$\{\{ runner\.temp \}\}\/easysubway-reviewed-production-source-fixture\.json/);
   assert.match(workflow, /EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage\/route-map-audit\.json/);
+  assert.match(workflow, /Data Pack Release \/ Prepare release fixture/);
+  assert.match(workflow, /tools\/datapack\/import-official-sources\.mjs/);
+  assert.match(workflow, /--input tools\/datapack\/inputs\/capital-pilot-production-source-input\.json/);
+  assert.match(workflow, /build_fixture="\$\{EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE\}"/);
+  assert.match(workflow, /build_fixture="\$\{EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE\}"/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_BUILD_FIXTURE=\$\{build_fixture\}/);
+  assert.match(workflow, /tools\/datapack\/apply-admin-review-overrides\.mjs/);
   assert.match(workflow, /Data Pack Release \/ Audit route map coordinate coverage/);
   assert.match(workflow, /node tools\/route-map\/audit-route-map\.mjs/);
   assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE\}"/);
@@ -2689,7 +2698,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /--fail-on BLOCKER,HIGH/);
   assert.match(workflow, /test -s "\$\{EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT\}"/);
   assert.match(workflow, /node tools\/datapack\/validate-source-inventory\.mjs/);
-  assert.match(workflow, /tools\/datapack\/build-datapack\.mjs/);
+  assert.match(workflow, /tools\/datapack\/build-datapack\.mjs[\s\S]*?--fixture "\$\{EASYSUBWAY_DATAPACK_BUILD_FIXTURE\}"/);
   assert.match(workflow, /tools\/datapack\/validate-datapack\.mjs/);
   assert.match(workflow, /tools\/datapack\/create-publish-plan\.mjs/);
   assert.match(workflow, /tools\/datapack\/publish-object-storage\.mjs/);
@@ -2717,8 +2726,10 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /\$\{EASYSUBWAY_DATAPACK_STAGE\}\/catalog\/current\.json/);
   assert.match(workflow, /publish-plan\.json/);
   assert.doesNotMatch(workflow, /\$\{EASYSUBWAY_DATAPACK_STAGE\}\/current\.json/);
-  assert.ok(overrideIndex >= 0, "workflow must apply admin review overrides");
-  assert.ok(routeMapAuditIndex > overrideIndex, "workflow must audit reviewed route map coordinates after admin review overrides");
+  assert.ok(restoreSecretIndex >= 0, "workflow must restore dotenv secret before production data pack build");
+  assert.ok(remoteEnvIndex > restoreSecretIndex, "workflow must validate remote publish env after secret restore");
+  assert.ok(prepareIndex > remoteEnvIndex, "workflow must prepare the release fixture after remote publish mode is known");
+  assert.ok(routeMapAuditIndex > prepareIndex, "workflow must audit reviewed route map coordinates after release fixture preparation");
   assert.ok(buildIndex > routeMapAuditIndex, "workflow must build data packs after route map coordinate audit");
   assert.ok(validateIndex >= 0, "workflow must validate generated data packs");
   assert.ok(packIndex > validateIndex, "workflow must stage pack files after validation");
@@ -2726,9 +2737,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(manifestIndex > verifyIndex, "workflow must stage manifest after pack checksum verification");
   assert.ok(preflightIndex > manifestIndex, "workflow must create publish preflight plan after manifest staging");
   assert.ok(executorDryRunIndex > preflightIndex, "workflow must validate publish executor after plan creation");
-  assert.ok(restoreSecretIndex > executorDryRunIndex, "workflow must restore dotenv secret after dry-run validation");
-  assert.ok(remoteEnvIndex > restoreSecretIndex, "workflow must validate remote publish env after secret restore");
-  assert.ok(remotePublishIndex > remoteEnvIndex, "workflow must publish remotely after env validation");
+  assert.ok(remotePublishIndex > executorDryRunIndex, "workflow must publish remotely after dry-run validation");
   const requireProductionIndex = workflow.indexOf("--require-production", remotePublishIndex);
   const publishObjectStorageIndex = workflow.indexOf("publish-object-storage.mjs", remotePublishIndex);
   assert.notStrictEqual(
@@ -4866,8 +4875,14 @@ test("데이터팩 release workflow는 관리자 검수 override를 다음 pack 
   const datapackTest = read("tools/datapack/datapack-tools.test.mjs");
 
   assert.match(workflow, /EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE=/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE=/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE=/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_BUILD_FIXTURE/);
+  assert.match(workflow, /tools\/datapack\/import-official-sources\.mjs/);
+  assert.match(workflow, /tools\/datapack\/inputs\/capital-pilot-production-source-input\.json/);
   assert.match(workflow, /tools\/datapack\/apply-admin-review-overrides\.mjs/);
   assert.match(workflow, /--fixture tools\/datapack\/fixtures\/catalog-fixture\.json/);
+  assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE\}"/);
   assert.match(workflow, /--overrides tools\/datapack\/fixtures\/admin-review-overrides\.json/);
   assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE\}"/);
   assert.match(script, /facilityStatusUpdates/);
