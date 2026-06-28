@@ -337,6 +337,7 @@
         "targetDeviceClass",
         "viewport",
         "seedData",
+        "uiTreePath",
         "screenTitleKo",
         "forbiddenClaimsAbsent",
         "matchesFeatureScope",
