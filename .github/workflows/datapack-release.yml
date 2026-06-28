@@ -105,7 +105,7 @@ jobs:
           set -euo pipefail
           mkdir -p "${EASYSUBWAY_DATAPACK_STAGE}"
           node tools/route-map/audit-route-map.mjs \
-            --fixture "${EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE}" \
+            --fixture "${EASYSUBWAY_DATAPACK_BUILD_FIXTURE}" \
             --reviewed-ambiguities tools/route-map/fixtures/reviewed-ambiguities.json \
             --fail-on BLOCKER,HIGH \
             --pretty > "${EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT}"

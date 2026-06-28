@@ -34,6 +34,7 @@ function buildFixture(inventory, input) {
   const networkEdges = routeEdges(input.routeEdges ?? [], allowedSourceIds, mappingBySourceKey);
   const facilities = facilityRows(input.facilityRows ?? [], allowedSourceIds, mappingBySourceKey);
   const movementCandidates = movementPathCandidates(input.movementPathCandidates ?? [], allowedSourceIds, mappingBySourceKey);
+  const routeMapPositions = routeMapPositionRows(input.routeMapPositions ?? [], allowedSourceIds, mappingBySourceKey);
   const productionMinimumRows = productionMinimumTableRows(input, {
     stations: stations.length,
     stationLines: stationLines.length,
@@ -52,14 +53,15 @@ function buildFixture(inventory, input) {
         schemaVersion: requiredString(input.pack.schemaVersion, "pack.schemaVersion"),
         url: input.pack.url ?? `catalog/${input.pack.id}-v${input.pack.version}.sqlite.gz`,
         sourceInventory: selectedSources.map(packSourceInventoryEntry),
-        requiredTables: input.requiredTables ?? [
+        requiredTables: input.requiredTables ?? compactUnique([
           "catalog_metadata",
           "operators",
           "lines",
           "stations",
           "station_lines",
           "network_edges",
-        ],
+          ...(routeMapPositions.length > 0 ? ["route_map_positions"] : []),
+        ]),
         minimumTableRows: {
           catalog_metadata: 2,
           operators: input.operators?.length ?? 0,
@@ -67,6 +69,7 @@ function buildFixture(inventory, input) {
           stations: productionMinimumRows?.stations ?? stations.length,
           station_lines: productionMinimumRows?.station_lines ?? stationLines.length,
           network_edges: productionMinimumRows?.network_edges ?? networkEdges.length,
+          ...(routeMapPositions.length > 0 ? { route_map_positions: routeMapPositions.length } : {}),
           facilities: productionMinimumRows?.facilities ?? facilities.length,
         },
         metadata: {
@@ -90,6 +93,7 @@ function buildFixture(inventory, input) {
         stationLines,
         stationAliases: stationAliases(input.stationMappings ?? [], mappingBySourceKey),
         networkEdges,
+        routeMapPositions,
         stationExits: input.stationExits ?? [],
         facilities,
         movementPathCandidates: movementCandidates,
@@ -500,6 +504,31 @@ function movementPathCandidates(rows, allowedSourceIds, mappingBySourceKey) {
   });
 }
 
+function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
+  return rows.map((row) => {
+    const sourceId = requiredKnownSource(row.sourceId, allowedSourceIds, "routeMapPositions.sourceId");
+    const mapping = mappingForEndpoint(row.station, allowedSourceIds, mappingBySourceKey);
+    return {
+      stationId: mapping.stationId,
+      lineId: mapping.lineId,
+      region: requiredString(row.region, "routeMapPositions.region"),
+      x: requiredNonNegativeInteger(row.x, "routeMapPositions.x"),
+      y: requiredNonNegativeInteger(row.y, "routeMapPositions.y"),
+      labelPolygon: row.labelPolygon ?? undefined,
+      sourceId,
+      sourceName: requiredString(row.sourceName, "routeMapPositions.sourceName"),
+      sourceUrl: requiredString(row.sourceUrl, "routeMapPositions.sourceUrl"),
+      sourceSha256: requiredString(row.sourceSha256, "routeMapPositions.sourceSha256"),
+      license: row.license ?? "",
+      licenseStatus: requiredString(row.licenseStatus, "routeMapPositions.licenseStatus"),
+      commercialUseAllowed: row.commercialUseAllowed === true,
+      attributionRequired: row.attributionRequired !== false,
+      sourceLabel: row.sourceLabel ?? "",
+      reviewedAt: requiredString(row.reviewedAt, "routeMapPositions.reviewedAt"),
+    };
+  });
+}
+
 function nodeIdForEndpoint(endpoint, allowedSourceIds, mappingBySourceKey) {
   const mapping = mappingForEndpoint(endpoint, allowedSourceIds, mappingBySourceKey);
   if (endpoint.nodeKind === "STATION") {
@@ -560,6 +589,17 @@ function requiredInteger(value, label) {
     throw new Error(`${label} must be an integer`);
   }
   return value;
+}
+
+function requiredNonNegativeInteger(value, label) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function compactUnique(values) {
+  return [...new Set(values)];
 }
 
 function parseArgs(argv) {
