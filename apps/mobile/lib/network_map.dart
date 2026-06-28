@@ -1266,6 +1266,7 @@ class _AndroidRouteMapFallbackLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
+      key: const Key('routeMapViewportRenderer'),
       child: CustomPaint(
         painter: _AndroidRouteMapFallbackPainter(
           data: data,
