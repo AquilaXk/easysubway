@@ -76,6 +76,17 @@
       "install_update_rollback_failure"
     ]
   },
+  "latestOperationsEvidenceStatus": {
+    "issue": 1019,
+    "supportMailboxRouting": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+    "alertRouteDryRun": "PASS",
+    "remainingBlockers": [
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "post-launch-review-window-evidence-after-public-release",
+      "support-incident-response-dry-run-evidence"
+    ]
+  },
   "releaseControl": {
     "raciRequired": true,
     "freezeRequired": true,

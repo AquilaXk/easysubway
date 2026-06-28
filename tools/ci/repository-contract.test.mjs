@@ -1081,6 +1081,28 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "apps/mobile/release/operations-release-evidence.json");
   assert.equal(postLaunchOperationsReviewGate.supportIncidentResponseGate, supportIncidentResponsePath);
   assert.match(postLaunchOperationsReviewGate.evidenceRoot, /\.codex\/evidence\/release\/post-launch-operations-review\/<rc-or-run>/);
+  assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-06-28");
+  assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.result, "PASS");
+  assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.channel, "Slack Incoming Webhook");
+  assert.match(
+    postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.publicEvidenceSummary,
+    /HTTP 200 \/ ok/,
+  );
+  assert.equal(
+    postLaunchOperationsReviewGate.latestQaEvidenceSummary.supportMailboxRouting.result,
+    "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+  );
+  assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.supportMailboxRouting.addresses, [
+    "support@aquilaxk.site",
+    "security@aquilaxk.site",
+    "privacy@aquilaxk.site",
+  ]);
+  assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.remainingExternalBlockers, [
+    "play-review-status-summary",
+    "crash-anr-vitals-summary",
+    "support-ticket-summary-after-public-release",
+    "post-launch-review-window-evidence-after-public-release",
+  ]);
   assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
     ["first_2h", "first_24h", "day_7", "day_30"],
@@ -1159,6 +1181,40 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(supportIncidentResponseGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(supportIncidentResponseGate.postLaunchOperationsReviewGate, postLaunchOperationsReviewPath);
   assert.match(supportIncidentResponseGate.evidenceRoot, /\.codex\/evidence\/release\/support-incident-response\/<rc-or-run>/);
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.publicContactDomain, "aquilaxk.site");
+  assert.equal(
+    supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.result,
+    "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+  );
+  assert.deepEqual(supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.addresses, [
+    "support@aquilaxk.site",
+    "security@aquilaxk.site",
+    "privacy@aquilaxk.site",
+  ]);
+  assert.ok(supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.dnsEvidence.includes("MX records present"));
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.redactionPolicy,
+    /raw report receipt token/,
+  );
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.redactionPolicy,
+    /operator private contact/,
+  );
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.redactionPolicy,
+    /provider credential or quota token/,
+  );
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.redactionPolicy,
+    /photo metadata/,
+  );
+  assert.deepEqual(supportIncidentResponseGate.latestQaEvidenceSummary.remainingSupportReadiness, [
+    "data-error-triage-dry-run",
+    "emergency-datapack-release-rollback-runbook-match",
+    "incident-notice-copy-review",
+    "local-emulator-help-screen-screenshot-or-ui-tree",
+    "operator-contact-route-evidence",
+  ]);
   assert.deepEqual(
     supportIncidentResponseGate.supportChannels.map((channel) => channel.id).sort(),
     ["faq_and_status_notice", "security_privacy_deletion", "support_email"],
@@ -1922,6 +1978,15 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(gate.releaseReadiness.iosBlocksAndroidRelease, false);
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("measured_performance_budget_failure"));
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
+  assert.equal(gate.latestOperationsEvidenceStatus.issue, 1019);
+  assert.equal(gate.latestOperationsEvidenceStatus.supportMailboxRouting, "RESOLVED_BY_QA_MANUAL_EVIDENCE");
+  assert.equal(gate.latestOperationsEvidenceStatus.alertRouteDryRun, "PASS");
+  assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingBlockers, [
+    "play-review-status-summary",
+    "crash-anr-vitals-summary",
+    "post-launch-review-window-evidence-after-public-release",
+    "support-incident-response-dry-run-evidence",
+  ]);
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
   assert.deepEqual(
