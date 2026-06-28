@@ -275,6 +275,58 @@
       "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "playConsoleSummaryPath", "result", "blockerDisposition"]
     }
   ],
+  "latestQaEvidenceStatus": {
+    "qaEvidenceDateKst": "2026-06-29",
+    "localEvidenceStatus": {
+      "local16KbEmulatorSmoke": "PASS",
+      "fontScale150HomeSmoke": "PASS",
+      "fontScale200HomeSmoke": "PASS",
+      "routeMapInitialViewportSmoke": "PASS",
+      "talkBackRouteMapUiTree": "PASS_UI_TREE_ONLY",
+      "locationPermissionDeniedRecovery": "PASS",
+      "myReportsBackendFailureRecovery": "PASS",
+      "realDeviceHomeSmoke": "PASS",
+      "playInstalledBuildProvenance": "BLOCKED_EXTERNAL",
+      "playConsolePreLaunchAndVitals": "BLOCKED_EXTERNAL"
+    },
+    "resolvedEvidence": [
+      "android-quality-gate-contract",
+      "emulator-discovery-command-policy",
+      "local-16kb-runtime-home-station-search-smoke",
+      "font-scale-150-home-smoke",
+      "font-scale-200-home-smoke",
+      "route-map-initial-bounds-visual-smoke",
+      "talkback-route-map-ui-tree-accessibility-service",
+      "location-permission-denied-recovery",
+      "my-reports-backend-failure-recovery",
+      "real-device-home-smoke",
+      "release-logcat-privacy-marker-scan"
+    ],
+    "remainingExternalBlockers": [
+      "play-installed-build-provenance",
+      "play-generated-apk-download-id-summary",
+      "talkback-manual-reading-order-notes",
+      "play-pre-launch-crash-anr-policy-summary",
+      "android-vitals-crash-anr-summary",
+      "play-installed-network-logcat-privacy-summary",
+      "play-installed-route-map-performance-budget",
+      "play-installed-font-scale-150-200-compact-screen-screenshots",
+      "upload-failure-recovery-on-rc-or-play-installed-build"
+    ],
+    "notClosingReasonKo": "#1021은 local emulator/real-device smoke 일부가 PASS여도 Play-installed provenance, 실제 TalkBack reading order, Play Console pre-launch/vitals, Play-installed 성능/복구 증거가 남아 open 유지한다.",
+    "redactionPolicy": {
+      "secretValuesPrinted": false,
+      "forbiddenInGitHubEvidence": [
+        "raw location coordinates",
+        "facility report photo",
+        "receipt token",
+        "network trace with device identifiers",
+        "Play-installed APK or AAB binary",
+        "signing credential",
+        "session cookie"
+      ]
+    }
+  },
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/android-quality/<rc-or-run>/",
     "githubEvidencePolicy": "summary-or-public-link",

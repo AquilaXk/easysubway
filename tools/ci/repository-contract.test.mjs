@@ -7637,6 +7637,42 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   ]);
   assert.equal(gate.deviceEvidencePolicy.emptyAdbDevicesDisposition, "INSUFFICIENT_EVIDENCE");
   assert.equal(gate.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/android-quality/<rc-or-run>/");
+  assert.equal(gate.latestQaEvidenceStatus.qaEvidenceDateKst, "2026-06-29");
+  assert.equal(gate.latestQaEvidenceStatus.localEvidenceStatus.local16KbEmulatorSmoke, "PASS");
+  assert.equal(gate.latestQaEvidenceStatus.localEvidenceStatus.talkBackRouteMapUiTree, "PASS_UI_TREE_ONLY");
+  assert.equal(gate.latestQaEvidenceStatus.localEvidenceStatus.playInstalledBuildProvenance, "BLOCKED_EXTERNAL");
+  assert.equal(gate.latestQaEvidenceStatus.localEvidenceStatus.playConsolePreLaunchAndVitals, "BLOCKED_EXTERNAL");
+  assert.deepEqual(gate.latestQaEvidenceStatus.resolvedEvidence, [
+    "android-quality-gate-contract",
+    "emulator-discovery-command-policy",
+    "local-16kb-runtime-home-station-search-smoke",
+    "font-scale-150-home-smoke",
+    "font-scale-200-home-smoke",
+    "route-map-initial-bounds-visual-smoke",
+    "talkback-route-map-ui-tree-accessibility-service",
+    "location-permission-denied-recovery",
+    "my-reports-backend-failure-recovery",
+    "real-device-home-smoke",
+    "release-logcat-privacy-marker-scan",
+  ]);
+  assert.deepEqual(gate.latestQaEvidenceStatus.remainingExternalBlockers, [
+    "play-installed-build-provenance",
+    "play-generated-apk-download-id-summary",
+    "talkback-manual-reading-order-notes",
+    "play-pre-launch-crash-anr-policy-summary",
+    "android-vitals-crash-anr-summary",
+    "play-installed-network-logcat-privacy-summary",
+    "play-installed-route-map-performance-budget",
+    "play-installed-font-scale-150-200-compact-screen-screenshots",
+    "upload-failure-recovery-on-rc-or-play-installed-build",
+  ]);
+  assert.match(gate.latestQaEvidenceStatus.notClosingReasonKo, /#1021/);
+  assert.equal(gate.latestQaEvidenceStatus.redactionPolicy.secretValuesPrinted, false);
+  assert.ok(
+    gate.latestQaEvidenceStatus.redactionPolicy.forbiddenInGitHubEvidence.includes(
+      "network trace with device identifiers",
+    ),
+  );
   assert.match(
     gate.deviceEvidencePolicy.requiredDeviceDiscoveryCommands.join("\n"),
     /ANDROID_HOME|ANDROID_SDK_ROOT/,
