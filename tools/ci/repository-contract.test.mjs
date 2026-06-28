@@ -1299,6 +1299,45 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
   assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.qaEvidenceDateKst, "2026-06-28");
+  assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.playAndStorePreflight.androidPlayInternalTrack, "READY");
+  assert.equal(
+    abusePenetrationRehearsalGate.latestQaEvidenceStatus.playAndStorePreflight.googlePlayApi,
+    "READY_EDIT_TRACK_VALIDATE",
+  );
+  assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.playAndStorePreflight.uploadedInternalVersionCode, 10001);
+  assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.playAndStorePreflight.latestVersionCodeEnv, 10001);
+  assert.deepEqual(abusePenetrationRehearsalGate.latestQaEvidenceStatus.resolvedEvidence, [
+    "android-play-internal-track-env-preflight",
+    "datapack-object-storage-publish-env-preflight",
+    "google-play-api-edit-track-validate",
+    "play-internal-upload-version-code-10001",
+    "store-distribution-evidence-success",
+    "production-datapack-release-publish-success",
+    "android-aab-release-artifact-secret-scan-output",
+    "release-aab-internal-endpoint-scan-output",
+    "backend-image-env-redaction-summary",
+    "backend-abuse-security-selected-tests",
+    "trusted-proxy-negative-test-output",
+  ]);
+  assert.deepEqual(abusePenetrationRehearsalGate.latestQaEvidenceStatus.remainingExternalBlockers, [
+    "play-generated-apk-download-id-summary",
+    "play-installed-build-smoke",
+    "play-pre-launch-report-crash-anr-policy-summary",
+    "network-trace-redaction-summary-from-play-installed-build",
+    "deployed-public-https-backend-report-admin-base-url-evidence",
+    "deployed-admin-operator-auth-session-csrf-summary",
+    "deployed-signed-url-boundary-summary",
+    "object-storage-lifecycle-retention-delete-summary",
+    "deployed-distributed-or-multi-node-rate-limit-rehearsal",
+  ]);
+  assert.match(abusePenetrationRehearsalGate.latestQaEvidenceStatus.notClosingReasonKo, /#1022/);
+  assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.redactionPolicy.secretValuesPrinted, false);
+  assert.ok(
+    abusePenetrationRehearsalGate.latestQaEvidenceStatus.redactionPolicy.forbiddenInGitHubEvidence.includes(
+      "raw signed URL",
+    ),
+  );
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020"]);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.acceptedArtifactSources, [
     "rc-aab",
