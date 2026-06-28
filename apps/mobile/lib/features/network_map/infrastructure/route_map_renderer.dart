@@ -158,6 +158,7 @@ final class RouteMapRendererHealthMonitor {
       case RouteMapRendererFramePresented(:final revision):
         if (_pendingRevision != null && revision == _pendingRevision!) {
           _clearPendingFrame();
+          _recoveryAttempt = 0;
         }
       case RouteMapRendererProcessGone():
         _recover();
