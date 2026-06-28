@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/adaptive_layout.dart';
 import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
@@ -609,6 +610,54 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('홈 화면은 태블릿 landscape에서 핵심 CTA와 보조 영역을 나란히 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(
+          favorites: [_favoriteRoute()],
+        ),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('homeLargeScreenLayout')), findsOneWidget);
+    expect(find.byKey(const Key('homeBottomNavigationBar')), findsOneWidget);
+    expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('heroStationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('recentSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('homeRecentRouteSection')), findsOneWidget);
+
+    final homeList = tester.widget<ListView>(
+      find.byKey(const Key('homePrototypeList')),
+    );
+    final padding = homeList.padding!.resolve(TextDirection.ltr);
+    expect(padding.left, EasySubwayAdaptiveLayout.largeScreenGutter);
+    expect(padding.right, EasySubwayAdaptiveLayout.largeScreenGutter);
+    expect(padding.bottom, 112);
+
+    final heroRect = tester.getRect(find.byKey(const Key('homeHeroCard')));
+    final recentSearchRect = tester.getRect(
+      find.byKey(const Key('recentSearchButton')),
+    );
+
+    expect(heroRect.left, lessThan(recentSearchRect.left));
+    expect(heroRect.right, lessThan(recentSearchRect.left));
+    expect(heroRect.width, lessThan(800));
+    expect(recentSearchRect.top, lessThan(heroRect.bottom));
   });
 
   testWidgets('홈 우측 상단 알림 버튼은 알림함으로 이동한다', (tester) async {
