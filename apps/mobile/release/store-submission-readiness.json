@@ -17,6 +17,18 @@
     "App Store Connect App Privacy",
     "App Store Connect Review Information"
   ],
+  "latestEvidenceStatus": {
+    "issue": 1018,
+    "privacyPolicyUrl": "PASS_PUBLIC_HTTPS",
+    "publicContactMailboxes": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+    "remainingGooglePlayBlockers": [
+      "play-console-data-safety-preview",
+      "play-console-main-listing-preview",
+      "play-pre-launch-report-or-android-vitals-export",
+      "play-upload-or-play-installed-required-screenshot-set"
+    ],
+    "notClosingReasonKo": "Play Console preview, pre-launch/Android vitals, Play-uploaded screenshot set 증거가 남아 있어 #1018은 open 유지한다."
+  },
   "items": [
     {
       "id": "play_data_safety",
