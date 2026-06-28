@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
+import 'adaptive_layout.dart';
 import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -1893,6 +1894,176 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         _hasSearchQuery ||
         _shouldShowNearbyFallbackSearch;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
+    final searchInputSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showSearchInput) ...[
+          TextField(
+            key: const Key('stationSearchInput'),
+            controller: _queryController,
+            minLines: 1,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 20, height: 1.35),
+            decoration: InputDecoration(
+              hintText: '역 이름을 입력해 주세요',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _hasSearchQuery
+                  ? IconButton(
+                      tooltip: '검색어 지우기',
+                      onPressed: _queryController.clear,
+                      icon: const Icon(Icons.close),
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: EasySubwayAccessibleColors.line,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: EasySubwayAccessibleColors.line,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: EasySubwayAccessibleColors.primary,
+                  width: 2,
+                ),
+              ),
+            ),
+            onSubmitted: _submit,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+    final recentSearchSection = AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final isSearching =
+            _controller.state.status == StationSearchStatus.loading;
+        if (isNearbyEntry || _hasSearchQuery) {
+          return const SizedBox.shrink();
+        }
+        if (_recentQueries.isEmpty) {
+          return isRecentEntry
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _StationRecentSearchEmptyState(
+                    onSearchTap: _openStationSearch,
+                  ),
+                )
+              : const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _StationRecentSearchSection(
+            queries: _recentQueries,
+            showTitle: !isRecentEntry,
+            enabled: !isSearching && !_isNearbySearchRunning,
+            onQuerySelected: _searchRecentQuery,
+            onQueryRemoved: _removeRecentQuery,
+            onClearAll: _clearRecentQueries,
+          ),
+        );
+      },
+    );
+    final actionButtonSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showSearchInput || showNearbyRetryButton) ...[
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final isSearching =
+                  _controller.state.status == StationSearchStatus.loading;
+              final isNearbyDisabled = isSearching || _isNearbySearchRunning;
+              if (showNearbyRetryButton) {
+                return OutlinedButton.icon(
+                  key: const Key('nearbyStationSearchButton'),
+                  onPressed: isNearbyDisabled ? null : _searchNearby,
+                  icon: const Icon(Icons.my_location),
+                  label: const Text('내 주변 역 다시 찾기'),
+                );
+              }
+              if (_hasSearchQuery) {
+                return FilledButton.icon(
+                  key: const Key('stationSearchSubmitButton'),
+                  onPressed: isSearching
+                      ? null
+                      : () => _submit(_queryController.text),
+                  icon: const Icon(Icons.search),
+                  label: const Text('검색'),
+                );
+              }
+              return OutlinedButton.icon(
+                key: const Key('nearbyStationSearchButton'),
+                onPressed: isNearbyDisabled ? null : _searchNearby,
+                icon: const Icon(Icons.my_location),
+                label: const Text('내 주변 역 찾기'),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ],
+    );
+    final resultSection = AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return _StationSearchBody(
+          state: _controller.state,
+          onResultTap: _openStationDetail,
+          onSetOrigin: widget.routeDraftController == null
+              ? null
+              : _setRouteOrigin,
+          onSetDestination: widget.routeDraftController == null
+              ? null
+              : _setRouteDestination,
+          isOpeningLocationSettings: _isOpeningLocationSettings,
+          onOpenLocationSettings: _openLocationSettings,
+        );
+      },
+    );
+    final lineFilterSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showSearchInput && _lineOptionsFuture != null)
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final isSearching =
+                  _controller.state.status == StationSearchStatus.loading;
+              final hasSearchResults =
+                  _controller.state.status == StationSearchStatus.success &&
+                  _controller.state.source == StationSearchResultSource.search;
+              return _StationLineFilterPanel(
+                expanded: !hasSearchResults || _isLineFilterExpanded,
+                collapsible: hasSearchResults,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isLineFilterExpanded = !_isLineFilterExpanded;
+                  });
+                },
+                child: _StationLineFilterSection(
+                  linesFuture: _lineOptionsFuture!,
+                  selectedLine: _selectedLine,
+                  selectedRegion: _selectedLineRegion,
+                  enabled: !isSearching && !_isNearbySearchRunning,
+                  onRegionSelected: _selectLineRegion,
+                  onLineSelected: _selectLine,
+                ),
+              );
+            },
+          ),
+      ],
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (widget.entryMode) {
@@ -1911,169 +2082,27 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          children: [
-            if (showSearchInput) ...[
-              TextField(
-                key: const Key('stationSearchInput'),
-                controller: _queryController,
-                minLines: 1,
-                textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 20, height: 1.35),
-                decoration: InputDecoration(
-                  hintText: '역 이름을 입력해 주세요',
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _hasSearchQuery
-                      ? IconButton(
-                          tooltip: '검색어 지우기',
-                          onPressed: _queryController.clear,
-                          icon: const Icon(Icons.close),
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: EasySubwayAccessibleColors.line,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: EasySubwayAccessibleColors.line,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: const BorderSide(
-                      color: EasySubwayAccessibleColors.primary,
-                      width: 2,
-                    ),
-                  ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
+              constraints,
+            );
+            return ListView(
+              padding: isLargeScreen
+                  ? const EdgeInsets.fromLTRB(24, 24, 24, 40)
+                  : const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              children: [
+                _StationSearchAdaptiveContent(
+                  isLargeScreen: isLargeScreen,
+                  searchInputSection: searchInputSection,
+                  recentSearchSection: recentSearchSection,
+                  actionButtonSection: actionButtonSection,
+                  resultSection: resultSection,
+                  lineFilterSection: lineFilterSection,
                 ),
-                onSubmitted: _submit,
-              ),
-              const SizedBox(height: 12),
-            ],
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final isSearching =
-                    _controller.state.status == StationSearchStatus.loading;
-                if (isNearbyEntry || _hasSearchQuery) {
-                  return const SizedBox.shrink();
-                }
-                if (_recentQueries.isEmpty) {
-                  return isRecentEntry
-                      ? Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _StationRecentSearchEmptyState(
-                            onSearchTap: _openStationSearch,
-                          ),
-                        )
-                      : const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _StationRecentSearchSection(
-                    queries: _recentQueries,
-                    showTitle: !isRecentEntry,
-                    enabled: !isSearching && !_isNearbySearchRunning,
-                    onQuerySelected: _searchRecentQuery,
-                    onQueryRemoved: _removeRecentQuery,
-                    onClearAll: _clearRecentQueries,
-                  ),
-                );
-              },
-            ),
-            if (showSearchInput || showNearbyRetryButton) ...[
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  final isSearching =
-                      _controller.state.status == StationSearchStatus.loading;
-                  final isNearbyDisabled =
-                      isSearching || _isNearbySearchRunning;
-                  if (showNearbyRetryButton) {
-                    return OutlinedButton.icon(
-                      key: const Key('nearbyStationSearchButton'),
-                      onPressed: isNearbyDisabled ? null : _searchNearby,
-                      icon: const Icon(Icons.my_location),
-                      label: const Text('내 주변 역 다시 찾기'),
-                    );
-                  }
-                  if (_hasSearchQuery) {
-                    return FilledButton.icon(
-                      key: const Key('stationSearchSubmitButton'),
-                      onPressed: isSearching
-                          ? null
-                          : () => _submit(_queryController.text),
-                      icon: const Icon(Icons.search),
-                      label: const Text('검색'),
-                    );
-                  }
-                  return OutlinedButton.icon(
-                    key: const Key('nearbyStationSearchButton'),
-                    onPressed: isNearbyDisabled ? null : _searchNearby,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('내 주변 역 찾기'),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                return _StationSearchBody(
-                  state: _controller.state,
-                  onResultTap: _openStationDetail,
-                  onSetOrigin: widget.routeDraftController == null
-                      ? null
-                      : _setRouteOrigin,
-                  onSetDestination: widget.routeDraftController == null
-                      ? null
-                      : _setRouteDestination,
-                  isOpeningLocationSettings: _isOpeningLocationSettings,
-                  onOpenLocationSettings: _openLocationSettings,
-                );
-              },
-            ),
-            if (showSearchInput && _lineOptionsFuture != null) ...[
-              const SizedBox(height: 16),
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  final isSearching =
-                      _controller.state.status == StationSearchStatus.loading;
-                  final hasSearchResults =
-                      _controller.state.status == StationSearchStatus.success &&
-                      _controller.state.source ==
-                          StationSearchResultSource.search;
-                  return _StationLineFilterPanel(
-                    expanded: !hasSearchResults || _isLineFilterExpanded,
-                    collapsible: hasSearchResults,
-                    onToggleExpanded: () {
-                      setState(() {
-                        _isLineFilterExpanded = !_isLineFilterExpanded;
-                      });
-                    },
-                    child: _StationLineFilterSection(
-                      linesFuture: _lineOptionsFuture!,
-                      selectedLine: _selectedLine,
-                      selectedRegion: _selectedLineRegion,
-                      enabled: !isSearching && !_isNearbySearchRunning,
-                      onRegionSelected: _selectLineRegion,
-                      onLineSelected: _selectLine,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -2908,6 +2937,76 @@ class _LineFilterBadge extends StatelessWidget {
           fontSize: fontSize * 0.8,
           fontWeight: FontWeight.w700,
           height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _StationSearchAdaptiveContent extends StatelessWidget {
+  const _StationSearchAdaptiveContent({
+    required this.isLargeScreen,
+    required this.searchInputSection,
+    required this.recentSearchSection,
+    required this.actionButtonSection,
+    required this.resultSection,
+    required this.lineFilterSection,
+  });
+
+  final bool isLargeScreen;
+  final Widget searchInputSection;
+  final Widget recentSearchSection;
+  final Widget actionButtonSection;
+  final Widget resultSection;
+  final Widget lineFilterSection;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isLargeScreen) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          searchInputSection,
+          recentSearchSection,
+          actionButtonSection,
+          resultSection,
+          const SizedBox(height: 16),
+          lineFilterSection,
+        ],
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: EasySubwayAdaptiveLayout.largeScreenMaxContentWidth,
+        ),
+        child: Row(
+          key: const Key('stationSearchLargeScreenLayout'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  searchInputSection,
+                  actionButtonSection,
+                  resultSection,
+                ],
+              ),
+            ),
+            const SizedBox(
+              width: EasySubwayAdaptiveLayout.largeScreenColumnGap,
+            ),
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [recentSearchSection, lineFilterSection],
+              ),
+            ),
+          ],
         ),
       ),
     );
