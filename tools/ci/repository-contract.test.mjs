@@ -1620,6 +1620,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.match(readme, /휠체어 경로 보장/);
   assert.match(readme, /Play-generated APK와 device compatibility matrix gate/);
   assert.match(readme, /로컬 AAB만으로는 Go evidence가 될 수 없고/);
+  assert.match(readme, /generatedApks 다운로드 APK를 adb\/shell로 설치한 증거는 artifact identity와 manifest 확인에만 쓰고/);
+  assert.match(readme, /Play-installed build smoke는 `installerPackageName=com\.android\.vending`/);
   assert.match(readme, /16 KB page-size/);
   assert.match(readme, /Android 출시 후 2시간\/24시간\/7일\/30일 운영 검토/);
   assert.match(readme, /post-launch-operations-review-gate\.json/);
