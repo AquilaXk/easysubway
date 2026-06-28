@@ -51,6 +51,10 @@ const _representativeRouteRegressions = [
     'requiredEdgeIds': ['edge-a-b-express'],
   },
 ];
+const _productionSigningPublicKey = DataPackSigningPublicKey(
+  modulusBase64Url: 'AQ',
+  exponentBase64Url: 'AQAB',
+);
 
 void main() {
   test('manifest client는 TTL 안에서는 네트워크를 호출하지 않는다', () async {
@@ -237,6 +241,58 @@ void main() {
     final cache = await stateRepository.readManifestCache();
     expect(cache?.etag, 'etag-v18');
   });
+
+  test(
+    'manifest client는 production key에서 fixture manifest를 client 오류로 거부한다',
+    () async {
+      final userDatabase = user_db.UserDatabase.memory();
+      addTearDown(userDatabase.close);
+      final stateRepository = DataPackUpdateStateRepository(
+        userDatabase: userDatabase,
+        now: () => DateTime.utc(2026, 6, 27, 12),
+      );
+      await stateRepository.saveManifestCache(
+        etag: 'etag-v18',
+        checkedAt: DateTime.utc(2026, 6, 27, 10),
+        ttl: const Duration(minutes: 30),
+      );
+      var requestCount = 0;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) {
+        requestCount++;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.set(HttpHeaders.etagHeader, 'etag-v19')
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(_v2ManifestJson(sequence: 43, version: '19')))
+          ..close();
+      });
+
+      final client = DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/manifest.json',
+        ),
+        stateRepository: stateRepository,
+        productionSigningPublicKey: _productionSigningPublicKey,
+        now: () => DateTime.utc(2026, 6, 27, 12),
+      );
+
+      await expectLater(
+        client.fetchManifestIfNeeded(),
+        throwsA(
+          isA<DataPackClientException>().having(
+            (error) => error.message,
+            'message',
+            '데이터팩 정보 형식이 올바르지 않습니다.',
+          ),
+        ),
+      );
+      final cache = await stateRepository.readManifestCache();
+      expect(requestCount, 1);
+      expect(cache?.etag, 'etag-v18');
+    },
+  );
 
   test('manifest client는 v2 manifest cache TTL을 expiresAt으로 제한한다', () async {
     final userDatabase = user_db.UserDatabase.memory();

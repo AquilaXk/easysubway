@@ -61,14 +61,24 @@ class DataPackClient {
     final body = await utf8
         .decodeStream(response)
         .timeout(_manifestFetchTimeout);
-    final decoded = jsonDecode(body);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
+    }
     if (decoded is! Map<String, Object?>) {
       throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
     }
-    final manifest = DataPackManifest.fromJson(
-      decoded,
-      productionSigningPublicKey: productionSigningPublicKey,
-    );
+    final DataPackManifest manifest;
+    try {
+      manifest = DataPackManifest.fromJson(
+        decoded,
+        productionSigningPublicKey: productionSigningPublicKey,
+      );
+    } on FormatException {
+      throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
+    }
     _ensureExpectedManifestChannel(manifest);
     if (manifest.isExpiredAt(_now())) {
       throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
