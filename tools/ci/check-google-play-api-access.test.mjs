@@ -49,13 +49,13 @@ test("Google Play API access checker는 edit를 삭제하고 redacted report를 
   assert.match(report, /^edit_insert\.ready=true$/m);
   assert.match(report, /^tracks\.ids=internal,production$/m);
   assert.match(report, /^tracks\.max_version_code=7$/m);
-  assert.match(report, /^latest_version_code_matches_track_max=true$/m);
+  assert.match(report, /^latest_version_code_covers_track_max=true$/m);
   assert.match(report, /^edit_delete\.ready=true$/m);
   assert.doesNotMatch(report, /play-service@example\.invalid/);
   assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
 });
 
-test("Google Play API access checker는 env versionCode가 Play track max와 다르면 실패한다", async () => {
+test("Google Play API access checker는 env versionCode가 Play track max보다 낮으면 실패한다", async () => {
   const requests = [];
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const serviceAccount = {
@@ -85,15 +85,53 @@ test("Google Play API access checker는 env versionCode가 Play track max와 다
       apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
       fetchImpl: mockGooglePlayFetch(requests, "7"),
     }),
-    /latest versionCode does not match/,
+    /latest versionCode is lower than track max/,
   );
 
   const output = readFileSync(outputFile, "utf8");
   const report = readFileSync(reportFile, "utf8");
   assert.match(output, /^google_play_api_access_ready=false$/m);
-  assert.match(report, /^latest_version_code_matches_track_max=false$/m);
+  assert.match(report, /^latest_version_code_covers_track_max=false$/m);
   assert.match(report, /^edit_delete\.ready=true$/m);
   assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
+});
+
+test("Google Play API access checker는 env versionCode가 track max 이상이면 통과한다", async () => {
+  const requests = [];
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const serviceAccount = {
+    client_email: "play-service@example.invalid",
+    private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
+    token_uri: "https://androidpublisher.example.invalid/token",
+  };
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-google-play-api-lower-bound-"));
+  const envFile = path.join(dir, "store.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      `EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=${Buffer.from(JSON.stringify(serviceAccount)).toString("base64")}`,
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=9",
+      "",
+    ].join("\n"),
+  );
+
+  await runGooglePlayApiAccess({
+    envFile,
+    githubOutput: outputFile,
+    reportPath: reportFile,
+    apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
+    fetchImpl: mockGooglePlayFetch(requests, "7"),
+  });
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^google_play_api_access_ready=true$/m);
+  assert.match(report, /^tracks\.max_version_code=7$/m);
+  assert.match(report, /^latest_version_code_env=9$/m);
+  assert.match(report, /^latest_version_code_covers_track_max=true$/m);
 });
 
 test("Google Play API access checker는 Play API 실패도 redacted report로 남긴다", async () => {
@@ -144,6 +182,43 @@ test("Google Play API access checker는 Play API 실패도 redacted report로 �
   assert.match(report, /^edit_delete\.ready=true$/m);
   assert.doesNotMatch(report, /play-service@example\.invalid/);
   assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
+});
+
+test("Google Play API access checker는 malformed credential도 redacted report로 남긴다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-google-play-api-malformed-"));
+  const envFile = path.join(dir, "store.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=not-json",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=7",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    runGooglePlayApiAccess({
+      envFile,
+      githubOutput: outputFile,
+      reportPath: reportFile,
+      apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
+      fetchImpl: async () => {
+        throw new Error("fetch must not be called");
+      },
+    }),
+    /Unexpected token|not valid JSON/,
+  );
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^google_play_api_access_ready=false$/m);
+  assert.match(report, /^service_account_json_source=base64$/m);
+  assert.match(report, /^failure=/m);
+  assert.match(report, /^edit_delete\.ready=false$/m);
+  assert.doesNotMatch(report, /not-json/);
 });
 
 function mockGooglePlayFetch(requests, maxVersionCode, config = {}) {

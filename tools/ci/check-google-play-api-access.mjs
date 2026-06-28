@@ -26,9 +26,9 @@ export async function runGooglePlayApiAccess({
 }) {
   const normalizedApiBaseUrl = apiBaseUrl.replace(/\/$/, "");
   const env = parseDotenv(await readFile(envFile, "utf8"));
-  const packageName = requireEnv(env, "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME");
+  const packageName = env.EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME?.trim() || "unknown";
   const latestVersionCode = env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE?.trim() || "unknown";
-  const { serviceAccount, source } = readServiceAccount(env);
+  const serviceAccountSource = detectServiceAccountSource(env);
   let token;
   let editId;
   let editDeleted = false;
@@ -37,12 +37,16 @@ export async function runGooglePlayApiAccess({
   const report = [
     "google_play_api_access",
     `package_name=${packageName}`,
-    `service_account_json_source=${source}`,
+    `service_account_json_source=${serviceAccountSource}`,
     "oauth_scope=androidpublisher",
     `latest_version_code_env=${latestVersionCode}`,
   ];
 
   try {
+    if (packageName === "unknown") {
+      throw new Error("missing required env: EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME");
+    }
+    const serviceAccount = readServiceAccount(env);
     token = await fetchAccessToken(serviceAccount, fetchImpl);
     const edit = await requestJson(`${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits`, {
       method: "POST",
@@ -67,11 +71,11 @@ export async function runGooglePlayApiAccess({
     report.push(`tracks.count=${trackList.length}`);
     report.push(`tracks.ids=${trackIds.join(",") || "none"}`);
     report.push(`tracks.max_version_code=${maxTrackVersionCode ?? "none"}`);
-    const latestVersionCodeMatch = versionCodeMatch(latestVersionCode, maxTrackVersionCode);
-    report.push(`latest_version_code_matches_track_max=${latestVersionCodeMatch}`);
-    if (latestVersionCodeMatch === "false") {
+    const latestVersionCodeCoversTrackMax = versionCodeCoversTrackMax(latestVersionCode, maxTrackVersionCode);
+    report.push(`latest_version_code_covers_track_max=${latestVersionCodeCoversTrackMax}`);
+    if (latestVersionCodeCoversTrackMax === "false") {
       ready = false;
-      failureMessage = "google play latest versionCode does not match track max versionCode";
+      failureMessage = "google play latest versionCode is lower than track max versionCode";
     }
 
     await requestJson(
@@ -175,18 +179,22 @@ function redactReportValue(value) {
   return value.replace(/\s+/g, " ").slice(0, 220);
 }
 
-function readServiceAccount(env) {
+function detectServiceAccountSource(env) {
   if (hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")) {
-    return {
-      serviceAccount: JSON.parse(env.EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON),
-      source: "json",
-    };
+    return "json";
   }
   if (hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64")) {
-    return {
-      serviceAccount: JSON.parse(Buffer.from(env.EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64.trim(), "base64").toString("utf8")),
-      source: "base64",
-    };
+    return "base64";
+  }
+  return "missing";
+}
+
+function readServiceAccount(env) {
+  if (hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")) {
+    return JSON.parse(env.EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON);
+  }
+  if (hasValue(env, "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64")) {
+    return JSON.parse(Buffer.from(env.EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64.trim(), "base64").toString("utf8"));
   }
   throw new Error("missing google play service account json");
 }
@@ -259,11 +267,14 @@ function maxVersionCode(tracks) {
   return max?.toString();
 }
 
-function versionCodeMatch(latestVersionCode, maxTrackVersionCode) {
+function versionCodeCoversTrackMax(latestVersionCode, maxTrackVersionCode) {
   if (latestVersionCode === "unknown" || maxTrackVersionCode === undefined) {
     return "unknown";
   }
-  return latestVersionCode === maxTrackVersionCode ? "true" : "false";
+  if (!/^(0|[1-9]\d*)$/.test(latestVersionCode)) {
+    return "unknown";
+  }
+  return BigInt(latestVersionCode) >= BigInt(maxTrackVersionCode) ? "true" : "false";
 }
 
 function parseArgs(argv) {
