@@ -793,6 +793,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               Positioned.fill(
                 child: mapAsset == null
                     ? const _OriginalRouteMapUnavailable()
+                    : defaultTargetPlatform == TargetPlatform.android
+                    ? _AndroidRouteMapFallbackLayer(
+                        data: widget.data,
+                        geometry: geometry,
+                        camera: camera,
+                      )
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
                         camera:
@@ -1243,6 +1249,165 @@ class _MapControlButton extends StatelessWidget {
         icon: Icon(icon),
       ),
     );
+  }
+}
+
+class _AndroidRouteMapFallbackLayer extends StatelessWidget {
+  const _AndroidRouteMapFallbackLayer({
+    required this.data,
+    required this.geometry,
+    required this.camera,
+  });
+
+  final NetworkMapData data;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _AndroidRouteMapFallbackPainter(
+          data: data,
+          geometry: geometry,
+          camera: camera,
+        ),
+      ),
+    );
+  }
+}
+
+class _AndroidRouteMapFallbackPainter extends CustomPainter {
+  const _AndroidRouteMapFallbackPainter({
+    required this.data,
+    required this.geometry,
+    required this.camera,
+  });
+
+  final NetworkMapData data;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lineById = {for (final line in data.lines) line.id: line};
+    final stationById = {
+      for (final station in data.stations) station.id: station,
+    };
+    final visibleStations = _visibleCanonicalStations(
+      geometry: geometry,
+      camera: camera,
+    );
+    final visibleRect = camera.visibleSourceRect.inflate(180 / camera.scale);
+    final paintedSegments = <String>{};
+
+    canvas.save();
+    canvas.transform(camera.sourceToViewport.storage);
+
+    for (final edge in data.edges) {
+      final fromStation = stationById[edge.fromStationId];
+      final toStation = stationById[edge.toStationId];
+      if (fromStation == null || toStation == null) {
+        continue;
+      }
+      final from = Offset(geometry.x(fromStation), geometry.y(fromStation));
+      final to = Offset(geometry.x(toStation), geometry.y(toStation));
+      if (!Rect.fromPoints(from, to).inflate(24).overlaps(visibleRect)) {
+        continue;
+      }
+      final line = lineById[edge.lineId];
+      final paint = Paint()
+        ..color = line == null
+            ? EasySubwayAccessibleColors.line
+            : _colorFromHex(line.color)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 7 / camera.scale;
+      canvas.drawLine(from, to, paint);
+    }
+
+    for (final station in data.stations) {
+      if (!_stationHitRect(station, geometry).overlaps(visibleRect)) {
+        continue;
+      }
+      final line = lineById[station.lineId];
+      final color = line == null
+          ? EasySubwayAccessibleColors.line
+          : _colorFromHex(line.color);
+      final paint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 7 / camera.scale;
+      for (final pathData in [
+        station.position.upPath,
+        station.position.downPath,
+      ]) {
+        if (pathData.isEmpty ||
+            !paintedSegments.add('${station.lineId}:$pathData')) {
+          continue;
+        }
+        final path = _pathFromSvg(pathData).shift(-geometry.origin);
+        if (path.getBounds().overlaps(visibleRect)) {
+          canvas.drawPath(path, paint);
+        }
+      }
+    }
+
+    final nodeStroke = Paint()
+      ..color = const Color(0xFF2F3E42)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 / camera.scale;
+    final nodeFill = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    for (final station in visibleStations) {
+      final center = Offset(geometry.x(station), geometry.y(station));
+      final nodeRadius = 5 / camera.scale;
+      canvas.drawCircle(center, nodeRadius, nodeFill);
+      canvas.drawCircle(center, nodeRadius, nodeStroke);
+    }
+    canvas.restore();
+
+    final labelStyle = const TextStyle(
+      color: Color(0xFF102A2C),
+      fontSize: 16,
+      fontWeight: FontWeight.w800,
+    );
+    final labelBackground = Paint()
+      ..color = Colors.white.withValues(alpha: 0.82)
+      ..style = PaintingStyle.fill;
+    final occupiedLabels = <Rect>[];
+    for (final station in visibleStations) {
+      final center = Offset(geometry.x(station), geometry.y(station));
+      final labelOffset = _labelOffsetFor(station);
+      final labelPainter = TextPainter(
+        text: TextSpan(text: station.nameKo, style: labelStyle),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      final labelTopLeft = camera.sourceToViewportPoint(center + labelOffset);
+      final labelRect = labelTopLeft & labelPainter.size;
+      final paddedRect = labelRect.inflate(3);
+      if (occupiedLabels.any((existing) => existing.overlaps(paddedRect))) {
+        continue;
+      }
+      occupiedLabels.add(paddedRect);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(paddedRect, const Radius.circular(3)),
+        labelBackground,
+      );
+      labelPainter.paint(canvas, labelTopLeft);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AndroidRouteMapFallbackPainter oldDelegate) {
+    return oldDelegate.data != data ||
+        oldDelegate.geometry != geometry ||
+        oldDelegate.camera != camera;
   }
 }
 
