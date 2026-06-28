@@ -989,6 +989,16 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_closed_test_requirement"));
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_app_signing_enrollment"));
   assert.ok(playProductionAccessGate.requiredConsoleEvidence.map((item) => item.id).includes("play_version_code_monotonicity"));
+  assert.ok(
+    playProductionAccessGate.requiredConsoleEvidence
+      .find((item) => item.id === "play_production_access_status")
+      .evidence.includes("android-publisher-api-edit-track-list-summary"),
+  );
+  assert.ok(
+    playProductionAccessGate.requiredConsoleEvidence
+      .find((item) => item.id === "play_version_code_monotonicity")
+      .evidence.includes("android-publisher-api-track-versioncode-summary"),
+  );
   assert.equal(playProductionAccessGate.goNoGoRules.missingPlayAppSigningEnrollment, "BLOCKED_EXTERNAL");
   assert.equal(playProductionAccessGate.goNoGoRules.versionCodeNotGreaterThanLatestPlayArtifact, "BLOCKED_EXTERNAL");
   assert.equal(playProductionAccessGate.goNoGoRules.failedRcVersionCodeReuse, "BLOCKED_TECHNICAL");
@@ -2732,9 +2742,14 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
     existsSync(path.join(root, "tools/ci/check-store-distribution-evidence-env.mjs")),
     "store distribution evidence env preflight must exist",
   );
+  assert.ok(
+    existsSync(path.join(root, "tools/ci/check-google-play-api-access.mjs")),
+    "Google Play API access checker must exist",
+  );
 
   const workflow = read(".github/workflows/store-distribution-evidence.yml");
   const preflight = read("tools/ci/check-store-distribution-evidence-env.mjs");
+  const playApiAccess = read("tools/ci/check-google-play-api-access.mjs");
 
   assert.match(workflow, /^name: Store Distribution Evidence$/m);
   assert.match(workflow, /workflow_dispatch:/);
@@ -2747,9 +2762,12 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(workflow, /--mobile-pubspec apps\/mobile\/pubspec\.yaml/);
   assert.match(workflow, /--github-output "\$\{GITHUB_OUTPUT\}"/);
   assert.match(workflow, /--report "\$\{RUNNER_TEMP\}\/store-distribution-evidence-preflight\.txt"/);
+  assert.match(workflow, /node tools\/ci\/check-google-play-api-access\.mjs/);
+  assert.match(workflow, /--report "\$\{RUNNER_TEMP\}\/google-play-api-access\.txt"/);
   assert.match(workflow, /node tools\/datapack\/export-publish-env\.mjs/);
   assert.doesNotMatch(workflow, /--allow-invalid-disabled/);
   assert.match(workflow, /store-distribution-evidence-preflight-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /\$\{\{ runner\.temp \}\}\/google-play-api-access\.txt/);
 
   assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON/);
   assert.match(preflight, /EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME/);
@@ -2767,6 +2785,13 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(preflight, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_ENABLED/);
   assert.match(preflight, /EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL/);
   assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
+
+  assert.match(playApiAccess, /https:\/\/www\.googleapis\.com\/auth\/androidpublisher/);
+  assert.match(playApiAccess, /\/applications\/\$\{encodePath\(packageName\)\}\/edits/);
+  assert.match(playApiAccess, /\/tracks/);
+  assert.match(playApiAccess, /:validate/);
+  assert.match(playApiAccess, /method: "DELETE"/);
+  assert.doesNotMatch(playApiAccess, /client_email=.*\$\{/, "API access report must not print service account email");
 });
 
 test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker로 보지 않는다", async () => {
