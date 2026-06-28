@@ -3177,6 +3177,60 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   }
 });
 
+test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
+  const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
+
+  assert.equal(scope.schemaVersion, 1);
+  assert.equal(scope.applicationId, "easysubway");
+  assert.equal(scope.releaseGate, "production-datapack-scope");
+  assert.equal(scope.issue, 547);
+  assert.equal(scope.decision.status, "qa-approved");
+  assert.equal(scope.supportScope.id, "capital_pilot_android_v1");
+  assert.deepEqual(scope.supportScope.regionIds, ["capital"]);
+  assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
+    "UNSUPPORTED_REGION",
+    "확인 필요",
+  ]);
+
+  assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
+    "kric-station-elevator",
+    "kric-station-elevator-movement",
+    "kric-station-escalator",
+    "kric-wheelchair-lift-location",
+    "kric-wheelchair-lift-movement",
+    "molit-urban-rail-full-route",
+    "seoulmetro-station-line-info",
+  ]);
+  assert.ok(scope.productionSourceSet.excludedFromV1SupportClaims.includes("seoul-realtime-arrival-station-info"));
+  assert.ok(scope.productionSourceSet.optionalAccessibilitySourceIds.includes("kric-disabled-toilet"));
+
+  for (const sourceId of scope.productionSourceSet.requiredSourceIds) {
+    const source = inventorySources.get(sourceId);
+    assert.ok(source, `${sourceId} must exist in source inventory`);
+    assert.equal(source.requiredForProductionPack, true, `${sourceId} must be production eligible`);
+    assert.equal(source.license.redistributionAllowed, true, `${sourceId} must allow redistribution`);
+    assert.ok(source.coverageScope.regionIds.includes("capital"), `${sourceId} must cover capital`);
+  }
+
+  assert.equal(scope.productionPromotionCriteria.artifactKind, "production");
+  assert.equal(scope.productionPromotionCriteria.releaseModeAllowGaps, false);
+  assert.equal(scope.productionPromotionCriteria.p0CoverageGapPolicy, "fail-release");
+  assert.equal(scope.productionPromotionCriteria.minimumProductionCoverageValuesMustBePositive, true);
+  assert.equal(scope.productionPromotionCriteria.coverageEvidenceRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.manifestVersion, 2);
+  assert.equal(scope.productionPromotionCriteria.manifest.channel, "production");
+  assert.equal(scope.productionPromotionCriteria.manifest.publicHttpsPackUrlRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.localPlaceholderHostForbidden, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.rsaSignatureRequired, true);
+  assert.equal(scope.productionPromotionCriteria.strictMobilityProfile.staleUnknownGeneratedConnectorCannotProduceFound, true);
+  assert.ok(scope.productionPromotionCriteria.androidEvidenceRequired.includes("published-manifest-install"));
+  assert.ok(scope.productionPromotionCriteria.androidEvidenceRequired.includes("rollback-manifest-recovery"));
+  assert.ok(scope.linkedReleaseBlockers.includes(571));
+  assert.ok(scope.linkedReleaseBlockers.includes(1020));
+});
+
 test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
