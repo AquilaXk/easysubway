@@ -8,6 +8,33 @@
   "storePrivacyInventory": "apps/mobile/release/store-privacy-inventory.json",
   "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
   "status": "BLOCKED_EXTERNAL",
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-06-28",
+    "privacyPolicyUrl": {
+      "result": "PASS_PUBLIC_HTTPS",
+      "url": "https://easysubway-api.aquilaxk.site/easysubway/privacy",
+      "requiredIn": ["Play Console", "app help", "README.md or public policy page"],
+      "remainingActionKo": "Play Console URL 입력 화면과 앱 도움말 화면의 같은 URL 캡처를 최종 제출 전에 다시 확인한다."
+    },
+    "publicContactMailboxes": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "domain": "aquilaxk.site",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "redactionPolicy": "GitHub에는 mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
+    },
+    "remainingExternalBlockers": [
+      "play-console-data-safety-preview",
+      "play-console-main-listing-preview",
+      "play-pre-launch-report-or-android-vitals-export",
+      "play-upload-or-play-installed-required-screenshot-set"
+    ],
+    "remainingEvidenceBeforeFinalGo": [
+      "network-trace-match-summary",
+      "crash-anr-privacy-summary",
+      "store-screenshot-summary",
+      "privacy-url-same-url-summary"
+    ]
+  },
   "appContentDeclarations": {
     "ads": false,
     "appAccessRequiresSignIn": false,

@@ -7749,6 +7749,16 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(readiness.policyRefreshKo, /제출 직전|최신/);
   assert.doesNotMatch(JSON.stringify(readiness), /\b(TBD|TODO)\b|\.{3}/i);
   assert.ok(Array.isArray(readiness.items));
+  assert.equal(readiness.latestEvidenceStatus.issue, 1018);
+  assert.equal(readiness.latestEvidenceStatus.privacyPolicyUrl, "PASS_PUBLIC_HTTPS");
+  assert.equal(readiness.latestEvidenceStatus.publicContactMailboxes, "RESOLVED_BY_QA_MANUAL_EVIDENCE");
+  assert.deepEqual(readiness.latestEvidenceStatus.remainingGooglePlayBlockers, [
+    "play-console-data-safety-preview",
+    "play-console-main-listing-preview",
+    "play-pre-launch-report-or-android-vitals-export",
+    "play-upload-or-play-installed-required-screenshot-set",
+  ]);
+  assert.match(readiness.latestEvidenceStatus.notClosingReasonKo, /#1018은 open 유지/);
 
   const items = new Map(readiness.items.map((item) => [item.id, item]));
   const requiredIds = [
@@ -7782,6 +7792,44 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
 
   const stores = new Set(readiness.items.map((item) => item.store));
   assert.deepEqual([...stores].sort(), ["app-store", "cross-store", "google-play"]);
+
+  assert.equal(playStoreContent.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-06-28");
+  assert.equal(playStoreContent.latestQaEvidenceSummary.privacyPolicyUrl.result, "PASS_PUBLIC_HTTPS");
+  assert.equal(
+    playStoreContent.latestQaEvidenceSummary.privacyPolicyUrl.url,
+    "https://easysubway-api.aquilaxk.site/easysubway/privacy",
+  );
+  assert.deepEqual(playStoreContent.latestQaEvidenceSummary.privacyPolicyUrl.requiredIn, [
+    "Play Console",
+    "app help",
+    "README.md or public policy page",
+  ]);
+  assert.equal(
+    playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.result,
+    "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+  );
+  assert.equal(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.domain, "aquilaxk.site");
+  assert.deepEqual(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.addresses, [
+    "support@aquilaxk.site",
+    "security@aquilaxk.site",
+    "privacy@aquilaxk.site",
+  ]);
+  assert.match(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.redactionPolicy, /raw report receipt token/);
+  assert.match(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.redactionPolicy, /operator private contact/);
+  assert.match(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.redactionPolicy, /provider credential or quota token/);
+  assert.match(playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.redactionPolicy, /photo metadata/);
+  assert.deepEqual(playStoreContent.latestQaEvidenceSummary.remainingExternalBlockers, [
+    "play-console-data-safety-preview",
+    "play-console-main-listing-preview",
+    "play-pre-launch-report-or-android-vitals-export",
+    "play-upload-or-play-installed-required-screenshot-set",
+  ]);
+  assert.deepEqual(playStoreContent.latestQaEvidenceSummary.remainingEvidenceBeforeFinalGo, [
+    "network-trace-match-summary",
+    "crash-anr-privacy-summary",
+    "store-screenshot-summary",
+    "privacy-url-same-url-summary",
+  ]);
 
   for (const id of requiredIds) {
     const item = items.get(id);
