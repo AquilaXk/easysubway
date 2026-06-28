@@ -5573,8 +5573,15 @@ Uri stationApiBaseUriForEnvironment({
     // 운영 빌드는 로컬 개발 주소로 조용히 떨어지지 않게 빌드 설정 누락을 즉시 드러낸다.
     throw StateError('Release API base URL must be configured.');
   }
-  if (isAndroid) {
-    return Uri.parse('http://10.0.2.2:8080');
+  Uri? developmentBaseUri;
+  assert(() {
+    developmentBaseUri = Uri.parse(
+      isAndroid ? 'http://10.0.2.2:8080' : 'http://127.0.0.1:8080',
+    );
+    return true;
+  }());
+  if (developmentBaseUri == null) {
+    throw StateError('Development API base URL is only available in debug.');
   }
-  return Uri.parse('http://127.0.0.1:8080');
+  return developmentBaseUri!;
 }
