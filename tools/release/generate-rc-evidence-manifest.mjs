@@ -198,9 +198,12 @@ function parsePairs(value) {
 function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion) {
   const sourceEntries = [
     ["rc_device_qa", 571],
+    ["production_datapack", 547],
     ["signed_rc_store_submission", 1015],
     ["play_generated_install", 1016],
     ["store_privacy_submission", 1018],
+    ["backend_operations", 1017],
+    ["post_launch_operations", 1019],
     ["android_release_quality", 1021],
     ["abuse_penetration_rehearsal", 1022],
   ];
