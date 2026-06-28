@@ -670,6 +670,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _requestedRendererCamera;
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
+  bool _routeMapRendererActive = false;
+  bool _routeMapFallbackActive = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
@@ -765,6 +767,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _requestedRendererCamera = null;
             _presentedRendererCamera = null;
             _requestedRendererCamerasByRevision.clear();
+            _routeMapFallbackActive = false;
+            _routeMapRendererActive = mapAsset != null;
             _lastRendererCameraRequestAt = null;
             _gestureActive = false;
             final initialCamera = _cameraForBounds(
@@ -777,8 +781,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               initialCamera,
             );
             _camera = initialCamera;
-            _requestedRendererCamera = initialRendererCamera;
-            _presentedRendererCamera = initialRendererCamera;
+            if (_routeMapRendererActive) {
+              _requestedRendererCamera = initialRendererCamera;
+              _presentedRendererCamera = initialRendererCamera;
+            }
           }
           final camera =
               _camera ??
@@ -793,6 +799,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               Positioned.fill(
                 child: mapAsset == null
                     ? const _OriginalRouteMapUnavailable()
+                    : _routeMapFallbackActive
+                    ? _AndroidRouteMapFallbackLayer(
+                        data: widget.data,
+                        geometry: geometry,
+                        camera: camera,
+                      )
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
                         camera:
@@ -1008,6 +1020,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       if (!mounted || pendingCamera == null) {
         return;
       }
+      if (!_routeMapRendererActive) {
+        setState(() {
+          _camera = pendingCamera;
+          _requestedRendererCamera = null;
+          _presentedRendererCamera = null;
+          _requestedRendererCamerasByRevision.clear();
+        });
+        return;
+      }
       final rendererCamera = _requestedRendererCameraFor(
         pendingCamera,
         forceCommit: forceRendererCameraCommit,
@@ -1115,6 +1136,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     if (event is RouteMapRendererFramePresented) {
       _markRendererFramePresented(event.revision);
     }
+    if (event is RouteMapRendererFailed) {
+      _activateRouteMapFallback();
+    }
     if (!kDebugMode && !kProfileMode) {
       return;
     }
@@ -1166,6 +1190,28 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     setState(() {
       _presentedRendererCamera = camera;
+    });
+  }
+
+  void _activateRouteMapFallback() {
+    if (_routeMapFallbackActive) {
+      return;
+    }
+    _releaseRenderer(disposeRenderer: true);
+    if (!mounted) {
+      _routeMapFallbackActive = true;
+      _routeMapRendererActive = false;
+      _requestedRendererCamera = null;
+      _presentedRendererCamera = null;
+      _requestedRendererCamerasByRevision.clear();
+      return;
+    }
+    setState(() {
+      _routeMapFallbackActive = true;
+      _routeMapRendererActive = false;
+      _requestedRendererCamera = null;
+      _presentedRendererCamera = null;
+      _requestedRendererCamerasByRevision.clear();
     });
   }
 }
@@ -1244,6 +1290,332 @@ class _MapControlButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AndroidRouteMapFallbackLayer extends StatelessWidget {
+  const _AndroidRouteMapFallbackLayer({
+    required this.data,
+    required this.geometry,
+    required this.camera,
+  });
+
+  final NetworkMapData data;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      key: const Key('routeMapViewportRenderer'),
+      child: CustomPaint(
+        painter: _AndroidRouteMapFallbackPainter(
+          data: data,
+          geometry: geometry,
+          camera: camera,
+          textScaler: MediaQuery.textScalerOf(context),
+        ),
+      ),
+    );
+  }
+}
+
+class _AndroidRouteMapFallbackPainter extends CustomPainter {
+  const _AndroidRouteMapFallbackPainter({
+    required this.data,
+    required this.geometry,
+    required this.camera,
+    required this.textScaler,
+  });
+
+  final NetworkMapData data;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+  final TextScaler textScaler;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lineById = {for (final line in data.lines) line.id: line};
+    final stationsById = <String, List<NetworkMapStation>>{};
+    final stationByLineKey = <String, NetworkMapStation>{};
+    for (final station in data.stations) {
+      stationsById.putIfAbsent(station.id, () => []).add(station);
+      stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+          station;
+    }
+    final visibleStations = _visibleCanonicalStations(
+      geometry: geometry,
+      camera: camera,
+    );
+    final visibleRect = camera.visibleSourceRect.inflate(180 / camera.scale);
+    final paintedSegments = <String>{};
+
+    canvas.save();
+    canvas.transform(camera.sourceToViewport.storage);
+
+    for (final edge in data.edges) {
+      final fromStation = _stationForMapEdgeEndpoint(
+        edge.fromStationId,
+        edge.lineId,
+        stationByLineKey,
+        stationsById,
+      );
+      final toStation = _stationForMapEdgeEndpoint(
+        edge.toStationId,
+        edge.lineId,
+        stationByLineKey,
+        stationsById,
+      );
+      if (fromStation == null || toStation == null) {
+        continue;
+      }
+      final from = Offset(geometry.x(fromStation), geometry.y(fromStation));
+      final to = Offset(geometry.x(toStation), geometry.y(toStation));
+      if (!Rect.fromPoints(from, to).inflate(24).overlaps(visibleRect)) {
+        continue;
+      }
+      final line = lineById[edge.lineId];
+      final paint = Paint()
+        ..color = line == null
+            ? EasySubwayAccessibleColors.line
+            : _colorFromHex(line.color)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 7 / camera.scale;
+      canvas.drawLine(from, to, paint);
+    }
+
+    for (final station in data.stations) {
+      if (!_stationHitRect(station, geometry).overlaps(visibleRect)) {
+        continue;
+      }
+      final line = lineById[station.lineId];
+      final color = line == null
+          ? EasySubwayAccessibleColors.line
+          : _colorFromHex(line.color);
+      final paint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 7 / camera.scale;
+      for (final pathData in [
+        station.position.upPath,
+        station.position.downPath,
+      ]) {
+        if (pathData.isEmpty ||
+            !paintedSegments.add('${station.lineId}:$pathData')) {
+          continue;
+        }
+        final cachedPath = _cachedRouteMapPath(pathData, geometry.origin);
+        if (cachedPath.bounds.overlaps(visibleRect)) {
+          canvas.drawPath(cachedPath.path, paint);
+        }
+      }
+    }
+
+    final nodeStroke = Paint()
+      ..color = const Color(0xFF2F3E42)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 / camera.scale;
+    final nodeFill = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    for (final station in visibleStations) {
+      final center = Offset(geometry.x(station), geometry.y(station));
+      final nodeRadius = 5 / camera.scale;
+      canvas.drawCircle(center, nodeRadius, nodeFill);
+      canvas.drawCircle(center, nodeRadius, nodeStroke);
+    }
+    canvas.restore();
+
+    final labelStyle = const TextStyle(
+      color: Color(0xFF102A2C),
+      fontSize: 16,
+      fontWeight: FontWeight.w800,
+    );
+    final labelBackground = Paint()
+      ..color = Colors.white.withValues(alpha: 0.82)
+      ..style = PaintingStyle.fill;
+    final occupiedLabels = <Rect>[];
+    for (final station in visibleStations) {
+      final center = Offset(geometry.x(station), geometry.y(station));
+      final labelOffset = _labelOffsetFor(station);
+      final labelPainter = TextPainter(
+        text: TextSpan(text: station.nameKo, style: labelStyle),
+        textDirection: TextDirection.ltr,
+        textScaler: textScaler,
+        maxLines: 1,
+      )..layout();
+      final labelCenter = camera.sourceToViewportPoint(center + labelOffset);
+      final labelTopLeft = labelCenter - labelPainter.size.center(Offset.zero);
+      final labelRect = labelTopLeft & labelPainter.size;
+      final paddedRect = labelRect.inflate(3);
+      if (occupiedLabels.any((existing) => existing.overlaps(paddedRect))) {
+        continue;
+      }
+      occupiedLabels.add(paddedRect);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(paddedRect, const Radius.circular(3)),
+        labelBackground,
+      );
+      labelPainter.paint(canvas, labelTopLeft);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AndroidRouteMapFallbackPainter oldDelegate) {
+    return !_sameNetworkMapData(oldDelegate.data, data) ||
+        !_sameMapGeometry(oldDelegate.geometry, geometry) ||
+        !_sameMapCamera(oldDelegate.camera, camera) ||
+        oldDelegate.textScaler != textScaler;
+  }
+}
+
+String _networkMapStationLineKey(String stationId, String lineId) =>
+    '$stationId:$lineId';
+
+@visibleForTesting
+NetworkMapStation? networkMapStationForMapEdgeEndpoint({
+  required String endpoint,
+  required String lineId,
+  required Iterable<NetworkMapStation> stations,
+}) {
+  final stationsById = <String, List<NetworkMapStation>>{};
+  final stationByLineKey = <String, NetworkMapStation>{};
+  for (final station in stations) {
+    stationsById.putIfAbsent(station.id, () => []).add(station);
+    stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+        station;
+  }
+  return _stationForMapEdgeEndpoint(
+    endpoint,
+    lineId,
+    stationByLineKey,
+    stationsById,
+  );
+}
+
+NetworkMapStation? _stationForMapEdgeEndpoint(
+  String endpoint,
+  String lineId,
+  Map<String, NetworkMapStation> stationByLineKey,
+  Map<String, List<NetworkMapStation>> stationsById,
+) {
+  final endpointStations = stationsById[endpoint];
+  return stationByLineKey[endpoint] ??
+      stationByLineKey[_networkMapStationLineKey(endpoint, lineId)] ??
+      (endpointStations == null || endpointStations.isEmpty
+          ? null
+          : endpointStations.first);
+}
+
+class _CachedRouteMapPath {
+  const _CachedRouteMapPath(this.path, this.bounds);
+
+  final Path path;
+  final Rect bounds;
+}
+
+final _routeMapPathCache = <String, _CachedRouteMapPath>{};
+
+_CachedRouteMapPath _cachedRouteMapPath(String pathData, Offset origin) {
+  final key = '${origin.dx}:${origin.dy}:$pathData';
+  return _routeMapPathCache.putIfAbsent(key, () {
+    final path = _pathFromSvg(pathData).shift(-origin);
+    return _CachedRouteMapPath(path, path.getBounds());
+  });
+}
+
+bool _sameMapCamera(MapCameraState a, MapCameraState b) {
+  return a.sourceBounds == b.sourceBounds &&
+      a.viewportSize == b.viewportSize &&
+      a.center == b.center &&
+      a.scale == b.scale &&
+      a.minScale == b.minScale &&
+      a.maxScale == b.maxScale &&
+      a.revision == b.revision;
+}
+
+bool _sameMapGeometry(_MapGeometry a, _MapGeometry b) {
+  return a.origin == b.origin &&
+      a.focus == b.focus &&
+      a.width == b.width &&
+      a.height == b.height &&
+      a.initialBounds == b.initialBounds &&
+      a.overlayStyleScale == b.overlayStyleScale;
+}
+
+bool _sameNetworkMapData(NetworkMapData a, NetworkMapData b) {
+  return a.selectedRegion == b.selectedRegion &&
+      _sameNetworkMapLines(a.lines, b.lines) &&
+      _sameNetworkMapStations(a.stations, b.stations) &&
+      _sameNetworkMapEdges(a.edges, b.edges);
+}
+
+bool _sameNetworkMapLines(List<NetworkMapLine> a, List<NetworkMapLine> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.name != right.name ||
+        left.color != right.color ||
+        left.region != right.region) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameNetworkMapStations(
+  List<NetworkMapStation> a,
+  List<NetworkMapStation> b,
+) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.nameKo != right.nameKo ||
+        left.lineId != right.lineId ||
+        !_sameNetworkMapPosition(left.position, right.position)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameNetworkMapPosition(NetworkMapPosition a, NetworkMapPosition b) {
+  return a.x == b.x &&
+      a.y == b.y &&
+      a.labelDx == b.labelDx &&
+      a.labelDy == b.labelDy &&
+      a.labelPolygon == b.labelPolygon &&
+      a.upPath == b.upPath &&
+      a.downPath == b.downPath &&
+      a.sourceId == b.sourceId;
+}
+
+bool _sameNetworkMapEdges(List<NetworkMapEdge> a, List<NetworkMapEdge> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.lineId != right.lineId ||
+        left.fromStationId != right.fromStationId ||
+        left.toStationId != right.toStationId) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class _RouteMapViewportRenderer extends StatelessWidget {
@@ -1642,7 +2014,7 @@ class _MapGeometry {
         if (pathData.isEmpty) {
           continue;
         }
-        final bounds = _pathFromSvg(pathData).getBounds();
+        final bounds = _cachedRouteMapPath(pathData, Offset.zero).bounds;
         minX = math.min(minX, bounds.left);
         minY = math.min(minY, bounds.top);
         maxX = math.max(maxX, bounds.right);
@@ -2193,7 +2565,7 @@ Offset _labelOffsetFor(NetworkMapStation station) {
   if (pathData.isEmpty) {
     return const Offset(8, 3);
   }
-  final bounds = _pathFromSvg(pathData).getBounds();
+  final bounds = _cachedRouteMapPath(pathData, Offset.zero).bounds;
   if (bounds.width > bounds.height * 1.2) {
     return const Offset(0, 12);
   }

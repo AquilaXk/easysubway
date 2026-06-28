@@ -95,6 +95,74 @@ void main() {
     },
   );
 
+  test(
+    'health monitor reports failure after repeated blank recoveries',
+    () async {
+      final controller = _FakeRouteMapRendererController();
+      final timers = _ManualTimerFactory();
+      final observed = <RouteMapRendererEvent>[];
+      final monitor = RouteMapRendererHealthMonitor(
+        controller,
+        blankTimeout: const Duration(milliseconds: 10),
+        maxRecoveryAttempts: 1,
+        onEvent: observed.add,
+        timerFactory: timers.create,
+      )..start();
+      addTearDown(monitor.stop);
+
+      controller.emit(const RouteMapRendererCameraRequested(5));
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
+      controller.emit(const RouteMapRendererAssetReady());
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
+
+      expect(controller.retryCalls, 1);
+      expect(
+        observed,
+        contains(
+          isA<RouteMapRendererFailed>().having(
+            (event) => event.reason,
+            'reason',
+            contains('did not present a frame'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'health monitor resets recovery attempts after a frame presents',
+    () async {
+      final controller = _FakeRouteMapRendererController();
+      final timers = _ManualTimerFactory();
+      final observed = <RouteMapRendererEvent>[];
+      final monitor = RouteMapRendererHealthMonitor(
+        controller,
+        blankTimeout: const Duration(milliseconds: 10),
+        maxRecoveryAttempts: 1,
+        onEvent: observed.add,
+        timerFactory: timers.create,
+      )..start();
+      addTearDown(monitor.stop);
+
+      controller.emit(const RouteMapRendererCameraRequested(5));
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
+      controller
+        ..emit(const RouteMapRendererAssetReady())
+        ..emit(const RouteMapRendererFramePresented(5));
+      await pumpEventQueue();
+
+      controller.emit(const RouteMapRendererCameraRequested(6));
+      await pumpEventQueue();
+      timers.elapse(const Duration(milliseconds: 10));
+
+      expect(controller.retryCalls, 2);
+      expect(observed.whereType<RouteMapRendererFailed>(), isEmpty);
+    },
+  );
+
   test('health monitor cancels blank watchdog after frame presents', () async {
     final controller = _FakeRouteMapRendererController();
     final timers = _ManualTimerFactory();

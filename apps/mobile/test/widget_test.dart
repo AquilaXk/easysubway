@@ -1240,10 +1240,72 @@ void main() {
       );
       expect(renderer.width, surface.width);
       expect(renderer.height, surface.height);
+      expect(
+        tester.widget(find.byKey(const Key('routeMapViewportRenderer'))),
+        isA<ColoredBox>(),
+      );
     } finally {
       debugDefaultTargetPlatformOverride = null;
       tester.view.resetDevicePixelRatio();
     }
+  });
+
+  test('Android 노선도 fallback edge resolver는 station-line endpoint를 해석한다', () {
+    const stations = [
+      NetworkMapStation(
+        id: 'station-a',
+        nameKo: '출발역',
+        nameEn: 'A',
+        region: '수도권',
+        lineId: 'seoul-4',
+        stationCode: '401',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 2800,
+          y: 3200,
+          labelDx: 0,
+          labelDy: 40,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-route-map-source-capital-review',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-a',
+        nameKo: '다른노선역',
+        nameEn: 'A transfer',
+        region: '수도권',
+        lineId: 'seoul-2',
+        stationCode: '201',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 2800,
+          y: 3200,
+          labelDx: 0,
+          labelDy: 40,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-route-map-source-capital-review',
+        ),
+      ),
+    ];
+
+    expect(
+      networkMapStationForMapEdgeEndpoint(
+        endpoint: 'station-a:seoul-4',
+        lineId: 'seoul-4',
+        stations: stations,
+      )?.stationCode,
+      '401',
+    );
+    expect(
+      networkMapStationForMapEdgeEndpoint(
+        endpoint: 'station-a',
+        lineId: 'seoul-4',
+        stations: stations,
+      )?.stationCode,
+      '401',
+    );
   });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
