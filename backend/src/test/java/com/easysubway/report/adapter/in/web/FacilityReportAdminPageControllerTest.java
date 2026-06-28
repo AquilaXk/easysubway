@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easysubway.admin.authorization.AdminPermission;
 import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
@@ -228,7 +229,7 @@ class FacilityReportAdminPageControllerTest {
 	void adminReportPhotoEndpointsRequirePhotoReadPermission() throws Exception {
 		String reportId = createReportWithPhotoAndLocation("사진 권한 경계를 확인할 신고");
 		RequestPostProcessor reportReviewer = user("report-reviewer")
-			.authorities(new SimpleGrantedAuthority("admin.report.review"));
+			.authorities(new SimpleGrantedAuthority(AdminPermission.REPORT_REVIEW.authority()));
 
 		mockMvc.perform(get("/admin/reports/{reportId}/photo/thumbnail", reportId)
 				.with(reportReviewer))
