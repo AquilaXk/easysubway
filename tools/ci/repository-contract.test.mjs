@@ -7694,9 +7694,15 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_permissions_declaration").readyWhenKo, /위치|권한/);
   assert.ok(items.get("play_listing_assets_truthfulness").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_listing_assets_truthfulness").readyWhenKo, /고정 스크린샷 세트/);
+  const playListingAssetsTruthfulnessReadyWhenKo = items.get("play_listing_assets_truthfulness").readyWhenKo;
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /7인치\/10인치 태블릿/);
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /Chromebook/);
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /Android XR/);
+  assert.ok(items.get("play_listing_assets_truthfulness").evidence.includes("large-screen-screenshot-review"));
   assert.match(items.get("play_account_data_deletion").configurationSources.join("\n"), /EASYSUBWAY_DATA_DELETION_EMAIL/);
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("app-content-declarations"));
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("store-listing-scope-copy-review"));
+  assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("large-screen-store-screenshot-asset-record"));
   assert.deepEqual(playStoreContent.requiredScreenshotSet.map((item) => item.id), [
     "home_support_scope",
     "station_search",
@@ -7707,6 +7713,31 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "help_privacy_data_deletion",
     "data_baseline_source_realtime_scope",
   ]);
+  assert.deepEqual(playStoreContent.largeScreenScreenshotTargets.map((item) => item.id), [
+    "seven_inch_tablet_landscape",
+    "ten_inch_tablet_landscape",
+    "chromebook_16_9",
+    "android_xr_16_9",
+  ]);
+  const largeScreenTargets = new Map(playStoreContent.largeScreenScreenshotTargets.map((item) => [item.id, item]));
+  for (const target of largeScreenTargets.values()) {
+    assert.ok(target.requiredScreenshotIds.includes("home_support_scope"), `${target.id} must include home evidence`);
+    assert.ok(target.requiredScreenshotIds.includes("station_search"), `${target.id} must include station search evidence`);
+    assert.ok(
+      target.requiredScreenshotIds.includes("station_detail_facility_status"),
+      `${target.id} must include station detail evidence`,
+    );
+    assert.ok(target.requiredEvidenceFields.includes("sourceGitSha"), `${target.id} must record source git SHA`);
+    assert.ok(target.requiredEvidenceFields.includes("sourceBuildType"), `${target.id} must record source build type`);
+    assert.ok(target.requiredEvidenceFields.includes("viewport"), `${target.id} must record viewport`);
+    assert.ok(target.requiredEvidenceFields.includes("seedData"), `${target.id} must record seed data`);
+    assert.ok(target.requiredEvidenceFields.includes("uiTreePath"), `${target.id} must record UI tree evidence`);
+    assert.ok(target.requiredEvidenceFields.includes("result"), `${target.id} must record result`);
+  }
+  assert.ok(largeScreenTargets.get("chromebook_16_9").requiredScreenshotIds.includes("help_privacy_data_deletion"));
+  assert.ok(largeScreenTargets.get("chromebook_16_9").requiredEvidenceFields.includes("keyboardMouseSmokeResult"));
+  assert.ok(largeScreenTargets.get("android_xr_16_9").requiredScreenshotIds.includes("help_privacy_data_deletion"));
+  assert.match(largeScreenTargets.get("android_xr_16_9").scopeNoteKo, /XR 전용 spatial UI 지원으로 표현하지 않는다/);
   assert.deepEqual(playStoreContent.dataSafetyDeclarations.requiredFieldsPerDataType, [
     "collected",
     "collectionType",
@@ -7835,6 +7866,23 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   );
   assert.ok(
     playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("forbiddenClaimsAbsent"),
+  );
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("sourceGitSha"));
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("targetDeviceClass"));
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("viewport"));
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("seedData"));
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("uiTreePath"));
+  assert.equal(
+    playStoreContent.assetEvidence.tabletScreenshots,
+    "required_large_screen_screenshots_matching_largeScreenScreenshotTargets",
+  );
+  assert.equal(
+    playStoreContent.assetEvidence.chromebookScreenshots,
+    "required_16_9_app_screenshots_matching_largeScreenScreenshotTargets",
+  );
+  assert.equal(
+    playStoreContent.assetEvidence.androidXrScreenshots,
+    "required_16_9_app_screenshots_without_xr_specific_ui_claim",
   );
   assert.ok(
     playStoreContent.evidenceSummarySchemas.crashAnrPrivacySummary.requiredFields.includes("forbiddenPayloadAbsent"),

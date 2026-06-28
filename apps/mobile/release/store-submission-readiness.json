@@ -145,8 +145,8 @@
       "category": "store-listing",
       "titleKo": "Play 스토어 등록 정보와 스크린샷",
       "decisionOwnerKo": "제품/마케팅 담당",
-      "readyWhenKo": "설명, 고정 스크린샷 세트, 기능 문구가 실제 앱 화면과 일치하고 실시간 안전 경로 보장처럼 과장된 표현을 사용하지 않는다.",
-      "evidence": ["screenshot-review", "copy-review"],
+      "readyWhenKo": "설명, 고정 스크린샷 세트, 7인치/10인치 태블릿, Chromebook, Android XR 16:9 후보 이미지, 기능 문구가 실제 앱 화면과 일치하고 실시간 안전 경로 보장처럼 과장된 표현을 사용하지 않는다.",
+      "evidence": ["screenshot-review", "large-screen-screenshot-review", "copy-review"],
       "linkedArtifacts": ["README.md", "apps/mobile/lib/main.dart", "apps/mobile/release/accessibility-release-qa.json", "apps/mobile/release/play-store-submission-content.json"],
       "configurationSources": ["release build screenshots"]
     },
