@@ -7417,6 +7417,21 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     "androidApplicationId",
   ]);
   assert.equal(gate.buildIdentityPolicy.mismatchDisposition, "NO_GO");
+  assert.equal(gate.playConsoleEvidencePolicy.requiredBeforeGo, true);
+  assert.deepEqual(gate.playConsoleEvidencePolicy.requiredSummaryFields, [
+    "playPreLaunchReportResult",
+    "playPreLaunchCrashCount",
+    "playPreLaunchAnrCount",
+    "playPolicyWarningStatus",
+    "androidVitalsCrashAnrSummary",
+    "triageDisposition",
+    "capturedAtUtc",
+  ]);
+  assert.equal(gate.playConsoleEvidencePolicy.goNoGoRules.missingConsoleSummary, "BLOCKED_EXTERNAL");
+  assert.equal(gate.playConsoleEvidencePolicy.goNoGoRules.preLaunchCrashOrAnr, "BLOCKED_TECHNICAL");
+  assert.equal(gate.playConsoleEvidencePolicy.goNoGoRules.untriagedPolicyWarning, "BLOCKED_TECHNICAL");
+  assert.match(gate.playConsoleEvidencePolicy.summaryRequiredKo, /Play Console pre-launch report/);
+  assert.match(gate.playConsoleEvidencePolicy.summaryRequiredKo, /Android vitals/);
   assert.equal(gate.deviceEvidencePolicy.codexQaDevice, "local_android_emulator_only");
   assert.equal(gate.deviceEvidencePolicy.physicalDeviceEvidence, "not_used_for_codex_pr_evidence");
   assert.equal(gate.deviceEvidencePolicy.releaseRcEvidence, "play_installed_or_exact_rc_required_before_go");
@@ -7458,6 +7473,8 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     "uiTreePath",
     "screenshotOrRecordingPath",
     "logcatSummaryPath",
+    "talkbackNotesPath",
+    "playConsoleSummaryPath",
     "result",
     "blockerDisposition",
   ]) {
@@ -7516,6 +7533,18 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     requiredChecks
       .get("route_map_performance_budget")
       .evidence.includes("matched-profile-route-map-camera-latency-summary"),
+  );
+  assert.ok(
+    requiredChecks.get("talkback_primary_journey").evidence.includes("talkback-reading-order-notes"),
+    "TalkBack check must require actual reading-order notes instead of only UI tree evidence",
+  );
+  assert.ok(
+    requiredChecks.get("crash_anr_privacy_safe_reporting").evidence.includes("play-console-pre-launch-report-summary"),
+    "crash/ANR check must require Play Console pre-launch summary evidence",
+  );
+  assert.ok(
+    requiredChecks.get("crash_anr_privacy_safe_reporting").evidence.includes("android-vitals-summary"),
+    "crash/ANR check must require Android vitals summary evidence",
   );
 
   const evidenceSet = new Map(gate.requiredEvidenceSet.map((item) => [item.id, item]));
@@ -7578,12 +7607,20 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
     "font scale check must record the viewport",
   );
   assert.ok(
+    checkEvidenceMatrix.get("talkback_primary_journey").requiredSummaryFields.includes("talkbackNotesPath"),
+    "TalkBack check must record the actual reading-order notes path",
+  );
+  assert.ok(
     checkEvidenceMatrix.get("route_map_performance_budget").requiredSummaryFields.includes("buildSource"),
     "performance check must record RC or Play-installed build source",
   );
   assert.ok(
     checkEvidenceMatrix.get("crash_anr_privacy_safe_reporting").requiredSummaryFields.includes("logcatSummaryPath"),
     "crash/ANR privacy check must record logcat or crash summary path",
+  );
+  assert.ok(
+    checkEvidenceMatrix.get("crash_anr_privacy_safe_reporting").requiredSummaryFields.includes("playConsoleSummaryPath"),
+    "crash/ANR privacy check must record Play Console or Android vitals summary path",
   );
 
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("android-release-quality-gate-manifest"));
