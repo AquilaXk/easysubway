@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { createSign } from "node:crypto";
+import { pathToFileURL } from "node:url";
 
 const androidPublisherScope = "https://www.googleapis.com/auth/androidpublisher";
 const defaultTokenUri = "https://oauth2.googleapis.com/token";
@@ -8,17 +9,31 @@ const defaultApiBaseUrl = "https://androidpublisher.googleapis.com/androidpublis
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const envFile = requireArg(args, "env-file");
-  const githubOutput = requireArg(args, "github-output");
-  const reportPath = requireArg(args, "report");
-  const apiBaseUrl = (args.get("api-base-url") ?? defaultApiBaseUrl).replace(/\/$/, "");
+  await runGooglePlayApiAccess({
+    envFile: requireArg(args, "env-file"),
+    githubOutput: requireArg(args, "github-output"),
+    reportPath: requireArg(args, "report"),
+    apiBaseUrl: args.get("api-base-url") ?? defaultApiBaseUrl,
+  });
+}
+
+export async function runGooglePlayApiAccess({
+  envFile,
+  githubOutput,
+  reportPath,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImpl = fetch,
+}) {
+  const normalizedApiBaseUrl = apiBaseUrl.replace(/\/$/, "");
   const env = parseDotenv(await readFile(envFile, "utf8"));
   const packageName = requireEnv(env, "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME");
   const latestVersionCode = env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE?.trim() || "unknown";
   const { serviceAccount, source } = readServiceAccount(env);
-  const token = await fetchAccessToken(serviceAccount);
+  const token = await fetchAccessToken(serviceAccount, fetchImpl);
   let editId;
   let editDeleted = false;
+  let ready = true;
+  let failureMessage;
   const report = [
     "google_play_api_access",
     `package_name=${packageName}`,
@@ -28,17 +43,18 @@ async function main() {
   ];
 
   try {
-    const edit = await requestJson(`${apiBaseUrl}/applications/${encodePath(packageName)}/edits`, {
+    const edit = await requestJson(`${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits`, {
       method: "POST",
       token,
       body: {},
-    });
+    }, fetchImpl);
     editId = requireJsonString(edit, "id");
     report.push("edit_insert.ready=true");
 
     const tracks = await requestJson(
-      `${apiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}/tracks`,
+      `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}/tracks`,
       { method: "GET", token },
+      fetchImpl,
     );
     const trackList = Array.isArray(tracks.tracks) ? tracks.tracks : [];
     const trackIds = trackList
@@ -50,18 +66,25 @@ async function main() {
     report.push(`tracks.count=${trackList.length}`);
     report.push(`tracks.ids=${trackIds.join(",") || "none"}`);
     report.push(`tracks.max_version_code=${maxTrackVersionCode ?? "none"}`);
-    report.push(`latest_version_code_matches_track_max=${versionCodeMatch(latestVersionCode, maxTrackVersionCode)}`);
+    const latestVersionCodeMatch = versionCodeMatch(latestVersionCode, maxTrackVersionCode);
+    report.push(`latest_version_code_matches_track_max=${latestVersionCodeMatch}`);
+    if (latestVersionCodeMatch === "false") {
+      ready = false;
+      failureMessage = "google play latest versionCode does not match track max versionCode";
+    }
 
     await requestJson(
-      `${apiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}:validate`,
+      `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}:validate`,
       { method: "POST", token, body: {} },
+      fetchImpl,
     );
     report.push("edit_validate.ready=true");
   } finally {
     if (editId) {
       await requestJson(
-        `${apiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}`,
+        `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}`,
         { method: "DELETE", token },
+        fetchImpl,
       );
       editDeleted = true;
     }
@@ -70,11 +93,14 @@ async function main() {
   report.push(`edit_delete.ready=${editDeleted}`);
   report.push("secret_values_printed=false");
   report.push("");
-  await appendFile(githubOutput, "google_play_api_access_ready=true\n");
+  await appendFile(githubOutput, `google_play_api_access_ready=${ready}\n`);
   await writeFile(reportPath, report.join("\n"));
+  if (!ready) {
+    throw new Error(failureMessage);
+  }
 }
 
-async function fetchAccessToken(serviceAccount) {
+async function fetchAccessToken(serviceAccount, fetchImpl) {
   const tokenUri = serviceAccount.token_uri || defaultTokenUri;
   const nowSeconds = Math.floor(Date.now() / 1000);
   const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
@@ -88,7 +114,7 @@ async function fetchAccessToken(serviceAccount) {
   const unsignedToken = `${header}.${claim}`;
   const signature = createSign("RSA-SHA256").update(unsignedToken).sign(requireJsonString(serviceAccount, "private_key"));
   const assertion = `${unsignedToken}.${signature.toString("base64url")}`;
-  const response = await fetch(tokenUri, {
+  const response = await fetchImpl(tokenUri, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -103,8 +129,8 @@ async function fetchAccessToken(serviceAccount) {
   return body.access_token;
 }
 
-async function requestJson(url, { method, token, body }) {
-  const response = await fetch(url, {
+async function requestJson(url, { method, token, body }, fetchImpl) {
+  const response = await fetchImpl(url, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
@@ -246,7 +272,9 @@ function requireArg(args, name) {
   return value;
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

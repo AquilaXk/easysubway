@@ -1,60 +1,21 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { generateKeyPairSync } from "node:crypto";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
-const root = process.cwd();
+import { runGooglePlayApiAccess } from "./check-google-play-api-access.mjs";
 
 test("Google Play API access checker는 edit를 삭제하고 redacted report를 만든다", async (t) => {
   const requests = [];
-  const server = createServer((request, response) => {
-    requests.push(`${request.method} ${request.url}`);
-    request.resume();
-    if (request.url === "/token") {
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ access_token: "access-token", token_type: "Bearer", expires_in: 3600 }));
-      return;
-    }
-    if (request.method === "POST" && request.url === "/androidpublisher/v3/applications/com.easysubway.app/edits") {
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ id: "edit-1", expiryTimeSeconds: "1800000000" }));
-      return;
-    }
-    if (request.method === "GET" && request.url === "/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1/tracks") {
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({
-        tracks: [
-          { trackId: "internal", releases: [{ versionCodes: ["7"] }] },
-          { trackId: "production", releases: [] },
-        ],
-      }));
-      return;
-    }
-    if (request.method === "POST" && request.url === "/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1:validate") {
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ id: "edit-1" }));
-      return;
-    }
-    if (request.method === "DELETE" && request.url === "/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1") {
-      response.setHeader("content-type", "application/json");
-      response.end("{}");
-      return;
-    }
-    response.statusCode = 404;
-    response.end("{}");
+  t.after(() => {
+    requests.length = 0;
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(() => new Promise((resolve) => server.close(resolve)));
 
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const baseUrl = "https://androidpublisher.example.invalid";
   const serviceAccount = {
     client_email: "play-service@example.invalid",
     private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
@@ -74,21 +35,13 @@ test("Google Play API access checker는 edit를 삭제하고 redacted report를 
     ].join("\n"),
   );
 
-  await execFileAsync(
-    process.execPath,
-    [
-      "tools/ci/check-google-play-api-access.mjs",
-      "--env-file",
-      envFile,
-      "--github-output",
-      outputFile,
-      "--report",
-      reportFile,
-      "--api-base-url",
-      `${baseUrl}/androidpublisher/v3`,
-    ],
-    { cwd: root },
-  );
+  await runGooglePlayApiAccess({
+    envFile,
+    githubOutput: outputFile,
+    reportPath: reportFile,
+    apiBaseUrl: `${baseUrl}/androidpublisher/v3`,
+    fetchImpl: mockGooglePlayFetch(requests, "7"),
+  });
 
   const output = readFileSync(outputFile, "utf8");
   const report = readFileSync(reportFile, "utf8");
@@ -99,5 +52,81 @@ test("Google Play API access checker는 edit를 삭제하고 redacted report를 
   assert.match(report, /^latest_version_code_matches_track_max=true$/m);
   assert.match(report, /^edit_delete\.ready=true$/m);
   assert.doesNotMatch(report, /play-service@example\.invalid/);
-  assert.ok(requests.includes("DELETE /androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
+  assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
 });
+
+test("Google Play API access checker는 env versionCode가 Play track max와 다르면 실패한다", async () => {
+  const requests = [];
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const serviceAccount = {
+    client_email: "play-service@example.invalid",
+    private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
+    token_uri: "https://androidpublisher.example.invalid/token",
+  };
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-google-play-api-mismatch-"));
+  const envFile = path.join(dir, "store.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      `EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=${Buffer.from(JSON.stringify(serviceAccount)).toString("base64")}`,
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=6",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    runGooglePlayApiAccess({
+      envFile,
+      githubOutput: outputFile,
+      reportPath: reportFile,
+      apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
+      fetchImpl: mockGooglePlayFetch(requests, "7"),
+    }),
+    /latest versionCode does not match/,
+  );
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^google_play_api_access_ready=false$/m);
+  assert.match(report, /^latest_version_code_matches_track_max=false$/m);
+  assert.match(report, /^edit_delete\.ready=true$/m);
+  assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
+});
+
+function mockGooglePlayFetch(requests, maxVersionCode) {
+  return async (url, options = {}) => {
+    const method = options.method ?? "GET";
+    requests.push(`${method} ${url}`);
+    if (url === "https://androidpublisher.example.invalid/token") {
+      return jsonResponse({ access_token: "access-token", token_type: "Bearer", expires_in: 3600 });
+    }
+    if (method === "POST" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits") {
+      return jsonResponse({ id: "edit-1", expiryTimeSeconds: "1800000000" });
+    }
+    if (method === "GET" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1/tracks") {
+      return jsonResponse({
+        tracks: [
+          { trackId: "internal", releases: [{ versionCodes: [maxVersionCode] }] },
+          { trackId: "production", releases: [] },
+        ],
+      });
+    }
+    if (method === "POST" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1:validate") {
+      return jsonResponse({ id: "edit-1" });
+    }
+    if (method === "DELETE" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1") {
+      return jsonResponse({});
+    }
+    return jsonResponse({}, 404);
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
