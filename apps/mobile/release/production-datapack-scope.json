@@ -94,7 +94,7 @@
     "source licenseStatus is not redistributable",
     "source license.redistributionAllowed is not true",
     "pack url is not absolute HTTPS",
-    "pack or source url uses localhost, .localhost, or .local host",
+    "pack or source url uses localhost, .localhost, .local domains, or .local hosts",
     "manifestVersion is not 2",
     "RSA pack or manifest signature is missing",
     "coverageEvidence is empty",
