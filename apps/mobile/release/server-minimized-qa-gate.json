@@ -4,10 +4,16 @@
   "releaseGate": "server-minimized-device-qa",
   "localOnlyEvidence": true,
   "evidenceRoot": ".codex/evidence/server-minimization/pr10",
+  "releaseBlockerScope": {
+    "androidGooglePlayV1Required": true,
+    "iosDeferredOutOfScope": true,
+    "iosEvidenceRetainedForHistory": true,
+    "completionRuleKo": "Android Google Play v1 release evidence만 #571 release blocker로 본다. 기존 iOS 증거는 참고로 유지하지만 Android 완료를 차단하지 않는다."
+  },
   "platformCompletionRule": {
     "androidRequired": true,
-    "iosRequired": true,
-    "singlePlatformEvidenceIsInsufficient": true
+    "iosRequired": false,
+    "singlePlatformEvidenceIsInsufficient": false
   },
   "checks": [
     {
