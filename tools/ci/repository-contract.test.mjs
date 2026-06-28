@@ -1050,6 +1050,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("internal-app-sharing"));
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("play-installed-build"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("play-generated-split-apk-install-log"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("install-provenance-record"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("foreground-app-launch-smoke-record"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("latest-play-uploaded-versioncode-record"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("play-generated-artifact-identity-match-record"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("pre-launch-report-crash-anr-policy-warning-summary"));
@@ -1058,6 +1060,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactIdentityFields.includes("appSigningKeySha256Fingerprint"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactIdentityFields.includes("dataPackManifestSha256"));
   assert.match(playGeneratedApkDeviceMatrixGate.identityMatchPolicy, /RC evidence manifest/);
+  assert.match(playGeneratedApkDeviceMatrixGate.installProvenancePolicy.playGeneratedApkShellInstallKo, /Play-installed build smoke를 대체하지 않는다/);
+  assert.ok(playGeneratedApkDeviceMatrixGate.installProvenancePolicy.playInstalledBuildRequires.includes("installerPackageName=com.android.vending"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.installProvenancePolicy.playInstalledBuildRequires.includes("foregroundPackage=com.easysubway.app"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.installProvenancePolicy.forbiddenSmokeSubstitutes.includes("initiatingPackageName=com.android.shell"));
+  assert.ok(playGeneratedApkDeviceMatrixGate.installProvenancePolicy.forbiddenSmokeSubstitutes.includes("package stopped=true or notLaunched=true"));
   assert.match(playGeneratedApkDeviceMatrixGate.versionCodePolicy, /최신 artifact보다 커야/);
   assert.ok(playGeneratedApkDeviceMatrixGate.deviceMatrix.every((item) => item.releaseBlocker === true));
   assert.ok(playGeneratedApkDeviceMatrixGate.deviceMatrix.map((item) => item.id).includes("android_16_16kb_page_size"));
@@ -1065,6 +1072,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.artifactIdentityMismatch, "BLOCKED_TECHNICAL");
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.appSigningCertificateMismatch, "BLOCKED_TECHNICAL");
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.versionCodeNotGreaterThanLatestPlayArtifact, "BLOCKED_EXTERNAL");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.missingPlayInstallerProvenance, "BLOCKED_EXTERNAL");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.shellInstalledArtifactUsedAsPlayInstalledSmoke, "BLOCKED_EXTERNAL");
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_EXTERNAL");
