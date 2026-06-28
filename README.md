@@ -82,14 +82,14 @@ EasySubway collects and stores only the data needed to provide subway accessibil
 
 The mobile app can process location, station or route searches, accessibility preferences, report text, report photos, report receipt metadata, crash logs, and performance diagnostics for app functionality. Report photos and report text are used only for facility report review and are not used for advertising. EasySubway does not sell personal or sensitive user data.
 
-Data is transmitted over HTTPS when network submission is required. Local favorites, recent searches, report receipts, drafts, preferences, and installed data-pack audit records remain on the user's device unless the user submits a report or requests deletion. Users can request deletion of report data or ask privacy questions through `privacy@easysubway.app`.
+Data is transmitted over HTTPS when network submission is required. Local favorites, recent searches, report receipts, drafts, preferences, and installed data-pack audit records remain on the user's device unless the user submits a report or requests deletion. Users can request deletion of report data or ask privacy questions through `privacy@aquilaxk.site`.
 
 Store submission and release contact points:
 
 - Privacy policy URL: `https://github.com/AquilaXk/easysubway#privacy-policy`
-- Support: `support@easysubway.app`
-- Security: `security@easysubway.app`
-- Data deletion and privacy requests: `privacy@easysubway.app`
+- Support: `support@aquilaxk.site`
+- Security: `security@aquilaxk.site`
+- Data deletion and privacy requests: `privacy@aquilaxk.site`
 
 ## Runtime Architecture
 
