@@ -670,6 +670,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _requestedRendererCamera;
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
+  bool _routeMapRendererActive = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
@@ -757,14 +758,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.height,
           );
           final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
+          final routeMapRendererActive =
+              mapAsset != null &&
+              defaultTargetPlatform != TargetPlatform.android;
           final layoutKey =
-              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
+              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$routeMapRendererActive';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
             _requestedRendererCamera = null;
             _presentedRendererCamera = null;
             _requestedRendererCamerasByRevision.clear();
+            _routeMapRendererActive = routeMapRendererActive;
             _lastRendererCameraRequestAt = null;
             _gestureActive = false;
             final initialCamera = _cameraForBounds(
@@ -777,8 +782,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               initialCamera,
             );
             _camera = initialCamera;
-            _requestedRendererCamera = initialRendererCamera;
-            _presentedRendererCamera = initialRendererCamera;
+            if (routeMapRendererActive) {
+              _requestedRendererCamera = initialRendererCamera;
+              _presentedRendererCamera = initialRendererCamera;
+            }
           }
           final camera =
               _camera ??
@@ -1012,6 +1019,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       _pendingCamera = null;
       _forceRendererCameraCommit = false;
       if (!mounted || pendingCamera == null) {
+        return;
+      }
+      if (!_routeMapRendererActive) {
+        setState(() {
+          _camera = pendingCamera;
+          _requestedRendererCamera = null;
+          _presentedRendererCamera = null;
+          _requestedRendererCamerasByRevision.clear();
+        });
         return;
       }
       final rendererCamera = _requestedRendererCameraFor(
@@ -1295,9 +1311,13 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final lineById = {for (final line in data.lines) line.id: line};
-    final stationById = {
-      for (final station in data.stations) station.id: station,
-    };
+    final stationsById = <String, List<NetworkMapStation>>{};
+    final stationByLineKey = <String, NetworkMapStation>{};
+    for (final station in data.stations) {
+      stationsById.putIfAbsent(station.id, () => []).add(station);
+      stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+          station;
+    }
     final visibleStations = _visibleCanonicalStations(
       geometry: geometry,
       camera: camera,
@@ -1309,8 +1329,18 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
     canvas.transform(camera.sourceToViewport.storage);
 
     for (final edge in data.edges) {
-      final fromStation = stationById[edge.fromStationId];
-      final toStation = stationById[edge.toStationId];
+      final fromStation = _stationForMapEdgeEndpoint(
+        edge.fromStationId,
+        edge.lineId,
+        stationByLineKey,
+        stationsById,
+      );
+      final toStation = _stationForMapEdgeEndpoint(
+        edge.toStationId,
+        edge.lineId,
+        stationByLineKey,
+        stationsById,
+      );
       if (fromStation == null || toStation == null) {
         continue;
       }
@@ -1415,6 +1445,44 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
         !_sameMapCamera(oldDelegate.camera, camera) ||
         oldDelegate.textScaler != textScaler;
   }
+}
+
+String _networkMapStationLineKey(String stationId, String lineId) =>
+    '$stationId:$lineId';
+
+@visibleForTesting
+NetworkMapStation? networkMapStationForMapEdgeEndpoint({
+  required String endpoint,
+  required String lineId,
+  required Iterable<NetworkMapStation> stations,
+}) {
+  final stationsById = <String, List<NetworkMapStation>>{};
+  final stationByLineKey = <String, NetworkMapStation>{};
+  for (final station in stations) {
+    stationsById.putIfAbsent(station.id, () => []).add(station);
+    stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+        station;
+  }
+  return _stationForMapEdgeEndpoint(
+    endpoint,
+    lineId,
+    stationByLineKey,
+    stationsById,
+  );
+}
+
+NetworkMapStation? _stationForMapEdgeEndpoint(
+  String endpoint,
+  String lineId,
+  Map<String, NetworkMapStation> stationByLineKey,
+  Map<String, List<NetworkMapStation>> stationsById,
+) {
+  final endpointStations = stationsById[endpoint];
+  return stationByLineKey[endpoint] ??
+      stationByLineKey[_networkMapStationLineKey(endpoint, lineId)] ??
+      (endpointStations == null || endpointStations.isEmpty
+          ? null
+          : endpointStations.first);
 }
 
 class _CachedRouteMapPath {
