@@ -5219,6 +5219,39 @@ test("수도권 pilot production source input은 production manifest v2 pack으�
     ],
     { cwd: root },
   );
+  const importedFixture = JSON.parse(await readFile(importedFixturePath, "utf8"));
+  assert.ok(importedFixture.packs[0].requiredTables.includes("route_map_positions"));
+  assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 2);
+
+  const missingRouteMapInputPath = path.join(outputDir, "capital-pilot-production-missing-route-map.json");
+  await writeFile(
+    missingRouteMapInputPath,
+    `${JSON.stringify(
+      {
+        ...input,
+        routeMapPositions: [],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        missingRouteMapInputPath,
+        "--output",
+        path.join(outputDir, "missing-route-map.json"),
+      ],
+      { cwd: root },
+    ),
+    /routeMapPositions must include at least one row/,
+  );
+
   await execFileAsync(
     process.execPath,
     [
@@ -5253,6 +5286,46 @@ test("수도권 pilot production source input은 production manifest v2 pack으�
   assert.equal(manifest.signature.algorithm, "rsa-sha256-manifest-v2");
   assert.equal(manifest.packs[0].artifactKind, "production");
   assert.equal(manifest.packs[0].signature.algorithm, "rsa-sha256-pack-manifest-v2");
+
+  const provenance = JSON.parse(await readFile(path.join(packOutputDir, "current.provenance.json"), "utf8"));
+  const routeMapRecords = provenance.packs[0].records.filter(
+    (record) => record.sourceId === "seoulmetro-cyberstation-route-map",
+  );
+  assert.equal(
+    routeMapRecords.filter((record) => record.field === "route_map_position").length,
+    2,
+  );
+  assert.equal(
+    routeMapRecords.filter((record) => record.field === "route_map_label_polygon").length,
+    1,
+  );
+
+  const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/report-coverage-gaps.mjs",
+      "--targets",
+      "tools/datapack/nationwide-coverage-targets.json",
+      "--inventory",
+      "tools/datapack/source-inventory.json",
+      "--provenance",
+      path.join(packOutputDir, "current.provenance.json"),
+      "--output",
+      coverageGapReportPath,
+      "--allow-gaps",
+    ],
+    { cwd: root },
+  );
+  const coverageGapReport = JSON.parse(await readFile(coverageGapReportPath, "utf8"));
+  const capitalRouteMapCoverage = coverageGapReport.requirements.find(
+    (entry) =>
+      entry.regionId === "capital" &&
+      entry.operatorId === "seoul-metro" &&
+      entry.sourceDomain === "route_map_positions",
+  );
+  assert.equal(capitalRouteMapCoverage.status, "covered");
+  assert.equal(capitalRouteMapCoverage.coveredFields, 2);
 });
 
 test("승인된 관리자 검수 결과는 다음 data pack fixture 시설 상태에 반영된다", async () => {

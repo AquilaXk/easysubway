@@ -35,6 +35,10 @@ function buildFixture(inventory, input) {
   const facilities = facilityRows(input.facilityRows ?? [], allowedSourceIds, mappingBySourceKey);
   const movementCandidates = movementPathCandidates(input.movementPathCandidates ?? [], allowedSourceIds, mappingBySourceKey);
   const routeMapPositions = routeMapPositionRows(input.routeMapPositions ?? [], allowedSourceIds, mappingBySourceKey);
+  const requiresRouteMapPositions = sourceDomainEnabled(selectedSources, "route_map_positions");
+  if (requiresRouteMapPositions && routeMapPositions.length === 0) {
+    throw new Error("routeMapPositions must include at least one row when route_map_positions source coverage is selected");
+  }
   const productionMinimumRows = productionMinimumTableRows(input, {
     stations: stations.length,
     stationLines: stationLines.length,
@@ -60,7 +64,7 @@ function buildFixture(inventory, input) {
           "stations",
           "station_lines",
           "network_edges",
-          ...(routeMapPositions.length > 0 ? ["route_map_positions"] : []),
+          ...(requiresRouteMapPositions ? ["route_map_positions"] : []),
         ]),
         minimumTableRows: {
           catalog_metadata: 2,
@@ -69,7 +73,7 @@ function buildFixture(inventory, input) {
           stations: productionMinimumRows?.stations ?? stations.length,
           station_lines: productionMinimumRows?.station_lines ?? stationLines.length,
           network_edges: productionMinimumRows?.network_edges ?? networkEdges.length,
-          ...(routeMapPositions.length > 0 ? { route_map_positions: routeMapPositions.length } : {}),
+          ...(requiresRouteMapPositions ? { route_map_positions: routeMapPositions.length } : {}),
           facilities: productionMinimumRows?.facilities ?? facilities.length,
         },
         metadata: {
@@ -180,6 +184,10 @@ function sourceCoverageIndex(selectedSources) {
     bySourceId,
     requiredKeys: [...requiredKeys].sort(),
   };
+}
+
+function sourceDomainEnabled(selectedSources, sourceDomain) {
+  return selectedSources.some((source) => source.coverageScope?.sourceDomains?.includes(sourceDomain));
 }
 
 function coverageKey(regionId, operatorId, sourceDomain) {
@@ -523,6 +531,7 @@ function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
       licenseStatus: requiredString(row.licenseStatus, "routeMapPositions.licenseStatus"),
       commercialUseAllowed: row.commercialUseAllowed === true,
       attributionRequired: row.attributionRequired !== false,
+      derivationKind: "OFFICIAL",
       sourceLabel: row.sourceLabel ?? "",
       reviewedAt: requiredString(row.reviewedAt, "routeMapPositions.reviewedAt"),
     };
