@@ -1423,7 +1423,8 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
         textScaler: textScaler,
         maxLines: 1,
       )..layout();
-      final labelTopLeft = camera.sourceToViewportPoint(center + labelOffset);
+      final labelCenter = camera.sourceToViewportPoint(center + labelOffset);
+      final labelTopLeft = labelCenter - labelPainter.size.center(Offset.zero);
       final labelRect = labelTopLeft & labelPainter.size;
       final paddedRect = labelRect.inflate(3);
       if (occupiedLabels.any((existing) => existing.overlaps(paddedRect))) {
