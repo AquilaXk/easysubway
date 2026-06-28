@@ -15,7 +15,7 @@
       "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
       "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
       "dnsEvidence": ["MX records present", "SPF TXT present", "DKIM TXT present"],
-      "redactionPolicy": "GitHub에는 mailbox 개인 정보, raw receipt token, message body를 올리지 않는다."
+      "redactionPolicy": "GitHub에는 support mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
     },
     "remainingSupportReadiness": [
       "data-error-triage-dry-run",
