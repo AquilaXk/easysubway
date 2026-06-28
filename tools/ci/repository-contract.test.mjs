@@ -2455,6 +2455,65 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("postgresql-restore-rehearsal"));
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("facility-report-photo-restore-check"));
   assert.equal(operationsEvidence.backendControlPlane.issue, 1017);
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.qaEvidenceDateKst,
+    "2026-06-28",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.githubEnvironmentProtection
+      .productionRequiredReviewer,
+    "PASS_REQUIRED_REVIEWER_CONFIGURED",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.githubEnvironmentProtection
+      .productionEnvironmentSecret,
+    "PASS_ENV_SCOPED_EASYSUBWAY_ENV_PRESENT",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.githubEnvironmentProtection
+      .repositoryWideProductionSecretsOnly,
+    "RESOLVED_BY_ENV_SCOPED_SECRET",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .deploymentEnvValidation,
+    "PASS_VALIDATE_DEPLOYMENT_ENV",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .secretValueCapturedInEvidence,
+    false,
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.resolvedEvidence,
+    [
+      "github-production-environment-required-reviewer-summary",
+      "production-secret-scope-review",
+      "prod-like-env-validation-output",
+      "backend-gradle-check-output",
+    ],
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.remainingBlockers,
+    [
+      "production-or-prod-like-deploy-readiness-summary",
+      "backend-rollback-drill-result",
+      "postgresql-restore-rehearsal-result",
+      "facility-report-photo-object-restore-result",
+      "admin-operator-page-smoke-output",
+      "admin-page-accessibility-smoke-output",
+      "admin-role-matrix-test-output",
+      "basic-auth-exception-owner-expiry-or-prod-disabled-live-evidence",
+      "operator-global-audit-sample",
+      "trusted-proxy-negative-test-output",
+    ],
+  );
+  assert.match(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.notClosingReasonKo, /#1017/);
+  assert.ok(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.redactionPolicy.forbiddenInGitHubEvidence.includes(
+      "raw environment secret",
+    ),
+  );
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.inventoryRequired, true);
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.defaultDenyRequired, true);
   assert.equal(
