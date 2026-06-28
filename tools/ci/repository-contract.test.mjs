@@ -3177,6 +3177,103 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   }
 });
 
+test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
+  const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
+
+  assert.equal(scope.schemaVersion, 1);
+  assert.equal(scope.applicationId, "easysubway");
+  assert.equal(scope.androidApplicationId, "com.easysubway.app");
+  assert.equal(scope.releaseGate, "production-datapack-scope");
+  assert.equal(scope.issue, 547);
+  assert.equal(scope.decision.approvalState, "qa-approved");
+  assert.equal(scope.supportScope.id, "capital_pilot_android_v1");
+  assert.deepEqual(scope.supportScope.regionIds, ["capital"]);
+  assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
+    "UNSUPPORTED_REGION",
+    "확인 필요",
+  ]);
+
+  assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
+    "kric-station-elevator",
+    "kric-station-elevator-movement",
+    "kric-station-escalator",
+    "kric-wheelchair-lift-location",
+    "kric-wheelchair-lift-movement",
+    "molit-urban-rail-full-route",
+    "seoulmetro-station-line-info",
+  ]);
+  assert.ok(scope.productionSourceSet.excludedFromV1SupportClaims.includes("seoul-realtime-arrival-station-info"));
+  assert.ok(scope.productionSourceSet.optionalAccessibilitySourceIds.includes("kric-disabled-toilet"));
+  assert.deepEqual(scope.productionSourceSet.optionalAccessibilitySourceIds.sort(), [
+    "kric-braille-displays",
+    "kric-disabled-toilet",
+    "kric-elevator-car-number",
+    "kric-metropolitan-rail-station-info",
+    "kric-platform-train-distance",
+    "kric-safety-platform",
+  ]);
+  assert.deepEqual(scope.productionSourceSet.excludedFromV1SupportClaims.sort(), [
+    "busan-transportation-urban-rail-station-info",
+    "molit-tago-subway-info",
+    "seoul-realtime-arrival-station-info",
+    "seoul-subway-hourly-boarding",
+  ]);
+
+  const requiredSourceIds = new Set(scope.productionSourceSet.requiredSourceIds);
+  const optionalSourceIds = new Set(scope.productionSourceSet.optionalAccessibilitySourceIds);
+  const excludedSourceIds = new Set(scope.productionSourceSet.excludedFromV1SupportClaims);
+  assert.equal(requiredSourceIds.size, scope.productionSourceSet.requiredSourceIds.length);
+  assert.equal(optionalSourceIds.size, scope.productionSourceSet.optionalAccessibilitySourceIds.length);
+  assert.equal(excludedSourceIds.size, scope.productionSourceSet.excludedFromV1SupportClaims.length);
+  assert.deepEqual([...requiredSourceIds].filter((sourceId) => optionalSourceIds.has(sourceId)), []);
+  assert.deepEqual([...requiredSourceIds].filter((sourceId) => excludedSourceIds.has(sourceId)), []);
+  assert.deepEqual([...optionalSourceIds].filter((sourceId) => excludedSourceIds.has(sourceId)), []);
+
+  for (const sourceId of [
+    ...scope.productionSourceSet.requiredSourceIds,
+    ...scope.productionSourceSet.optionalAccessibilitySourceIds,
+    ...scope.productionSourceSet.excludedFromV1SupportClaims,
+  ]) {
+    const source = inventorySources.get(sourceId);
+    assert.ok(source, `${sourceId} must exist in source inventory`);
+  }
+  for (const sourceId of scope.productionSourceSet.requiredSourceIds) {
+    const source = inventorySources.get(sourceId);
+    assert.equal(source.requiredForProductionPack, true, `${sourceId} must be production eligible`);
+    assert.equal(source.license.redistributionAllowed, true, `${sourceId} must allow redistribution`);
+    assert.ok(source.coverageScope.regionIds.includes("capital"), `${sourceId} must cover capital`);
+  }
+
+  assert.equal(scope.productionPromotionCriteria.artifactKind, "production");
+  assert.equal(scope.productionPromotionCriteria.releaseModeAllowGaps, false);
+  assert.equal(scope.productionPromotionCriteria.p0CoverageGapPolicy, "fail-release");
+  assert.equal(scope.productionPromotionCriteria.minimumProductionCoverageValuesMustBePositive, true);
+  assert.equal(scope.productionPromotionCriteria.coverageEvidenceRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.manifestVersion, 2);
+  assert.equal(scope.productionPromotionCriteria.manifest.channel, "production");
+  assert.equal(scope.productionPromotionCriteria.manifest.releaseSequenceMustIncrease, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.publishedAtExpiresAtRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.publicHttpsPackUrlRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.localPlaceholderHostForbidden, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.rsaSignatureRequired, true);
+  assert.equal(scope.productionPromotionCriteria.manifest.privateKeyForbiddenInRepoArtifacts, true);
+  assert.equal(scope.productionPromotionCriteria.strictMobilityProfile.staleUnknownGeneratedConnectorCannotProduceFound, true);
+  assert.ok(scope.productionPromotionCriteria.androidEvidenceRequired.includes("published-manifest-install"));
+  assert.ok(scope.productionPromotionCriteria.androidEvidenceRequired.includes("rollback-manifest-recovery"));
+  assert.ok(
+    scope.productionPromotionCriteria.androidEvidenceRequired.includes(
+      "corrupt-expired-channel-mismatch-unsigned-manifest-rejection",
+    ),
+  );
+  assert.ok(scope.productionPromotionCriteria.androidEvidenceRequired.includes("offline-existing-pack-retained"));
+  assert.ok(scope.productionPromotionForbiddenWhen.includes("pack or source url uses localhost, .localhost, .local domains, or .local hosts"));
+  assert.equal(scope.evidencePolicy.githubSummaryOnly, true);
+  assert.ok(scope.linkedReleaseBlockers.includes(571));
+  assert.ok(scope.linkedReleaseBlockers.includes(1020));
+});
+
 test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
