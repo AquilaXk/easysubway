@@ -9,6 +9,53 @@
   "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
   "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
   "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<rc-or-run>/",
+  "latestQaEvidenceStatus": {
+    "qaEvidenceDateKst": "2026-06-28",
+    "playAndStorePreflight": {
+      "androidPlayInternalTrack": "READY",
+      "datapackObjectStoragePublish": "READY",
+      "googlePlayApi": "READY_EDIT_TRACK_VALIDATE",
+      "uploadedInternalVersionCode": 10001,
+      "latestVersionCodeEnv": 10001
+    },
+    "resolvedEvidence": [
+      "android-play-internal-track-env-preflight",
+      "datapack-object-storage-publish-env-preflight",
+      "google-play-api-edit-track-validate",
+      "play-internal-upload-version-code-10001",
+      "store-distribution-evidence-success",
+      "production-datapack-release-publish-success",
+      "android-aab-release-artifact-secret-scan-output",
+      "release-aab-internal-endpoint-scan-output",
+      "backend-image-env-redaction-summary",
+      "backend-abuse-security-selected-tests",
+      "trusted-proxy-negative-test-output"
+    ],
+    "remainingExternalBlockers": [
+      "play-generated-apk-download-id-summary",
+      "play-installed-build-smoke",
+      "play-pre-launch-report-crash-anr-policy-summary",
+      "network-trace-redaction-summary-from-play-installed-build",
+      "deployed-public-https-backend-report-admin-base-url-evidence",
+      "deployed-admin-operator-auth-session-csrf-summary",
+      "deployed-signed-url-boundary-summary",
+      "object-storage-lifecycle-retention-delete-summary",
+      "deployed-distributed-or-multi-node-rate-limit-rehearsal"
+    ],
+    "notClosingReasonKo": "#1022는 Play credential/store preflight와 local/backend 자동 검증은 확보됐지만, Play-generated/Play-installed artifact 및 deployed production-like rehearsal evidence가 아직 없어 open 유지한다.",
+    "redactionPolicy": {
+      "secretValuesPrinted": false,
+      "forbiddenInGitHubEvidence": [
+        "raw receipt token",
+        "raw signed URL",
+        "photo binary",
+        "provider credential",
+        "operator password",
+        "session cookie",
+        "full object key"
+      ]
+    }
+  },
   "buildIdentityPolicy": {
     "requiredIssueLinks": ["#1015", "#1016", "#1020"],
     "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],
