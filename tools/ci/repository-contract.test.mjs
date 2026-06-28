@@ -2060,6 +2060,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "store-distribution-evidence-success",
     "play-internal-upload-version-code-10001",
     "android-publisher-api-access-ready",
+    "server-minimized-android-release-scope-fixed",
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
@@ -2847,14 +2848,18 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   assert.equal(gate.releaseGate, "server-minimized-device-qa");
   assert.equal(gate.localOnlyEvidence, true);
   assert.match(gate.evidenceRoot, /^\.codex\/evidence\/server-minimization\/pr10$/);
+  assert.equal(gate.releaseBlockerScope.androidGooglePlayV1Required, true);
+  assert.equal(gate.releaseBlockerScope.iosDeferredOutOfScope, true);
+  assert.equal(gate.releaseBlockerScope.iosEvidenceRetainedForHistory, true);
+  assert.match(gate.releaseBlockerScope.completionRuleKo, /Android Google Play v1 release evidence만/);
   assert.doesNotMatch(
     JSON.stringify(gate),
     /com\.easysubway\.mobile/,
     "server minimized QA gate must not reference the retired Android package",
   );
   assert.equal(gate.platformCompletionRule.androidRequired, true);
-  assert.equal(gate.platformCompletionRule.iosRequired, true);
-  assert.equal(gate.platformCompletionRule.singlePlatformEvidenceIsInsufficient, true);
+  assert.equal(gate.platformCompletionRule.iosRequired, false);
+  assert.equal(gate.platformCompletionRule.singlePlatformEvidenceIsInsufficient, false);
   assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO)\b|\.{3}/i);
 
   const requiredFinalAcceptanceIds = [
