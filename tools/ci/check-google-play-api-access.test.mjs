@@ -276,6 +276,8 @@ function mockGooglePlayFetch(requests, maxVersionCode, config = {}) {
       });
     }
     if (method === "POST" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1:validate") {
+      assert.equal(requestOptions.body, undefined);
+      assert.equal(requestOptions.headers?.["content-type"], undefined);
       return jsonResponse(config.validateBody ?? { id: "edit-1" }, config.validateStatus ?? 200);
     }
     if (method === "DELETE" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1") {

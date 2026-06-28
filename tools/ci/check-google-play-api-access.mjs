@@ -80,7 +80,7 @@ export async function runGooglePlayApiAccess({
 
     await requestJson(
       `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}:validate`,
-      { method: "POST", token, body: {} },
+      { method: "POST", token },
       fetchImpl,
     );
     report.push("edit_validate.ready=true");
