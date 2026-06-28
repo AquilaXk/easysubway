@@ -22,6 +22,8 @@
     "rc-versioncode-greater-than-latest-play-artifact-record",
     "play-generated-artifact-identity-match-record",
     "play-generated-split-apk-install-log",
+    "install-provenance-record",
+    "foreground-app-launch-smoke-record",
     "device-specific-manifest-dump",
     "package-versioncode-minsdk-targetsdk-record",
     "permission-network-security-config-review",
@@ -39,6 +41,24 @@
     "dataPackManifestSha256"
   ],
   "identityMatchPolicy": "Play-generated APK 또는 Play-installed build evidence의 packageId, versionName, versionCode, appSigningKeySha256Fingerprint, dataPackManifestSha256는 RC evidence manifest와 일치해야 한다.",
+  "installProvenancePolicy": {
+    "playGeneratedApkShellInstallKo": "App Bundle Explorer 또는 generatedApks.download로 받은 APK를 adb/shell로 설치한 증거는 artifact identity와 manifest 확인에만 사용할 수 있고 Play-installed build smoke를 대체하지 않는다.",
+    "playInstalledBuildRequires": [
+      "installerPackageName=com.android.vending",
+      "initiatingPackageName=com.android.vending",
+      "stopped=false",
+      "notLaunched=false",
+      "foregroundPackage=com.easysubway.app",
+      "app-screen-screenshot-or-ui-tree"
+    ],
+    "forbiddenSmokeSubstitutes": [
+      "installerPackageName=null",
+      "initiatingPackageName=com.android.shell",
+      "Play에서 이 앱을 다운로드하세요 warning screen",
+      "App not available testing page",
+      "package stopped=true or notLaunched=true"
+    ]
+  },
   "versionCodePolicy": "RC versionCode는 Play Console에 업로드된 최신 artifact보다 커야 하며 실패한 RC versionCode는 fixed release에서 재사용하지 않는다.",
   "deviceMatrix": [
     {
@@ -70,6 +90,8 @@
     "artifactIdentityMismatch": "BLOCKED_TECHNICAL",
     "appSigningCertificateMismatch": "BLOCKED_TECHNICAL",
     "versionCodeNotGreaterThanLatestPlayArtifact": "BLOCKED_EXTERNAL",
+    "missingPlayInstallerProvenance": "BLOCKED_EXTERNAL",
+    "shellInstalledArtifactUsedAsPlayInstalledSmoke": "BLOCKED_EXTERNAL",
     "playInstalledSmokeCrash": "BLOCKED_TECHNICAL",
     "deviceMatrixP0Failure": "BLOCKED_TECHNICAL",
     "preLaunchCrashAnrOrPolicyWarningUntriaged": "BLOCKED_TECHNICAL"
