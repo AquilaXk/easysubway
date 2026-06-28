@@ -916,6 +916,16 @@ void main() {
     expect(second.revision, 5);
   });
 
+  test('공식 노선도 초기 화면은 전체 asset bounds에서 시작한다', () {
+    expect(
+      networkMapInitialOriginalAssetBounds(
+        sourceWidth: 5724,
+        sourceHeight: 6516,
+      ),
+      const Rect.fromLTWH(0, 0, 5724, 6516),
+    );
+  });
+
   test('노선도 gesture renderer commit은 interval, drift, scale 기준으로 제한한다', () {
     const committed = MapCameraState(
       sourceBounds: Rect.fromLTWH(0, 0, 1000, 500),
