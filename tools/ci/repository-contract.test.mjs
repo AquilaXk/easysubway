@@ -2026,6 +2026,43 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "post-launch-review-window-evidence-after-public-release",
     "support-incident-response-dry-run-evidence",
   ]);
+  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-06-29");
+  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "1fbf3314e2867d41676f749baa75ea31679d35af");
+  assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
+  assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022]);
+  assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
+    "production-datapack-release-publish-success",
+    "store-distribution-evidence-success",
+    "play-internal-upload-version-code-10001",
+    "android-quality-local-emulator-real-device-smoke-summary",
+    "abuse-rehearsal-local-and-store-preflight-summary",
+    "operations-alert-and-mailbox-routing-summary",
+  ]);
+  assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
+    "play-installed-build-provenance",
+    "play-pre-launch-crash-anr-policy-summary",
+    "play-console-data-safety-listing-screenshot-final-preview",
+    "android-vitals-crash-anr-summary",
+    "support-incident-response-dry-run-evidence",
+    "post-launch-review-window-evidence-after-public-release",
+    "play-installed-android-quality-performance-recovery-evidence",
+    "production-like-abuse-rehearsal-evidence",
+    "server-minimized-final-acceptance-evidence",
+  ]);
+  assert.deepEqual(gate.latestGoNoGoStatus.remainingApprovalPrerequisites, [
+    "release-owner-final-go-approval",
+  ]);
+  assert.equal(gate.latestGoNoGoStatus.externalEffectGate.googlePlayProductionSubmitAllowed, false);
+  assert.equal(gate.latestGoNoGoStatus.externalEffectGate.publicReleaseAllowed, false);
+  assert.equal(
+    gate.latestGoNoGoStatus.externalEffectGate.reasonKo,
+    "open Android P0 blocker가 남아 있고 Play-installed, Play Console, Android vitals, production-like rehearsal 증거가 아직 동결되지 않았다.",
+  );
+  assert.equal(
+    gate.latestGoNoGoStatus.notClosingReasonKo,
+    "#1020은 latest evidence status를 동결했지만, open release blocker와 final GO approval이 남아 있어 NO-GO 상태로 open 유지한다.",
+  );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
   assert.deepEqual(
