@@ -96,9 +96,59 @@ test("Google Play API access checker는 env versionCode가 Play track max와 다
   assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
 });
 
-function mockGooglePlayFetch(requests, maxVersionCode) {
-  return async (url, options = {}) => {
-    const method = options.method ?? "GET";
+test("Google Play API access checker는 Play API 실패도 redacted report로 남긴다", async () => {
+  const requests = [];
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const serviceAccount = {
+    client_email: "play-service@example.invalid",
+    private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
+    token_uri: "https://androidpublisher.example.invalid/token",
+  };
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-google-play-api-failure-"));
+  const envFile = path.join(dir, "store.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      `EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=${Buffer.from(JSON.stringify(serviceAccount)).toString("base64")}`,
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=7",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    runGooglePlayApiAccess({
+      envFile,
+      githubOutput: outputFile,
+      reportPath: reportFile,
+      apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
+      fetchImpl: mockGooglePlayFetch(requests, "7", {
+        validateStatus: 403,
+        validateBody: {
+          error: {
+            status: "PERMISSION_DENIED",
+            message: "Android Publisher API is disabled for project secret-project-id",
+          },
+        },
+      }),
+    }),
+    /google play api POST failed: 403/,
+  );
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^google_play_api_access_ready=false$/m);
+  assert.match(report, /^failure=google play api POST failed: 403 status=PERMISSION_DENIED/m);
+  assert.match(report, /^edit_delete\.ready=true$/m);
+  assert.doesNotMatch(report, /play-service@example\.invalid/);
+  assert.ok(requests.includes("DELETE https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1"));
+});
+
+function mockGooglePlayFetch(requests, maxVersionCode, config = {}) {
+  return async (url, requestOptions = {}) => {
+    const method = requestOptions.method ?? "GET";
     requests.push(`${method} ${url}`);
     if (url === "https://androidpublisher.example.invalid/token") {
       return jsonResponse({ access_token: "access-token", token_type: "Bearer", expires_in: 3600 });
@@ -115,7 +165,7 @@ function mockGooglePlayFetch(requests, maxVersionCode) {
       });
     }
     if (method === "POST" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1:validate") {
-      return jsonResponse({ id: "edit-1" });
+      return jsonResponse(config.validateBody ?? { id: "edit-1" }, config.validateStatus ?? 200);
     }
     if (method === "DELETE" && url === "https://androidpublisher.example.invalid/androidpublisher/v3/applications/com.easysubway.app/edits/edit-1") {
       return jsonResponse({});

@@ -29,7 +29,7 @@ export async function runGooglePlayApiAccess({
   const packageName = requireEnv(env, "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME");
   const latestVersionCode = env.EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE?.trim() || "unknown";
   const { serviceAccount, source } = readServiceAccount(env);
-  const token = await fetchAccessToken(serviceAccount, fetchImpl);
+  let token;
   let editId;
   let editDeleted = false;
   let ready = true;
@@ -43,6 +43,7 @@ export async function runGooglePlayApiAccess({
   ];
 
   try {
+    token = await fetchAccessToken(serviceAccount, fetchImpl);
     const edit = await requestJson(`${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits`, {
       method: "POST",
       token,
@@ -79,14 +80,25 @@ export async function runGooglePlayApiAccess({
       fetchImpl,
     );
     report.push("edit_validate.ready=true");
+  } catch (error) {
+    ready = false;
+    failureMessage = error instanceof Error ? error.message : "google play api access failed";
+    report.push(`failure=${redactReportValue(failureMessage)}`);
   } finally {
-    if (editId) {
-      await requestJson(
-        `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}`,
-        { method: "DELETE", token },
-        fetchImpl,
-      );
-      editDeleted = true;
+    if (editId && token) {
+      try {
+        await requestJson(
+          `${normalizedApiBaseUrl}/applications/${encodePath(packageName)}/edits/${encodePath(editId)}`,
+          { method: "DELETE", token },
+          fetchImpl,
+        );
+        editDeleted = true;
+      } catch (error) {
+        ready = false;
+        failureMessage ??= error instanceof Error ? error.message : "google play edit delete failed";
+        const deleteFailure = error instanceof Error ? error.message : "google play edit delete failed";
+        report.push(`edit_delete.failure=${redactReportValue(deleteFailure)}`);
+      }
     }
   }
 
@@ -157,6 +169,10 @@ function apiErrorSummary(parsed) {
   const status = typeof error.status === "string" ? error.status : "unknown";
   const message = typeof error.message === "string" ? error.message.replace(/\s+/g, " ").slice(0, 180) : "none";
   return `status=${status} message=${message}`;
+}
+
+function redactReportValue(value) {
+  return value.replace(/\s+/g, " ").slice(0, 220);
 }
 
 function readServiceAccount(env) {
