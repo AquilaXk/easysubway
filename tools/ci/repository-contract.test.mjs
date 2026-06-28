@@ -7694,7 +7694,10 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_permissions_declaration").readyWhenKo, /위치|권한/);
   assert.ok(items.get("play_listing_assets_truthfulness").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_listing_assets_truthfulness").readyWhenKo, /고정 스크린샷 세트/);
-  assert.match(items.get("play_listing_assets_truthfulness").readyWhenKo, /7인치\/10인치 태블릿|Chromebook|Android XR/);
+  const playListingAssetsTruthfulnessReadyWhenKo = items.get("play_listing_assets_truthfulness").readyWhenKo;
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /7인치\/10인치 태블릿/);
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /Chromebook/);
+  assert.match(playListingAssetsTruthfulnessReadyWhenKo, /Android XR/);
   assert.ok(items.get("play_listing_assets_truthfulness").evidence.includes("large-screen-screenshot-review"));
   assert.match(items.get("play_account_data_deletion").configurationSources.join("\n"), /EASYSUBWAY_DATA_DELETION_EMAIL/);
   assert.ok(androidRcEvidence.requiredEvidence.playConsoleSubmission.includes("app-content-declarations"));
@@ -7867,6 +7870,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("targetDeviceClass"));
   assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("viewport"));
   assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("seedData"));
+  assert.ok(playStoreContent.evidenceSummarySchemas.storeScreenshotSummary.requiredFields.includes("uiTreePath"));
   assert.equal(
     playStoreContent.assetEvidence.tabletScreenshots,
     "required_large_screen_screenshots_matching_largeScreenScreenshotTargets",
