@@ -5,7 +5,7 @@
   "releaseGate": "rc-evidence-manifest",
   "issue": 1020,
   "parentIssues": [1014, 1020],
-  "linkedEvidenceIssues": [571, 1015, 1016, 1018, 1021, 1022],
+  "linkedEvidenceIssues": [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022],
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
   "releaseGovernanceGate": "apps/mobile/release/release-governance-gate.json",
@@ -37,6 +37,11 @@
       "expiresAfterDays": 14
     },
     {
+      "id": "production_datapack",
+      "sourceIssue": 547,
+      "expiresAfterDays": 14
+    },
+    {
       "id": "signed_rc_store_submission",
       "sourceIssue": 1015,
       "expiresAfterDays": 14
@@ -49,6 +54,16 @@
     {
       "id": "store_privacy_submission",
       "sourceIssue": 1018,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "backend_operations",
+      "sourceIssue": 1017,
+      "expiresAfterDays": 14
+    },
+    {
+      "id": "post_launch_operations",
+      "sourceIssue": 1019,
       "expiresAfterDays": 14
     },
     {
