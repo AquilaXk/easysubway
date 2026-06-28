@@ -8,6 +8,23 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "postLaunchOperationsReviewGate": "apps/mobile/release/post-launch-operations-review-gate.json",
   "evidenceRoot": ".codex/evidence/release/support-incident-response/<rc-or-run>/",
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-06-28",
+    "publicContactDomain": "aquilaxk.site",
+    "mailboxRouting": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "dnsEvidence": ["MX records present", "SPF TXT present", "DKIM TXT present"],
+      "redactionPolicy": "GitHub에는 mailbox 개인 정보, raw receipt token, message body를 올리지 않는다."
+    },
+    "remainingSupportReadiness": [
+      "data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "operator-contact-route-evidence"
+    ]
+  },
   "supportChannels": [
     {
       "id": "support_email",
