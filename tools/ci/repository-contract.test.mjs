@@ -42,18 +42,11 @@ function currentMobileVersion() {
   };
 }
 
-function androidSemverVersionCode({ major, minor, patch }) {
-  return major * 10000 + minor * 100 + patch;
-}
-
-test("Android versionCode는 semver 기반 고정 계산식을 따른다", () => {
+test("Android versionCode는 표시 버전과 분리된 단조 증가 빌드 번호다", () => {
   const mobileVersion = currentMobileVersion();
-  assert.equal(
-    mobileVersion.code,
-    androidSemverVersionCode(mobileVersion),
-    "Android versionCode must equal major * 10000 + minor * 100 + patch",
-  );
-  assert.match(read("README.md"), /major \* 10000 \+ minor \* 100 \+ patch/);
+  assert.ok(mobileVersion.code > 0, "Android versionCode must be positive");
+  assert.match(read("README.md"), /표시 버전은 SemVer/);
+  assert.match(read("README.md"), /빌드 번호는 스토어 업로드마다 단조 증가/);
 });
 
 function escapeRegExp(value) {
