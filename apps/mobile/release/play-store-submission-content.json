@@ -54,6 +54,91 @@
       "titleKo": "데이터 기준일과 실시간 제공 범위"
     }
   ],
+  "largeScreenScreenshotTargets": [
+    {
+      "id": "seven_inch_tablet_landscape",
+      "playConsoleSlot": "7-inch tablet",
+      "viewportClass": "compact-tablet-landscape",
+      "aspectRatio": "16:9-or-play-accepted",
+      "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "result"
+      ],
+      "scopeNoteKo": "휴대전화 중앙 고립 UI가 아니라 핵심 CTA, 검색, 역 상세 요약이 대화면 기준으로 표시되는지 확인한다."
+    },
+    {
+      "id": "ten_inch_tablet_landscape",
+      "playConsoleSlot": "10-inch tablet",
+      "viewportClass": "expanded-tablet-landscape",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "result"
+      ],
+      "scopeNoteKo": "홈, 역 검색, 역 상세가 넓은 화면에서 좌우 정보 구조를 유지하고 큰 글씨 기준의 overflow가 없는지 확인한다."
+    },
+    {
+      "id": "chromebook_16_9",
+      "playConsoleSlot": "Chromebook",
+      "viewportClass": "desktop-window-16-9",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": [
+        "home_support_scope",
+        "station_search",
+        "station_detail_facility_status",
+        "help_privacy_data_deletion"
+      ],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "keyboardMouseSmokeResult",
+        "result"
+      ],
+      "scopeNoteKo": "Chromebook 전용 UX 완성이 아니라 등록정보용 16:9 실제 앱 화면과 기본 focus, 입력, 클릭, 스크롤 smoke 결과를 기록한다."
+    },
+    {
+      "id": "android_xr_16_9",
+      "playConsoleSlot": "Android XR",
+      "viewportClass": "xr-listing-16-9",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": [
+        "home_support_scope",
+        "station_search",
+        "station_detail_facility_status",
+        "help_privacy_data_deletion"
+      ],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "result"
+      ],
+      "scopeNoteKo": "Android XR 등록정보 칸을 위한 16:9 실제 앱 화면 후보이며 XR 전용 spatial UI 지원으로 표현하지 않는다."
+    }
+  ],
   "dataSafetyDeclarations": {
     "tracking": false,
     "sharesDataWithThirdParties": false,
@@ -247,7 +332,12 @@
       "requiredFields": [
         "screenshotId",
         "buildIdentity",
+        "sourceGitSha",
         "sourceBuildType",
+        "targetDeviceClass",
+        "viewport",
+        "seedData",
+        "uiTreePath",
         "screenTitleKo",
         "forbiddenClaimsAbsent",
         "matchesFeatureScope",
@@ -327,7 +417,10 @@
     "appIcon": "required_play_console_preview_or_asset_record",
     "featureGraphic": "required_play_console_preview_or_asset_record",
     "phoneScreenshots": "required_release_build_screenshots_matching_requiredScreenshotSet",
-    "tabletPolicy": "tablet_compatible_until_tablet_specific_ui_gate",
+    "tabletScreenshots": "required_large_screen_screenshots_matching_largeScreenScreenshotTargets",
+    "chromebookScreenshots": "required_16_9_app_screenshots_matching_largeScreenScreenshotTargets",
+    "androidXrScreenshots": "required_16_9_app_screenshots_without_xr_specific_ui_claim",
+    "tabletPolicy": "large_screen_layout_gate_required_before_final_tablet_listing_assets",
     "listingPreview": "required_play_console_preview_summary"
   },
   "evidencePolicy": {
