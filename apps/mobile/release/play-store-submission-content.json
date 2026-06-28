@@ -63,7 +63,7 @@
       "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
       "requiredEvidenceFields": [
         "sourceGitSha",
-        "buildVariant",
+        "sourceBuildType",
         "viewport",
         "seedData",
         "captureTarget",
@@ -81,7 +81,7 @@
       "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
       "requiredEvidenceFields": [
         "sourceGitSha",
-        "buildVariant",
+        "sourceBuildType",
         "viewport",
         "seedData",
         "captureTarget",
@@ -104,7 +104,7 @@
       ],
       "requiredEvidenceFields": [
         "sourceGitSha",
-        "buildVariant",
+        "sourceBuildType",
         "viewport",
         "seedData",
         "captureTarget",
@@ -128,7 +128,7 @@
       ],
       "requiredEvidenceFields": [
         "sourceGitSha",
-        "buildVariant",
+        "sourceBuildType",
         "viewport",
         "seedData",
         "captureTarget",
