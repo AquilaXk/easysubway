@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'accessible_design.dart';
+import 'adaptive_layout.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'facility_report.dart';
@@ -1359,6 +1360,38 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final heroSection = _HomePrototypeHero(
+      profile: currentProfile,
+      onRouteSearch: openRouteSearch,
+      onStationSearch: () => unawaited(openStationSearch()),
+      onProfileTap: openSettings,
+    );
+    final routeDraftSection = AnimatedBuilder(
+      animation: _routeDraftController,
+      builder: (context, _) {
+        final draft = _routeDraftController.draft;
+        if (draft.origin == null && draft.destination == null) {
+          return const SizedBox.shrink();
+        }
+        return _HomeRouteDraftCard(draft: draft, onTap: openRouteSearch);
+      },
+    );
+    final stationActions = _HomeStationActionRow(
+      onRecentSearch: () =>
+          unawaited(openStationSearch(StationSearchEntryMode.recent)),
+      onNearbyStations: () =>
+          unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+    );
+    final facilitySection = _HomeFacilityAlertSection(
+      facilitiesFuture: _favoriteFacilitiesFuture,
+      onOpenFacilities: openSavedItems,
+    );
+    final recentRouteSection = _HomeRecentRouteSection(
+      key: const Key('homeRecentRouteSection'),
+      routesFuture: _recentRoutesFuture,
+      onTap: openRouteSearch,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('쉬운 지하철'),
@@ -1379,50 +1412,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          key: const Key('homeRefreshIndicator'),
-          onRefresh: refreshHomeState,
-          child: ListView(
-            key: const Key('homePrototypeList'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(17, 18, 17, 96),
-            children: [
-              _HomePrototypeHero(
-                profile: currentProfile,
-                onRouteSearch: openRouteSearch,
-                onStationSearch: () => unawaited(openStationSearch()),
-                onProfileTap: openSettings,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
+              constraints,
+            );
+            return RefreshIndicator(
+              key: const Key('homeRefreshIndicator'),
+              onRefresh: refreshHomeState,
+              child: ListView(
+                key: const Key('homePrototypeList'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: isLargeScreen
+                    ? const EdgeInsets.fromLTRB(24, 24, 24, 112)
+                    : const EdgeInsets.fromLTRB(17, 18, 17, 96),
+                children: [
+                  _HomeAdaptiveContent(
+                    isLargeScreen: isLargeScreen,
+                    heroSection: heroSection,
+                    routeDraftSection: routeDraftSection,
+                    stationActions: stationActions,
+                    facilitySection: facilitySection,
+                    recentRouteSection: recentRouteSection,
+                  ),
+                ],
               ),
-              AnimatedBuilder(
-                animation: _routeDraftController,
-                builder: (context, _) {
-                  final draft = _routeDraftController.draft;
-                  if (draft.origin == null && draft.destination == null) {
-                    return const SizedBox.shrink();
-                  }
-                  return _HomeRouteDraftCard(
-                    draft: draft,
-                    onTap: openRouteSearch,
-                  );
-                },
-              ),
-              _HomeStationActionRow(
-                onRecentSearch: () =>
-                    unawaited(openStationSearch(StationSearchEntryMode.recent)),
-                onNearbyStations: () =>
-                    unawaited(openStationSearch(StationSearchEntryMode.nearby)),
-              ),
-              _HomeFacilityAlertSection(
-                facilitiesFuture: _favoriteFacilitiesFuture,
-                onOpenFacilities: openSavedItems,
-              ),
-              _HomeRecentRouteSection(
-                key: const Key('homeRecentRouteSection'),
-                routesFuture: _recentRoutesFuture,
-                onTap: openRouteSearch,
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
       bottomNavigationBar: NavigationBar(
@@ -1592,6 +1608,70 @@ class _HomeNotificationButton extends StatelessWidget {
               icon: const Icon(Icons.notifications_none),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeAdaptiveContent extends StatelessWidget {
+  const _HomeAdaptiveContent({
+    required this.isLargeScreen,
+    required this.heroSection,
+    required this.routeDraftSection,
+    required this.stationActions,
+    required this.facilitySection,
+    required this.recentRouteSection,
+  });
+
+  final bool isLargeScreen;
+  final Widget heroSection;
+  final Widget routeDraftSection;
+  final Widget stationActions;
+  final Widget facilitySection;
+  final Widget recentRouteSection;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isLargeScreen) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          heroSection,
+          routeDraftSection,
+          stationActions,
+          facilitySection,
+          recentRouteSection,
+        ],
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: EasySubwayAdaptiveLayout.largeScreenMaxContentWidth,
+        ),
+        child: Row(
+          key: const Key('homeLargeScreenLayout'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: heroSection),
+            const SizedBox(
+              width: EasySubwayAdaptiveLayout.largeScreenColumnGap,
+            ),
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  routeDraftSection,
+                  stationActions,
+                  facilitySection,
+                  recentRouteSection,
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
