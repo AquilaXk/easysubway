@@ -775,6 +775,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               geometry.initialBounds,
               constraints,
               sourceBounds: fullBounds,
+              contain: mapAsset != null,
               minScale: minScale,
             );
             final initialRendererCamera = networkMapOverscannedRendererCamera(
@@ -1934,6 +1935,12 @@ Rect _readableBoundsFor(_MapGeometry geometry) {
   return Rect.fromLTWH(left, top, width, height);
 }
 
+@visibleForTesting
+Rect networkMapInitialOriginalAssetBounds({
+  required double sourceWidth,
+  required double sourceHeight,
+}) => Rect.fromLTWH(0, 0, sourceWidth, sourceHeight);
+
 class _MapGeometry {
   _MapGeometry({
     required this.origin,
@@ -1969,13 +1976,9 @@ class _MapGeometry {
       focus: Offset(sourceWidth / 2, sourceHeight / 2),
       width: sourceWidth,
       height: sourceHeight,
-      initialBounds: _readableBoundsFor(
-        _MapGeometry(
-          origin: Offset.zero,
-          focus: Offset(sourceWidth / 2, sourceHeight / 2),
-          width: sourceWidth,
-          height: sourceHeight,
-        ),
+      initialBounds: networkMapInitialOriginalAssetBounds(
+        sourceWidth: sourceWidth,
+        sourceHeight: sourceHeight,
       ),
       overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
           ? overlayStyleScale
