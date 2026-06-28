@@ -87,6 +87,39 @@
       "support-incident-response-dry-run-evidence"
     ]
   },
+  "latestGoNoGoStatus": {
+    "qaEvidenceDateKst": "2026-06-29",
+    "reviewedMainMergeSha": "1fbf3314e2867d41676f749baa75ea31679d35af",
+    "currentDecision": "NO_GO",
+    "decisionOwner": "release-owner",
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022],
+    "recentlyResolvedEvidence": [
+      "production-datapack-release-publish-success",
+      "store-distribution-evidence-success",
+      "play-internal-upload-version-code-10001",
+      "android-quality-local-emulator-real-device-smoke-summary",
+      "abuse-rehearsal-local-and-store-preflight-summary",
+      "operations-alert-and-mailbox-routing-summary"
+    ],
+    "remainingP0Blockers": [
+      "play-installed-build-provenance",
+      "play-pre-launch-crash-anr-policy-summary",
+      "play-console-data-safety-listing-screenshot-final-preview",
+      "android-vitals-crash-anr-summary",
+      "support-incident-response-dry-run-evidence",
+      "post-launch-review-window-evidence-after-public-release",
+      "play-installed-android-quality-performance-recovery-evidence",
+      "production-like-abuse-rehearsal-evidence",
+      "server-minimized-final-acceptance-evidence",
+      "release-owner-final-go-approval"
+    ],
+    "externalEffectGate": {
+      "googlePlayProductionSubmitAllowed": false,
+      "publicReleaseAllowed": false,
+      "reasonKo": "open Android P0 blocker가 남아 있고 Play-installed, Play Console, Android vitals, production-like rehearsal 증거가 아직 동결되지 않았다."
+    },
+    "notClosingReasonKo": "#1020은 latest evidence status를 동결했지만, open release blocker와 final GO approval이 남아 있어 NO-GO 상태로 open 유지한다."
+  },
   "releaseControl": {
     "raciRequired": true,
     "freezeRequired": true,
