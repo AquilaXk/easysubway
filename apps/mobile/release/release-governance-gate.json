@@ -97,6 +97,7 @@
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
       "play-internal-upload-version-code-10001",
+      "android-publisher-api-access-ready",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
       "operations-alert-and-mailbox-routing-summary"
