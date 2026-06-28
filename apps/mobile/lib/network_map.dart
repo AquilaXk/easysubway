@@ -1272,6 +1272,7 @@ class _AndroidRouteMapFallbackLayer extends StatelessWidget {
           data: data,
           geometry: geometry,
           camera: camera,
+          textScaler: MediaQuery.textScalerOf(context),
         ),
       ),
     );
@@ -1283,11 +1284,13 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
     required this.data,
     required this.geometry,
     required this.camera,
+    required this.textScaler,
   });
 
   final NetworkMapData data;
   final _MapGeometry geometry;
   final MapCameraState camera;
+  final TextScaler textScaler;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1350,9 +1353,9 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
             !paintedSegments.add('${station.lineId}:$pathData')) {
           continue;
         }
-        final path = _pathFromSvg(pathData).shift(-geometry.origin);
-        if (path.getBounds().overlaps(visibleRect)) {
-          canvas.drawPath(path, paint);
+        final cachedPath = _cachedRouteMapPath(pathData, geometry.origin);
+        if (cachedPath.bounds.overlaps(visibleRect)) {
+          canvas.drawPath(cachedPath.path, paint);
         }
       }
     }
@@ -1387,6 +1390,7 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
       final labelPainter = TextPainter(
         text: TextSpan(text: station.nameKo, style: labelStyle),
         textDirection: TextDirection.ltr,
+        textScaler: textScaler,
         maxLines: 1,
       )..layout();
       final labelTopLeft = camera.sourceToViewportPoint(center + labelOffset);
@@ -1406,10 +1410,119 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AndroidRouteMapFallbackPainter oldDelegate) {
-    return oldDelegate.data != data ||
-        oldDelegate.geometry != geometry ||
-        oldDelegate.camera != camera;
+    return !_sameNetworkMapData(oldDelegate.data, data) ||
+        !_sameMapGeometry(oldDelegate.geometry, geometry) ||
+        !_sameMapCamera(oldDelegate.camera, camera) ||
+        oldDelegate.textScaler != textScaler;
   }
+}
+
+class _CachedRouteMapPath {
+  const _CachedRouteMapPath(this.path, this.bounds);
+
+  final Path path;
+  final Rect bounds;
+}
+
+final _routeMapPathCache = <String, _CachedRouteMapPath>{};
+
+_CachedRouteMapPath _cachedRouteMapPath(String pathData, Offset origin) {
+  final key = '${origin.dx}:${origin.dy}:$pathData';
+  return _routeMapPathCache.putIfAbsent(key, () {
+    final path = _pathFromSvg(pathData).shift(-origin);
+    return _CachedRouteMapPath(path, path.getBounds());
+  });
+}
+
+bool _sameMapCamera(MapCameraState a, MapCameraState b) {
+  return a.sourceBounds == b.sourceBounds &&
+      a.viewportSize == b.viewportSize &&
+      a.center == b.center &&
+      a.scale == b.scale &&
+      a.minScale == b.minScale &&
+      a.maxScale == b.maxScale &&
+      a.revision == b.revision;
+}
+
+bool _sameMapGeometry(_MapGeometry a, _MapGeometry b) {
+  return a.origin == b.origin &&
+      a.focus == b.focus &&
+      a.width == b.width &&
+      a.height == b.height &&
+      a.initialBounds == b.initialBounds &&
+      a.overlayStyleScale == b.overlayStyleScale;
+}
+
+bool _sameNetworkMapData(NetworkMapData a, NetworkMapData b) {
+  return a.selectedRegion == b.selectedRegion &&
+      _sameNetworkMapLines(a.lines, b.lines) &&
+      _sameNetworkMapStations(a.stations, b.stations) &&
+      _sameNetworkMapEdges(a.edges, b.edges);
+}
+
+bool _sameNetworkMapLines(List<NetworkMapLine> a, List<NetworkMapLine> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.name != right.name ||
+        left.color != right.color ||
+        left.region != right.region) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameNetworkMapStations(
+  List<NetworkMapStation> a,
+  List<NetworkMapStation> b,
+) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.nameKo != right.nameKo ||
+        left.lineId != right.lineId ||
+        !_sameNetworkMapPosition(left.position, right.position)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameNetworkMapPosition(NetworkMapPosition a, NetworkMapPosition b) {
+  return a.x == b.x &&
+      a.y == b.y &&
+      a.labelDx == b.labelDx &&
+      a.labelDy == b.labelDy &&
+      a.labelPolygon == b.labelPolygon &&
+      a.upPath == b.upPath &&
+      a.downPath == b.downPath &&
+      a.sourceId == b.sourceId;
+}
+
+bool _sameNetworkMapEdges(List<NetworkMapEdge> a, List<NetworkMapEdge> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var index = 0; index < a.length; index += 1) {
+    final left = a[index];
+    final right = b[index];
+    if (left.id != right.id ||
+        left.lineId != right.lineId ||
+        left.fromStationId != right.fromStationId ||
+        left.toStationId != right.toStationId) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class _RouteMapViewportRenderer extends StatelessWidget {
@@ -1808,7 +1921,7 @@ class _MapGeometry {
         if (pathData.isEmpty) {
           continue;
         }
-        final bounds = _pathFromSvg(pathData).getBounds();
+        final bounds = _cachedRouteMapPath(pathData, Offset.zero).bounds;
         minX = math.min(minX, bounds.left);
         minY = math.min(minY, bounds.top);
         maxX = math.max(maxX, bounds.right);
@@ -2359,7 +2472,7 @@ Offset _labelOffsetFor(NetworkMapStation station) {
   if (pathData.isEmpty) {
     return const Offset(8, 3);
   }
-  final bounds = _pathFromSvg(pathData).getBounds();
+  final bounds = _cachedRouteMapPath(pathData, Offset.zero).bounds;
   if (bounds.width > bounds.height * 1.2) {
     return const Offset(0, 12);
   }
