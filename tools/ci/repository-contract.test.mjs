@@ -7728,6 +7728,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
       `${target.id} must include station detail evidence`,
     );
     assert.ok(target.requiredEvidenceFields.includes("sourceGitSha"), `${target.id} must record source git SHA`);
+    assert.ok(target.requiredEvidenceFields.includes("sourceBuildType"), `${target.id} must record source build type`);
     assert.ok(target.requiredEvidenceFields.includes("viewport"), `${target.id} must record viewport`);
     assert.ok(target.requiredEvidenceFields.includes("seedData"), `${target.id} must record seed data`);
     assert.ok(target.requiredEvidenceFields.includes("uiTreePath"), `${target.id} must record UI tree evidence`);
