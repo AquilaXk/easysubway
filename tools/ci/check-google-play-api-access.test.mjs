@@ -209,16 +209,52 @@ test("Google Play API access checker는 malformed credential도 redacted report�
         throw new Error("fetch must not be called");
       },
     }),
-    /Unexpected token|not valid JSON/,
+    /invalid google play service account json/,
   );
 
   const output = readFileSync(outputFile, "utf8");
   const report = readFileSync(reportFile, "utf8");
   assert.match(output, /^google_play_api_access_ready=false$/m);
   assert.match(report, /^service_account_json_source=base64$/m);
-  assert.match(report, /^failure=/m);
+  assert.match(report, /^failure=invalid google play service account json$/m);
   assert.match(report, /^edit_delete\.ready=false$/m);
   assert.doesNotMatch(report, /not-json/);
+});
+
+test("Google Play API access checker는 malformed JSON credential 원문을 report에 남기지 않는다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-google-play-api-malformed-json-"));
+  const envFile = path.join(dir, "store.env");
+  const outputFile = path.join(dir, "github-output.txt");
+  const reportFile = path.join(dir, "report.txt");
+  await writeFile(
+    envFile,
+    [
+      "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=abc123secret",
+      "EASYSUBWAY_GOOGLE_PLAY_PACKAGE_NAME=com.easysubway.app",
+      "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=7",
+      "",
+    ].join("\n"),
+  );
+
+  await assert.rejects(
+    runGooglePlayApiAccess({
+      envFile,
+      githubOutput: outputFile,
+      reportPath: reportFile,
+      apiBaseUrl: "https://androidpublisher.example.invalid/androidpublisher/v3",
+      fetchImpl: async () => {
+        throw new Error("fetch must not be called");
+      },
+    }),
+    /invalid google play service account json/,
+  );
+
+  const output = readFileSync(outputFile, "utf8");
+  const report = readFileSync(reportFile, "utf8");
+  assert.match(output, /^google_play_api_access_ready=false$/m);
+  assert.match(report, /^service_account_json_source=json$/m);
+  assert.match(report, /^failure=invalid google play service account json$/m);
+  assert.doesNotMatch(report, /abc123secret/);
 });
 
 function mockGooglePlayFetch(requests, maxVersionCode, config = {}) {
