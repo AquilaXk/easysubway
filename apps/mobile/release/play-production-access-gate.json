@@ -36,7 +36,8 @@
       "evidence": [
         "production-access-status-summary",
         "production-menu-access-screenshot-or-summary",
-        "production-access-approval-or-rejection-record"
+        "production-access-approval-or-rejection-record",
+        "android-publisher-api-edit-track-list-summary"
       ]
     },
     {
@@ -83,6 +84,7 @@
       "evidence": [
         "latest-play-uploaded-versioncode-record",
         "rc-versioncode-comparison-record",
+        "android-publisher-api-track-versioncode-summary",
         "failed-rc-versioncode-reuse-policy",
         "fixed-release-versioncode-increase-procedure"
       ]

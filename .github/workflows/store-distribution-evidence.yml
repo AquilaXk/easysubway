@@ -52,6 +52,15 @@ jobs:
             --github-output "${GITHUB_OUTPUT}" \
             --report "${RUNNER_TEMP}/store-distribution-evidence-preflight.txt"
 
+      - name: Store Distribution Evidence / Check Google Play API access
+        id: google-play-api
+        run: |
+          set -euo pipefail
+          node tools/ci/check-google-play-api-access.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --github-output "${GITHUB_OUTPUT}" \
+            --report "${RUNNER_TEMP}/google-play-api-access.txt"
+
       - name: Store Distribution Evidence / Validate data pack object storage publish env
         id: datapack-env
         run: |
@@ -66,6 +75,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: store-distribution-evidence-preflight-${{ github.sha }}
-          path: ${{ runner.temp }}/store-distribution-evidence-preflight.txt
+          path: |
+            ${{ runner.temp }}/store-distribution-evidence-preflight.txt
+            ${{ runner.temp }}/google-play-api-access.txt
           if-no-files-found: warn
           retention-days: 14
