@@ -9,6 +9,27 @@
   "operationsEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
   "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
   "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-06-28",
+    "alertRouteDryRun": {
+      "result": "PASS",
+      "channel": "Slack Incoming Webhook",
+      "publicEvidenceSummary": "HTTP 200 / ok dry-run passed; webhook URL is not stored in tracked files or GitHub comments.",
+      "localOnlyEvidenceRoot": ".codex/evidence/release/post-launch-operations-review/slack-alert-route-20260628/"
+    },
+    "supportMailboxRouting": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "publicContactDomain": "aquilaxk.site",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "summaryKo": "QA 수동 메일 테스트로 support/security/privacy 주소 routing을 정상 확인했다."
+    },
+    "remainingExternalBlockers": [
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "support-ticket-summary-after-public-release",
+      "post-launch-review-window-evidence-after-public-release"
+    ]
+  },
   "reviewWindows": [
     {
       "id": "first_2h",
