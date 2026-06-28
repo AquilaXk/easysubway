@@ -6412,6 +6412,99 @@ void main() {
     }
   });
 
+  testWidgets('역 상세는 태블릿 landscape에서 요약과 시설 정보를 나란히 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [
+        StationExitInfo(
+          id: 'exit-sangnoksu-1',
+          stationId: 'station-sangnoksu',
+          exitNumber: '1',
+          name: '1번 출구',
+          hasElevatorConnection: true,
+          hasStairOnlyPath: false,
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          fieldValidationStatus: 'VERIFIED',
+        ),
+      ],
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-12',
+          fieldValidationStatus: 'VERIFIED',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('stationDetailLargeScreenLayout')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('stationDetailPrimaryColumn')), findsOneWidget);
+    expect(find.byKey(const Key('stationDetailDetailColumn')), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(
+      find.byKey(
+        const Key('stationFacilityCard-facility-sangnoksu-elevator-1'),
+      ),
+      findsOneWidget,
+    );
+
+    final primaryRect = tester.getRect(
+      find.byKey(const Key('stationDetailPrimaryColumn')),
+    );
+    final detailRect = tester.getRect(
+      find.byKey(const Key('stationDetailDetailColumn')),
+    );
+    final facilityRect = tester.getRect(
+      find.byKey(
+        const Key('stationFacilityCard-facility-sangnoksu-elevator-1'),
+      ),
+    );
+
+    expect(primaryRect.right, lessThan(detailRect.left));
+    expect(facilityRect.left, greaterThan(primaryRect.right));
+    expect(detailRect.top, lessThan(primaryRect.bottom));
+  });
+
   testWidgets('시설 상세는 실제 시설 데이터로 위치 상태 제보 진입을 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final repository = FakeStationSearchRepository(

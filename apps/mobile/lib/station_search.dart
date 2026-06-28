@@ -4126,80 +4126,104 @@ class _StationDetailContent extends StatelessWidget {
       facilities: facilities,
     );
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        _StationDetailHeader(detail: detail),
-        const SizedBox(height: 12),
-        _InfoBasisDisclosure(
-          labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+    final primaryChildren = <Widget>[
+      _StationDetailHeader(detail: detail),
+      const SizedBox(height: 12),
+      _InfoBasisDisclosure(
+        labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+      ),
+      const SizedBox(height: 12),
+      if (facilityAttentionSummary.isNotEmpty) ...[
+        _StationFacilityStatusSummary(
+          text: facilityAttentionSummary,
+          semanticLabel: facilityAttentionSemanticLabel,
         ),
         const SizedBox(height: 12),
-        if (facilityAttentionSummary.isNotEmpty) ...[
-          _StationFacilityStatusSummary(
-            text: facilityAttentionSummary,
-            semanticLabel: facilityAttentionSemanticLabel,
-          ),
-          const SizedBox(height: 12),
-        ],
-        _StationDetailRouteActions(
-          detail: detail,
-          routeDraftController: routeDraftController,
-        ),
-        const SizedBox(height: 12),
-        const _StationSafetyGuidanceNotice(),
-        if (favoriteController != null) ...[
-          const SizedBox(height: 16),
-          _StationFavoriteControl(
-            detail: detail,
-            controller: favoriteController!,
-          ),
-        ],
-        const SizedBox(height: 24),
-        if (layoutSummaryItems.isNotEmpty) ...[
-          const _StationDetailSectionTitle(title: '이동 구조'),
-          const SizedBox(height: 12),
-          _StationLayoutSummary(
-            items: layoutSummaryItems,
-            semanticLabel: layoutSummarySemanticLabel,
-          ),
-          const SizedBox(height: 24),
-        ],
-        if (internalRouteState != null) ...[
-          const _StationDetailSectionTitle(title: '역 안 이동 순서'),
-          const SizedBox(height: 12),
-          _StationInternalRouteGuidance(state: internalRouteState!),
-          const SizedBox(height: 24),
-        ],
-        if (mapMarkers.isNotEmpty) ...[
-          const _StationDetailSectionTitle(title: '지도 위치 목록'),
-          const SizedBox(height: 12),
-          _StationMapTextFallback(markers: mapMarkers),
-          const SizedBox(height: 24),
-        ],
-        const _StationDetailSectionTitle(title: '출구'),
-        const SizedBox(height: 12),
-        if (exits.isEmpty)
-          const _StationDetailEmptyMessage(message: '출구 정보가 아직 없습니다.')
-        else
-          for (final exit in exits) _StationExitCard(exit: exit),
-        const SizedBox(height: 24),
-        const _StationDetailSectionTitle(title: '시설'),
-        const SizedBox(height: 12),
-        if (facilities.isEmpty)
-          const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
-        else
-          for (final facility in facilities)
-            _StationFacilityCard(
-              facility: facility,
-              station: detail,
-              onReportTap: () => _openFacilityReport(context, facility),
-            ),
-        const SizedBox(height: 24),
-        const _StationDetailSectionTitle(title: '실시간 열차'),
-        const SizedBox(height: 12),
-        _StationRealtimeSummary(snapshot: realtimeSnapshot),
       ],
+      _StationDetailRouteActions(
+        detail: detail,
+        routeDraftController: routeDraftController,
+      ),
+      const SizedBox(height: 12),
+      const _StationSafetyGuidanceNotice(),
+      if (favoriteController != null) ...[
+        const SizedBox(height: 16),
+        _StationFavoriteControl(
+          detail: detail,
+          controller: favoriteController!,
+        ),
+      ],
+    ];
+    final detailChildren = <Widget>[
+      if (layoutSummaryItems.isNotEmpty) ...[
+        const _StationDetailSectionTitle(title: '이동 구조'),
+        const SizedBox(height: 12),
+        _StationLayoutSummary(
+          items: layoutSummaryItems,
+          semanticLabel: layoutSummarySemanticLabel,
+        ),
+        const SizedBox(height: 24),
+      ],
+      if (internalRouteState != null) ...[
+        const _StationDetailSectionTitle(title: '역 안 이동 순서'),
+        const SizedBox(height: 12),
+        _StationInternalRouteGuidance(state: internalRouteState!),
+        const SizedBox(height: 24),
+      ],
+      if (mapMarkers.isNotEmpty) ...[
+        const _StationDetailSectionTitle(title: '지도 위치 목록'),
+        const SizedBox(height: 12),
+        _StationMapTextFallback(markers: mapMarkers),
+        const SizedBox(height: 24),
+      ],
+      const _StationDetailSectionTitle(title: '출구'),
+      const SizedBox(height: 12),
+      if (exits.isEmpty)
+        const _StationDetailEmptyMessage(message: '출구 정보가 아직 없습니다.')
+      else
+        for (final exit in exits) _StationExitCard(exit: exit),
+      const SizedBox(height: 24),
+      const _StationDetailSectionTitle(title: '시설'),
+      const SizedBox(height: 12),
+      if (facilities.isEmpty)
+        const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
+      else
+        for (final facility in facilities)
+          _StationFacilityCard(
+            facility: facility,
+            station: detail,
+            onReportTap: () => _openFacilityReport(context, facility),
+          ),
+      const SizedBox(height: 24),
+      const _StationDetailSectionTitle(title: '실시간 열차'),
+      const SizedBox(height: 12),
+      _StationRealtimeSummary(snapshot: realtimeSnapshot),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
+          constraints,
+        );
+        return ListView(
+          key: const Key('stationDetailList'),
+          padding: isLargeScreen
+              ? const EdgeInsets.fromLTRB(24, 24, 24, 40)
+              : const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          children: isLargeScreen
+              ? [
+                  _StationDetailAdaptiveContent(
+                    primaryChildren: primaryChildren,
+                    detailChildren: detailChildren,
+                  ),
+                ]
+              : [
+                  ...primaryChildren,
+                  const SizedBox(height: 24),
+                  ...detailChildren,
+                ],
+        );
+      },
     );
   }
 
@@ -4259,6 +4283,52 @@ class _StationDetailContent extends StatelessWidget {
       return null;
     }
     return provider.openLocationSettings;
+  }
+}
+
+class _StationDetailAdaptiveContent extends StatelessWidget {
+  const _StationDetailAdaptiveContent({
+    required this.primaryChildren,
+    required this.detailChildren,
+  });
+
+  final List<Widget> primaryChildren;
+  final List<Widget> detailChildren;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: EasySubwayAdaptiveLayout.largeScreenMaxContentWidth,
+        ),
+        child: Row(
+          key: const Key('stationDetailLargeScreenLayout'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 4,
+              child: Column(
+                key: const Key('stationDetailPrimaryColumn'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: primaryChildren,
+              ),
+            ),
+            const SizedBox(
+              width: EasySubwayAdaptiveLayout.largeScreenColumnGap,
+            ),
+            Expanded(
+              flex: 5,
+              child: Column(
+                key: const Key('stationDetailDetailColumn'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: detailChildren,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
