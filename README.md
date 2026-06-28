@@ -86,7 +86,7 @@ Data is transmitted over HTTPS when network submission is required. Local favori
 
 Store submission and release contact points:
 
-- Privacy policy URL: `https://github.com/AquilaXk/easysubway#privacy-policy`
+- Privacy policy URL: `https://easysubway-api.aquilaxk.site/easysubway/privacy`
 - Support: `support@aquilaxk.site`
 - Security: `security@aquilaxk.site`
 - Data deletion and privacy requests: `privacy@aquilaxk.site`
