@@ -671,6 +671,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
   bool _routeMapRendererActive = false;
+  bool _routeMapFallbackActive = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
@@ -758,18 +759,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.height,
           );
           final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
-          final routeMapRendererActive =
-              mapAsset != null &&
-              defaultTargetPlatform != TargetPlatform.android;
           final layoutKey =
-              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$routeMapRendererActive';
+              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
             _requestedRendererCamera = null;
             _presentedRendererCamera = null;
             _requestedRendererCamerasByRevision.clear();
-            _routeMapRendererActive = routeMapRendererActive;
+            _routeMapFallbackActive = false;
+            _routeMapRendererActive = mapAsset != null;
             _lastRendererCameraRequestAt = null;
             _gestureActive = false;
             final initialCamera = _cameraForBounds(
@@ -782,7 +781,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               initialCamera,
             );
             _camera = initialCamera;
-            if (routeMapRendererActive) {
+            if (_routeMapRendererActive) {
               _requestedRendererCamera = initialRendererCamera;
               _presentedRendererCamera = initialRendererCamera;
             }
@@ -800,7 +799,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               Positioned.fill(
                 child: mapAsset == null
                     ? const _OriginalRouteMapUnavailable()
-                    : defaultTargetPlatform == TargetPlatform.android
+                    : _routeMapFallbackActive
                     ? _AndroidRouteMapFallbackLayer(
                         data: widget.data,
                         geometry: geometry,
@@ -1137,6 +1136,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     if (event is RouteMapRendererFramePresented) {
       _markRendererFramePresented(event.revision);
     }
+    if (event is RouteMapRendererFailed) {
+      _activateRouteMapFallback();
+    }
     if (!kDebugMode && !kProfileMode) {
       return;
     }
@@ -1188,6 +1190,28 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     setState(() {
       _presentedRendererCamera = camera;
+    });
+  }
+
+  void _activateRouteMapFallback() {
+    if (_routeMapFallbackActive) {
+      return;
+    }
+    _releaseRenderer(disposeRenderer: true);
+    if (!mounted) {
+      _routeMapFallbackActive = true;
+      _routeMapRendererActive = false;
+      _requestedRendererCamera = null;
+      _presentedRendererCamera = null;
+      _requestedRendererCamerasByRevision.clear();
+      return;
+    }
+    setState(() {
+      _routeMapFallbackActive = true;
+      _routeMapRendererActive = false;
+      _requestedRendererCamera = null;
+      _presentedRendererCamera = null;
+      _requestedRendererCamerasByRevision.clear();
     });
   }
 }

@@ -85,12 +85,15 @@ final class RouteMapRendererHealthMonitor {
   RouteMapRendererHealthMonitor(
     this._controller, {
     this.blankTimeout = const Duration(milliseconds: 1500),
+    this.maxRecoveryAttempts = 2,
     this.onEvent,
     Timer Function(Duration duration, void Function() callback)? timerFactory,
-  }) : _timerFactory = timerFactory ?? Timer.new;
+  }) : assert(maxRecoveryAttempts > 0),
+       _timerFactory = timerFactory ?? Timer.new;
 
   final RouteMapRendererController _controller;
   final Duration blankTimeout;
+  final int maxRecoveryAttempts;
   final void Function(RouteMapRendererEvent event)? onEvent;
   final Timer Function(Duration duration, void Function() callback)
   _timerFactory;
@@ -203,6 +206,14 @@ final class RouteMapRendererHealthMonitor {
   void _recover({int? rewatchRevision}) {
     _clearPendingFrame();
     _retryWatchRevision = rewatchRevision;
+    if (_recoveryAttempt >= maxRecoveryAttempts) {
+      onEvent?.call(
+        RouteMapRendererFailed(
+          'renderer did not present a frame after $maxRecoveryAttempts recovery attempts',
+        ),
+      );
+      return;
+    }
     _recoveryAttempt += 1;
     onEvent?.call(RouteMapRendererRecovering(_recoveryAttempt));
     unawaited(

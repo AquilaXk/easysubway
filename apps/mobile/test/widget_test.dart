@@ -1240,6 +1240,10 @@ void main() {
       );
       expect(renderer.width, surface.width);
       expect(renderer.height, surface.height);
+      expect(
+        tester.widget(find.byKey(const Key('routeMapViewportRenderer'))),
+        isA<ColoredBox>(),
+      );
     } finally {
       debugDefaultTargetPlatformOverride = null;
       tester.view.resetDevicePixelRatio();
