@@ -30,6 +30,32 @@ function currentMobileVersionCode() {
   return Number.parseInt(match[1], 10);
 }
 
+function currentMobileVersion() {
+  const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*(\d+)\.(\d+)\.(\d+)[+](\d+)\s*$/m);
+  assert.ok(match, "mobile pubspec must contain semver versionName and numeric versionCode");
+  const [, major, minor, patch, code] = match;
+  return {
+    major: Number.parseInt(major, 10),
+    minor: Number.parseInt(minor, 10),
+    patch: Number.parseInt(patch, 10),
+    code: Number.parseInt(code, 10),
+  };
+}
+
+function androidSemverVersionCode({ major, minor, patch }) {
+  return major * 10000 + minor * 100 + patch;
+}
+
+test("Android versionCode는 semver 기반 고정 계산식을 따른다", () => {
+  const mobileVersion = currentMobileVersion();
+  assert.equal(
+    mobileVersion.code,
+    androidSemverVersionCode(mobileVersion),
+    "Android versionCode must equal major * 10000 + minor * 100 + patch",
+  );
+  assert.match(read("README.md"), /major \* 10000 \+ minor \* 100 \+ patch/);
+});
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
