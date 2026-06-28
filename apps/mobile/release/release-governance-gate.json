@@ -110,7 +110,9 @@
       "post-launch-review-window-evidence-after-public-release",
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
-      "server-minimized-final-acceptance-evidence",
+      "server-minimized-final-acceptance-evidence"
+    ],
+    "remainingApprovalPrerequisites": [
       "release-owner-final-go-approval"
     ],
     "externalEffectGate": {
