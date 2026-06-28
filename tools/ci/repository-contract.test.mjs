@@ -1003,6 +1003,30 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playProductionAccessGate.releaseGate, "play-production-access-closed-test");
   assert.equal(playProductionAccessGate.issue, 1016);
   assert.equal(playProductionAccessGate.parentEvidenceManifest, androidRcEvidencePath);
+  assert.equal(playProductionAccessGate.status, "BLOCKED_EXTERNAL");
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.qaEvidenceDateKst, "2026-06-29");
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.result, "PASS");
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.packageName, "com.easysubway.app");
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.latestVersionCodeEnv, 10001);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.editInsertReady, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.tracksListReady, true);
+  assert.deepEqual(playProductionAccessGate.latestApiAccessCheck.tracks, [
+    "alpha",
+    "beta",
+    "internal",
+    "production",
+  ]);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.tracksMaxVersionCode, 10001);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.latestVersionCodeCoversTrackMax, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.editValidateReady, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.editDeleteReady, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.uploadAttempted, false);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.storeSubmitAttempted, false);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.secretValuesPrinted, false);
+  assert.match(
+    playProductionAccessGate.latestApiAccessCheck.localOnlyEvidence,
+    /\.codex\/evidence\/release\/play-production-access\/1016-api-recheck-20260629\//,
+  );
   assert.equal(playProductionAccessGate.officialPolicy.closedTestMinimumOptedInTesters, 12);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestContinuousOptInDays, 14);
   assert.match(playProductionAccessGate.officialPolicy.source, /^https:\/\/support\.google\.com\/googleplay\/android-developer\/answer\/14151465/);
@@ -2035,6 +2059,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
     "play-internal-upload-version-code-10001",
+    "android-publisher-api-access-ready",
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
