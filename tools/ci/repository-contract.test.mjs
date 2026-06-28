@@ -2056,7 +2056,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(readme, /EASYSUBWAY_PRIVACY_POLICY_URL/);
   assert.match(readme, /EASYSUBWAY_DATA_DELETION_EMAIL/);
   assert.match(readme, /## Privacy Policy/);
-  assert.match(readme, /https:\/\/github\.com\/AquilaXk\/easysubway#privacy-policy/);
+  assert.match(readme, /https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/privacy/);
   assert.match(readme, /EasySubway does not sell personal or sensitive user data\./);
   assert.match(readme, /support@aquilaxk\.site/);
   assert.match(readme, /security@aquilaxk\.site/);
@@ -2066,7 +2066,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-privacy-env-"));
   const validEnv = path.join(dir, "valid.env");
   await writeFile(validEnv, [
-    "EASYSUBWAY_PRIVACY_POLICY_URL=https://github.com/AquilaXk/easysubway#privacy-policy",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -2081,14 +2081,14 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     },
   );
   const githubEnvOutput = readFileSync(githubEnv, "utf8");
-  assert.match(githubEnvOutput, /^EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/github\.com\/AquilaXk\/easysubway#privacy-policy$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/privacy$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
 
   const rcEnv = path.join(dir, "android-rc.env");
   await writeFile(rcEnv, [
-    "EASYSUBWAY_PRIVACY_POLICY_URL=https://github.com/AquilaXk/easysubway#privacy-policy",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -2141,7 +2141,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcEnv = path.join(dir, "invalid-android-rc.env");
   await writeFile(invalidRcEnv, [
-    "EASYSUBWAY_PRIVACY_POLICY_URL=https://github.com/AquilaXk/easysubway#privacy-policy",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -2167,7 +2167,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcKeyEnv = path.join(dir, "invalid-android-rc-key.env");
   await writeFile(invalidRcKeyEnv, [
-    "EASYSUBWAY_PRIVACY_POLICY_URL=https://github.com/AquilaXk/easysubway#privacy-policy",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -2193,7 +2193,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcFingerprintEnv = path.join(dir, "invalid-android-rc-fingerprint.env");
   await writeFile(invalidRcFingerprintEnv, [
-    "EASYSUBWAY_PRIVACY_POLICY_URL=https://github.com/AquilaXk/easysubway#privacy-policy",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
