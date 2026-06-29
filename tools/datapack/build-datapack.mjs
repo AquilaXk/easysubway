@@ -4,6 +4,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { usesLocalPlaceholderHost } from "./production-url-policy.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -149,12 +150,12 @@ async function loadBuildInput(args) {
     };
   }
 
-  const buildSpecPath = resolveRepoPath(buildSpecArg, "buildSpec");
+  const buildSpecPath = resolveBuildInputPath(buildSpecArg, "buildSpec");
   const buildSpecBytes = await readFile(buildSpecPath);
   const buildSpec = JSON.parse(buildSpecBytes);
   validateCandidateBuildSpec(buildSpec);
   return {
-    fixture: JSON.parse(await readFile(resolveRepoPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8")),
+    fixture: JSON.parse(await readFile(resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8")),
     candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes)),
   };
 }
@@ -171,7 +172,7 @@ function validateCandidateBuildSpec(buildSpec) {
   }
   requiredString(buildSpec.candidateId, "buildSpec.candidateId");
   requiredString(buildSpec.productionScopeId, "buildSpec.productionScopeId");
-  resolveRepoPath(buildSpec.fixturePath, "buildSpec.fixturePath");
+  resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath");
   requiredStringArray(buildSpec.sourceSnapshotIds, "buildSpec.sourceSnapshotIds");
   for (const field of candidateBuildSpecHashFields) {
     sha256HexString(buildSpec[field], `buildSpec.${field}`);
@@ -202,13 +203,25 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256) {
   };
 }
 
-function resolveRepoPath(value, label) {
+function resolveBuildInputPath(value, label) {
   const resolved = path.resolve(root, requiredString(value, label));
-  const relative = path.relative(root, resolved);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`${label} must stay inside repository`);
+  if (!isWithinAllowedBuildInputRoot(resolved)) {
+    throw new Error(`${label} must stay inside repository or temp directory`);
   }
   return resolved;
+}
+
+function isWithinAllowedBuildInputRoot(resolvedPath) {
+  return allowedBuildInputRoots().some((allowedRoot) => {
+    const relative = path.relative(allowedRoot, resolvedPath);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  });
+}
+
+function allowedBuildInputRoots() {
+  return [root, tmpdir(), process.env.RUNNER_TEMP]
+    .filter((value) => typeof value === "string" && value.trim() !== "")
+    .map((value) => path.resolve(value));
 }
 
 function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
