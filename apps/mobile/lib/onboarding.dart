@@ -961,7 +961,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       container: true,
                       excludeSemantics: true,
                       liveRegion: true,
-                      label: '다음 행동, $_onboardingNotificationFailureNextAction',
+                      label: '도움말, $_onboardingNotificationFailureNextAction',
                       child: Text(
                         _onboardingNotificationFailureNextAction,
                         style: textTheme.bodyMedium?.copyWith(

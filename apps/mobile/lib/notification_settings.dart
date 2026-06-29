@@ -896,7 +896,7 @@ class _NotificationSettingsMessage extends StatelessWidget {
             container: true,
             excludeSemantics: true,
             liveRegion: true,
-            label: '다음 행동, $_notificationRegistrationFailureNextAction',
+            label: '도움말, $_notificationRegistrationFailureNextAction',
             child: Text(
               _notificationRegistrationFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(

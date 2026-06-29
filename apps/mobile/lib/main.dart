@@ -2053,7 +2053,7 @@ class _NotificationInboxItem {
       subtitle:
           '${facility.severityLabel} · ${facility.typeLabel} ${facility.statusLabel}',
       semanticLabel:
-          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 권장 행동 ${facility.nextActionLabel}',
+          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, ${facility.nextActionLabel}',
       kind: '시설',
       severity: facility.statusPresentation.severity,
       actionLabel: facility.nextActionLabel,
@@ -2142,7 +2142,7 @@ class _NotificationInboxCard extends StatelessWidget {
           if (item.actionLabel.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              '권장 행동 ${item.actionLabel}',
+              item.actionLabel,
               style: const TextStyle(
                 color: EasySubwayAccessibleColors.text,
                 fontSize: 13,
@@ -2596,7 +2596,7 @@ class _HomeFacilityAlertCard extends StatelessWidget {
       facility.statusPresentation.severity,
     );
     final semanticLabel =
-        '${facility.stationLabel} $facilityName, ${facility.typeLabel} ${facility.statusLabel}, 심각도 ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, 다음 행동 ${facility.nextActionLabel}';
+        '${facility.stationLabel} $facilityName, ${facility.typeLabel} ${facility.statusLabel}, ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, ${facility.nextActionLabel}';
     return Semantics(
       container: true,
       explicitChildNodes: true,

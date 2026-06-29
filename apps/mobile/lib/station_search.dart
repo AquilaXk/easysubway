@@ -793,7 +793,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, 다음 행동 $nextActionLabel';
+    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
   }
 }
 
@@ -3237,7 +3237,7 @@ class _StationSearchFailureMessage extends StatelessWidget {
             key: const Key('stationSearchFailureNextAction'),
             container: true,
             excludeSemantics: true,
-            label: '다음 행동, $_stationSearchFailureNextAction',
+            label: '도움말, $_stationSearchFailureNextAction',
             child: Text(
               _stationSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(

@@ -838,7 +838,7 @@ class RouteSearchResult {
       parts.add('$attentionLabel ${safeBlockedReasons.join(', ')}');
     }
     if (isBlocked) {
-      parts.add('다음 행동 $_routeSearchFailureNextAction');
+      parts.add('다른 방법 $_routeSearchFailureNextAction');
     }
     if (warnings.isNotEmpty) {
       parts.add(
@@ -2550,7 +2550,7 @@ class _RouteSearchFailureMessage extends StatelessWidget {
             container: true,
             excludeSemantics: true,
             liveRegion: true,
-            label: '다음 행동, $_routeSearchFailureNextAction',
+            label: '도움말, $_routeSearchFailureNextAction',
             child: Text(
               _routeSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -3183,7 +3183,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
           title: '다른 방법',
           text: _routeSearchFailureNextAction,
           icon: Icons.refresh,
-          semanticsLabel: '다음 행동, $_routeSearchFailureNextAction',
+          semanticsLabel: '도움말, $_routeSearchFailureNextAction',
         ),
         const _RouteNotice(
           title: '안전 안내',
@@ -3948,7 +3948,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
             container: true,
             excludeSemantics: true,
             liveRegion: true,
-            label: '다음 행동, $_routeFeedbackFailureNextAction',
+            label: '도움말, $_routeFeedbackFailureNextAction',
             child: Text(
               _routeFeedbackFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -4079,7 +4079,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
             container: true,
             excludeSemantics: true,
             liveRegion: true,
-            label: '다음 행동, $_favoriteRouteSaveFailureNextAction',
+            label: '도움말, $_favoriteRouteSaveFailureNextAction',
             child: Text(
               _favoriteRouteSaveFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -4413,7 +4413,7 @@ class _FavoriteRouteListBody extends StatelessWidget {
                 container: true,
                 excludeSemantics: true,
                 liveRegion: true,
-                label: '다음 행동, $_favoriteRouteLoadFailureNextAction',
+                label: '도움말, $_favoriteRouteLoadFailureNextAction',
                 child: Text(
                   _favoriteRouteLoadFailureNextAction,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(

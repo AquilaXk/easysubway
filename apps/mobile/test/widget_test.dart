@@ -796,7 +796,7 @@ void main() {
     expect(reportRepository.listMyReportsCount, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('알림함 시설 상태는 심각도와 다음 행동을 함께 보여준다', (tester) async {
+  testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -817,9 +817,9 @@ void main() {
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('확인 요청 · 엘리베이터 제보됨'), findsOneWidget);
-    expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
+    expect(find.text('역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 확인 요청, .*공식 안내, 권장 행동 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('확인 요청, .*공식 안내, 역무원 도움 요청')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -2809,7 +2809,7 @@ void main() {
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
   });
 
-  testWidgets('홈 시설 알림은 더 높은 심각도 시설과 다음 행동을 먼저 보여준다', (tester) async {
+  testWidgets('홈 시설 알림은 더 급한 시설과 할 일을 먼저 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -2843,7 +2843,7 @@ void main() {
     expect(find.text('고장·폐쇄 · 엘리베이터 폐쇄'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*공식 안내, 다음 행동 대체 출구 보기')),
+      find.bySemanticsLabel(RegExp('고장·폐쇄, .*공식 안내, 대체 출구 보기')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -4953,7 +4953,7 @@ void main() {
     expect(find.text('기기 알림 설정과 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'), findsNothing);
   });
 
-  testWidgets('알림 설정 화면은 기기 알림 실패 다음 행동을 안내한다', (tester) async {
+  testWidgets('알림 설정 화면은 기기 알림 실패 도움말을 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final notificationPermissionProvider = FakeNotificationPermissionProvider(
       nextStatus: NotificationPermissionStatus.denied,
@@ -4987,7 +4987,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('다음 행동, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
+        find.bySemanticsLabel('도움말, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
         findsOneWidget,
       );
       expect(
@@ -4995,7 +4995,7 @@ void main() {
           find.byKey(const Key('notificationRegistrationFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
+          label: '도움말, 휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
           isLiveRegion: true,
         ),
       );
@@ -5126,10 +5126,11 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 다음 행동 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 상태 제보',
         ),
         findsOneWidget,
       );
+      expectNoForbiddenUserCopy(tester);
 
       final tileSize = tester.getSize(
         find.byKey(
@@ -5381,7 +5382,7 @@ void main() {
     expect(searchAgainMobilityType, 'WHEELCHAIR');
   });
 
-  testWidgets('즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
       ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
@@ -5399,7 +5400,7 @@ void main() {
       expect(find.text('즐겨찾기 경로를 불러오지 못했습니다.'), findsOneWidget);
       expect(find.text('네트워크 상태를 확인한 뒤 다시 불러와 주세요.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('다음 행동, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.'),
+        find.bySemanticsLabel('도움말, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.'),
         findsOneWidget,
       );
       expect(
@@ -5407,7 +5408,7 @@ void main() {
           find.byKey(const Key('favoriteRouteLoadFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.',
+          label: '도움말, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.',
           isLiveRegion: true,
         ),
       );
@@ -6964,7 +6965,7 @@ void main() {
       expect(find.bySemanticsLabel('위치 권한을 확인해 주세요.'), findsOneWidget);
       expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('다음 행동, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+        find.bySemanticsLabel('도움말, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
         findsOneWidget,
       );
 
@@ -7000,7 +7001,7 @@ void main() {
     expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
     expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsNothing);
     expect(
-      find.bySemanticsLabel('다음 행동, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+      find.bySemanticsLabel('도움말, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
       findsNothing,
     );
   });
@@ -7238,7 +7239,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 다음 행동 상태 제보, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 상태 제보, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -7298,7 +7299,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 다음 행동 상태 제보',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 상태 제보',
         ),
         findsOneWidget,
       );
@@ -8829,7 +8830,7 @@ void main() {
     expect(favoriteRouteRepository.savedRouteSearchIds, isEmpty);
   });
 
-  testWidgets('즐겨찾기 경로 저장 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -8899,7 +8900,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('다음 행동, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
+        find.bySemanticsLabel('도움말, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
         findsOneWidget,
       );
       expect(
@@ -8907,7 +8908,7 @@ void main() {
           find.byKey(const Key('favoriteRouteSaveFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.',
+          label: '도움말, 네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.',
           isLiveRegion: true,
         ),
       );
@@ -9304,7 +9305,7 @@ void main() {
     expect(find.text('계단 없는 경로가 없습니다'), findsNothing);
   });
 
-  testWidgets('경로 피드백 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('경로 피드백 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -9377,7 +9378,7 @@ void main() {
       expect(find.text('의견을 보내지 못했습니다.'), findsOneWidget);
       expect(find.text('잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('다음 행동, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'),
+        find.bySemanticsLabel('도움말, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'),
         findsOneWidget,
       );
       expect(
@@ -9385,7 +9386,7 @@ void main() {
           find.byKey(const Key('routeFeedbackFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.',
+          label: '도움말, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.',
           isLiveRegion: true,
         ),
       );
@@ -9511,7 +9512,7 @@ void main() {
     expect(find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'), findsNothing);
   });
 
-  testWidgets('경로 검색 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('경로 검색 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
       queryResults: {
@@ -9574,7 +9575,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
+        find.bySemanticsLabel('도움말, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
       );
       expect(
@@ -9582,7 +9583,7 @@ void main() {
           find.byKey(const Key('routeSearchFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.',
+          label: '도움말, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.',
           isLiveRegion: true,
         ),
       );
@@ -9746,7 +9747,7 @@ void main() {
       expect(nextActionNotice, findsOneWidget);
       expect(tester.getSize(nextActionNotice).height, greaterThanOrEqualTo(44));
       expect(
-        find.bySemanticsLabel('다음 행동, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
+        find.bySemanticsLabel('도움말, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
       );
       final completedButton = tester.widget<FilledButton>(
@@ -9900,7 +9901,7 @@ void main() {
     }
   });
 
-  testWidgets('시설 신고 실패는 다음 행동을 쉬운 문구로 안내한다', (tester) async {
+  testWidgets('시설 신고 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository()
       ..error = const FacilityReportException('신고를 보내지 못했습니다.');
@@ -9939,7 +9940,7 @@ void main() {
       expect(find.text('신고를 보내지 못했습니다.'), findsOneWidget);
       expect(find.text('내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('다음 행동, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'),
+        find.bySemanticsLabel('도움말, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'),
         findsOneWidget,
       );
       expect(
@@ -9947,7 +9948,7 @@ void main() {
           find.byKey(const Key('facilityReportFailureNextAction')),
         ),
         isSemantics(
-          label: '다음 행동, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.',
+          label: '도움말, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.',
           isLiveRegion: true,
         ),
       );

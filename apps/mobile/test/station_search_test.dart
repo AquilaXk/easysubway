@@ -1461,7 +1461,7 @@ void main() {
     expect(ramp.statusTitle, '현장 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 다음 행동 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');
