@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
@@ -476,6 +476,40 @@ test("데이터팩 생성기는 repo와 temp 밖 buildSpec fixturePath를 거부
   const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
   buildSpec.fixturePath = path.resolve(path.parse(root).root, "etc", "hosts");
   await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+  try {
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/build-datapack.mjs",
+          "--build-spec",
+          buildSpecPath,
+          "--output",
+          outputDir,
+        ],
+        { cwd: root, env: productionEnv },
+      ),
+      /buildSpec.fixturePath must stay inside repository or temp directory/,
+    );
+  } finally {
+    await rm(buildSpecDir, { recursive: true, force: true });
+  }
+});
+
+test("데이터팩 생성기는 repo 내부 symlink가 temp 밖 fixture를 가리키면 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-build-spec-symlink-${Date.now()}`);
+  const buildSpecDir = path.join(root, "tmp", `easysubway-datapack-build-spec-symlink-${process.pid}-${Date.now()}`);
+  const buildSpecPath = path.join(buildSpecDir, "candidate-build-spec.symlink.json");
+  const symlinkPath = path.join(buildSpecDir, "catalog-fixture.symlink.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await rm(buildSpecDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(buildSpecDir, { recursive: true });
+  const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
+  buildSpec.fixturePath = symlinkPath;
+  await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+  await symlink(path.resolve(path.parse(root).root, "etc", "hosts"), symlinkPath);
 
   try {
     await assert.rejects(

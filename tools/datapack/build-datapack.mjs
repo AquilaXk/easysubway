@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash, createSign } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
@@ -150,17 +150,17 @@ async function loadBuildInput(args) {
     };
   }
 
-  const buildSpecPath = resolveBuildInputPath(buildSpecArg, "buildSpec");
+  const buildSpecPath = await resolveBuildInputPath(buildSpecArg, "buildSpec");
   const buildSpecBytes = await readFile(buildSpecPath);
   const buildSpec = JSON.parse(buildSpecBytes);
-  validateCandidateBuildSpec(buildSpec);
+  await validateCandidateBuildSpec(buildSpec);
   return {
-    fixture: JSON.parse(await readFile(resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8")),
+    fixture: JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8")),
     candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes)),
   };
 }
 
-function validateCandidateBuildSpec(buildSpec) {
+async function validateCandidateBuildSpec(buildSpec) {
   if (!buildSpec || typeof buildSpec !== "object" || Array.isArray(buildSpec)) {
     throw new Error("buildSpec must be an object");
   }
@@ -172,7 +172,7 @@ function validateCandidateBuildSpec(buildSpec) {
   }
   requiredString(buildSpec.candidateId, "buildSpec.candidateId");
   requiredString(buildSpec.productionScopeId, "buildSpec.productionScopeId");
-  resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath");
+  await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath");
   requiredStringArray(buildSpec.sourceSnapshotIds, "buildSpec.sourceSnapshotIds");
   for (const field of candidateBuildSpecHashFields) {
     sha256HexString(buildSpec[field], `buildSpec.${field}`);
@@ -207,25 +207,36 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256) {
   };
 }
 
-function resolveBuildInputPath(value, label) {
+async function resolveBuildInputPath(value, label) {
   const resolved = path.resolve(root, requiredString(value, label));
-  if (!isWithinAllowedBuildInputRoot(resolved)) {
+  const canonicalPath = await realpath(resolved);
+  if (!(await isWithinAllowedBuildInputRoot(canonicalPath))) {
     throw new Error(`${label} must stay inside repository or temp directory`);
   }
-  return resolved;
+  return canonicalPath;
 }
 
-function isWithinAllowedBuildInputRoot(resolvedPath) {
-  return allowedBuildInputRoots().some((allowedRoot) => {
+async function isWithinAllowedBuildInputRoot(resolvedPath) {
+  const allowedRoots = await allowedBuildInputRoots();
+  return allowedRoots.some((allowedRoot) => {
     const relative = path.relative(allowedRoot, resolvedPath);
     return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
   });
 }
 
-function allowedBuildInputRoots() {
-  return [root, tmpdir(), process.env.RUNNER_TEMP]
+async function allowedBuildInputRoots() {
+  const candidateRoots = [root, tmpdir(), process.env.RUNNER_TEMP]
     .filter((value) => typeof value === "string" && value.trim() !== "")
     .map((value) => path.resolve(value));
+  const canonicalRoots = [];
+  for (const candidateRoot of candidateRoots) {
+    try {
+      canonicalRoots.push(await realpath(candidateRoot));
+    } catch {
+      // Optional CI temp roots may be absent in local runs.
+    }
+  }
+  return canonicalRoots;
 }
 
 function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
