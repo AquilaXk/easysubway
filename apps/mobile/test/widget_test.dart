@@ -5221,7 +5221,7 @@ void main() {
       expect(find.text('이동 편의도 92점'), findsNothing);
       expect(find.text('상세 이동 정보는 다시 검색해 확인'), findsOneWidget);
       expect(
-        find.text('기준: 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13'),
+        find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13'),
         findsOneWidget,
       );
       expect(
@@ -5234,7 +5234,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간은 다시 확인해 주세요, 환승은 다시 확인해 주세요, 걷는 거리는 다시 확인해 주세요, 계단 여부는 다시 확인해 주세요, 엘리베이터 연결은 다시 확인해 주세요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간은 다시 확인해 주세요, 환승은 다시 확인해 주세요, 걷는 거리는 다시 확인해 주세요, 계단 여부는 다시 확인해 주세요, 엘리베이터 연결은 다시 확인해 주세요',
         ),
         findsOneWidget,
       );
@@ -7612,7 +7612,7 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'));
     await tester.pumpAndSettle();
     expect(find.text('안내 확인 방법'), findsOneWidget);
-    expect(find.text('최근 확인됨'), findsOneWidget);
+    expect(find.text('최근 확인했어요'), findsOneWidget);
     expect(find.text('최근 확인된 정보예요'), findsOneWidget);
     expect(find.text('공식 안내'), findsOneWidget);
     expectNoForbiddenUserCopy(tester);

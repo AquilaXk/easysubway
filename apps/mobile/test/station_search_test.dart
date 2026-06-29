@@ -1466,7 +1466,7 @@ void main() {
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');
     expect(customerCenter.severityLabel, '정상');
-    expect(customerCenter.fieldValidationLabel, '최근 확인됨');
+    expect(customerCenter.fieldValidationLabel, '최근 확인했어요');
     expect(customerCenter.statusTitle, '이용 가능');
     expect(customerCenter.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(customerCenter.semanticLabel, isNot(contains('현장 검증')));
