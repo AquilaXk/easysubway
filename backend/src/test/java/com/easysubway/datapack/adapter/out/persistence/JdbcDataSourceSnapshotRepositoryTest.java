@@ -123,6 +123,15 @@ class JdbcDataSourceSnapshotRepositoryTest {
 		))
 			.isInstanceOf(InvalidDataSourceSnapshotException.class)
 			.hasMessageContaining("rawObjectUri");
+		assertThatThrownBy(() -> lockedSnapshot(
+			"snapshot-uri-empty-bucket",
+			"a".repeat(64),
+			13,
+			"s3:///kric-station-elevator/snapshot-uri-empty-bucket.json",
+			true
+		))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("rawObjectUri");
 	}
 
 	private DataSourceSnapshot lockedSnapshot(String snapshotId, String rawSha256, int rowCount) {

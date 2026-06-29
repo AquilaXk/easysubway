@@ -93,7 +93,7 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
 		var objectStorageScheme = "s3".equals(uri.getScheme()) || "oci".equals(uri.getScheme());
-		if (!objectStorageScheme || uri.getRawQuery() != null || uri.getRawUserInfo() != null || uri.getRawFragment() != null) {
+		if (!objectStorageScheme || uri.getRawAuthority() == null || uri.getRawAuthority().isBlank() || uri.getRawQuery() != null || uri.getRawUserInfo() != null || uri.getRawFragment() != null) {
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
 		return trimmed;

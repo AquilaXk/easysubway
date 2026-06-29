@@ -398,6 +398,14 @@ class DatabaseMigrationContainerTest {
 			.isInstanceOf(DataAccessException.class);
 		assertThatThrownBy(() -> insertSnapshotEvidencePolicyCase(
 			jdbcTemplate,
+			"snapshot-raw-policy-empty-bucket-uri",
+			"s3:///snapshot-raw-policy-empty-bucket-uri.json",
+			true,
+			"2026-07-06 00:00:00"
+		))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertSnapshotEvidencePolicyCase(
+			jdbcTemplate,
 			"snapshot-raw-policy-expired-retention",
 			"s3://evidence/snapshot-raw-policy-expired-retention.json",
 			true,
