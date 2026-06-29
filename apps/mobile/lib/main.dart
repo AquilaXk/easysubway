@@ -1211,6 +1211,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedTabIndex = 0;
   late String _mobilityType;
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteRoute>>? _recentRoutesFuture;
@@ -1342,6 +1343,15 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    void openHomeTab() {
+      if (_selectedTabIndex == 0) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 0;
+      });
+    }
+
     Future<void> refreshHomeState() async {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
@@ -1449,18 +1459,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     void openNetworkMap() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => NetworkMapScreen(
-            repository: networkMapRepository,
-            routeDraftController: _routeDraftController,
-            onOpenRouteSearch: openRouteSearch,
-            onOpenStationSearch: () => unawaited(openStationSearch()),
-            onOpenSaved: openSavedItems,
-            onOpenSettings: openSettings,
-          ),
-        ),
-      );
+      if (_selectedTabIndex == 1) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 1;
+      });
     }
 
     final heroSection = _HomePrototypeHero(
@@ -1496,6 +1500,75 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: openRouteSearch,
       onRetry: () => unawaited(refreshHomeState()),
     );
+    final bottomNavigationBar = NavigationBar(
+      key: const Key('homeBottomNavigationBar'),
+      selectedIndex: _selectedTabIndex,
+      height: 72,
+      onDestinationSelected: (index) {
+        switch (index) {
+          case 0:
+            openHomeTab();
+            break;
+          case 1:
+            openNetworkMap();
+            break;
+          case 2:
+            unawaited(openRouteSearch());
+            break;
+          case 3:
+            openSavedItems();
+            break;
+          case 4:
+            openSettings();
+            break;
+        }
+      },
+      destinations: const [
+        NavigationDestination(
+          key: Key('bottomNavHome'),
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: '홈',
+        ),
+        NavigationDestination(
+          key: Key('bottomNavMap'),
+          icon: Icon(Icons.map_outlined),
+          selectedIcon: Icon(Icons.map),
+          label: '노선도',
+        ),
+        NavigationDestination(
+          key: Key('bottomNavRoute'),
+          icon: Icon(Icons.route_outlined),
+          selectedIcon: Icon(Icons.route),
+          label: '길찾기',
+        ),
+        NavigationDestination(
+          key: Key('bottomNavSaved'),
+          icon: Icon(Icons.star_border),
+          selectedIcon: Icon(Icons.star),
+          label: '즐겨찾기',
+        ),
+        NavigationDestination(
+          key: Key('bottomNavMore'),
+          icon: Icon(Icons.more_horiz),
+          selectedIcon: Icon(Icons.more),
+          label: '더보기',
+        ),
+      ],
+    );
+
+    if (_selectedTabIndex == 1) {
+      return NetworkMapScreen(
+        repository: networkMapRepository,
+        routeDraftController: _routeDraftController,
+        onOpenRouteSearch: openRouteSearch,
+        onOpenStationSearch: () => unawaited(openStationSearch()),
+        onOpenSaved: openSavedItems,
+        onOpenSettings: openSettings,
+        onOpenHome: openHomeTab,
+        bottomNavigationBar: bottomNavigationBar,
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -1546,61 +1619,7 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        key: const Key('homeBottomNavigationBar'),
-        selectedIndex: 0,
-        height: 72,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              openNetworkMap();
-              break;
-            case 2:
-              unawaited(openRouteSearch());
-              break;
-            case 3:
-              openSavedItems();
-              break;
-            case 4:
-              openSettings();
-              break;
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            key: Key('bottomNavHome'),
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '홈',
-          ),
-          NavigationDestination(
-            key: Key('bottomNavMap'),
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: '노선도',
-          ),
-          NavigationDestination(
-            key: Key('bottomNavRoute'),
-            icon: Icon(Icons.route_outlined),
-            selectedIcon: Icon(Icons.route),
-            label: '길찾기',
-          ),
-          NavigationDestination(
-            key: Key('bottomNavSaved'),
-            icon: Icon(Icons.star_border),
-            selectedIcon: Icon(Icons.star),
-            label: '즐겨찾기',
-          ),
-          NavigationDestination(
-            key: Key('bottomNavMore'),
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more),
-            label: '더보기',
-          ),
-        ],
-      ),
+      bottomNavigationBar: bottomNavigationBar,
     );
   }
 
