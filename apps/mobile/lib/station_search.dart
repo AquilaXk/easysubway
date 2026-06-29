@@ -947,7 +947,7 @@ String _dataConfidenceLabel(String dataConfidence) {
 String _fieldValidationLabel(String fieldValidationStatus) {
   final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
   return switch (normalizedStatus) {
-    'VERIFIED' => '최근 확인됨',
+    'VERIFIED' => '최근 확인했어요',
     'STALE' => '최근 확인한 내용은 다시 봐 주세요',
     'UNKNOWN' => '최근 확인한 기록이 없어요',
     _ => '최근 확인한 기록이 없어요',

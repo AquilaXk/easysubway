@@ -465,10 +465,10 @@ class FavoriteRoute {
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get scoreBasisText =>
-      '기준: $mobilityLabel, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+      '$mobilityLabel 조건 · $lineLabel · 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
 
   String get scoreBasisSemanticLabel =>
-      '기준 $mobilityLabel, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+      '$mobilityLabel 조건, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
 
   String get movementMetricLabel =>
       '예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요';
