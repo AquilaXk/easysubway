@@ -1213,6 +1213,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTabIndex = 0;
   late String _mobilityType;
+  String? _routeTabMobilityType;
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
@@ -1352,11 +1353,13 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    void openRouteTab() {
-      if (_selectedTabIndex == 2) {
+    void openRouteTab([String? mobilityType]) {
+      final nextMobilityType = mobilityType ?? initialMobilityType;
+      if (_selectedTabIndex == 2 && _routeTabMobilityType == nextMobilityType) {
         return;
       }
       setState(() {
+        _routeTabMobilityType = nextMobilityType;
         _selectedTabIndex = 2;
       });
     }
@@ -1590,13 +1593,28 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
 
+    Widget rootTab(Widget child) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop || _selectedTabIndex == 0) {
+            return;
+          }
+          openHomeTab();
+        },
+        child: child,
+      );
+    }
+
     if (_selectedTabIndex == 1) {
-      return NetworkMapScreen(
-        repository: networkMapRepository,
-        routeDraftController: _routeDraftController,
-        onOpenRouteSearch: openRouteSearch,
-        onOpenStationSearch: () => unawaited(openStationSearch()),
-        bottomNavigationBar: bottomNavigationBar,
+      return rootTab(
+        NetworkMapScreen(
+          repository: networkMapRepository,
+          routeDraftController: _routeDraftController,
+          onOpenRouteSearch: openRouteSearch,
+          onOpenStationSearch: () => unawaited(openStationSearch()),
+          bottomNavigationBar: bottomNavigationBar,
+        ),
       );
     }
 
@@ -1606,42 +1624,48 @@ class _HomeScreenState extends State<HomeScreen> {
         stationRepository: repository,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
-        initialMobilityType: initialMobilityType,
+        initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
         simpleViewEnabled: simpleViewEnabled,
         shellNavigationBar: bottomNavigationBar,
+        onShellBackToHome: openHomeTab,
       );
     }
 
     if (_selectedTabIndex == 3) {
-      return FavoriteHomeScreen(
-        favoriteRepository: favoriteRepository,
-        favoriteFacilityRepository: favoriteFacilityRepository,
-        favoriteRouteRepository: favoriteRouteRepository,
-        stationRepository: repository,
-        reportRepository: reportRepository,
-        locationProvider: locationProvider,
-        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-        internalRouteRepository: internalRouteRepository,
-        realtimeRepository: realtimeRepository,
-        routeDraftController: _routeDraftController,
-        initialMobilityType: initialMobilityType,
-        onOpenRouteSearch: ([mobilityType]) async => openRouteTab(),
-        bottomNavigationBar: bottomNavigationBar,
+      return rootTab(
+        FavoriteHomeScreen(
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: favoriteFacilityRepository,
+          favoriteRouteRepository: favoriteRouteRepository,
+          stationRepository: repository,
+          reportRepository: reportRepository,
+          locationProvider: locationProvider,
+          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+          internalRouteRepository: internalRouteRepository,
+          realtimeRepository: realtimeRepository,
+          routeDraftController: _routeDraftController,
+          initialMobilityType: initialMobilityType,
+          onOpenRouteSearch: ([mobilityType]) async =>
+              openRouteTab(mobilityType),
+          bottomNavigationBar: bottomNavigationBar,
+        ),
       );
     }
 
     if (_selectedTabIndex == 4) {
-      return AppSettingsScreen(
-        currentProfile: currentProfile,
-        viewPreferences: widget.viewPreferences,
-        notificationRepository: notificationRepository,
-        notificationPermissionProvider: notificationPermissionProvider,
-        onViewPreferencesChanged: widget.onViewPreferencesChanged,
-        onOpenMobilityProfile: _openMobilityProfile,
-        onOpenSupportAccess: openSupportAccess,
-        onOpenMyReports: openMyReports,
-        bottomNavigationBar: bottomNavigationBar,
+      return rootTab(
+        AppSettingsScreen(
+          currentProfile: currentProfile,
+          viewPreferences: widget.viewPreferences,
+          notificationRepository: notificationRepository,
+          notificationPermissionProvider: notificationPermissionProvider,
+          onViewPreferencesChanged: widget.onViewPreferencesChanged,
+          onOpenMobilityProfile: _openMobilityProfile,
+          onOpenSupportAccess: openSupportAccess,
+          onOpenMyReports: openMyReports,
+          bottomNavigationBar: bottomNavigationBar,
+        ),
       );
     }
 

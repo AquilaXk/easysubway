@@ -1252,6 +1252,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.simpleViewEnabled = true,
     this.initialDraft,
     this.shellNavigationBar,
+    this.onShellBackToHome,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -1262,6 +1263,7 @@ class RouteSearchScreen extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final RouteDraft? initialDraft;
   final Widget? shellNavigationBar;
+  final VoidCallback? onShellBackToHome;
   final String initialMobilityType;
   final bool simpleViewEnabled;
 
@@ -1344,7 +1346,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         },
       ),
     );
-    return Scaffold(
+    final scaffold = Scaffold(
       key: const Key('routeSearchScreen'),
       appBar: AppBar(title: const Text('길찾기')),
       bottomNavigationBar: widget.shellNavigationBar == null
@@ -1432,11 +1434,34 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                 state: _controller.state,
                 routeFeedbackRepository: widget.routeFeedbackRepository,
                 favoriteRouteRepository: widget.favoriteRouteRepository,
+                onShellBackToHome: widget.onShellBackToHome,
               ),
             ),
           ],
         ),
       ),
+    );
+    final onShellBackToHome = widget.onShellBackToHome;
+    if (onShellBackToHome == null) {
+      return scaffold;
+    }
+    return AnimatedBuilder(
+      animation: _controller,
+      child: scaffold,
+      builder: (context, child) {
+        if (_controller.state.status == RouteSearchViewStatus.success) {
+          return child!;
+        }
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) {
+              onShellBackToHome();
+            }
+          },
+          child: child!,
+        );
+      },
     );
   }
 
@@ -2524,11 +2549,13 @@ class _RouteSearchBody extends StatelessWidget {
     required this.state,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
+    required this.onShellBackToHome,
   });
 
   final RouteSearchState state;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final VoidCallback? onShellBackToHome;
 
   @override
   Widget build(BuildContext context) {
@@ -2551,6 +2578,7 @@ class _RouteSearchBody extends StatelessWidget {
         result: state.result!,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
+        onShellBackToHome: onShellBackToHome,
       ),
     };
   }
@@ -2636,11 +2664,13 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.result,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
+    required this.onShellBackToHome,
   });
 
   final RouteSearchResult result;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final VoidCallback? onShellBackToHome;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -2661,7 +2691,20 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
   Widget build(BuildContext context) {
     final result = widget.result;
     if (result.isBlocked) {
-      return _RouteBlockedWorkflow(result: result);
+      final content = _RouteBlockedWorkflow(result: result);
+      final onShellBackToHome = widget.onShellBackToHome;
+      if (onShellBackToHome == null) {
+        return content;
+      }
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            onShellBackToHome();
+          }
+        },
+        child: content,
+      );
     }
 
     final canUseRouteActions = _isRecommendedRoute(result);
@@ -2717,10 +2760,15 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         onBack: () => setState(() => _view = _RouteWorkflowView.detail),
       ),
     };
+    final onShellBackToHome = widget.onShellBackToHome;
     return PopScope(
-      canPop: _view == _RouteWorkflowView.list,
+      canPop: _view == _RouteWorkflowView.list && onShellBackToHome == null,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
+          return;
+        }
+        if (_view == _RouteWorkflowView.list) {
+          onShellBackToHome?.call();
           return;
         }
         setState(() {
