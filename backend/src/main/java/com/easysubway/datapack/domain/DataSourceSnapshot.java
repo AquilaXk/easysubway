@@ -100,6 +100,9 @@ public record DataSourceSnapshot(
 		if (!objectStorageScheme
 			|| uri.getRawAuthority() == null
 			|| uri.getRawAuthority().isBlank()
+			|| uri.getRawPath() == null
+			|| uri.getRawPath().isBlank()
+			|| "/".equals(uri.getRawPath())
 			|| uri.getRawQuery() != null
 			|| uri.getRawUserInfo() != null
 			|| uri.getRawFragment() != null) {

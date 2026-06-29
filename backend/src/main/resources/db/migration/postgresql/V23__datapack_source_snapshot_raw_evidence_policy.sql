@@ -12,6 +12,6 @@ ALTER TABLE data_source_snapshots
 	ADD CONSTRAINT chk_data_source_snapshots_credential_redacted
 		CHECK (credential_redacted = TRUE) NOT VALID,
 	ADD CONSTRAINT chk_data_source_snapshots_raw_object_uri
-		CHECK (((raw_object_uri LIKE 's3://_%' AND raw_object_uri NOT LIKE 's3:///%') OR (raw_object_uri LIKE 'oci://_%' AND raw_object_uri NOT LIKE 'oci:///%')) AND POSITION('?' IN raw_object_uri) = 0 AND POSITION('@' IN raw_object_uri) = 0 AND POSITION('#' IN raw_object_uri) = 0) NOT VALID,
+		CHECK (((raw_object_uri LIKE 's3://_%/_%' AND raw_object_uri NOT LIKE 's3:///%') OR (raw_object_uri LIKE 'oci://_%/_%' AND raw_object_uri NOT LIKE 'oci:///%')) AND POSITION('?' IN raw_object_uri) = 0 AND POSITION('@' IN raw_object_uri) = 0 AND POSITION('#' IN raw_object_uri) = 0) NOT VALID,
 	ADD CONSTRAINT chk_data_source_snapshots_raw_retention
 		CHECK (raw_retention_expires_at > retrieved_at) NOT VALID;
