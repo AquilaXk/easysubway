@@ -7097,7 +7097,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(feedbackDashboardService, /SummarizeRouteFeedbackPort/);
   assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort/);
   assert.match(repository, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
