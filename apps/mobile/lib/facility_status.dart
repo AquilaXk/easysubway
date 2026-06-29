@@ -40,10 +40,10 @@ const _cautionPresentation = FacilityStatusPresentation(
 
 const _needsInfoPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '한 번 더 확인',
-  statusTitle: '한 번 더 확인해 주세요',
+  severityLabel: '정보 부족',
+  statusTitle: '상태 정보가 부족해요',
   nextActionLabel: '시설 상세 보기',
-  nextActionDescription: '최근 확인한 안내를 보고 이동 전 현장 안내를 확인하세요.',
+  nextActionDescription: '시설 상세를 살펴보고 이동 전 현장 안내를 봐 주세요.',
   priority: 30,
 );
 
@@ -92,12 +92,12 @@ String buildFacilityAttentionSummary(Iterable<String> statuses) {
 String buildFacilityAttentionSemanticLabel(Iterable<String> statuses) {
   final counts = _attentionCounts(statuses);
   if (counts.isEmpty) {
-    return '다시 볼 시설 없음';
+    return '살펴볼 시설 없음';
   }
   final summary = counts.entries
       .map((entry) => '${entry.key.severityLabel} ${entry.value}개')
       .join(', ');
-  return '다시 볼 시설, $summary';
+  return '살펴볼 시설, $summary';
 }
 
 String facilityStatusDisplayLabel({

@@ -235,7 +235,7 @@ void main() {
     );
     expect(
       await burdenLabelFor('node-stale-from', 'node-stale-to'),
-      contains('최근 상태를 다시 확인해 주세요'),
+      contains('최신 상태를 준비 중이에요'),
     );
   });
 

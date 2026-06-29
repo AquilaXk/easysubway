@@ -3836,7 +3836,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                       key: const Key('favoriteHomeErrorState'),
                       icon: Icons.error_outline,
                       title: '즐겨찾기를 불러오지 못했어요',
-                      subtitle: '저장한 역, 시설, 경로를 다시 확인해 주세요.',
+                      subtitle: '잠시 후 다시 불러와 주세요.',
                       actionLabel: '다시 시도',
                       onAction: () {
                         setState(() {
@@ -4095,7 +4095,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
           icon: Icons.route_outlined,
           label: '경로',
           countLabel: _countLabel(routeCount),
-          subtitle: '이동 조건과 저장한 경로를 다시 확인해요',
+          subtitle: '이동 조건과 저장한 경로를 살펴봐요',
           onTap: onRoutes,
         ),
       ],
@@ -4251,7 +4251,7 @@ class OfflineDataScreen extends StatelessWidget {
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
                     subtitle: '앱 설치 때 함께 받은 안내',
-                    trailing: '다시 확인',
+                    trailing: '저장됨',
                   ),
                   _AppInfoRow(
                     icon: Icons.verified_outlined,
