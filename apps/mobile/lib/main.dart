@@ -1945,7 +1945,15 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                 setState(() {
                   _itemsFuture = next;
                 });
-                await next;
+                try {
+                  await next;
+                } catch (error, stackTrace) {
+                  reportMobileError(
+                    error,
+                    stackTrace,
+                    context: '알림함 새로고침 중 예외가 발생했습니다.',
+                  );
+                }
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1953,7 +1961,20 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
-                  if (items.isEmpty)
+                  if (snapshot.hasError)
+                    _HomeStateCard(
+                      key: const Key('notificationInboxErrorState'),
+                      icon: Icons.error_outline,
+                      title: '알림을 불러오지 못했어요',
+                      subtitle: '잠시 후 다시 시도해 주세요.',
+                      actionLabel: '다시 시도',
+                      onAction: () {
+                        setState(() {
+                          _itemsFuture = _loadItems();
+                        });
+                      },
+                    )
+                  else if (items.isEmpty)
                     const _AppCard(
                       child: _AppInfoRow(
                         icon: Icons.notifications_none,
@@ -1983,6 +2004,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
 
   Future<List<_NotificationInboxItem>> _loadItems() async {
     final items = <_NotificationInboxItem>[];
+    var loadFailed = false;
     final favoriteFacilityRepository = widget.favoriteFacilityRepository;
     if (favoriteFacilityRepository != null) {
       try {
@@ -1992,6 +2014,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
           items.add(_NotificationInboxItem.facility(facility));
         }
       } catch (error, stackTrace) {
+        loadFailed = true;
         reportMobileError(
           error,
           stackTrace,
@@ -2006,11 +2029,15 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
         items.add(_NotificationInboxItem.report(report));
       }
     } catch (error, stackTrace) {
+      loadFailed = true;
       reportMobileError(
         error,
         stackTrace,
         context: '알림함 제보 상태를 불러오는 중 예외가 발생했습니다.',
       );
+    }
+    if (items.isEmpty && loadFailed) {
+      throw StateError('notification inbox load failed');
     }
     return items;
   }
