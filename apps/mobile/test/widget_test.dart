@@ -4295,7 +4295,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 보안 문의와 취약점 접수 경로를 안내한다', (tester) async {
+  testWidgets('도움말은 보안과 개인정보 문의 경로를 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final launcher = RecordingSupportAccessLauncher();
     try {
@@ -4326,7 +4326,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('보안 문의 안내'), findsOneWidget);
-      expect(find.text('취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요.'), findsOneWidget);
+      expect(find.text('앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.'), findsOneWidget);
+      expect(find.textContaining('취약점'), findsNothing);
       expect(find.textContaining('계정 접근'), findsNothing);
       await tester.scrollUntilVisible(
         find.byKey(const Key('securityContactAccessItem')),
