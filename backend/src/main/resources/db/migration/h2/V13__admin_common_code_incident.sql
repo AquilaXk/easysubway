@@ -25,7 +25,7 @@ INSERT INTO admin_menu_items (hidden, display_order, display_name, parent_progra
 VALUES (FALSE, 87, '공통코드', NULL, 'a-codes'), (FALSE, 88, '장애관리', NULL, 'a-incidents');
 
 INSERT INTO admin_common_code_groups (group_code, display_name, description, sort_order, enabled, created_at, updated_at)
-VALUES ('REPORT_REJECTION_REASON', '신고 반려 사유', '제보 검수에서 반복 선택하는 반려 사유', 10, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('FACILITY_STATUS_REASON', '시설 변경 사유', '시설 상태 변경 사유', 20, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('BATCH_FAILURE_CATEGORY', '배치 실패 분류', '수집 배치 실패 원인 분류', 30, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_SEVERITY', '장애 심각도', '운영 incident 심각도', 40, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_STATUS', '장애 상태', '운영 incident 처리 상태', 50, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_SOURCE', '장애 출처', 'incident 발생 출처', 60, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP); -- NOSONAR
+VALUES ('REPORT_REJECTION_REASON', '신고 반려 사유', '제보 확인에서 반복 선택하는 반려 사유', 10, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('FACILITY_STATUS_REASON', '시설 변경 사유', '시설 상태 변경 사유', 20, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('BATCH_FAILURE_CATEGORY', '배치 실패 분류', '수집 배치 실패 원인 분류', 30, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_SEVERITY', '장애 심각도', '운영 incident 심각도', 40, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_STATUS', '장애 상태', '운영 incident 처리 상태', 50, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), ('INCIDENT_SOURCE', '장애 출처', 'incident 발생 출처', 60, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP); -- NOSONAR
 
 INSERT INTO admin_common_codes (group_code, code, display_name, description, sort_order, enabled, created_at, updated_at)
 SELECT code_groups.group_code, code_seed.code, code_seed.display_name, code_seed.description, code_seed.sort_order, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -34,9 +34,9 @@ FROM (
         (10, 'DUPLICATE', '중복 제보', '이미 처리 중인 동일 제보', 10),
         (10, 'INSUFFICIENT', '정보 부족', '역·시설·사진 정보 부족', 20),
         (20, 'INSPECTION', '정기 점검', '운영기관 정기 점검', 10),
-        (20, 'REPORT_CONFIRMED', '제보 확인', '제보 검수 후 상태 변경', 20),
+        (20, 'REPORT_CONFIRMED', '제보 확인', '제보 확인 후 상태 변경', 20),
         (30, 'SOURCE_TIMEOUT', '원천 응답 지연', '원천 데이터 응답 시간 초과', 10),
-        (30, 'VALIDATION_ERROR', '검증 실패', '수집 산출물 검증 실패', 20),
+        (30, 'VALIDATION_ERROR', '확인 실패', '수집 산출물 확인 실패', 20),
         (40, 'MAJOR', 'Major', '사용자 기능 영향', 10),
         (40, 'MINOR', 'Minor', '운영 확인 필요', 20),
         (50, 'OPEN', 'Open', '처리 전', 10),
