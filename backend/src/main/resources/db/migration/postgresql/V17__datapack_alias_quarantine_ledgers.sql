@@ -1,3 +1,6 @@
+ALTER TABLE data_source_snapshots
+	ADD CONSTRAINT uq_data_source_snapshots_snapshot_source UNIQUE (snapshot_id, source_id);
+
 CREATE TABLE IF NOT EXISTS external_alias_approvals (
 	id VARCHAR(120) NOT NULL PRIMARY KEY,
 	source_id VARCHAR(120) NOT NULL,
@@ -15,8 +18,8 @@ CREATE TABLE IF NOT EXISTS external_alias_approvals (
 	evidence_hash datapack_sha256 NOT NULL,
 	superseded_by VARCHAR(120),
 	created_at TIMESTAMP NOT NULL,
-	CONSTRAINT fk_external_alias_approvals_snapshot
-		FOREIGN KEY (source_snapshot_id) REFERENCES data_source_snapshots(snapshot_id)
+	CONSTRAINT fk_external_alias_approvals_snapshot_source
+		FOREIGN KEY (source_snapshot_id, source_id) REFERENCES data_source_snapshots(snapshot_id, source_id)
 		ON DELETE RESTRICT ON UPDATE RESTRICT,
 	CONSTRAINT fk_external_alias_approvals_superseded
 		FOREIGN KEY (superseded_by) REFERENCES external_alias_approvals(id)
@@ -46,8 +49,8 @@ CREATE TABLE IF NOT EXISTS source_quarantine_records (
 	resolved_by VARCHAR(120),
 	resolved_at TIMESTAMP,
 	created_at TIMESTAMP NOT NULL,
-	CONSTRAINT fk_source_quarantine_records_snapshot
-		FOREIGN KEY (source_snapshot_id) REFERENCES data_source_snapshots(snapshot_id)
+	CONSTRAINT fk_source_quarantine_records_snapshot_source
+		FOREIGN KEY (source_snapshot_id, source_id) REFERENCES data_source_snapshots(snapshot_id, source_id)
 		ON DELETE RESTRICT ON UPDATE RESTRICT,
 	CONSTRAINT chk_source_quarantine_records_resolution_state
 		CHECK (
