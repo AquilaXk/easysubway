@@ -46,7 +46,8 @@ class JdbcDataSourceSnapshotRepositoryTest {
 				credential_redacted BOOLEAN NOT NULL,
 				previous_snapshot_id VARCHAR(120),
 				diff_summary VARCHAR(1000),
-				freshness_expires_at TIMESTAMP NOT NULL
+				freshness_expires_at TIMESTAMP NOT NULL,
+				raw_retention_expires_at TIMESTAMP NOT NULL
 			)
 			""");
 		repository = new JdbcDataSourceSnapshotRepository(jdbcTemplate);
@@ -83,7 +84,46 @@ class JdbcDataSourceSnapshotRepositoryTest {
 		assertThat(repository.saveSnapshot(snapshot)).isEqualTo(snapshot);
 	}
 
+	@Test
+	@DisplayName("raw evidence는 credential redaction과 credential 없는 object URI가 필요하다")
+	void rawEvidenceRequiresRedactedCredentialAndObjectUri() {
+		assertThatThrownBy(() -> lockedSnapshot(
+			"snapshot-unredacted",
+			"a".repeat(64),
+			13,
+			"s3://easysubway-datapack-sources/kric-station-elevator/snapshot-unredacted.json",
+			false
+		))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("credentialRedacted");
+		assertThatThrownBy(() -> lockedSnapshot(
+			"snapshot-uri-secret",
+			"a".repeat(64),
+			13,
+			"s3://easysubway-datapack-sources/kric-station-elevator/snapshot-uri-secret.json?serviceKey=secret",
+			true
+		))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("rawObjectUri");
+	}
+
 	private DataSourceSnapshot lockedSnapshot(String snapshotId, String rawSha256, int rowCount) {
+		return lockedSnapshot(
+			snapshotId,
+			rawSha256,
+			rowCount,
+			"s3://easysubway-datapack-sources/kric-station-elevator/%s.json".formatted(snapshotId),
+			true
+		);
+	}
+
+	private DataSourceSnapshot lockedSnapshot(
+		String snapshotId,
+		String rawSha256,
+		int rowCount,
+		String rawObjectUri,
+		boolean credentialRedacted
+	) {
 		return new DataSourceSnapshot(
 			snapshotId,
 			"kric-station-elevator",
@@ -92,7 +132,7 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			LocalDateTime.of(2026, 6, 28, 0, 0, 0, 987654321),
 			rowCount,
 			rawSha256,
-			"s3://easysubway-datapack-sources/kric-station-elevator/%s.json".formatted(snapshotId),
+			rawObjectUri,
 			"c".repeat(64),
 			"d".repeat(64),
 			"LOCKED",
@@ -100,10 +140,11 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			"PASS",
 			"SUCCESS",
 			true,
-			true,
+			credentialRedacted,
 			null,
 			"initial snapshot",
-			LocalDateTime.of(2026, 7, 6, 3, 0, 0, 555555555)
+			LocalDateTime.of(2026, 7, 6, 3, 0, 0, 555555555),
+			LocalDateTime.of(2026, 9, 29, 3, 0, 0, 555555555)
 		);
 	}
 }

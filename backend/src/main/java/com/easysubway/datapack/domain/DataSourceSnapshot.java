@@ -23,7 +23,8 @@ public record DataSourceSnapshot(
 	boolean credentialRedacted,
 	String previousSnapshotId,
 	String diffSummary,
-	LocalDateTime freshnessExpiresAt
+	LocalDateTime freshnessExpiresAt,
+	LocalDateTime rawRetentionExpiresAt
 ) {
 
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
@@ -41,7 +42,7 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("rowCount must be zero or positive.");
 		}
 		rawSha256 = requireSha256(rawSha256, "rawSha256");
-		rawObjectUri = requireText(rawObjectUri, "rawObjectUri");
+		rawObjectUri = requireRawObjectUri(rawObjectUri);
 		redactedRequestFingerprint = requireSha256(redactedRequestFingerprint, "redactedRequestFingerprint");
 		schemaFingerprint = requireSha256(schemaFingerprint, "schemaFingerprint");
 		snapshotStatus = requireText(snapshotStatus, "snapshotStatus");
@@ -54,6 +55,16 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("freshnessExpiresAt is required.");
 		}
 		freshnessExpiresAt = normalizeTimestamp(freshnessExpiresAt);
+		if (!credentialRedacted) {
+			throw new InvalidDataSourceSnapshotException("credentialRedacted must be true before storing raw evidence.");
+		}
+		if (rawRetentionExpiresAt == null) {
+			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt is required.");
+		}
+		rawRetentionExpiresAt = normalizeTimestamp(rawRetentionExpiresAt);
+		if (!rawRetentionExpiresAt.isAfter(retrievedAt)) {
+			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt must be after retrievedAt.");
+		}
 	}
 
 	private static String requireText(String value, String field) {
@@ -67,6 +78,14 @@ public record DataSourceSnapshot(
 		String trimmed = requireText(value, field);
 		if (!SHA256.matcher(trimmed).matches()) {
 			throw new InvalidDataSourceSnapshotException(field + " must be a lowercase SHA-256 hex value.");
+		}
+		return trimmed;
+	}
+
+	private static String requireRawObjectUri(String value) {
+		String trimmed = requireText(value, "rawObjectUri");
+		if ((!trimmed.startsWith("s3://") && !trimmed.startsWith("oci://")) || trimmed.contains("?")) {
+			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
 		return trimmed;
 	}
