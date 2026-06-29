@@ -73,13 +73,23 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			.hasMessageContaining("LOCKED source snapshot");
 	}
 
+	@Test
+	@DisplayName("DB timestamp 정밀도보다 작은 nano 값이 있어도 같은 snapshot 재저장은 허용한다")
+	void sameSnapshotWithNanosecondTimestampIsIdempotent() {
+		var snapshot = lockedSnapshot("snapshot-1", "a".repeat(64), 13);
+
+		repository.saveSnapshot(snapshot);
+
+		assertThat(repository.saveSnapshot(snapshot)).isEqualTo(snapshot);
+	}
+
 	private DataSourceSnapshot lockedSnapshot(String snapshotId, String rawSha256, int rowCount) {
 		return new DataSourceSnapshot(
 			snapshotId,
 			"kric-station-elevator",
 			"국가철도공단",
-			LocalDateTime.of(2026, 6, 29, 3, 0),
-			LocalDateTime.of(2026, 6, 28, 0, 0),
+			LocalDateTime.of(2026, 6, 29, 3, 0, 0, 123456789),
+			LocalDateTime.of(2026, 6, 28, 0, 0, 0, 987654321),
 			rowCount,
 			rawSha256,
 			"s3://easysubway-datapack-sources/kric-station-elevator/%s.json".formatted(snapshotId),
@@ -93,7 +103,7 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			true,
 			null,
 			"initial snapshot",
-			LocalDateTime.of(2026, 7, 6, 3, 0)
+			LocalDateTime.of(2026, 7, 6, 3, 0, 0, 555555555)
 		);
 	}
 }

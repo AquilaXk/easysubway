@@ -1,6 +1,7 @@
 package com.easysubway.datapack.domain;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 
 public record DataSourceSnapshot(
@@ -34,6 +35,8 @@ public record DataSourceSnapshot(
 		if (retrievedAt == null) {
 			throw new InvalidDataSourceSnapshotException("retrievedAt is required.");
 		}
+		retrievedAt = normalizeTimestamp(retrievedAt);
+		sourceUpdatedAt = normalizeTimestamp(sourceUpdatedAt);
 		if (rowCount < 0) {
 			throw new InvalidDataSourceSnapshotException("rowCount must be zero or positive.");
 		}
@@ -50,6 +53,7 @@ public record DataSourceSnapshot(
 		if (freshnessExpiresAt == null) {
 			throw new InvalidDataSourceSnapshotException("freshnessExpiresAt is required.");
 		}
+		freshnessExpiresAt = normalizeTimestamp(freshnessExpiresAt);
 	}
 
 	private static String requireText(String value, String field) {
@@ -72,5 +76,12 @@ public record DataSourceSnapshot(
 			return null;
 		}
 		return value.trim();
+	}
+
+	private static LocalDateTime normalizeTimestamp(LocalDateTime value) {
+		if (value == null) {
+			return null;
+		}
+		return value.truncatedTo(ChronoUnit.MICROS);
 	}
 }
