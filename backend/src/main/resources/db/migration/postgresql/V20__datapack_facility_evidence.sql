@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS facility_evidence (
 	CONSTRAINT fk_facility_evidence_snapshot_source
 		FOREIGN KEY (source_snapshot_id, source_id) REFERENCES data_source_snapshots(snapshot_id, source_id)
 		ON DELETE RESTRICT ON UPDATE RESTRICT,
+	CONSTRAINT fk_facility_evidence_manual_override
+		FOREIGN KEY (manual_override_id) REFERENCES manual_overrides(id)
+		ON DELETE RESTRICT ON UPDATE RESTRICT,
 	CONSTRAINT chk_facility_evidence_type
 		CHECK (facility_type IN ('ELEVATOR', 'ESCALATOR', 'WHEELCHAIR_LIFT', 'DISABLED_TOILET')),
 	CONSTRAINT chk_facility_evidence_kind
