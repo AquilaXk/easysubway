@@ -158,7 +158,7 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
       'PREGNANT' => local.MobilityType.pregnant,
       'TEMPORARY_INJURY' => local.MobilityType.temporaryInjury,
       'LUGGAGE' => local.MobilityType.luggage,
-      _ => local.MobilityType.senior,
+      _ => throw const InternalRouteException('지원하지 않는 이동 조건입니다.'),
     };
   }
 }
@@ -221,7 +221,7 @@ class _InternalRouteSnapshot {
     final edgeTypeSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
       'edge_type',
-      "'WALK'",
+      "'UNKNOWN'",
     );
     final distanceMetersSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
@@ -246,17 +246,17 @@ class _InternalRouteSnapshot {
     final slopeLevelSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
       'slope_level',
-      '1',
+      '0',
     );
     final widthLevelSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
       'width_level',
-      '2',
+      '0',
     );
     final reliabilityScoreSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,
       'reliability_score',
-      '100',
+      '40',
     );
     final accessibilityStatusSql = _selectInternalRouteEdgeColumn(
       edgeColumnNames,

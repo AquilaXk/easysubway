@@ -123,7 +123,7 @@ class LocalRouteRepository implements RouteSearchRepository {
               lineName,
             ),
             reason: _stepReason(),
-            evidenceSources: const [],
+            evidenceSources: step.evidenceSources,
             timeSource: step.timeSource,
             distanceSource: step.distanceSource,
             confidenceLabel: step.confidenceLabel,
@@ -279,7 +279,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'PREGNANT' => local.MobilityType.pregnant,
       'TEMPORARY_INJURY' => local.MobilityType.temporaryInjury,
       'LUGGAGE' => local.MobilityType.luggage,
-      _ => local.MobilityType.senior,
+      _ => throw const RouteSearchException('지원하지 않는 이동 조건입니다.'),
     };
   }
 }
@@ -331,6 +331,11 @@ class _RouteCatalogSnapshot {
       'service_pattern',
       "''",
     );
+    final edgeTypeSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'edge_type',
+      "'UNKNOWN'",
+    );
     final includesStairsSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'includes_stairs',
@@ -348,7 +353,7 @@ class _RouteCatalogSnapshot {
     final reliabilityScoreSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'reliability_score',
-      '100',
+      '40',
     );
     final lastVerifiedAtSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
@@ -428,7 +433,8 @@ class _RouteCatalogSnapshot {
         ),
     };
     final networkEdgeRows = await database.customSelect('''
-          SELECT id, from_node_id, to_node_id, duration_seconds, edge_type,
+          SELECT id, from_node_id, to_node_id, duration_seconds,
+                 $edgeTypeSql AS edge_type,
                  $distanceMetersSql AS distance_meters,
                  $servicePatternSql AS service_pattern,
                  $includesStairsSql AS includes_stairs,

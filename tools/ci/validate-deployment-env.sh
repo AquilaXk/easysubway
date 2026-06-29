@@ -74,6 +74,30 @@ is_admin_basic_auth_enabled() {
   esac
 }
 
+is_truthy_env_value() {
+  local name="$1"
+  case "$(normalized_env_value "${name}")" in
+    true|on|yes|1)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
+is_false_env_value() {
+  local name="$1"
+  case "$(normalized_env_value "${name}")" in
+    false|off|no|0)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
 is_satisfied_by_runtime_fallback() {
   local name="$1"
   case "${name}" in
@@ -99,6 +123,21 @@ is_satisfied_by_runtime_fallback() {
       true
       ;;
     EASYSUBWAY_ADMIN_MASTER_DATA_VERSION)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_CUTOVER_ENFORCED)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK)
+      true
+      ;;
+    EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP)
       true
       ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER)
@@ -146,5 +185,27 @@ done < <(sed -nE 's/^([A-Z0-9_]+)=.*/\1/p' .env.example)
 if (( ${#missing_names[@]} > 0 )); then
   printf 'Missing required deployment env names:\n' >&2
   printf ' - %s\n' "${missing_names[@]}" >&2
+  exit 1
+fi
+
+cutover_invalid_names=()
+if is_truthy_env_value EASYSUBWAY_ADMIN_CUTOVER_ENFORCED; then
+  if ! is_truthy_env_value EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT; then
+    cutover_invalid_names+=(EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT)
+  fi
+  if ! is_truthy_env_value EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT; then
+    cutover_invalid_names+=(EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT)
+  fi
+  if ! is_false_env_value EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK; then
+    cutover_invalid_names+=(EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK)
+  fi
+  if ! is_false_env_value EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP; then
+    cutover_invalid_names+=(EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP)
+  fi
+fi
+
+if (( ${#cutover_invalid_names[@]} > 0 )); then
+  printf 'Invalid admin cutover env values:\n' >&2
+  printf ' - %s\n' "${cutover_invalid_names[@]}" >&2
   exit 1
 fi

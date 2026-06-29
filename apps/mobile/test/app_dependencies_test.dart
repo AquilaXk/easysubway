@@ -8,10 +8,21 @@ import 'package:easysubway_mobile/core/database/user/user_database.dart'
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
+import 'package:easysubway_mobile/main.dart' as app;
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('release build는 demo home data flag를 허용하지 않는다', () {
+    expect(
+      () => app.validateReleaseBuildFlags(
+        isReleaseMode: true,
+        demoHomeDataEnabled: true,
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('로컬 데이터베이스가 있으면 API 주소 없이도 경로 의존성이 동작한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();

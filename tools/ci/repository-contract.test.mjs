@@ -659,6 +659,11 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ADMIN_PASSWORD=secret",
     "EASYSUBWAY_ADMIN_REVISION=main-20260627",
     "EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=datapack-20260627",
+    "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
@@ -683,6 +688,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_CUTOVER_ENFORCED/);
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, [
@@ -759,6 +765,29 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
     /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/
   );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP/
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines.map((line) => {
+      if (line === "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=false") return "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=false") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=false";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=false";
+      return line;
+    }),
+    "",
+  ].join("\n"));
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, "EASYSUBWAY_POSTGRES_DB=easysubway\n");
   await assert.rejects(
@@ -868,6 +897,37 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
+test("release dart-define guard는 demo home data flag를 차단한다", async () => {
+  await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
+  ], { cwd: root });
+  await assert.rejects(
+    execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true",
+    ], { cwd: root }),
+    /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
+  );
+});
+
+test("mobile datapack asset audit는 fixture provenance와 최소 row를 검사한다", async () => {
+  const auditor = read("tools/ci/audit-mobile-datapack-assets.mjs");
+  assert.match(auditor, /artifactKind/);
+  assert.match(auditor, /fixture/);
+  assert.match(auditor, /sourceInventory/);
+  assert.match(auditor, /review-required/);
+  assert.match(auditor, /station_exits/);
+  assert.match(auditor, /facilities/);
+  assert.match(auditor, /data_quality_records/);
+  await execFileAsync(process.execPath, [
+    "tools/ci/audit-mobile-datapack-assets.mjs",
+    "--index",
+    "apps/mobile/assets/datapacks/index.json",
+    "--root",
+    "apps/mobile",
+  ], { cwd: root });
+});
+
 test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 backend image 검증을 생성한다", () => {
   assert.equal(
     existsSync(path.join(root, ".github/workflows/release-artifacts.yml")),
@@ -889,11 +949,14 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
   assert.match(workflow, /keytool -genkeypair/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
-  assert.match(workflow, /flutter build appbundle --release/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
+	  assert.match(workflow, /Android Release Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"[\s\S]*Android Release Artifact \/ Audit bundled datapacks/);
+	  assert.match(workflow, /node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile/);
+	  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
+	  assert.match(workflow, /flutter build appbundle --release/);
   assert.equal(
     (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
     0,
@@ -909,7 +972,8 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true/);
   assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
@@ -4690,9 +4754,18 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   for (const file of files) {
     const source = read(file);
     assert.match(source, /import org\.springframework\.context\.annotation\.Profile;/, `${file} must import Profile`);
-    assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
+    if (file.endsWith("InMemoryRouteSearchRepository.java")) {
+      assert.match(
+        source,
+        /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/,
+        `${file} must be disabled on prod-like profiles`,
+      );
+    } else {
+      assert.match(source, /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/, `${file} must be disabled on prod profile`);
+    }
   }
-  assert.match(readinessConfiguration, /@Profile\("prod"\)/);
+  assert.match(applicationYml, /group:\s*\n\s*staging:\s*prod\s*\n\s*release:\s*prod\s*\n\s*prod-like:\s*prod/);
+  assert.match(readinessConfiguration, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(readinessConfiguration, /HealthIndicator/);
   assert.match(readinessConfiguration, /Status\.DOWN/);
   assert.match(readinessConfiguration, /productionReadinessHealthIndicator/);
@@ -4700,7 +4773,7 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   assert.doesNotMatch(readinessConfiguration, /BeanCreationException/);
   assert.doesNotMatch(readinessConfiguration, /운영 영속 저장소 구현이 필요합니다\./);
   assert.doesNotMatch(unavailableTransitMaster, /@Repository/);
-  assert.doesNotMatch(unavailableTransitMaster, /@Profile\("prod"\)/);
+  assert.doesNotMatch(unavailableTransitMaster, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(unavailableTransitMaster, /implements[\s\S]*LoadTransitMasterPort/);
   assert.match(
     unavailableTransitMaster,
@@ -4731,7 +4804,7 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   );
   assert.match(unavailableTransitMaster, /saveRouteNode[\s\S]*unsupportedWriteOperation\("saveRouteNode"\)/);
   assert.match(unavailableTransitMaster, /saveRouteEdge[\s\S]*unsupportedWriteOperation\("saveRouteEdge"\)/);
-  assert.match(jdbcTransitMasterOverride, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcTransitMasterOverride, /@Repository\s+@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcTransitMasterOverride, /extends UnavailableTransitMasterRepository/);
   assert.match(jdbcTransitMasterOverride, /implements[\s\S]*RollbackTransitMasterOverridePort/);
   assert.match(jdbcTransitMasterOverride, /transit_master_overrides/);
@@ -5528,7 +5601,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(repository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort/);
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
   assert.match(repository, /PageResult<FacilityReportSummary> loadReportSummaries/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort/);
   assert.match(jdbcRepository, /Optional<FacilityReport> loadReport\(String reportId\)/);
   assert.match(jdbcRepository, /List<FacilityReport> loadReports\(\)/);
@@ -5806,7 +5879,7 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(reportController, /facilityReportUseCase\.getReportByReceiptToken\(reportId, receiptToken\)/);
   assert.match(reportController, /facilityReportUseCase\.getUserReport\(reportId, principal\.getName\(\)\)/);
   assert.match(reportController, /facilityReportUseCase\.confirmReportResultByReceiptToken\(reportId, receiptToken\)/);
-  assert.match(reportController, /environment\.getActiveProfiles\(\)[\s\S]*contains\("prod"\)/);
+  assert.match(reportController, /activeProfiles\.contains\("prod"\)[\s\S]*activeProfiles\.contains\("staging"\)[\s\S]*activeProfiles\.contains\("release"\)[\s\S]*activeProfiles\.contains\("prod-like"\)/);
   assert.match(reportController, /"content-type", request\.normalizedPhotoContentType\(\)/);
   assert.match(reportController, /@RequestHeader\(name = "Content-Type", required = false\) String contentType/);
   assert.match(reportController, /uploadIntents\.requireUpload\(\s*uploadId,\s*contentType,/);
@@ -5824,11 +5897,11 @@ test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준
   assert.match(uploadIntents, /void discardPendingObjectKey\(\s*String clientSubmissionId,\s*String objectKey,\s*String contentType,\s*String sha256,\s*Long sizeBytes,\s*Consumer<String> deleteObject/);
   assert.match(uploadIntents, /isValidSignedObjectKey\(clientSubmissionId, normalizedObjectKey, contentType, sha256, sizeBytes\)/);
   assert.match(uploadIntents, /clientSubmissionId\.length\(\) <= 120 && clientSubmissionId\.matches\("\[A-Za-z0-9_-\]\+"\)/);
-  assert.match(uploadUrlSigner, /@Profile\("prod"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
+  assert.match(uploadUrlSigner, /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*ObjectStorageFacilityReportUploadUrlSigner/);
   assert.match(uploadUrlSigner, /AWS4-HMAC-SHA256/);
   assert.match(uploadUrlSigner, /X-Amz-Credential/);
   assert.match(uploadUrlSigner, /X-Amz-SignedHeaders/);
-  assert.match(objectStorage, /@Profile\("prod"\)/);
+  assert.match(objectStorage, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(objectStorage, /implements[\s\S]*StoreFacilityReportPhotoPort,[\s\S]*LoadFacilityReportPhotoPort,[\s\S]*DeleteFacilityReportPhotoPort,[\s\S]*StoreFacilityReportUploadedPhotoPort/);
   assert.match(objectStorage, /HttpRequest signedRequest\(String method, String objectKey, String contentType, byte\[] body\)/);
   assert.match(applicationProd, /receipt-token-pepper: \$\{EASYSUBWAY_REPORT_RECEIPT_PEPPER:\$\{EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER:\}\}/);
@@ -5916,7 +5989,7 @@ test("백엔드 이동 프로필은 헥사고날 API 경계를 따른다", () =>
   assert.match(service, /defaultProfile/);
   assert.match(service, /MobilityType\.WHEELCHAIR/);
   assert.match(repository, /implements[\s\S]*LoadMobilityProfilePort[\s\S]*SaveMobilityProfilePort/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadMobilityProfilePort[\s\S]*SaveMobilityProfilePort[\s\S]*DeleteUserMobilityProfilePort/);
   assert.match(jdbcRepository, /Optional<MobilityProfile> loadProfile\(String userId\)/);
   assert.match(jdbcRepository, /MobilityProfile saveProfile\(MobilityProfile profile\)/);
@@ -5974,7 +6047,7 @@ test("백엔드 즐겨찾기 역은 헥사고날 API 경계를 따른다", () =>
   assert.match(service, /StationNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteStationPort[\s\S]*LoadFavoriteStationAlertTargetPort[\s\S]*SaveFavoriteStationPort[\s\S]*DeleteFavoriteStationPort/);
   assert.match(repository, /loadUserIdsByFavoriteStationId/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadFavoriteStationPort[\s\S]*LoadFavoriteStationAlertTargetPort[\s\S]*SaveFavoriteStationPort[\s\S]*DeleteFavoriteStationPort[\s\S]*DeleteUserFavoriteStationPort/);
   assert.match(jdbcRepository, /List<FavoriteStation> loadFavoriteStations\(String userId\)/);
   assert.match(jdbcRepository, /Optional<FavoriteStation> loadFavoriteStation\(String userId, String stationId\)/);
@@ -6041,7 +6114,7 @@ test("백엔드 즐겨찾기 시설은 시설 마스터 기반 헥사고날 API 
   assert.match(service, /FavoriteFacilityNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*LoadFavoriteFacilityAlertTargetPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort/);
   assert.match(repository, /loadUserIdsByFavoriteFacilityId/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadFavoriteFacilityPort[\s\S]*LoadFavoriteFacilityAlertTargetPort[\s\S]*SaveFavoriteFacilityPort[\s\S]*DeleteFavoriteFacilityPort[\s\S]*DeleteUserFavoriteFacilityPort/);
   assert.match(jdbcRepository, /List<FavoriteFacility> loadFavoriteFacilities\(String userId\)/);
   assert.match(jdbcRepository, /Optional<FavoriteFacility> loadFavoriteFacility\(String userId, String facilityId\)/);
@@ -6102,7 +6175,7 @@ test("백엔드 즐겨찾기 경로는 경로 검색 결과 기반 헥사고날 
   assert.match(service, /RouteSearchNotFoundException/);
   assert.match(repository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*LoadFavoriteRouteAlertTargetPort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort/);
   assert.match(repository, /loadUserIdsByRouteStationId/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadFavoriteRoutePort[\s\S]*LoadFavoriteRouteAlertTargetPort[\s\S]*SaveFavoriteRoutePort[\s\S]*DeleteFavoriteRoutePort[\s\S]*DeleteUserFavoriteRoutePort/);
   assert.match(jdbcRepository, /List<FavoriteRoute> loadFavoriteRoutes\(String userId\)/);
   assert.match(jdbcRepository, /Optional<FavoriteRoute> loadFavoriteRoute\(String userId, String routeSearchId\)/);
@@ -6162,7 +6235,7 @@ test("백엔드 알림 설정은 인증 사용자 기준 헥사고날 API 경계
   assert.match(saveSettingsPort, /interface SaveNotificationSettingsPort/);
   assert.match(service, /implements NotificationPreferenceUseCase/);
   assert.match(repository, /implements[\s\S]*LoadNotificationPreferencePort[\s\S]*SaveRegisteredDevicePort[\s\S]*SaveNotificationSettingsPort/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadNotificationPreferencePort[\s\S]*SaveRegisteredDevicePort[\s\S]*SaveNotificationSettingsPort[\s\S]*DeleteUserNotificationPreferencePort/);
   assert.match(jdbcRepository, /Optional<NotificationSettings> loadNotificationSettings\(String userId\)/);
   assert.match(jdbcRepository, /List<RegisteredDevice> loadDevices\(String userId\)/);
@@ -6270,7 +6343,7 @@ test("백엔드 푸시 알림 outbox는 관리자 API와 헥사고날 경계를 
   assert.match(dashboardService, /implements PushNotificationDashboardUseCase/);
   assert.match(dashboardService, /SummarizePushNotificationOutboxPort/);
   assert.match(repository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*SummarizePushNotificationOutboxPort/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadPushNotificationOutboxPort[\s\S]*SavePushNotificationOutboxPort[\s\S]*SummarizePushNotificationOutboxPort[\s\S]*DeleteUserPushNotificationPort/);
   assert.match(jdbcRepository, /List<PushNotification> loadPushNotifications\(String userId\)/);
   assert.match(jdbcRepository, /PushNotification savePushNotification\(PushNotification notification\)/);
@@ -6555,10 +6628,10 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(sourceAdapter, /\.sorted\(\)/);
   assert.match(sourceAdapter, /MessageDigest\.getInstance\("SHA-256"\)/);
   assert.match(repository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
-  assert.match(repository, /@Profile\("!prod"\)/);
+  assert.match(repository, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
   assert.match(repository, /loadRun\(String runId\)/);
   assert.match(repository, /loadLatestCompletedRun\(DataCollectionSource source\)/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
@@ -6694,9 +6767,9 @@ test("현장 검증 기준선은 세션과 항목을 관리자 API로 추적한�
   assert.match(useCase, /List<FieldVerificationChangeHistory> listStationChangeHistory\(String stationId\)/);
   assert.match(historyRepositoryPort, /void save\(FieldVerificationChangeHistory history\)/);
   assert.match(historyRepositoryPort, /List<FieldVerificationChangeHistory> listByStationId\(String stationId\)/);
-  assert.match(inMemoryHistoryRepository, /@Repository\s+@Profile\("!prod"\)/);
+  assert.match(inMemoryHistoryRepository, /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/);
   assert.match(inMemoryHistoryRepository, /implements FieldVerificationChangeHistoryRepository/);
-  assert.match(jdbcHistoryRepository, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcHistoryRepository, /@Repository\s+@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcHistoryRepository, /JdbcTemplate/);
   assert.match(jdbcHistoryRepository, /INSERT INTO field_verification_change_history/);
   assert.match(jdbcHistoryRepository, /ORDER BY changed_at DESC, history_id ASC/);
@@ -6746,10 +6819,10 @@ test("현장 검증 세션 저장소는 운영/비운영 저장소 경계를 분
   assert.match(sessionRepositoryPort, /List<FieldVerificationSession> listAll\(\)/);
   assert.match(sessionRepositoryPort, /Optional<FieldVerificationSession> findByStationId\(String stationId\)/);
   assert.match(sessionRepositoryPort, /void save\(FieldVerificationSession session\)/);
-  assert.match(inMemorySessionRepository, /@Repository\s+@Profile\("!prod"\)/);
+  assert.match(inMemorySessionRepository, /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/);
   assert.match(inMemorySessionRepository, /implements FieldVerificationSessionRepository/);
   assert.match(inMemorySessionRepository, /LinkedHashMap/);
-  assert.match(jdbcSessionRepository, /@Repository\s+@Profile\("prod"\)/);
+  assert.match(jdbcSessionRepository, /@Repository\s+@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcSessionRepository, /ROW_NUMBER\(\) OVER/);
   assert.match(jdbcSessionRepository, /PARTITION BY station_id/);
   assert.match(jdbcSessionRepository, /INSERT INTO field_verification_sessions/);
@@ -6928,7 +7001,7 @@ test("사용자 활동 JDBC 저장소는 운영 프로필에서 활동 지표를
   assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_api_traffic_events_occurred[\s\S]*ON api_traffic_events \(occurred_at DESC, status_code ASC\)/);
   assert.match(schema, /chk_api_traffic_events_status_code[\s\S]*CHECK \(status_code BETWEEN 100 AND 599\)/);
   assert.match(schema, /chk_api_traffic_events_duration[\s\S]*CHECK \(duration_millis >= 0\)/);
-  assert.match(repository, /@Profile\("prod"\)/);
+  assert.match(repository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(repository, /implements[\s\S]*RecordUserActivityPort[\s\S]*RecordApiTrafficPort[\s\S]*SummarizeUserActivityPort/);
   assert.match(repository, /USER_ID_MAX_LENGTH = 120/);
   assert.match(repository, /사용자 활동 식별자는 120자 이하여야 합니다\./);
@@ -6960,7 +7033,7 @@ test("신고 검수 감사 로그 JDBC 저장소는 운영 프로필에서 검�
     schema,
     /CREATE INDEX IF NOT EXISTS idx_facility_report_review_audits_report[\s\S]*ON facility_report_review_audits \(report_id, created_at ASC, audit_id ASC\)/,
   );
-  assert.match(repository, /@Profile\("prod"\)/);
+  assert.match(repository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(repository, /implements[\s\S]*LoadFacilityReportReviewAuditPort[\s\S]*SaveFacilityReportReviewAuditPort/);
   assert.match(repository, /INSERT INTO facility_report_review_audits/);
   assert.match(repository, /WHERE report_id = \?/);
@@ -7101,8 +7174,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(feedbackDashboardService, /implements RouteFeedbackDashboardUseCase/);
   assert.match(feedbackDashboardService, /SummarizeRouteFeedbackPort/);
   assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort/);
-  assert.match(repository, /@Profile\("!prod"\)/);
-  assert.match(jdbcRepository, /@Profile\("prod"\)/);
+  assert.match(repository, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
+  assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /INSERT INTO route_search_results/);
@@ -8584,7 +8657,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(adminIdentityUserDetailsService, /fallbackUserDetailsService/);
   assert.match(adminIdentityUserDetailsService, /credentialsExpired/);
   assert.match(adminIdentityUserDetailsService, /AdminAuthorization\.authoritiesFor/);
-  assert.match(jdbcAdminIdentityRepository, /@Profile\("prod"\)/);
+  assert.match(jdbcAdminIdentityRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcAdminIdentityRepository, /INSERT INTO admin_users/);
   assert.match(jdbcAdminIdentityRepository, /INSERT INTO admin_login_audits/);
   const abuseControlGate = items.get("backend_report_abuse_control_release_gate");

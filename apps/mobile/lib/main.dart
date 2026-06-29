@@ -38,6 +38,10 @@ const defaultDemoHomeDataEnabled = bool.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  validateReleaseBuildFlags(
+    isReleaseMode: kReleaseMode,
+    demoHomeDataEnabled: defaultDemoHomeDataEnabled,
+  );
   final bootstrap = await AppBootstrap.initialize(
     enablePushNotifications: defaultPushNotificationsEnabled,
     favoriteRepository: defaultDemoHomeDataEnabled
@@ -67,6 +71,15 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+void validateReleaseBuildFlags({
+  required bool isReleaseMode,
+  required bool demoHomeDataEnabled,
+}) {
+  if (isReleaseMode && demoHomeDataEnabled) {
+    throw StateError('EASYSUBWAY_DEMO_HOME_DATA is not allowed in release.');
+  }
 }
 
 class _DemoFavoriteStationRepository implements FavoriteStationRepository {

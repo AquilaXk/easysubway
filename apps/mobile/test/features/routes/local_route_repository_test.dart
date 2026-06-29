@@ -115,7 +115,7 @@ void main() {
       result.steps.map((step) => step.stepType),
       containsAll(['entry', 'exit']),
     );
-    expect(result.steps.expand((step) => step.evidenceSources), isEmpty);
+    expect(result.steps.expand((step) => step.evidenceSources), isNotEmpty);
   });
 
   test('기존 baseline access edge 값은 보강 과정에서 덮어쓰지 않는다', () async {
@@ -198,7 +198,7 @@ void main() {
     expect(rideStep.actionTitle, '열차 이동');
     expect(rideStep.actionDetail, contains('출발역에서 중간역까지'));
     expect(rideStep.reason, '선택한 경로 기준으로 안내합니다.');
-    expect(rideStep.evidenceSources, isEmpty);
+    expect(rideStep.evidenceSources, contains('edge:edge-a-b-local'));
     expect(rideStep.timeSource, 'STATIC_ESTIMATE');
     expect(rideStep.distanceSource, 'MEASURED');
     expect(rideStep.confidenceLabel, '높은 신뢰도');
