@@ -4274,7 +4274,7 @@ class OfflineDataScreen extends StatelessWidget {
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
             ),
-            _AppSectionTitle(title: '저장된 데이터 상태'),
+            _AppSectionTitle(title: '저장된 안내 상태'),
             _AppCard(
               child: Column(
                 children: [

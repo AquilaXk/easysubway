@@ -3606,7 +3606,7 @@ void main() {
     await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('저장된 데이터 상태'), findsOneWidget);
+    expect(find.text('저장된 안내 상태'), findsOneWidget);
     expect(find.text('지역'), findsOneWidget);
     expect(find.text('수도권 역과 노선'), findsOneWidget);
     expect(find.text('마지막 갱신'), findsOneWidget);
