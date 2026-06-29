@@ -898,6 +898,36 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(main, /homeRecentRouteEmptyState/);
 });
 
+test("모바일 역 검색 결과 큰 글자 문구 회귀 테스트는 유지된다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const resultTileMatch = stationSearch.match(
+    /class _StationSearchResultTile[\s\S]*?class _StationRoleActionBar/,
+  );
+  const largeTextTestMatch = widgetTest.match(
+    /testWidgets\('역 검색 결과 핵심 문구는 큰 글자에서 한 줄 말줄임으로 고정하지 않는다'[\s\S]*?\n  testWidgets\('/,
+  );
+
+  assert.ok(resultTileMatch, "_StationSearchResultTile block not found");
+  const resultTile = resultTileMatch[0];
+  assert.match(resultTile, /StationLineBadges\([\s\S]*maxBadgeCount:\s*2/);
+  assert.match(
+    resultTile,
+    /Text\(\s*stationName[\s\S]*Text\(\s*result\.distanceLabel\.isEmpty[\s\S]*Text\(\s*result\.dataQualityLabel/,
+  );
+  assert.doesNotMatch(resultTile, /maxLines:\s*1/);
+  assert.doesNotMatch(resultTile, /overflow:\s*TextOverflow\.ellipsis/);
+  assert.ok(largeTextTestMatch, "station search large text widget test block not found");
+  const largeTextTest = largeTextTestMatch[0];
+  assert.match(largeTextTest, /TextScaler\.linear\(2\.0\)/);
+  assert.match(largeTextTest, /김포공항국제선환승센터/);
+  assert.match(largeTextTest, /수도권 9호선 급행/);
+  assert.match(largeTextTest, /공항철도 직통 일반 공용/);
+  assert.match(largeTextTest, /일부 정보는 확인 중이에요/);
+  assert.match(largeTextTest, /expect\(widget\.maxLines, isNot\(1\)\)/);
+  assert.match(largeTextTest, /expect\(widget\.overflow, isNot\(TextOverflow\.ellipsis\)\)/);
+});
+
 test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지된다", () => {
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
