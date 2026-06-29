@@ -5280,7 +5280,7 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
     stations: 2,
     station_lines: 2,
     network_edges: 6,
-    facilities: 3,
+    facilities: 6,
   });
 
   const packOutputDir = path.join(outputDir, "pack");
@@ -5364,6 +5364,38 @@ test("수도권 pilot production source input은 production manifest v2 pack으�
       { cwd: root },
     ),
     /selected production source has no row provenance: kric-station-elevator/,
+  );
+
+  const missingWheelchairLiftEvidenceInputPath = path.join(
+    outputDir,
+    "capital-pilot-production-missing-wheelchair-lift-evidence.json",
+  );
+  await writeFile(
+    missingWheelchairLiftEvidenceInputPath,
+    `${JSON.stringify(
+      {
+        ...input,
+        facilityRows: input.facilityRows.filter((row) => row.id !== "facility-sadang-wheelchair-lift-kric-1"),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        missingWheelchairLiftEvidenceInputPath,
+        "--output",
+        path.join(outputDir, "missing-wheelchair-lift-evidence.json"),
+      ],
+      { cwd: root },
+    ),
+    /production facility evidence missing: station-sadang:WHEELCHAIR_LIFT/,
   );
 
   await execFileAsync(
@@ -6788,6 +6820,8 @@ function productionSourceIngestInput() {
     scopeId: "capital_pilot_android_v1",
     includedRegionIds: ["capital"],
     includedOperatorIds: ["seoul-metro"],
+    facilityCoverageDenominator: "includedStationIds x requiredFacilityTypes",
+    requiredFacilityTypes: ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"],
   };
   input.stationMappings.unshift(
     {
@@ -6826,20 +6860,54 @@ function productionSourceIngestInput() {
     (row) => row.sourceId !== "seoul-realtime-arrival-station-info",
   );
   input.facilityRows = [
-    ["kric-station-elevator", "facility-sangnoksu-elevator-kric-1", "ELEVATOR", "상록수 엘리베이터 설치 정보"],
-    ["kric-station-escalator", "facility-sangnoksu-escalator-kric-1", "ESCALATOR", "상록수 에스컬레이터 설치 정보"],
+    [
+      "kric-station-elevator",
+      "facility-sangnoksu-elevator-kric-1",
+      "ELEVATOR",
+      "상록수 엘리베이터 설치 정보",
+      "MOLIT-SEOUL-4-448",
+    ],
+    [
+      "kric-station-escalator",
+      "facility-sangnoksu-escalator-kric-1",
+      "ESCALATOR",
+      "상록수 에스컬레이터 설치 정보",
+      "MOLIT-SEOUL-4-448",
+    ],
     [
       "kric-wheelchair-lift-location",
       "facility-sangnoksu-wheelchair-lift-kric-1",
       "WHEELCHAIR_LIFT",
       "상록수 휠체어리프트 설치 정보",
+      "MOLIT-SEOUL-4-448",
     ],
-  ].map(([sourceId, id, type, name], index) => ({
+    [
+      "kric-station-elevator",
+      "facility-sadang-elevator-kric-1",
+      "ELEVATOR",
+      "사당 엘리베이터 설치 정보",
+      "MOLIT-SEOUL-4-433",
+    ],
+    [
+      "kric-station-escalator",
+      "facility-sadang-escalator-kric-1",
+      "ESCALATOR",
+      "사당 에스컬레이터 설치 정보",
+      "MOLIT-SEOUL-4-433",
+    ],
+    [
+      "kric-wheelchair-lift-location",
+      "facility-sadang-wheelchair-lift-kric-1",
+      "WHEELCHAIR_LIFT",
+      "사당 휠체어리프트 설치 정보",
+      "MOLIT-SEOUL-4-433",
+    ],
+  ].map(([sourceId, id, type, name, sourceStationCode], index) => ({
     sourceId,
     id,
     station: {
       sourceId: "molit-urban-rail-full-route",
-      sourceStationCode: "MOLIT-SEOUL-4-448",
+      sourceStationCode,
       lineId: "seoul-4",
     },
     type,
@@ -6889,7 +6957,7 @@ function productionSourceIngestInput() {
     stations: 2,
     stationLines: 2,
     routeEdges: 6,
-    facilities: 3,
+    facilities: 6,
   };
   input.routeEdges.push(
     productionSourceAccessRouteEdge({

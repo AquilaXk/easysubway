@@ -36,6 +36,7 @@ function buildFixture(inventory, input) {
   const movementCandidates = movementPathCandidates(input.movementPathCandidates ?? [], allowedSourceIds, mappingBySourceKey);
   const routeMapPositions = routeMapPositionRows(input.routeMapPositions ?? [], allowedSourceIds, mappingBySourceKey);
   validateSelectedSourceRows(input, sourceIds);
+  validateSupportedFacilityCoverage(input, stationRows, facilities);
   const requiresRouteMapPositions = sourceDomainEnabled(selectedSources, "route_map_positions");
   if (requiresRouteMapPositions && routeMapPositions.length === 0) {
     throw new Error("routeMapPositions must include at least one row when route_map_positions source coverage is selected");
@@ -213,6 +214,28 @@ function validateSelectedSourceRows(input, sourceIds) {
   for (const sourceId of sourceIds) {
     if ((counts.get(sourceId) ?? 0) === 0) {
       throw new Error(`selected production source has no row provenance: ${sourceId}`);
+    }
+  }
+}
+
+function validateSupportedFacilityCoverage(input, stationRows, facilities) {
+  if ((input.pack.artifactKind ?? "fixture") !== "production") {
+    return;
+  }
+  const requiredFacilityTypes = input.supportedV1Scope?.requiredFacilityTypes;
+  if (!Array.isArray(requiredFacilityTypes) || requiredFacilityTypes.length === 0) {
+    throw new Error("supportedV1Scope.requiredFacilityTypes must be a non-empty array for production pack");
+  }
+  const stationIds = new Set(stationRows.map(({ mapping }) => mapping.stationId));
+  const facilityKeys = new Set(
+    facilities.map((facility) => `${facility.stationId}:${requiredString(facility.type, "facilities.type")}`),
+  );
+  for (const stationId of [...stationIds].sort()) {
+    for (const facilityType of requiredStringArray(requiredFacilityTypes, "supportedV1Scope.requiredFacilityTypes")) {
+      const key = `${stationId}:${facilityType}`;
+      if (!facilityKeys.has(key)) {
+        throw new Error(`production facility evidence missing: ${key}`);
+      }
     }
   }
 }
