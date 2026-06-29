@@ -8410,6 +8410,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V22__datapack_admin_permissions.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
@@ -8417,6 +8418,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
+    read("backend/src/main/resources/db/migration/h2/V22__datapack_admin_permissions.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -8624,8 +8626,21 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.privacy-log.read",
     "admin.batch.retry",
     "admin.operations.manage",
+    "admin.datapack.read",
+    "admin.datapack.source.run",
+    "admin.datapack.alias.review",
+    "admin.datapack.quarantine.review",
+    "admin.datapack.evidence.review",
+    "admin.datapack.override.request",
+    "admin.datapack.override.approve",
+    "admin.datapack.candidate.build",
+    "admin.datapack.staging.promote",
+    "admin.datapack.production.approve",
+    "admin.datapack.rollback",
+    "admin.datapack.audit.read",
   ]);
   for (const adminRbacSchema of [adminRbacPostgresSchema, adminRbacH2Schema]) {
+    const compactAdminRbacSchema = adminRbacSchema.replace(/\s+/g, "");
     assert.match(adminRbacSchema, /CREATE TABLE admin_role_permissions/);
     assert.match(adminRbacSchema, /CREATE TABLE admin_user_roles/);
     assert.match(adminRbacSchema, /CREATE TABLE admin_menu_items/);
@@ -8639,8 +8654,8 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     assert.match(adminRbacSchema, /REPORT_REJECTION_REASON/);
     assert.match(adminRbacSchema, /BATCH_FAILURE_CATEGORY/);
     assert.match(adminRbacSchema, /INCIDENT_STATUS/);
-    assert.ok(adminRbacSchema.includes(adminRbacRoleConstraint));
-    assert.ok(adminRbacSchema.includes(adminRbacPermissionConstraint));
+    assert.ok(compactAdminRbacSchema.includes(adminRbacRoleConstraint.replace(/\s+/g, "")));
+    assert.ok(compactAdminRbacSchema.includes(adminRbacPermissionConstraint.replace(/\s+/g, "")));
     assert.match(adminRbacSchema, /login_id = LOWER\(TRIM\(login_id\)\)/);
     assert.match(adminRbacSchema, /FOREIGN KEY \(parent_program_code\) REFERENCES admin_menu_items\(program_code\)/);
     assert.doesNotMatch(adminRbacSchema, /\b(url|handler|controller|method)_/i);
