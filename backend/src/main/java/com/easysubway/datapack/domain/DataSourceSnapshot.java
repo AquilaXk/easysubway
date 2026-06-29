@@ -103,6 +103,7 @@ public record DataSourceSnapshot(
 			|| uri.getRawPath() == null
 			|| uri.getRawPath().isBlank()
 			|| "/".equals(uri.getRawPath())
+			|| trimmed.contains("@")
 			|| uri.getRawQuery() != null
 			|| uri.getRawUserInfo() != null
 			|| uri.getRawFragment() != null) {
