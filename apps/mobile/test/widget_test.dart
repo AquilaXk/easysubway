@@ -3530,6 +3530,70 @@ void main() {
       find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
     );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsNothing);
+  });
+
+  testWidgets('설정 화면 보기 옵션 마지막 queued 저장 실패는 마지막 변경만 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('latest save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+
+    firstSave.complete();
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.completeError(StateError('latest save failed'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
@@ -3571,7 +3635,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
-    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
 
     firstSave.complete();
     await tester.pump();
@@ -3580,6 +3644,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(onboardingStore.savedResult?.profile.id, 'wheelchair');
+    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,

@@ -572,6 +572,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
   bool _savingOnboardingResult = false;
   OnboardingResult? _pendingOnboardingResult;
+  Completer<void>? _pendingOnboardingSaveCompleter;
   UserDataDeletionResult? _dataDeletionResult;
   UserDataDeletionScope _dataDeletionScope = UserDataDeletionScope.deviceOnly;
 
@@ -792,34 +793,52 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   }
 
   Future<void> _saveOnboardingResult(OnboardingResult result) async {
+    final saveCompleter = Completer<void>();
+    final supersededCompleter = _pendingOnboardingSaveCompleter;
+    if (supersededCompleter != null && !supersededCompleter.isCompleted) {
+      supersededCompleter.complete();
+    }
     _pendingOnboardingResult = result;
+    _pendingOnboardingSaveCompleter = saveCompleter;
     _applyOnboardingResult(result);
     if (_savingOnboardingResult) {
-      return;
+      return saveCompleter.future;
     }
     _savingOnboardingResult = true;
-    Object? firstError;
-    StackTrace? firstStackTrace;
     try {
       while (mounted) {
         final nextResult = _pendingOnboardingResult;
+        final nextCompleter = _pendingOnboardingSaveCompleter;
         _pendingOnboardingResult = null;
+        _pendingOnboardingSaveCompleter = null;
         if (nextResult == null) {
           break;
         }
         try {
           await _persistOnboardingResult(nextResult);
+          if (nextCompleter != null && !nextCompleter.isCompleted) {
+            nextCompleter.complete();
+          }
         } catch (error, stackTrace) {
-          firstError ??= error;
-          firstStackTrace ??= stackTrace;
+          if (_pendingOnboardingResult != null) {
+            if (nextCompleter != null && !nextCompleter.isCompleted) {
+              nextCompleter.complete();
+            }
+          } else if (nextCompleter != null && !nextCompleter.isCompleted) {
+            nextCompleter.completeError(error, stackTrace);
+          }
         }
       }
     } finally {
+      final pendingCompleter = _pendingOnboardingSaveCompleter;
+      if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+        pendingCompleter.complete();
+      }
+      _pendingOnboardingResult = null;
+      _pendingOnboardingSaveCompleter = null;
       _savingOnboardingResult = false;
     }
-    if (firstError != null && firstStackTrace != null) {
-      Error.throwWithStackTrace(firstError, firstStackTrace);
-    }
+    return saveCompleter.future;
   }
 
   Future<void> _saveMobilityProfile(MobilityProfileOption profile) async {
