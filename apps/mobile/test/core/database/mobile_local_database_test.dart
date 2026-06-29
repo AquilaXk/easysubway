@@ -1089,7 +1089,7 @@ void main() {
     expect(reports, hasLength(1));
     expect(
       reports.single.context.toString(),
-      contains('데이터팩 업데이트 확인 중 예외가 발생했습니다.'),
+      contains('이동 정보 업데이트 확인 중 예외가 발생했습니다.'),
     );
   });
 
