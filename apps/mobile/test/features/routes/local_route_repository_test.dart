@@ -201,10 +201,10 @@ void main() {
     expect(rideStep.evidenceSources, contains('edge:edge-a-b-local'));
     expect(rideStep.timeSource, 'STATIC_ESTIMATE');
     expect(rideStep.distanceSource, 'MEASURED');
-    expect(rideStep.confidenceLabel, '높은 신뢰도');
+    expect(rideStep.confidenceLabel, '최근 확인된 정보예요');
   });
 
-  test('계단 없는 동선 여부가 미확인인 선택 경로는 높은 신뢰도로 표시하지 않는다', () async {
+  test('계단 없는 동선 여부가 미확인인 선택 경로는 최근 확인 문구로 표시하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(
@@ -1148,7 +1148,7 @@ void main() {
     });
   });
 
-  test('최고 시설 품질 레코드는 낮은 신뢰도 경고를 만들지 않는다', () async {
+  test('최근 확인된 시설 품질 레코드는 추가 확인 경고를 만들지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
@@ -1511,7 +1511,7 @@ void main() {
     expect(rideStep.estimatedMinutes, 2);
   });
 
-  test('step 소요시간은 측정값이 없으면 ranking fallback 시간으로 표시하지 않는다', () async {
+  test('step 소요시간은 확인된 값이 없으면 ranking fallback 시간으로 표시하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
@@ -1554,7 +1554,7 @@ void main() {
     expect(rideStep.distanceMeters, 850);
   });
 
-  test('step 거리는 ranking cost에서 만들지 않고 측정값이 없으면 미확인으로 둔다', () async {
+  test('step 거리는 ranking cost에서 만들지 않고 확인된 값이 없으면 미확인으로 둔다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
@@ -1595,7 +1595,7 @@ void main() {
     expect(rideStep.distanceMeters, 0);
   });
 
-  test('step 거리는 catalog 측정값이 있으면 ranking cost 대신 그 값을 사용한다', () async {
+  test('step 거리는 catalog에 확인된 값이 있으면 ranking cost 대신 그 값을 사용한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
