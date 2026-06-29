@@ -157,13 +157,15 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		return count("""
 			SELECT COUNT(*)
 			FROM manual_overrides
-			WHERE approval_status <> 'APPROVED'
-				OR conflict_status = 'UNRESOLVED'
-				OR superseded_by IS NOT NULL
-				OR approved_by IS NULL
-				OR approved_at IS NULL
-				OR approved_by = requested_by
-				OR (strict_route_eligible = TRUE AND route_safety_approved_by IS NULL)
+			WHERE superseded_by IS NULL
+				AND (
+					approval_status <> 'APPROVED'
+					OR conflict_status = 'UNRESOLVED'
+					OR approved_by IS NULL
+					OR approved_at IS NULL
+					OR approved_by = requested_by
+					OR (strict_route_eligible = TRUE AND route_safety_approved_by IS NULL)
+				)
 			""");
 	}
 

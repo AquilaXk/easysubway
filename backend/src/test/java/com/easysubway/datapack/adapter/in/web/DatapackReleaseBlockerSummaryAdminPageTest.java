@@ -102,6 +102,20 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("대체된 manual override 이력은 release blocker로 집계하지 않는다")
+	void supersededManualOverrideHistoryIsNotReleaseBlocker() throws Exception {
+		insertSupersededManualOverrideHistory();
+
+		String html = getAdminHtml("/admin/dashboard/page");
+
+		assertThat(html)
+			.contains("전체 blocker 9건")
+			.contains("manual override 1")
+			.doesNotContain("전체 blocker 10건")
+			.doesNotContain("manual override 2");
+	}
+
+	@Test
 	@DisplayName("데이터 품질 화면은 release readiness matrix를 보여준다")
 	void qualityDashboardShowsReleaseReadinessMatrix() throws Exception {
 		String html = getAdminHtml("/admin/data-quality/page");
@@ -236,6 +250,37 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 				'PENDING', 'NONE', FALSE, '2026-06-29 03:33:00',
 				'2026-07-06 03:33:00', '2026-06-29 03:33:00')
 			""", SHA_F);
+	}
+
+	private void insertSupersededManualOverrideHistory() {
+		jdbcTemplate.update("""
+			INSERT INTO manual_overrides (
+				id, entity_type, entity_id, field_name, before_value, after_value,
+				reason_code, reason, evidence_uri, evidence_hash, requested_by,
+				approved_by, approved_at, approval_status, conflict_status,
+				strict_route_eligible, effective_from, expires_at, created_at
+			)
+			VALUES ('override-replacement', 'FACILITY', 'facility-superseded',
+				'operational_status', 'UNKNOWN', 'AVAILABLE', 'FIELD_CHECK',
+				'대체 override 승인', 's3://evidence/replacement', ?, 'data-operator',
+				'release-approver', '2026-06-29 03:40:00', 'APPROVED', 'NONE',
+				FALSE, '2026-06-29 03:40:00', '2026-07-06 03:40:00',
+				'2026-06-29 03:40:00')
+			""", SHA_A);
+		jdbcTemplate.update("""
+			INSERT INTO manual_overrides (
+				id, entity_type, entity_id, field_name, before_value, after_value,
+				reason_code, reason, evidence_uri, evidence_hash, requested_by,
+				approval_status, conflict_status, strict_route_eligible,
+				effective_from, expires_at, superseded_by, created_at
+			)
+			VALUES ('override-superseded-history', 'FACILITY', 'facility-superseded',
+				'operational_status', 'UNKNOWN', 'AVAILABLE', 'FIELD_CHECK',
+				'대체된 override 이력', 's3://evidence/superseded', ?, 'data-operator',
+				'SUPERSEDED', 'UNRESOLVED', TRUE, '2026-06-29 03:39:00',
+				'2026-07-06 03:39:00', 'override-replacement',
+				'2026-06-29 03:39:00')
+			""", SHA_B);
 	}
 
 	private void insertEvidenceBlockers() {
