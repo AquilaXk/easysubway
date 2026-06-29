@@ -191,7 +191,7 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256) {
   ]));
   return {
     schemaVersion: buildSpec.schemaVersion,
-    artifactKind: buildSpec.artifactKind,
+    artifactKind: requiredString(buildSpec.artifactKind, "buildSpec.artifactKind"),
     candidateId: requiredString(buildSpec.candidateId, "buildSpec.candidateId"),
     productionScopeId: requiredString(buildSpec.productionScopeId, "buildSpec.productionScopeId"),
     buildSpecSha256,
