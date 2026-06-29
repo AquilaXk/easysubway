@@ -965,15 +965,8 @@ String _fieldVerificationStatusLabel(String fieldValidationStatus) {
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
-  const internalValidationPhrases = [
-    '현장 검증됨',
-    '현장 검증 전',
-    '현장 재확인 필요',
-    '관리자 검수',
-  ];
-  for (final phrase in internalValidationPhrases) {
-    label = label.replaceAll(phrase, '');
-  }
+  label = label.replaceAll(RegExp(r'현장\s*(검증됨|검증 전|재확인 필요)'), '');
+  label = label.replaceAll(RegExp(r'관리자\s*검수'), '');
   label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
   return label;
 }
@@ -1353,7 +1346,7 @@ class StationDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 상세 화면은 기본 정보, 출구, 시설을 함께 읽되 느린 네트워크에서 대기 시간이 합산되지 않게 병렬로 요청한다.
+      // 상세 화면은 요약, 출구, 시설을 함께 읽되 느린 네트워크에서 대기 시간이 합산되지 않게 병렬로 요청한다.
       final responses = await Future.wait<Object>([
         repository.getStationDetail(stationId),
         repository.listStationExits(stationId),

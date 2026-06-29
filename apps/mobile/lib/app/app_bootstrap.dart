@@ -136,7 +136,11 @@ Future<void> _runDataPackUpdateSafely({
       userDatabase: userDatabase,
     );
   } catch (error, stackTrace) {
-    reportMobileError(error, stackTrace, context: '데이터팩 업데이트 확인 중 예외가 발생했습니다.');
+    reportMobileError(
+      error,
+      stackTrace,
+      context: '이동 정보 업데이트 확인 중 예외가 발생했습니다.',
+    );
   }
 }
 

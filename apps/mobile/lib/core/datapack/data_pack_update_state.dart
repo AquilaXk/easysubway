@@ -93,7 +93,7 @@ class DataPackUpdateStateRepository {
     if (!manifest.hasReplayProtection) {
       if (await hasAcceptedManifestState()) {
         throw const DataPackManifestReplayException(
-          '데이터팩 manifest 보호 정보가 없습니다.',
+          '앱 이동 정보를 안전하게 확인하지 못했습니다.',
         );
       }
       return;
@@ -106,14 +106,10 @@ class DataPackUpdateStateRepository {
       return;
     }
     if (sequence < accepted.releaseSequence) {
-      throw const DataPackManifestReplayException(
-        '데이터팩 manifest가 이전 release입니다.',
-      );
+      throw const DataPackManifestReplayException('앱 이동 정보가 오래된 버전입니다.');
     }
     if (sequence == accepted.releaseSequence && hash != accepted.manifestHash) {
-      throw const DataPackManifestReplayException(
-        '데이터팩 manifest release가 일치하지 않습니다.',
-      );
+      throw const DataPackManifestReplayException('앱 이동 정보가 서로 맞지 않습니다.');
     }
   }
 
