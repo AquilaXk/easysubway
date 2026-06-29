@@ -270,9 +270,6 @@ class NetworkMapScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.onOpenRouteSearch,
     required this.onOpenStationSearch,
-    required this.onOpenSaved,
-    required this.onOpenSettings,
-    this.onOpenHome,
     this.bottomNavigationBar,
     super.key,
   });
@@ -281,9 +278,6 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback onOpenStationSearch;
-  final VoidCallback onOpenSaved;
-  final VoidCallback onOpenSettings;
-  final VoidCallback? onOpenHome;
   final Widget? bottomNavigationBar;
 
   @override
@@ -362,54 +356,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           },
         ),
       ),
-      bottomNavigationBar:
-          widget.bottomNavigationBar ??
-          NavigationBar(
-            selectedIndex: 1,
-            height: 72,
-            onDestinationSelected: (index) {
-              switch (index) {
-                case 0:
-                  final onOpenHome = widget.onOpenHome;
-                  if (onOpenHome == null) {
-                    Navigator.of(context).maybePop();
-                  } else {
-                    onOpenHome();
-                  }
-                  break;
-                case 1:
-                  break;
-                case 2:
-                  Navigator.of(context).maybePop();
-                  widget.onOpenRouteSearch();
-                  break;
-                case 3:
-                  Navigator.of(context).maybePop();
-                  widget.onOpenSaved();
-                  break;
-                case 4:
-                  Navigator.of(context).maybePop();
-                  widget.onOpenSettings();
-                  break;
-              }
-            },
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                label: '홈',
-              ),
-              NavigationDestination(icon: Icon(Icons.map), label: '노선도'),
-              NavigationDestination(
-                icon: Icon(Icons.route_outlined),
-                label: '길찾기',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.star_border),
-                label: '즐겨찾기',
-              ),
-              NavigationDestination(icon: Icon(Icons.more_horiz), label: '더보기'),
-            ],
-          ),
+      bottomNavigationBar: widget.bottomNavigationBar,
     );
   }
 

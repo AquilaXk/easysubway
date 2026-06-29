@@ -1033,8 +1033,6 @@ void main() {
           onOpenStationSearch: () {
             stationSearchOpened = true;
           },
-          onOpenSaved: () {},
-          onOpenSettings: () {},
         ),
       ),
     );

@@ -1596,9 +1596,6 @@ class _HomeScreenState extends State<HomeScreen> {
         routeDraftController: _routeDraftController,
         onOpenRouteSearch: openRouteSearch,
         onOpenStationSearch: () => unawaited(openStationSearch()),
-        onOpenSaved: openSavedItems,
-        onOpenSettings: openSettings,
-        onOpenHome: openHomeTab,
         bottomNavigationBar: bottomNavigationBar,
       );
     }
