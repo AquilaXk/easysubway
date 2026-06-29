@@ -25,10 +25,7 @@ CREATE TABLE IF NOT EXISTS datapack_normalization_runs (
 			AND accepted_count + quarantine_count + alias_review_count <= normalized_count
 		),
 	CONSTRAINT chk_datapack_normalization_runs_finished_state
-		CHECK (
-			(status = 'RUNNING' AND completed_at IS NULL)
-			OR (status <> 'RUNNING' AND completed_at IS NOT NULL)
-		)
+		CHECK ((completed_at IS NULL) = (status = 'RUNNING'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_datapack_normalization_runs_snapshot_status
