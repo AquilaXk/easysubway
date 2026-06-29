@@ -948,7 +948,7 @@ void main() {
         'UNKNOWN',
         'B1',
         '1F',
-        '설치 정보만 있고 운행 상태는 확인 필요'
+        '설치 여부는 알지만 운행 상태는 확인 필요'
       )
     ''');
     await database.customStatement('''
