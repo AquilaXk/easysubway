@@ -7,9 +7,13 @@ import com.easysubway.datapack.application.service.DatapackReleaseChannelCommand
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -86,6 +90,30 @@ class DatapackReleaseChannelCommandServiceTest {
 	}
 
 	@Test
+	@DisplayName("같은 idempotency key라도 workflow run URL이 다르면 거절한다")
+	void idempotencyKeyIncludesWorkflowRunUrl() {
+		service.promote(command("candidate-stable-3", "candidate-stable-4", SHA_3, SHA_4, "idem-workflow"));
+
+		var changedWorkflowCommand = new ReleaseChannelCommand(
+			"production",
+			"candidate-stable-3",
+			"candidate-stable-4",
+			SHA_3,
+			SHA_4,
+			"data-operator",
+			"release-approver",
+			"release request",
+			"idem-workflow",
+			"https://github.com/AquilaXk/easysubway/actions/runs/changed"
+		);
+
+		assertThatThrownBy(() -> service.promote(changedWorkflowCommand))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("idempotency key already belongs to a different release operation");
+		assertThat(eventCount("idem-workflow")).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("진행 중인 channel operation이 있으면 새 요청을 거절한다")
 	void pendingOperationBlocksNewCommand() {
 		jdbcTemplate.update("""
@@ -124,25 +152,34 @@ class DatapackReleaseChannelCommandServiceTest {
 		assertThat(eventCount("idem-rollback")).isEqualTo(1);
 	}
 
-	@Test
+	@ParameterizedTest(name = "{0} 누락은 요청을 거절한다")
+	@MethodSource("missingAuditAndHashFields")
 	@DisplayName("reason, actor, manifest hash 같은 필수 값이 없으면 요청을 거절한다")
-	void commandRequiresAuditAndHashFields() {
+	void commandRequiresAuditAndHashFields(String expectedFieldName, ReleaseChannelCommand command) {
+		assertThatThrownBy(() -> service.promote(command))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining(expectedFieldName);
+	}
+
+	@Test
+	@DisplayName("manifest hash가 64자 hex가 아니면 요청을 거절한다")
+	void commandRejectsNonHexManifestHash() {
 		var command = new ReleaseChannelCommand(
 			"production",
 			"candidate-stable-3",
 			"candidate-stable-4",
 			SHA_3,
-			"",
+			"z".repeat(64),
 			"data-operator",
 			"release-approver",
 			"ship stable 4",
-			"idem-missing-hash",
+			"idem-non-hex-hash",
 			"https://github.com/AquilaXk/easysubway/actions/runs/1131"
 		);
 
 		assertThatThrownBy(() -> service.promote(command))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("nextManifestSha256");
+			.hasMessageContaining("nextManifestSha256 must be a sha256 hex string");
 	}
 
 	private ReleaseChannelCommand command(
@@ -224,6 +261,31 @@ class DatapackReleaseChannelCommandServiceTest {
 			SELECT COUNT(*) FROM datapack_release_channel_events
 			WHERE channel = 'production' AND idempotency_key = ?
 			""", Integer.class, idempotencyKey);
+	}
+
+	private static Stream<Arguments> missingAuditAndHashFields() {
+		return Stream.of(
+			Arguments.of("requestedBy", commandWithMissing("requestedBy")),
+			Arguments.of("approvedBy", commandWithMissing("approvedBy")),
+			Arguments.of("reason", commandWithMissing("reason")),
+			Arguments.of("previousManifestSha256", commandWithMissing("previousManifestSha256")),
+			Arguments.of("nextManifestSha256", commandWithMissing("nextManifestSha256"))
+		);
+	}
+
+	private static ReleaseChannelCommand commandWithMissing(String fieldName) {
+		return new ReleaseChannelCommand(
+			"production",
+			"candidate-stable-3",
+			"candidate-stable-4",
+			"previousManifestSha256".equals(fieldName) ? "" : SHA_3,
+			"nextManifestSha256".equals(fieldName) ? "" : SHA_4,
+			"requestedBy".equals(fieldName) ? "" : "data-operator",
+			"approvedBy".equals(fieldName) ? "" : "release-approver",
+			"reason".equals(fieldName) ? "" : "ship stable 4",
+			"idem-missing-" + fieldName,
+			"https://github.com/AquilaXk/easysubway/actions/runs/1131"
+		);
 	}
 
 	@TestConfiguration

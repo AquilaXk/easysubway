@@ -1,5 +1,6 @@
 package com.easysubway.datapack.adapter.out.persistence;
 
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -11,7 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class JdbcDatapackReleaseChannelRepository {
+public class JdbcDatapackReleaseChannelRepository implements DatapackReleaseChannelCommandPort {
 
 	private final JdbcTemplate jdbcTemplate;
 
@@ -55,18 +56,20 @@ public class JdbcDatapackReleaseChannelRepository {
 			""", this::mapEvent, limit);
 	}
 
-	public Optional<ReleaseChannelEventRow> findEventByIdempotencyKey(String channel, String idempotencyKey) {
+	@Override
+	public Optional<ReleaseChannelEvent> findEventByIdempotencyKey(String channel, String idempotencyKey) {
 		return jdbcTemplate.query("""
 			SELECT id, channel, previous_candidate_id, next_candidate_id,
 				previous_manifest_sha256, next_manifest_sha256, operation_type,
-				operation_status, requested_by, approved_by, reason,
+				requested_by, approved_by, reason,
 				idempotency_key, workflow_run_url, created_at
 			FROM datapack_release_channel_events
 			WHERE channel = ? AND idempotency_key = ?
-			""", this::mapEvent, channel, idempotencyKey).stream().findFirst();
+			""", this::mapCommandEvent, channel, idempotencyKey).stream().findFirst();
 	}
 
-	public Optional<ReleaseChannelStateRow> lockChannel(String channel) {
+	@Override
+	public Optional<ReleaseChannelState> lockChannel(String channel) {
 		return jdbcTemplate.query("""
 			SELECT channel, candidate_id, manifest_sha256,
 				previous_stable_candidate_id, previous_manifest_sha256,
@@ -77,6 +80,7 @@ public class JdbcDatapackReleaseChannelRepository {
 			""", this::mapChannelState, channel).stream().findFirst();
 	}
 
+	@Override
 	public boolean candidateHasManifest(String candidateId, String manifestSha256) {
 		Integer count = jdbcTemplate.queryForObject("""
 			SELECT COUNT(*)
@@ -86,6 +90,7 @@ public class JdbcDatapackReleaseChannelRepository {
 		return count != null && count > 0;
 	}
 
+	@Override
 	public void updateChannel(
 		String channel,
 		String nextCandidateId,
@@ -129,6 +134,7 @@ public class JdbcDatapackReleaseChannelRepository {
 		);
 	}
 
+	@Override
 	public void insertEvent(
 		String id,
 		String channel,
@@ -210,8 +216,25 @@ public class JdbcDatapackReleaseChannelRepository {
 		);
 	}
 
-	private ReleaseChannelStateRow mapChannelState(ResultSet resultSet, int rowNumber) throws SQLException {
-		return new ReleaseChannelStateRow(
+	private ReleaseChannelEvent mapCommandEvent(ResultSet resultSet, int rowNumber) throws SQLException {
+		return new ReleaseChannelEvent(
+			resultSet.getString("id"),
+			resultSet.getString("channel"),
+			resultSet.getString("previous_candidate_id"),
+			resultSet.getString("next_candidate_id"),
+			resultSet.getString("previous_manifest_sha256"),
+			resultSet.getString("next_manifest_sha256"),
+			resultSet.getString("operation_type"),
+			resultSet.getString("requested_by"),
+			resultSet.getString("approved_by"),
+			resultSet.getString("reason"),
+			resultSet.getString("idempotency_key"),
+			resultSet.getString("workflow_run_url")
+		);
+	}
+
+	private ReleaseChannelState mapChannelState(ResultSet resultSet, int rowNumber) throws SQLException {
+		return new ReleaseChannelState(
 			resultSet.getString("channel"),
 			resultSet.getString("candidate_id"),
 			resultSet.getString("manifest_sha256"),
@@ -257,17 +280,6 @@ public class JdbcDatapackReleaseChannelRepository {
 		String idempotencyKey,
 		String workflowRunUrl,
 		LocalDateTime createdAt
-	) {
-	}
-
-	public record ReleaseChannelStateRow(
-		String channel,
-		String candidateId,
-		String manifestSha256,
-		String previousStableCandidateId,
-		String previousManifestSha256,
-		boolean rollbackAvailable,
-		String lastOperationStatus
 	) {
 	}
 }

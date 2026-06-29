@@ -1,11 +1,12 @@
 package com.easysubway.datapack.application.service;
 
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseChannelRepository;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseChannelRepository.ReleaseChannelEventRow;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseChannelRepository.ReleaseChannelStateRow;
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort.ReleaseChannelEvent;
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort.ReleaseChannelState;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,11 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DatapackReleaseChannelCommandService {
 
-	private final JdbcDatapackReleaseChannelRepository repository;
+	private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-fA-F]{64}");
+
+	private final DatapackReleaseChannelCommandPort repository;
 	private final Clock clock;
 
 	public DatapackReleaseChannelCommandService(
-		JdbcDatapackReleaseChannelRepository repository,
+		DatapackReleaseChannelCommandPort repository,
 		ObjectProvider<Clock> clockProvider
 	) {
 		this.repository = repository;
@@ -96,7 +99,7 @@ public class DatapackReleaseChannelCommandService {
 		);
 	}
 
-	private void ensureNoPendingOperation(ReleaseChannelStateRow channel) {
+	private void ensureNoPendingOperation(ReleaseChannelState channel) {
 		if ("PENDING".equals(channel.lastOperationStatus())) {
 			throw new IllegalStateException("release channel " + channel.channel()
 				+ " already has a pending release operation");
@@ -106,7 +109,7 @@ public class DatapackReleaseChannelCommandService {
 	private void ensureSameIdempotentRequest(
 		String operationType,
 		ReleaseChannelCommand command,
-		ReleaseChannelEventRow event
+		ReleaseChannelEvent event
 	) {
 		if (!operationType.equals(event.operationType())
 			|| !command.previousCandidateId().equals(event.previousCandidateId())
@@ -115,13 +118,14 @@ public class DatapackReleaseChannelCommandService {
 			|| !command.nextManifestSha256().equals(event.nextManifestSha256())
 			|| !command.requestedBy().equals(event.requestedBy())
 			|| !command.approvedBy().equals(event.approvedBy())
-			|| !command.reason().equals(event.reason())) {
+			|| !command.reason().equals(event.reason())
+			|| !command.workflowRunUrl().equals(event.workflowRunUrl())) {
 			throw new IllegalArgumentException(
 				"idempotency key already belongs to a different release operation");
 		}
 	}
 
-	private void ensureCurrentPointerMatches(ReleaseChannelStateRow channel, ReleaseChannelCommand command) {
+	private void ensureCurrentPointerMatches(ReleaseChannelState channel, ReleaseChannelCommand command) {
 		if (!channel.candidateId().equals(command.previousCandidateId())
 			|| !channel.manifestSha256().equals(command.previousManifestSha256())) {
 			throw new IllegalArgumentException("previous candidate or manifest hash does not match current channel");
@@ -134,7 +138,7 @@ public class DatapackReleaseChannelCommandService {
 		}
 	}
 
-	private void ensureRollbackTarget(ReleaseChannelStateRow channel, ReleaseChannelCommand command) {
+	private void ensureRollbackTarget(ReleaseChannelState channel, ReleaseChannelCommand command) {
 		if (!channel.rollbackAvailable()
 			|| channel.previousStableCandidateId() == null
 			|| channel.previousManifestSha256() == null
@@ -167,6 +171,7 @@ public class DatapackReleaseChannelCommandService {
 			requireText(approvedBy, "approvedBy");
 			requireText(reason, "reason");
 			requireText(idempotencyKey, "idempotencyKey");
+			requireText(workflowRunUrl, "workflowRunUrl");
 		}
 
 		private static void requireText(String value, String name) {
@@ -177,7 +182,7 @@ public class DatapackReleaseChannelCommandService {
 
 		private static void requireSha(String value, String name) {
 			requireText(value, name);
-			if (value.length() != 64) {
+			if (!SHA256_HEX.matcher(value).matches()) {
 				throw new IllegalArgumentException(name + " must be a sha256 hex string");
 			}
 		}
@@ -192,7 +197,7 @@ public class DatapackReleaseChannelCommandService {
 		boolean idempotentReplay
 	) {
 
-		private static ReleaseChannelOperationResult from(ReleaseChannelEventRow event, boolean idempotentReplay) {
+		private static ReleaseChannelOperationResult from(ReleaseChannelEvent event, boolean idempotentReplay) {
 			return new ReleaseChannelOperationResult(
 				event.id(),
 				event.channel(),
