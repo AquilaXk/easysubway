@@ -879,6 +879,25 @@ test("노선도 탭 화면은 자체 하단 NavigationBar를 만들지 않는다
   );
 });
 
+test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+
+  assert.match(main, /selectedIndex:\s*_selectedTabIndex/);
+  assert.doesNotMatch(main, /selectedIndex:\s*[0-9]/);
+  assert.match(widgetTest, /홈 노선도 탭은 같은 shell 안에서 선택 상태를 바꾼다/);
+  assert.match(widgetTest, /홈 하단 탭은 길찾기 즐겨찾기 더보기를 같은 shell에서 전환한다/);
+  assert.match(widgetTest, /홈 하단 루트 탭에서 시스템 뒤로가기는 홈으로 돌아온다/);
+  assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
+  assert.match(widgetTest, /노선도 로드 실패는 재시도와 역 검색 대안을 보여준다/);
+  assert.match(main, /homeFacilityAlertLoadingState/);
+  assert.match(main, /homeFacilityAlertErrorState/);
+  assert.match(main, /homeFacilityAlertEmptyState/);
+  assert.match(main, /homeRecentRouteLoadingState/);
+  assert.match(main, /homeRecentRouteErrorState/);
+  assert.match(main, /homeRecentRouteEmptyState/);
+});
+
 test("Android 권한 파서는 속성 순서와 추가 속성이 달라도 권한명을 추출한다", () => {
   const permissions = androidManifestPermissions(`
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
