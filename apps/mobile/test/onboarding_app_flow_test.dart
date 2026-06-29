@@ -15,7 +15,7 @@ import 'fake_secure_key_value_storage.dart';
 // Repository contract markers for permission onboarding scenarios:
 // 첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다
 // 첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다
-// 첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다
+// 첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다
 // 첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다
 // 첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다
 

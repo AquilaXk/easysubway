@@ -294,7 +294,7 @@ void main() {
     expect(completedResult?.profile.id, 'elderly');
   });
 
-  testWidgets('온보딩은 알림 권한 요청 실패 다음 행동을 안내한다', (tester) async {
+  testWidgets('온보딩은 알림 권한 요청 실패 도움말을 안내한다', (tester) async {
     final notificationPermissionProvider = _FakeNotificationPermissionProvider(
       error: const NotificationSettingsException('알림 권한을 확인하지 못했습니다.'),
     );
@@ -324,7 +324,7 @@ void main() {
     expect(completedResult, isNull);
     expect(find.text('나중에 알림 설정에서 다시 켤 수 있습니다.'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('다음 행동, 나중에 알림 설정에서 다시 켤 수 있습니다.'),
+      find.bySemanticsLabel('도움말, 나중에 알림 설정에서 다시 켤 수 있습니다.'),
       findsOneWidget,
     );
     expect(

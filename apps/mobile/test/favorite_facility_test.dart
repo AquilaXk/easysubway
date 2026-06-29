@@ -76,13 +76,13 @@ void main() {
     expect(favorites.single.verificationStatusLabel, '상태를 다시 확인해 주세요');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 다음 행동 상태 제보',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 상태 제보',
     );
     expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(favorites.single.semanticLabel, isNot(contains('출처')));
   });
 
-  test('즐겨찾기 시설 상태는 심각도와 다음 행동을 구분한다', () {
+  test('즐겨찾기 시설 상태는 안내 수준과 할 일을 구분한다', () {
     final closed = _favoriteFacility(status: 'CLOSED');
     final unavailable = _favoriteFacility(status: 'OUT_OF_SERVICE');
     final reported = _favoriteFacility(status: 'USER_REPORTED');

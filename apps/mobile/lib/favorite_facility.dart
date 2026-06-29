@@ -309,7 +309,7 @@ class FavoriteFacility {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel =>
-      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, 다음 행동 $nextActionLabel';
+      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }
@@ -653,7 +653,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${favorite.severityLabel} · 다음 행동 ${favorite.nextActionLabel}',
+                        '${favorite.severityLabel} · ${favorite.nextActionLabel}',
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF405A5D),
                           fontWeight: FontWeight.w700,
