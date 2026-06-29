@@ -622,7 +622,7 @@ String _internalRouteDistanceLabel(int distanceMeters) {
 
 String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus) {
-    'VERIFIED' => '최근 확인됨',
+    'VERIFIED' => '최근 확인했어요',
     'STALE' => '최근 상태를 다시 확인해 주세요',
     'UNKNOWN' => '최근 확인한 기록이 없어요',
     _ => '최근 확인한 기록이 없어요',

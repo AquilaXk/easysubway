@@ -227,7 +227,7 @@ void main() {
 
     expect(
       await burdenLabelFor('node-verified-from', 'node-verified-to'),
-      contains('최근 확인됨'),
+      contains('최근 확인했어요'),
     );
     expect(
       await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
