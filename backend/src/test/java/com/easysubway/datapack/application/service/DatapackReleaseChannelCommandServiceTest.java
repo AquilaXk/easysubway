@@ -182,6 +182,28 @@ class DatapackReleaseChannelCommandServiceTest {
 			.hasMessageContaining("nextManifestSha256 must be a sha256 hex string");
 	}
 
+	@Test
+	@DisplayName("요청자와 승인자가 같으면 production 승격 요청을 거절한다")
+	void commandRejectsSameRequesterAndApprover() {
+		var command = new ReleaseChannelCommand(
+			"production",
+			"candidate-stable-3",
+			"candidate-stable-4",
+			SHA_3,
+			SHA_4,
+			"release-operator",
+			"release-operator",
+			"ship stable 4",
+			"idem-same-actor",
+			"https://github.com/AquilaXk/easysubway/actions/runs/1140"
+		);
+
+		assertThatThrownBy(() -> service.promote(command))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("approvedBy must be different from requestedBy");
+		assertThat(eventCount("idem-same-actor")).isZero();
+	}
+
 	private ReleaseChannelCommand command(
 		String previousCandidateId,
 		String nextCandidateId,
