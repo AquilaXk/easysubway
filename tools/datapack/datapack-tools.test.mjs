@@ -5429,6 +5429,99 @@ test("수도권 pilot production source input은 production manifest v2 pack으�
   assert.notEqual(capitalRouteMapCoverage.status, "covered");
 });
 
+test("관리자 검수 NORMAL override는 production 시설 provenance와 validator를 통과한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-production-admin-normal-override-${Date.now()}`);
+  const inputPath = path.join(outputDir, "official-source-input.json");
+  const importedFixturePath = path.join(outputDir, "catalog-fixture.imported.json");
+  const overridePath = path.join(outputDir, "admin-review-overrides.json");
+  const reviewedFixturePath = path.join(outputDir, "catalog-fixture.reviewed.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(inputPath, `${JSON.stringify(productionSourceIngestInput(), null, 2)}\n`);
+  await writeFile(
+    overridePath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        source: "facility-report-admin-review",
+        exportedAt: "2026-06-22T01:00:00.000Z",
+        facilityStatusUpdates: [
+          {
+            reportId: "report-admin-approved-recovered-kric-elevator",
+            facilityId: "facility-sangnoksu-elevator-kric-1",
+            status: "NORMAL",
+            reviewedBy: "admin-user",
+            reviewedAt: "2026-06-22T00:30:00.000Z",
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/import-official-sources.mjs",
+      "--inventory",
+      "tools/datapack/source-inventory.json",
+      "--input",
+      inputPath,
+      "--output",
+      importedFixturePath,
+    ],
+    { cwd: root },
+  );
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/apply-admin-review-overrides.mjs",
+      "--fixture",
+      importedFixturePath,
+      "--overrides",
+      overridePath,
+      "--output",
+      reviewedFixturePath,
+    ],
+    { cwd: root },
+  );
+
+  const reviewedFixture = JSON.parse(await readFile(reviewedFixturePath, "utf8"));
+  const reviewedFacility = reviewedFixture.packs[0].facilities.find(
+    (facility) => facility.id === "facility-sangnoksu-elevator-kric-1",
+  );
+  assert.equal(reviewedFacility.status, "NORMAL");
+  assert.equal(reviewedFacility.statusMeaning, "REALTIME_OPERATION");
+  assert.equal(reviewedFacility.operationalStatus, "AVAILABLE");
+  assert.equal(reviewedFacility.verifiedAt, "2026-06-22T00:30:00.000Z");
+  assert.equal(reviewedFacility.retrievedAt, "2026-06-22T01:00:00.000Z");
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      reviewedFixturePath,
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest",
+      path.join(packOutputDir, "current.json"),
+      "--root",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+});
+
 test("승인된 관리자 검수 결과는 다음 data pack fixture 시설 상태에 반영된다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-admin-review-overrides-${Date.now()}`);
   const inputPath = path.join(outputDir, "catalog-fixture.json");
@@ -5640,6 +5733,8 @@ test("관리자 검수 override는 복구 상태를 route 접근성에 다시 �
     (summary) => summary.stationId === "station-sangnoksu",
   );
   assert.equal(reviewedFacility.status, "NORMAL");
+  assert.equal(reviewedFacility.statusMeaning, "REALTIME_OPERATION");
+  assert.equal(reviewedFacility.operationalStatus, "AVAILABLE");
   assert.equal(reviewedInternalRouteEdge.accessibilityStatus, "AVAILABLE");
   assert.equal(reviewedSummary.summary, "1번 출구 엘리베이터 이용 가능");
   assert.equal(reviewedSummary.warning, "");
