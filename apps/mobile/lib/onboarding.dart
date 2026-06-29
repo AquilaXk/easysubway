@@ -918,7 +918,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       _OnboardingViewPreferenceSwitch(
                         key: const Key('onboardingPreference-simpleView'),
                         title: '간편 보기',
-                        subtitle: '중요한 정보만 먼저 표시',
+                        subtitle: '꼭 필요한 안내부터 보여요',
                         value: _preferences.simpleViewEnabled,
                         onChanged: (value) {
                           setState(() {
@@ -1290,7 +1290,7 @@ class _OnboardingConditionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = enabled ? '우선 적용' : '기본 적용';
+    final state = enabled ? '켜짐' : '꺼짐';
 
     return Semantics(
       container: true,
