@@ -159,9 +159,9 @@ void main() {
     expect(elevator.semanticLabel, contains('시설 상태가 확인됐어요'));
     expect(elevator.lastUpdatedAt, '2026-06-19');
     expect(escalator.dataConfidence, 'LOW');
-    expect(escalator.semanticLabel, contains('상태를 다시 확인해 주세요'));
+    expect(escalator.semanticLabel, contains('최신 상태를 준비 중이에요'));
     expect(toilet.dataConfidence, 'LOW');
-    expect(toilet.semanticLabel, contains('상태를 다시 확인해 주세요'));
+    expect(toilet.semanticLabel, contains('최신 상태를 준비 중이에요'));
   });
 
   test('상록수역 시설은 최신 현장 검증 record를 선택한다', () async {
@@ -191,7 +191,7 @@ void main() {
     );
     expect(elevator.dataConfidence, 'LOW');
     expect(elevator.lastUpdatedAt, '2026-06-20');
-    expect(elevator.semanticLabel, contains('상태를 다시 확인해 주세요'));
+    expect(elevator.semanticLabel, contains('최신 상태를 준비 중이에요'));
   });
 
   test('존재하지 않는 역 상세 조회는 역 검색 예외를 던진다', () async {

@@ -107,10 +107,10 @@ void main() {
     expect(markers[0].semanticLabel, contains('마지막 확인 2026-06-12'));
     expect(markers[1].semanticLabel, contains('1번 출구'));
     expect(markers[1].semanticLabel, contains('계단 없는 이동 가능'));
-    expect(markers[1].semanticLabel, contains('상태를 다시 확인해 주세요'));
+    expect(markers[1].semanticLabel, contains('최신 상태를 준비 중이에요'));
     expect(markers[2].semanticLabel, contains('엘리베이터'));
     expect(markers[2].semanticLabel, contains('이용 가능'));
     expect(markers[2].semanticLabel, contains('최근 확인 2026-06-12'));
-    expect(markers[2].semanticLabel, contains('상태를 다시 확인해 주세요'));
+    expect(markers[2].semanticLabel, contains('최신 상태를 준비 중이에요'));
   });
 }

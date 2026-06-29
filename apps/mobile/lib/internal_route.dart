@@ -285,7 +285,7 @@ class InternalRouteResult {
     return switch (status) {
       'FOUND' => '역 안 이동 경로를 찾았어요',
       'BLOCKED' => '계단 없는 역 안 이동 경로를 찾지 못했어요',
-      _ => '역 안 이동을 다시 확인해 주세요',
+      _ => '역 안 이동 안내가 부족해요',
     };
   }
 
@@ -294,7 +294,7 @@ class InternalRouteResult {
   String get totalBurdenLabel {
     if (isBlocked) {
       return blockedReasons.isEmpty
-          ? '이동 전에 다시 확인해 주세요'
+          ? '이동 전에 안내를 살펴봐 주세요'
           : blockedReasons.join(', ');
     }
     return '${_internalRouteSecondsLabel(totalEstimatedSeconds)} · ${_internalRouteDistanceLabel(totalDistanceMeters)}';
@@ -395,7 +395,7 @@ class InternalRouteStep {
       _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
-      if (requiresEscalator) '에스컬레이터는 다시 확인해 주세요',
+      if (requiresEscalator) '에스컬레이터 정보가 부족해요',
       if (reliabilityScore < 80) '이동 전 역무원에게 확인해 주세요',
     ];
     return labels.join(' · ');
@@ -422,7 +422,7 @@ class InternalRouteWarning {
 
   String get userMessage {
     return switch (code.trim()) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 이동 전에 다시 확인해 주세요.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 정보가 부족해요.',
       'STALE_ACCESSIBILITY_DATA' => '엘리베이터와 통로 상태를 최근에 확인하지 못했어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 확인하지 못했어요.',
@@ -625,7 +625,7 @@ String _internalRouteDistanceLabel(int distanceMeters) {
 String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus) {
     'VERIFIED' => '최근 확인했어요',
-    'STALE' => '최근 상태를 다시 확인해 주세요',
+    'STALE' => '최신 상태를 준비 중이에요',
     'UNKNOWN' => '최근 확인한 기록이 없어요',
     _ => '최근 확인한 기록이 없어요',
   };

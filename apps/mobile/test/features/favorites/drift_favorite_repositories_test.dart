@@ -92,7 +92,7 @@ void main() {
       favorites.single.facilityId,
       'facility-sangnoksu-accessible-toilet-1',
     );
-    expect(favorites.single.verificationStatusLabel, '상태를 다시 확인해 주세요');
+    expect(favorites.single.verificationStatusLabel, '최신 상태를 준비 중이에요');
     expect(favorites.single.lastUpdatedAt, '2025-06-01');
   });
 

@@ -102,7 +102,7 @@ void main() {
       '시설 정보를 함께 볼 수 있어요',
       '쉬운 길 안내를 볼 수 있어요',
       '고장·공사 소식이 반영됐어요',
-      '확인이 더 필요해요',
+      '정보를 준비 중이에요',
     ]);
   });
 
@@ -1300,13 +1300,10 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(
-      state.facilityAttentionSummary,
-      '고장·폐쇄 1개 · 가기 전 확인 1개 · 한 번 더 확인 1개',
-    );
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 확인 1개 · 정보 부족 1개');
     expect(
       state.facilityAttentionSemanticLabel,
-      '다시 볼 시설, 고장·폐쇄 1개, 가기 전 확인 1개, 한 번 더 확인 1개',
+      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 확인 1개, 정보 부족 1개',
     );
   });
 
@@ -1460,11 +1457,11 @@ void main() {
     expect(ramp.statusLabel, '공사 중');
     expect(ramp.severityLabel, '가기 전 확인');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
-    expect(ramp.confidenceLabel, '확인이 더 필요해요');
+    expect(ramp.confidenceLabel, '정보가 부족해요');
     expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 최신 상태를 준비 중이에요, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');

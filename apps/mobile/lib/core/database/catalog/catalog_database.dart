@@ -260,7 +260,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             installationStatus: const Value('INSTALLED'),
             floorFrom: const Value('B1'),
             floorTo: const Value('1F'),
-            description: const Value('확인이 더 필요한 이동 보조 시설'),
+            description: const Value('정보가 부족한 이동 보조 시설'),
           ),
           FacilitiesCompanion.insert(
             id: 'facility-sangnoksu-accessible-toilet-1',

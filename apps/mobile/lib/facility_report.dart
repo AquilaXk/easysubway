@@ -913,7 +913,7 @@ class FacilityReportResult {
       'REJECTED' => '반려됨',
       'DUPLICATE' => '중복 제보',
       'RESOLVED' => '처리 완료',
-      _ => '접수 상태를 다시 확인해 주세요',
+      _ => '접수 상태를 불러오지 못했어요',
     };
   }
 
@@ -1218,7 +1218,7 @@ class FacilityReportController extends ChangeNotifier {
         stackTrace,
         context: '시설 제보 처리 상태 새로고침 중 예외가 발생했습니다.',
       );
-      // 알 수 없는 오류도 같은 화면에서 다시 확인할 수 있게 접수 결과를 보존한다.
+      // 알 수 없는 오류도 같은 화면에서 살펴볼 수 있게 접수 결과를 보존한다.
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.failure,
@@ -1850,7 +1850,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2.5),
                         )
                       : const Icon(Icons.my_location),
-                  label: const Text('위치 다시 확인'),
+                  label: const Text('위치 다시 찾기'),
                 ),
               ],
             ],
@@ -1926,7 +1926,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             const Text(_facilityReportUploadDisclosurePurpose),
             if (_submitWithoutLocation) ...[
               const SizedBox(height: 8),
-              const Text('현재 위치 없이 제보하면 담당자가 현장 위치를 다시 확인해야 할 수 있습니다.'),
+              const Text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
             ],
             const SizedBox(height: 8),
             const Text(_facilityReportUploadDisclosureScope),
