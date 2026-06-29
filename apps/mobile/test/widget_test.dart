@@ -988,6 +988,38 @@ void main() {
     );
   });
 
+  testWidgets('홈 길찾기 버튼은 새 화면이 아니라 shell 길찾기 탭으로 전환한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeSearchButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('homeBottomNavigationBar')), findsOneWidget);
+    expect(
+      tester
+          .widget<NavigationBar>(
+            find.byKey(const Key('homeBottomNavigationBar')),
+          )
+          .selectedIndex,
+      2,
+    );
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('길찾기')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['테스트권', '부산'],
