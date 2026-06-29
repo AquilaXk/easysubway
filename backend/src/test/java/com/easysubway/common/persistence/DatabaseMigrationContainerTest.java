@@ -222,6 +222,10 @@ class DatabaseMigrationContainerTest {
 	}
 
 	private void assertDatapackPermissionMatrix(JdbcTemplate jdbcTemplate) {
+		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "ADMIN_VIEWER"))
+			.contains("admin.datapack.read");
+		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "REPORT_REVIEWER"))
+			.doesNotContain("admin.datapack.read");
 		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "DATA_OPERATOR"))
 			.contains(
 				"admin.datapack.read",
@@ -234,13 +238,18 @@ class DatabaseMigrationContainerTest {
 				"admin.datapack.production.approve",
 				"admin.datapack.rollback"
 			);
-		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "REPORT_REVIEWER"))
-			.doesNotContain("admin.datapack.read");
 		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "MASTER_EDITOR"))
 			.contains(
 				"admin.datapack.read",
 				"admin.datapack.alias.review",
 				"admin.datapack.quarantine.review",
+				"admin.datapack.evidence.review",
+				"admin.datapack.override.request"
+			)
+			.doesNotContain("admin.datapack.production.approve", "admin.datapack.rollback");
+		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "FIELD_OPERATOR"))
+			.contains(
+				"admin.datapack.read",
 				"admin.datapack.evidence.review",
 				"admin.datapack.override.request"
 			)

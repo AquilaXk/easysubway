@@ -148,12 +148,13 @@ class SecurityConfigTest {
 						"admin.report.review",
 						"admin.master.edit",
 						"admin.field.operate",
-						"admin.data.operate",
-						"admin.security.audit",
-						"admin.security.admin",
-						"admin.datapack.production.approve",
-						"admin.datapack.rollback"
-					);
+							"admin.data.operate",
+							"admin.security.audit",
+							"admin.security.admin",
+							"admin.datapack.override.approve",
+							"admin.datapack.production.approve",
+							"admin.datapack.rollback"
+						);
 			});
 	}
 
@@ -196,31 +197,28 @@ class SecurityConfigTest {
 	@DisplayName("인메모리 RBAC 저장소는 데이터팩 운영 세분 권한을 선언된 permission으로 허용한다")
 	void inMemoryAdminRbacAcceptsDatapackAuthorities() {
 		var rbacRepository = new InMemoryAdminRbacAuthorityRepository();
+		var datapackAuthorities = Set.of(
+			"admin.datapack.read",
+			"admin.datapack.source.run",
+			"admin.datapack.alias.review",
+			"admin.datapack.quarantine.review",
+			"admin.datapack.evidence.review",
+			"admin.datapack.override.request",
+			"admin.datapack.override.approve",
+			"admin.datapack.candidate.build",
+			"admin.datapack.staging.promote",
+			"admin.datapack.production.approve",
+			"admin.datapack.rollback",
+			"admin.datapack.audit.read"
+		);
 
 		rbacRepository.replacePermissionAuthorities(
 			"datapack-admin",
-			Set.of(
-				"admin.datapack.read",
-				"admin.datapack.source.run",
-				"admin.datapack.alias.review",
-				"admin.datapack.quarantine.review",
-				"admin.datapack.evidence.review",
-				"admin.datapack.override.request",
-				"admin.datapack.override.approve",
-				"admin.datapack.candidate.build",
-				"admin.datapack.staging.promote",
-				"admin.datapack.production.approve",
-				"admin.datapack.rollback",
-				"admin.datapack.audit.read"
-			)
+			datapackAuthorities
 		);
 
 		assertThat(rbacRepository.findPermissionAuthorities("datapack-admin"))
-			.contains(
-				"admin.datapack.read",
-				"admin.datapack.production.approve",
-				"admin.datapack.rollback"
-			);
+			.containsExactlyInAnyOrderElementsOf(datapackAuthorities);
 	}
 
 	@Test
