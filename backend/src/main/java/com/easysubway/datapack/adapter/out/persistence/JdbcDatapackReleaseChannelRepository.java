@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,6 +55,120 @@ public class JdbcDatapackReleaseChannelRepository {
 			""", this::mapEvent, limit);
 	}
 
+	public Optional<ReleaseChannelEventRow> findEventByIdempotencyKey(String channel, String idempotencyKey) {
+		return jdbcTemplate.query("""
+			SELECT id, channel, previous_candidate_id, next_candidate_id,
+				previous_manifest_sha256, next_manifest_sha256, operation_type,
+				operation_status, requested_by, approved_by, reason,
+				idempotency_key, workflow_run_url, created_at
+			FROM datapack_release_channel_events
+			WHERE channel = ? AND idempotency_key = ?
+			""", this::mapEvent, channel, idempotencyKey).stream().findFirst();
+	}
+
+	public Optional<ReleaseChannelStateRow> lockChannel(String channel) {
+		return jdbcTemplate.query("""
+			SELECT channel, candidate_id, manifest_sha256,
+				previous_stable_candidate_id, previous_manifest_sha256,
+				rollback_available, last_operation_status
+			FROM datapack_release_channels
+			WHERE channel = ?
+			FOR UPDATE
+			""", this::mapChannelState, channel).stream().findFirst();
+	}
+
+	public boolean candidateHasManifest(String candidateId, String manifestSha256) {
+		Integer count = jdbcTemplate.queryForObject("""
+			SELECT COUNT(*)
+			FROM datapack_candidates
+			WHERE id = ? AND manifest_sha256 = ?
+			""", Integer.class, candidateId, manifestSha256);
+		return count != null && count > 0;
+	}
+
+	public void updateChannel(
+		String channel,
+		String nextCandidateId,
+		String nextManifestSha256,
+		String previousStableCandidateId,
+		String previousManifestSha256,
+		String operationType,
+		String requestedBy,
+		String approvedBy,
+		String reason,
+		String idempotencyKey,
+		LocalDateTime updatedAt
+	) {
+		jdbcTemplate.update("""
+			UPDATE datapack_release_channels
+			SET candidate_id = ?,
+				manifest_sha256 = ?,
+				previous_stable_candidate_id = ?,
+				previous_manifest_sha256 = ?,
+				rollback_available = TRUE,
+				last_operation_type = ?,
+				last_operation_status = 'PASS',
+				requested_by = ?,
+				approved_by = ?,
+				reason = ?,
+				idempotency_key = ?,
+				updated_at = ?
+			WHERE channel = ?
+			""",
+			nextCandidateId,
+			nextManifestSha256,
+			previousStableCandidateId,
+			previousManifestSha256,
+			operationType,
+			requestedBy,
+			approvedBy,
+			reason,
+			idempotencyKey,
+			updatedAt,
+			channel
+		);
+	}
+
+	public void insertEvent(
+		String id,
+		String channel,
+		String previousCandidateId,
+		String nextCandidateId,
+		String previousManifestSha256,
+		String nextManifestSha256,
+		String operationType,
+		String requestedBy,
+		String approvedBy,
+		String reason,
+		String idempotencyKey,
+		String workflowRunUrl,
+		LocalDateTime createdAt
+	) {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_channel_events (
+				id, channel, previous_candidate_id, next_candidate_id,
+				previous_manifest_sha256, next_manifest_sha256, operation_type,
+				operation_status, requested_by, approved_by, reason,
+				idempotency_key, workflow_run_url, created_at
+			)
+			VALUES (?, ?, ?, ?, ?, ?, ?, 'PASS', ?, ?, ?, ?, ?, ?)
+			""",
+			id,
+			channel,
+			previousCandidateId,
+			nextCandidateId,
+			previousManifestSha256,
+			nextManifestSha256,
+			operationType,
+			requestedBy,
+			approvedBy,
+			reason,
+			idempotencyKey,
+			workflowRunUrl,
+			createdAt
+		);
+	}
+
 	private ReleaseChannelRow mapChannel(ResultSet resultSet, int rowNumber) throws SQLException {
 		return new ReleaseChannelRow(
 			resultSet.getString("channel"),
@@ -95,6 +210,18 @@ public class JdbcDatapackReleaseChannelRepository {
 		);
 	}
 
+	private ReleaseChannelStateRow mapChannelState(ResultSet resultSet, int rowNumber) throws SQLException {
+		return new ReleaseChannelStateRow(
+			resultSet.getString("channel"),
+			resultSet.getString("candidate_id"),
+			resultSet.getString("manifest_sha256"),
+			resultSet.getString("previous_stable_candidate_id"),
+			resultSet.getString("previous_manifest_sha256"),
+			resultSet.getBoolean("rollback_available"),
+			resultSet.getString("last_operation_status")
+		);
+	}
+
 	public record ReleaseChannelRow(
 		String channel,
 		String candidateId,
@@ -130,6 +257,17 @@ public class JdbcDatapackReleaseChannelRepository {
 		String idempotencyKey,
 		String workflowRunUrl,
 		LocalDateTime createdAt
+	) {
+	}
+
+	public record ReleaseChannelStateRow(
+		String channel,
+		String candidateId,
+		String manifestSha256,
+		String previousStableCandidateId,
+		String previousManifestSha256,
+		boolean rollbackAvailable,
+		String lastOperationStatus
 	) {
 	}
 }
