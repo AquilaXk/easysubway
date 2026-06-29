@@ -363,7 +363,7 @@ void main() {
 
     await tester.dragUntilVisible(
       find.text('최근 경로'),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, -160),
     );
     await tester.pumpAndSettle();
@@ -405,7 +405,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final homeList = tester.widget<ListView>(
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
     );
     expect(homeList.padding?.resolve(TextDirection.ltr).bottom, 96);
   });
@@ -639,7 +639,7 @@ void main() {
       expect(find.text('경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.'), findsNothing);
 
       await tester.drag(
-        find.byKey(const Key('homePrototypeList')),
+        find.byKey(const Key('homeContentList')),
         const Offset(0, -620),
       );
       await tester.pumpAndSettle();
@@ -682,7 +682,7 @@ void main() {
     expect(find.byKey(const Key('homeRecentRouteSection')), findsOneWidget);
 
     final homeList = tester.widget<ListView>(
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
     );
     final padding = homeList.padding!.resolve(TextDirection.ltr);
     expect(padding.left, EasySubwayAdaptiveLayout.largeScreenGutter);
@@ -2760,14 +2760,14 @@ void main() {
 
     await tester.dragUntilVisible(
       find.text('최근 경로'),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, -160),
     );
     await tester.pumpAndSettle();
     expect(find.text('최근 경로'), findsOneWidget);
     await tester.dragUntilVisible(
       find.byKey(const Key('homeRecentRouteCard')),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, -120),
     );
     await tester.pumpAndSettle();
@@ -2870,7 +2870,7 @@ void main() {
     expect(find.text('시설 알림을 불러오지 못했어요'), findsOneWidget);
     await tester.dragUntilVisible(
       find.byKey(const Key('homeRecentRouteErrorState')),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, -120),
     );
     await tester.pumpAndSettle();
@@ -3075,7 +3075,7 @@ void main() {
     );
     await tester.dragUntilVisible(
       find.byKey(const Key('recentSearchButton')),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, -120),
     );
     await tester.pumpAndSettle();
@@ -3930,7 +3930,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('routeSearchButton')),
-      find.byKey(const Key('homePrototypeList')),
+      find.byKey(const Key('homeContentList')),
       const Offset(0, 180),
     );
     await tester.pumpAndSettle();

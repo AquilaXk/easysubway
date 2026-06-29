@@ -819,6 +819,17 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   }
 });
 
+test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
+  const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+
+  for (const file of mobileFiles) {
+    assert.doesNotMatch(read(file), /Prototype/, `${file} still has prototype UI naming`);
+  }
+});
+
 test("Android 권한 파서는 속성 순서와 추가 속성이 달라도 권한명을 추출한다", () => {
   const permissions = androidManifestPermissions(`
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
