@@ -8,7 +8,11 @@ class EasySubwayAdaptiveLayout {
   static const double largeScreenGutter = 24;
   static const double largeScreenColumnGap = 18;
 
-  static bool isLargeScreen(BoxConstraints constraints) {
-    return constraints.maxWidth >= largeScreenMinWidth;
+  static bool isLargeScreen(
+    BoxConstraints constraints, {
+    double textScaleFactor = 1,
+  }) {
+    final minWidth = textScaleFactor >= 1.6 ? 1024 : largeScreenMinWidth;
+    return constraints.maxWidth >= minWidth;
   }
 }

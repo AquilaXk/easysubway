@@ -3378,6 +3378,7 @@ void main() {
       final homeContext = tester.element(find.byType(HomeScreen));
       expect(MediaQuery.of(homeContext).highContrast, isTrue);
       expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('homeLargeScreenLayout')), findsNothing);
       expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
       expect(find.byKey(const Key('heroStationSearchButton')), findsOneWidget);
       expect(find.byKey(const Key('homeBottomNavigationBar')), findsOneWidget);
@@ -6704,7 +6705,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(
       find.byKey(const Key('stationSearchLargeScreenLayout')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('stationSearchResult-station-transfer')),
@@ -7748,36 +7749,40 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('stationDetailList')), findsOneWidget);
       expect(
         find.byKey(const Key('stationDetailLargeScreenLayout')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(
-        find.byKey(const Key('stationFacilityCard-facility-normal')),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('stationFacilityCard-facility-broken')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('stationFacilityCard-facility-needs-check')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('이용 가능'), findsOneWidget);
-      expect(find.text('이용할 수 없어요'), findsOneWidget);
-      expect(find.text('상태 정보가 부족해요'), findsOneWidget);
+      var sawNormal = false;
+      var sawBroken = false;
+      var sawNeedsCheck = false;
+      for (var index = 0; index < 8; index += 1) {
+        sawNormal |= find.text('이용 가능').evaluate().isNotEmpty;
+        sawBroken |= find.text('이용할 수 없어요').evaluate().isNotEmpty;
+        sawNeedsCheck |= find.text('상태 정보가 부족해요').evaluate().isNotEmpty;
+        if (sawNormal && sawBroken && sawNeedsCheck) {
+          break;
+        }
+        await tester.drag(
+          find.byKey(const Key('stationDetailList')),
+          const Offset(0, -260),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(sawNormal, isTrue);
+      expect(sawBroken, isTrue);
+      expect(sawNeedsCheck, isTrue);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
