@@ -320,6 +320,11 @@ class CatalogDatabase extends _$CatalogDatabase {
 
   Future<void> _seedBaselineRouteMapPositions() async {
     final updatedAt = DateTime.utc(2026, 6, 19).millisecondsSinceEpoch ~/ 1000;
+    const sourceId = 'baseline-route-map-source-capital-review';
+    const sourceName = '수도권 도시철도 노선도';
+    const sourceUrl = 'https://www.seoulmetro.co.kr/kr/cyberStation.do';
+    const license = 'public-reference';
+    const licenseStatus = '출처 표기 필요';
     final rows = [
       ['station-sangnoksu', 'seoul-4', '수도권', 156, 250],
       ['station-sadang', 'seoul-4', '수도권', 390, 320],
@@ -341,15 +346,39 @@ class CatalogDatabase extends _$CatalogDatabase {
           row[2],
           row[3],
           row[4],
-          'fixture-route-map-source-capital-review',
-          '수도권 노선도 fixture 좌표 확인',
-          'https://easysubway.local/fixtures/catalog-fixture.json',
-          'fixture-only',
-          'fixture-only',
+          sourceId,
+          sourceName,
+          sourceUrl,
+          license,
+          licenseStatus,
           0,
           1,
           updatedAt,
           updatedAt,
+        ],
+      );
+      await customStatement(
+        '''
+        UPDATE route_map_positions
+        SET source_id = ?, source_name = ?, source_url = ?,
+            license = ?, license_status = ?, updated_at = ?
+        WHERE station_id = ?
+          AND line_id = ?
+          AND (
+            source_id = 'fixture-route-map-source-capital-review'
+            OR source_url LIKE '%easysubway.local/fixtures%'
+            OR license_status = 'fixture-only'
+          )
+        ''',
+        [
+          sourceId,
+          sourceName,
+          sourceUrl,
+          license,
+          licenseStatus,
+          updatedAt,
+          row[0],
+          row[1],
         ],
       );
     }
