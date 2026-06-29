@@ -551,7 +551,7 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 상세 정보, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 자세한 안내, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
   }
 }
 
@@ -1372,7 +1372,7 @@ class StationDetailController extends ChangeNotifier {
       }
       _state = const StationDetailState(
         status: StationDetailStatus.failure,
-        message: '역 상세 정보를 불러오지 못했습니다.',
+        message: '역 안내를 불러오지 못했습니다.',
       );
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '역 상세 화면 로드 중 예외가 발생했습니다.');
@@ -1381,7 +1381,7 @@ class StationDetailController extends ChangeNotifier {
       }
       _state = const StationDetailState(
         status: StationDetailStatus.failure,
-        message: '역 상세 정보를 불러오지 못했습니다.',
+        message: '역 안내를 불러오지 못했습니다.',
       );
     }
 
@@ -4044,7 +4044,7 @@ class _StationDetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (state.status) {
       StationDetailStatus.loading => Semantics(
-        label: '역 상세 정보 불러오는 중',
+        label: '역 안내 불러오는 중',
         liveRegion: true,
         child: const Center(child: CircularProgressIndicator()),
       ),

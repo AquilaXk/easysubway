@@ -229,7 +229,7 @@ void main() {
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
                   'message':
-                      '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
+                      '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 안내를 확인하세요.',
                 },
               ],
               'recommendationReasons': [

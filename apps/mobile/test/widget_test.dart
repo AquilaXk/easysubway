@@ -179,9 +179,13 @@ Future<void> _openRouteDestinationStationInput(WidgetTester tester) async {
 }
 
 Future<void> _openFirstRouteResultDetail(WidgetTester tester) async {
-  await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
+  final routeResult = find.byKey(
+    const Key('routeResultListItem'),
+    skipOffstage: false,
+  );
+  await tester.ensureVisible(routeResult);
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('routeResultListItem')));
+  await tester.tap(routeResult);
   await tester.pumpAndSettle();
 }
 
@@ -1030,6 +1034,169 @@ void main() {
           .selectedIndex,
       0,
     );
+  });
+
+  testWidgets('홈 하단 루트 탭에서 시스템 뒤로가기는 홈으로 돌아온다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapRegionNames: const ['수도권'],
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> expectBackToHome({
+      required Key tabKey,
+      required Key screenKey,
+    }) async {
+      await tester.tap(find.byKey(tabKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(screenKey), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(screenKey), findsNothing);
+      expect(
+        tester
+            .widget<NavigationBar>(
+              find.byKey(const Key('homeBottomNavigationBar')),
+            )
+            .selectedIndex,
+        0,
+      );
+    }
+
+    await expectBackToHome(
+      tabKey: const Key('bottomNavMap'),
+      screenKey: const Key('networkMapScreen'),
+    );
+    await expectBackToHome(
+      tabKey: const Key('bottomNavRoute'),
+      screenKey: const Key('routeSearchScreen'),
+    );
+    await expectBackToHome(
+      tabKey: const Key('bottomNavSaved'),
+      screenKey: const Key('favoriteHomeScreen'),
+    );
+    await expectBackToHome(
+      tabKey: const Key('bottomNavMore'),
+      screenKey: const Key('settingsScreen'),
+    );
+  });
+
+  testWidgets('홈 shell 경로 상세 뒤로가기는 결과 목록으로 돌아간다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavRoute')));
+    await tester.pumpAndSettle();
+    await _openRouteOriginStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeOriginStationInput')),
+      '상록수',
+    );
+    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+    await _openRouteDestinationStationInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('routeDestinationStationInput')),
+      '사당',
+    );
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+    expect(find.text('이동 순서'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    expect(find.text('이동 순서'), findsNothing);
+    expect(
+      tester
+          .widget<NavigationBar>(
+            find.byKey(const Key('homeBottomNavigationBar')),
+          )
+          .selectedIndex,
+      2,
+    );
+  });
+
+  testWidgets('홈 shell 즐겨찾기 경로 다시 찾기는 저장된 이동 조건을 유지한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: routeRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(
+          favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
+        ),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavSaved')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<NavigationBar>(
+            find.byKey(const Key('homeBottomNavigationBar')),
+          )
+          .selectedIndex,
+      2,
+    );
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('홈 길찾기 버튼은 새 화면이 아니라 shell 길찾기 탭으로 전환한다', (tester) async {
@@ -7245,7 +7412,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
+          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
@@ -7291,7 +7458,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
+          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -8097,7 +8264,7 @@ void main() {
 
     expect(
       find.bySemanticsLabel(
-        '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
+        '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
       ),
       findsOneWidget,
     );
@@ -12485,7 +12652,7 @@ RouteSearchResult _sampleRouteSearchResult({
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',
-        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
+        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 안내를 확인하세요.',
       ),
     ],
     recommendationReasons: recommendationReasons,

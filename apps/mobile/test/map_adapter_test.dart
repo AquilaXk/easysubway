@@ -103,7 +103,7 @@ void main() {
       'facility-elevator-1',
     ]);
     expect(markers[0].title, '상록수역');
-    expect(markers[0].semanticLabel, contains('상록수역 상세 정보'));
+    expect(markers[0].semanticLabel, contains('상록수역 자세한 안내'));
     expect(markers[0].semanticLabel, contains('마지막 확인 2026-06-12'));
     expect(markers[1].semanticLabel, contains('1번 출구'));
     expect(markers[1].semanticLabel, contains('계단 없는 이동 가능'));
