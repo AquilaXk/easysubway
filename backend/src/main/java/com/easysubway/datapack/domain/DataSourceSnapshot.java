@@ -1,5 +1,7 @@
 package com.easysubway.datapack.domain;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
@@ -84,7 +86,14 @@ public record DataSourceSnapshot(
 
 	private static String requireRawObjectUri(String value) {
 		String trimmed = requireText(value, "rawObjectUri");
-		if ((!trimmed.startsWith("s3://") && !trimmed.startsWith("oci://")) || trimmed.contains("?")) {
+		URI uri;
+		try {
+			uri = new URI(trimmed);
+		} catch (URISyntaxException exception) {
+			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
+		}
+		var objectStorageScheme = "s3".equals(uri.getScheme()) || "oci".equals(uri.getScheme());
+		if (!objectStorageScheme || uri.getRawQuery() != null || uri.getRawUserInfo() != null || uri.getRawFragment() != null) {
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
 		return trimmed;

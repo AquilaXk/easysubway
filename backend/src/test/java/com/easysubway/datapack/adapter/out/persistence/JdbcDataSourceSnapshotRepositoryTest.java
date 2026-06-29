@@ -105,6 +105,24 @@ class JdbcDataSourceSnapshotRepositoryTest {
 		))
 			.isInstanceOf(InvalidDataSourceSnapshotException.class)
 			.hasMessageContaining("rawObjectUri");
+		assertThatThrownBy(() -> lockedSnapshot(
+			"snapshot-uri-userinfo",
+			"a".repeat(64),
+			13,
+			"s3://access:secret@easysubway-datapack-sources/kric-station-elevator/snapshot-uri-userinfo.json",
+			true
+		))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("rawObjectUri");
+		assertThatThrownBy(() -> lockedSnapshot(
+			"snapshot-uri-fragment",
+			"a".repeat(64),
+			13,
+			"oci://easysubway-datapack-sources/kric-station-elevator/snapshot-uri-fragment.json#token=secret",
+			true
+		))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("rawObjectUri");
 	}
 
 	private DataSourceSnapshot lockedSnapshot(String snapshotId, String rawSha256, int rowCount) {

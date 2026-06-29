@@ -92,7 +92,7 @@ class DatabaseMigrationContainerTest {
 				"chk_manual_overrides_effective_window",
 				"chk_manual_overrides_route_safety",
 				"chk_route_edge_evidence_strict_route"
-		);
+			);
 		assertNormalizationRunGuards(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
 		assertSnapshotRawEvidencePolicyGuards(jdbcTemplate);
@@ -356,6 +356,22 @@ class DatabaseMigrationContainerTest {
 			jdbcTemplate,
 			"snapshot-raw-policy-secret-uri",
 			"s3://evidence/snapshot-raw-policy-secret-uri.json?serviceKey=secret",
+			true,
+			"2026-07-06 00:00:00"
+		))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertSnapshotEvidencePolicyCase(
+			jdbcTemplate,
+			"snapshot-raw-policy-userinfo-uri",
+			"s3://access:secret@evidence/snapshot-raw-policy-userinfo-uri.json",
+			true,
+			"2026-07-06 00:00:00"
+		))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertSnapshotEvidencePolicyCase(
+			jdbcTemplate,
+			"snapshot-raw-policy-fragment-uri",
+			"oci://evidence/snapshot-raw-policy-fragment-uri.json#token=secret",
 			true,
 			"2026-07-06 00:00:00"
 		))

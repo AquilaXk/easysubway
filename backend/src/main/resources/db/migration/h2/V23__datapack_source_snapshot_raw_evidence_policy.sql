@@ -14,7 +14,7 @@ ALTER TABLE data_source_snapshots
 
 ALTER TABLE data_source_snapshots
 	ADD CONSTRAINT chk_data_source_snapshots_raw_object_uri
-		CHECK ((raw_object_uri LIKE 's3://%' OR raw_object_uri LIKE 'oci://%') AND raw_object_uri NOT LIKE '%?%');
+		CHECK ((raw_object_uri LIKE 's3://%' OR raw_object_uri LIKE 'oci://%') AND raw_object_uri NOT LIKE '%?%' AND raw_object_uri NOT LIKE '%@%' AND raw_object_uri NOT LIKE '%#%');
 
 ALTER TABLE data_source_snapshots
 	ADD CONSTRAINT chk_data_source_snapshots_raw_retention
