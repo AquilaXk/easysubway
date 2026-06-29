@@ -819,7 +819,12 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       profile: profile,
       preferences: currentResult.preferences,
     );
-    await _saveOnboardingResult(nextResult);
+    try {
+      await _saveOnboardingResult(nextResult);
+    } catch (error, stackTrace) {
+      _applyOnboardingResult(currentResult);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> _saveViewPreferences(
@@ -1595,10 +1600,25 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted || selectedProfile == null) {
       return null;
     }
+    final previousMobilityType = _mobilityType;
     setState(() {
       _mobilityType = selectedProfile.mobilityType;
     });
-    await widget.onMobilityProfileChanged?.call(selectedProfile);
+    try {
+      await widget.onMobilityProfileChanged?.call(selectedProfile);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '이동 조건 저장 중 예외가 발생했습니다.');
+      if (!mounted) {
+        return null;
+      }
+      setState(() {
+        _mobilityType = previousMobilityType;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이동 조건을 저장하지 못했습니다. 이전 조건으로 되돌렸어요.')),
+      );
+      return null;
+    }
     if (!mounted) {
       return null;
     }
