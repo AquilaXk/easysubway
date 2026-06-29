@@ -5013,8 +5013,8 @@ class _SecurityContactNotice extends StatelessWidget {
   const _SecurityContactNotice();
 
   static const _title = '보안 문의 안내';
-  static const _contactNotice = '취약점이나 개인정보 보호 우려를 발견하면 보안 문의로 알려주세요.';
-  static const _scopeNotice = '위치, 신고 사진, 알림, 개인정보 보호 우려를 함께 접수할 수 있습니다.';
+  static const _contactNotice = '앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.';
+  static const _scopeNotice = '위치, 신고 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.';
 
   @override
   Widget build(BuildContext context) {
