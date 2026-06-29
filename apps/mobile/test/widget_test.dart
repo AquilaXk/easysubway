@@ -1160,6 +1160,45 @@ void main() {
     );
   });
 
+  testWidgets('홈 shell 즐겨찾기 경로 다시 찾기는 저장된 이동 조건을 유지한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: routeRepository,
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(
+          favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
+        ),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavSaved')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<NavigationBar>(
+            find.byKey(const Key('homeBottomNavigationBar')),
+          )
+          .selectedIndex,
+      2,
+    );
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+  });
+
   testWidgets('홈 길찾기 버튼은 새 화면이 아니라 shell 길찾기 탭으로 전환한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(

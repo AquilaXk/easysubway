@@ -1213,6 +1213,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTabIndex = 0;
   late String _mobilityType;
+  String? _routeTabMobilityType;
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteRoute>>? _recentRoutesFuture;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
@@ -1352,11 +1353,13 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    void openRouteTab() {
-      if (_selectedTabIndex == 2) {
+    void openRouteTab([String? mobilityType]) {
+      final nextMobilityType = mobilityType ?? initialMobilityType;
+      if (_selectedTabIndex == 2 && _routeTabMobilityType == nextMobilityType) {
         return;
       }
       setState(() {
+        _routeTabMobilityType = nextMobilityType;
         _selectedTabIndex = 2;
       });
     }
@@ -1621,7 +1624,7 @@ class _HomeScreenState extends State<HomeScreen> {
         stationRepository: repository,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
-        initialMobilityType: initialMobilityType,
+        initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
         simpleViewEnabled: simpleViewEnabled,
         shellNavigationBar: bottomNavigationBar,
@@ -1643,7 +1646,8 @@ class _HomeScreenState extends State<HomeScreen> {
           realtimeRepository: realtimeRepository,
           routeDraftController: _routeDraftController,
           initialMobilityType: initialMobilityType,
-          onOpenRouteSearch: ([mobilityType]) async => openRouteTab(),
+          onOpenRouteSearch: ([mobilityType]) async =>
+              openRouteTab(mobilityType),
           bottomNavigationBar: bottomNavigationBar,
         ),
       );
