@@ -76,7 +76,7 @@ class RealtimeSnapshot {
   const RealtimeSnapshot.unavailable()
     : status = RealtimeSnapshotStatus.unavailable,
       fallbackCode = 'PROVIDER_ERROR',
-      message = '실시간 정보를 불러오지 못했습니다. 역 정보와 경로 검색은 계속 이용할 수 있습니다.',
+      message = '실시간 정보를 불러오지 못했어요. 역 정보와 경로 검색은 계속 이용할 수 있습니다.',
       receivedAt = '',
       arrivals = const [];
 
@@ -142,11 +142,11 @@ class RealtimeApiRepository implements RealtimeRepository {
     try {
       final response = await _apiClient.getJson(path);
       final data = response.requireSuccessData(
-        errorFactory: () => const RealtimeException('실시간 정보를 불러오지 못했습니다.'),
+        errorFactory: () => const RealtimeException('실시간 정보를 불러오지 못했어요.'),
         expectedStatusCode: HttpStatus.ok,
       );
       if (data is! Map<String, Object?>) {
-        throw const RealtimeException('실시간 정보를 불러오지 못했습니다.');
+        throw const RealtimeException('실시간 정보를 불러오지 못했어요.');
       }
       return RealtimeSnapshot.fromJson(data);
     } on RealtimeException {
@@ -157,7 +157,7 @@ class RealtimeApiRepository implements RealtimeRepository {
         stackTrace,
         context: '실시간 도착 정보 조회 중 예외가 발생했습니다.',
       );
-      throw const RealtimeException('실시간 정보를 불러오지 못했습니다.');
+      throw const RealtimeException('실시간 정보를 불러오지 못했어요.');
     }
   }
 }

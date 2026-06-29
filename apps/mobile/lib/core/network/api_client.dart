@@ -84,14 +84,14 @@ class ApiClient {
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        '서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.',
+        '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } catch (error, stackTrace) {
       throw ApiException(
-        '요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        '요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
@@ -137,14 +137,14 @@ class ApiClient {
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        '서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.',
+        '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } catch (error, stackTrace) {
       throw ApiException(
-        '요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        '요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
@@ -202,7 +202,7 @@ Object? _decodeJson(String body, {required int statusCode, required Uri uri}) {
     return jsonDecode(body);
   } on FormatException catch (error, stackTrace) {
     throw ApiException(
-      '받은 정보를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      '받은 정보를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
       statusCode: statusCode,
       path: uri.path,
       cause: error,

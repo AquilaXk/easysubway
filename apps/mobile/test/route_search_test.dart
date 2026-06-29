@@ -148,7 +148,7 @@ void main() {
         isA<InternalRouteException>().having(
           (error) => error.message,
           'message',
-          '역 안 이동 안내를 불러오지 못했습니다.',
+          '역 안 이동 안내를 불러오지 못했어요.',
         ),
       ),
     );
@@ -322,7 +322,7 @@ void main() {
     expect(controller.state.status, RouteSearchViewStatus.failure);
     expect(controller.state.message, '출발역과 도착역을 입력해 주세요.');
 
-    repository.error = const RouteSearchException('경로 정보를 불러오지 못했습니다.');
+    repository.error = const RouteSearchException('경로 정보를 불러오지 못했어요.');
 
     await controller.search(
       const RouteSearchRequest(
@@ -337,7 +337,7 @@ void main() {
     expect(repository.requests.single.destinationStationId, 'station-sadang');
     expect(repository.requests.single.mobilityType, 'SENIOR');
     expect(controller.state.status, RouteSearchViewStatus.failure);
-    expect(controller.state.message, '경로 정보를 불러오지 못했습니다.');
+    expect(controller.state.message, '경로 정보를 불러오지 못했어요.');
   });
 
   test('경로 검색 컨트롤러는 화면 종료 후 비동기 결과를 알리지 않는다', () async {

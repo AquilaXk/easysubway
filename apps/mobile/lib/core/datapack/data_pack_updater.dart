@@ -180,7 +180,7 @@ class DataPackUpdater {
       if (installedPointer != null) {
         return installedPointer;
       }
-      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했습니다.');
+      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
 
     if (results.isEmpty) {
@@ -199,7 +199,7 @@ class DataPackUpdater {
       }
     }
     if (selected == null) {
-      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했습니다.');
+      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
     return selected;
   }
@@ -224,7 +224,7 @@ class DataPackUpdater {
         .timeout(_dataPackDownloadTimeout);
     final response = await request.close().timeout(_dataPackDownloadTimeout);
     if (response.statusCode != HttpStatus.ok) {
-      throw const DataPackClientException('이동 정보를 내려받지 못했습니다.');
+      throw const DataPackClientException('이동 정보를 내려받지 못했어요.');
     }
     final expectedSizeBytes = pack.sizeBytes;
     final contentLength = response.contentLength;

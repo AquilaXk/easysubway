@@ -93,7 +93,7 @@ class DataPackUpdateStateRepository {
     if (!manifest.hasReplayProtection) {
       if (await hasAcceptedManifestState()) {
         throw const DataPackManifestReplayException(
-          '앱 이동 정보를 안전하게 확인하지 못했습니다.',
+          '앱 이동 정보를 안전하게 확인하지 못했어요.',
         );
       }
       return;

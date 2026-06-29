@@ -523,7 +523,7 @@ void main() {
     expect(onboardingStore.savedResult, isNull);
     expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
     expect(find.byType(HomeScreen), findsNothing);
-    expect(find.text('설정을 저장하지 못했습니다. 다시 시도해 주세요.'), findsOneWidget);
+    expect(find.text('설정을 저장하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
   });
 
   testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
@@ -3215,7 +3215,7 @@ void main() {
 
   testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
-      error: const CurrentLocationException('현재 위치를 확인하지 못했습니다.'),
+      error: const CurrentLocationException('현재 위치를 확인하지 못했어요.'),
       needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
@@ -3242,7 +3242,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('현재 위치를 확인하지 못했습니다.'), findsOneWidget);
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
     expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
     expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
@@ -3418,7 +3418,7 @@ void main() {
 
   testWidgets('홈은 저장 경로 재조회 실패를 즐겨찾기 카드로 표시하지 않는다', (tester) async {
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
-      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
 
     await tester.pumpWidget(
       EasySubwayApp(
@@ -3442,7 +3442,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), findsNothing);
+    expect(find.text('즐겨찾기한 경로를 불러오지 못했어요'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '즐겨찾기 경로 보기'), findsNothing);
   });
 
@@ -3746,7 +3746,7 @@ void main() {
       find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
     );
-    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+    expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 이동 조건 저장 실패는 이전 조건으로 되돌린다', (tester) async {
@@ -3788,7 +3788,7 @@ void main() {
     expect(onboardingStore.savedResult?.profile.id, 'elderly');
     expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
     expect(find.text('계단 없는 길만 안내해요'), findsNothing);
-    expect(find.text('이동 조건을 저장하지 못했습니다. 이전 조건으로 되돌렸어요.'), findsOneWidget);
+    expect(find.text('이동 조건을 저장하지 못했어요. 이전 조건으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션은 빠른 연속 변경에서도 마지막 값을 저장한다', (tester) async {
@@ -3919,7 +3919,7 @@ void main() {
       find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
     );
-    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsNothing);
+    expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsNothing);
   });
 
   testWidgets('설정 화면 보기 옵션 마지막 queued 저장 실패는 마지막 변경만 되돌린다', (tester) async {
@@ -3982,7 +3982,7 @@ void main() {
       find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
     );
-    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+    expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션 연속 저장 실패는 마지막 저장값으로 되돌린다', (tester) async {
@@ -4047,7 +4047,7 @@ void main() {
       find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
     );
-    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+    expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
@@ -4885,7 +4885,7 @@ void main() {
   testWidgets('데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다', (tester) async {
     final deletionRepository = FakeUserDataDeletionRepository(
       error: const UserDataDeletionException(
-        '데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        '데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
       ),
     );
     final onboardingStore = MemoryOnboardingResultStore(
@@ -4932,7 +4932,7 @@ void main() {
     expect(deletionRepository.deleteCount, 1);
     expect(onboardingStore.savedResult, isNotNull);
     expect(draftTargetStore.target, isNotNull);
-    expect(find.text('데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+    expect(find.text('데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
   });
 
   testWidgets('도움말은 연결값이 비어 있으면 준비 중으로 보여주고 실행하지 않는다', (tester) async {
@@ -5202,7 +5202,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(notificationPermissionProvider.requestCount, 1);
-      expect(find.text('기기 알림 등록을 마치지 못했습니다.'), findsNothing);
+      expect(find.text('기기 알림 등록을 마치지 못했어요.'), findsNothing);
       expect(find.text('알림을 켜지 못했어요.'), findsOneWidget);
       expect(
         find.text('휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
@@ -5607,7 +5607,7 @@ void main() {
   testWidgets('즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
-      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했습니다.');
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
 
     try {
       await tester.pumpWidget(
@@ -5619,7 +5619,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('즐겨찾기 경로를 불러오지 못했습니다.'), findsOneWidget);
+      expect(find.text('즐겨찾기 경로를 불러오지 못했어요.'), findsOneWidget);
       expect(find.text('네트워크 상태를 확인한 뒤 다시 불러와 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel('도움말, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.'),
@@ -9094,7 +9094,7 @@ void main() {
       },
     );
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
-      ..error = const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했습니다.');
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했어요.');
 
     try {
       await tester.pumpWidget(
@@ -9149,7 +9149,7 @@ void main() {
       await tester.tap(find.byKey(const Key('routeFavoriteSaveButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('즐겨찾기 경로를 처리하지 못했습니다.'), findsOneWidget);
+      expect(find.text('즐겨찾기 경로를 처리하지 못했어요.'), findsOneWidget);
       expect(
         find.text('네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
         findsOneWidget,
@@ -9569,7 +9569,7 @@ void main() {
       },
     );
     final routeFeedbackRepository = FakeRouteFeedbackRepository()
-      ..error = const RouteFeedbackException('의견을 보내지 못했습니다.');
+      ..error = const RouteFeedbackException('의견을 보내지 못했어요.');
 
     try {
       await tester.pumpWidget(
@@ -9630,7 +9630,7 @@ void main() {
       await tester.tap(find.byKey(const Key('routeFeedbackNotHelpfulButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('의견을 보내지 못했습니다.'), findsOneWidget);
+      expect(find.text('의견을 보내지 못했어요.'), findsOneWidget);
       expect(find.text('잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel('도움말, 잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.'),
@@ -9653,7 +9653,7 @@ void main() {
       routeFeedbackRepository.requests.single.rating,
       RouteFeedbackRating.notHelpful,
     );
-    expect(find.text('의견을 보내지 못했습니다.'), findsOneWidget);
+    expect(find.text('의견을 보내지 못했어요.'), findsOneWidget);
   });
 
   testWidgets('경로 안내 칩은 좁은 화면과 큰 글자에서도 넘치지 않는다', (tester) async {
@@ -9777,7 +9777,7 @@ void main() {
       },
     );
     final routeRepository = FakeRouteSearchRepository(
-      error: const RouteSearchException('경로 정보를 불러오지 못했습니다.'),
+      error: const RouteSearchException('경로 정보를 불러오지 못했어요.'),
     );
 
     try {
@@ -9824,7 +9824,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(routeRepository.requests, hasLength(1));
-      expect(find.text('경로 정보를 불러오지 못했습니다.'), findsOneWidget);
+      expect(find.text('경로 정보를 불러오지 못했어요.'), findsOneWidget);
       expect(
         find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
@@ -10159,7 +10159,7 @@ void main() {
   testWidgets('시설 신고 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository()
-      ..error = const FacilityReportException('신고를 보내지 못했습니다.');
+      ..error = const FacilityReportException('신고를 보내지 못했어요.');
 
     try {
       await tester.pumpWidget(
@@ -10192,7 +10192,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(reportRepository.requests, hasLength(1));
-      expect(find.text('신고를 보내지 못했습니다.'), findsOneWidget);
+      expect(find.text('신고를 보내지 못했어요.'), findsOneWidget);
       expect(find.text('내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'), findsOneWidget);
       expect(
         find.bySemanticsLabel('도움말, 내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.'),
@@ -11520,7 +11520,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('위치 권한을 허용해 주세요.'), findsOneWidget);
-    expect(find.text('현재 위치를 확인하지 못했습니다.'), findsNothing);
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );

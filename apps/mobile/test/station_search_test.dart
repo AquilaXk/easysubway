@@ -454,7 +454,7 @@ void main() {
           isA<StationSearchException>().having(
             (error) => error.message,
             'message',
-            '역 정보를 불러오지 못했습니다.',
+            '역 정보를 불러오지 못했어요.',
           ),
         ),
       );
@@ -857,7 +857,7 @@ void main() {
           isA<StationSearchException>().having(
             (error) => error.message,
             'message',
-            '역 정보를 불러오지 못했습니다.',
+            '역 정보를 불러오지 못했어요.',
           ),
         ),
       );
@@ -963,12 +963,12 @@ void main() {
     expect(controller.state.status, StationSearchStatus.empty);
     expect(controller.state.message, '검색 결과가 없습니다.');
 
-    repository.error = const StationSearchException('역 정보를 불러오지 못했습니다.');
+    repository.error = const StationSearchException('역 정보를 불러오지 못했어요.');
 
     await controller.search('상록수');
 
     expect(controller.state.status, StationSearchStatus.failure);
-    expect(controller.state.message, '역 정보를 불러오지 못했습니다.');
+    expect(controller.state.message, '역 정보를 불러오지 못했어요.');
   });
 
   test('역 검색 컨트롤러는 현재 위치 주변 역을 거리와 함께 표시한다', () async {
@@ -1267,7 +1267,7 @@ void main() {
 
     expect(reportedErrors, isEmpty);
     expect(controller.state.status, StationDetailStatus.failure);
-    expect(controller.state.message, '역 안내를 불러오지 못했습니다.');
+    expect(controller.state.message, '역 안내를 불러오지 못했어요.');
   });
 
   test('역 상세 상태는 확인이 필요한 시설을 먼저 보여 주고 짧은 요약을 만든다', () {
@@ -1371,11 +1371,11 @@ void main() {
     expect(controller.state.status, FavoriteStationListStatus.empty);
     expect(controller.state.message, '즐겨찾기한 역이 없습니다.');
 
-    repository.error = const FavoriteStationException('즐겨찾기를 불러오지 못했습니다.');
+    repository.error = const FavoriteStationException('즐겨찾기를 불러오지 못했어요.');
     await controller.load();
 
     expect(controller.state.status, FavoriteStationListStatus.failure);
-    expect(controller.state.message, '즐겨찾기를 불러오지 못했습니다.');
+    expect(controller.state.message, '즐겨찾기를 불러오지 못했어요.');
   });
 
   test('역 상세 즐겨찾기 컨트롤러는 저장과 해제를 순서대로 처리한다', () async {
@@ -1860,7 +1860,7 @@ class FailingStationDetailRepository implements StationSearchRepository {
 
   @override
   Future<StationDetail> getStationDetail(String stationId) async {
-    throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+    throw const StationSearchException('역 정보를 불러오지 못했어요.');
   }
 
   @override
@@ -1921,7 +1921,7 @@ class FailingRealtimeRepository implements RealtimeRepository {
 
   @override
   Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
-    throw const RealtimeException('실시간 정보를 불러오지 못했습니다.');
+    throw const RealtimeException('실시간 정보를 불러오지 못했어요.');
   }
 }
 
