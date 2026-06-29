@@ -816,10 +816,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('점검·제보 · 엘리베이터 제보됨'), findsOneWidget);
+    expect(find.text('확인 요청 · 엘리베이터 제보됨'), findsOneWidget);
     expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 점검·제보, .*공식 정보, 권장 행동 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('심각도 확인 요청, .*공식 정보, 권장 행동 역무원 도움 요청')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -2741,7 +2741,7 @@ void main() {
     expect(find.byKey(const Key('homeHeroCard')), findsOneWidget);
     expect(find.text('시설 알림'), findsOneWidget);
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('정보 확인 필요 · 엘리베이터 확인 필요'), findsOneWidget);
+    expect(find.text('확인이 필요해요 · 엘리베이터 다시 확인해 주세요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
@@ -4998,7 +4998,7 @@ void main() {
       expect(find.text('즐겨찾기한 역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
@@ -5009,7 +5009,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('즐겨찾기 역, 상록수, 수도권 4호선, 수도권, 일부 정보는 확인 중이에요'),
         findsOneWidget,
       );
       expect(find.text('출처 공식 파일'), findsNothing);
@@ -5082,7 +5082,7 @@ void main() {
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('이용 가능'), findsOneWidget);
-      expect(find.text('상태 확인 필요'), findsOneWidget);
+      expect(find.text('상태를 다시 확인해 주세요'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '상태 제보'), findsOneWidget);
@@ -5094,7 +5094,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태 확인 필요, 다음 행동 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
@@ -5190,11 +5190,17 @@ void main() {
         find.text('기준: 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13'),
         findsOneWidget,
       );
-      expect(find.text('예상 시간 확인 필요 · 환승 확인 필요 · 도보 확인 필요'), findsOneWidget);
-      expect(find.text('계단 정보 확인 필요 · 엘리베이터 연결 확인 필요'), findsOneWidget);
+      expect(
+        find.text('예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('계단 여부는 다시 확인해 주세요 · 엘리베이터 연결은 다시 확인해 주세요'),
+        findsOneWidget,
+      );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 확인 필요, 환승 확인 필요, 도보 확인 필요, 계단 정보 확인 필요, 엘리베이터 연결 확인 필요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 기준 천천히 이동, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간은 다시 확인해 주세요, 환승은 다시 확인해 주세요, 걷는 거리는 다시 확인해 주세요, 계단 여부는 다시 확인해 주세요, 엘리베이터 연결은 다시 확인해 주세요',
         ),
         findsOneWidget,
       );
@@ -5464,19 +5470,19 @@ void main() {
       );
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
       expect(find.text('수도권'), findsNothing);
-      expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
       expect(find.text('출처 확인 필요'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 일부 정보는 확인 중이에요'),
         findsOneWidget,
       );
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음'),
+          find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권, 일부 정보는 확인 중이에요'),
         ),
         isSemantics(
-          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 기본 정보만 있음',
+          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권, 일부 정보는 확인 중이에요',
           isButton: true,
           hasTapAction: true,
         ),
@@ -5517,6 +5523,71 @@ void main() {
       );
     } finally {
       semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 검색 결과 핵심 문구는 큰 글자에서 한 줄 말줄임으로 고정하지 않는다', (tester) async {
+    final longStationName = '김포공항국제선환승센터';
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '김포': [
+          StationSearchResult(
+            id: 'station-gimpo-airport',
+            nameKo: longStationName,
+            nameEn: 'gimpo-airport',
+            region: '수도권',
+            dataQualityLevel: 'LEVEL_1',
+            dataSourceType: 'OFFICIAL_FILE',
+            lastVerifiedAt: '2026-06-13',
+            distanceMeters: 1280,
+            lines: const [
+              StationSearchLine(
+                id: 'seoul-9',
+                name: '수도권 9호선 급행',
+                color: '#BDB092',
+                stationCode: '902',
+              ),
+              StationSearchLine(
+                id: 'airport-railroad',
+                name: '공항철도 직통 일반 공용',
+                color: '#006D9D',
+                stationCode: 'A05',
+              ),
+            ],
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+        child: EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '김포');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    for (final text in [
+      '$longStationName역',
+      '현재 위치 기준 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용',
+      '일부 정보는 확인 중이에요',
+    ]) {
+      final widget = tester.widget<Text>(find.text(text));
+      expect(widget.maxLines, isNot(1));
+      expect(widget.overflow, isNot(TextOverflow.ellipsis));
     }
   });
 
@@ -6618,7 +6689,7 @@ void main() {
       expect(find.byKey(const Key('nearbyStationPrimaryCard')), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '가장 가까운 역, 상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 기본 정보만 있음',
+          '가장 가까운 역, 상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요',
         ),
         findsOneWidget,
       );
@@ -7037,10 +7108,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
-      expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(
-        find.bySemanticsLabel('상록수역, 수도권 2호선, 수도권, 기본 정보만 있음'),
+        find.bySemanticsLabel('상록수역, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요'),
         findsOneWidget,
       );
       await tester.tap(
@@ -7053,7 +7124,7 @@ void main() {
       expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('수도권 2호선'), findsOneWidget);
-      expect(find.text('기본 정보만 있음'), findsOneWidget);
+      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
       expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
@@ -7063,7 +7134,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 마지막 확인 2026-06-13',
+          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
@@ -7106,7 +7177,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 마지막 확인 2026-06-13, 지도 위치',
+          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -7117,7 +7188,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨, 지도 위치'),
+        find.bySemanticsLabel(
+          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태가 확인됐어요, 지도 위치',
+        ),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
@@ -7130,7 +7203,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태 확인됨, 다음 행동 상태 제보, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 다음 행동 상태 제보, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -7145,7 +7218,7 @@ void main() {
       expect(find.text('엘리베이터 연결'), findsOneWidget);
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태 확인됨'),
+        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태가 확인됐어요'),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
@@ -7172,7 +7245,7 @@ void main() {
           of: find.byKey(
             const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
           ),
-          matching: find.text('정보 확인 필요'),
+          matching: find.text('확인이 필요해요'),
         ),
         findsOneWidget,
       );
@@ -7190,7 +7263,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태 확인됨, 다음 행동 상태 제보',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 다음 행동 상태 제보',
         ),
         findsOneWidget,
       );
@@ -7413,7 +7486,7 @@ void main() {
 
       expect(find.text('이용 가능'), findsOneWidget);
       expect(find.text('이용 불가 확인'), findsOneWidget);
-      expect(find.text('정보 확인 필요'), findsOneWidget);
+      expect(find.text('확인이 필요해요'), findsOneWidget);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
@@ -7503,7 +7576,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('정보 기준'), findsOneWidget);
     expect(find.text('최근 확인됨'), findsOneWidget);
-    expect(find.text('확인 수준 높음'), findsOneWidget);
+    expect(find.text('최근 확인된 정보예요'), findsOneWidget);
     expect(find.text('공식 정보'), findsOneWidget);
     expectNoForbiddenUserCopy(tester);
 
@@ -7691,7 +7764,7 @@ void main() {
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
     expect(find.text('엘리베이터에서 개찰구까지 이동합니다.'), findsOneWidget);
     expect(
-      find.text('약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요'),
+      find.text('약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요'),
       findsOneWidget,
     );
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
@@ -7699,7 +7772,7 @@ void main() {
     expect(find.text('엘리베이터 필요'), findsNothing);
     expect(
       find.bySemanticsLabel(
-        '역 안 이동 순서, 역 안 이동 경로를 찾았어요, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요, 엘리베이터에서 개찰구까지 이동합니다.',
+        '역 안 이동 순서, 역 안 이동 경로를 찾았어요, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요, 엘리베이터에서 개찰구까지 이동합니다.',
       ),
       findsOneWidget,
     );
@@ -7910,7 +7983,7 @@ void main() {
 
     expect(
       find.bySemanticsLabel(
-        '상록수역 상세 정보, 수도권 2호선, 기본 정보만 있음, 마지막 확인 2026-06-13',
+        '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
       ),
       findsOneWidget,
     );
@@ -8225,10 +8298,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음'),
+          find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요'),
         ),
         isSemantics(
-          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 기본 정보만 있음',
+          label: '출발역 선택, 상록수, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요',
           isButton: true,
           hasTapAction: true,
         ),

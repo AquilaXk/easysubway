@@ -70,13 +70,13 @@ void main() {
     expect(favorites.single.severityLabel, '정상');
     expect(favorites.single.nextActionLabel, '상태 제보');
     expect(favorites.single.statusTitle, '이용 가능');
-    expect(favorites.single.confidenceLabel, '확인 수준 높음');
+    expect(favorites.single.confidenceLabel, '최근 확인된 정보예요');
     expect(favorites.single.dataSourceLabel, '공식 정보');
     expect(favorites.single.locationLabel, '1번 출구 앞');
-    expect(favorites.single.verificationStatusLabel, '상태 확인 필요');
+    expect(favorites.single.verificationStatusLabel, '상태를 다시 확인해 주세요');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태 확인 필요, 다음 행동 상태 제보',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 다음 행동 상태 제보',
     );
     expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(favorites.single.semanticLabel, isNot(contains('출처')));
@@ -96,14 +96,14 @@ void main() {
     expect(closed.needsAttention, isTrue);
     expect(unavailable.severityLabel, '고장·폐쇄');
     expect(unavailable.nextActionLabel, '대체 출구 보기');
-    expect(reported.severityLabel, '점검·제보');
+    expect(reported.severityLabel, '확인 요청');
     expect(reported.nextActionLabel, '역무원 도움 요청');
-    expect(unknown.severityLabel, '정보 확인 필요');
+    expect(unknown.severityLabel, '확인이 필요해요');
     expect(unknown.nextActionLabel, '시설 상세 보기');
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
-    expect(available.verificationStatusLabel, '상태 확인 필요');
-    expect(verified.verificationStatusLabel, '시설 상태 확인됨');
+    expect(available.verificationStatusLabel, '상태를 다시 확인해 주세요');
+    expect(verified.verificationStatusLabel, '시설 상태가 확인됐어요');
     expect(metadataOnlyDescription.locationLabel, '1F-B1');
   });
 

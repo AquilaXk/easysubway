@@ -9,6 +9,13 @@ const _forbiddenUserCopy = <String>[
   '관리자 검수',
   '현장 검증',
   '정보 신뢰도',
+  '기본 정보만 있음',
+  '확인 수준',
+  '정보 확인 필요',
+  '상태 확인 필요',
+  '점검·제보',
+  '검수 완료',
+  '제보 필요',
   '정적 추정',
   '측정값',
   '로그인 정보',
@@ -48,5 +55,6 @@ void expectNoForbiddenUserCopy(WidgetTester tester) {
       copy,
       isNot(matches(RegExp(r'(^|[^A-Za-z])(?:edge|node)([^A-Za-z]|$)'))),
     );
+    expect(copy, isNot(matches(RegExp(r'\d+\s*점'))));
   }
 }
