@@ -392,7 +392,7 @@ void main() {
     );
 
     expect(result.status, 'BLOCKED');
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
     expect(result.steps, isEmpty);
   });
 
@@ -427,7 +427,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
     expect(result.warnings, isEmpty);
     expect(result.recommendationReasons.join('\n'), isNot(contains('확인했어요')));
   });
@@ -470,7 +470,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
     expect(result.warnings, isEmpty);
   });
 
@@ -517,7 +517,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
     expect(result.warnings, isEmpty);
   });
 
@@ -624,7 +624,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
   });
 
   test('생성 transfer edge만 있는 휠체어 환승 경로는 검증된 경로로 안내하지 않는다', () async {
@@ -694,7 +694,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 동선 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
   });
 
   test('service pattern entry가 사용 불가이면 생성 entry로 우회하지 않는다', () async {
@@ -743,7 +743,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('base entry가 사용 불가이면 service pattern entry로 우회하지 않는다', () async {
@@ -792,7 +792,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('고장 시설에 연결된 entry edge는 접근 가능 경로에서 제외한다', () async {
@@ -859,7 +859,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('사용 불가 edge는 연결 시설 확인 필요 상태로 약화하지 않는다', () async {
@@ -926,7 +926,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('운행 상태 미확인 시설에 연결된 edge는 휠체어 경로 FOUND가 되지 않는다', () async {
@@ -995,7 +995,7 @@ void main() {
 
     expect(result.status, isNot('FOUND'));
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
   });
 
   test('검수 완료 시설에 연결된 available edge는 이동 가능하게 유지한다', () async {
@@ -1357,7 +1357,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('급행 pattern은 미정차역을 경유한 것처럼 연결하지 않는다', () async {
@@ -1696,7 +1696,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
   });
 
   test('service pattern transfer도 사용 불가 explicit transfer를 우회하지 않는다', () async {

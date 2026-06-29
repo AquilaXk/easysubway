@@ -1414,7 +1414,7 @@ class StationDetailController extends ChangeNotifier {
       return const RealtimeSnapshot(
         status: RealtimeSnapshotStatus.unsupported,
         fallbackCode: 'LINE_MAPPING_MISSING',
-        message: '노선 정보가 없어 실시간 열차를 확인할 수 없습니다.',
+        message: '이 노선은 아직 실시간 열차 안내가 어려워요.',
         receivedAt: '',
         arrivals: [],
       );

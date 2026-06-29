@@ -62,7 +62,7 @@
     },
     {
       "id": "route_result_found_and_unknown_or_needs_confirmation",
-      "titleKo": "경로 검색 결과와 확인 필요 상태"
+      "titleKo": "경로 검색 결과와 다시 확인 안내"
     },
     {
       "id": "facility_report_form",
@@ -443,7 +443,7 @@
     "supportRegionKo": "대한민국 도시철도 우선 지원",
     "dataBaselineRequired": true,
     "realtimeSupportScopeKo": "실시간 도착과 열차 위치는 지원 노선과 제공기관 상태가 확인된 범위에서만 표시",
-    "confirmationCopyKo": "경로와 시설 정보는 현장 상황과 다를 수 있어 이동 전 역무원 또는 운영기관 안내 확인이 필요합니다."
+    "confirmationCopyKo": "경로와 시설 정보는 현장 상황과 다를 수 있어 이동 전 역무원 또는 운영기관 안내를 함께 봐 주세요."
   },
   "prohibitedClaims": [
     "반드시 이동 가능",

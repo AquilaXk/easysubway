@@ -235,11 +235,11 @@ class LocalRouteEngine {
       'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 다시 확인해 주세요.',
       'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
-      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
       'GENERATED_CONNECTOR_UNVERIFIED' =>
         '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
       'DURATION_UNKNOWN' => '소요 시간을 다시 확인해 주세요.',
-      'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
+      'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };

@@ -9736,7 +9736,7 @@ void main() {
       expect(find.text('계단 없는 경로가 없습니다'), findsOneWidget);
       expect(find.text('추천 이유'), findsNothing);
       expect(find.text('엘리베이터 동선을 우선했어요'), findsNothing);
-      expect(find.text('안내 가능한 경로를 찾지 못했습니다.'), findsOneWidget);
+      expect(find.text('안내할 수 있는 경로를 아직 찾지 못했어요.'), findsOneWidget);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
         find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
