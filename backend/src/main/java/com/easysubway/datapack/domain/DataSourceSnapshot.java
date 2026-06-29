@@ -44,7 +44,7 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("rowCount must be zero or positive.");
 		}
 		rawSha256 = requireSha256(rawSha256, "rawSha256");
-		rawObjectUri = requireRawObjectUri(rawObjectUri);
+		rawObjectUri = requireText(rawObjectUri, "rawObjectUri");
 		redactedRequestFingerprint = requireSha256(redactedRequestFingerprint, "redactedRequestFingerprint");
 		schemaFingerprint = requireSha256(schemaFingerprint, "schemaFingerprint");
 		snapshotStatus = requireText(snapshotStatus, "snapshotStatus");
@@ -57,13 +57,17 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("freshnessExpiresAt is required.");
 		}
 		freshnessExpiresAt = normalizeTimestamp(freshnessExpiresAt);
-		if (!credentialRedacted) {
-			throw new InvalidDataSourceSnapshotException("credentialRedacted must be true before storing raw evidence.");
-		}
 		if (rawRetentionExpiresAt == null) {
 			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt is required.");
 		}
 		rawRetentionExpiresAt = normalizeTimestamp(rawRetentionExpiresAt);
+	}
+
+	public void requireRawEvidenceWritePolicy() {
+		if (!credentialRedacted) {
+			throw new InvalidDataSourceSnapshotException("credentialRedacted must be true before storing raw evidence.");
+		}
+		requireCredentialFreeRawObjectUri(rawObjectUri);
 		if (!rawRetentionExpiresAt.isAfter(retrievedAt)) {
 			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt must be after retrievedAt.");
 		}
@@ -84,7 +88,7 @@ public record DataSourceSnapshot(
 		return trimmed;
 	}
 
-	private static String requireRawObjectUri(String value) {
+	private static void requireCredentialFreeRawObjectUri(String value) {
 		String trimmed = requireText(value, "rawObjectUri");
 		URI uri;
 		try {
@@ -93,10 +97,14 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
 		var objectStorageScheme = "s3".equals(uri.getScheme()) || "oci".equals(uri.getScheme());
-		if (!objectStorageScheme || uri.getRawAuthority() == null || uri.getRawAuthority().isBlank() || uri.getRawQuery() != null || uri.getRawUserInfo() != null || uri.getRawFragment() != null) {
+		if (!objectStorageScheme
+			|| uri.getRawAuthority() == null
+			|| uri.getRawAuthority().isBlank()
+			|| uri.getRawQuery() != null
+			|| uri.getRawUserInfo() != null
+			|| uri.getRawFragment() != null) {
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
-		return trimmed;
 	}
 
 	private static String trimToNull(String value) {

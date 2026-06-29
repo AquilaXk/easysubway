@@ -29,6 +29,7 @@ public class JdbcDataSourceSnapshotRepository {
 	}
 
 	public DataSourceSnapshot saveSnapshot(DataSourceSnapshot snapshot) {
+		snapshot.requireRawEvidenceWritePolicy();
 		try {
 			insert(snapshot);
 			return snapshot;
