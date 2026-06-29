@@ -180,7 +180,7 @@ class DataPackUpdater {
       if (installedPointer != null) {
         return installedPointer;
       }
-      throw const DataPackClientException('활성 데이터팩을 선택하지 못했습니다.');
+      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했습니다.');
     }
 
     if (results.isEmpty) {
@@ -199,7 +199,7 @@ class DataPackUpdater {
       }
     }
     if (selected == null) {
-      throw const DataPackClientException('활성 데이터팩을 선택하지 못했습니다.');
+      throw const DataPackClientException('사용할 이동 정보를 선택하지 못했습니다.');
     }
     return selected;
   }
@@ -224,13 +224,13 @@ class DataPackUpdater {
         .timeout(_dataPackDownloadTimeout);
     final response = await request.close().timeout(_dataPackDownloadTimeout);
     if (response.statusCode != HttpStatus.ok) {
-      throw const DataPackClientException('데이터팩을 내려받지 못했습니다.');
+      throw const DataPackClientException('이동 정보를 내려받지 못했습니다.');
     }
     final expectedSizeBytes = pack.sizeBytes;
     final contentLength = response.contentLength;
     final maxBytes = expectedSizeBytes ?? _maxDataPackDownloadBytes;
     if (contentLength > maxBytes || contentLength > _maxDataPackDownloadBytes) {
-      throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
+      throw const DataPackClientException('이동 정보 파일이 너무 큽니다.');
     }
     final directory = await installer.catalogDirectory.create(recursive: true);
     final temporary = File(
@@ -242,7 +242,7 @@ class DataPackUpdater {
       await for (final chunk in response.timeout(_dataPackDownloadTimeout)) {
         received += chunk.length;
         if (received > maxBytes || received > _maxDataPackDownloadBytes) {
-          throw const DataPackClientException('데이터팩 크기가 허용 범위를 넘었습니다.');
+          throw const DataPackClientException('이동 정보 파일이 너무 큽니다.');
         }
         sink.add(chunk);
       }

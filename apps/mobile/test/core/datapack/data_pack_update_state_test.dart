@@ -284,7 +284,7 @@ void main() {
           isA<DataPackClientException>().having(
             (error) => error.message,
             'message',
-            '데이터팩 정보 형식이 올바르지 않습니다.',
+            '이동 정보 형식이 올바르지 않습니다.',
           ),
         ),
       );

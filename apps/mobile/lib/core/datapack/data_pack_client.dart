@@ -55,7 +55,7 @@ class DataPackClient {
       );
     }
     if (response.statusCode != HttpStatus.ok) {
-      throw const DataPackClientException('데이터팩 정보를 확인하지 못했습니다.');
+      throw const DataPackClientException('이동 정보를 확인하지 못했습니다.');
     }
 
     final body = await utf8
@@ -65,10 +65,10 @@ class DataPackClient {
     try {
       decoded = jsonDecode(body);
     } on FormatException {
-      throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
+      throw const DataPackClientException('이동 정보 형식이 올바르지 않습니다.');
     }
     if (decoded is! Map<String, Object?>) {
-      throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
+      throw const DataPackClientException('이동 정보 형식이 올바르지 않습니다.');
     }
     final DataPackManifest manifest;
     try {
@@ -77,11 +77,11 @@ class DataPackClient {
         productionSigningPublicKey: productionSigningPublicKey,
       );
     } on FormatException {
-      throw const DataPackClientException('데이터팩 정보 형식이 올바르지 않습니다.');
+      throw const DataPackClientException('이동 정보 형식이 올바르지 않습니다.');
     }
     _ensureExpectedManifestChannel(manifest);
     if (manifest.isExpiredAt(_now())) {
-      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+      throw const DataPackClientException('이동 정보가 만료되었습니다.');
     }
     try {
       await stateRepository.ensureManifestCanBeAccepted(manifest);
@@ -123,7 +123,7 @@ class DataPackClient {
     }
     final expiryTtl = expiresAt.difference(checkedAt.toUtc());
     if (expiryTtl <= Duration.zero) {
-      throw const DataPackClientException('데이터팩 정보가 만료되었습니다.');
+      throw const DataPackClientException('이동 정보가 만료되었습니다.');
     }
     return expiryTtl < ttl ? expiryTtl : ttl;
   }
@@ -136,7 +136,7 @@ class DataPackClient {
         ? 'production'
         : expectedManifestChannel.trim();
     if (manifest.channel != expected) {
-      throw const DataPackClientException('데이터팩 manifest 채널이 올바르지 않습니다.');
+      throw const DataPackClientException('이동 정보가 앱과 맞지 않습니다.');
     }
   }
 }
