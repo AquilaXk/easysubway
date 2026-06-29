@@ -898,6 +898,21 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(main, /homeRecentRouteEmptyState/);
 });
 
+test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지된다", () => {
+  const routeSearch = read("apps/mobile/lib/route_search.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+
+  assert.match(widgetTest, /경로 결과 단계는 시스템 뒤로가기를 화면 내 뒤로가기와 맞춘다/);
+  assert.match(widgetTest, /routeStartGuidanceButton/);
+  assert.match(widgetTest, /routeOpenInternalRouteButton/);
+  assert.match(widgetTest, /routeOpenFeedbackButton/);
+  assert.match(routeSearch, /return PopScope\(/);
+  assert.match(routeSearch, /_RouteWorkflowView\.detail\s*=>\s*_RouteWorkflowView\.list/);
+  assert.match(routeSearch, /_RouteWorkflowView\.guidance\s*=>\s*_RouteWorkflowView\.detail/);
+  assert.match(routeSearch, /_RouteWorkflowView\.internalRoute\s*=>\s*_RouteWorkflowView\.guidance/);
+  assert.match(routeSearch, /_RouteWorkflowView\.feedback\s*=>\s*_RouteWorkflowView\.detail/);
+});
+
 test("Android 권한 파서는 속성 순서와 추가 속성이 달라도 권한명을 추출한다", () => {
   const permissions = androidManifestPermissions(`
     <manifest xmlns:android="http://schemas.android.com/apk/res/android">
