@@ -1693,6 +1693,7 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
               constraints,
+              textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
             );
             return RefreshIndicator(
               key: const Key('homeRefreshIndicator'),
