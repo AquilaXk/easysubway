@@ -23,12 +23,12 @@ CREATE TABLE IF NOT EXISTS data_source_snapshots (
 		ON DELETE RESTRICT ON UPDATE RESTRICT,
 	CONSTRAINT chk_data_source_snapshots_row_count
 		CHECK (row_count >= 0),
-	CONSTRAINT chk_data_source_snapshots_raw_sha256
-		CHECK (raw_sha256 ~ '^[0-9a-f]{64}$'),
-	CONSTRAINT chk_data_source_snapshots_request_fingerprint
-		CHECK (redacted_request_fingerprint ~ '^[0-9a-f]{64}$'),
-	CONSTRAINT chk_data_source_snapshots_schema_fingerprint
-		CHECK (schema_fingerprint ~ '^[0-9a-f]{64}$')
+	CONSTRAINT chk_data_source_snapshots_sha256_fields
+		CHECK (
+			raw_sha256 ~ '^[0-9a-f]{64}$'
+			AND redacted_request_fingerprint ~ '^[0-9a-f]{64}$'
+			AND schema_fingerprint ~ '^[0-9a-f]{64}$'
+		)
 );
 
 CREATE INDEX IF NOT EXISTS idx_data_source_snapshots_source_retrieved
