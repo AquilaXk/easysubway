@@ -45,12 +45,29 @@ class DatabaseMigrationContainerTest {
 				"facility_reports",
 				"push_notification_outbox",
 				"data_source_snapshots",
+				"external_alias_approvals",
+				"source_quarantine_records",
+				"source_quarantine_resolutions",
 				"transit_master_overrides",
 				"transit_master_override_audits"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17");
 		assertThat(foreignKeyNames(jdbcTemplate))
-			.contains("fk_facility_report_review_audits_report", "fk_data_source_snapshots_previous");
+			.contains(
+				"fk_facility_report_review_audits_report",
+				"fk_data_source_snapshots_previous",
+				"fk_external_alias_approvals_snapshot",
+				"fk_external_alias_approvals_superseded",
+				"fk_source_quarantine_records_snapshot",
+				"fk_source_quarantine_resolutions_record"
+			);
+		assertThat(checkConstraintNames(jdbcTemplate))
+			.contains(
+				"chk_external_alias_approvals_confidence",
+				"chk_external_alias_approvals_approved_state",
+				"chk_source_quarantine_records_resolution_state",
+				"chk_source_quarantine_resolutions_status"
+			);
 	}
 
 	private List<String> tableNames(JdbcTemplate jdbcTemplate) {
@@ -77,6 +94,16 @@ class DatabaseMigrationContainerTest {
 			FROM information_schema.table_constraints
 			WHERE table_schema = 'public'
 				AND constraint_type = 'FOREIGN KEY'
+			ORDER BY constraint_name
+			""", String.class);
+	}
+
+	private List<String> checkConstraintNames(JdbcTemplate jdbcTemplate) {
+		return jdbcTemplate.queryForList("""
+			SELECT constraint_name
+			FROM information_schema.table_constraints
+			WHERE table_schema = 'public'
+				AND constraint_type = 'CHECK'
 			ORDER BY constraint_name
 			""", String.class);
 	}
