@@ -393,7 +393,7 @@ class FavoriteStation {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선 정보 없음';
+      return '노선을 다시 확인해 주세요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -460,7 +460,7 @@ class StationSearchResult {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선 정보 없음';
+      return '노선을 다시 확인해 주세요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -545,7 +545,7 @@ class StationDetail {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선 정보 없음';
+      return '노선을 다시 확인해 주세요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -743,7 +743,7 @@ class StationFacilityInfo {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '확인이 필요해요',
+      'UNKNOWN' => '한 번 더 확인해 주세요',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
@@ -787,7 +787,7 @@ class StationFacilityInfo {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치 확인 필요';
+    return '위치를 다시 확인해 주세요';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
@@ -965,7 +965,7 @@ String _fieldVerificationStatusLabel(String fieldValidationStatus) {
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
-  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인 필요)'), '');
+  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인\s*필요)'), '');
   label = label.replaceAll(RegExp(r'관리자\s*검[수]'), '');
   label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
   return label;
@@ -1249,7 +1249,7 @@ class StationDetailState {
   String get facilityAttentionSemanticLabel {
     final count = attentionFacilityCount;
     if (count == 0) {
-      return '확인이 필요한 시설 없음';
+      return '다시 볼 시설 없음';
     }
     return buildFacilityAttentionSemanticLabel(
       facilities.map((facility) => facility.status),
@@ -5568,7 +5568,7 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   final from = facility.floorFrom.trim();
   final to = facility.floorTo.trim();
   if (from.isEmpty && to.isEmpty) {
-    return '연결 위치 확인 필요';
+    return '연결 위치를 다시 확인해 주세요';
   }
   if (from.isEmpty || to.isEmpty) {
     return '연결 위치 ${from.isEmpty ? to : from}';

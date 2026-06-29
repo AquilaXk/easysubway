@@ -1300,10 +1300,13 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 확인 요청 1개 · 확인이 필요해요 1개');
+    expect(
+      state.facilityAttentionSummary,
+      '고장·폐쇄 1개 · 가기 전 확인 1개 · 한 번 더 확인 1개',
+    );
     expect(
       state.facilityAttentionSemanticLabel,
-      '확인이 필요한 시설, 고장·폐쇄 1개, 확인 요청 1개, 확인이 필요해요 1개',
+      '다시 볼 시설, 고장·폐쇄 1개, 가기 전 확인 1개, 한 번 더 확인 1개',
     );
   });
 
@@ -1455,13 +1458,13 @@ void main() {
 
     expect(ramp.typeLabel, '경사로');
     expect(ramp.statusLabel, '공사 중');
-    expect(ramp.severityLabel, '확인 요청');
+    expect(ramp.severityLabel, '가기 전 확인');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
     expect(ramp.confidenceLabel, '확인이 더 필요해요');
-    expect(ramp.statusTitle, '현장 확인 필요');
+    expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');

@@ -285,7 +285,7 @@ class InternalRouteResult {
     return switch (status) {
       'FOUND' => '역 안 이동 경로를 찾았어요',
       'BLOCKED' => '계단 없는 역 안 이동 경로를 찾지 못했어요',
-      _ => '역 안 이동 확인이 필요해요',
+      _ => '역 안 이동을 다시 확인해 주세요',
     };
   }
 
@@ -293,7 +293,9 @@ class InternalRouteResult {
 
   String get totalBurdenLabel {
     if (isBlocked) {
-      return blockedReasons.isEmpty ? '이동 전 확인 필요' : blockedReasons.join(', ');
+      return blockedReasons.isEmpty
+          ? '이동 전에 다시 확인해 주세요'
+          : blockedReasons.join(', ');
     }
     return '${_internalRouteSecondsLabel(totalEstimatedSeconds)} · ${_internalRouteDistanceLabel(totalDistanceMeters)}';
   }
@@ -420,7 +422,7 @@ class InternalRouteWarning {
 
   String get userMessage {
     return switch (code.trim()) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 이동 전 확인이 필요해요.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 이동 전에 다시 확인해 주세요.',
       'STALE_ACCESSIBILITY_DATA' => '엘리베이터와 통로 상태를 최근에 확인하지 못했어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 확인하지 못했어요.',

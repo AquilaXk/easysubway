@@ -96,9 +96,9 @@ void main() {
     expect(closed.needsAttention, isTrue);
     expect(unavailable.severityLabel, '고장·폐쇄');
     expect(unavailable.nextActionLabel, '대체 출구 보기');
-    expect(reported.severityLabel, '확인 요청');
+    expect(reported.severityLabel, '가기 전 확인');
     expect(reported.nextActionLabel, '역무원 도움 요청');
-    expect(unknown.severityLabel, '확인이 필요해요');
+    expect(unknown.severityLabel, '한 번 더 확인');
     expect(unknown.nextActionLabel, '시설 상세 보기');
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);

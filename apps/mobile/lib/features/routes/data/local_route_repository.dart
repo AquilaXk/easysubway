@@ -255,7 +255,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     return [
       '현재 저장된 안내로 경로 단계를 계산했어요.',
       '출구와 시설 상태는 현장 안내를 함께 확인해 주세요.',
-      if (result.warnings.isNotEmpty) '확인 필요 구간은 주의 안내와 함께 표시합니다.',
+      if (result.warnings.isNotEmpty) '다시 볼 구간은 주의 안내와 함께 표시합니다.',
     ];
   }
 
@@ -720,7 +720,7 @@ class _RouteCatalogSnapshot {
   }
 
   String stationName(String stationId) {
-    return stationsById[stationId] ?? '확인 필요 역';
+    return stationsById[stationId] ?? '이름을 다시 확인해 주세요';
   }
 
   bool hasStation(String stationId) {
