@@ -1821,15 +1821,19 @@ class _RouteRecentDestinationListState
   @override
   void initState() {
     super.initState();
-    _future = widget.repository?.listFavoriteRoutes();
+    _loadFavorites();
   }
 
   @override
   void didUpdateWidget(_RouteRecentDestinationList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.repository != widget.repository) {
-      _future = widget.repository?.listFavoriteRoutes();
+      _loadFavorites();
     }
+  }
+
+  void _loadFavorites() {
+    _future = widget.repository?.listFavoriteRoutes();
   }
 
   @override
@@ -1841,6 +1845,25 @@ class _RouteRecentDestinationListState
     return FutureBuilder<List<FavoriteRoute>>(
       future: future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _RouteSearchMessage(
+                message: '최근 도착지를 불러오지 못했어요.',
+                liveRegion: true,
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('routeRecentDestinationRetryButton'),
+                onPressed: () => setState(_loadFavorites),
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 불러오기'),
+              ),
+              const SizedBox(height: 18),
+            ],
+          );
+        }
         final routes = snapshot.data ?? const <FavoriteRoute>[];
         final destinations = _routeRecentDestinations(routes);
         if (destinations.isEmpty) {
