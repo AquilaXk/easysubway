@@ -96,6 +96,7 @@ class DatabaseMigrationContainerTest {
 		assertNormalizationRunGuards(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
 		assertSnapshotRawEvidencePolicyGuards(jdbcTemplate);
+		assertPostgresqlSnapshotRawEvidenceConstraintsAreStaged(jdbcTemplate);
 		assertFacilityEvidenceStrictRouteGuards(jdbcTemplate);
 		assertManualOverrideProductionGuards(jdbcTemplate);
 		assertRouteEdgeEvidenceStrictRouteGuards(jdbcTemplate);
@@ -240,6 +241,25 @@ class DatabaseMigrationContainerTest {
 				AND constraint_type = 'CHECK'
 			ORDER BY constraint_name
 			""", String.class);
+	}
+
+	private void assertPostgresqlSnapshotRawEvidenceConstraintsAreStaged(JdbcTemplate jdbcTemplate) {
+		assertThat(jdbcTemplate.queryForList("""
+			SELECT conname
+			FROM pg_constraint
+			WHERE conname IN (
+				'chk_data_source_snapshots_credential_redacted',
+				'chk_data_source_snapshots_raw_object_uri',
+				'chk_data_source_snapshots_raw_retention'
+			)
+				AND convalidated = false
+			ORDER BY conname
+			""", String.class))
+			.containsExactly(
+				"chk_data_source_snapshots_credential_redacted",
+				"chk_data_source_snapshots_raw_object_uri",
+				"chk_data_source_snapshots_raw_retention"
+			);
 	}
 
 	private void assertDatapackPermissionMatrix(JdbcTemplate jdbcTemplate) {
