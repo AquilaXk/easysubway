@@ -7484,7 +7484,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다/);
-  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 설정이 꺼진 구성에서 온보딩 알림 권한을 요청하지 않는다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다/);
   assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
@@ -7634,7 +7634,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReportTest, /접수번호로 처리 상태를 조회한다/);
   assert.match(facilityReportTest, /접수 후 처리 상태를 다시 확인한다/);
   assert.match(widgetTest, /제보 번호 ES-1001, 현재 상태 반영됨/);
-  assert.match(widgetTest, /시설 신고 실패는 다음 행동을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /시설 신고 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(notificationSettings, /class NotificationSettingsApiRepository/);
   assert.match(notificationSettings, /\/api\/v1\/me\/notification-settings/);
   assert.match(notificationSettings, /AuthorizationHeaderProvider/);
@@ -7651,12 +7651,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요\./);
   assert.match(notificationSettingsTest, /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(notificationSettingsTest, /알림 설정 컨트롤러는 조회와 저장 상태를 구분한다/);
-  assert.match(widgetTest, /알림 설정 화면은 기기 알림 실패 다음 행동을 안내한다/);
+  assert.match(widgetTest, /알림 설정 화면은 기기 알림 실패 도움말을 안내한다/);
   assert.match(read("apps/mobile/lib/onboarding.dart"), /onboardingNotificationFailureNextAction/);
   assert.match(read("apps/mobile/lib/onboarding.dart"), /나중에 알림 설정에서 다시 켤 수 있습니다\./);
-  assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 다음 행동을 안내한다/);
-  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
-  assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 다음 행동을 안내한다/);
+  assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 도움말을 안내한다/);
+  assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
+  assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
   assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
@@ -7694,23 +7694,23 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(supportAccessInfoTest, /Release security email must be configured\./);
   assert.match(routeSearch, /routeSearchFailureNextAction/);
   assert.match(routeSearch, /역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요\./);
-  assert.match(routeSearch, /다음 행동 \$_routeSearchFailureNextAction/);
+  assert.match(routeSearch, /다른 방법 \$_routeSearchFailureNextAction/);
   assert.match(routeSearch, /routeBlockedNextActionNotice/);
   assert.doesNotMatch(
     routeSearch,
     /label: '다음 행동, \$_routeSearchFailureNextAction'[\s\S]{0,120}child: const SizedBox\.shrink\(\)/,
   );
-  assert.match(widgetTest, /경로 검색 실패는 다음 행동을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /안내 불가 이유[\s\S]*다음 행동/);
+  assert.match(widgetTest, /경로 검색 실패는 도움말을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /안내 불가 이유[\s\S]*도움말/);
   assert.match(routeSearch, /routeFeedbackFailureNextAction/);
   assert.match(routeSearch, /잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요\./);
-  assert.match(widgetTest, /경로 피드백 실패는 다음 행동을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /경로 피드백 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /favoriteRouteSaveFailureNextAction/);
   assert.match(routeSearch, /네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요\./);
   assert.match(routeSearch, /favoriteRouteLoadFailureNextAction/);
   assert.match(routeSearch, /네트워크 상태를 확인한 뒤 다시 불러와 주세요\./);
-  assert.match(widgetTest, /즐겨찾기 경로 저장 실패는 다음 행동을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /즐겨찾기 경로 목록 실패는 다음 행동을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /import 'core\/network\/api_client\.dart';/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*_apiClient\.postJson\(/);

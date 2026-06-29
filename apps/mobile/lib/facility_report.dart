@@ -2544,7 +2544,7 @@ class _FacilityReportMessage extends StatelessWidget {
             container: true,
             excludeSemantics: true,
             liveRegion: true,
-            label: '다음 행동, $_facilityReportFailureNextAction',
+            label: '도움말, $_facilityReportFailureNextAction',
             child: Text(
               _facilityReportFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
