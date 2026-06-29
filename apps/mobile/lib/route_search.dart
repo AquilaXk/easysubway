@@ -960,7 +960,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '확인 필요',
+        fallback: '다시 확인해 주세요',
       ),
     );
   }
@@ -1035,7 +1035,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리 확인 필요';
+      return '시간 또는 거리를 다시 확인해 주세요';
     }
     return '앱에 저장된 길 안내 기준';
   }
@@ -1043,14 +1043,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간 확인 필요';
+    return '시간을 다시 확인해 주세요';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리 확인 필요';
+    return '거리를 다시 확인해 주세요';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
@@ -1071,7 +1071,7 @@ String _routeWarningLabel(String code) {
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     'GENERATED_CONNECTOR_UNVERIFIED' =>
       '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
-    'DURATION_UNKNOWN' => '소요 시간 확인이 필요한 구간입니다.',
+    'DURATION_UNKNOWN' => '소요 시간을 다시 확인해 주세요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
     _ => '일부 이동 정보를 확인하지 못했어요.',

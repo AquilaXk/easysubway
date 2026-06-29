@@ -965,7 +965,7 @@ String _fieldVerificationStatusLabel(String fieldValidationStatus) {
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
-  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인 필요)'), '');
+  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인\s*필요)'), '');
   label = label.replaceAll(RegExp(r'관리자\s*검[수]'), '');
   label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
   return label;

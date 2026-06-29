@@ -293,7 +293,9 @@ class InternalRouteResult {
 
   String get totalBurdenLabel {
     if (isBlocked) {
-      return blockedReasons.isEmpty ? '이동 전 확인 필요' : blockedReasons.join(', ');
+      return blockedReasons.isEmpty
+          ? '이동 전에 다시 확인해 주세요'
+          : blockedReasons.join(', ');
     }
     return '${_internalRouteSecondsLabel(totalEstimatedSeconds)} · ${_internalRouteDistanceLabel(totalDistanceMeters)}';
   }

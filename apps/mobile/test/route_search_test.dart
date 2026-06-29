@@ -290,7 +290,7 @@ void main() {
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.hasMetricSourceMetadata, isTrue);
-    expect(result.steps.first.metricSourceLabel, '시간 또는 거리 확인 필요');
+    expect(result.steps.first.metricSourceLabel, '시간 또는 거리를 다시 확인해 주세요');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.stepType, 'entry');
@@ -306,7 +306,7 @@ void main() {
       result.warnings.map((warning) => warning.userMessage),
       contains('접근성 시설 정보가 최근 확인되지 않았습니다.'),
     );
-    expect(result.semanticLabel, contains('시간 또는 거리 확인 필요'));
+    expect(result.semanticLabel, contains('시간 또는 거리를 다시 확인해 주세요'));
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {
@@ -656,7 +656,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '약 30분 · 거리 확인 필요');
+    expect(step.burdenLabel, '약 30분 · 거리를 다시 확인해 주세요');
   });
 
   test('경로 단계 이동 부담은 측정 시간 없음 상태를 0분으로 표시하지 않는다', () {
@@ -674,7 +674,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '시간 확인 필요 · 180m');
+    expect(step.burdenLabel, '시간을 다시 확인해 주세요 · 180m');
   });
 
   test('경로 계단 상태는 unknown을 계단 없음으로 올리지 않는다', () {

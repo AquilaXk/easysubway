@@ -10245,7 +10245,7 @@ void main() {
             facilityId: 'facility-sangnoksu-toilet-1',
             facilityName: '장애인 화장실',
             facilityTypeLabel: '장애인 화장실',
-            facilityStatusLabel: '확인 필요',
+            facilityStatusLabel: '다시 확인해 주세요',
           ),
           draftTargetStore: draftTargetStore,
           photoPicker: () async => const FacilityReportPhotoAttachment(
@@ -10287,7 +10287,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '확인 필요',
+        facilityStatusLabel: '다시 확인해 주세요',
       ),
     );
     var restoreCount = 0;
@@ -10324,7 +10324,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 다시 확인해 주세요'),
       findsOneWidget,
     );
 
@@ -10373,7 +10373,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '확인 필요',
+        facilityStatusLabel: '다시 확인해 주세요',
       ),
     );
     var restoreCount = 0;
@@ -10420,7 +10420,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 확인 필요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 다시 확인해 주세요'),
       findsOneWidget,
     );
   });
@@ -10434,7 +10434,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '확인 필요',
+        facilityStatusLabel: '다시 확인해 주세요',
       ),
     )..throwOnClear = true;
 
