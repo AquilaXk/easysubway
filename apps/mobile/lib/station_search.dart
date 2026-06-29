@@ -603,7 +603,7 @@ class StationExitInfo {
   final String fieldValidationStatus;
 
   String get elevatorConnectionLabel {
-    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결 확인 필요';
+    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결은 다시 확인해 주세요';
   }
 
   String get stairPathLabel {
@@ -743,12 +743,12 @@ class StationFacilityInfo {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '확인 필요',
+      'UNKNOWN' => '확인이 필요해요',
       'USER_REPORTED' => '제보됨',
-      'ADMIN_VERIFIED' => '검수 완료',
-      'NEEDS_REPORT' => '제보 필요',
-      'NEEDS_CHECK' => '확인 필요',
-      _ => '상태 확인 필요',
+      'ADMIN_VERIFIED' => '확인 완료',
+      'NEEDS_REPORT' => '알려 주세요',
+      'NEEDS_CHECK' => '다시 확인해 주세요',
+      _ => '다시 확인해 주세요',
     };
   }
 
@@ -927,20 +927,20 @@ int? _optionalInt(Map<String, Object?> json, String key) {
 
 String _dataQualityLabel(String dataQualityLevel) {
   return switch (dataQualityLevel) {
-    'LEVEL_1' => '기본 정보만 있음',
-    'LEVEL_2' => '시설 정보 확인됨',
-    'LEVEL_3' => '쉬운 길 안내 가능',
-    'LEVEL_4' => '고장·공사 반영됨',
-    _ => '정보 확인 필요',
+    'LEVEL_1' => '일부 정보는 확인 중이에요',
+    'LEVEL_2' => '시설 정보를 함께 볼 수 있어요',
+    'LEVEL_3' => '쉬운 길 안내를 볼 수 있어요',
+    'LEVEL_4' => '고장·공사 소식이 반영됐어요',
+    _ => '확인이 더 필요해요',
   };
 }
 
 String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
-    'HIGH' => '확인 수준 높음',
-    'MEDIUM' => '확인 수준 보통',
-    'LOW' => '정보 확인 필요',
-    _ => '정보 확인 필요',
+    'HIGH' => '최근 확인된 정보예요',
+    'MEDIUM' => '일부 확인된 정보예요',
+    'LOW' => '확인이 더 필요해요',
+    _ => '확인이 더 필요해요',
   };
 }
 
@@ -948,18 +948,18 @@ String _fieldValidationLabel(String fieldValidationStatus) {
   final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
   return switch (normalizedStatus) {
     'VERIFIED' => '최근 확인됨',
-    'STALE' => '최근 재확인 필요',
-    'UNKNOWN' => '최근 확인 정보 없음',
-    _ => '최근 확인 정보 없음',
+    'STALE' => '최근 정보는 다시 확인해 주세요',
+    'UNKNOWN' => '최근 확인 정보가 없어요',
+    _ => '최근 확인 정보가 없어요',
   };
 }
 
 String _fieldVerificationStatusLabel(String fieldValidationStatus) {
   final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
   return switch (normalizedStatus) {
-    'VERIFIED' => '시설 상태 확인됨',
-    'STALE' => '상태 재확인 필요',
-    _ => '상태 확인 필요',
+    'VERIFIED' => '시설 상태가 확인됐어요',
+    'STALE' => '상태를 다시 확인해 주세요',
+    _ => '상태를 다시 확인해 주세요',
   };
 }
 
@@ -3373,8 +3373,6 @@ class _StationSearchResultTile extends StatelessWidget {
                               children: [
                                 Text(
                                   stationName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: textTheme.titleLarge?.copyWith(
                                     color: const Color(0xFF102A2C),
                                     fontWeight: FontWeight.w700,
@@ -3386,8 +3384,6 @@ class _StationSearchResultTile extends StatelessWidget {
                                   result.distanceLabel.isEmpty
                                       ? result.lineLabel
                                       : '${result.distanceLabel} · ${result.lineLabel}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyLarge?.copyWith(
                                     color: const Color(0xFF29484B),
                                     fontWeight: FontWeight.w600,
@@ -3397,8 +3393,6 @@ class _StationSearchResultTile extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Text(
                                   result.dataQualityLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyMedium?.copyWith(
                                     color: const Color(0xFF405A5D),
                                     fontWeight: FontWeight.w600,

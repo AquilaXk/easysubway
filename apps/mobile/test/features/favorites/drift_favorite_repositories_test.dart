@@ -61,7 +61,7 @@ void main() {
     expect(favorites.single.facilityId, 'facility-sangnoksu-elevator-1');
     expect(favorites.single.stationNameKo, '상록수');
     expect(favorites.single.name, '1번 출구 엘리베이터');
-    expect(favorites.single.verificationStatusLabel, '시설 상태 확인됨');
+    expect(favorites.single.verificationStatusLabel, '시설 상태가 확인됐어요');
     expect(favorites.single.lastUpdatedAt, '2026-06-19');
     expect(favorites.single.addedAt, '2026-06-19T09:00:00.000Z');
   });
@@ -92,7 +92,7 @@ void main() {
       favorites.single.facilityId,
       'facility-sangnoksu-accessible-toilet-1',
     );
-    expect(favorites.single.verificationStatusLabel, '상태 재확인 필요');
+    expect(favorites.single.verificationStatusLabel, '상태를 다시 확인해 주세요');
     expect(favorites.single.lastUpdatedAt, '2025-06-01');
   });
 

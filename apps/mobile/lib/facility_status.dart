@@ -31,7 +31,7 @@ const _blockedPresentation = FacilityStatusPresentation(
 
 const _cautionPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.caution,
-  severityLabel: '점검·제보',
+  severityLabel: '확인 요청',
   statusTitle: '현장 확인 필요',
   nextActionLabel: '역무원 도움 요청',
   nextActionDescription: '현장 안내를 확인하고 필요하면 역무원 도움을 요청하세요.',
@@ -40,8 +40,8 @@ const _cautionPresentation = FacilityStatusPresentation(
 
 const _needsInfoPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '정보 확인 필요',
-  statusTitle: '정보 확인 필요',
+  severityLabel: '확인이 필요해요',
+  statusTitle: '확인이 필요해요',
   nextActionLabel: '시설 상세 보기',
   nextActionDescription: '최근 확인 시각과 출처를 보고 이동 전 현장 안내를 확인하세요.',
   priority: 30,

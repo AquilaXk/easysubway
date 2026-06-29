@@ -120,7 +120,7 @@ void main() {
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
     expect(
       result.steps.single.burdenLabel,
-      '약 1분 15초 · 28m · 최근 확인 정보 없음 · 엘리베이터를 이용해요',
+      '약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요',
     );
     expect(result.semanticLabel, contains('1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지'));
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));

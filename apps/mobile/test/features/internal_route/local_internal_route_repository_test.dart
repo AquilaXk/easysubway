@@ -231,11 +231,11 @@ void main() {
     );
     expect(
       await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
-      contains('최근 확인 정보 없음'),
+      contains('최근 확인 정보가 없어요'),
     );
     expect(
       await burdenLabelFor('node-stale-from', 'node-stale-to'),
-      contains('최근 상태 확인 필요'),
+      contains('최근 상태를 다시 확인해 주세요'),
     );
   });
 

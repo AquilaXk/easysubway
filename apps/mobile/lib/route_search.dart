@@ -470,9 +470,11 @@ class FavoriteRoute {
   String get scoreBasisSemanticLabel =>
       '기준 $mobilityLabel, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
 
-  String get movementMetricLabel => '예상 시간 확인 필요 · 환승 확인 필요 · 도보 확인 필요';
+  String get movementMetricLabel =>
+      '예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요';
 
-  String get accessibilityMetricLabel => '계단 정보 확인 필요 · 엘리베이터 연결 확인 필요';
+  String get accessibilityMetricLabel =>
+      '계단 여부는 다시 확인해 주세요 · 엘리베이터 연결은 다시 확인해 주세요';
 
   String get semanticLabel {
     return [
@@ -482,11 +484,11 @@ class FavoriteRoute {
       mobilityLabel,
       scoreLabel,
       scoreBasisSemanticLabel,
-      '예상 시간 확인 필요',
-      '환승 확인 필요',
-      '도보 확인 필요',
-      '계단 정보 확인 필요',
-      '엘리베이터 연결 확인 필요',
+      '예상 시간은 다시 확인해 주세요',
+      '환승은 다시 확인해 주세요',
+      '걷는 거리는 다시 확인해 주세요',
+      '계단 여부는 다시 확인해 주세요',
+      '엘리베이터 연결은 다시 확인해 주세요',
     ].join(', ');
   }
 }
