@@ -659,6 +659,11 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ADMIN_PASSWORD=secret",
     "EASYSUBWAY_ADMIN_REVISION=main-20260627",
     "EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=datapack-20260627",
+    "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true",
+    "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
@@ -683,6 +688,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
+  assert.match(validator, /EASYSUBWAY_ADMIN_CUTOVER_ENFORCED/);
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, [
@@ -759,6 +765,29 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
     /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/
   );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK[\s\S]*EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP/
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines.map((line) => {
+      if (line === "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=false") return "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=false") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_RBAC_ENFORCEMENT=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=true";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=false";
+      if (line === "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true") return "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=false";
+      return line;
+    }),
+    "",
+  ].join("\n"));
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, "EASYSUBWAY_POSTGRES_DB=easysubway\n");
   await assert.rejects(
@@ -868,6 +897,37 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
+test("release dart-define guard는 demo home data flag를 차단한다", async () => {
+  await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
+  ], { cwd: root });
+  await assert.rejects(
+    execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true",
+    ], { cwd: root }),
+    /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
+  );
+});
+
+test("mobile datapack asset audit는 fixture provenance와 최소 row를 검사한다", async () => {
+  const auditor = read("tools/ci/audit-mobile-datapack-assets.mjs");
+  assert.match(auditor, /artifactKind/);
+  assert.match(auditor, /fixture/);
+  assert.match(auditor, /sourceInventory/);
+  assert.match(auditor, /review-required/);
+  assert.match(auditor, /station_exits/);
+  assert.match(auditor, /facilities/);
+  assert.match(auditor, /data_quality_records/);
+  await execFileAsync(process.execPath, [
+    "tools/ci/audit-mobile-datapack-assets.mjs",
+    "--index",
+    "apps/mobile/assets/datapacks/index.json",
+    "--root",
+    "apps/mobile",
+  ], { cwd: root });
+});
+
 test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 backend image 검증을 생성한다", () => {
   assert.equal(
     existsSync(path.join(root, ".github/workflows/release-artifacts.yml")),
@@ -889,11 +949,13 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
   assert.match(workflow, /keytool -genkeypair/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
-  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
-  assert.match(workflow, /flutter build appbundle --release/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
+	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
+	  assert.match(workflow, /node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile/);
+	  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
+	  assert.match(workflow, /flutter build appbundle --release/);
   assert.equal(
     (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
     0,
@@ -909,7 +971,8 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
-  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true/);
   assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);

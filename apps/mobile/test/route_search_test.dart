@@ -289,7 +289,8 @@ void main() {
     ]);
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.actionTitle, isEmpty);
-    expect(result.steps.first.hasMetricSourceMetadata, isFalse);
+    expect(result.steps.first.hasMetricSourceMetadata, isTrue);
+    expect(result.steps.first.metricSourceLabel, '시간 또는 거리 확인 필요');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.stepType, 'entry');
@@ -305,8 +306,7 @@ void main() {
       result.warnings.map((warning) => warning.userMessage),
       contains('접근성 시설 정보가 최근 확인되지 않았습니다.'),
     );
-    expect(result.semanticLabel, isNot(contains('시간 확인 필요')));
-    expect(result.semanticLabel, isNot(contains('거리 확인 필요')));
+    expect(result.semanticLabel, contains('시간 또는 거리 확인 필요'));
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {

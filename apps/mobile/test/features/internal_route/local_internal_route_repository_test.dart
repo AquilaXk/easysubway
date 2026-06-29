@@ -288,16 +288,18 @@ void main() {
     );
 
     final step = result.steps.single;
-    expect(step.edgeType, 'WALK');
+    expect(step.edgeType, 'UNKNOWN');
     expect(step.distanceMeters, 0);
     expect(step.estimatedSeconds, 80);
     expect(step.includesStairs, isFalse);
     expect(step.requiresElevator, isFalse);
     expect(step.requiresEscalator, isFalse);
-    expect(step.slopeLevel, 1);
-    expect(step.widthLevel, 2);
-    expect(step.reliabilityScore, 100);
-    expect(result.warnings, isEmpty);
+    expect(step.slopeLevel, 0);
+    expect(step.widthLevel, 0);
+    expect(step.reliabilityScore, 40);
+    expect(result.warnings.map((warning) => warning.code), [
+      'LOW_DATA_CONFIDENCE',
+    ]);
 
     final wheelchairResult = await repository.searchInternalRoute(
       const InternalRouteRequest(

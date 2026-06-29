@@ -949,9 +949,17 @@ class RouteSearchStep {
         json['evidenceSources'],
         'route step evidence source',
       ),
-      timeSource: _optionalRouteString(json, 'timeSource'),
-      distanceSource: _optionalRouteString(json, 'distanceSource'),
-      confidenceLabel: _optionalRouteString(json, 'confidenceLabel'),
+      timeSource: _optionalRouteString(json, 'timeSource', fallback: 'UNKNOWN'),
+      distanceSource: _optionalRouteString(
+        json,
+        'distanceSource',
+        fallback: 'UNKNOWN',
+      ),
+      confidenceLabel: _optionalRouteString(
+        json,
+        'confidenceLabel',
+        fallback: '확인 필요',
+      ),
     );
   }
 
@@ -997,7 +1005,8 @@ class RouteSearchStep {
       _routeStepDetailLabel(stepType: stepType),
       if (safeReason.isNotEmpty) safeReason,
       burdenLabel,
-      if (hasMetricSourceMetadata) '시간과 거리는 앱 경로 데이터 기준',
+      if (confidenceLabel.isNotEmpty) confidenceLabel,
+      if (hasMetricSourceMetadata) metricSourceLabel,
     ];
     return labels.join(', ');
   }
@@ -1018,6 +1027,13 @@ class RouteSearchStep {
   String get metricSourceLabel {
     if (!hasMetricSourceMetadata) {
       return '';
+    }
+    if (timeSource == 'ESTIMATED_CONSTANT' ||
+        distanceSource == 'ESTIMATED_CONSTANT') {
+      return '추정 시간과 거리, 현장 안내 우선';
+    }
+    if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
+      return '시간 또는 거리 확인 필요';
     }
     return '앱 경로 데이터 기준';
   }
@@ -1051,6 +1067,8 @@ String _routeWarningLabel(String code) {
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
+    'GENERATED_CONNECTOR_UNVERIFIED' => '연결 추정 구간입니다. 현장 확인이 필요합니다.',
+    'DURATION_UNKNOWN' => '소요 시간 확인이 필요한 구간입니다.',
     'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
     _ => '일부 이동 정보를 확인하지 못했어요.',
@@ -4643,12 +4661,17 @@ String _requiredRouteString(Map<String, Object?> json, String key) {
   throw FormatException('Missing required route field: $key');
 }
 
-String _optionalRouteString(Map<String, Object?> json, String key) {
+String _optionalRouteString(
+  Map<String, Object?> json,
+  String key, {
+  String fallback = '',
+}) {
   final value = json[key];
   if (value is String) {
-    return value.trim();
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
   }
-  return '';
+  return fallback;
 }
 
 List<String> _routeStringList(Object? value, String label) {

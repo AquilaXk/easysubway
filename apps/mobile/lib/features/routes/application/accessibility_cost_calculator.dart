@@ -85,6 +85,14 @@ class AccessibilityCostCalculator {
       cost += weight.stairOnlyAccessPenalty;
       warningCodes.add('STAIR_ONLY_ACCESS');
     }
+    if (edge.isGeneratedConnector) {
+      cost += weight.lowDataConfidencePenalty;
+      warningCodes.add('GENERATED_CONNECTOR_UNVERIFIED');
+    }
+    if (edge.durationSeconds <= 0) {
+      cost += 3600;
+      warningCodes.add('DURATION_UNKNOWN');
+    }
     if (edge.accessibilityState == RouteAccessibilityState.unknown) {
       cost += weight.lowDataConfidencePenalty;
     }
