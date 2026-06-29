@@ -2079,6 +2079,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           builder: (context, constraints) {
             final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
               constraints,
+              textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
             );
             return ListView(
               padding: isLargeScreen
@@ -4191,6 +4192,7 @@ class _StationDetailContent extends StatelessWidget {
       builder: (context, constraints) {
         final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
           constraints,
+          textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
         );
         return ListView(
           key: const Key('stationDetailList'),
