@@ -65,7 +65,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains("데이터팩 출시 준비")
 			.contains("FAIL")
 			.contains("candidate-release-blocked")
-			.contains("전체 blocker 8건")
+			.contains("전체 blocker 9건")
 			.contains("alias 1")
 			.contains("quarantine 1")
 			.contains("manual override 1")

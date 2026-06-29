@@ -37,12 +37,14 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		long manualOverrideBlockers = countManualOverrideBlockers();
 		long facilityBlockers = countFacilityBlockers(null);
 		long routeGateBlockers = countRouteGateBlockers(null);
+		ManifestSignatureSummary manifestSignature = manifestSignature(candidate);
 		long totalBlockers = candidateGateBlockers
 			+ aliasBlockers
 			+ quarantineBlockers
 			+ manualOverrideBlockers
 			+ facilityBlockers
-			+ routeGateBlockers;
+			+ routeGateBlockers
+			+ manifestSignature.blockerCount();
 		return new DatapackReleaseBlockerSummary(
 			candidate.map(CandidateGateSummary::candidateId).orElse("-"),
 			candidate.map(CandidateGateSummary::scopeId).orElse("-"),
@@ -54,7 +56,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 			manualOverrideBlockers,
 			facilityBlockers,
 			routeGateBlockers,
-			readinessRows(candidate, aliasBlockers, quarantineBlockers, facilityBlockers, routeGateBlockers),
+			readinessRows(candidate, aliasBlockers, quarantineBlockers, facilityBlockers, routeGateBlockers, manifestSignature),
 			candidate.map(CandidateGateSummary::createdAt).orElse(null)
 		);
 	}
@@ -101,7 +103,8 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		long aliasBlockers,
 		long quarantineBlockers,
 		long facilityBlockers,
-		long routeGateBlockers
+		long routeGateBlockers,
+		ManifestSignatureSummary manifestSignature
 	) {
 		long sourceBlockers = candidate.map(row -> "PASS".equals(row.coverageStatus()) ? 0L : 1L).orElse(1L)
 			+ aliasBlockers
@@ -112,30 +115,24 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 			new ReleaseReadinessRow("Source coverage", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
 			new ReleaseReadinessRow("Facility evidence", statusFor(facilityBlockers), facilityBlockers, "strict route eligible facility evidence"),
 			new ReleaseReadinessRow("Route gate", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER and generated connector gates"),
-			new ReleaseReadinessRow("Manifest signature", manifestSignatureStatus(candidate), manifestBlockerCount(candidate), "release evidence bundle / signature")
+			new ReleaseReadinessRow("Manifest signature", manifestSignature.status(), manifestSignature.blockerCount(), "release evidence bundle / signature")
 		);
 	}
 
-	private String manifestSignatureStatus(Optional<CandidateGateSummary> candidate) {
+	private ManifestSignatureSummary manifestSignature(Optional<CandidateGateSummary> candidate) {
 		if (candidate.isEmpty()) {
-			return "확인 필요";
+			return new ManifestSignatureSummary("확인 필요", 1);
 		}
-		return jdbcTemplate.query("""
+		String status = jdbcTemplate.query("""
 			SELECT manifest_signature_status
 			FROM datapack_release_evidence_bundles
 			WHERE candidate_id = ?
 			""", (resultSet, rowNumber) -> resultSet.getString("manifest_signature_status"), candidate.get().candidateId())
 			.stream()
 			.findFirst()
-			.map(status -> "PASS".equals(status) ? "PASS" : status)
+			.map(manifestStatus -> "PASS".equals(manifestStatus) ? "PASS" : manifestStatus)
 			.orElse("확인 필요");
-	}
-
-	private long manifestBlockerCount(Optional<CandidateGateSummary> candidate) {
-		if (candidate.isEmpty()) {
-			return 1L;
-		}
-		return "PASS".equals(manifestSignatureStatus(candidate)) ? 0L : 1L;
+		return new ManifestSignatureSummary(status, "PASS".equals(status) ? 0 : 1);
 	}
 
 	private long countManualOverrideBlockers() {
@@ -290,5 +287,8 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 				.filter(status -> !"PASS".equals(status))
 				.count();
 		}
+	}
+
+	private record ManifestSignatureSummary(String status, long blockerCount) {
 	}
 }
