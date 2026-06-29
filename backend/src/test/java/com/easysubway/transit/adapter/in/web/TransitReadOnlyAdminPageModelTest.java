@@ -3,7 +3,7 @@ package com.easysubway.transit.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
 import com.easysubway.transit.adapter.out.persistence.UnavailableTransitMasterRepository;
 import com.easysubway.transit.application.service.TransitMasterService;
 import com.easysubway.transit.domain.AccessibilityFacilityStatus;
@@ -80,7 +80,7 @@ class TransitReadOnlyAdminPageModelTest {
 		var controller = new TransitStationAdminPageController(
 			transitMasterService,
 			transitMasterService,
-			mock(JdbcDatapackReleaseBlockerSummaryRepository.class)
+			mock(DatapackReleaseBlockerSummaryUseCase.class)
 		);
 		var model = new ExtendedModelMap();
 
@@ -96,7 +96,7 @@ class TransitReadOnlyAdminPageModelTest {
 		var controller = new TransitStationAdminPageController(
 			transitMasterService,
 			transitMasterService,
-			mock(JdbcDatapackReleaseBlockerSummaryRepository.class)
+			mock(DatapackReleaseBlockerSummaryUseCase.class)
 		);
 		var redirectAttributes = new RedirectAttributesModelMap();
 

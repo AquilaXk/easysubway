@@ -5,7 +5,7 @@ import com.easysubway.admin.authorization.AdminPermission;
 import com.easysubway.admin.web.AdminFormErrorView;
 import com.easysubway.common.web.pagination.AdminPageRequest;
 import com.easysubway.common.web.pagination.EgovPaginationView;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
 import com.easysubway.transit.application.port.in.CreateAccessibilityFacilityCommand;
 import com.easysubway.transit.application.port.in.StationMasterDataCounts;
 import com.easysubway.transit.application.port.in.StationSearchCommand;
@@ -51,16 +51,16 @@ class TransitStationAdminPageController {
 
 	private final TransitMasterQueryUseCase transitMasterQueryUseCase;
 	private final TransitMasterAdminUseCase transitMasterAdminUseCase;
-	private final JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository;
+	private final DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase;
 
 	TransitStationAdminPageController(
 		TransitMasterQueryUseCase transitMasterQueryUseCase,
 		TransitMasterAdminUseCase transitMasterAdminUseCase,
-		JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository
+		DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase
 	) {
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 		this.transitMasterAdminUseCase = transitMasterAdminUseCase;
-		this.datapackReleaseBlockerSummaryRepository = datapackReleaseBlockerSummaryRepository;
+		this.datapackReleaseBlockerSummaryUseCase = datapackReleaseBlockerSummaryUseCase;
 	}
 
 	@GetMapping("/admin/stations/page")
@@ -105,7 +105,7 @@ class TransitStationAdminPageController {
 		model.addAttribute("routeNodeCount", transitMasterQueryUseCase.listRouteNodes(stationId).size());
 		model.addAttribute("routeEdgeCount", transitMasterQueryUseCase.listRouteEdges(stationId).size());
 		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
-			model.addAttribute("stationReleaseSummary", datapackReleaseBlockerSummaryRepository.summarizeStation(stationId));
+			model.addAttribute("stationReleaseSummary", datapackReleaseBlockerSummaryUseCase.summarizeStation(stationId));
 		}
 		return "admin/stations/detail";
 	}

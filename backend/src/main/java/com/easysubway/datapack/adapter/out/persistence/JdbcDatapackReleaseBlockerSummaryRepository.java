@@ -1,5 +1,10 @@
 package com.easysubway.datapack.adapter.out.persistence;
 
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase.DatapackReleaseBlockerSummary;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase.ReleaseReadinessRow;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase.StationReleaseBlockerRow;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase.StationReleaseBlockerSummary;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -11,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class JdbcDatapackReleaseBlockerSummaryRepository {
+public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackReleaseBlockerSummaryUseCase {
 
 	private final JdbcTemplate jdbcTemplate;
 
@@ -250,75 +255,6 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 
 	private static String sourceNote(long aliasBlockers, long quarantineBlockers) {
 		return "alias " + aliasBlockers + " / quarantine " + quarantineBlockers;
-	}
-
-	public record DatapackReleaseBlockerSummary(
-		String candidateId,
-		String scopeId,
-		String status,
-		long totalBlockers,
-		long candidateGateBlockers,
-		long aliasBlockers,
-		long quarantineBlockers,
-		long manualOverrideBlockers,
-		long facilityBlockers,
-		long routeGateBlockers,
-		long manifestBlockers,
-		List<ReleaseReadinessRow> readinessRows,
-		LocalDateTime candidateCreatedAt
-	) {
-
-		public static DatapackReleaseBlockerSummary empty() {
-			return new DatapackReleaseBlockerSummary(
-				"-",
-				"-",
-				"확인 필요",
-				0,
-				0,
-				0,
-				0,
-				0,
-				0,
-				0,
-				0,
-				List.of(
-					new ReleaseReadinessRow("Source coverage", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Validator", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Facility evidence", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Route gate", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Android evidence", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Manifest signature", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Manual override", "확인 필요", 0, "candidate 없음")
-				),
-				null
-			);
-		}
-	}
-
-	public record ReleaseReadinessRow(String label, String status, long blockerCount, String note) {
-	}
-
-	public record StationReleaseBlockerSummary(
-		String stationId,
-		String status,
-		long totalBlockers,
-		List<StationReleaseBlockerRow> rows
-	) {
-
-		public static StationReleaseBlockerSummary empty(String stationId) {
-			return new StationReleaseBlockerSummary(
-				stationId,
-				"확인 필요",
-				0,
-				List.of(
-					new StationReleaseBlockerRow("Facility evidence", 0, "확인 필요"),
-					new StationReleaseBlockerRow("Route gate", 0, "확인 필요")
-				)
-			);
-		}
-	}
-
-	public record StationReleaseBlockerRow(String label, long blockerCount, String status) {
 	}
 
 	private record CandidateGateSummary(

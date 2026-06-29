@@ -3,7 +3,7 @@ package com.easysubway.quality.adapter.in.web;
 import com.easysubway.admin.authorization.AdminAuthorization;
 import com.easysubway.admin.authorization.AdminPermission;
 import com.easysubway.common.web.WebMessageResolver;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
 import com.easysubway.quality.application.port.in.DataQualityUseCase;
 import com.easysubway.quality.domain.AccessibilityImprovementPriority;
 import com.easysubway.quality.domain.DataQualitySummary;
@@ -37,20 +37,20 @@ class DataQualityAdminPageController {
 	private final TransitMasterQueryUseCase transitMasterQueryUseCase;
 	private final FacilityReportUseCase facilityReportUseCase;
 	private final WebMessageResolver messages;
-	private final JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository;
+	private final DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase;
 
 	DataQualityAdminPageController(
 		DataQualityUseCase dataQualityUseCase,
 		TransitMasterQueryUseCase transitMasterQueryUseCase,
 		FacilityReportUseCase facilityReportUseCase,
 		WebMessageResolver messages,
-		JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository
+		DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase
 	) {
 		this.dataQualityUseCase = dataQualityUseCase;
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 		this.facilityReportUseCase = facilityReportUseCase;
 		this.messages = messages;
-		this.datapackReleaseBlockerSummaryRepository = datapackReleaseBlockerSummaryRepository;
+		this.datapackReleaseBlockerSummaryUseCase = datapackReleaseBlockerSummaryUseCase;
 	}
 
 	@GetMapping("/admin/data-quality/page")
@@ -88,7 +88,7 @@ class DataQualityAdminPageController {
 			)
 		);
 		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
-			model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryRepository.summarize());
+			model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryUseCase.summarize());
 		}
 		return "admin/quality/dashboard";
 	}
