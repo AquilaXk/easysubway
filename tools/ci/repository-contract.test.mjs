@@ -8210,6 +8210,9 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     assert.ok(target.requiredEvidenceFields.includes("viewport"), `${target.id} must record viewport`);
     assert.ok(target.requiredEvidenceFields.includes("seedData"), `${target.id} must record seed data`);
     assert.ok(target.requiredEvidenceFields.includes("uiTreePath"), `${target.id} must record UI tree evidence`);
+    assert.ok(target.requiredEvidenceFields.includes("largeTextScaleResult"), `${target.id} must record large text evidence`);
+    assert.ok(target.requiredEvidenceFields.includes("highContrastResult"), `${target.id} must record high contrast evidence`);
+    assert.ok(target.requiredEvidenceFields.includes("accessibilityGuidelineResult"), `${target.id} must record accessibility guideline evidence`);
     assert.ok(target.requiredEvidenceFields.includes("result"), `${target.id} must record result`);
   }
   assert.ok(largeScreenTargets.get("chromebook_16_9").requiredScreenshotIds.includes("help_privacy_data_deletion"));

@@ -763,6 +763,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         stackTrace,
         context: '온보딩 설정을 저장하는 중 예외가 발생했습니다.',
       );
+      rethrow;
     }
   }
 
@@ -806,12 +807,17 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     if (currentResult == null) {
       return;
     }
-    await _saveOnboardingResult(
-      OnboardingResult(
-        profile: currentResult.profile,
-        preferences: preferences,
-      ),
-    );
+    try {
+      await _saveOnboardingResult(
+        OnboardingResult(
+          profile: currentResult.profile,
+          preferences: preferences,
+        ),
+      );
+    } catch (error, stackTrace) {
+      _applyOnboardingResult(currentResult);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   void _applyOnboardingResult(OnboardingResult result) {
@@ -1398,11 +1404,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final facilitySection = _HomeFacilityAlertSection(
       facilitiesFuture: _favoriteFacilitiesFuture,
       onOpenFacilities: openSavedItems,
+      onRetry: () => unawaited(refreshHomeState()),
     );
     final recentRouteSection = _HomeRecentRouteSection(
       key: const Key('homeRecentRouteSection'),
       routesFuture: _recentRoutesFuture,
       onTap: openRouteSearch,
+      onRetry: () => unawaited(refreshHomeState()),
     );
 
     return Scaffold(
@@ -2311,10 +2319,12 @@ class _HomeFacilityAlertSection extends StatelessWidget {
   const _HomeFacilityAlertSection({
     required this.facilitiesFuture,
     required this.onOpenFacilities,
+    required this.onRetry,
   });
 
   final Future<List<FavoriteFacility>>? facilitiesFuture;
   final VoidCallback onOpenFacilities;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -2325,25 +2335,50 @@ class _HomeFacilityAlertSection extends StatelessWidget {
     return FutureBuilder<List<FavoriteFacility>>(
       future: facilitiesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done ||
-            snapshot.hasError) {
-          return const SizedBox.shrink();
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _HomeStateSection(
+            title: '시설 알림',
+            child: _HomeStateCard(
+              key: Key('homeFacilityAlertLoadingState'),
+              icon: Icons.hourglass_empty,
+              title: '저장한 시설 상태를 확인하고 있어요',
+              subtitle: '잠시 후 고장·공사 알림을 보여드릴게요.',
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return _HomeStateSection(
+            title: '시설 알림',
+            child: _HomeStateCard(
+              key: const Key('homeFacilityAlertErrorState'),
+              icon: Icons.error_outline,
+              title: '시설 알림을 불러오지 못했어요',
+              subtitle: '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+              actionLabel: '다시 시도',
+              onAction: onRetry,
+            ),
+          );
         }
         final alert = _firstFacilityAlert(
           snapshot.data ?? const <FavoriteFacility>[],
         );
         if (alert == null) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _HomePrototypeSection(title: '시설 알림'),
-            _HomeFacilityAlertCard(
-              facility: alert,
-              onOpenFacilities: onOpenFacilities,
+          return const _HomeStateSection(
+            title: '시설 알림',
+            child: _HomeStateCard(
+              key: Key('homeFacilityAlertEmptyState'),
+              icon: Icons.check_circle_outline,
+              title: '확인할 시설 알림이 없어요',
+              subtitle: '저장한 시설에 고장·공사 알림이 생기면 여기에서 알려드려요.',
             ),
-          ],
+          );
+        }
+        return _HomeStateSection(
+          title: '시설 알림',
+          child: _HomeFacilityAlertCard(
+            facility: alert,
+            onOpenFacilities: onOpenFacilities,
+          ),
         );
       },
     );
@@ -2530,10 +2565,12 @@ class _HomeRecentRouteSection extends StatelessWidget {
     super.key,
     required this.routesFuture,
     required this.onTap,
+    required this.onRetry,
   });
 
   final Future<List<FavoriteRoute>>? routesFuture;
   final Future<void> Function() onTap;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -2544,22 +2581,117 @@ class _HomeRecentRouteSection extends StatelessWidget {
     return FutureBuilder<List<FavoriteRoute>>(
       future: routesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done ||
-            snapshot.hasError) {
-          return const SizedBox.shrink();
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _HomeStateSection(
+            title: '최근 경로',
+            child: _HomeStateCard(
+              key: Key('homeRecentRouteLoadingState'),
+              icon: Icons.hourglass_empty,
+              title: '최근 경로를 확인하고 있어요',
+              subtitle: '저장된 경로가 있으면 바로 이어서 보여드릴게요.',
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return _HomeStateSection(
+            title: '최근 경로',
+            child: _HomeStateCard(
+              key: const Key('homeRecentRouteErrorState'),
+              icon: Icons.error_outline,
+              title: '최근 경로를 불러오지 못했어요',
+              subtitle: '저장된 경로를 확인하려면 다시 시도해 주세요.',
+              actionLabel: '다시 시도',
+              onAction: onRetry,
+            ),
+          );
         }
         final routes = snapshot.data ?? const <FavoriteRoute>[];
         if (routes.isEmpty) {
-          return const SizedBox.shrink();
+          return _HomeStateSection(
+            title: '최근 경로',
+            child: _HomeStateCard(
+              key: const Key('homeRecentRouteEmptyState'),
+              icon: Icons.route_outlined,
+              title: '최근 경로가 아직 없어요',
+              subtitle: '길찾기를 한 번 사용하면 자주 확인하는 경로를 이어서 볼 수 있어요.',
+              actionLabel: '길찾기 시작',
+              onAction: () => unawaited(onTap()),
+            ),
+          );
         }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _HomePrototypeSection(title: '최근 경로'),
-            _HomeRecentRouteCard(route: routes.first, onTap: onTap),
-          ],
+        return _HomeStateSection(
+          title: '최근 경로',
+          child: _HomeRecentRouteCard(route: routes.first, onTap: onTap),
         );
       },
+    );
+  }
+}
+
+class _HomeStateSection extends StatelessWidget {
+  const _HomeStateSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _HomePrototypeSection(title: title),
+        child,
+      ],
+    );
+  }
+}
+
+class _HomeStateCard extends StatelessWidget {
+  const _HomeStateCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final actionLabel = this.actionLabel;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title, $subtitle',
+      child: _PrototypeCard(
+        showBorder: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PrototypeInfoRow(
+              icon: icon,
+              iconBackground: EasySubwayAccessibleColors.mintSoft,
+              iconColor: EasySubwayAccessibleColors.mintDark,
+              title: title,
+              subtitle: subtitle,
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.refresh),
+                label: Text(actionLabel),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -3023,6 +3155,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('largeTextSettingsButton'),
                     icon: Icons.text_fields,
                     title: '큰 글자',
+                    subtitle: '화면 글자와 버튼 설명을 더 크게 보여줘요',
                     enabled: _viewPreferences.largeTextEnabled,
                     onChanged: (value) {
                       _updateViewPreferences(
@@ -3034,6 +3167,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('simpleViewSettingsButton'),
                     icon: Icons.visibility_outlined,
                     title: '간편 보기',
+                    subtitle: '필수 행동과 상태 안내를 먼저 보여줘요',
                     enabled: _viewPreferences.simpleViewEnabled,
                     onChanged: (value) {
                       _updateViewPreferences(
@@ -3045,6 +3179,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('highContrastSettingsButton'),
                     icon: Icons.contrast,
                     title: '고대비',
+                    subtitle: '버튼과 상태 문구의 대비를 더 강하게 보여줘요',
                     enabled: _viewPreferences.highContrastEnabled,
                     onChanged: (value) {
                       _updateViewPreferences(
@@ -3144,10 +3279,28 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   Future<void> _updateViewPreferences(
     OnboardingViewPreferences preferences,
   ) async {
+    final previous = _viewPreferences;
     setState(() {
       _viewPreferences = preferences;
     });
-    await widget.onViewPreferencesChanged(preferences);
+    try {
+      await widget.onViewPreferencesChanged(preferences);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '설정 화면 보기 옵션 저장 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _viewPreferences = previous;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.')),
+      );
+    }
   }
 }
 
@@ -3288,6 +3441,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
   const _AppSettingsPreferenceTile({
     required this.icon,
     required this.title,
+    required this.subtitle,
     required this.enabled,
     required this.onChanged,
     super.key,
@@ -3295,6 +3449,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
 
   final IconData icon;
   final String title;
+  final String subtitle;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
@@ -3303,7 +3458,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
     final value = enabled ? '켜짐' : '꺼짐';
     final action = enabled ? '끄기' : '켜기';
     return Semantics(
-      label: '$title, $value, 두 번 탭해 $action',
+      label: '$title, $value, $subtitle, 두 번 탭해 $action',
       toggled: enabled,
       onTap: () => onChanged(!enabled),
       child: ExcludeSemantics(
@@ -3321,7 +3476,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
             ),
           ),
           subtitle: Text(
-            '설정 화면에서 바로 바꿀 수 있어요',
+            subtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: EasySubwayAccessibleColors.mutedText,
               height: 1.3,
@@ -3412,6 +3567,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
           future: _dataFuture,
           builder: (context, snapshot) {
             final data = snapshot.data ?? const _FavoriteHomeData();
+            final hasError = snapshot.hasError;
             return RefreshIndicator(
               onRefresh: () async {
                 final next = _loadData();
@@ -3427,48 +3583,63 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
                   const _HomePrototypeSection(title: '즐겨찾기한 항목'),
-                  _FavoriteHomeQuickGrid(
-                    stationCount: data.stations.length,
-                    facilityCount: data.facilities.length,
-                    routeCount: data.routes.length,
-                    onStations: widget.favoriteRepository == null
-                        ? null
-                        : _openFavoriteStations,
-                    onFacilities: widget.favoriteFacilityRepository == null
-                        ? null
-                        : _openFavoriteFacilities,
-                    onRoutes: widget.favoriteRouteRepository == null
-                        ? null
-                        : _openFavoriteRoutes,
-                  ),
-                  if (_firstFacilityAlert(data.facilities)
-                      case final alert?) ...[
-                    const _HomePrototypeSection(title: '확인 필요'),
-                    _HomeFacilityAlertCard(
-                      facility: alert,
-                      onOpenFacilities: _openFavoriteFacilities,
+                  if (hasError)
+                    _HomeStateCard(
+                      key: const Key('favoriteHomeErrorState'),
+                      icon: Icons.error_outline,
+                      title: '즐겨찾기를 불러오지 못했어요',
+                      subtitle: '저장한 역, 시설, 경로를 다시 확인해 주세요.',
+                      actionLabel: '다시 시도',
+                      onAction: () {
+                        setState(() {
+                          _dataFuture = _loadData();
+                        });
+                      },
+                    )
+                  else ...[
+                    _FavoriteHomeQuickGrid(
+                      stationCount: data.stations.length,
+                      facilityCount: data.facilities.length,
+                      routeCount: data.routes.length,
+                      onStations: widget.favoriteRepository == null
+                          ? null
+                          : _openFavoriteStations,
+                      onFacilities: widget.favoriteFacilityRepository == null
+                          ? null
+                          : _openFavoriteFacilities,
+                      onRoutes: widget.favoriteRouteRepository == null
+                          ? null
+                          : _openFavoriteRoutes,
                     ),
-                  ],
-                  if (data.routes.isNotEmpty) ...[
-                    const _HomePrototypeSection(title: '최근 경로'),
-                    _HomeSavedRouteCard(
-                      route: data.routes.first,
-                      onTap: _openFavoriteRoutes,
-                    ),
-                  ],
-                  if (data.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 16),
-                      child: _PrototypeCard(
-                        child: _PrototypeInfoRow(
-                          icon: Icons.bookmark_border,
-                          iconBackground: EasySubwayAccessibleColors.mintSoft,
-                          iconColor: EasySubwayAccessibleColors.mintDark,
-                          title: '즐겨찾기한 항목이 없습니다',
-                          subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
+                    if (_firstFacilityAlert(data.facilities)
+                        case final alert?) ...[
+                      const _HomePrototypeSection(title: '확인 필요'),
+                      _HomeFacilityAlertCard(
+                        facility: alert,
+                        onOpenFacilities: _openFavoriteFacilities,
+                      ),
+                    ],
+                    if (data.routes.isNotEmpty) ...[
+                      const _HomePrototypeSection(title: '최근 경로'),
+                      _HomeSavedRouteCard(
+                        route: data.routes.first,
+                        onTap: _openFavoriteRoutes,
+                      ),
+                    ],
+                    if (data.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 16),
+                        child: _PrototypeCard(
+                          child: _PrototypeInfoRow(
+                            icon: Icons.bookmark_border,
+                            iconBackground: EasySubwayAccessibleColors.mintSoft,
+                            iconColor: EasySubwayAccessibleColors.mintDark,
+                            title: '즐겨찾기한 항목이 없습니다',
+                            subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
+                          ),
                         ),
                       ),
-                    ),
+                  ],
                 ],
               ),
             );
@@ -3479,35 +3650,20 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   }
 
   Future<_FavoriteHomeData> _loadData() async {
-    final stations = await _loadFavoriteList(
-      widget.favoriteRepository?.listFavoriteStations,
-    );
-    final facilities = await _loadFavoriteList(
-      widget.favoriteFacilityRepository?.listFavoriteFacilities,
-    );
-    final routes = await _loadFavoriteList(
-      widget.favoriteRouteRepository?.listFavoriteRoutes,
-    );
+    final stations =
+        await widget.favoriteRepository?.listFavoriteStations() ??
+        const <FavoriteStation>[];
+    final facilities =
+        await widget.favoriteFacilityRepository?.listFavoriteFacilities() ??
+        const <FavoriteFacility>[];
+    final routes =
+        await widget.favoriteRouteRepository?.listFavoriteRoutes() ??
+        const <FavoriteRoute>[];
     return _FavoriteHomeData(
       stations: stations,
       facilities: facilities,
       routes: routes,
     );
-  }
-
-  Future<List<T>> _loadFavoriteList<T>(Future<List<T>> Function()? load) async {
-    if (load == null) {
-      return const [];
-    }
-    try {
-      return await load();
-    } catch (error, stackTrace) {
-      assert(() {
-        stackTrace.toString();
-        return true;
-      }());
-      return const [];
-    }
   }
 
   void _openFavoriteRoutes() {

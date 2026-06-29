@@ -2633,7 +2633,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     final canOpenFeedback =
         canUseApiActions && widget.routeFeedbackRepository != null;
 
-    return switch (_view) {
+    final content = switch (_view) {
       _RouteWorkflowView.list => _RouteResultsListView(
         result: result,
         onOpenDetail: () => setState(() => _view = _RouteWorkflowView.detail),
@@ -2677,6 +2677,24 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         onBack: () => setState(() => _view = _RouteWorkflowView.detail),
       ),
     };
+    return PopScope(
+      canPop: _view == _RouteWorkflowView.list,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        setState(() {
+          _view = switch (_view) {
+            _RouteWorkflowView.detail => _RouteWorkflowView.list,
+            _RouteWorkflowView.guidance => _RouteWorkflowView.detail,
+            _RouteWorkflowView.internalRoute => _RouteWorkflowView.guidance,
+            _RouteWorkflowView.feedback => _RouteWorkflowView.detail,
+            _ => _RouteWorkflowView.list,
+          };
+        });
+      },
+      child: content,
+    );
   }
 }
 
