@@ -262,7 +262,7 @@ class FavoriteFacility {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '확인이 필요해요',
+      'UNKNOWN' => '한 번 더 확인해 주세요',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
@@ -303,7 +303,7 @@ class FavoriteFacility {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치 확인 필요';
+    return '위치를 다시 확인해 주세요';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
@@ -774,7 +774,7 @@ String _facilityVerificationStatusLabel(String fieldValidationStatus) {
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
-  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인 필요)'), '');
+  label = label.replaceAll(RegExp(r'현장\s*(검[증]됨|검[증] 전|재확인\s*필요)'), '');
   label = label.replaceAll(RegExp(r'관리자\s*검[수]'), '');
   label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
   return label;

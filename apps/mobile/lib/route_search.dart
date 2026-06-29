@@ -32,15 +32,15 @@ String _mobilityLabelFor(String mobilityType) {
       return option.title;
     }
   }
-  return '이동 조건 확인 필요';
+  return '이동 조건을 다시 선택해 주세요';
 }
 
 String _routeDateLabel(String value) {
   final trimmed = value.trim();
   if (trimmed.length >= 10) {
-    return trimmed.substring(0, 10);
+    return '최근 확인 ${trimmed.substring(0, 10)}';
   }
-  return '확인 필요';
+  return '최근 확인일을 다시 확인해 주세요';
 }
 
 abstract class RouteSearchRepository {
@@ -458,17 +458,17 @@ class FavoriteRoute {
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
-  String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 다시 확인해 주세요' : lineName;
 
   String get scoreLabel => '상세 이동 정보는 다시 검색해 확인';
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get scoreBasisText =>
-      '$mobilityLabel 조건 · $lineLabel · 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+      '$mobilityLabel 조건 · $lineLabel · ${_routeDateLabel(routeCreatedAt)}';
 
   String get scoreBasisSemanticLabel =>
-      '$mobilityLabel 조건, $lineLabel, 최근 확인 ${_routeDateLabel(routeCreatedAt)}';
+      '$mobilityLabel 조건, $lineLabel, ${_routeDateLabel(routeCreatedAt)}';
 
   String get movementMetricLabel =>
       '예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요';
@@ -700,7 +700,7 @@ class RouteSearchResult {
         steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
       return '계단 없음 확인';
     }
-    return '계단 여부 확인 필요';
+    return '계단 여부를 다시 확인해 주세요';
   }
 
   int get walkingDistanceMeters {
@@ -740,13 +740,13 @@ class RouteSearchResult {
     return switch (status) {
       'FOUND' => '경로를 찾았습니다',
       'BLOCKED' => '안내할 수 있는 경로가 없습니다',
-      _ => '확인이 필요합니다',
+      _ => '다시 확인해 주세요',
     };
   }
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선 확인 필요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 다시 확인해 주세요' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
@@ -806,7 +806,7 @@ class RouteSearchResult {
       return '안내 불가 이유';
     }
     if (needsConfirmation) {
-      return '확인 필요 이유';
+      return '다시 확인할 내용';
     }
     return warnings.isEmpty ? '주의 없음' : '주의 확인';
   }
@@ -853,17 +853,17 @@ class RouteSearchResult {
     }
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
     if (isBlocked) {
-      parts.add('확인 요청 $_routeBlockedConfirmationNotice');
+      parts.add('이동 전 확인 $_routeBlockedConfirmationNotice');
     }
     return parts.join(', ');
   }
 
   String get burdenLevelLabel {
     if (isBlocked) {
-      return '이동 부담 확인 필요';
+      return '이동 부담을 다시 확인해 주세요';
     }
     if (movementSteps.isEmpty) {
-      return '이동 부담 확인 필요';
+      return '이동 부담을 다시 확인해 주세요';
     }
     if (_hasHighBurdenFact) {
       return '이동 부담 높음';
@@ -960,7 +960,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '확인 필요',
+        fallback: '다시 확인해 주세요',
       ),
     );
   }
@@ -1035,7 +1035,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리 확인 필요';
+      return '시간 또는 거리를 다시 확인해 주세요';
     }
     return '앱에 저장된 길 안내 기준';
   }
@@ -1043,14 +1043,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간 확인 필요';
+    return '시간을 다시 확인해 주세요';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리 확인 필요';
+    return '거리를 다시 확인해 주세요';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
@@ -1065,13 +1065,13 @@ String _routeDistanceLabel(int distanceMeters) {
 
 String _routeWarningLabel(String code) {
   return switch (code.trim()) {
-    'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 확인이 필요합니다.',
+    'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 다시 확인해 주세요.',
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     'GENERATED_CONNECTOR_UNVERIFIED' =>
       '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
-    'DURATION_UNKNOWN' => '소요 시간 확인이 필요한 구간입니다.',
+    'DURATION_UNKNOWN' => '소요 시간을 다시 확인해 주세요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
     _ => '일부 이동 정보를 확인하지 못했어요.',
@@ -2932,7 +2932,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                       ? '현재 조건에서 막힌 이유를 확인하세요'
                       : _isRecommendedRoute(result)
                       ? '시간·환승·걷기와 편한 정도를 확인하세요.'
-                      : '이 경로는 이동 전 확인이 필요합니다',
+                      : '이 경로는 이동 전 다시 확인해 주세요',
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -3301,7 +3301,7 @@ class _RouteResultListButton extends StatelessWidget {
                         ),
                         _RouteStatusChip(
                           key: const Key('routeGuidanceMobilityChip'),
-                          label: result.mobilityLabel == '이동 조건 확인 필요'
+                          label: result.mobilityLabel == '이동 조건을 다시 선택해 주세요'
                               ? result.mobilityLabel
                               : result.comfortLabel,
                           icon: Icons.accessible_forward,
@@ -3416,7 +3416,7 @@ String _routeMetaLabel(RouteSearchResult result) {
 
 String _routeGuidanceMobilityHeaderLabel(RouteSearchResult result) {
   final mobilityLabel = result.mobilityLabel;
-  if (mobilityLabel == '이동 조건 확인 필요') {
+  if (mobilityLabel == '이동 조건을 다시 선택해 주세요') {
     return mobilityLabel;
   }
   final condition = _routeMobilityConditionLabel(

@@ -17,7 +17,7 @@ class RouteStep {
     this.evidenceSources = const [],
     this.timeSource = 'UNKNOWN',
     this.distanceSource = 'UNKNOWN',
-    this.confidenceLabel = '확인 필요',
+    this.confidenceLabel = '다시 확인해 주세요',
   });
 
   final int sequence;
