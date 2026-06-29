@@ -585,7 +585,7 @@ void main() {
           evidenceSources: ['edge:edge-a-b-local'],
           timeSource: 'STATIC_ESTIMATE',
           distanceSource: 'MEASURED',
-          confidenceLabel: '최근 확인된 정보예요',
+          confidenceLabel: '확인된 정보예요',
         ),
         RouteSearchStep(
           sequence: 2,

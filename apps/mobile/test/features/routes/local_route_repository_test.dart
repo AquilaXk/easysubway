@@ -201,10 +201,10 @@ void main() {
     expect(rideStep.evidenceSources, contains('edge:edge-a-b-local'));
     expect(rideStep.timeSource, 'STATIC_ESTIMATE');
     expect(rideStep.distanceSource, 'MEASURED');
-    expect(rideStep.confidenceLabel, '최근 확인된 정보예요');
+    expect(rideStep.confidenceLabel, '확인된 정보예요');
   });
 
-  test('계단 없는 동선 여부가 미확인인 선택 경로는 최근 확인 문구로 표시하지 않는다', () async {
+  test('계단 없는 동선 여부가 미확인인 선택 경로는 확인된 정보 문구로 표시하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(

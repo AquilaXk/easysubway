@@ -222,7 +222,7 @@ class LocalRouteEngine {
       return '확인 필요';
     }
     if (edge.reliabilityScore >= 80) {
-      return '최근 확인된 정보예요';
+      return '확인된 정보예요';
     }
     if (edge.reliabilityScore >= 60) {
       return '일부 확인된 정보예요';
