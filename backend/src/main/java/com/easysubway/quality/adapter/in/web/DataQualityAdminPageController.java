@@ -1,6 +1,7 @@
 package com.easysubway.quality.adapter.in.web;
 
 import com.easysubway.common.web.WebMessageResolver;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
 import com.easysubway.quality.application.port.in.DataQualityUseCase;
 import com.easysubway.quality.domain.AccessibilityImprovementPriority;
 import com.easysubway.quality.domain.DataQualitySummary;
@@ -33,17 +34,20 @@ class DataQualityAdminPageController {
 	private final TransitMasterQueryUseCase transitMasterQueryUseCase;
 	private final FacilityReportUseCase facilityReportUseCase;
 	private final WebMessageResolver messages;
+	private final JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository;
 
 	DataQualityAdminPageController(
 		DataQualityUseCase dataQualityUseCase,
 		TransitMasterQueryUseCase transitMasterQueryUseCase,
 		FacilityReportUseCase facilityReportUseCase,
-		WebMessageResolver messages
+		WebMessageResolver messages,
+		JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository
 	) {
 		this.dataQualityUseCase = dataQualityUseCase;
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 		this.facilityReportUseCase = facilityReportUseCase;
 		this.messages = messages;
+		this.datapackReleaseBlockerSummaryRepository = datapackReleaseBlockerSummaryRepository;
 	}
 
 	@GetMapping("/admin/data-quality/page")
@@ -80,6 +84,7 @@ class DataQualityAdminPageController {
 				messages
 			)
 		);
+		model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryRepository.summarize());
 		return "admin/quality/dashboard";
 	}
 

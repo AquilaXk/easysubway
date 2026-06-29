@@ -2,6 +2,7 @@ package com.easysubway.admin.adapter.in.web;
 
 import com.easysubway.collection.application.port.in.DataCollectionUseCase;
 import com.easysubway.collection.domain.DataCollectionRun;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
 import com.easysubway.health.application.port.in.CheckHealthUseCase;
 import com.easysubway.health.domain.HealthComponent;
 import com.easysubway.health.domain.HealthStatus;
@@ -32,6 +33,7 @@ class AdminOverviewPageController {
 	private final UserActivityDashboardUseCase userActivityDashboardUseCase;
 	private final DataCollectionUseCase dataCollectionUseCase;
 	private final CheckHealthUseCase checkHealthUseCase;
+	private final JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository;
 
 	AdminOverviewPageController(
 		DataQualityUseCase dataQualityUseCase,
@@ -40,7 +42,8 @@ class AdminOverviewPageController {
 		PushNotificationDashboardUseCase pushNotificationDashboardUseCase,
 		UserActivityDashboardUseCase userActivityDashboardUseCase,
 		DataCollectionUseCase dataCollectionUseCase,
-		CheckHealthUseCase checkHealthUseCase
+		CheckHealthUseCase checkHealthUseCase,
+		JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository
 	) {
 		this.dataQualityUseCase = dataQualityUseCase;
 		this.facilityReportUseCase = facilityReportUseCase;
@@ -49,6 +52,7 @@ class AdminOverviewPageController {
 		this.userActivityDashboardUseCase = userActivityDashboardUseCase;
 		this.dataCollectionUseCase = dataCollectionUseCase;
 		this.checkHealthUseCase = checkHealthUseCase;
+		this.datapackReleaseBlockerSummaryRepository = datapackReleaseBlockerSummaryRepository;
 	}
 
 	@GetMapping("/admin/dashboard/page")
@@ -73,6 +77,7 @@ class AdminOverviewPageController {
 			health.status(),
 			health.service()
 		));
+		model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryRepository.summarize());
 		return "admin/dashboard";
 	}
 

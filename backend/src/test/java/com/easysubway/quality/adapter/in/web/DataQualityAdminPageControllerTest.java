@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.common.web.WebMessageResolver;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository.DatapackReleaseBlockerSummary;
 import com.easysubway.quality.application.port.in.DataQualityUseCase;
 import com.easysubway.quality.domain.DataQualitySummary;
 import com.easysubway.report.application.port.in.FacilityReportUseCase;
@@ -137,15 +139,19 @@ class DataQualityAdminPageControllerTest {
 		DataQualityUseCase dataQualityUseCase = mock(DataQualityUseCase.class);
 		TransitMasterQueryUseCase transitMasterQueryUseCase = mock(TransitMasterQueryUseCase.class);
 		FacilityReportUseCase facilityReportUseCase = mock(FacilityReportUseCase.class);
+		JdbcDatapackReleaseBlockerSummaryRepository releaseSummaryRepository =
+			mock(JdbcDatapackReleaseBlockerSummaryRepository.class);
 		DataQualityAdminPageController controller = new DataQualityAdminPageController(
 			dataQualityUseCase,
 			transitMasterQueryUseCase,
 			facilityReportUseCase,
-			WebMessageResolver.defaultMessages()
+			WebMessageResolver.defaultMessages(),
+			releaseSummaryRepository
 		);
 		when(dataQualityUseCase.summarizeDataQuality()).thenReturn(emptySummary());
 		when(transitMasterQueryUseCase.listRegions()).thenReturn(List.of());
 		when(facilityReportUseCase.countReportsByStatus()).thenReturn(Map.of());
+		when(releaseSummaryRepository.summarize()).thenReturn(DatapackReleaseBlockerSummary.empty());
 		when(facilityReportUseCase.listRepeatedBrokenReportFacilities()).thenReturn(List.of(
 			new RepeatedBrokenFacilityReportSummary("station-sangnoksu", "facility-removed", 2),
 			new RepeatedBrokenFacilityReportSummary("station-removed", "facility-old", 3),

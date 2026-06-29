@@ -3,6 +3,7 @@ package com.easysubway.transit.adapter.in.web;
 import com.easysubway.admin.web.AdminFormErrorView;
 import com.easysubway.common.web.pagination.AdminPageRequest;
 import com.easysubway.common.web.pagination.EgovPaginationView;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
 import com.easysubway.transit.application.port.in.CreateAccessibilityFacilityCommand;
 import com.easysubway.transit.application.port.in.StationMasterDataCounts;
 import com.easysubway.transit.application.port.in.StationSearchCommand;
@@ -47,13 +48,16 @@ class TransitStationAdminPageController {
 
 	private final TransitMasterQueryUseCase transitMasterQueryUseCase;
 	private final TransitMasterAdminUseCase transitMasterAdminUseCase;
+	private final JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository;
 
 	TransitStationAdminPageController(
 		TransitMasterQueryUseCase transitMasterQueryUseCase,
-		TransitMasterAdminUseCase transitMasterAdminUseCase
+		TransitMasterAdminUseCase transitMasterAdminUseCase,
+		JdbcDatapackReleaseBlockerSummaryRepository datapackReleaseBlockerSummaryRepository
 	) {
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 		this.transitMasterAdminUseCase = transitMasterAdminUseCase;
+		this.datapackReleaseBlockerSummaryRepository = datapackReleaseBlockerSummaryRepository;
 	}
 
 	@GetMapping("/admin/stations/page")
@@ -97,6 +101,7 @@ class TransitStationAdminPageController {
 		model.addAttribute("layoutCount", transitMasterQueryUseCase.listSimplifiedStationLayouts(stationId).size());
 		model.addAttribute("routeNodeCount", transitMasterQueryUseCase.listRouteNodes(stationId).size());
 		model.addAttribute("routeEdgeCount", transitMasterQueryUseCase.listRouteEdges(stationId).size());
+		model.addAttribute("stationReleaseSummary", datapackReleaseBlockerSummaryRepository.summarizeStation(stationId));
 		return "admin/stations/detail";
 	}
 

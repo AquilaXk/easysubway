@@ -1,0 +1,294 @@
+package com.easysubway.datapack.adapter.out.persistence;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class JdbcDatapackReleaseBlockerSummaryRepository {
+
+	private final JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	public JdbcDatapackReleaseBlockerSummaryRepository(DataSource dataSource) {
+		this.jdbcTemplate = new JdbcTemplate(dataSource);
+	}
+
+	public DatapackReleaseBlockerSummary summarize() {
+		Optional<CandidateGateSummary> candidate = latestCandidate();
+		long candidateGateBlockers = candidate.map(CandidateGateSummary::blockerCount).orElse(0L);
+		long aliasBlockers = count("""
+			SELECT COUNT(*)
+			FROM external_alias_approvals
+			WHERE approval_status <> 'APPROVED'
+				AND superseded_by IS NULL
+			""");
+		long quarantineBlockers = count("""
+			SELECT COUNT(*)
+			FROM source_quarantine_records
+			WHERE resolution_status = 'OPEN'
+			""");
+		long manualOverrideBlockers = countManualOverrideBlockers();
+		long facilityBlockers = countFacilityBlockers(null);
+		long routeGateBlockers = countRouteGateBlockers(null);
+		long totalBlockers = candidateGateBlockers
+			+ aliasBlockers
+			+ quarantineBlockers
+			+ manualOverrideBlockers
+			+ facilityBlockers
+			+ routeGateBlockers;
+		return new DatapackReleaseBlockerSummary(
+			candidate.map(CandidateGateSummary::candidateId).orElse("-"),
+			candidate.map(CandidateGateSummary::scopeId).orElse("-"),
+			releaseStatus(candidate, totalBlockers),
+			totalBlockers,
+			candidateGateBlockers,
+			aliasBlockers,
+			quarantineBlockers,
+			manualOverrideBlockers,
+			facilityBlockers,
+			routeGateBlockers,
+			readinessRows(candidate, aliasBlockers, quarantineBlockers, facilityBlockers, routeGateBlockers),
+			candidate.map(CandidateGateSummary::createdAt).orElse(null)
+		);
+	}
+
+	public StationReleaseBlockerSummary summarizeStation(String stationId) {
+		long facilityBlockers = countFacilityBlockers(stationId);
+		long routeGateBlockers = countRouteGateBlockers(stationId);
+		long totalBlockers = facilityBlockers + routeGateBlockers;
+		return new StationReleaseBlockerSummary(
+			stationId,
+			totalBlockers == 0 ? "PASS" : "확인 필요",
+			totalBlockers,
+			List.of(
+				new StationReleaseBlockerRow("Facility evidence", facilityBlockers, rowStatus(facilityBlockers)),
+				new StationReleaseBlockerRow("Route gate", routeGateBlockers, rowStatus(routeGateBlockers))
+			)
+		);
+	}
+
+	private Optional<CandidateGateSummary> latestCandidate() {
+		return jdbcTemplate.query("""
+			SELECT id, scope_id, coverage_status, validator_status,
+				route_regression_status, android_evidence_status, created_at
+			FROM datapack_candidates
+			ORDER BY created_at DESC, id ASC
+			LIMIT 1
+			""", this::mapCandidate).stream().findFirst();
+	}
+
+	private CandidateGateSummary mapCandidate(ResultSet resultSet, int rowNumber) throws SQLException {
+		return new CandidateGateSummary(
+			resultSet.getString("id"),
+			resultSet.getString("scope_id"),
+			resultSet.getString("coverage_status"),
+			resultSet.getString("validator_status"),
+			resultSet.getString("route_regression_status"),
+			resultSet.getString("android_evidence_status"),
+			resultSet.getTimestamp("created_at").toLocalDateTime()
+		);
+	}
+
+	private List<ReleaseReadinessRow> readinessRows(
+		Optional<CandidateGateSummary> candidate,
+		long aliasBlockers,
+		long quarantineBlockers,
+		long facilityBlockers,
+		long routeGateBlockers
+	) {
+		long sourceBlockers = candidate.map(row -> "PASS".equals(row.coverageStatus()) ? 0L : 1L).orElse(1L)
+			+ aliasBlockers
+			+ quarantineBlockers;
+		long routeBlockers = candidate.map(row -> "PASS".equals(row.routeRegressionStatus()) ? 0L : 1L).orElse(1L)
+			+ routeGateBlockers;
+		return List.of(
+			new ReleaseReadinessRow("Source coverage", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
+			new ReleaseReadinessRow("Facility evidence", statusFor(facilityBlockers), facilityBlockers, "strict route eligible facility evidence"),
+			new ReleaseReadinessRow("Route gate", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER and generated connector gates"),
+			new ReleaseReadinessRow("Manifest signature", manifestSignatureStatus(candidate), manifestBlockerCount(candidate), "release evidence bundle / signature")
+		);
+	}
+
+	private String manifestSignatureStatus(Optional<CandidateGateSummary> candidate) {
+		if (candidate.isEmpty()) {
+			return "확인 필요";
+		}
+		return jdbcTemplate.query("""
+			SELECT manifest_signature_status
+			FROM datapack_release_evidence_bundles
+			WHERE candidate_id = ?
+			""", (resultSet, rowNumber) -> resultSet.getString("manifest_signature_status"), candidate.get().candidateId())
+			.stream()
+			.findFirst()
+			.map(status -> "PASS".equals(status) ? "PASS" : status)
+			.orElse("확인 필요");
+	}
+
+	private long manifestBlockerCount(Optional<CandidateGateSummary> candidate) {
+		if (candidate.isEmpty()) {
+			return 1L;
+		}
+		return "PASS".equals(manifestSignatureStatus(candidate)) ? 0L : 1L;
+	}
+
+	private long countManualOverrideBlockers() {
+		return count("""
+			SELECT COUNT(*)
+			FROM manual_overrides
+			WHERE approval_status <> 'APPROVED'
+				OR conflict_status = 'UNRESOLVED'
+				OR superseded_by IS NOT NULL
+				OR approved_by IS NULL
+				OR approved_at IS NULL
+				OR approved_by = requested_by
+				OR (strict_route_eligible = TRUE AND route_safety_approved_by IS NULL)
+			""");
+	}
+
+	private long countFacilityBlockers(String stationId) {
+		return countWithOptionalStation("""
+			SELECT COUNT(*)
+			FROM facility_evidence
+			WHERE (
+				strict_route_eligible = FALSE
+				OR evidence_kind = 'UNKNOWN_PENDING_REVIEW'
+				OR operational_status IN ('UNKNOWN', 'CHECK_REQUIRED')
+				OR conflict_status = 'UNRESOLVED'
+			)
+			""", stationId);
+	}
+
+	private long countRouteGateBlockers(String stationId) {
+		return countWithOptionalStation("""
+			SELECT COUNT(*)
+			FROM route_edge_evidence
+			WHERE (
+				strict_route_eligible = FALSE
+				OR edge_type = 'GENERATED_CONNECTOR'
+				OR provenance_kind IN ('GENERATED', 'UNKNOWN')
+				OR verification_status IN ('UNKNOWN', 'GENERATED', 'STALE', 'MISSING')
+			)
+			""", stationId);
+	}
+
+	private long countWithOptionalStation(String baseSql, String stationId) {
+		if (stationId == null) {
+			return count(baseSql);
+		}
+		Long result = jdbcTemplate.queryForObject(baseSql + " AND station_id = ?", Long.class, stationId);
+		return result == null ? 0L : result;
+	}
+
+	private long count(String sql) {
+		Long result = jdbcTemplate.queryForObject(sql, Long.class);
+		return result == null ? 0L : result;
+	}
+
+	private static String releaseStatus(Optional<CandidateGateSummary> candidate, long totalBlockers) {
+		if (candidate.isEmpty()) {
+			return "확인 필요";
+		}
+		return totalBlockers == 0 ? "READY" : "FAIL";
+	}
+
+	private static String statusFor(long blockerCount) {
+		return blockerCount == 0 ? "PASS" : "FAIL";
+	}
+
+	private static String rowStatus(long blockerCount) {
+		return blockerCount == 0 ? "PASS" : "확인 필요";
+	}
+
+	private static String sourceNote(long aliasBlockers, long quarantineBlockers) {
+		return "alias " + aliasBlockers + " / quarantine " + quarantineBlockers;
+	}
+
+	public record DatapackReleaseBlockerSummary(
+		String candidateId,
+		String scopeId,
+		String status,
+		long totalBlockers,
+		long candidateGateBlockers,
+		long aliasBlockers,
+		long quarantineBlockers,
+		long manualOverrideBlockers,
+		long facilityBlockers,
+		long routeGateBlockers,
+		List<ReleaseReadinessRow> readinessRows,
+		LocalDateTime candidateCreatedAt
+	) {
+
+		public static DatapackReleaseBlockerSummary empty() {
+			return new DatapackReleaseBlockerSummary(
+				"-",
+				"-",
+				"확인 필요",
+				0,
+				0,
+				0,
+				0,
+				0,
+				0,
+				0,
+				List.of(
+					new ReleaseReadinessRow("Source coverage", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Facility evidence", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Route gate", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Manifest signature", "확인 필요", 0, "candidate 없음")
+				),
+				null
+			);
+		}
+	}
+
+	public record ReleaseReadinessRow(String label, String status, long blockerCount, String note) {
+	}
+
+	public record StationReleaseBlockerSummary(
+		String stationId,
+		String status,
+		long totalBlockers,
+		List<StationReleaseBlockerRow> rows
+	) {
+
+		public static StationReleaseBlockerSummary empty(String stationId) {
+			return new StationReleaseBlockerSummary(
+				stationId,
+				"확인 필요",
+				0,
+				List.of(
+					new StationReleaseBlockerRow("Facility evidence", 0, "확인 필요"),
+					new StationReleaseBlockerRow("Route gate", 0, "확인 필요")
+				)
+			);
+		}
+	}
+
+	public record StationReleaseBlockerRow(String label, long blockerCount, String status) {
+	}
+
+	private record CandidateGateSummary(
+		String candidateId,
+		String scopeId,
+		String coverageStatus,
+		String validatorStatus,
+		String routeRegressionStatus,
+		String androidEvidenceStatus,
+		LocalDateTime createdAt
+	) {
+
+		long blockerCount() {
+			return List.of(coverageStatus, validatorStatus, routeRegressionStatus, androidEvidenceStatus)
+				.stream()
+				.filter(status -> !"PASS".equals(status))
+				.count();
+		}
+	}
+}
