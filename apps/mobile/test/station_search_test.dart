@@ -1267,7 +1267,7 @@ void main() {
 
     expect(reportedErrors, isEmpty);
     expect(controller.state.status, StationDetailStatus.failure);
-    expect(controller.state.message, '역 상세 정보를 불러오지 못했습니다.');
+    expect(controller.state.message, '역 안내를 불러오지 못했습니다.');
   });
 
   test('역 상세 상태는 확인이 필요한 시설을 먼저 보여 주고 짧은 요약을 만든다', () {

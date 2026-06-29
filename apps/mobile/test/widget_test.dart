@@ -179,9 +179,13 @@ Future<void> _openRouteDestinationStationInput(WidgetTester tester) async {
 }
 
 Future<void> _openFirstRouteResultDetail(WidgetTester tester) async {
-  await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
+  final routeResult = find.byKey(
+    const Key('routeResultListItem'),
+    skipOffstage: false,
+  );
+  await tester.ensureVisible(routeResult);
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('routeResultListItem')));
+  await tester.tap(routeResult);
   await tester.pumpAndSettle();
 }
 
@@ -7369,7 +7373,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
+          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
@@ -7415,7 +7419,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
+          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -8221,7 +8225,7 @@ void main() {
 
     expect(
       find.bySemanticsLabel(
-        '상록수역 상세 정보, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
+        '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
       ),
       findsOneWidget,
     );
@@ -12609,7 +12613,7 @@ RouteSearchResult _sampleRouteSearchResult({
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',
-        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 상세 정보를 확인하세요.',
+        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 안내를 확인하세요.',
       ),
     ],
     recommendationReasons: recommendationReasons,
