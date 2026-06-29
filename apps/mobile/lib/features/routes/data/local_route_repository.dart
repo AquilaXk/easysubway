@@ -370,6 +370,17 @@ class _RouteCatalogSnapshot {
       'facility_id',
       'NULL',
     );
+    final facilityColumns = await database
+        .customSelect('PRAGMA table_info(facilities)')
+        .get();
+    final facilityColumnNames = {
+      for (final row in facilityColumns) row.read<String>('name'),
+    };
+    final operationalStatusSql = _selectFacilityColumn(
+      facilityColumnNames,
+      'operational_status',
+      'NULL',
+    );
     final hasDataQualityRecords = await _tableExists(
       database,
       'data_quality_records',
@@ -380,6 +391,7 @@ class _RouteCatalogSnapshot {
               ? '''
           SELECT f.id,
                  f.status,
+                 $operationalStatusSql AS operational_status,
                  (
                    SELECT q.quality_level
                    FROM data_quality_records q
@@ -402,6 +414,7 @@ class _RouteCatalogSnapshot {
               : '''
           SELECT f.id,
                  f.status,
+                 $operationalStatusSql AS operational_status,
                  NULL AS quality_level,
                  NULL AS checked_at
           FROM facilities f
@@ -414,6 +427,7 @@ class _RouteCatalogSnapshot {
         row.read<String>('id'): _FacilitySnapshot(
           id: row.read<String>('id'),
           status: row.read<String>('status'),
+          operationalStatus: row.readNullable<String>('operational_status'),
           qualityLevel: row.readNullable<String>('quality_level'),
           checkedAtSeconds: row.readNullable<int>('checked_at'),
         ),
@@ -924,12 +938,14 @@ class _FacilitySnapshot {
   const _FacilitySnapshot({
     required this.id,
     required this.status,
+    required this.operationalStatus,
     required this.qualityLevel,
     required this.checkedAtSeconds,
   });
 
   final String id;
   final String status;
+  final String? operationalStatus;
   final String? qualityLevel;
   final int? checkedAtSeconds;
 }
@@ -941,6 +957,14 @@ String _effectiveAccessibilityStatus(
   final edgeStatusUpper = edgeStatus.toUpperCase();
   if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
     return edgeStatus;
+  }
+  final operationalStatus = facility.operationalStatus?.toUpperCase();
+  if (operationalStatus == 'UNKNOWN' || operationalStatus == 'CHECK_REQUIRED') {
+    return 'UNKNOWN';
+  }
+  if (operationalStatus == 'UNAVAILABLE' ||
+      operationalStatus == 'OUT_OF_SERVICE') {
+    return 'UNAVAILABLE';
   }
   final status = facility.status.toUpperCase();
   if (status == 'NORMAL' ||
@@ -955,6 +979,16 @@ String _effectiveAccessibilityStatus(
     return 'UNKNOWN';
   }
   return 'UNAVAILABLE';
+}
+
+String _selectFacilityColumn(
+  Set<String> columnNames,
+  String columnName,
+  String fallbackExpression,
+) {
+  return columnNames.contains(columnName)
+      ? 'f.$columnName'
+      : fallbackExpression;
 }
 
 int _effectiveReliabilityScore(

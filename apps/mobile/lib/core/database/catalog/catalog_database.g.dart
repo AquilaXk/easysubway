@@ -3551,6 +3551,42 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(100),
   );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
   static const VerificationMeta _facilityIdMeta = const VerificationMeta(
     'facilityId',
   );
@@ -3574,6 +3610,18 @@ class $NetworkEdgesTable extends NetworkEdges
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3587,8 +3635,12 @@ class $NetworkEdgesTable extends NetworkEdges
     stairAccessState,
     accessibilityStatus,
     reliabilityScore,
+    sourceId,
+    provenanceKind,
+    verificationStatus,
     facilityId,
     lastVerifiedAt,
+    evidenceHash,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3695,6 +3747,30 @@ class $NetworkEdgesTable extends NetworkEdges
         ),
       );
     }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
     if (data.containsKey('facility_id')) {
       context.handle(
         _facilityIdMeta,
@@ -3707,6 +3783,15 @@ class $NetworkEdgesTable extends NetworkEdges
         lastVerifiedAt.isAcceptableOrUnknown(
           data['last_verified_at']!,
           _lastVerifiedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
         ),
       );
     }
@@ -3763,6 +3848,18 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.int,
         data['${effectivePrefix}reliability_score'],
       )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
       facilityId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}facility_id'],
@@ -3771,6 +3868,10 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_verified_at'],
       ),
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
     );
   }
 
@@ -3792,8 +3893,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final String stairAccessState;
   final String accessibilityStatus;
   final int reliabilityScore;
+  final String sourceId;
+  final String provenanceKind;
+  final String verificationStatus;
   final String? facilityId;
   final DateTime? lastVerifiedAt;
+  final String evidenceHash;
   const NetworkEdge({
     required this.id,
     required this.fromNodeId,
@@ -3806,8 +3911,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     required this.stairAccessState,
     required this.accessibilityStatus,
     required this.reliabilityScore,
+    required this.sourceId,
+    required this.provenanceKind,
+    required this.verificationStatus,
     this.facilityId,
     this.lastVerifiedAt,
+    required this.evidenceHash,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3823,12 +3932,16 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['stair_access_state'] = Variable<String>(stairAccessState);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['reliability_score'] = Variable<int>(reliabilityScore);
+    map['source_id'] = Variable<String>(sourceId);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['verification_status'] = Variable<String>(verificationStatus);
     if (!nullToAbsent || facilityId != null) {
       map['facility_id'] = Variable<String>(facilityId);
     }
     if (!nullToAbsent || lastVerifiedAt != null) {
       map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
     }
+    map['evidence_hash'] = Variable<String>(evidenceHash);
     return map;
   }
 
@@ -3845,12 +3958,16 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       stairAccessState: Value(stairAccessState),
       accessibilityStatus: Value(accessibilityStatus),
       reliabilityScore: Value(reliabilityScore),
+      sourceId: Value(sourceId),
+      provenanceKind: Value(provenanceKind),
+      verificationStatus: Value(verificationStatus),
       facilityId: facilityId == null && nullToAbsent
           ? const Value.absent()
           : Value(facilityId),
       lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastVerifiedAt),
+      evidenceHash: Value(evidenceHash),
     );
   }
 
@@ -3873,8 +3990,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
         json['accessibilityStatus'],
       ),
       reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
       facilityId: serializer.fromJson<String?>(json['facilityId']),
       lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
     );
   }
   @override
@@ -3892,8 +4015,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'stairAccessState': serializer.toJson<String>(stairAccessState),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
       'facilityId': serializer.toJson<String?>(facilityId),
       'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
     };
   }
 
@@ -3909,8 +4036,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     String? stairAccessState,
     String? accessibilityStatus,
     int? reliabilityScore,
+    String? sourceId,
+    String? provenanceKind,
+    String? verificationStatus,
     Value<String?> facilityId = const Value.absent(),
     Value<DateTime?> lastVerifiedAt = const Value.absent(),
+    String? evidenceHash,
   }) => NetworkEdge(
     id: id ?? this.id,
     fromNodeId: fromNodeId ?? this.fromNodeId,
@@ -3923,10 +4054,14 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     stairAccessState: stairAccessState ?? this.stairAccessState,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+    sourceId: sourceId ?? this.sourceId,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
     facilityId: facilityId.present ? facilityId.value : this.facilityId,
     lastVerifiedAt: lastVerifiedAt.present
         ? lastVerifiedAt.value
         : this.lastVerifiedAt,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
   );
   NetworkEdge copyWithCompanion(NetworkEdgesCompanion data) {
     return NetworkEdge(
@@ -3957,12 +4092,22 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       reliabilityScore: data.reliabilityScore.present
           ? data.reliabilityScore.value
           : this.reliabilityScore,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
       facilityId: data.facilityId.present
           ? data.facilityId.value
           : this.facilityId,
       lastVerifiedAt: data.lastVerifiedAt.present
           ? data.lastVerifiedAt.value
           : this.lastVerifiedAt,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
     );
   }
 
@@ -3980,8 +4125,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
-          ..write('lastVerifiedAt: $lastVerifiedAt')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash')
           ..write(')'))
         .toString();
   }
@@ -3999,8 +4148,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     stairAccessState,
     accessibilityStatus,
     reliabilityScore,
+    sourceId,
+    provenanceKind,
+    verificationStatus,
     facilityId,
     lastVerifiedAt,
+    evidenceHash,
   );
   @override
   bool operator ==(Object other) =>
@@ -4017,8 +4170,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.stairAccessState == this.stairAccessState &&
           other.accessibilityStatus == this.accessibilityStatus &&
           other.reliabilityScore == this.reliabilityScore &&
+          other.sourceId == this.sourceId &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verificationStatus == this.verificationStatus &&
           other.facilityId == this.facilityId &&
-          other.lastVerifiedAt == this.lastVerifiedAt);
+          other.lastVerifiedAt == this.lastVerifiedAt &&
+          other.evidenceHash == this.evidenceHash);
 }
 
 class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
@@ -4033,8 +4190,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<String> stairAccessState;
   final Value<String> accessibilityStatus;
   final Value<int> reliabilityScore;
+  final Value<String> sourceId;
+  final Value<String> provenanceKind;
+  final Value<String> verificationStatus;
   final Value<String?> facilityId;
   final Value<DateTime?> lastVerifiedAt;
+  final Value<String> evidenceHash;
   final Value<int> rowid;
   const NetworkEdgesCompanion({
     this.id = const Value.absent(),
@@ -4048,8 +4209,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NetworkEdgesCompanion.insert({
@@ -4064,8 +4229,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
     this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        fromNodeId = Value(fromNodeId),
@@ -4082,8 +4251,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<String>? stairAccessState,
     Expression<String>? accessibilityStatus,
     Expression<int>? reliabilityScore,
+    Expression<String>? sourceId,
+    Expression<String>? provenanceKind,
+    Expression<String>? verificationStatus,
     Expression<String>? facilityId,
     Expression<DateTime>? lastVerifiedAt,
+    Expression<String>? evidenceHash,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4099,8 +4272,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (accessibilityStatus != null)
         'accessibility_status': accessibilityStatus,
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
+      if (sourceId != null) 'source_id': sourceId,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
       if (facilityId != null) 'facility_id': facilityId,
       if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4117,8 +4294,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<String>? stairAccessState,
     Value<String>? accessibilityStatus,
     Value<int>? reliabilityScore,
+    Value<String>? sourceId,
+    Value<String>? provenanceKind,
+    Value<String>? verificationStatus,
     Value<String?>? facilityId,
     Value<DateTime?>? lastVerifiedAt,
+    Value<String>? evidenceHash,
     Value<int>? rowid,
   }) {
     return NetworkEdgesCompanion(
@@ -4133,8 +4314,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       stairAccessState: stairAccessState ?? this.stairAccessState,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+      sourceId: sourceId ?? this.sourceId,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
       facilityId: facilityId ?? this.facilityId,
       lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4175,11 +4360,23 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (reliabilityScore.present) {
       map['reliability_score'] = Variable<int>(reliabilityScore.value);
     }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
     if (facilityId.present) {
       map['facility_id'] = Variable<String>(facilityId.value);
     }
     if (lastVerifiedAt.present) {
       map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -4201,8 +4398,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
           ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4590,7 +4791,7 @@ class $FacilitiesTable extends Facilities
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('NORMAL'),
+    defaultValue: const Constant('UNKNOWN'),
   );
   static const VerificationMeta _floorFromMeta = const VerificationMeta(
     'floorFrom',
@@ -4628,6 +4829,125 @@ class $FacilitiesTable extends Facilities
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _providerFacilityRefMeta =
+      const VerificationMeta('providerFacilityRef');
+  @override
+  late final GeneratedColumn<String> providerFacilityRef =
+      GeneratedColumn<String>(
+        'provider_facility_ref',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verifiedAtMeta = const VerificationMeta(
+    'verifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> verifiedAt = GeneratedColumn<DateTime>(
+    'verified_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _retrievedAtMeta = const VerificationMeta(
+    'retrievedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> retrievedAt = GeneratedColumn<DateTime>(
+    'retrieved_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _statusMeaningMeta = const VerificationMeta(
+    'statusMeaning',
+  );
+  @override
+  late final GeneratedColumn<String> statusMeaning = GeneratedColumn<String>(
+    'status_meaning',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _operationalStatusMeta = const VerificationMeta(
+    'operationalStatus',
+  );
+  @override
+  late final GeneratedColumn<String> operationalStatus =
+      GeneratedColumn<String>(
+        'operational_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _installationStatusMeta =
+      const VerificationMeta('installationStatus');
+  @override
+  late final GeneratedColumn<String> installationStatus =
+      GeneratedColumn<String>(
+        'installation_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _confidenceMeta = const VerificationMeta(
+    'confidence',
+  );
+  @override
+  late final GeneratedColumn<int> confidence = GeneratedColumn<int>(
+    'confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4639,6 +4959,16 @@ class $FacilitiesTable extends Facilities
     floorFrom,
     floorTo,
     description,
+    sourceId,
+    providerFacilityRef,
+    provenanceKind,
+    verifiedAt,
+    retrievedAt,
+    evidenceHash,
+    statusMeaning,
+    operationalStatus,
+    installationStatus,
+    confidence,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4714,6 +5044,87 @@ class $FacilitiesTable extends Facilities
         ),
       );
     }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('provider_facility_ref')) {
+      context.handle(
+        _providerFacilityRefMeta,
+        providerFacilityRef.isAcceptableOrUnknown(
+          data['provider_facility_ref']!,
+          _providerFacilityRefMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verified_at')) {
+      context.handle(
+        _verifiedAtMeta,
+        verifiedAt.isAcceptableOrUnknown(data['verified_at']!, _verifiedAtMeta),
+      );
+    }
+    if (data.containsKey('retrieved_at')) {
+      context.handle(
+        _retrievedAtMeta,
+        retrievedAt.isAcceptableOrUnknown(
+          data['retrieved_at']!,
+          _retrievedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status_meaning')) {
+      context.handle(
+        _statusMeaningMeta,
+        statusMeaning.isAcceptableOrUnknown(
+          data['status_meaning']!,
+          _statusMeaningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('operational_status')) {
+      context.handle(
+        _operationalStatusMeta,
+        operationalStatus.isAcceptableOrUnknown(
+          data['operational_status']!,
+          _operationalStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('installation_status')) {
+      context.handle(
+        _installationStatusMeta,
+        installationStatus.isAcceptableOrUnknown(
+          data['installation_status']!,
+          _installationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('confidence')) {
+      context.handle(
+        _confidenceMeta,
+        confidence.isAcceptableOrUnknown(data['confidence']!, _confidenceMeta),
+      );
+    }
     return context;
   }
 
@@ -4759,6 +5170,46 @@ class $FacilitiesTable extends Facilities
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      providerFacilityRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_facility_ref'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}verified_at'],
+      ),
+      retrievedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}retrieved_at'],
+      ),
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
+      statusMeaning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status_meaning'],
+      )!,
+      operationalStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operational_status'],
+      )!,
+      installationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}installation_status'],
+      )!,
+      confidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}confidence'],
+      )!,
     );
   }
 
@@ -4778,6 +5229,16 @@ class Facility extends DataClass implements Insertable<Facility> {
   final String floorFrom;
   final String floorTo;
   final String description;
+  final String sourceId;
+  final String providerFacilityRef;
+  final String provenanceKind;
+  final DateTime? verifiedAt;
+  final DateTime? retrievedAt;
+  final String evidenceHash;
+  final String statusMeaning;
+  final String operationalStatus;
+  final String installationStatus;
+  final int confidence;
   const Facility({
     required this.id,
     required this.stationId,
@@ -4788,6 +5249,16 @@ class Facility extends DataClass implements Insertable<Facility> {
     required this.floorFrom,
     required this.floorTo,
     required this.description,
+    required this.sourceId,
+    required this.providerFacilityRef,
+    required this.provenanceKind,
+    this.verifiedAt,
+    this.retrievedAt,
+    required this.evidenceHash,
+    required this.statusMeaning,
+    required this.operationalStatus,
+    required this.installationStatus,
+    required this.confidence,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4803,6 +5274,20 @@ class Facility extends DataClass implements Insertable<Facility> {
     map['floor_from'] = Variable<String>(floorFrom);
     map['floor_to'] = Variable<String>(floorTo);
     map['description'] = Variable<String>(description);
+    map['source_id'] = Variable<String>(sourceId);
+    map['provider_facility_ref'] = Variable<String>(providerFacilityRef);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    if (!nullToAbsent || verifiedAt != null) {
+      map['verified_at'] = Variable<DateTime>(verifiedAt);
+    }
+    if (!nullToAbsent || retrievedAt != null) {
+      map['retrieved_at'] = Variable<DateTime>(retrievedAt);
+    }
+    map['evidence_hash'] = Variable<String>(evidenceHash);
+    map['status_meaning'] = Variable<String>(statusMeaning);
+    map['operational_status'] = Variable<String>(operationalStatus);
+    map['installation_status'] = Variable<String>(installationStatus);
+    map['confidence'] = Variable<int>(confidence);
     return map;
   }
 
@@ -4819,6 +5304,20 @@ class Facility extends DataClass implements Insertable<Facility> {
       floorFrom: Value(floorFrom),
       floorTo: Value(floorTo),
       description: Value(description),
+      sourceId: Value(sourceId),
+      providerFacilityRef: Value(providerFacilityRef),
+      provenanceKind: Value(provenanceKind),
+      verifiedAt: verifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(verifiedAt),
+      retrievedAt: retrievedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(retrievedAt),
+      evidenceHash: Value(evidenceHash),
+      statusMeaning: Value(statusMeaning),
+      operationalStatus: Value(operationalStatus),
+      installationStatus: Value(installationStatus),
+      confidence: Value(confidence),
     );
   }
 
@@ -4837,6 +5336,20 @@ class Facility extends DataClass implements Insertable<Facility> {
       floorFrom: serializer.fromJson<String>(json['floorFrom']),
       floorTo: serializer.fromJson<String>(json['floorTo']),
       description: serializer.fromJson<String>(json['description']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      providerFacilityRef: serializer.fromJson<String>(
+        json['providerFacilityRef'],
+      ),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verifiedAt: serializer.fromJson<DateTime?>(json['verifiedAt']),
+      retrievedAt: serializer.fromJson<DateTime?>(json['retrievedAt']),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
+      statusMeaning: serializer.fromJson<String>(json['statusMeaning']),
+      operationalStatus: serializer.fromJson<String>(json['operationalStatus']),
+      installationStatus: serializer.fromJson<String>(
+        json['installationStatus'],
+      ),
+      confidence: serializer.fromJson<int>(json['confidence']),
     );
   }
   @override
@@ -4852,6 +5365,16 @@ class Facility extends DataClass implements Insertable<Facility> {
       'floorFrom': serializer.toJson<String>(floorFrom),
       'floorTo': serializer.toJson<String>(floorTo),
       'description': serializer.toJson<String>(description),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'providerFacilityRef': serializer.toJson<String>(providerFacilityRef),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verifiedAt': serializer.toJson<DateTime?>(verifiedAt),
+      'retrievedAt': serializer.toJson<DateTime?>(retrievedAt),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
+      'statusMeaning': serializer.toJson<String>(statusMeaning),
+      'operationalStatus': serializer.toJson<String>(operationalStatus),
+      'installationStatus': serializer.toJson<String>(installationStatus),
+      'confidence': serializer.toJson<int>(confidence),
     };
   }
 
@@ -4865,6 +5388,16 @@ class Facility extends DataClass implements Insertable<Facility> {
     String? floorFrom,
     String? floorTo,
     String? description,
+    String? sourceId,
+    String? providerFacilityRef,
+    String? provenanceKind,
+    Value<DateTime?> verifiedAt = const Value.absent(),
+    Value<DateTime?> retrievedAt = const Value.absent(),
+    String? evidenceHash,
+    String? statusMeaning,
+    String? operationalStatus,
+    String? installationStatus,
+    int? confidence,
   }) => Facility(
     id: id ?? this.id,
     stationId: stationId ?? this.stationId,
@@ -4875,6 +5408,16 @@ class Facility extends DataClass implements Insertable<Facility> {
     floorFrom: floorFrom ?? this.floorFrom,
     floorTo: floorTo ?? this.floorTo,
     description: description ?? this.description,
+    sourceId: sourceId ?? this.sourceId,
+    providerFacilityRef: providerFacilityRef ?? this.providerFacilityRef,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verifiedAt: verifiedAt.present ? verifiedAt.value : this.verifiedAt,
+    retrievedAt: retrievedAt.present ? retrievedAt.value : this.retrievedAt,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
+    statusMeaning: statusMeaning ?? this.statusMeaning,
+    operationalStatus: operationalStatus ?? this.operationalStatus,
+    installationStatus: installationStatus ?? this.installationStatus,
+    confidence: confidence ?? this.confidence,
   );
   Facility copyWithCompanion(FacilitiesCompanion data) {
     return Facility(
@@ -4889,6 +5432,34 @@ class Facility extends DataClass implements Insertable<Facility> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      providerFacilityRef: data.providerFacilityRef.present
+          ? data.providerFacilityRef.value
+          : this.providerFacilityRef,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verifiedAt: data.verifiedAt.present
+          ? data.verifiedAt.value
+          : this.verifiedAt,
+      retrievedAt: data.retrievedAt.present
+          ? data.retrievedAt.value
+          : this.retrievedAt,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
+      statusMeaning: data.statusMeaning.present
+          ? data.statusMeaning.value
+          : this.statusMeaning,
+      operationalStatus: data.operationalStatus.present
+          ? data.operationalStatus.value
+          : this.operationalStatus,
+      installationStatus: data.installationStatus.present
+          ? data.installationStatus.value
+          : this.installationStatus,
+      confidence: data.confidence.present
+          ? data.confidence.value
+          : this.confidence,
     );
   }
 
@@ -4903,7 +5474,17 @@ class Facility extends DataClass implements Insertable<Facility> {
           ..write('status: $status, ')
           ..write('floorFrom: $floorFrom, ')
           ..write('floorTo: $floorTo, ')
-          ..write('description: $description')
+          ..write('description: $description, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('providerFacilityRef: $providerFacilityRef, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verifiedAt: $verifiedAt, ')
+          ..write('retrievedAt: $retrievedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('statusMeaning: $statusMeaning, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('installationStatus: $installationStatus, ')
+          ..write('confidence: $confidence')
           ..write(')'))
         .toString();
   }
@@ -4919,6 +5500,16 @@ class Facility extends DataClass implements Insertable<Facility> {
     floorFrom,
     floorTo,
     description,
+    sourceId,
+    providerFacilityRef,
+    provenanceKind,
+    verifiedAt,
+    retrievedAt,
+    evidenceHash,
+    statusMeaning,
+    operationalStatus,
+    installationStatus,
+    confidence,
   );
   @override
   bool operator ==(Object other) =>
@@ -4932,7 +5523,17 @@ class Facility extends DataClass implements Insertable<Facility> {
           other.status == this.status &&
           other.floorFrom == this.floorFrom &&
           other.floorTo == this.floorTo &&
-          other.description == this.description);
+          other.description == this.description &&
+          other.sourceId == this.sourceId &&
+          other.providerFacilityRef == this.providerFacilityRef &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verifiedAt == this.verifiedAt &&
+          other.retrievedAt == this.retrievedAt &&
+          other.evidenceHash == this.evidenceHash &&
+          other.statusMeaning == this.statusMeaning &&
+          other.operationalStatus == this.operationalStatus &&
+          other.installationStatus == this.installationStatus &&
+          other.confidence == this.confidence);
 }
 
 class FacilitiesCompanion extends UpdateCompanion<Facility> {
@@ -4945,6 +5546,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
   final Value<String> floorFrom;
   final Value<String> floorTo;
   final Value<String> description;
+  final Value<String> sourceId;
+  final Value<String> providerFacilityRef;
+  final Value<String> provenanceKind;
+  final Value<DateTime?> verifiedAt;
+  final Value<DateTime?> retrievedAt;
+  final Value<String> evidenceHash;
+  final Value<String> statusMeaning;
+  final Value<String> operationalStatus;
+  final Value<String> installationStatus;
+  final Value<int> confidence;
   final Value<int> rowid;
   const FacilitiesCompanion({
     this.id = const Value.absent(),
@@ -4956,6 +5567,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     this.floorFrom = const Value.absent(),
     this.floorTo = const Value.absent(),
     this.description = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.providerFacilityRef = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verifiedAt = const Value.absent(),
+    this.retrievedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.statusMeaning = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.installationStatus = const Value.absent(),
+    this.confidence = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FacilitiesCompanion.insert({
@@ -4968,6 +5589,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     this.floorFrom = const Value.absent(),
     this.floorTo = const Value.absent(),
     this.description = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.providerFacilityRef = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verifiedAt = const Value.absent(),
+    this.retrievedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.statusMeaning = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.installationStatus = const Value.absent(),
+    this.confidence = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        stationId = Value(stationId),
@@ -4983,6 +5614,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     Expression<String>? floorFrom,
     Expression<String>? floorTo,
     Expression<String>? description,
+    Expression<String>? sourceId,
+    Expression<String>? providerFacilityRef,
+    Expression<String>? provenanceKind,
+    Expression<DateTime>? verifiedAt,
+    Expression<DateTime>? retrievedAt,
+    Expression<String>? evidenceHash,
+    Expression<String>? statusMeaning,
+    Expression<String>? operationalStatus,
+    Expression<String>? installationStatus,
+    Expression<int>? confidence,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4995,6 +5636,17 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
       if (floorFrom != null) 'floor_from': floorFrom,
       if (floorTo != null) 'floor_to': floorTo,
       if (description != null) 'description': description,
+      if (sourceId != null) 'source_id': sourceId,
+      if (providerFacilityRef != null)
+        'provider_facility_ref': providerFacilityRef,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verifiedAt != null) 'verified_at': verifiedAt,
+      if (retrievedAt != null) 'retrieved_at': retrievedAt,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
+      if (statusMeaning != null) 'status_meaning': statusMeaning,
+      if (operationalStatus != null) 'operational_status': operationalStatus,
+      if (installationStatus != null) 'installation_status': installationStatus,
+      if (confidence != null) 'confidence': confidence,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5009,6 +5661,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     Value<String>? floorFrom,
     Value<String>? floorTo,
     Value<String>? description,
+    Value<String>? sourceId,
+    Value<String>? providerFacilityRef,
+    Value<String>? provenanceKind,
+    Value<DateTime?>? verifiedAt,
+    Value<DateTime?>? retrievedAt,
+    Value<String>? evidenceHash,
+    Value<String>? statusMeaning,
+    Value<String>? operationalStatus,
+    Value<String>? installationStatus,
+    Value<int>? confidence,
     Value<int>? rowid,
   }) {
     return FacilitiesCompanion(
@@ -5021,6 +5683,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
       floorFrom: floorFrom ?? this.floorFrom,
       floorTo: floorTo ?? this.floorTo,
       description: description ?? this.description,
+      sourceId: sourceId ?? this.sourceId,
+      providerFacilityRef: providerFacilityRef ?? this.providerFacilityRef,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verifiedAt: verifiedAt ?? this.verifiedAt,
+      retrievedAt: retrievedAt ?? this.retrievedAt,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
+      statusMeaning: statusMeaning ?? this.statusMeaning,
+      operationalStatus: operationalStatus ?? this.operationalStatus,
+      installationStatus: installationStatus ?? this.installationStatus,
+      confidence: confidence ?? this.confidence,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5055,6 +5727,38 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (providerFacilityRef.present) {
+      map['provider_facility_ref'] = Variable<String>(
+        providerFacilityRef.value,
+      );
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verifiedAt.present) {
+      map['verified_at'] = Variable<DateTime>(verifiedAt.value);
+    }
+    if (retrievedAt.present) {
+      map['retrieved_at'] = Variable<DateTime>(retrievedAt.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
+    if (statusMeaning.present) {
+      map['status_meaning'] = Variable<String>(statusMeaning.value);
+    }
+    if (operationalStatus.present) {
+      map['operational_status'] = Variable<String>(operationalStatus.value);
+    }
+    if (installationStatus.present) {
+      map['installation_status'] = Variable<String>(installationStatus.value);
+    }
+    if (confidence.present) {
+      map['confidence'] = Variable<int>(confidence.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5073,6 +5777,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
           ..write('floorFrom: $floorFrom, ')
           ..write('floorTo: $floorTo, ')
           ..write('description: $description, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('providerFacilityRef: $providerFacilityRef, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verifiedAt: $verifiedAt, ')
+          ..write('retrievedAt: $retrievedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('statusMeaning: $statusMeaning, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('installationStatus: $installationStatus, ')
+          ..write('confidence: $confidence, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5832,6 +6546,77 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         requiredDuringInsert: false,
         defaultValue: const Constant('UNKNOWN'),
       );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _facilityIdMeta = const VerificationMeta(
+    'facilityId',
+  );
+  @override
+  late final GeneratedColumn<String> facilityId = GeneratedColumn<String>(
+    'facility_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _instructionMeta = const VerificationMeta(
     'instruction',
   );
@@ -5859,6 +6644,12 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     widthLevel,
     reliabilityScore,
     accessibilityStatus,
+    sourceId,
+    provenanceKind,
+    verificationStatus,
+    facilityId,
+    lastVerifiedAt,
+    evidenceHash,
     instruction,
   ];
   @override
@@ -5978,6 +6769,54 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         ),
       );
     }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('facility_id')) {
+      context.handle(
+        _facilityIdMeta,
+        facilityId.isAcceptableOrUnknown(data['facility_id']!, _facilityIdMeta),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    }
     if (data.containsKey('instruction')) {
       context.handle(
         _instructionMeta,
@@ -6048,6 +6887,30 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         DriftSqlType.string,
         data['${effectivePrefix}accessibility_status'],
       )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
+      facilityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}facility_id'],
+      ),
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
       instruction: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}instruction'],
@@ -6076,6 +6939,12 @@ class InternalRouteEdge extends DataClass
   final int widthLevel;
   final int reliabilityScore;
   final String accessibilityStatus;
+  final String sourceId;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String? facilityId;
+  final DateTime? lastVerifiedAt;
+  final String evidenceHash;
   final String instruction;
   const InternalRouteEdge({
     required this.id,
@@ -6091,6 +6960,12 @@ class InternalRouteEdge extends DataClass
     required this.widthLevel,
     required this.reliabilityScore,
     required this.accessibilityStatus,
+    required this.sourceId,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    this.facilityId,
+    this.lastVerifiedAt,
+    required this.evidenceHash,
     required this.instruction,
   });
   @override
@@ -6109,6 +6984,16 @@ class InternalRouteEdge extends DataClass
     map['width_level'] = Variable<int>(widthLevel);
     map['reliability_score'] = Variable<int>(reliabilityScore);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
+    map['source_id'] = Variable<String>(sourceId);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['verification_status'] = Variable<String>(verificationStatus);
+    if (!nullToAbsent || facilityId != null) {
+      map['facility_id'] = Variable<String>(facilityId);
+    }
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
+    map['evidence_hash'] = Variable<String>(evidenceHash);
     map['instruction'] = Variable<String>(instruction);
     return map;
   }
@@ -6128,6 +7013,16 @@ class InternalRouteEdge extends DataClass
       widthLevel: Value(widthLevel),
       reliabilityScore: Value(reliabilityScore),
       accessibilityStatus: Value(accessibilityStatus),
+      sourceId: Value(sourceId),
+      provenanceKind: Value(provenanceKind),
+      verificationStatus: Value(verificationStatus),
+      facilityId: facilityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(facilityId),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
+      evidenceHash: Value(evidenceHash),
       instruction: Value(instruction),
     );
   }
@@ -6153,6 +7048,14 @@ class InternalRouteEdge extends DataClass
       accessibilityStatus: serializer.fromJson<String>(
         json['accessibilityStatus'],
       ),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
+      facilityId: serializer.fromJson<String?>(json['facilityId']),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
       instruction: serializer.fromJson<String>(json['instruction']),
     );
   }
@@ -6173,6 +7076,12 @@ class InternalRouteEdge extends DataClass
       'widthLevel': serializer.toJson<int>(widthLevel),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
+      'facilityId': serializer.toJson<String?>(facilityId),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
       'instruction': serializer.toJson<String>(instruction),
     };
   }
@@ -6191,6 +7100,12 @@ class InternalRouteEdge extends DataClass
     int? widthLevel,
     int? reliabilityScore,
     String? accessibilityStatus,
+    String? sourceId,
+    String? provenanceKind,
+    String? verificationStatus,
+    Value<String?> facilityId = const Value.absent(),
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
+    String? evidenceHash,
     String? instruction,
   }) => InternalRouteEdge(
     id: id ?? this.id,
@@ -6206,6 +7121,14 @@ class InternalRouteEdge extends DataClass
     widthLevel: widthLevel ?? this.widthLevel,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+    sourceId: sourceId ?? this.sourceId,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
+    facilityId: facilityId.present ? facilityId.value : this.facilityId,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
     instruction: instruction ?? this.instruction,
   );
   InternalRouteEdge copyWithCompanion(InternalRouteEdgesCompanion data) {
@@ -6243,6 +7166,22 @@ class InternalRouteEdge extends DataClass
       accessibilityStatus: data.accessibilityStatus.present
           ? data.accessibilityStatus.value
           : this.accessibilityStatus,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
+      facilityId: data.facilityId.present
+          ? data.facilityId.value
+          : this.facilityId,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
       instruction: data.instruction.present
           ? data.instruction.value
           : this.instruction,
@@ -6265,6 +7204,12 @@ class InternalRouteEdge extends DataClass
           ..write('widthLevel: $widthLevel, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('facilityId: $facilityId, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
           ..write('instruction: $instruction')
           ..write(')'))
         .toString();
@@ -6285,6 +7230,12 @@ class InternalRouteEdge extends DataClass
     widthLevel,
     reliabilityScore,
     accessibilityStatus,
+    sourceId,
+    provenanceKind,
+    verificationStatus,
+    facilityId,
+    lastVerifiedAt,
+    evidenceHash,
     instruction,
   );
   @override
@@ -6304,6 +7255,12 @@ class InternalRouteEdge extends DataClass
           other.widthLevel == this.widthLevel &&
           other.reliabilityScore == this.reliabilityScore &&
           other.accessibilityStatus == this.accessibilityStatus &&
+          other.sourceId == this.sourceId &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verificationStatus == this.verificationStatus &&
+          other.facilityId == this.facilityId &&
+          other.lastVerifiedAt == this.lastVerifiedAt &&
+          other.evidenceHash == this.evidenceHash &&
           other.instruction == this.instruction);
 }
 
@@ -6321,6 +7278,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
   final Value<int> widthLevel;
   final Value<int> reliabilityScore;
   final Value<String> accessibilityStatus;
+  final Value<String> sourceId;
+  final Value<String> provenanceKind;
+  final Value<String> verificationStatus;
+  final Value<String?> facilityId;
+  final Value<DateTime?> lastVerifiedAt;
+  final Value<String> evidenceHash;
   final Value<String> instruction;
   final Value<int> rowid;
   const InternalRouteEdgesCompanion({
@@ -6337,6 +7300,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.widthLevel = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.facilityId = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6354,6 +7323,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.widthLevel = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.facilityId = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
     this.instruction = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -6373,6 +7348,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Expression<int>? widthLevel,
     Expression<int>? reliabilityScore,
     Expression<String>? accessibilityStatus,
+    Expression<String>? sourceId,
+    Expression<String>? provenanceKind,
+    Expression<String>? verificationStatus,
+    Expression<String>? facilityId,
+    Expression<DateTime>? lastVerifiedAt,
+    Expression<String>? evidenceHash,
     Expression<String>? instruction,
     Expression<int>? rowid,
   }) {
@@ -6391,6 +7372,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
       if (accessibilityStatus != null)
         'accessibility_status': accessibilityStatus,
+      if (sourceId != null) 'source_id': sourceId,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (facilityId != null) 'facility_id': facilityId,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
       if (instruction != null) 'instruction': instruction,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6410,6 +7397,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Value<int>? widthLevel,
     Value<int>? reliabilityScore,
     Value<String>? accessibilityStatus,
+    Value<String>? sourceId,
+    Value<String>? provenanceKind,
+    Value<String>? verificationStatus,
+    Value<String?>? facilityId,
+    Value<DateTime?>? lastVerifiedAt,
+    Value<String>? evidenceHash,
     Value<String>? instruction,
     Value<int>? rowid,
   }) {
@@ -6427,6 +7420,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       widthLevel: widthLevel ?? this.widthLevel,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+      sourceId: sourceId ?? this.sourceId,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      facilityId: facilityId ?? this.facilityId,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
       instruction: instruction ?? this.instruction,
       rowid: rowid ?? this.rowid,
     );
@@ -6474,6 +7473,24 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     if (accessibilityStatus.present) {
       map['accessibility_status'] = Variable<String>(accessibilityStatus.value);
     }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
+    if (facilityId.present) {
+      map['facility_id'] = Variable<String>(facilityId.value);
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
     if (instruction.present) {
       map['instruction'] = Variable<String>(instruction.value);
     }
@@ -6499,6 +7516,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
           ..write('widthLevel: $widthLevel, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('facilityId: $facilityId, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
           ..write('instruction: $instruction, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8773,8 +9796,12 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
+      Value<String> sourceId,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
       Value<String?> facilityId,
       Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
       Value<int> rowid,
     });
 typedef $$NetworkEdgesTableUpdateCompanionBuilder =
@@ -8790,8 +9817,12 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
+      Value<String> sourceId,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
       Value<String?> facilityId,
       Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
       Value<int> rowid,
     });
 
@@ -8859,6 +9890,21 @@ class $$NetworkEdgesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get facilityId => $composableBuilder(
     column: $table.facilityId,
     builder: (column) => ColumnFilters(column),
@@ -8866,6 +9912,11 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
     column: $table.lastVerifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8934,6 +9985,21 @@ class $$NetworkEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get facilityId => $composableBuilder(
     column: $table.facilityId,
     builder: (column) => ColumnOrderings(column),
@@ -8941,6 +10007,11 @@ class $$NetworkEdgesTableOrderingComposer
 
   ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
     column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -9003,6 +10074,19 @@ class $$NetworkEdgesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get facilityId => $composableBuilder(
     column: $table.facilityId,
     builder: (column) => column,
@@ -9010,6 +10094,11 @@ class $$NetworkEdgesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
     column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
     builder: (column) => column,
   );
 }
@@ -9058,8 +10147,12 @@ class $$NetworkEdgesTableTableManager
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion(
                 id: id,
@@ -9073,8 +10166,12 @@ class $$NetworkEdgesTableTableManager
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
+                sourceId: sourceId,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
                 facilityId: facilityId,
                 lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9090,8 +10187,12 @@ class $$NetworkEdgesTableTableManager
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
                 Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkEdgesCompanion.insert(
                 id: id,
@@ -9105,8 +10206,12 @@ class $$NetworkEdgesTableTableManager
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
+                sourceId: sourceId,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
                 facilityId: facilityId,
                 lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -9332,6 +10437,16 @@ typedef $$FacilitiesTableCreateCompanionBuilder =
       Value<String> floorFrom,
       Value<String> floorTo,
       Value<String> description,
+      Value<String> sourceId,
+      Value<String> providerFacilityRef,
+      Value<String> provenanceKind,
+      Value<DateTime?> verifiedAt,
+      Value<DateTime?> retrievedAt,
+      Value<String> evidenceHash,
+      Value<String> statusMeaning,
+      Value<String> operationalStatus,
+      Value<String> installationStatus,
+      Value<int> confidence,
       Value<int> rowid,
     });
 typedef $$FacilitiesTableUpdateCompanionBuilder =
@@ -9345,6 +10460,16 @@ typedef $$FacilitiesTableUpdateCompanionBuilder =
       Value<String> floorFrom,
       Value<String> floorTo,
       Value<String> description,
+      Value<String> sourceId,
+      Value<String> providerFacilityRef,
+      Value<String> provenanceKind,
+      Value<DateTime?> verifiedAt,
+      Value<DateTime?> retrievedAt,
+      Value<String> evidenceHash,
+      Value<String> statusMeaning,
+      Value<String> operationalStatus,
+      Value<String> installationStatus,
+      Value<int> confidence,
       Value<int> rowid,
     });
 
@@ -9399,6 +10524,56 @@ class $$FacilitiesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerFacilityRef => $composableBuilder(
+    column: $table.providerFacilityRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get confidence => $composableBuilder(
+    column: $table.confidence,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9456,6 +10631,56 @@ class $$FacilitiesTableOrderingComposer
     column: $table.description,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerFacilityRef => $composableBuilder(
+    column: $table.providerFacilityRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FacilitiesTableAnnotationComposer
@@ -9493,6 +10718,54 @@ class $$FacilitiesTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get providerFacilityRef => $composableBuilder(
+    column: $table.providerFacilityRef,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get confidence => $composableBuilder(
+    column: $table.confidence,
     builder: (column) => column,
   );
 }
@@ -9537,6 +10810,16 @@ class $$FacilitiesTableTableManager
                 Value<String> floorFrom = const Value.absent(),
                 Value<String> floorTo = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> providerFacilityRef = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<DateTime?> verifiedAt = const Value.absent(),
+                Value<DateTime?> retrievedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> statusMeaning = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<String> installationStatus = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FacilitiesCompanion(
                 id: id,
@@ -9548,6 +10831,16 @@ class $$FacilitiesTableTableManager
                 floorFrom: floorFrom,
                 floorTo: floorTo,
                 description: description,
+                sourceId: sourceId,
+                providerFacilityRef: providerFacilityRef,
+                provenanceKind: provenanceKind,
+                verifiedAt: verifiedAt,
+                retrievedAt: retrievedAt,
+                evidenceHash: evidenceHash,
+                statusMeaning: statusMeaning,
+                operationalStatus: operationalStatus,
+                installationStatus: installationStatus,
+                confidence: confidence,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9561,6 +10854,16 @@ class $$FacilitiesTableTableManager
                 Value<String> floorFrom = const Value.absent(),
                 Value<String> floorTo = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> providerFacilityRef = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<DateTime?> verifiedAt = const Value.absent(),
+                Value<DateTime?> retrievedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> statusMeaning = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<String> installationStatus = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FacilitiesCompanion.insert(
                 id: id,
@@ -9572,6 +10875,16 @@ class $$FacilitiesTableTableManager
                 floorFrom: floorFrom,
                 floorTo: floorTo,
                 description: description,
+                sourceId: sourceId,
+                providerFacilityRef: providerFacilityRef,
+                provenanceKind: provenanceKind,
+                verifiedAt: verifiedAt,
+                retrievedAt: retrievedAt,
+                evidenceHash: evidenceHash,
+                statusMeaning: statusMeaning,
+                operationalStatus: operationalStatus,
+                installationStatus: installationStatus,
+                confidence: confidence,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -9986,6 +11299,12 @@ typedef $$InternalRouteEdgesTableCreateCompanionBuilder =
       Value<int> widthLevel,
       Value<int> reliabilityScore,
       Value<String> accessibilityStatus,
+      Value<String> sourceId,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<String?> facilityId,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -10004,6 +11323,12 @@ typedef $$InternalRouteEdgesTableUpdateCompanionBuilder =
       Value<int> widthLevel,
       Value<int> reliabilityScore,
       Value<String> accessibilityStatus,
+      Value<String> sourceId,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<String?> facilityId,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
       Value<String> instruction,
       Value<int> rowid,
     });
@@ -10079,6 +11404,36 @@ class $$InternalRouteEdgesTableFilterComposer
 
   ColumnFilters<String> get accessibilityStatus => $composableBuilder(
     column: $table.accessibilityStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10162,6 +11517,36 @@ class $$InternalRouteEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get instruction => $composableBuilder(
     column: $table.instruction,
     builder: (column) => ColumnOrderings(column),
@@ -10236,6 +11621,34 @@ class $$InternalRouteEdgesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get instruction => $composableBuilder(
     column: $table.instruction,
     builder: (column) => column,
@@ -10295,6 +11708,12 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> widthLevel = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<String?> facilityId = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion(
@@ -10311,6 +11730,12 @@ class $$InternalRouteEdgesTableTableManager
                 widthLevel: widthLevel,
                 reliabilityScore: reliabilityScore,
                 accessibilityStatus: accessibilityStatus,
+                sourceId: sourceId,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                facilityId: facilityId,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
                 instruction: instruction,
                 rowid: rowid,
               ),
@@ -10329,6 +11754,12 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> widthLevel = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<String?> facilityId = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
                 Value<String> instruction = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InternalRouteEdgesCompanion.insert(
@@ -10345,6 +11776,12 @@ class $$InternalRouteEdgesTableTableManager
                 widthLevel: widthLevel,
                 reliabilityScore: reliabilityScore,
                 accessibilityStatus: accessibilityStatus,
+                sourceId: sourceId,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                facilityId: facilityId,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
                 instruction: instruction,
                 rowid: rowid,
               ),

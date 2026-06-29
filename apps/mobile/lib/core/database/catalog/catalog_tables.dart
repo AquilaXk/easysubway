@@ -185,9 +185,18 @@ class NetworkEdges extends Table {
       .withDefault(const Constant('UNKNOWN'))();
   IntColumn get reliabilityScore =>
       integer().named('reliability_score').withDefault(const Constant(100))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get provenanceKind =>
+      text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
+  TextColumn get verificationStatus => text()
+      .named('verification_status')
+      .withDefault(const Constant('UNKNOWN'))();
   TextColumn get facilityId => text().named('facility_id').nullable()();
   DateTimeColumn get lastVerifiedAt =>
       dateTime().named('last_verified_at').nullable()();
+  TextColumn get evidenceHash =>
+      text().named('evidence_hash').withDefault(const Constant(''))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -215,12 +224,31 @@ class Facilities extends Table {
   TextColumn get exitId => text().named('exit_id').nullable()();
   TextColumn get type => text()();
   TextColumn get name => text()();
-  TextColumn get status => text().withDefault(const Constant('NORMAL'))();
+  TextColumn get status => text().withDefault(const Constant('UNKNOWN'))();
   TextColumn get floorFrom =>
       text().named('floor_from').withDefault(const Constant(''))();
   TextColumn get floorTo =>
       text().named('floor_to').withDefault(const Constant(''))();
   TextColumn get description => text().withDefault(const Constant(''))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get providerFacilityRef =>
+      text().named('provider_facility_ref').withDefault(const Constant(''))();
+  TextColumn get provenanceKind =>
+      text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
+  DateTimeColumn get verifiedAt => dateTime().named('verified_at').nullable()();
+  DateTimeColumn get retrievedAt =>
+      dateTime().named('retrieved_at').nullable()();
+  TextColumn get evidenceHash =>
+      text().named('evidence_hash').withDefault(const Constant(''))();
+  TextColumn get statusMeaning =>
+      text().named('status_meaning').withDefault(const Constant(''))();
+  TextColumn get operationalStatus =>
+      text().named('operational_status').withDefault(const Constant(''))();
+  TextColumn get installationStatus =>
+      text().named('installation_status').withDefault(const Constant(''))();
+  IntColumn get confidence =>
+      integer().named('confidence').withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -280,6 +308,18 @@ class InternalRouteEdges extends Table {
   TextColumn get accessibilityStatus => text()
       .named('accessibility_status')
       .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get provenanceKind =>
+      text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
+  TextColumn get verificationStatus => text()
+      .named('verification_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get facilityId => text().named('facility_id').nullable()();
+  DateTimeColumn get lastVerifiedAt =>
+      dateTime().named('last_verified_at').nullable()();
+  TextColumn get evidenceHash =>
+      text().named('evidence_hash').withDefault(const Constant(''))();
   TextColumn get instruction => text().withDefault(const Constant(''))();
 
   @override
