@@ -2919,7 +2919,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 22),
-                _RoutePrototypeSection(
+                _RouteResultSection(
                   title: result.isBlocked
                       ? '안내 불가 이유'
                       : _isRecommendedRoute(result)
@@ -3029,12 +3029,12 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                         if (_isRecommendedRoute(result) &&
                             result.movementSteps.isNotEmpty) ...[
                           const SizedBox(height: 15),
-                          const _RoutePrototypeLinePath(),
+                          const _RouteLinePath(),
                         ],
                         if (blockedReasonLabels.isNotEmpty) ...[
                           const SizedBox(height: 13),
                           for (final reason in blockedReasonLabels)
-                            _RoutePrototypeReason(text: reason, blocked: true),
+                            _RouteReasonBadge(text: reason, blocked: true),
                         ],
                         if (result.arrivalGuidanceStep != null) ...[
                           const SizedBox(height: 16),
@@ -3173,7 +3173,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         for (final reason in reasons)
-          _RoutePrototypeReason(text: reason, blocked: true),
+          _RouteReasonBadge(text: reason, blocked: true),
         const SizedBox(height: 12),
         const _RouteNotice(
           key: Key('routeBlockedNextActionNotice'),
@@ -3282,28 +3282,28 @@ class _RouteResultListButton extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(_routeMetaLabel(result)),
                     const SizedBox(height: 12),
-                    const _RoutePrototypeLinePath(),
+                    const _RouteLinePath(),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        _RoutePrototypeChip(
+                        _RouteStatusChip(
                           label: _routeTransferLabel(result),
                           icon: Icons.route_outlined,
                         ),
-                        _RoutePrototypeChip(
+                        _RouteStatusChip(
                           label: '걷기 ${_routeWalkingDistanceLabel(result)}',
                           icon: Icons.directions_walk,
                         ),
-                        _RoutePrototypeChip(
+                        _RouteStatusChip(
                           key: const Key('routeGuidanceMobilityChip'),
                           label: result.mobilityLabel == '이동 조건 확인 필요'
                               ? result.mobilityLabel
                               : result.comfortLabel,
                           icon: Icons.accessible_forward,
                         ),
-                        _RoutePrototypeChip(
+                        _RouteStatusChip(
                           label: result.stairAccessLabel,
                           icon: _routeStairAccessIcon(result),
                         ),
@@ -3358,7 +3358,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 for (final chip in chips)
-                  _RoutePrototypeChip(
+                  _RouteStatusChip(
                     key: Key('routeDarkSummaryChip-${chip.label}'),
                     label: chip.label,
                     icon: chip.icon,
@@ -3475,8 +3475,8 @@ String _normalizeRouteStairState(String value) {
   };
 }
 
-class _RoutePrototypeSection extends StatelessWidget {
-  const _RoutePrototypeSection({required this.title, required this.subtitle});
+class _RouteResultSection extends StatelessWidget {
+  const _RouteResultSection({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -3510,12 +3510,8 @@ class _RoutePrototypeSection extends StatelessWidget {
   }
 }
 
-class _RoutePrototypeChip extends StatelessWidget {
-  const _RoutePrototypeChip({
-    super.key,
-    required this.label,
-    required this.icon,
-  });
+class _RouteStatusChip extends StatelessWidget {
+  const _RouteStatusChip({super.key, required this.label, required this.icon});
 
   final String label;
   final IconData icon;
@@ -3555,22 +3551,22 @@ class _RouteSummaryChip {
   final IconData icon;
 }
 
-class _RoutePrototypeLinePath extends StatelessWidget {
-  const _RoutePrototypeLinePath();
+class _RouteLinePath extends StatelessWidget {
+  const _RouteLinePath();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _RoutePrototypeNode(),
+        _RouteLineNode(),
         Expanded(child: Container(height: 6, color: const Color(0xFF27A6D9))),
-        _RoutePrototypeNode(),
+        _RouteLineNode(),
       ],
     );
   }
 }
 
-class _RoutePrototypeNode extends StatelessWidget {
+class _RouteLineNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -3586,8 +3582,8 @@ class _RoutePrototypeNode extends StatelessWidget {
   }
 }
 
-class _RoutePrototypeReason extends StatelessWidget {
-  const _RoutePrototypeReason({required this.text, this.blocked = false});
+class _RouteReasonBadge extends StatelessWidget {
+  const _RouteReasonBadge({required this.text, this.blocked = false});
 
   final String text;
   final bool blocked;
