@@ -3464,6 +3464,74 @@ void main() {
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
   });
 
+  testWidgets('설정 화면 보기 옵션 첫 저장 실패 뒤에도 마지막 값을 유지한다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('first save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
+    await tester.pump();
+
+    firstSave.completeError(StateError('first save failed'));
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isTrue,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
     final firstSave = Completer<void>();
     final latestSave = Completer<void>();
@@ -3689,6 +3757,50 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, 420));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('즐겨찾기 하위 화면 복귀 새로고침 실패는 오류 상태로 끝난다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('favorite failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FavoriteHomeScreen(
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          facilityReportDraftTargetStore: null,
+          internalRouteRepository: FakeInternalRouteRepository(
+            result: _internalRouteResult(),
+          ),
+          realtimeRepository: const UnavailableRealtimeRepository(),
+          routeDraftController: RouteDraftController(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('favoriteHomeStationsButton')));
+    await tester.pumpAndSettle();
+    favoriteRepository.error = StateError('favorite failed');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);

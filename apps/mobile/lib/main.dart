@@ -770,11 +770,13 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _onboardingState = previousOnboardingState;
-        _startScreenDismissed = previousStartScreenDismissed;
-        _introScreenDismissed = previousIntroScreenDismissed;
-      });
+      if (_isSameOnboardingResult(_onboardingState.result, result)) {
+        setState(() {
+          _onboardingState = previousOnboardingState;
+          _startScreenDismissed = previousStartScreenDismissed;
+          _introScreenDismissed = previousIntroScreenDismissed;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('설정을 저장하지 못했습니다. 다시 시도해 주세요.')),
       );
@@ -796,6 +798,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       return;
     }
     _savingOnboardingResult = true;
+    Object? firstError;
+    StackTrace? firstStackTrace;
     try {
       while (mounted) {
         final nextResult = _pendingOnboardingResult;
@@ -803,10 +807,18 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         if (nextResult == null) {
           break;
         }
-        await _persistOnboardingResult(nextResult);
+        try {
+          await _persistOnboardingResult(nextResult);
+        } catch (error, stackTrace) {
+          firstError ??= error;
+          firstStackTrace ??= stackTrace;
+        }
       }
     } finally {
       _savingOnboardingResult = false;
+    }
+    if (firstError != null && firstStackTrace != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace);
     }
   }
 
@@ -822,7 +834,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     try {
       await _saveOnboardingResult(nextResult);
     } catch (error, stackTrace) {
-      _applyOnboardingResult(currentResult);
+      if (_isSameOnboardingResult(_onboardingState.result, nextResult)) {
+        _applyOnboardingResult(currentResult);
+      }
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -834,15 +848,16 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     if (currentResult == null) {
       return;
     }
+    final nextResult = OnboardingResult(
+      profile: currentResult.profile,
+      preferences: preferences,
+    );
     try {
-      await _saveOnboardingResult(
-        OnboardingResult(
-          profile: currentResult.profile,
-          preferences: preferences,
-        ),
-      );
+      await _saveOnboardingResult(nextResult);
     } catch (error, stackTrace) {
-      _applyOnboardingResult(currentResult);
+      if (_isSameOnboardingResult(_onboardingState.result, nextResult)) {
+        _applyOnboardingResult(currentResult);
+      }
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -854,6 +869,12 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     setState(() {
       _onboardingState = OnboardingState.completed(result: result);
     });
+  }
+
+  bool _isSameOnboardingResult(OnboardingResult? left, OnboardingResult right) {
+    return left != null &&
+        left.profile.id == right.profile.id &&
+        _isSameViewPreferences(left.preferences, right.preferences);
   }
 
   void _schedulePendingFacilityReportPhotoRecovery() {
@@ -3336,9 +3357,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _viewPreferences = previous;
-      });
+      if (_isSameViewPreferences(_viewPreferences, preferences)) {
+        setState(() {
+          _viewPreferences = previous;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.')),
       );
@@ -3817,8 +3840,25 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     setState(() {
       _dataFuture = next;
     });
-    await next;
+    try {
+      await next;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다.',
+      );
+    }
   }
+}
+
+bool _isSameViewPreferences(
+  OnboardingViewPreferences left,
+  OnboardingViewPreferences right,
+) {
+  return left.largeTextEnabled == right.largeTextEnabled &&
+      left.highContrastEnabled == right.highContrastEnabled &&
+      left.simpleViewEnabled == right.simpleViewEnabled;
 }
 
 class _FavoriteHomeData {
