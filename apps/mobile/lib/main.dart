@@ -3388,7 +3388,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               ),
               _AppSettingsSection(
                 key: const Key('settingsSection-region-data'),
-                title: '기본 지역과 데이터',
+                title: '저장된 안내',
                 children: [
                   const _AppSettingsInfoTile(
                     icon: Icons.public,
@@ -4205,7 +4205,7 @@ class OfflineDataScreen extends StatelessWidget {
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '지역',
-                    subtitle: '수도권 기본 데이터',
+                    subtitle: '수도권 역과 노선',
                     trailing: '저장됨',
                   ),
                   _AppInfoRow(
@@ -4213,16 +4213,16 @@ class OfflineDataScreen extends StatelessWidget {
                     iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
-                    subtitle: '앱에 포함된 기본 데이터',
-                    trailing: '확인 필요',
+                    subtitle: '앱 설치 때 함께 받은 안내',
+                    trailing: '다시 확인',
                   ),
                   _AppInfoRow(
                     icon: Icons.verified_outlined,
                     iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
-                    title: '데이터 품질',
-                    subtitle: '기본 역·노선 정보 우선',
-                    trailing: '보통',
+                    title: '안내 범위',
+                    subtitle: '주요 역·노선 안내를 먼저 보여줘요',
+                    trailing: '일부',
                   ),
                   _AppInfoRow(
                     icon: Icons.info_outline,

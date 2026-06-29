@@ -253,7 +253,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     }
 
     return [
-      '현재 데이터 기준으로 선택된 경로 단계를 계산했습니다.',
+      '현재 저장된 안내로 경로 단계를 계산했어요.',
       '출구와 시설 상태는 현장 안내를 함께 확인해 주세요.',
       if (result.warnings.isNotEmpty) '확인 필요 구간은 주의 안내와 함께 표시합니다.',
     ];
@@ -266,7 +266,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
       'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
-      'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
+      'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '안내 가능한 경로를 찾지 못했습니다.',
     };
   }

@@ -236,10 +236,11 @@ class LocalRouteEngine {
       'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
-      'GENERATED_CONNECTOR_UNVERIFIED' => '연결 추정 구간입니다. 현장 확인이 필요합니다.',
+      'GENERATED_CONNECTOR_UNVERIFIED' =>
+        '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
       'DURATION_UNKNOWN' => '소요 시간 확인이 필요한 구간입니다.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
-      'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
+      'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };
   }
