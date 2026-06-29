@@ -106,6 +106,7 @@ function validateSqlite(sqlitePath, pack) {
 
     validateNetworkEdgeReferences(database, pack);
     validateProductionNetworkEdgeProvenance(database, pack);
+    validateProductionFacilityProvenance(database, pack);
     validateRegionalQualityMetricsMatchDatabase(database, pack);
     validateRepresentativeRouteRegressions(database, pack);
 
@@ -699,6 +700,69 @@ function validateProductionNetworkEdgeProvenance(database, pack) {
       throw new Error(
         `${pack.id}@${pack.version} verified ${kind.toUpperCase()} coverage gap: ${item.missingCount}/${item.denominator}`,
       );
+    }
+  }
+}
+
+function validateProductionFacilityProvenance(database, pack) {
+  if (pack.artifactKind !== "production" || !hasTable(database, "facilities")) {
+    return;
+  }
+  const requiredColumns = [
+    "source_id",
+    "provider_facility_ref",
+    "provenance_kind",
+    "verified_at",
+    "retrieved_at",
+    "evidence_hash",
+    "status_meaning",
+    "operational_status",
+    "installation_status",
+    "confidence",
+  ];
+  const columns = new Set(database.prepare("PRAGMA table_info(facilities)").all().map((row) => row.name));
+  for (const column of requiredColumns) {
+    if (!columns.has(column)) {
+      throw new Error(`${pack.id}@${pack.version} facilities provenance column missing: ${column}`);
+    }
+  }
+  const sourceIds = new Set(pack.sourceInventory.map((source) => source.id));
+  const rows = database
+    .prepare(`
+      SELECT id, status, source_id, provider_facility_ref, provenance_kind,
+             verified_at, retrieved_at, evidence_hash, status_meaning,
+             operational_status, installation_status, confidence
+      FROM facilities
+      ORDER BY id
+    `)
+    .all();
+  for (const row of rows) {
+    if (!sourceIds.has(requiredString(row.source_id, `facilities.${row.id}.source_id`))) {
+      throw new Error(`${pack.id}@${pack.version} facilities source_id is not in sourceInventory: ${row.id}`);
+    }
+    requiredString(row.provider_facility_ref, `facilities.${row.id}.provider_facility_ref`);
+    const provenanceKind = requiredString(row.provenance_kind, `facilities.${row.id}.provenance_kind`);
+    if (!["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(provenanceKind)) {
+      throw new Error(`${pack.id}@${pack.version} facilities provenance_kind is not allowed: ${row.id}`);
+    }
+    if (!Number.isInteger(row.verified_at) || row.verified_at <= 0) {
+      throw new Error(`${pack.id}@${pack.version} facilities verified_at is required: ${row.id}`);
+    }
+    if (!Number.isInteger(row.retrieved_at) || row.retrieved_at <= 0) {
+      throw new Error(`${pack.id}@${pack.version} facilities retrieved_at is required: ${row.id}`);
+    }
+    requiredSha256(row.evidence_hash, `facilities.${row.id}.evidence_hash`);
+    const statusMeaning = requiredString(row.status_meaning, `facilities.${row.id}.status_meaning`);
+    requiredString(row.operational_status, `facilities.${row.id}.operational_status`);
+    requiredString(row.installation_status, `facilities.${row.id}.installation_status`);
+    if (!Number.isInteger(row.confidence) || row.confidence < 0 || row.confidence > 100) {
+      throw new Error(`${pack.id}@${pack.version} facilities confidence must be between 0 and 100: ${row.id}`);
+    }
+    const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
+      String(row.status ?? "").toUpperCase(),
+    );
+    if (positiveStatus && statusMeaning !== "REALTIME_OPERATION") {
+      throw new Error(`${pack.id}@${pack.version} facilities positive status requires REALTIME_OPERATION evidence: ${row.id}`);
     }
   }
 }
