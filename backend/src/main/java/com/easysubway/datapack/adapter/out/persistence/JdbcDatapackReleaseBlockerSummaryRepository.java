@@ -56,6 +56,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 			manualOverrideBlockers,
 			facilityBlockers,
 			routeGateBlockers,
+			manifestSignature.blockerCount(),
 			readinessRows(candidate, aliasBlockers, quarantineBlockers, facilityBlockers, routeGateBlockers, manifestSignature),
 			candidate.map(CandidateGateSummary::createdAt).orElse(null)
 		);
@@ -218,6 +219,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		long manualOverrideBlockers,
 		long facilityBlockers,
 		long routeGateBlockers,
+		long manifestBlockers,
 		List<ReleaseReadinessRow> readinessRows,
 		LocalDateTime candidateCreatedAt
 	) {
@@ -227,6 +229,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 				"-",
 				"-",
 				"확인 필요",
+				0,
 				0,
 				0,
 				0,

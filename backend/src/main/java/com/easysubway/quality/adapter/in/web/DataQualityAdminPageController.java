@@ -1,5 +1,7 @@
 package com.easysubway.quality.adapter.in.web;
 
+import com.easysubway.admin.authorization.AdminAuthorization;
+import com.easysubway.admin.authorization.AdminPermission;
 import com.easysubway.common.web.WebMessageResolver;
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseBlockerSummaryRepository;
 import com.easysubway.quality.application.port.in.DataQualityUseCase;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,7 +54,7 @@ class DataQualityAdminPageController {
 	}
 
 	@GetMapping("/admin/data-quality/page")
-	String dataQualityDashboardPage(Model model) {
+	String dataQualityDashboardPage(Model model, Authentication authentication) {
 		DataQualitySummary summary = dataQualityUseCase.summarizeDataQuality();
 		List<TransitRegionSummary> regions = transitMasterQueryUseCase.listRegions();
 		Map<FacilityReportStatus, Long> reportStatusCounts = facilityReportUseCase.countReportsByStatus();
@@ -84,7 +87,9 @@ class DataQualityAdminPageController {
 				messages
 			)
 		);
-		model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryRepository.summarize());
+		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
+			model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryRepository.summarize());
+		}
 		return "admin/quality/dashboard";
 	}
 

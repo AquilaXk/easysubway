@@ -70,7 +70,19 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains("quarantine 1")
 			.contains("manual override 1")
 			.contains("route gate 1")
+			.contains("manifest signature")
 			.doesNotContain("name=\"commandToken\"");
+	}
+
+	@Test
+	@DisplayName("datapack read 권한이 없으면 통합 대시보드 release blocker 요약을 숨긴다")
+	void dashboardHidesDatapackReleaseBlockerSummaryWithoutDatapackRead() throws Exception {
+		String html = getAdminHtmlWithoutDatapackRead("/admin/dashboard/page");
+
+		assertThat(html)
+			.doesNotContain("데이터팩 출시 준비")
+			.doesNotContain("candidate-release-blocked")
+			.doesNotContain("전체 blocker 9건");
 	}
 
 	@Test
@@ -102,6 +114,18 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	private String getAdminHtml(String path) throws Exception {
+		return mockMvc.perform(get(path)
+				.with(user("viewer").authorities(
+					new SimpleGrantedAuthority("admin.view"),
+					new SimpleGrantedAuthority("admin.datapack.read")
+				)))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+	}
+
+	private String getAdminHtmlWithoutDatapackRead(String path) throws Exception {
 		return mockMvc.perform(get(path)
 				.with(user("viewer").authorities(new SimpleGrantedAuthority("admin.view"))))
 			.andExpect(status().isOk())

@@ -30,7 +30,7 @@
 		<div class="metric"><span>서비스 상태</span><strong th:text="${dashboard.healthStatus}">UP</strong><em th:text="${dashboard.serviceName}">easysubway</em></div>
 	</div>
 
-	<section class="admin-panel">
+	<section class="admin-panel" th:if="${datapackReleaseSummary != null}">
 		<h2>데이터팩 출시 준비</h2>
 		<p class="summary">
 			<span th:text="${datapackReleaseSummary.candidateId}">candidate-id</span>
@@ -55,6 +55,7 @@
 			<tr><th scope="row">manual override</th><td th:text="${datapackReleaseSummary.manualOverrideBlockers}">0</td></tr>
 			<tr><th scope="row">facility evidence</th><td th:text="${datapackReleaseSummary.facilityBlockers}">0</td></tr>
 			<tr><th scope="row">route gate</th><td th:text="${datapackReleaseSummary.routeGateBlockers}">0</td></tr>
+			<tr><th scope="row">manifest signature</th><td th:text="${datapackReleaseSummary.manifestBlockers}">0</td></tr>
 			</tbody>
 		</table>
 	</section>

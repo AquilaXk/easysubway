@@ -59,7 +59,7 @@
 		</section>
 	</div>
 
-	<section>
+	<section th:if="${stationReleaseSummary != null}">
 		<h2>Release readiness</h2>
 		<p class="summary">
 			<span th:text="|${station.stationName}역 release blocker|">상록수역 release blocker</span>
