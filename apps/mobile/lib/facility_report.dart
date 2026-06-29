@@ -15,9 +15,9 @@ import 'mobile_error_reporter.dart';
 import 'secure_key_value_storage.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
-const _facilityReportErrorMessage = '제보를 보내지 못했습니다.';
-const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했습니다.';
-const _facilityReportListErrorMessage = '제보 내역을 불러오지 못했습니다.';
+const _facilityReportErrorMessage = '제보를 보내지 못했어요.';
+const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했어요.';
+const _facilityReportListErrorMessage = '제보 내역을 불러오지 못했어요.';
 const _facilityReportFailureNextAction = '내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
 const _facilityReportPhotoUploadMaxAttempts = 2;
@@ -1222,7 +1222,7 @@ class FacilityReportController extends ChangeNotifier {
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.failure,
-          message: '처리 상태를 확인하지 못했습니다.',
+          message: '처리 상태를 확인하지 못했어요.',
           result: currentResult,
         ),
       );
@@ -2107,7 +2107,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (mounted) {
         setState(() {
           _photoAttachment = null;
-          _photoMessage = '사진을 추가하지 못했습니다.';
+          _photoMessage = '사진을 추가하지 못했어요.';
           _isPhotoFailure = true;
         });
       }
@@ -2255,7 +2255,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       }
       setState(() {
         _attachedLocation = null;
-        _locationMessage = '현재 위치를 확인하지 못했습니다.';
+        _locationMessage = '현재 위치를 확인하지 못했어요.';
         _isLocationFailure = true;
         _submitWithoutLocation = false;
       });

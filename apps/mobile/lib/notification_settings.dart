@@ -9,8 +9,8 @@ import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
 
 const _notificationSettingsTimeout = Duration(seconds: 8);
-const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했습니다.';
-const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했습니다.';
+const _notificationSettingsLoadErrorMessage = '알림 설정을 불러오지 못했어요.';
+const _notificationSettingsSaveErrorMessage = '알림 설정을 저장하지 못했어요.';
 const _deviceRegistrationErrorMessage = '알림을 켜지 못했어요.';
 const _notificationPermissionErrorMessage = '알림을 켤 수 있는지 확인하지 못했어요.';
 const _notificationRegistrationFailureNextAction =

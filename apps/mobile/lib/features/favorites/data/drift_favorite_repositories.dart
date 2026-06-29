@@ -134,7 +134,7 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         )
         .getSingleOrNull();
     if (row == null) {
-      throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했습니다.');
+      throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
     }
   }
 }
@@ -248,7 +248,7 @@ class DriftFavoriteFacilityRepository implements FavoriteFacilityRepository {
     final trimmedFacilityId = facilityId.trim();
     final row = await _facilityCatalogRow(trimmedFacilityId);
     if (row == null) {
-      throw const FavoriteFacilityException('즐겨찾기 시설을 처리하지 못했습니다.');
+      throw const FavoriteFacilityException('즐겨찾기 시설을 처리하지 못했어요.');
     }
     await userDatabase
         .into(userDatabase.favoriteFacilities)
@@ -341,7 +341,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
   }) async {
     final routeResult = result;
     if (routeResult == null) {
-      throw const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했습니다.');
+      throw const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했어요.');
     }
     final routeId = _favoriteRouteStorageId(
       routeSearchId: routeSearchId,
