@@ -296,7 +296,7 @@ void main() {
 
   testWidgets('온보딩은 알림 권한 요청 실패 도움말을 안내한다', (tester) async {
     final notificationPermissionProvider = _FakeNotificationPermissionProvider(
-      error: const NotificationSettingsException('알림 권한을 확인하지 못했습니다.'),
+      error: const NotificationSettingsException('알림 권한을 확인하지 못했어요.'),
     );
     OnboardingResult? completedResult;
 

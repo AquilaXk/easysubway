@@ -113,7 +113,7 @@ class DriftStationRepository
   Future<StationDetail> getStationDetail(String stationId) async {
     final summary = await _getStationSummary(stationId);
     if (summary == null) {
-      throw const StationSearchException('역 정보를 불러오지 못했습니다.');
+      throw const StationSearchException('역 정보를 불러오지 못했어요.');
     }
 
     return StationDetail(

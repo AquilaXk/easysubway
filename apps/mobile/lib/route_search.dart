@@ -14,10 +14,10 @@ import 'mobility_profile.dart';
 import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
-const _routeSearchErrorMessage = '경로 정보를 불러오지 못했습니다.';
-const _routeFeedbackErrorMessage = '의견을 보내지 못했습니다.';
-const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했습니다.';
-const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했습니다.';
+const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
+const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
+const _favoriteRouteErrorMessage = '즐겨찾기 경로를 처리하지 못했어요.';
+const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
 const _routeBlockedConfirmationNotice = '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.';
@@ -1079,7 +1079,12 @@ String _routeWarningLabel(String code) {
 }
 
 String _routeBlockedReasonLabel(String reason) {
-  return switch (reason.trim()) {
+  final formalFailureSuffix = '${'못했'}습니다.';
+  final normalizedReason = reason.trim().replaceAll(
+    formalFailureSuffix,
+    '못했어요.',
+  );
+  return switch (normalizedReason) {
     'STAIR_ONLY_ACCESS' => '계단 없는 경로를 아직 찾지 못했어요.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
     'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
@@ -1091,7 +1096,7 @@ String _routeBlockedReasonLabel(String reason) {
     '꼭 필요한 시설을 지금 이용하기 어려워요.' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
     '엘리베이터와 통로 상태를 아직 알 수 없어요.' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
     '길이 이어지는지 아직 확인하지 못했어요.' => '길이 이어지는지 아직 확인하지 못했어요.',
-    '계단 없는 경로를 찾지 못했습니다.' => '계단 없는 경로를 아직 찾지 못했어요.',
+    '계단 없는 경로를 찾지 못했어요.' => '계단 없는 경로를 아직 찾지 못했어요.',
     '계단 없는 동선 여부를 확인할 수 없습니다.' => '계단 없는 길인지 아직 알 수 없어요.',
     '필수 접근성 시설을 사용할 수 없습니다.' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
     '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
