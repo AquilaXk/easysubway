@@ -11,6 +11,7 @@ import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
@@ -472,6 +473,45 @@ void main() {
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
 
+  testWidgets('온보딩 기본 시작 저장 실패는 안내 화면에 머문다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final onboardingStore = MemoryOnboardingResultStore(
+      saveError: StateError('save failed'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('onboardingIntroSkipButton')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('onboardingIntroSkipButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(onboardingStore.savedResult, isNull);
+    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
+    expect(find.byType(HomeScreen), findsNothing);
+    expect(find.text('설정을 저장하지 못했습니다. 다시 시도해 주세요.'), findsOneWidget);
+  });
+
   testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -529,7 +569,7 @@ void main() {
       expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
       expect(find.byKey(const Key('heroStationSearchButton')), findsOneWidget);
       expect(find.byKey(const Key('homeRouteDraftPanel')), findsNothing);
-      expect(find.text('시설 알림'), findsNothing);
+      expect(find.text('시설 알림'), findsOneWidget);
       expect(find.text('주의'), findsNothing);
       expect(find.text('대체 1번 출구'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '대체 길 보기'), findsNothing);
@@ -594,7 +634,7 @@ void main() {
         ),
       );
 
-      expect(find.text('최근 경로'), findsNothing);
+      expect(find.text('최근 경로'), findsOneWidget);
       expect(find.text('저장한 경로가 없습니다'), findsNothing);
       expect(find.text('경로를 저장하면 현재 시설 상태와 함께 다시 볼 수 있어요.'), findsNothing);
 
@@ -750,7 +790,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('heroStationSearchButton')));
     await tester.pumpAndSettle();
-    await tester.pageBack();
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(reportRepository.listMyReportsCount, greaterThanOrEqualTo(2));
@@ -879,6 +919,40 @@ void main() {
     expect(repository.requestedNetworkMapLineIds, isNot(contains('seoul-4')));
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsNothing);
     expect(find.text('부산'), findsOneWidget);
+  });
+
+  testWidgets('노선도 로드 실패는 재시도와 역 검색 대안을 보여준다', (tester) async {
+    var stationSearchOpened = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(
+            networkMapError: StateError('map failed'),
+          ),
+          routeDraftController: RouteDraftController(),
+          onOpenRouteSearch: () async {},
+          onOpenStationSearch: () {
+            stationSearchOpened = true;
+          },
+          onOpenSaved: () {},
+          onOpenSettings: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
+    expect(find.byKey(const Key('networkMapRetryButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapStationSearchFallbackButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStationSearchFallbackButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(stationSearchOpened, isTrue);
   });
 
   testWidgets('노선도는 노선 필터 없이 전체 지도에서 역을 선택한다', (tester) async {
@@ -2646,7 +2720,7 @@ void main() {
     expectNoForbiddenUserCopy(tester);
   });
 
-  testWidgets('홈 시설 알림은 주의 상태 시설이 없으면 섹션을 숨긴다', (tester) async {
+  testWidgets('홈 시설 알림은 주의 상태 시설이 없으면 빈 상태를 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -2661,10 +2735,47 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 알림'), findsNothing);
+    expect(find.text('시설 알림'), findsOneWidget);
+    expect(
+      find.byKey(const Key('homeFacilityAlertEmptyState')),
+      findsOneWidget,
+    );
+    expect(find.text('확인할 시설 알림이 없어요'), findsOneWidget);
     expect(find.text('정상'), findsNothing);
     expect(find.text('주의'), findsNothing);
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
+  });
+
+  testWidgets('홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다', (tester) async {
+    final facilityRepository = FakeFavoriteFacilityRepository()
+      ..error = const FavoriteFacilityException('시설 알림 실패');
+    final routeRepository = FakeFavoriteRouteRepository()
+      ..error = const FavoriteRouteException('최근 경로 실패');
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteFacilityRepository: facilityRepository,
+        favoriteRouteRepository: routeRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('homeFacilityAlertErrorState')),
+      findsOneWidget,
+    );
+    expect(find.text('시설 알림을 불러오지 못했어요'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.byKey(const Key('homeRecentRouteErrorState')),
+      find.byKey(const Key('homePrototypeList')),
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('최근 경로를 불러오지 못했어요'), findsOneWidget);
   });
 
   testWidgets('홈 가까운 역은 실제 주변 역 검색 화면으로 바로 연결된다', (tester) async {
@@ -2881,6 +2992,52 @@ void main() {
     );
   });
 
+  testWidgets('홈 대화면은 시스템 고대비와 200% 글자에서 핵심 CTA를 유지한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(highContrast: true);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: false,
+              simpleViewEnabled: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final homeContext = tester.element(find.byType(HomeScreen));
+      expect(MediaQuery.of(homeContext).highContrast, isTrue);
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
+      expect(find.byKey(const Key('heroStationSearchButton')), findsOneWidget);
+      expect(find.byKey(const Key('homeBottomNavigationBar')), findsOneWidget);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('홈은 저장한 경로를 최근 경로로 보여주되 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
@@ -2932,7 +3089,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.pageBack();
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기한 경로를 불러오지 못했습니다'), findsNothing);
@@ -2997,19 +3154,19 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '큰 글자, 켜짐, 두 번 탭해 끄기',
+          '큰 글자, 켜짐, 화면 글자와 버튼 설명을 더 크게 보여줘요, 두 번 탭해 끄기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
       expect(
         settingsActionSemantics(
-          '간편 보기, 꺼짐, 두 번 탭해 켜기',
+          '간편 보기, 꺼짐, 필수 행동과 상태 안내를 먼저 보여줘요, 두 번 탭해 켜기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
       expect(
         settingsActionSemantics(
-          '고대비, 켜짐, 두 번 탭해 끄기',
+          '고대비, 켜짐, 버튼과 상태 문구의 대비를 더 강하게 보여줘요, 두 번 탭해 끄기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -3114,10 +3271,19 @@ void main() {
       isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
-    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
-    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
-    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
-    await tester.pageBack();
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     final homeContext = tester.element(find.byType(HomeScreen));
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
@@ -3136,9 +3302,104 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
-    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
-    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('설정 화면 보기 옵션 저장 실패는 이전 값으로 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveError: StateError('save failed'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+  });
+
+  testWidgets('설정 화면 이동 조건 저장 실패는 이전 조건으로 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences.defaults(),
+      ),
+      saveError: StateError('save failed'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('mobilityProfileButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(onboardingStore.savedResult?.profile.id, 'elderly');
+    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
+    expect(find.text('계단 없는 길만 안내해요'), findsNothing);
+    expect(find.text('이동 조건을 저장하지 못했습니다. 이전 조건으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션은 빠른 연속 변경에서도 마지막 값을 저장한다', (tester) async {
@@ -3176,9 +3437,18 @@ void main() {
     await tester.pump();
 
     expect(onboardingStore.saveCount, 1);
-    expect(find.bySemanticsLabel('큰 글자, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
-    expect(find.bySemanticsLabel('고대비, 켜짐, 두 번 탭해 끄기'), findsOneWidget);
-    expect(find.bySemanticsLabel('간편 보기, 꺼짐, 두 번 탭해 켜기'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
 
     firstSave.complete();
     await tester.pump();
@@ -3192,6 +3462,203 @@ void main() {
       isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
+  });
+
+  testWidgets('설정 화면 보기 옵션 첫 저장 실패 뒤에도 마지막 값을 유지한다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('first save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
+    await tester.pump();
+
+    firstSave.completeError(StateError('first save failed'));
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isTrue,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('간편 보기, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsNothing);
+  });
+
+  testWidgets('설정 화면 보기 옵션 마지막 queued 저장 실패는 마지막 변경만 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('latest save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+
+    firstSave.complete();
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.completeError(StateError('latest save failed'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+  });
+
+  testWidgets('설정 화면 보기 옵션 연속 저장 실패는 마지막 저장값으로 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final exception = details.exceptionAsString();
+      if (!exception.contains('first save failed') &&
+          !exception.contains('latest save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+
+    firstSave.completeError(StateError('first save failed'));
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.completeError(StateError('latest save failed'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isTrue);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
@@ -3233,7 +3700,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
-    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
 
     firstSave.complete();
     await tester.pump();
@@ -3242,6 +3709,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(onboardingStore.savedResult?.profile.id, 'wheelchair');
+    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
@@ -3320,7 +3788,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
     await tester.pumpAndSettle();
-    await tester.pageBack();
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('routeSearchButton')),
@@ -3381,6 +3849,92 @@ void main() {
     expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
+  });
+
+  testWidgets('즐겨찾기 홈 새로고침 실패는 오류 상태로 끝나고 예외를 흘리지 않는다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('favorite failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final favoriteRepository = FakeFavoriteStationRepository()
+      ..error = StateError('favorite failed');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FavoriteHomeScreen(
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          facilityReportDraftTargetStore: null,
+          internalRouteRepository: FakeInternalRouteRepository(
+            result: _internalRouteResult(),
+          ),
+          realtimeRepository: const UnavailableRealtimeRepository(),
+          routeDraftController: RouteDraftController(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, 420));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('즐겨찾기 하위 화면 복귀 새로고침 실패는 오류 상태로 끝난다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('favorite failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FavoriteHomeScreen(
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          facilityReportDraftTargetStore: null,
+          internalRouteRepository: FakeInternalRouteRepository(
+            result: _internalRouteResult(),
+          ),
+          realtimeRepository: const UnavailableRealtimeRepository(),
+          routeDraftController: RouteDraftController(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('favoriteHomeStationsButton')));
+    await tester.pumpAndSettle();
+    favoriteRepository.error = StateError('favorite failed');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
   });
 
   testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
@@ -4660,19 +5214,13 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-          favoriteRouteRepository: favoriteRouteRepository,
-          notificationRepository: FakeNotificationSettingsRepository(),
-          initialOnboardingState: _completedOnboardingState(),
+        MaterialApp(
+          home: Scaffold(
+            body: FavoriteRouteListContent(repository: favoriteRouteRepository),
+          ),
         ),
       );
-
-      await _openFavoriteList(tester);
+      await tester.pumpAndSettle();
 
       expect(find.text('즐겨찾기 경로를 불러오지 못했습니다.'), findsOneWidget);
       expect(find.text('네트워크 상태를 확인한 뒤 다시 불러와 주세요.'), findsOneWidget);
@@ -5556,6 +6104,120 @@ void main() {
     expect(inputRect.right, lessThan(filterRect.left));
     expect(resultRect.right, lessThan(filterRect.left));
     expect(filterRect.top, lessThan(resultRect.bottom));
+  });
+
+  testWidgets('역 검색 대화면은 경계 폭 큰 글씨와 긴 노선명에서 렌더링된다', (tester) async {
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final repository = FakeStationSearchRepository(
+      lineOptions: const [
+        SubwayLineOption(
+          id: 'gyeongui-jungang',
+          name: '경의중앙선',
+          color: '#77C4A3',
+          region: '수도권',
+          lineCode: '경의중앙',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'ui-sinseol',
+          name: '우이신설선',
+          color: '#B7C452',
+          region: '수도권',
+          lineCode: '우이신설',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'gimpo-gold',
+          name: '김포골드라인',
+          color: '#AD8605',
+          region: '수도권',
+          lineCode: '김포골드',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'airport-railroad',
+          name: '공항철도',
+          color: '#0090D2',
+          region: '수도권',
+          lineCode: '공항',
+          active: true,
+        ),
+        SubwayLineOption(
+          id: 'shinbundang',
+          name: '신분당선',
+          color: '#D31145',
+          region: '수도권',
+          lineCode: '신분당',
+          active: true,
+        ),
+      ],
+      nextResults: [
+        const StationSearchResult(
+          id: 'station-transfer',
+          nameKo: '디지털미디어시티',
+          nameEn: 'Digital Media City',
+          region: '수도권',
+          dataQualityLevel: 'LEVEL_1',
+          lastVerifiedAt: '2026-06-12',
+          lines: [
+            StationSearchLine(
+              id: 'gyeongui-jungang',
+              name: '경의중앙선',
+              color: '#77C4A3',
+              stationCode: 'K316',
+            ),
+            StationSearchLine(
+              id: 'airport-railroad',
+              name: '공항철도',
+              color: '#0090D2',
+              stationCode: 'A04',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingStateWithPreferences(
+          preferences: const OnboardingViewPreferences(
+            largeTextEnabled: true,
+            highContrastEnabled: true,
+            simpleViewEnabled: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '디지털');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const Key('stationSearchLargeScreenLayout')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationSearchResult-station-transfer')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('stationLineFilterPanel')), findsOneWidget);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
   });
 
   testWidgets('역 검색은 노선을 선택해 결과를 좁힌다', (tester) async {
@@ -6505,6 +7167,124 @@ void main() {
     expect(detailRect.top, lessThan(primaryRect.bottom));
   });
 
+  testWidgets('역 상세 대화면은 큰 글씨에서 시설 상태 3종을 렌더링한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-normal',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+        StationFacilityInfo(
+          id: 'facility-broken',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-2',
+          type: 'ELEVATOR',
+          name: '2번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '2번 출구 앞',
+          status: 'BROKEN',
+          dataConfidence: 'HIGH',
+          lastUpdatedAt: '2026-06-12',
+        ),
+        StationFacilityInfo(
+          id: 'facility-needs-check',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-3',
+          type: 'ESCALATOR',
+          name: '3번 출구 에스컬레이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '3번 출구 앞',
+          status: 'NEEDS_CHECK',
+          dataConfidence: 'LOW',
+          lastUpdatedAt: '2026-06-12',
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: true,
+              simpleViewEnabled: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const Key('stationDetailLargeScreenLayout')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationFacilityCard-facility-normal')),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationFacilityCard-facility-broken')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationFacilityCard-facility-needs-check')),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('이용 가능'), findsOneWidget);
+      expect(find.text('이용 불가 확인'), findsOneWidget);
+      expect(find.text('정보 확인 필요'), findsOneWidget);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('시설 상세는 실제 시설 데이터로 위치 상태 제보 진입을 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final repository = FakeStationSearchRepository(
@@ -7451,6 +8231,59 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('경로 결과 단계는 시스템 뒤로가기를 화면 내 뒤로가기와 맞춘다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          routeFeedbackRepository: FakeRouteFeedbackRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 29),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+    expect(find.text('이동 순서'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    expect(find.text('이동 순서'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStartGuidanceButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('전체 순서'), findsWidgets);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('이동 순서'), findsOneWidget);
+    expect(find.byKey(const Key('routeStartGuidanceButton')), findsOneWidget);
   });
 
   testWidgets('경로 검색 단순 보기를 끄면 화면에서 이동 조건을 바꿀 수 있다', (tester) async {
@@ -9716,7 +10549,7 @@ void main() {
     expect(readySubmitButton.onPressed, isNotNull);
   });
 
-  testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 확인을 요청하고 제출을 막는다', (tester) async {
+  testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException(
@@ -9805,10 +10638,34 @@ void main() {
       find.byKey(const Key('facilityReportSubmitButton')),
     );
     expect(failedLocationSubmitButton.onPressed, isNull);
-    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
-    await tester.pump();
+    expect(
+      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
+      findsOneWidget,
+    );
 
-    expect(reportRepository.requests, isEmpty);
+    await tester.tap(
+      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('위치 없이 제보합니다. 현장 위치 확인이 늦어질 수 있어요.'), findsOneWidget);
+
+    final noLocationSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(noLocationSubmitButton.onPressed, isNotNull);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('사진·위치 확인'), findsOneWidget);
+    expect(
+      find.text('현재 위치 없이 제보하면 담당자가 현장 위치를 다시 확인해야 할 수 있습니다.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('보내기'));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.latitude, isNull);
+    expect(reportRepository.requests.single.longitude, isNull);
   });
 
   testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다', (tester) async {
@@ -10168,6 +11025,10 @@ void main() {
       find.byKey(const Key('facilityReportSubmitButton')),
     );
     expect(failedLocationSubmitButton.onPressed, isNull);
+    expect(
+      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pump();
     expect(reportRepository.requests, isEmpty);
@@ -10329,6 +11190,7 @@ class FakeStationSearchRepository
     this.lineOptions = const [],
     this.networkMapRegionNames = const ['테스트권'],
     this.networkMapData,
+    this.networkMapError,
     this.searchCompleter,
     StationDetail? stationDetail,
     this.stationExits = const [],
@@ -10343,6 +11205,7 @@ class FakeStationSearchRepository
   final List<SubwayLineOption> lineOptions;
   final List<String> networkMapRegionNames;
   final NetworkMapData? networkMapData;
+  final Object? networkMapError;
   final Completer<List<StationSearchResult>>? searchCompleter;
   final StationDetail stationDetail;
   final List<StationExitInfo> stationExits;
@@ -10420,6 +11283,10 @@ class FakeStationSearchRepository
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
     requestedNetworkMapRegions.add(region);
     requestedNetworkMapLineIds.add(lineId);
+    final mapError = networkMapError;
+    if (mapError != null) {
+      throw mapError;
+    }
     final customMapData = networkMapData;
     if (customMapData != null) {
       return customMapData;
@@ -11010,11 +11877,13 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
   MemoryOnboardingResultStore({
     OnboardingResult? initialResult,
     this.throwOnRead = false,
+    this.saveError,
     this.saveCompleters = const [],
   }) : savedResult = initialResult;
 
   OnboardingResult? savedResult;
   final bool throwOnRead;
+  final Object? saveError;
   final List<Completer<void>> saveCompleters;
   int readCount = 0;
   int saveCount = 0;
@@ -11034,6 +11903,10 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
         ? saveCompleters[saveCount]
         : null;
     saveCount++;
+    final error = saveError;
+    if (error != null) {
+      throw error;
+    }
     await saveCompleter?.future;
     savedResult = result;
   }

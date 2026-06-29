@@ -96,6 +96,9 @@
         "captureTarget",
         "localEvidencePath",
         "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
         "result"
       ],
       "scopeNoteKo": "휴대전화 중앙 고립 UI가 아니라 핵심 CTA, 검색, 역 상세 요약이 대화면 기준으로 표시되는지 확인한다."
@@ -114,6 +117,9 @@
         "captureTarget",
         "localEvidencePath",
         "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
         "result"
       ],
       "scopeNoteKo": "홈, 역 검색, 역 상세가 넓은 화면에서 좌우 정보 구조를 유지하고 큰 글씨 기준의 overflow가 없는지 확인한다."
@@ -138,6 +144,9 @@
         "localEvidencePath",
         "uiTreePath",
         "keyboardMouseSmokeResult",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
         "result"
       ],
       "scopeNoteKo": "Chromebook 전용 UX 완성이 아니라 등록정보용 16:9 실제 앱 화면과 기본 focus, 입력, 클릭, 스크롤 smoke 결과를 기록한다."
@@ -161,6 +170,9 @@
         "captureTarget",
         "localEvidencePath",
         "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
         "result"
       ],
       "scopeNoteKo": "Android XR 등록정보 칸을 위한 16:9 실제 앱 화면 후보이며 XR 전용 spatial UI 지원으로 표현하지 않는다."

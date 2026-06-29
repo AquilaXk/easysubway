@@ -321,8 +321,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         child: FutureBuilder<NetworkMapData>(
           future: _future,
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
+            if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return _NetworkMapLoadFailure(
+                onRetry: () => _reload(),
+                onOpenStationSearch: widget.onOpenStationSearch,
+              );
             }
             final data = snapshot.data!;
             return Stack(
@@ -417,6 +423,72 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _NetworkMapLoadFailure extends StatelessWidget {
+  const _NetworkMapLoadFailure({
+    required this.onRetry,
+    required this.onOpenStationSearch,
+  });
+
+  final VoidCallback onRetry;
+  final VoidCallback onOpenStationSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '노선도를 불러오지 못했어요. 다시 시도하거나 역명으로 검색할 수 있어요.',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(
+                Icons.map_outlined,
+                size: 48,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '노선도를 불러오지 못했어요',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '네트워크 상태를 확인한 뒤 다시 시도하거나 역명으로 검색해 주세요.',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(height: 1.35),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('networkMapRetryButton'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 시도'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('networkMapStationSearchFallbackButton'),
+                onPressed: onOpenStationSearch,
+                icon: const Icon(Icons.search),
+                label: const Text('역명으로 검색'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
