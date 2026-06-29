@@ -1502,7 +1502,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final heroSection = _HomeHero(
       profile: currentProfile,
-      onRouteSearch: openRouteSearch,
+      onRouteSearch: openRouteTab,
       onStationSearch: () => unawaited(openStationSearch()),
       onProfileTap: openSettings,
     );
