@@ -5293,10 +5293,14 @@ test("데이터팩 release workflow는 관리자 검수 override를 다음 pack 
   assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE\}"/);
   assert.match(workflow, /--overrides tools\/datapack\/fixtures\/admin-review-overrides\.json/);
   assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_BUILD_FIXTURE\}"/);
+  assert.doesNotMatch(workflow, /transit_master_overrides/);
+  assert.match(script, /datapack-manual-override-ledger/);
+  assert.match(script, /manual_overrides/);
   assert.match(script, /facilityStatusUpdates/);
   assert.match(script, /facilityStatusUpdates\.facilityId was not found in fixture/);
   assert.match(script, /adminReviewOverrideCount/);
   assert.match(datapackTest, /승인된 관리자 검수 결과는 다음 data pack fixture 시설 상태에 반영된다/);
+  assert.match(datapackTest, /legacy transit_master_overrides 입력을 거부한다/);
 });
 
 test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 유지한다", () => {
