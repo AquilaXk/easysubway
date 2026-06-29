@@ -98,11 +98,11 @@ void main() {
         .toList(growable: false);
 
     expect(labels, [
-      '기본 정보만 있음',
-      '시설 정보 확인됨',
-      '쉬운 길 안내 가능',
-      '고장·공사 반영됨',
-      '정보 확인 필요',
+      '일부 정보는 확인 중이에요',
+      '시설 정보를 함께 볼 수 있어요',
+      '쉬운 길 안내를 볼 수 있어요',
+      '고장·공사 소식이 반영됐어요',
+      '확인이 더 필요해요',
     ]);
   });
 
@@ -158,7 +158,7 @@ void main() {
     expect(results.single.id, 'station-sangnoksu');
     expect(results.single.nameKo, '상록수');
     expect(results.single.region, '수도권');
-    expect(results.single.dataQualityLabel, '기본 정보만 있음');
+    expect(results.single.dataQualityLabel, '일부 정보는 확인 중이에요');
     expect(results.single.dataSourceLabel, '공식 정보');
     expect(results.single.lines.single.name, '수도권 4호선');
   });
@@ -578,7 +578,7 @@ void main() {
     expect(detail.nameKo, '상록수');
     expect(detail.latitude, 37.302795);
     expect(detail.longitude, 126.866489);
-    expect(detail.dataQualityLabel, '기본 정보만 있음');
+    expect(detail.dataQualityLabel, '일부 정보는 확인 중이에요');
     expect(detail.dataSourceLabel, '공식 정보');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
@@ -592,7 +592,7 @@ void main() {
     expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
     expect(facilities.single.statusTitle, '이용 가능');
-    expect(facilities.single.confidenceLabel, '확인 수준 높음');
+    expect(facilities.single.confidenceLabel, '최근 확인된 정보예요');
     expect(facilities.single.dataSourceLabel, '공식 정보');
   });
 
@@ -658,7 +658,7 @@ void main() {
     expect(favorites.single.stationId, 'station-sangnoksu');
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
-    expect(favorites.single.dataQualityLabel, '기본 정보만 있음');
+    expect(favorites.single.dataQualityLabel, '일부 정보는 확인 중이에요');
     expect(favorites.single.dataSourceLabel, '공식 정보');
   });
 
@@ -1300,10 +1300,10 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 점검·제보 1개 · 정보 확인 필요 1개');
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 확인 요청 1개 · 확인이 필요해요 1개');
     expect(
       state.facilityAttentionSemanticLabel,
-      '확인이 필요한 시설, 고장·폐쇄 1개, 점검·제보 1개, 정보 확인 필요 1개',
+      '확인이 필요한 시설, 고장·폐쇄 1개, 확인 요청 1개, 확인이 필요해요 1개',
     );
   });
 
@@ -1455,16 +1455,16 @@ void main() {
 
     expect(ramp.typeLabel, '경사로');
     expect(ramp.statusLabel, '공사 중');
-    expect(ramp.severityLabel, '점검·제보');
+    expect(ramp.severityLabel, '확인 요청');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
-    expect(ramp.confidenceLabel, '정보 확인 필요');
+    expect(ramp.confidenceLabel, '확인이 더 필요해요');
     expect(ramp.statusTitle, '현장 확인 필요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태 확인 필요, 다음 행동 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 현장 확인 필요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 다음 행동 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
-    expect(customerCenter.statusLabel, '검수 완료');
+    expect(customerCenter.statusLabel, '확인 완료');
     expect(customerCenter.severityLabel, '정상');
     expect(customerCenter.fieldValidationLabel, '최근 확인됨');
     expect(customerCenter.statusTitle, '이용 가능');

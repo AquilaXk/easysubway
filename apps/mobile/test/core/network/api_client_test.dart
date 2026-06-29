@@ -333,4 +333,34 @@ void main() {
       ),
     );
   });
+
+  test('ApiClient 예외 문구는 사용자에게 개발 용어를 보이지 않는다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write('not-json')
+        ..close();
+    });
+
+    final client = ApiClient(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    await expectLater(
+      client.getJson('/stations'),
+      throwsA(
+        isA<ApiException>()
+            .having((error) => error.message, 'message', isNot(contains('API')))
+            .having(
+              (error) => error.message,
+              'message',
+              isNot(contains('JSON')),
+            ),
+      ),
+    );
+  });
 }

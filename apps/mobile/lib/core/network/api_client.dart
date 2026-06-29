@@ -77,21 +77,21 @@ class ApiClient {
       return ApiResponse(statusCode: response.statusCode, jsonBody: null);
     } on TimeoutException catch (error, stackTrace) {
       throw ApiException(
-        'API 요청 시간이 초과되었습니다.',
+        '연결 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        'API 서버에 연결하지 못했습니다.',
+        '서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } catch (error, stackTrace) {
       throw ApiException(
-        'API 요청을 처리하지 못했습니다.',
+        '요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
@@ -130,21 +130,21 @@ class ApiClient {
       rethrow;
     } on TimeoutException catch (error, stackTrace) {
       throw ApiException(
-        'API 요청 시간이 초과되었습니다.',
+        '연결 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        'API 서버에 연결하지 못했습니다.',
+        '서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
       );
     } catch (error, stackTrace) {
       throw ApiException(
-        'API 요청을 처리하지 못했습니다.',
+        '요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
@@ -202,7 +202,7 @@ Object? _decodeJson(String body, {required int statusCode, required Uri uri}) {
     return jsonDecode(body);
   } on FormatException catch (error, stackTrace) {
     throw ApiException(
-      'API JSON 응답을 해석하지 못했습니다.',
+      '받은 정보를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.',
       statusCode: statusCode,
       path: uri.path,
       cause: error,

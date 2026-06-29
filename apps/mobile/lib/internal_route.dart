@@ -393,8 +393,8 @@ class InternalRouteStep {
       _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
-      if (requiresEscalator) '에스컬레이터 상태 확인 필요',
-      if (reliabilityScore < 80) '이동 전 역무원 확인 필요',
+      if (requiresEscalator) '에스컬레이터는 다시 확인해 주세요',
+      if (reliabilityScore < 80) '이동 전 역무원에게 확인해 주세요',
     ];
     return labels.join(' · ');
   }
@@ -623,9 +623,9 @@ String _internalRouteDistanceLabel(int distanceMeters) {
 String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus) {
     'VERIFIED' => '최근 확인됨',
-    'STALE' => '최근 상태 확인 필요',
-    'UNKNOWN' => '최근 확인 정보 없음',
-    _ => '최근 확인 정보 없음',
+    'STALE' => '최근 상태를 다시 확인해 주세요',
+    'UNKNOWN' => '최근 확인 정보가 없어요',
+    _ => '최근 확인 정보가 없어요',
   };
 }
 
