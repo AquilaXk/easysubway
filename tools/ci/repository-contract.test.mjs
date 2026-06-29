@@ -953,6 +953,7 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
+	  assert.match(workflow, /Android Release Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"[\s\S]*Android Release Artifact \/ Audit bundled datapacks/);
 	  assert.match(workflow, /node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile/);
 	  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
 	  assert.match(workflow, /flutter build appbundle --release/);
