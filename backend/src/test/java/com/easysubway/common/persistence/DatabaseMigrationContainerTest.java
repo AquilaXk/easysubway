@@ -210,6 +210,7 @@ class DatabaseMigrationContainerTest {
 
 	private void assertManualOverrideProductionGuards(JdbcTemplate jdbcTemplate) {
 		insertManualOverride(jdbcTemplate, "override-ok", "facility-1", "APPROVED", "qa", "reviewer", false, null, null);
+		insertManualOverride(jdbcTemplate, "override-strict-pending", "facility-pending", "PENDING", "qa", null, true, null, null);
 
 		assertThatThrownBy(() ->
 			insertManualOverride(jdbcTemplate, "override-self-approved", "facility-self", "APPROVED", "qa", "qa", false, null, null))

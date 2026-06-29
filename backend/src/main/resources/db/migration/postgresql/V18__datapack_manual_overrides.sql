@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS manual_overrides (
 	CONSTRAINT chk_manual_overrides_route_safety
 		CHECK (
 			strict_route_eligible = FALSE
+			OR approval_status <> 'APPROVED'
 			OR (
 				approval_status = 'APPROVED'
 				AND route_safety_approved_by IS NOT NULL
