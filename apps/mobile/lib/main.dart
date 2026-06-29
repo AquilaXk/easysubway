@@ -629,14 +629,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
               profile: mobilityProfileOptions.first,
               preferences: const OnboardingViewPreferences.defaults(),
             );
-            await _saveOnboardingResult(result);
-            if (!mounted) {
-              return;
-            }
-            setState(() {
-              _onboardingState = OnboardingState.completed(result: result);
-            });
-            _schedulePendingFacilityReportPhotoRecovery();
+            await _completeOnboarding(result);
           },
         );
       }
@@ -644,11 +637,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         locationProvider: widget.locationProvider,
         notificationPermissionProvider: widget.notificationPermissionProvider,
         onCompleted: (result) async {
-          await _saveOnboardingResult(result);
-          setState(() {
-            _onboardingState = OnboardingState.completed(result: result);
-          });
-          _schedulePendingFacilityReportPhotoRecovery();
+          await _completeOnboarding(result);
         },
       );
     }
@@ -765,6 +754,39 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       );
       rethrow;
     }
+  }
+
+  Future<void> _completeOnboarding(OnboardingResult result) async {
+    final previousOnboardingState = _onboardingState;
+    final previousStartScreenDismissed = _startScreenDismissed;
+    final previousIntroScreenDismissed = _introScreenDismissed;
+    try {
+      await _saveOnboardingResult(result);
+    } catch (error, stackTrace) {
+      assert(() {
+        Object.hash(error, stackTrace);
+        return true;
+      }());
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _onboardingState = previousOnboardingState;
+        _startScreenDismissed = previousStartScreenDismissed;
+        _introScreenDismissed = previousIntroScreenDismissed;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('설정을 저장하지 못했습니다. 다시 시도해 주세요.')),
+      );
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _onboardingState = OnboardingState.completed(result: result);
+    });
+    _schedulePendingFacilityReportPhotoRecovery();
   }
 
   Future<void> _saveOnboardingResult(OnboardingResult result) async {
@@ -3574,7 +3596,15 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                 setState(() {
                   _dataFuture = next;
                 });
-                await next;
+                try {
+                  await next;
+                } catch (error, stackTrace) {
+                  reportMobileError(
+                    error,
+                    stackTrace,
+                    context: '즐겨찾기 새로고침 중 예외가 발생했습니다.',
+                  );
+                }
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),

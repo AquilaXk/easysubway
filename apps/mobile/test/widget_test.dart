@@ -11,6 +11,7 @@ import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
@@ -470,6 +471,45 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+  });
+
+  testWidgets('온보딩 기본 시작 저장 실패는 안내 화면에 머문다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final onboardingStore = MemoryOnboardingResultStore(
+      saveError: StateError('save failed'),
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('onboardingIntroSkipButton')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('onboardingIntroSkipButton')));
+    await tester.pumpAndSettle();
+
+    expect(onboardingStore.saveCount, 1);
+    expect(onboardingStore.savedResult, isNull);
+    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
+    expect(find.byType(HomeScreen), findsNothing);
+    expect(find.text('설정을 저장하지 못했습니다. 다시 시도해 주세요.'), findsOneWidget);
   });
 
   testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
@@ -3569,6 +3609,48 @@ void main() {
     expect(find.byKey(const Key('favoriteRoutesButton')), findsNothing);
     expect(find.byKey(const Key('favoriteStationsButton')), findsNothing);
     expect(find.byKey(const Key('favoriteFacilitiesButton')), findsNothing);
+  });
+
+  testWidgets('즐겨찾기 홈 새로고침 실패는 오류 상태로 끝나고 예외를 흘리지 않는다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.exceptionAsString().contains('favorite failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final favoriteRepository = FakeFavoriteStationRepository()
+      ..error = StateError('favorite failed');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FavoriteHomeScreen(
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          facilityReportDraftTargetStore: null,
+          internalRouteRepository: FakeInternalRouteRepository(
+            result: _internalRouteResult(),
+          ),
+          realtimeRepository: const UnavailableRealtimeRepository(),
+          routeDraftController: RouteDraftController(),
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, 420));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('favoriteHomeErrorState')), findsOneWidget);
+    expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
   });
 
   testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
