@@ -3902,6 +3902,33 @@ test("source inventory 검증기는 coverageScope 누락을 거부한다", async
   );
 });
 
+test("source inventory 검증기는 v1 optional source가 production 필수로 남는 것을 거부한다", async () => {
+  const sourceInventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
+  const invalidInventory = structuredClone(sourceInventory);
+  invalidInventory.sources.find((source) => source.id === "kric-disabled-toilet").requiredForProductionPack = true;
+
+  const outputDir = path.join(tmpdir(), `easysubway-source-inventory-optional-scope-${Date.now()}`);
+  const inventoryPath = path.join(outputDir, "source-inventory.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(inventoryPath, `${JSON.stringify(invalidInventory, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-inventory.mjs",
+        "--inventory",
+        inventoryPath,
+        "--scope",
+        "apps/mobile/release/production-datapack-scope.json",
+      ],
+      { cwd: root },
+    ),
+    /optional source .* must not be requiredForProductionPack/,
+  );
+});
+
 test("source candidate sample 검증기는 KRIC live evidence metadata를 허용한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-candidate-sample-${Date.now()}`);
   const samplePath = path.join(outputDir, "sample.json");

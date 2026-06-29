@@ -262,8 +262,8 @@ function inventorySourceMap(inventory) {
   const sources = new Map();
   for (const source of inventory.sources) {
     const id = requiredString(source.id, "inventory.sources.id");
-    if (source.requiredForProductionPack !== true) {
-      throw new Error(`${id}.requiredForProductionPack must be true`);
+    if (typeof source.requiredForProductionPack !== "boolean") {
+      throw new Error(`${id}.requiredForProductionPack must be boolean`);
     }
     if (!source.license || source.license.redistributionAllowed !== true) {
       throw new Error(`${id}.license.redistributionAllowed must be true`);
