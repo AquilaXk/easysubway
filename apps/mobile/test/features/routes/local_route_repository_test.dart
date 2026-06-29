@@ -929,6 +929,75 @@ void main() {
     expect(result.blockedReasons, contains('필수 접근성 시설을 사용할 수 없습니다.'));
   });
 
+  test('운행 상태 미확인 시설에 연결된 edge는 휠체어 경로 FOUND가 되지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, operational_status,
+        floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'NORMAL',
+        'UNKNOWN',
+        'B1',
+        '1F',
+        '설치 정보만 있고 운행 상태는 확인 필요'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, isNot('FOUND'));
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('접근성 시설 이용 가능 여부를 확인할 수 없습니다.'));
+  });
+
   test('검수 완료 시설에 연결된 available edge는 이동 가능하게 유지한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

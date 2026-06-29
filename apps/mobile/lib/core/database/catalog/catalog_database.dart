@@ -42,7 +42,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -66,6 +66,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 5) {
           await _addRouteMapLabelPolygonColumn();
+        }
+        if (from < 6) {
+          await _addRelease100ProvenanceColumns();
         }
       },
       beforeOpen: (_) async {
@@ -239,6 +242,9 @@ class CatalogDatabase extends _$CatalogDatabase {
             exitId: const Value('exit-sangnoksu-1'),
             type: 'ELEVATOR',
             name: '1번 출구 엘리베이터',
+            status: const Value('NORMAL'),
+            operationalStatus: const Value('AVAILABLE'),
+            installationStatus: const Value('INSTALLED'),
             floorFrom: const Value('B1'),
             floorTo: const Value('1F'),
             description: const Value('대합실과 1번 출구 지상을 연결'),
@@ -249,6 +255,9 @@ class CatalogDatabase extends _$CatalogDatabase {
             exitId: const Value('exit-sangnoksu-1'),
             type: 'ESCALATOR',
             name: '1번 출구 에스컬레이터',
+            status: const Value('UNKNOWN'),
+            operationalStatus: const Value('UNKNOWN'),
+            installationStatus: const Value('INSTALLED'),
             floorFrom: const Value('B1'),
             floorTo: const Value('1F'),
             description: const Value('현장 검증 전 이동 보조 시설'),
@@ -259,6 +268,9 @@ class CatalogDatabase extends _$CatalogDatabase {
             exitId: const Value(null),
             type: 'ACCESSIBLE_TOILET',
             name: '대합실 장애인 화장실',
+            status: const Value('UNKNOWN'),
+            operationalStatus: const Value('UNKNOWN'),
+            installationStatus: const Value('INSTALLED'),
             floorFrom: const Value('B1'),
             floorTo: const Value('B1'),
             description: const Value('대합실 내부'),
@@ -556,6 +568,107 @@ class CatalogDatabase extends _$CatalogDatabase {
     await _addColumnIfMissing(
       'route_map_positions',
       'label_polygon',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  Future<void> _addRelease100ProvenanceColumns() async {
+    await _addColumnIfMissing(
+      'network_edges',
+      'source_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'network_edges',
+      'provenance_kind',
+      "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await _addColumnIfMissing(
+      'network_edges',
+      'verification_status',
+      "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await _addColumnIfMissing(
+      'network_edges',
+      'evidence_hash',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+
+    await _addColumnIfMissing(
+      'facilities',
+      'source_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'provider_facility_ref',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'provenance_kind',
+      "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'verified_at',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'retrieved_at',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'evidence_hash',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'status_meaning',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'operational_status',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'installation_status',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'confidence',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'source_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'provenance_kind',
+      "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'verification_status',
+      "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    );
+    await _addColumnIfMissing('internal_route_edges', 'facility_id', 'TEXT');
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'last_verified_at',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'evidence_hash',
       "TEXT NOT NULL DEFAULT ''",
     );
   }
