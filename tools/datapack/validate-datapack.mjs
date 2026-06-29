@@ -676,10 +676,12 @@ function validateProductionNetworkEdgeProvenance(database, pack) {
   const coverage = productionVerifiedCoverage(database, edgeRows);
 
   for (const edge of edgeRows) {
-    if (!isPositiveAccessibilityEdge(edge)) {
-      continue;
+    if (isAccessibilityCoverageCandidate(edge)) {
+      validateAccessibilityCoverageEdgeProvenance(edge, sourceUpdatedAtById, pack);
     }
-    validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack);
+    if (isPositiveAccessibilityEdge(edge)) {
+      validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack);
+    }
   }
 
   const report = {
@@ -767,29 +769,33 @@ function validateProductionFacilityProvenance(database, pack) {
   }
 }
 
-function validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack) {
+function validateAccessibilityCoverageEdgeProvenance(edge, sourceUpdatedAtById, pack) {
   const sourceId = requiredString(edge.source_id, `network_edges.${edge.id}.source_id`);
   const sourceUpdatedAt = sourceUpdatedAtById.get(sourceId);
   if (sourceUpdatedAt === undefined) {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge source_id is not in sourceInventory: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge source_id is not in sourceInventory: ${edge.id}`);
   }
   const provenanceKind = requiredString(edge.provenance_kind, `network_edges.${edge.id}.provenance_kind`);
   if (!["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(provenanceKind)) {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge provenance_kind is not allowed: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge provenance_kind is not allowed: ${edge.id}`);
   }
   const verificationStatus = requiredString(edge.verification_status, `network_edges.${edge.id}.verification_status`);
   if (verificationStatus !== "VERIFIED") {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge verification_status must be VERIFIED: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge verification_status must be VERIFIED: ${edge.id}`);
   }
   if (!Number.isInteger(edge.last_verified_at) || edge.last_verified_at <= 0) {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge verifiedAt is required: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge verifiedAt is required: ${edge.id}`);
   }
   if (edge.last_verified_at < sourceUpdatedAt) {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge verifiedAt is older than source evidence: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge verifiedAt is older than source evidence: ${edge.id}`);
   }
   if (!Number.isInteger(edge.reliability_score) || edge.reliability_score < 80) {
-    throw new Error(`${pack.id}@${pack.version} network_edges positive edge reliability_score is below 80: ${edge.id}`);
+    throw new Error(`${pack.id}@${pack.version} network_edges accessibility edge reliability_score is below 80: ${edge.id}`);
   }
+}
+
+function validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack) {
+  validateAccessibilityCoverageEdgeProvenance(edge, sourceUpdatedAtById, pack);
 }
 
 function productionVerifiedCoverage(database, edgeRows) {
@@ -822,7 +828,7 @@ function productionVerifiedCoverage(database, edgeRows) {
   const verifiedExitPairs = new Set();
   const verifiedTransferPairs = new Set();
   for (const edge of edgeRows) {
-    if (!isVerifiedPositiveAccessibilityEdge(edge)) {
+    if (!isVerifiedAccessibilityCoverageEdge(edge)) {
       continue;
     }
     const edgeType = normalizedEdgeType(edge.edge_type);
@@ -862,9 +868,18 @@ function isPositiveAccessibilityEdge(edge) {
   );
 }
 
-function isVerifiedPositiveAccessibilityEdge(edge) {
+function isAccessibilityCoverageCandidate(edge) {
+  const edgeType = normalizedEdgeType(edge.edge_type);
   return (
-    isPositiveAccessibilityEdge(edge) &&
+    ["ENTRY", "EXIT", "TRANSFER"].includes(edgeType) &&
+    String(edge.stair_access_state ?? "").toUpperCase() === "STEP_FREE" &&
+    ["AVAILABLE", "UNKNOWN"].includes(String(edge.accessibility_status ?? "").toUpperCase())
+  );
+}
+
+function isVerifiedAccessibilityCoverageEdge(edge) {
+  return (
+    isAccessibilityCoverageCandidate(edge) &&
     edge.source_id &&
     edge.provenance_kind &&
     edge.verification_status === "VERIFIED" &&

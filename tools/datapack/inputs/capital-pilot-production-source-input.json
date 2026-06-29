@@ -249,7 +249,7 @@
       "servicePattern": "",
       "includesStairs": false,
       "stairAccessState": "STEP_FREE",
-      "accessibilityStatus": "AVAILABLE",
+      "accessibilityStatus": "UNKNOWN",
       "reliabilityScore": 90,
       "lastVerifiedAt": "2026-06-21T00:00:00.000Z"
     },
@@ -273,7 +273,7 @@
       "servicePattern": "",
       "includesStairs": false,
       "stairAccessState": "STEP_FREE",
-      "accessibilityStatus": "AVAILABLE",
+      "accessibilityStatus": "UNKNOWN",
       "reliabilityScore": 90,
       "lastVerifiedAt": "2026-06-21T00:00:00.000Z"
     },
@@ -297,7 +297,7 @@
       "servicePattern": "",
       "includesStairs": false,
       "stairAccessState": "STEP_FREE",
-      "accessibilityStatus": "AVAILABLE",
+      "accessibilityStatus": "UNKNOWN",
       "reliabilityScore": 90,
       "lastVerifiedAt": "2026-06-21T00:00:00.000Z"
     },
@@ -321,7 +321,7 @@
       "servicePattern": "",
       "includesStairs": false,
       "stairAccessState": "STEP_FREE",
-      "accessibilityStatus": "AVAILABLE",
+      "accessibilityStatus": "UNKNOWN",
       "reliabilityScore": 90,
       "lastVerifiedAt": "2026-06-21T00:00:00.000Z"
     }

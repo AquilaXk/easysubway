@@ -740,8 +740,8 @@ function buildSqlitePack(sqlitePath, schema, pack) {
             productionFacilityTimestamp(row.retrievedAt, isProductionPack, "retrievedAt") ?? 0,
             productionFacilityString(row.evidenceHash, isProductionPack, "evidenceHash"),
             productionFacilityString(row.statusMeaning, isProductionPack, "statusMeaning"),
-            row.operationalStatus ?? "UNKNOWN",
-            row.installationStatus ?? "UNKNOWN",
+            facilityOperationalStatus(row, isProductionPack),
+            facilityInstallationStatus(row, isProductionPack),
             row.confidence ?? 0,
           ];
         },
@@ -848,6 +848,30 @@ function productionFacilityTimestamp(value, isProductionPack, field) {
     return timestamp(value);
   }
   return timestamp(requiredString(value, `production facilities.${field}`));
+}
+
+function facilityOperationalStatus(row, isProductionPack) {
+  if (isProductionPack) {
+    return productionFacilityString(row.operationalStatus, isProductionPack, "operationalStatus");
+  }
+  if (row.operationalStatus) {
+    return row.operationalStatus;
+  }
+  const status = String(row.status ?? "").toUpperCase();
+  if (["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(status)) {
+    return "AVAILABLE";
+  }
+  if (["BROKEN", "UNDER_CONSTRUCTION", "CLOSED", "UNAVAILABLE", "OUT_OF_SERVICE"].includes(status)) {
+    return "UNAVAILABLE";
+  }
+  return "";
+}
+
+function facilityInstallationStatus(row, isProductionPack) {
+  if (isProductionPack) {
+    return productionFacilityString(row.installationStatus, isProductionPack, "installationStatus");
+  }
+  return row.installationStatus ?? "UNKNOWN";
 }
 
 function insertCatalogMetadata(database, pack) {
