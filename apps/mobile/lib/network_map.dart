@@ -2798,7 +2798,7 @@ class _StationSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             const Text(
-              '노선 순서와 좌표 기준으로 표시됩니다.',
+              '노선 순서에 맞춰 표시됩니다.',
               style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
             ),
             const SizedBox(height: 18),

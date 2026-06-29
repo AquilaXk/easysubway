@@ -2995,7 +2995,7 @@ void main() {
     expect(requested.longitude, closeTo(126.8665, 0.0001));
     expect(find.text('가장 가까운 역'), findsOneWidget);
     expect(find.text('상록수역'), findsOneWidget);
-    expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
+    expect(find.text('현재 위치에서 230m · 수도권 2호선'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchInput')), findsNothing);
     expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
   });
@@ -5660,7 +5660,7 @@ void main() {
 
     for (final text in [
       '$longStationName역',
-      '현재 위치 기준 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용',
+      '현재 위치에서 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용',
       '일부 정보는 확인 중이에요',
     ]) {
       final widget = tester.widget<Text>(find.text(text));
@@ -6796,11 +6796,11 @@ void main() {
       expect(repository.requestedNearbyLocations.single.latitude, 37.3028);
       expect(repository.requestedNearbyLocations.single.longitude, 126.8665);
       expect(find.text('상록수역'), findsOneWidget);
-      expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
+      expect(find.text('현재 위치에서 230m · 수도권 2호선'), findsOneWidget);
       expect(find.byKey(const Key('nearbyStationPrimaryCard')), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '가장 가까운 역, 상록수역, 현재 위치 기준 230m, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요',
+          '가장 가까운 역, 상록수역, 현재 위치에서 230m, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요',
         ),
         findsOneWidget,
       );
@@ -7009,7 +7009,7 @@ void main() {
 
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('상록수역'), findsOneWidget);
-    expect(find.text('현재 위치 기준 230m · 수도권 2호선'), findsOneWidget);
+    expect(find.text('현재 위치에서 230m · 수도권 2호선'), findsOneWidget);
   });
 
   testWidgets('역 검색은 현재 위치를 확인하지 못하면 짧은 안내를 보여준다', (tester) async {
@@ -8499,7 +8499,7 @@ void main() {
       expect(find.text('도착역에서 계단 없는 출구 동선을 확인합니다.'), findsOneWidget);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('열차 이동'), findsOneWidget);
-      expect(find.text('선택한 경로 기준으로 안내합니다.'), findsOneWidget);
+      expect(find.text('선택한 길을 따라 안내합니다.'), findsOneWidget);
       expect(find.textContaining('edge:'), findsNothing);
       expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
       expect(find.textContaining('MEASURED'), findsNothing);

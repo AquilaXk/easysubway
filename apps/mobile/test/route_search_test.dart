@@ -620,7 +620,7 @@ void main() {
     );
 
     final semanticLabel = result.semanticLabel;
-    expect(semanticLabel, contains('선택한 경로 기준으로 안내합니다.'));
+    expect(semanticLabel, contains('선택한 길을 따라 안내합니다.'));
     expect(semanticLabel, contains('도착역에서 계단 없는 출구 동선을 확인합니다.'));
     expect(semanticLabel, isNot(contains('edge:')));
     expect(semanticLabel, isNot(contains('line:')));

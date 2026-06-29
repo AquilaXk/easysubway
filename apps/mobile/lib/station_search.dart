@@ -471,9 +471,9 @@ class StationSearchResult {
       return '';
     }
     if (distance < 1000) {
-      return '현재 위치 기준 ${distance}m';
+      return '현재 위치에서 ${distance}m';
     }
-    return '현재 위치 기준 ${(distance / 1000).toStringAsFixed(1)}km';
+    return '현재 위치에서 ${(distance / 1000).toStringAsFixed(1)}km';
   }
 
   String get semanticLabel {

@@ -685,7 +685,7 @@ class RouteSearchResult {
     if (recommendationReasons.isEmpty) {
       return const [];
     }
-    return const ['선택한 경로 기준으로 안내합니다.'];
+    return const ['선택한 길을 따라 안내합니다.'];
   }
 
   List<String> get blockedReasonLabels {
@@ -1037,7 +1037,7 @@ class RouteSearchStep {
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리 정보가 부족해요';
     }
-    return '앱에 저장된 길 안내 기준';
+    return '앱에 저장된 길 안내예요';
   }
 }
 
@@ -1104,7 +1104,7 @@ String _routeStepReasonLabel(String reason) {
   if (reason.trim().isEmpty) {
     return '';
   }
-  return '선택한 경로 기준으로 안내합니다.';
+  return '선택한 길을 따라 안내합니다.';
 }
 
 String _routeStepDetailLabel({required String stepType}) {
