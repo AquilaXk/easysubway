@@ -1655,7 +1655,7 @@ void main() {
       positionSources: [
         NetworkMapPositionSource(
           id: 'fixture-route-map-source-capital-review',
-          name: '수도권 노선도 fixture 좌표 검수',
+          name: '수도권 노선도 fixture 좌표 확인',
           licenseStatus: 'fixture-only',
         ),
       ],
@@ -1975,7 +1975,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2052,7 +2052,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2128,7 +2128,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2212,7 +2212,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2308,7 +2308,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2406,7 +2406,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2517,7 +2517,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -2649,7 +2649,7 @@ void main() {
         positionSources: [
           NetworkMapPositionSource(
             id: 'fixture-route-map-source-capital-review',
-            name: '수도권 노선도 fixture 좌표 검수',
+            name: '수도권 노선도 fixture 좌표 확인',
             licenseStatus: 'fixture-only',
           ),
         ],
@@ -11605,7 +11605,7 @@ class FakeStationSearchRepository
       positionSources: const [
         NetworkMapPositionSource(
           id: 'fixture-route-map-source-capital-review',
-          name: '수도권 노선도 fixture 좌표 검수',
+          name: '수도권 노선도 fixture 좌표 확인',
           licenseStatus: 'fixture-only',
         ),
       ],

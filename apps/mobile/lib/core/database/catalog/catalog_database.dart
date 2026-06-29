@@ -342,7 +342,7 @@ class CatalogDatabase extends _$CatalogDatabase {
           row[3],
           row[4],
           'fixture-route-map-source-capital-review',
-          '수도권 노선도 fixture 좌표 검수',
+          '수도권 노선도 fixture 좌표 확인',
           'https://easysubway.local/fixtures/catalog-fixture.json',
           'fixture-only',
           'fixture-only',
