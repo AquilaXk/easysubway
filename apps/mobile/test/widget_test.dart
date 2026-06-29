@@ -2817,7 +2817,7 @@ void main() {
     expect(find.byKey(const Key('homeHeroCard')), findsOneWidget);
     expect(find.text('시설 알림'), findsOneWidget);
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('한 번 더 확인 · 엘리베이터 상태 정보가 부족해요'), findsOneWidget);
+    expect(find.text('정보 부족 · 엘리베이터 상태 정보가 부족해요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
@@ -5263,7 +5263,7 @@ void main() {
       expect(find.text('수도권 4호선'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('이동 편의도 92점'), findsNothing);
-      expect(find.text('상세 이동 정보는 다시 검색해 확인'), findsOneWidget);
+      expect(find.text('다시 찾으면 자세히 볼 수 있어요'), findsOneWidget);
       expect(
         find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13'),
         findsOneWidget,
@@ -5278,7 +5278,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 정보가 부족해요, 환승 정보가 부족해요, 걷는 거리 정보가 부족해요, 계단 여부를 아직 알 수 없어요, 엘리베이터 연결을 아직 알 수 없어요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 다시 찾으면 자세히 볼 수 있어요, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 정보가 부족해요, 환승 정보가 부족해요, 걷는 거리 정보가 부족해요, 계단 여부를 아직 알 수 없어요, 엘리베이터 연결을 아직 알 수 없어요',
         ),
         findsOneWidget,
       );
@@ -7359,7 +7359,7 @@ void main() {
           of: find.byKey(
             const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
           ),
-          matching: find.text('한 번 더 확인해 주세요'),
+          matching: find.text('상태 정보가 부족해요'),
         ),
         findsOneWidget,
       );
@@ -7600,7 +7600,7 @@ void main() {
 
       expect(find.text('이용 가능'), findsOneWidget);
       expect(find.text('이용할 수 없어요'), findsOneWidget);
-      expect(find.text('한 번 더 확인해 주세요'), findsOneWidget);
+      expect(find.text('상태 정보가 부족해요'), findsOneWidget);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {

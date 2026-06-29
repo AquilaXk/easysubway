@@ -460,7 +460,7 @@ class FavoriteRoute {
 
   String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
 
-  String get scoreLabel => '상세 이동 정보는 다시 검색해 확인';
+  String get scoreLabel => '다시 찾으면 자세히 볼 수 있어요';
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 

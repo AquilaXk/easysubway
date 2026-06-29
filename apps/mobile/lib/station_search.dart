@@ -743,7 +743,7 @@ class StationFacilityInfo {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '한 번 더 확인해 주세요',
+      'UNKNOWN' => '상태 정보가 부족해요',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
@@ -931,7 +931,7 @@ String _dataQualityLabel(String dataQualityLevel) {
     'LEVEL_2' => '시설 정보를 함께 볼 수 있어요',
     'LEVEL_3' => '쉬운 길 안내를 볼 수 있어요',
     'LEVEL_4' => '고장·공사 소식이 반영됐어요',
-    _ => '확인이 더 필요해요',
+    _ => '정보를 준비 중이에요',
   };
 }
 
@@ -939,8 +939,8 @@ String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
     'HIGH' => '최근 확인된 정보예요',
     'MEDIUM' => '일부 확인된 정보예요',
-    'LOW' => '확인이 더 필요해요',
-    _ => '확인이 더 필요해요',
+    'LOW' => '정보가 부족해요',
+    _ => '정보가 부족해요',
   };
 }
 

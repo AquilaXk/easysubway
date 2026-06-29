@@ -227,7 +227,7 @@ class LocalRouteEngine {
     if (edge.reliabilityScore >= 60) {
       return '일부 확인된 정보예요';
     }
-    return '확인이 더 필요해요';
+    return '정보가 부족해요';
   }
 
   String _warningMessage(String code) {

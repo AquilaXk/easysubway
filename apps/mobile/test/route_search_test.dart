@@ -824,7 +824,7 @@ void main() {
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
     expect(saved.mobilityLabel, '천천히 이동');
-    expect(saved.scoreLabel, '상세 이동 정보는 다시 검색해 확인');
+    expect(saved.scoreLabel, '다시 찾으면 자세히 볼 수 있어요');
     expect(saved.scoreLabel, isNot(contains('92점')));
   });
 
