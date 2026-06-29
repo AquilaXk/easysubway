@@ -43,7 +43,7 @@ const _needsInfoPresentation = FacilityStatusPresentation(
   severityLabel: '확인이 필요해요',
   statusTitle: '확인이 필요해요',
   nextActionLabel: '시설 상세 보기',
-  nextActionDescription: '최근 확인 시각과 출처를 보고 이동 전 현장 안내를 확인하세요.',
+  nextActionDescription: '최근 확인한 안내를 보고 이동 전 현장 안내를 확인하세요.',
   priority: 30,
 );
 

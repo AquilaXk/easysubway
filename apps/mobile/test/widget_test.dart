@@ -819,7 +819,7 @@ void main() {
     expect(find.text('확인 요청 · 엘리베이터 제보됨'), findsOneWidget);
     expect(find.text('권장 행동 역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 확인 요청, .*공식 정보, 권장 행동 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('심각도 확인 요청, .*공식 안내, 권장 행동 역무원 도움 요청')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -2811,7 +2811,7 @@ void main() {
     expect(find.text('고장·폐쇄 · 엘리베이터 폐쇄'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*공식 정보, 다음 행동 대체 출구 보기')),
+      find.bySemanticsLabel(RegExp('심각도 고장·폐쇄, .*공식 안내, 다음 행동 대체 출구 보기')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -3232,7 +3232,7 @@ void main() {
       expect(find.text('이동 조건'), findsOneWidget);
       expect(find.text('화면 및 접근성'), findsOneWidget);
       expect(find.text('경로 찾기'), findsNothing);
-      expect(find.text('기본 지역과 데이터'), findsOneWidget);
+      expect(find.text('저장된 안내'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
       expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
       expect(find.text('큰 글자'), findsOneWidget);
@@ -3354,11 +3354,11 @@ void main() {
 
     expect(find.text('저장된 데이터 상태'), findsOneWidget);
     expect(find.text('지역'), findsOneWidget);
-    expect(find.text('수도권 기본 데이터'), findsOneWidget);
+    expect(find.text('수도권 역과 노선'), findsOneWidget);
     expect(find.text('마지막 갱신'), findsOneWidget);
-    expect(find.text('앱에 포함된 기본 데이터'), findsOneWidget);
-    expect(find.text('데이터 품질'), findsOneWidget);
-    expect(find.text('기본 역·노선 정보 우선'), findsOneWidget);
+    expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
+    expect(find.text('안내 범위'), findsOneWidget);
+    expect(find.text('주요 역·노선 안내를 먼저 보여줘요'), findsOneWidget);
     expect(find.text('제한 사항'), findsOneWidget);
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
   });
@@ -7138,13 +7138,16 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.widgetWithText(OutlinedButton, '정보 기준 보기'), findsOneWidget);
-      await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 보기'));
+      expect(
+        find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'));
       await tester.pumpAndSettle();
-      expect(find.text('정보 기준'), findsOneWidget);
-      expect(find.text('공식 정보'), findsOneWidget);
+      expect(find.text('안내 확인 방법'), findsOneWidget);
+      expect(find.text('공식 안내'), findsOneWidget);
       expectNoForbiddenUserCopy(tester);
-      await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 접기'));
+      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 접기'));
       await tester.pumpAndSettle();
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.text('이동 구조'), findsOneWidget);
@@ -7571,13 +7574,13 @@ void main() {
     expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
     expect(find.text('정보 신뢰도 높음'), findsNothing);
     expect(find.text('출처 공식 파일'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '정보 기준 보기'), findsOneWidget);
-    await tester.tap(find.widgetWithText(OutlinedButton, '정보 기준 보기'));
+    expect(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'));
     await tester.pumpAndSettle();
-    expect(find.text('정보 기준'), findsOneWidget);
+    expect(find.text('안내 확인 방법'), findsOneWidget);
     expect(find.text('최근 확인됨'), findsOneWidget);
     expect(find.text('최근 확인된 정보예요'), findsOneWidget);
-    expect(find.text('공식 정보'), findsOneWidget);
+    expect(find.text('공식 안내'), findsOneWidget);
     expectNoForbiddenUserCopy(tester);
 
     await tester.scrollUntilVisible(
@@ -7764,7 +7767,7 @@ void main() {
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
     expect(find.text('엘리베이터에서 개찰구까지 이동합니다.'), findsOneWidget);
     expect(
-      find.text('약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요'),
+      find.text('약 1분 15초 · 28m · 최근 확인한 기록이 없어요 · 엘리베이터를 이용해요'),
       findsOneWidget,
     );
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
@@ -7772,7 +7775,7 @@ void main() {
     expect(find.text('엘리베이터 필요'), findsNothing);
     expect(
       find.bySemanticsLabel(
-        '역 안 이동 순서, 역 안 이동 경로를 찾았어요, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요, 엘리베이터에서 개찰구까지 이동합니다.',
+        '역 안 이동 순서, 역 안 이동 경로를 찾았어요, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m, 이동 단계 1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지, 약 1분 15초 · 28m · 최근 확인한 기록이 없어요 · 엘리베이터를 이용해요, 엘리베이터에서 개찰구까지 이동합니다.',
       ),
       findsOneWidget,
     );

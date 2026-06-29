@@ -71,7 +71,7 @@ void main() {
     expect(favorites.single.nextActionLabel, '상태 제보');
     expect(favorites.single.statusTitle, '이용 가능');
     expect(favorites.single.confidenceLabel, '최근 확인된 정보예요');
-    expect(favorites.single.dataSourceLabel, '공식 정보');
+    expect(favorites.single.dataSourceLabel, '공식 안내');
     expect(favorites.single.locationLabel, '1번 출구 앞');
     expect(favorites.single.verificationStatusLabel, '상태를 다시 확인해 주세요');
     expect(

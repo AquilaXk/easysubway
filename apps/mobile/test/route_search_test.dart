@@ -120,7 +120,7 @@ void main() {
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
     expect(
       result.steps.single.burdenLabel,
-      '약 1분 15초 · 28m · 최근 확인 정보가 없어요 · 엘리베이터를 이용해요',
+      '약 1분 15초 · 28m · 최근 확인한 기록이 없어요 · 엘리베이터를 이용해요',
     );
     expect(result.semanticLabel, contains('1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지'));
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
@@ -391,7 +391,7 @@ void main() {
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.needsConfirmation, isTrue);
     expect(result.attentionLabel, '확인 필요 이유');
-    expect(result.semanticLabel, contains('확인 필요 이유 경로 연결 정보를 확인할 수 없습니다.'));
+    expect(result.semanticLabel, contains('확인 필요 이유 길이 이어지는지 아직 확인하지 못했어요.'));
     expect(result.semanticLabel, isNot(contains('안내 불가 이유')));
     expect(result.semanticLabel, isNot(contains('다음 행동')));
   });
@@ -403,8 +403,8 @@ void main() {
     );
 
     expect(result.isBlocked, isFalse);
-    expect(result.blockedReasonLabels, ['경로 연결 정보를 확인할 수 없습니다.']);
-    expect(result.semanticLabel, contains('경로 연결 정보를 확인할 수 없습니다.'));
+    expect(result.blockedReasonLabels, ['길이 이어지는지 아직 확인하지 못했어요.']);
+    expect(result.semanticLabel, contains('길이 이어지는지 아직 확인하지 못했어요.'));
   });
 
   test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {

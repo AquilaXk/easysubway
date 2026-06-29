@@ -1032,12 +1032,12 @@ class RouteSearchStep {
     }
     if (timeSource == 'ESTIMATED_CONSTANT' ||
         distanceSource == 'ESTIMATED_CONSTANT') {
-      return '추정 시간과 거리, 현장 안내 우선';
+      return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리 확인 필요';
     }
-    return '앱 경로 데이터 기준';
+    return '앱에 저장된 길 안내 기준';
   }
 }
 
@@ -1069,9 +1069,10 @@ String _routeWarningLabel(String code) {
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 동선 여부를 확인할 수 없습니다.',
-    'GENERATED_CONNECTOR_UNVERIFIED' => '연결 추정 구간입니다. 현장 확인이 필요합니다.',
+    'GENERATED_CONNECTOR_UNVERIFIED' =>
+      '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
     'DURATION_UNKNOWN' => '소요 시간 확인이 필요한 구간입니다.',
-    'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
+    'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
     _ => '일부 이동 정보를 확인하지 못했어요.',
   };
@@ -1084,12 +1085,12 @@ String _routeBlockedReasonLabel(String reason) {
     'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     'FACILITY_UNAVAILABLE' => '필수 접근성 시설을 사용할 수 없습니다.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
-    'ROUTE_GRAPH_UNKNOWN' => '경로 연결 정보를 확인할 수 없습니다.',
+    'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     '계단 없는 경로를 찾지 못했습니다.' => '계단 없는 경로를 찾지 못했습니다.',
     '계단 없는 동선 여부를 확인할 수 없습니다.' => '계단 없는 동선 여부를 확인할 수 없습니다.',
     '필수 접근성 시설을 사용할 수 없습니다.' => '필수 접근성 시설을 사용할 수 없습니다.',
     '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => '접근성 시설 이용 가능 여부를 확인할 수 없습니다.',
-    '경로 연결 정보를 확인할 수 없습니다.' => '경로 연결 정보를 확인할 수 없습니다.',
+    '경로 연결 정보를 확인할 수 없습니다.' => '길이 이어지는지 아직 확인하지 못했어요.',
     _ => '안내 가능한 경로를 찾지 못했습니다.',
   };
 }
