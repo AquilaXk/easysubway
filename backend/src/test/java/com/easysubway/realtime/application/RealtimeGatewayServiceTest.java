@@ -349,6 +349,25 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("TOPIS provider fixture는 기본 dev profile에서도 동작한다")
+	void topisProviderUsesFixtureOnDefaultDevProfile() {
+		TopisRealtimeProvider provider = new TopisRealtimeProvider(
+			"",
+			new ObjectMapper(),
+			java.net.http.HttpClient.newHttpClient(),
+			new FixtureRealtimeProvider(),
+			true,
+			"",
+			"dev"
+		);
+
+		List<RealtimeArrival> arrivals = provider.arrivals(sangnoksuQuery());
+
+		assertThat(arrivals).hasSize(1);
+		assertThat(arrivals.get(0).stationName()).isEqualTo("상록수");
+	}
+
+	@Test
 	@DisplayName("TOPIS fixture는 release deploy env에서 켜져도 시작하지 않는다")
 	void topisFixtureFailsOnReleaseDeployEnv() {
 		String previous = System.getProperty("EASYSUBWAY_DEPLOY_ENV");

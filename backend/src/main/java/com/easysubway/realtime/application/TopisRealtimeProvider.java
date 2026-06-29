@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,7 +38,7 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 		ObjectMapper objectMapper,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_FIXTURE_ENABLED:false}") boolean fixtureEnabled,
 		@Value("${EASYSUBWAY_DEPLOY_ENV:}") String deployEnv,
-		@Value("${spring.profiles.active:}") String activeProfiles
+		Environment environment
 	) {
 		this(
 			serviceKey,
@@ -46,7 +47,7 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			new FixtureRealtimeProvider(),
 			fixtureEnabled,
 			deployEnv,
-			activeProfiles
+			runtimeProfiles(environment)
 		);
 	}
 
@@ -84,7 +85,7 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 		this.fallbackProvider = fallbackProvider;
 		this.fixtureEnabled = fixtureEnabled;
 		if (this.fixtureEnabled && !fixtureAllowedRuntime(deployEnv, activeProfiles)) {
-			throw new IllegalStateException("TOPIS fixture is only allowed in local/test runtime.");
+			throw new IllegalStateException("TOPIS fixture is only allowed in local/dev/test runtime.");
 		}
 	}
 
@@ -230,7 +231,15 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			firstNonBlank(activeProfiles, propertyOrEnv("spring.profiles.active"))
 		);
 		return !containsAny(runtime, "prod", "staging", "release", "prod-like")
-			&& containsAny(runtime, "local", "test");
+			&& containsAny(runtime, "local", "dev", "test");
+	}
+
+	private static String runtimeProfiles(Environment environment) {
+		String[] activeProfiles = environment.getActiveProfiles();
+		if (activeProfiles.length > 0) {
+			return String.join(",", activeProfiles);
+		}
+		return String.join(",", environment.getDefaultProfiles());
 	}
 
 	private String propertyOrEnv(String key) {
