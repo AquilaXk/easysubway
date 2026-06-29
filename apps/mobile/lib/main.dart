@@ -2584,7 +2584,15 @@ class _HomeFacilityAlertSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final facilitiesFuture = this.facilitiesFuture;
     if (facilitiesFuture == null) {
-      return const SizedBox.shrink();
+      return const _HomeStateSection(
+        title: '시설 알림',
+        child: _HomeStateCard(
+          key: Key('homeFacilityAlertUnavailableState'),
+          icon: Icons.notifications_off_outlined,
+          title: '시설 알림을 준비하지 못했어요',
+          subtitle: '앱을 다시 열어도 계속 보이면 도움말에서 알려 주세요.',
+        ),
+      );
     }
     return FutureBuilder<List<FavoriteFacility>>(
       future: facilitiesFuture,
@@ -2830,7 +2838,15 @@ class _HomeRecentRouteSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final routesFuture = this.routesFuture;
     if (routesFuture == null) {
-      return const SizedBox.shrink();
+      return const _HomeStateSection(
+        title: '최근 경로',
+        child: _HomeStateCard(
+          key: Key('homeRecentRouteUnavailableState'),
+          icon: Icons.route_outlined,
+          title: '최근 경로를 준비하지 못했어요',
+          subtitle: '앱을 다시 열어도 계속 보이면 도움말에서 알려 주세요.',
+        ),
+      );
     }
     return FutureBuilder<List<FavoriteRoute>>(
       future: routesFuture,
