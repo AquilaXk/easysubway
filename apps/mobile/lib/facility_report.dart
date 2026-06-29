@@ -1664,6 +1664,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _locationMessage = '';
   bool _isLoadingLocation = false;
   bool _isLocationFailure = false;
+  bool _submitWithoutLocation = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
   bool _isConfirmingPhotoUse = false;
@@ -1701,13 +1702,15 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
-    // 현장 좌표가 없으면 역·시설 판단이 흔들릴 수 있어 위치 확인 전 제출을 막는다.
+    final needsLocationChoice =
+        widget.locationLoader != null &&
+        _attachedLocation == null &&
+        !_submitWithoutLocation;
     final isSubmitDisabled =
         isLoading ||
         hasSubmittedReport ||
         _isLoadingLocation ||
-        _isLocationFailure ||
-        (widget.locationLoader != null && _attachedLocation == null);
+        needsLocationChoice;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 상태 제보')),
@@ -1793,6 +1796,25 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
               ),
               if (_isLocationFailure && !hasSubmittedReport) ...[
                 const SizedBox(height: 10),
+                FilledButton.icon(
+                  key: const Key('facilityReportSubmitWithoutLocationButton'),
+                  onPressed:
+                      isLoading ||
+                          _isOpeningLocationSettings ||
+                          _isLoadingLocation
+                      ? null
+                      : () {
+                          setState(() {
+                            _submitWithoutLocation = true;
+                            _isLocationFailure = false;
+                            _locationMessage =
+                                '위치 없이 제보합니다. 현장 위치 확인이 늦어질 수 있어요.';
+                          });
+                        },
+                  icon: const Icon(Icons.location_off_outlined),
+                  label: const Text('위치 없이 제보'),
+                ),
+                const SizedBox(height: 10),
                 if (_canOpenLocationSettings) ...[
                   OutlinedButton.icon(
                     key: const Key('facilityReportOpenLocationSettingsButton'),
@@ -1872,7 +1894,9 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
-    if (_photoAttachment != null || _attachedLocation != null) {
+    if (_photoAttachment != null ||
+        _attachedLocation != null ||
+        _submitWithoutLocation) {
       final confirmed = await _confirmReportUpload();
       if (!confirmed) {
         return;
@@ -1895,13 +1919,17 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(_facilityReportUploadDisclosureTitle),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_facilityReportUploadDisclosurePurpose),
-            SizedBox(height: 8),
-            Text(_facilityReportUploadDisclosureScope),
+            const Text(_facilityReportUploadDisclosurePurpose),
+            if (_submitWithoutLocation) ...[
+              const SizedBox(height: 8),
+              const Text('현재 위치 없이 제보하면 담당자가 현장 위치를 다시 확인해야 할 수 있습니다.'),
+            ],
+            const SizedBox(height: 8),
+            const Text(_facilityReportUploadDisclosureScope),
           ],
         ),
         actions: [
@@ -1957,6 +1985,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (mounted) {
         setState(() {
           _attachedLocation = null;
+          _submitWithoutLocation = false;
           _locationMessage = '위치 안내를 확인한 뒤 제보 위치를 첨부해 주세요.';
           _isLocationFailure = true;
         });
@@ -2191,6 +2220,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _isLoadingLocation = true;
       _locationMessage = '';
       _isLocationFailure = false;
+      _submitWithoutLocation = false;
     });
 
     try {
@@ -2202,6 +2232,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = location;
         _locationMessage = '';
         _isLocationFailure = false;
+        _submitWithoutLocation = false;
       });
     } on FacilityReportLocationException catch (error) {
       if (!mounted) {
@@ -2211,6 +2242,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = null;
         _locationMessage = error.message;
         _isLocationFailure = true;
+        _submitWithoutLocation = false;
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2225,6 +2257,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = null;
         _locationMessage = '현재 위치를 확인하지 못했습니다.';
         _isLocationFailure = true;
+        _submitWithoutLocation = false;
       });
     } finally {
       if (mounted) {
