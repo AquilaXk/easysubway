@@ -4687,6 +4687,7 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
       assert.match(source, /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/, `${file} must be disabled on prod profile`);
     }
   }
+  assert.match(applicationYml, /group:\s*\n\s*staging:\s*prod\s*\n\s*release:\s*prod\s*\n\s*prod-like:\s*prod/);
   assert.match(readinessConfiguration, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(readinessConfiguration, /HealthIndicator/);
   assert.match(readinessConfiguration, /Status\.DOWN/);
