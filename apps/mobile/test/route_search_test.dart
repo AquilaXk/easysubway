@@ -227,7 +227,7 @@ void main() {
               'warnings': [
                 {
                   'code': 'LOW_DATA_CONFIDENCE',
-                  'message': '일부 시설 정보는 확인이 필요합니다.',
+                  'message': '일부 시설 정보는 다시 확인해 주세요.',
                 },
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
@@ -373,7 +373,7 @@ void main() {
   test('경로 검색 결과는 확인 필요 상태를 이동 가능으로 안내하지 않는다', () {
     final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
 
-    expect(result.statusLabel, '확인이 필요합니다');
+    expect(result.statusLabel, '다시 확인해 주세요');
     expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
@@ -386,12 +386,12 @@ void main() {
     );
 
     expect(result.isBlocked, isFalse);
-    expect(result.statusLabel, '확인이 필요합니다');
+    expect(result.statusLabel, '다시 확인해 주세요');
     expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.needsConfirmation, isTrue);
-    expect(result.attentionLabel, '확인 필요 이유');
-    expect(result.semanticLabel, contains('확인 필요 이유 길이 이어지는지 아직 확인하지 못했어요.'));
+    expect(result.attentionLabel, '다시 확인할 내용');
+    expect(result.semanticLabel, contains('다시 확인할 내용 길이 이어지는지 아직 확인하지 못했어요.'));
     expect(result.semanticLabel, isNot(contains('안내 불가 이유')));
     expect(result.semanticLabel, isNot(contains('다음 행동')));
   });
@@ -698,8 +698,8 @@ void main() {
       ],
     );
 
-    expect(result.stairAccessLabel, '계단 여부 확인 필요');
-    expect(result.semanticLabel, contains('계단 여부 확인 필요'));
+    expect(result.stairAccessLabel, '계단 여부를 다시 확인해 주세요');
+    expect(result.semanticLabel, contains('계단 여부를 다시 확인해 주세요'));
     expect(result.semanticLabel, isNot(contains('계단 없음')));
   });
 
@@ -931,7 +931,7 @@ RouteSearchResult _sampleRouteSearchResult({
   List<RouteSearchWarning> warnings = const [
     RouteSearchWarning(
       code: 'LOW_DATA_CONFIDENCE',
-      message: '일부 시설 정보는 확인이 필요합니다.',
+      message: '일부 시설 정보는 다시 확인해 주세요.',
     ),
   ],
   List<String> blockedReasons = const [],

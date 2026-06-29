@@ -23,7 +23,7 @@ class FacilityStatusPresentation {
 const _blockedPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.blocked,
   severityLabel: '고장·폐쇄',
-  statusTitle: '이용 불가 확인',
+  statusTitle: '이용할 수 없어요',
   nextActionLabel: '대체 출구 보기',
   nextActionDescription: '이동 전 다른 출구와 역무원 안내를 확인하세요.',
   priority: 10,
@@ -31,8 +31,8 @@ const _blockedPresentation = FacilityStatusPresentation(
 
 const _cautionPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.caution,
-  severityLabel: '확인 요청',
-  statusTitle: '현장 확인 필요',
+  severityLabel: '가기 전 확인',
+  statusTitle: '가기 전에 확인해 주세요',
   nextActionLabel: '역무원 도움 요청',
   nextActionDescription: '현장 안내를 확인하고 필요하면 역무원 도움을 요청하세요.',
   priority: 20,
@@ -40,8 +40,8 @@ const _cautionPresentation = FacilityStatusPresentation(
 
 const _needsInfoPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '확인이 필요해요',
-  statusTitle: '확인이 필요해요',
+  severityLabel: '한 번 더 확인',
+  statusTitle: '한 번 더 확인해 주세요',
   nextActionLabel: '시설 상세 보기',
   nextActionDescription: '최근 확인한 안내를 보고 이동 전 현장 안내를 확인하세요.',
   priority: 30,
@@ -92,12 +92,12 @@ String buildFacilityAttentionSummary(Iterable<String> statuses) {
 String buildFacilityAttentionSemanticLabel(Iterable<String> statuses) {
   final counts = _attentionCounts(statuses);
   if (counts.isEmpty) {
-    return '확인이 필요한 시설 없음';
+    return '다시 볼 시설 없음';
   }
   final summary = counts.entries
       .map((entry) => '${entry.key.severityLabel} ${entry.value}개')
       .join(', ');
-  return '확인이 필요한 시설, $summary';
+  return '다시 볼 시설, $summary';
 }
 
 String facilityStatusDisplayLabel({
