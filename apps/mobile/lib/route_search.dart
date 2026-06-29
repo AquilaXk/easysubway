@@ -1243,6 +1243,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.favoriteRouteRepository,
     this.simpleViewEnabled = true,
     this.initialDraft,
+    this.shellNavigationBar,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -1252,6 +1253,7 @@ class RouteSearchScreen extends StatefulWidget {
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final RouteDraft? initialDraft;
+  final Widget? shellNavigationBar;
   final String initialMobilityType;
   final bool simpleViewEnabled;
 
@@ -1299,43 +1301,50 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('길찾기')),
-      bottomNavigationBar: Padding(
-        padding: easySubwayBottomActionInsets(context),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final isLoading =
-                _controller.state.status == RouteSearchViewStatus.loading;
-            final canSubmit =
-                _originStation != null && _destinationStation != null;
-            final submitLabel = isLoading
-                ? '경로 검색 중'
-                : canSubmit
-                ? '길찾기'
-                : '길찾기, 출발역과 도착역을 먼저 선택해 주세요';
-            return Semantics(
-              button: true,
-              enabled: canSubmit && !isLoading,
-              label: submitLabel,
-              child: ExcludeSemantics(
-                child: FilledButton(
-                  key: const Key('routeSearchSubmitButton'),
-                  onPressed: canSubmit && !isLoading ? _submit : null,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(60),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+    final submitButton = Padding(
+      padding: easySubwayBottomActionInsets(context),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final isLoading =
+              _controller.state.status == RouteSearchViewStatus.loading;
+          final canSubmit =
+              _originStation != null && _destinationStation != null;
+          final submitLabel = isLoading
+              ? '경로 검색 중'
+              : canSubmit
+              ? '길찾기'
+              : '길찾기, 출발역과 도착역을 먼저 선택해 주세요';
+          return Semantics(
+            button: true,
+            enabled: canSubmit && !isLoading,
+            label: submitLabel,
+            child: ExcludeSemantics(
+              child: FilledButton(
+                key: const Key('routeSearchSubmitButton'),
+                onPressed: canSubmit && !isLoading ? _submit : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(60),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(isLoading ? '경로 검색 중' : '길찾기'),
                 ),
+                child: Text(isLoading ? '경로 검색 중' : '길찾기'),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
+    );
+    return Scaffold(
+      key: const Key('routeSearchScreen'),
+      appBar: AppBar(title: const Text('길찾기')),
+      bottomNavigationBar: widget.shellNavigationBar == null
+          ? submitButton
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [submitButton, widget.shellNavigationBar!],
+            ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),

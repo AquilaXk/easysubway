@@ -859,7 +859,7 @@ void main() {
     expect(find.byTooltip('중심 보기'), findsNothing);
     expect(find.text('노선 목록으로 보기'), findsNothing);
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
-    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.text('저장'), findsNothing);
     expect(find.text('수도권'), findsOneWidget);
     expect(find.text('전국'), findsNothing);
@@ -921,6 +921,71 @@ void main() {
       find.byKey(const Key('homeBottomNavigationBar')),
     );
     expect(homeNavigationBar.selectedIndex, 0);
+  });
+
+  testWidgets('홈 하단 탭은 길찾기 즐겨찾기 더보기를 같은 shell에서 전환한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> expectShellTab({
+      required Key tabKey,
+      required Key screenKey,
+      required int selectedIndex,
+    }) async {
+      await tester.tap(find.byKey(tabKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byKey(screenKey), findsOneWidget);
+      expect(
+        tester
+            .widget<NavigationBar>(
+              find.byKey(const Key('homeBottomNavigationBar')),
+            )
+            .selectedIndex,
+        selectedIndex,
+      );
+    }
+
+    await expectShellTab(
+      tabKey: const Key('bottomNavRoute'),
+      screenKey: const Key('routeSearchScreen'),
+      selectedIndex: 2,
+    );
+    await expectShellTab(
+      tabKey: const Key('bottomNavSaved'),
+      screenKey: const Key('favoriteHomeScreen'),
+      selectedIndex: 3,
+    );
+    await expectShellTab(
+      tabKey: const Key('bottomNavMore'),
+      screenKey: const Key('settingsScreen'),
+      selectedIndex: 4,
+    );
+
+    await tester.tap(find.byKey(const Key('bottomNavHome')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('settingsScreen')), findsNothing);
+    expect(
+      tester
+          .widget<NavigationBar>(
+            find.byKey(const Key('homeBottomNavigationBar')),
+          )
+          .selectedIndex,
+      0,
+    );
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -3867,7 +3932,7 @@ void main() {
     await tester.tap(find.byKey(const Key('bottomNavSaved')));
     await tester.pumpAndSettle();
 
-    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(find.byKey(const Key('favoriteHomeScreen')), findsOneWidget);
     expect(find.byKey(const Key('favoriteHomeStationsButton')), findsOneWidget);
     expect(
       find.byKey(const Key('favoriteHomeFacilitiesButton')),
