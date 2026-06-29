@@ -185,6 +185,10 @@ function validateCandidateBuildSpec(buildSpec) {
 }
 
 function candidateBuildProvenance(buildSpec, buildSpecSha256) {
+  const normalizedHashes = Object.fromEntries(candidateBuildSpecHashFields.map((field) => [
+    field,
+    sha256HexString(buildSpec[field], `buildSpec.${field}`),
+  ]));
   return {
     schemaVersion: buildSpec.schemaVersion,
     artifactKind: buildSpec.artifactKind,
@@ -192,12 +196,12 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256) {
     productionScopeId: requiredString(buildSpec.productionScopeId, "buildSpec.productionScopeId"),
     buildSpecSha256,
     sourceSnapshotIds: requiredStringArray(buildSpec.sourceSnapshotIds, "buildSpec.sourceSnapshotIds"),
-    sourceSnapshotSetHash: buildSpec.sourceSnapshotSetHash,
-    approvedAliasLedgerHash: buildSpec.approvedAliasLedgerHash,
-    facilityEvidenceLedgerHash: buildSpec.facilityEvidenceLedgerHash,
-    routeEvidenceLedgerHash: buildSpec.routeEvidenceLedgerHash,
-    approvedOverrideSetHash: buildSpec.approvedOverrideSetHash,
-    sourceInventorySha256: buildSpec.sourceInventorySha256,
+    sourceSnapshotSetHash: normalizedHashes.sourceSnapshotSetHash,
+    approvedAliasLedgerHash: normalizedHashes.approvedAliasLedgerHash,
+    facilityEvidenceLedgerHash: normalizedHashes.facilityEvidenceLedgerHash,
+    routeEvidenceLedgerHash: normalizedHashes.routeEvidenceLedgerHash,
+    approvedOverrideSetHash: normalizedHashes.approvedOverrideSetHash,
+    sourceInventorySha256: normalizedHashes.sourceInventorySha256,
     builderGitSha: requiredString(buildSpec.builderGitSha, "buildSpec.builderGitSha"),
     builderVersion: requiredString(buildSpec.builderVersion, "buildSpec.builderVersion"),
   };
