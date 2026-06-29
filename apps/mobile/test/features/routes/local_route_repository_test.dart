@@ -197,7 +197,7 @@ void main() {
     );
     expect(rideStep.actionTitle, '열차 이동');
     expect(rideStep.actionDetail, contains('출발역에서 중간역까지'));
-    expect(rideStep.reason, '선택한 경로 기준으로 안내합니다.');
+    expect(rideStep.reason, '선택한 길을 따라 안내합니다.');
     expect(rideStep.evidenceSources, contains('edge:edge-a-b-local'));
     expect(rideStep.timeSource, 'STATIC_ESTIMATE');
     expect(rideStep.distanceSource, 'MEASURED');

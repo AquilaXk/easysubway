@@ -244,7 +244,7 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   String _stepReason() {
-    return '선택한 경로 기준으로 안내합니다.';
+    return '선택한 길을 따라 안내합니다.';
   }
 
   List<String> _recommendationReasons(local.LocalRouteResult result) {
