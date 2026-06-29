@@ -63,6 +63,11 @@ class DatapackReleaseChannelCommandServiceTest {
 		assertThat(channelValue("previous_manifest_sha256")).isEqualTo(SHA_3);
 		assertThat(channelValue("last_operation_type")).isEqualTo("PROMOTE");
 		assertThat(channelValue("last_operation_status")).isEqualTo("PASS");
+		assertThat(eventValue("idem-promote-1", "requested_by")).isEqualTo("data-operator");
+		assertThat(eventValue("idem-promote-1", "approved_by")).isEqualTo("release-approver");
+		assertThat(eventValue("idem-promote-1", "reason")).isEqualTo("release request");
+		assertThat(eventValue("idem-promote-1", "workflow_run_url"))
+			.isEqualTo("https://github.com/AquilaXk/easysubway/actions/runs/1131");
 		assertThat(eventCount("idem-promote-1")).isEqualTo(1);
 	}
 
@@ -283,6 +288,15 @@ class DatapackReleaseChannelCommandServiceTest {
 			SELECT COUNT(*) FROM datapack_release_channel_events
 			WHERE channel = 'production' AND idempotency_key = ?
 			""", Integer.class, idempotencyKey);
+	}
+
+	private String eventValue(String idempotencyKey, String column) {
+		return jdbcTemplate.queryForObject(
+			"SELECT " + column + " FROM datapack_release_channel_events "
+				+ "WHERE channel = 'production' AND idempotency_key = ?",
+			String.class,
+			idempotencyKey
+		);
 	}
 
 	private static Stream<Arguments> missingAuditAndHashFields() {
