@@ -505,8 +505,8 @@ class TransitStationLayoutAdminPageController {
 				edge.reliabilityScore(),
 				edge.active(),
 				edge.active() ? "활성" : "비활성",
-					"확인 정도 " + edge.reliabilityScore()
-				);
-			}
+				"확인 정도 " + edge.reliabilityScore()
+			);
 		}
 	}
+}

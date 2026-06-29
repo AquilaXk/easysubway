@@ -13,33 +13,33 @@
 <main class="admin-main">
 	<div th:replace="~{admin/fragments/shell :: topbar}"></div>
 	<div th:replace="~{admin/fragments/shell :: contentStart}"></div>
-		<header class="admin-page-head">
-			<div>
-				<h1>현장 확인 상세</h1>
-				<p>
-					<span th:text="${verification.stationName}">상록수</span>
-					<span> · </span>
-					<span th:text="${verification.sessionId}">session-id</span>
-				</p>
-			</div>
-			<div class="admin-actions">
-				<a class="admin-btn" th:href="@{/admin/field-verifications/stations/{stationId}/export.csv(stationId=${verification.stationId})}">CSV 내보내기</a>
-				<a class="admin-btn" th:href="@{/admin/field-verifications/page}">목록</a>
-			</div>
-		</header>
+	<header class="admin-page-head">
+		<div>
+			<h1>현장 확인 상세</h1>
+			<p>
+				<span th:text="${verification.stationName}">상록수</span>
+				<span> · </span>
+				<span th:text="${verification.sessionId}">session-id</span>
+			</p>
+		</div>
+		<div class="admin-actions">
+			<a class="admin-btn" th:href="@{/admin/field-verifications/stations/{stationId}/export.csv(stationId=${verification.stationId})}">CSV 내보내기</a>
+			<a class="admin-btn" th:href="@{/admin/field-verifications/page}">목록</a>
+		</div>
+	</header>
 	<div th:replace="~{admin/fragments/form-errors :: summary}"></div>
 
-		<div class="metric-grid">
-			<div class="metric"><span>전체 항목</span><strong th:text="${verification.itemCount}">0</strong></div>
-			<div class="metric"><span>확인 완료</span><strong th:text="${verification.verifiedCount}">0</strong></div>
-			<div class="metric"><span>재확인 필요</span><strong th:text="${verification.recheckCount}">0</strong></div>
-			<div class="metric"><span>확인한 사람</span><strong th:text="${verification.verifiedBy}">field-worker</strong></div>
-		</div>
+	<div class="metric-grid">
+		<div class="metric"><span>전체 항목</span><strong th:text="${verification.itemCount}">0</strong></div>
+		<div class="metric"><span>확인 완료</span><strong th:text="${verification.verifiedCount}">0</strong></div>
+		<div class="metric"><span>재확인 필요</span><strong th:text="${verification.recheckCount}">0</strong></div>
+		<div class="metric"><span>확인한 사람</span><strong th:text="${verification.verifiedBy}">field-worker</strong></div>
+	</div>
 
-		<div class="admin-grid-2">
-			<section class="admin-panel">
-				<h2>확인 항목</h2>
-				<table>
+	<div class="admin-grid-2">
+		<section class="admin-panel">
+			<h2>확인 항목</h2>
+			<table>
 				<thead>
 				<tr>
 					<th scope="col">항목</th>
