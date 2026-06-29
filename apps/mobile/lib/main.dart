@@ -4199,6 +4199,45 @@ class OfflineDataScreen extends StatelessWidget {
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
             ),
+            _HomePrototypeSection(title: '저장된 데이터 상태'),
+            _PrototypeCard(
+              child: Column(
+                children: [
+                  _PrototypeInfoRow(
+                    icon: Icons.public,
+                    iconBackground: EasySubwayAccessibleColors.mintSoft,
+                    iconColor: EasySubwayAccessibleColors.mintDark,
+                    title: '지역',
+                    subtitle: '수도권 기본 데이터',
+                    trailing: '저장됨',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.update,
+                    iconBackground: EasySubwayAccessibleColors.skySoft,
+                    iconColor: EasySubwayAccessibleColors.brand,
+                    title: '마지막 갱신',
+                    subtitle: '앱에 포함된 기본 데이터',
+                    trailing: '확인 필요',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.verified_outlined,
+                    iconBackground: EasySubwayAccessibleColors.skySoft,
+                    iconColor: EasySubwayAccessibleColors.brand,
+                    title: '데이터 품질',
+                    subtitle: '기본 역·노선 정보 우선',
+                    trailing: '보통',
+                  ),
+                  _PrototypeInfoRow(
+                    icon: Icons.info_outline,
+                    iconBackground: EasySubwayAccessibleColors.amberSoft,
+                    iconColor: EasySubwayAccessibleColors.amber,
+                    title: '제한 사항',
+                    subtitle: '실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요',
+                    trailing: '주의',
+                  ),
+                ],
+              ),
+            ),
             _HomePrototypeSection(title: '이용 가능'),
             _PrototypeCard(
               child: Column(

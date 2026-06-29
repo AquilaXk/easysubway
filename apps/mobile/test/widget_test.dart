@@ -3326,6 +3326,45 @@ void main() {
     }
   });
 
+  testWidgets('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMore')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('offlineDataSettingsButton')),
+      160,
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('offlineDataSettingsButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장된 데이터 상태'), findsOneWidget);
+    expect(find.text('지역'), findsOneWidget);
+    expect(find.text('수도권 기본 데이터'), findsOneWidget);
+    expect(find.text('마지막 갱신'), findsOneWidget);
+    expect(find.text('앱에 포함된 기본 데이터'), findsOneWidget);
+    expect(find.text('데이터 품질'), findsOneWidget);
+    expect(find.text('기본 역·노선 정보 우선'), findsOneWidget);
+    expect(find.text('제한 사항'), findsOneWidget);
+    expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
+  });
+
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
