@@ -319,7 +319,7 @@ void main() {
     expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
   });
 
-  testWidgets('기본 앱은 사진 복구 저장소가 없어도 플랫폼 오류 없이 홈을 보여준다', (tester) async {
+  testWidgets('기본 앱은 저장소가 없어도 상태를 숨기지 않고 홈을 보여준다', (tester) async {
     final reportedErrors = <FlutterErrorDetails>[];
 
     await runWithMobileErrorReporter(reportedErrors.add, () async {
@@ -343,8 +343,18 @@ void main() {
       findsOneWidget,
     );
 
-    expect(find.text('자주 가는 곳'), findsNothing);
-    expect(find.text('최근 경로'), findsNothing);
+    expect(find.text('시설 알림'), findsOneWidget);
+    expect(
+      find.byKey(const Key('homeFacilityAlertUnavailableState')),
+      findsOneWidget,
+    );
+    expect(find.text('시설 알림을 준비하지 못했어요'), findsOneWidget);
+    expect(find.text('최근 경로'), findsOneWidget);
+    expect(
+      find.byKey(const Key('homeRecentRouteUnavailableState')),
+      findsOneWidget,
+    );
+    expect(find.text('최근 경로를 준비하지 못했어요'), findsOneWidget);
     expect(find.text('저장한 경로가 없습니다'), findsNothing);
   });
 
