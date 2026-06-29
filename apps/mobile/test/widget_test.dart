@@ -3596,6 +3596,71 @@ void main() {
     expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
   });
 
+  testWidgets('설정 화면 보기 옵션 연속 저장 실패는 마지막 저장값으로 되돌린다', (tester) async {
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final exception = details.exceptionAsString();
+      if (!exception.contains('first save failed') &&
+          !exception.contains('latest save failed')) {
+        previousOnError?.call(details);
+      }
+    };
+    addTearDown(() => FlutterError.onError = previousOnError);
+    final firstSave = Completer<void>();
+    final latestSave = Completer<void>();
+    final onboardingStore = MemoryOnboardingResultStore(
+      initialResult: OnboardingResult(
+        profile: mobilityProfileOptions.first,
+        preferences: const OnboardingViewPreferences(
+          largeTextEnabled: true,
+          highContrastEnabled: false,
+          simpleViewEnabled: true,
+        ),
+      ),
+      saveCompleters: [firstSave, latestSave],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        onboardingStore: onboardingStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+
+    firstSave.completeError(StateError('first save failed'));
+    await tester.pump();
+    expect(onboardingStore.saveCount, 2);
+    latestSave.completeError(StateError('latest save failed'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isTrue);
+    expect(
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+    expect(
+      find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
+      findsOneWidget,
+    );
+    expect(find.text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.'), findsOneWidget);
+  });
+
   testWidgets('설정 화면 보기 옵션 저장 중 이동 조건을 바꿔도 마지막 결과를 유지한다', (tester) async {
     final firstSave = Completer<void>();
     final latestSave = Completer<void>();

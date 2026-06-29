@@ -572,7 +572,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
   bool _savingOnboardingResult = false;
   OnboardingResult? _pendingOnboardingResult;
-  Completer<void>? _pendingOnboardingSaveCompleter;
+  final _pendingOnboardingSaveCompleters = <Completer<void>>[];
+  late OnboardingResult? _lastPersistedOnboardingResult =
+      widget.initialOnboardingState.result;
   UserDataDeletionResult? _dataDeletionResult;
   UserDataDeletionScope _dataDeletionScope = UserDataDeletionScope.deviceOnly;
 
@@ -697,6 +699,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     }
     setState(() {
       _onboardingState = const OnboardingState.initial();
+      _lastPersistedOnboardingResult = null;
       _loadingOnboardingState = false;
       _startScreenDismissed = false;
       _introScreenDismissed = false;
@@ -739,6 +742,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _onboardingState = storedResult == null
           ? const OnboardingState.initial()
           : OnboardingState.completed(result: storedResult);
+      _lastPersistedOnboardingResult = storedResult;
       _loadingOnboardingState = false;
     });
     _schedulePendingFacilityReportPhotoRecovery();
@@ -747,6 +751,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   Future<void> _persistOnboardingResult(OnboardingResult result) async {
     try {
       await widget.onboardingStore?.saveResult(result);
+      _lastPersistedOnboardingResult = result;
     } catch (error, stackTrace) {
       reportMobileError(
         error,
@@ -794,12 +799,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
 
   Future<void> _saveOnboardingResult(OnboardingResult result) async {
     final saveCompleter = Completer<void>();
-    final supersededCompleter = _pendingOnboardingSaveCompleter;
-    if (supersededCompleter != null && !supersededCompleter.isCompleted) {
-      supersededCompleter.complete();
-    }
     _pendingOnboardingResult = result;
-    _pendingOnboardingSaveCompleter = saveCompleter;
+    _pendingOnboardingSaveCompleters.add(saveCompleter);
     _applyOnboardingResult(result);
     if (_savingOnboardingResult) {
       return saveCompleter.future;
@@ -808,34 +809,42 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     try {
       while (mounted) {
         final nextResult = _pendingOnboardingResult;
-        final nextCompleter = _pendingOnboardingSaveCompleter;
+        final nextCompleters = List<Completer<void>>.of(
+          _pendingOnboardingSaveCompleters,
+        );
         _pendingOnboardingResult = null;
-        _pendingOnboardingSaveCompleter = null;
+        _pendingOnboardingSaveCompleters.clear();
         if (nextResult == null) {
           break;
         }
         try {
           await _persistOnboardingResult(nextResult);
-          if (nextCompleter != null && !nextCompleter.isCompleted) {
-            nextCompleter.complete();
+          for (final completer in nextCompleters) {
+            if (!completer.isCompleted) {
+              completer.complete();
+            }
           }
         } catch (error, stackTrace) {
           if (_pendingOnboardingResult != null) {
-            if (nextCompleter != null && !nextCompleter.isCompleted) {
-              nextCompleter.complete();
+            _pendingOnboardingSaveCompleters.insertAll(0, nextCompleters);
+          } else {
+            _restoreLastPersistedOnboardingResult();
+            for (final completer in nextCompleters.reversed) {
+              if (!completer.isCompleted) {
+                completer.completeError(error, stackTrace);
+              }
             }
-          } else if (nextCompleter != null && !nextCompleter.isCompleted) {
-            nextCompleter.completeError(error, stackTrace);
           }
         }
       }
     } finally {
-      final pendingCompleter = _pendingOnboardingSaveCompleter;
-      if (pendingCompleter != null && !pendingCompleter.isCompleted) {
-        pendingCompleter.complete();
+      for (final completer in _pendingOnboardingSaveCompleters) {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
       }
       _pendingOnboardingResult = null;
-      _pendingOnboardingSaveCompleter = null;
+      _pendingOnboardingSaveCompleters.clear();
       _savingOnboardingResult = false;
     }
     return saveCompleter.future;
@@ -888,6 +897,14 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     setState(() {
       _onboardingState = OnboardingState.completed(result: result);
     });
+  }
+
+  void _restoreLastPersistedOnboardingResult() {
+    final persistedResult = _lastPersistedOnboardingResult;
+    if (persistedResult == null) {
+      return;
+    }
+    _applyOnboardingResult(persistedResult);
   }
 
   bool _isSameOnboardingResult(OnboardingResult? left, OnboardingResult right) {
