@@ -1500,7 +1500,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    final heroSection = _HomePrototypeHero(
+    final heroSection = _HomeHero(
       profile: currentProfile,
       onRouteSearch: openRouteSearch,
       onStationSearch: () => unawaited(openStationSearch()),
@@ -1677,7 +1677,7 @@ class _HomeScreenState extends State<HomeScreen> {
               key: const Key('homeRefreshIndicator'),
               onRefresh: refreshHomeState,
               child: ListView(
-                key: const Key('homePrototypeList'),
+                key: const Key('homeContentList'),
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: isLargeScreen
                     ? const EdgeInsets.fromLTRB(24, 24, 24, 112)
@@ -1957,8 +1957,8 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
                   if (items.isEmpty)
-                    const _PrototypeCard(
-                      child: _PrototypeInfoRow(
+                    const _AppCard(
+                      child: _AppInfoRow(
                         icon: Icons.notifications_none,
                         iconBackground: EasySubwayAccessibleColors.mintSoft,
                         iconColor: EasySubwayAccessibleColors.mintDark,
@@ -2126,14 +2126,14 @@ class _NotificationInboxCard extends StatelessWidget {
     }
 
     final accent = _facilitySeverityAccent(item.severity);
-    final card = _PrototypeCard(
+    final card = _AppCard(
       backgroundColor: accent.backgroundColor,
       borderColor: accent.borderColor,
       showBorder: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _PrototypeInfoRow(
+          _AppInfoRow(
             icon: item.icon,
             iconBackground: Colors.white,
             iconColor: accent.iconColor,
@@ -2175,8 +2175,8 @@ class _NotificationInboxCard extends StatelessWidget {
   }
 }
 
-class _HomePrototypeHero extends StatelessWidget {
-  const _HomePrototypeHero({
+class _HomeHero extends StatelessWidget {
+  const _HomeHero({
     required this.profile,
     required this.onRouteSearch,
     required this.onStationSearch,
@@ -2429,7 +2429,7 @@ class _HomeRouteDraftCard extends StatelessWidget {
             key: const Key('homeRouteDraftPanel'),
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
-            child: _PrototypeCard(
+            child: _AppCard(
               backgroundColor: EasySubwayAccessibleColors.skySoft,
               borderColor: const Color(0xFFB7DDF4),
               borderRadius: 18,
@@ -2490,8 +2490,8 @@ class _HomeRouteDraftCard extends StatelessWidget {
   }
 }
 
-class _HomePrototypeSection extends StatelessWidget {
-  const _HomePrototypeSection({required this.title});
+class _AppSectionTitle extends StatelessWidget {
+  const _AppSectionTitle({required this.title});
 
   final String title;
 
@@ -2604,13 +2604,13 @@ class _HomeFacilityAlertCard extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: semanticLabel,
-      child: _PrototypeCard(
+      child: _AppCard(
         backgroundColor: accent.backgroundColor,
         borderColor: accent.borderColor,
         showBorder: true,
         child: Column(
           children: [
-            _PrototypeInfoRow(
+            _AppInfoRow(
               icon: _facilityIcon(facility.type),
               iconBackground: Colors.white,
               iconColor: accent.iconColor,
@@ -2835,7 +2835,7 @@ class _HomeStateSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _HomePrototypeSection(title: title),
+        _AppSectionTitle(title: title),
         child,
       ],
     );
@@ -2865,12 +2865,12 @@ class _HomeStateCard extends StatelessWidget {
       container: true,
       liveRegion: true,
       label: '$title, $subtitle',
-      child: _PrototypeCard(
+      child: _AppCard(
         showBorder: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PrototypeInfoRow(
+            _AppInfoRow(
               icon: icon,
               iconBackground: EasySubwayAccessibleColors.mintSoft,
               iconColor: EasySubwayAccessibleColors.mintDark,
@@ -2913,7 +2913,7 @@ class _HomeRecentRouteCard extends StatelessWidget {
           key: const Key('homeRecentRouteCard'),
           onTap: () => unawaited(onTap()),
           borderRadius: BorderRadius.circular(26),
-          child: _PrototypeCard(
+          child: _AppCard(
             borderRadius: 26,
             showBorder: true,
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
@@ -3012,7 +3012,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          child: _PrototypeCard(
+          child: _AppCard(
             showBorder: true,
             child: Row(
               children: [
@@ -3130,8 +3130,8 @@ class _HomeMiniBadge extends StatelessWidget {
   }
 }
 
-class _PrototypeCard extends StatelessWidget {
-  const _PrototypeCard({
+class _AppCard extends StatelessWidget {
+  const _AppCard({
     required this.child,
     this.backgroundColor = Colors.white,
     this.borderColor = EasySubwayAccessibleColors.line,
@@ -3164,8 +3164,8 @@ class _PrototypeCard extends StatelessWidget {
   }
 }
 
-class _PrototypeInfoRow extends StatelessWidget {
-  const _PrototypeInfoRow({
+class _AppInfoRow extends StatelessWidget {
+  const _AppInfoRow({
     required this.icon,
     required this.iconBackground,
     required this.iconColor,
@@ -3796,7 +3796,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
-                  const _HomePrototypeSection(title: '즐겨찾기한 항목'),
+                  const _AppSectionTitle(title: '즐겨찾기한 항목'),
                   if (hasError)
                     _HomeStateCard(
                       key: const Key('favoriteHomeErrorState'),
@@ -3827,14 +3827,14 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                     ),
                     if (_firstFacilityAlert(data.facilities)
                         case final alert?) ...[
-                      const _HomePrototypeSection(title: '확인 필요'),
+                      const _AppSectionTitle(title: '확인 필요'),
                       _HomeFacilityAlertCard(
                         facility: alert,
                         onOpenFacilities: _openFavoriteFacilities,
                       ),
                     ],
                     if (data.routes.isNotEmpty) ...[
-                      const _HomePrototypeSection(title: '최근 경로'),
+                      const _AppSectionTitle(title: '최근 경로'),
                       _HomeSavedRouteCard(
                         route: data.routes.first,
                         onTap: _openFavoriteRoutes,
@@ -3843,8 +3843,8 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                     if (data.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 16),
-                        child: _PrototypeCard(
-                          child: _PrototypeInfoRow(
+                        child: _AppCard(
+                          child: _AppInfoRow(
                             icon: Icons.bookmark_border,
                             iconBackground: EasySubwayAccessibleColors.mintSoft,
                             iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4097,7 +4097,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
-          child: _PrototypeCard(
+          child: _AppCard(
             backgroundColor: Colors.white,
             borderRadius: 8,
             showBorder: true,
@@ -4188,10 +4188,10 @@ class OfflineDataScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: const [
-            _PrototypeCard(
+            _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
               borderColor: EasySubwayAccessibleColors.mintBorder,
-              child: _PrototypeInfoRow(
+              child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
                 iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4199,11 +4199,11 @@ class OfflineDataScreen extends StatelessWidget {
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
             ),
-            _HomePrototypeSection(title: '저장된 데이터 상태'),
-            _PrototypeCard(
+            _AppSectionTitle(title: '저장된 데이터 상태'),
+            _AppCard(
               child: Column(
                 children: [
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.public,
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4211,7 +4211,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '수도권 기본 데이터',
                     trailing: '저장됨',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.update,
                     iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
@@ -4219,7 +4219,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '앱에 포함된 기본 데이터',
                     trailing: '확인 필요',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.verified_outlined,
                     iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
@@ -4227,7 +4227,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '기본 역·노선 정보 우선',
                     trailing: '보통',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.info_outline,
                     iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
@@ -4238,11 +4238,11 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _HomePrototypeSection(title: '이용 가능'),
-            _PrototypeCard(
+            _AppSectionTitle(title: '이용 가능'),
+            _AppCard(
               child: Column(
                 children: [
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.map_outlined,
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4250,7 +4250,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '지역·노선·역 보기',
                     trailing: '가능',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.train_outlined,
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4258,7 +4258,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '출구와 엘리베이터 보기',
                     trailing: '가능',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.bookmark_border,
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
@@ -4269,11 +4269,11 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _HomePrototypeSection(title: '인터넷 연결 필요'),
-            _PrototypeCard(
+            _AppSectionTitle(title: '인터넷 연결 필요'),
+            _AppCard(
               child: Column(
                 children: [
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.report_outlined,
                     iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
@@ -4281,7 +4281,7 @@ class OfflineDataScreen extends StatelessWidget {
                     subtitle: '사진과 제보 보내기',
                     trailing: '연결 필요',
                   ),
-                  _PrototypeInfoRow(
+                  _AppInfoRow(
                     icon: Icons.refresh,
                     iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
@@ -4805,7 +4805,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            _PrototypeCard(
+            _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
               borderColor: EasySubwayAccessibleColors.mintBorder,
               child: Column(
@@ -4832,8 +4832,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const _HomePrototypeSection(title: '처리 결과'),
-            _PrototypeCard(
+            const _AppSectionTitle(title: '처리 결과'),
+            _AppCard(
               child: Column(
                 children: [
                   _DataDeletionResultRow(
@@ -4889,10 +4889,10 @@ class UserDataDeletionResultScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const _PrototypeCard(
+            const _AppCard(
               backgroundColor: EasySubwayAccessibleColors.skySoft,
               borderColor: Color(0xFFB7DDF4),
-              child: _PrototypeInfoRow(
+              child: _AppInfoRow(
                 icon: Icons.map_outlined,
                 iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.brand,
