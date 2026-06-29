@@ -93,9 +93,12 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		assertThat(html)
 			.contains("데이터팩 Release readiness")
 			.contains("Source coverage")
+			.contains("Validator")
 			.contains("Facility evidence")
 			.contains("Route gate")
+			.contains("Android evidence")
 			.contains("Manifest signature")
+			.contains("Manual override")
 			.contains("FAIL")
 			.contains("확인 필요");
 	}

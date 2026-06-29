@@ -57,7 +57,15 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 			facilityBlockers,
 			routeGateBlockers,
 			manifestSignature.blockerCount(),
-			readinessRows(candidate, aliasBlockers, quarantineBlockers, facilityBlockers, routeGateBlockers, manifestSignature),
+			readinessRows(
+				candidate,
+				aliasBlockers,
+				quarantineBlockers,
+				manualOverrideBlockers,
+				facilityBlockers,
+				routeGateBlockers,
+				manifestSignature
+			),
 			candidate.map(CandidateGateSummary::createdAt).orElse(null)
 		);
 	}
@@ -103,6 +111,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		Optional<CandidateGateSummary> candidate,
 		long aliasBlockers,
 		long quarantineBlockers,
+		long manualOverrideBlockers,
 		long facilityBlockers,
 		long routeGateBlockers,
 		ManifestSignatureSummary manifestSignature
@@ -110,13 +119,18 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 		long sourceBlockers = candidate.map(row -> "PASS".equals(row.coverageStatus()) ? 0L : 1L).orElse(1L)
 			+ aliasBlockers
 			+ quarantineBlockers;
+		long validatorBlockers = candidate.map(row -> "PASS".equals(row.validatorStatus()) ? 0L : 1L).orElse(1L);
 		long routeBlockers = candidate.map(row -> "PASS".equals(row.routeRegressionStatus()) ? 0L : 1L).orElse(1L)
 			+ routeGateBlockers;
+		long androidBlockers = candidate.map(row -> "PASS".equals(row.androidEvidenceStatus()) ? 0L : 1L).orElse(1L);
 		return List.of(
 			new ReleaseReadinessRow("Source coverage", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
+			new ReleaseReadinessRow("Validator", statusFor(validatorBlockers), validatorBlockers, "SQLite integrity / validator gates"),
 			new ReleaseReadinessRow("Facility evidence", statusFor(facilityBlockers), facilityBlockers, "strict route eligible facility evidence"),
 			new ReleaseReadinessRow("Route gate", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER and generated connector gates"),
-			new ReleaseReadinessRow("Manifest signature", manifestSignature.status(), manifestSignature.blockerCount(), "release evidence bundle / signature")
+			new ReleaseReadinessRow("Android evidence", statusFor(androidBlockers), androidBlockers, "Android datapack adoption evidence"),
+			new ReleaseReadinessRow("Manifest signature", manifestSignature.status(), manifestSignature.blockerCount(), "release evidence bundle / signature"),
+			new ReleaseReadinessRow("Manual override", statusFor(manualOverrideBlockers), manualOverrideBlockers, "approval / expiry / conflict gates")
 		);
 	}
 
@@ -239,9 +253,12 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 				0,
 				List.of(
 					new ReleaseReadinessRow("Source coverage", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Validator", "확인 필요", 0, "candidate 없음"),
 					new ReleaseReadinessRow("Facility evidence", "확인 필요", 0, "candidate 없음"),
 					new ReleaseReadinessRow("Route gate", "확인 필요", 0, "candidate 없음"),
-					new ReleaseReadinessRow("Manifest signature", "확인 필요", 0, "candidate 없음")
+					new ReleaseReadinessRow("Android evidence", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Manifest signature", "확인 필요", 0, "candidate 없음"),
+					new ReleaseReadinessRow("Manual override", "확인 필요", 0, "candidate 없음")
 				),
 				null
 			);
