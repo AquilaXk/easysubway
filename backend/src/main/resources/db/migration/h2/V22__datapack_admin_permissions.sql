@@ -30,9 +30,16 @@ ALTER TABLE admin_role_permissions ADD CONSTRAINT ck_h2_admin_role_permissions_p
 
 MERGE INTO admin_role_permissions (role_code, permission_code, created_at)
 KEY (role_code, permission_code)
-SELECT DISTINCT role_code, 'admin.datapack.read', CURRENT_TIMESTAMP
-FROM admin_role_permissions
-WHERE permission_code = 'admin.view';
+SELECT role_seed.role_code, 'admin.datapack.read', CURRENT_TIMESTAMP
+FROM (
+    VALUES
+        ('ADMIN_VIEWER'),
+        ('MASTER_EDITOR'),
+        ('FIELD_OPERATOR'),
+        ('DATA_OPERATOR'),
+        ('SECURITY_ADMIN'),
+        ('SUPER_ADMIN')
+) AS role_seed(role_code);
 
 MERGE INTO admin_role_permissions (role_code, permission_code, created_at)
 KEY (role_code, permission_code)

@@ -234,6 +234,8 @@ class DatabaseMigrationContainerTest {
 				"admin.datapack.production.approve",
 				"admin.datapack.rollback"
 			);
+		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "REPORT_REVIEWER"))
+			.doesNotContain("admin.datapack.read");
 		assertThat(permissionAuthoritiesForRole(jdbcTemplate, "MASTER_EDITOR"))
 			.contains(
 				"admin.datapack.read",
