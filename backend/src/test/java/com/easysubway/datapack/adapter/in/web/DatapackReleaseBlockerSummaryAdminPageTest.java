@@ -38,18 +38,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 
 	@BeforeEach
 	void setUp() {
-		jdbcTemplate.update("DELETE FROM datapack_release_channel_events");
-		jdbcTemplate.update("DELETE FROM datapack_release_channels");
-		jdbcTemplate.update("DELETE FROM datapack_release_evidence_bundles");
-		jdbcTemplate.update("DELETE FROM datapack_candidate_inputs");
-		jdbcTemplate.update("DELETE FROM datapack_candidates");
-		jdbcTemplate.update("DELETE FROM route_edge_evidence");
-		jdbcTemplate.update("DELETE FROM facility_evidence");
-		jdbcTemplate.update("DELETE FROM manual_overrides");
-		jdbcTemplate.update("DELETE FROM source_quarantine_resolutions");
-		jdbcTemplate.update("DELETE FROM source_quarantine_records");
-		jdbcTemplate.update("DELETE FROM external_alias_approvals");
-		jdbcTemplate.update("DELETE FROM data_source_snapshots");
+		clearDatapackTables();
 		insertSourceSnapshot();
 		insertCandidate();
 		insertAliasQuarantineOverride();
@@ -83,6 +72,33 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.doesNotContain("데이터팩 출시 준비")
 			.doesNotContain("candidate-release-blocked")
 			.doesNotContain("전체 blocker 9건");
+	}
+
+	@Test
+	@DisplayName("데이터팩 근거가 없으면 release readiness는 집계 전 상태를 보여준다")
+	void releaseReadinessFallsBackWhenDatapackEvidenceIsEmpty() throws Exception {
+		clearDatapackTables();
+
+		String dashboardHtml = getAdminHtml("/admin/dashboard/page");
+		String qualityHtml = getAdminHtml("/admin/data-quality/page");
+		String stationHtml = getAdminHtml("/admin/stations/station-sangnoksu/page");
+
+		assertThat(dashboardHtml)
+			.contains("데이터팩 출시 준비")
+			.contains("확인 필요")
+			.contains("전체 blocker 1건")
+			.doesNotContain("FAIL")
+			.doesNotContain("PASS");
+		assertThat(qualityHtml)
+			.contains("데이터팩 Release readiness")
+			.contains("Source coverage")
+			.contains("확인 필요");
+		assertThat(stationHtml)
+			.contains("Release readiness")
+			.contains("상록수역 release blocker")
+			.contains("확인 필요 0건")
+			.contains("집계 전")
+			.doesNotContain("PASS 0건");
 	}
 
 	@Test
@@ -135,6 +151,21 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.andReturn()
 			.getResponse()
 			.getContentAsString();
+	}
+
+	private void clearDatapackTables() {
+		jdbcTemplate.update("DELETE FROM datapack_release_channel_events");
+		jdbcTemplate.update("DELETE FROM datapack_release_channels");
+		jdbcTemplate.update("DELETE FROM datapack_release_evidence_bundles");
+		jdbcTemplate.update("DELETE FROM datapack_candidate_inputs");
+		jdbcTemplate.update("DELETE FROM datapack_candidates");
+		jdbcTemplate.update("DELETE FROM route_edge_evidence");
+		jdbcTemplate.update("DELETE FROM facility_evidence");
+		jdbcTemplate.update("DELETE FROM manual_overrides");
+		jdbcTemplate.update("DELETE FROM source_quarantine_resolutions");
+		jdbcTemplate.update("DELETE FROM source_quarantine_records");
+		jdbcTemplate.update("DELETE FROM external_alias_approvals");
+		jdbcTemplate.update("DELETE FROM data_source_snapshots");
 	}
 
 	private void insertSourceSnapshot() {

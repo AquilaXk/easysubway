@@ -73,14 +73,17 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 	public StationReleaseBlockerSummary summarizeStation(String stationId) {
 		long facilityBlockers = countFacilityBlockers(stationId);
 		long routeGateBlockers = countRouteGateBlockers(stationId);
+		long facilityEvidenceRows = countFacilityEvidenceRows(stationId);
+		long routeEvidenceRows = countRouteEvidenceRows(stationId);
 		long totalBlockers = facilityBlockers + routeGateBlockers;
+		boolean hasAnyEvidence = facilityEvidenceRows > 0 || routeEvidenceRows > 0;
 		return new StationReleaseBlockerSummary(
 			stationId,
-			totalBlockers == 0 ? "PASS" : "확인 필요",
+			hasAnyEvidence && totalBlockers == 0 ? "PASS" : "확인 필요",
 			totalBlockers,
 			List.of(
-				new StationReleaseBlockerRow("Facility evidence", facilityBlockers, rowStatus(facilityBlockers)),
-				new StationReleaseBlockerRow("Route gate", routeGateBlockers, rowStatus(routeGateBlockers))
+				new StationReleaseBlockerRow("Facility evidence", facilityBlockers, stationRowStatus(facilityBlockers, facilityEvidenceRows)),
+				new StationReleaseBlockerRow("Route gate", routeGateBlockers, stationRowStatus(routeGateBlockers, routeEvidenceRows))
 			)
 		);
 	}
@@ -190,6 +193,24 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 			""", stationId);
 	}
 
+	private long countFacilityEvidenceRows(String stationId) {
+		Long result = jdbcTemplate.queryForObject("""
+			SELECT COUNT(*)
+			FROM facility_evidence
+			WHERE station_id = ?
+			""", Long.class, stationId);
+		return result == null ? 0L : result;
+	}
+
+	private long countRouteEvidenceRows(String stationId) {
+		Long result = jdbcTemplate.queryForObject("""
+			SELECT COUNT(*)
+			FROM route_edge_evidence
+			WHERE station_id = ?
+			""", Long.class, stationId);
+		return result == null ? 0L : result;
+	}
+
 	private long countWithOptionalStation(String baseSql, String stationId) {
 		if (stationId == null) {
 			return count(baseSql);
@@ -216,6 +237,13 @@ public class JdbcDatapackReleaseBlockerSummaryRepository {
 
 	private static String rowStatus(long blockerCount) {
 		return blockerCount == 0 ? "PASS" : "확인 필요";
+	}
+
+	private static String stationRowStatus(long blockerCount, long evidenceRows) {
+		if (evidenceRows == 0) {
+			return "집계 전";
+		}
+		return rowStatus(blockerCount);
 	}
 
 	private static String sourceNote(long aliasBlockers, long quarantineBlockers) {
