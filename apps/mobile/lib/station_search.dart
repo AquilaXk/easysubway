@@ -948,9 +948,9 @@ String _fieldValidationLabel(String fieldValidationStatus) {
   final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
   return switch (normalizedStatus) {
     'VERIFIED' => '최근 확인됨',
-    'STALE' => '최근 정보는 다시 확인해 주세요',
-    'UNKNOWN' => '최근 확인 정보가 없어요',
-    _ => '최근 확인 정보가 없어요',
+    'STALE' => '최근 확인한 내용은 다시 봐 주세요',
+    'UNKNOWN' => '최근 확인한 기록이 없어요',
+    _ => '최근 확인한 기록이 없어요',
   };
 }
 
@@ -973,13 +973,13 @@ String _facilityUserLocationLabel(String description) {
 
 String _dataSourceLabel(String dataSourceType) {
   return switch (dataSourceType) {
-    'OFFICIAL_API' => '공식 정보',
-    'OFFICIAL_FILE' => '공식 정보',
+    'OFFICIAL_API' => '공식 안내',
+    'OFFICIAL_FILE' => '공식 안내',
     'OPERATOR_PAGE' => '운영기관 안내',
-    'USER_REPORT' => '출처 사용자 제보',
-    'ADMIN_VERIFIED' => '확인된 정보',
-    'PARTNER_FEED' => '연계 정보',
-    _ => '출처 확인 필요',
+    'USER_REPORT' => '이용자 제보',
+    'ADMIN_VERIFIED' => '확인된 안내',
+    'PARTNER_FEED' => '연계 안내',
+    _ => '안내를 다시 확인 중이에요',
   };
 }
 
@@ -4377,7 +4377,7 @@ class _StationRealtimeSummary extends StatelessWidget {
       title,
       summary,
       if (updatedLabel.isNotEmpty) updatedLabel,
-      '열차 위치는 GPS가 아니라 운행 정보 기준 위치입니다.',
+      '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
     ];
     return Semantics(
       label: semanticParts.join(', '),
@@ -4434,7 +4434,7 @@ class _StationRealtimeSummary extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             Text(
-              '열차 위치는 GPS가 아니라 운행 정보 기준 위치입니다.',
+              '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: EasySubwayAccessibleColors.mutedText,
                 height: 1.3,
@@ -5093,7 +5093,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
         OutlinedButton.icon(
           onPressed: () => setState(() => _expanded = !_expanded),
           icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
-          label: Text(_expanded ? '정보 기준 접기' : '정보 기준 보기'),
+          label: Text(_expanded ? '안내 확인 방법 접기' : '안내 확인 방법 보기'),
         ),
         if (_expanded) ...[
           const SizedBox(height: 10),
@@ -5111,7 +5111,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '정보 기준',
+                    '안내 확인 방법',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w900,
