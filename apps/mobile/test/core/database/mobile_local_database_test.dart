@@ -298,6 +298,48 @@ void main() {
     );
   });
 
+  test('기존 baseline 노선도 출처에 남은 fixture 문구를 정리한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE route_map_positions
+      SET source_id = 'fixture-route-map-source-capital-review',
+          source_name = '수도권 노선도 fixture 좌표 확인',
+          source_url = 'https://easysubway.local/fixtures/catalog-fixture.json',
+          license = 'fixture-only',
+          license_status = 'fixture-only'
+      WHERE station_id = 'station-sangnoksu'
+        AND line_id = 'seoul-4'
+      ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final routeMapPosition = await database.customSelect('''
+          SELECT source_id, source_name, source_url, license, license_status
+          FROM route_map_positions
+          WHERE station_id = 'station-sangnoksu'
+            AND line_id = 'seoul-4'
+          ''').getSingle();
+    final displayedSourceValues = [
+      routeMapPosition.read<String>('source_id'),
+      routeMapPosition.read<String>('source_name'),
+      routeMapPosition.read<String>('source_url'),
+      routeMapPosition.read<String>('license'),
+      routeMapPosition.read<String>('license_status'),
+    ].join(' ').toLowerCase();
+
+    expect(routeMapPosition.read<String>('source_name'), '수도권 도시철도 노선도');
+    expect(
+      routeMapPosition.read<String>('source_url'),
+      'https://www.seoulmetro.co.kr/kr/cyberStation.do',
+    );
+    expect(displayedSourceValues, isNot(contains('fixture')));
+    expect(displayedSourceValues, isNot(contains('easysubway.local')));
+    expect(displayedSourceValues, isNot(contains('review-required')));
+  });
+
   test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-catalog-search-',
