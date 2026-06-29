@@ -7772,7 +7772,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletion, /refreshExistingAuthorization/);
   assert.match(
     userDataDeletion,
-    /userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했습니다\. 잠시 후 다시 시도해 주세요\.'/,
+    /userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했어요\. 잠시 후 다시 시도해 주세요\.'/,
   );
   assert.match(userDataDeletionTest, /인증 헤더로 DELETE \/api\/v1\/me를 호출한다/);
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
