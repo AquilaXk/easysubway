@@ -889,6 +889,40 @@ void main() {
     expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
   });
 
+  testWidgets('홈 노선도 탭은 같은 shell 안에서 선택 상태를 바꾼다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapRegionNames: const ['수도권'],
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('bottomNavMap')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    final navigationBar = tester.widget<NavigationBar>(
+      find.byKey(const Key('homeBottomNavigationBar')),
+    );
+    expect(navigationBar.selectedIndex, 1);
+
+    await tester.tap(find.byKey(const Key('bottomNavHome')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapScreen')), findsNothing);
+    final homeNavigationBar = tester.widget<NavigationBar>(
+      find.byKey(const Key('homeBottomNavigationBar')),
+    );
+    expect(homeNavigationBar.selectedIndex, 0);
+  });
+
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['테스트권', '부산'],
