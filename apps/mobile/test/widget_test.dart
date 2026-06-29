@@ -3340,6 +3340,44 @@ void main() {
       tester.getSize(find.byKey(const Key('homeProfilePill'))).height,
       greaterThanOrEqualTo(36),
     );
+    final profileText = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const Key('homeProfilePill')),
+        matching: find.text('이동 조건: 천천히 이동 〉'),
+      ),
+    );
+    expect(profileText.maxLines, isNull);
+    expect(profileText.overflow, isNot(TextOverflow.ellipsis));
+  });
+
+  testWidgets('홈 최근 경로 역명은 말줄임으로 자르지 않는다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        recentRoutesFuture: Future.value([_favoriteRoute()]),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('homeRecentRouteCard')),
+      find.byKey(const Key('homeContentList')),
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+
+    for (final stationName in ['상록수역', '사당역']) {
+      final stationText = tester.widget<Text>(find.text(stationName));
+      expect(stationText.maxLines, isNull);
+      expect(stationText.overflow, isNot(TextOverflow.ellipsis));
+    }
   });
 
   testWidgets('홈 대화면은 시스템 고대비와 200% 글자에서 핵심 CTA를 유지한다', (tester) async {
