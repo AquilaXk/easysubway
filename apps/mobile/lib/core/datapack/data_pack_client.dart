@@ -55,7 +55,7 @@ class DataPackClient {
       );
     }
     if (response.statusCode != HttpStatus.ok) {
-      throw const DataPackClientException('이동 정보를 확인하지 못했습니다.');
+      throw const DataPackClientException('이동 정보를 확인하지 못했어요.');
     }
 
     final body = await utf8

@@ -5,10 +5,10 @@ import '../../../core/network/api_client.dart';
 import '../../../mobile_error_reporter.dart';
 import '../../../station_search.dart';
 
-const _stationSearchErrorMessage = '역 정보를 불러오지 못했습니다.';
+const _stationSearchErrorMessage = '역 정보를 불러오지 못했어요.';
 const _favoriteStationTimeout = Duration(seconds: 8);
-const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했습니다.';
-const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했습니다.';
+const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했어요.';
+const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했어요.';
 
 class StationSearchApiRepository
     implements StationSearchRepository, StationLineFilterRepository {

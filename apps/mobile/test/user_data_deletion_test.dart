@@ -179,7 +179,7 @@ void main() {
         isA<UserDataDeletionException>().having(
           (error) => error.message,
           'message',
-          '데이터 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          '데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
         ),
       ),
     );

@@ -745,7 +745,7 @@ void main() {
           isA<FacilityReportException>().having(
             (error) => error.message,
             'message',
-            '제보를 보내지 못했습니다.',
+            '제보를 보내지 못했어요.',
           ),
         ),
       );
@@ -785,7 +785,7 @@ void main() {
           isA<FacilityReportException>().having(
             (error) => error.message,
             'message',
-            '제보를 보내지 못했습니다.',
+            '제보를 보내지 못했어요.',
           ),
         ),
       );
@@ -1011,7 +1011,7 @@ void main() {
         isA<FacilityReportException>().having(
           (error) => error.message,
           'message',
-          '처리 상태를 확인하지 못했습니다.',
+          '처리 상태를 확인하지 못했어요.',
         ),
       ),
     );
@@ -1089,7 +1089,7 @@ void main() {
 
     expect(repository.loadedReportIds, ['report-1']);
     expect(controller.state.status, FacilityReportViewStatus.failure);
-    expect(controller.state.message, '처리 상태를 확인하지 못했습니다.');
+    expect(controller.state.message, '처리 상태를 확인하지 못했어요.');
     expect(controller.state.result?.id, 'report-1');
     expect(controller.state.result?.statusLabel, '접수됨');
   });
@@ -1227,7 +1227,7 @@ class FailingRefreshFacilityReportRepository
   @override
   Future<FacilityReportResult> getReport(String reportId) {
     loadedReportIds.add(reportId);
-    return Future.error(const FacilityReportException('처리 상태를 확인하지 못했습니다.'));
+    return Future.error(const FacilityReportException('처리 상태를 확인하지 못했어요.'));
   }
 
   @override

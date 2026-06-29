@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
-const _internalRouteErrorMessage = '역 안 이동 안내를 불러오지 못했습니다.';
+const _internalRouteErrorMessage = '역 안 이동 안내를 불러오지 못했어요.';
 
 abstract class InternalRouteRepository {
   Future<List<InternalRouteNode>> listRouteNodes(String stationId);

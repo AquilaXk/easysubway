@@ -784,7 +784,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         });
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('설정을 저장하지 못했습니다. 다시 시도해 주세요.')),
+        const SnackBar(content: Text('설정을 저장하지 못했어요. 다시 시도해 주세요.')),
       );
       return;
     }
@@ -1790,7 +1790,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _mobilityType = previousMobilityType;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이동 조건을 저장하지 못했습니다. 이전 조건으로 되돌렸어요.')),
+        const SnackBar(content: Text('이동 조건을 저장하지 못했어요. 이전 조건으로 되돌렸어요.')),
       );
       return null;
     }
@@ -3574,7 +3574,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         });
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('설정을 저장하지 못했습니다. 이전 값으로 되돌렸어요.')),
+        const SnackBar(content: Text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.')),
       );
     }
   }

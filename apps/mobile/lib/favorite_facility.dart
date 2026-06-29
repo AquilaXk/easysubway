@@ -10,8 +10,8 @@ import 'facility_status.dart';
 import 'mobile_error_reporter.dart';
 
 const _favoriteFacilityTimeout = Duration(seconds: 8);
-const _favoriteFacilityLoadErrorMessage = '즐겨찾기 시설을 불러오지 못했습니다.';
-const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 처리하지 못했습니다.';
+const _favoriteFacilityLoadErrorMessage = '즐겨찾기 시설을 불러오지 못했어요.';
+const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 처리하지 못했어요.';
 
 abstract class FavoriteFacilityRepository {
   Future<List<FavoriteFacility>> listFavoriteFacilities();
