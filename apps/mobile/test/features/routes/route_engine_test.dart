@@ -225,7 +225,7 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
-    test('낮은 신뢰도와 오래된 데이터는 경고 코드와 비용에 반영한다', () {
+    test('확인이 더 필요한 오래된 데이터는 경고 코드와 비용에 반영한다', () {
       final engine = LocalRouteEngine(graph: _lowQualityFixtureGraph());
 
       final result = engine.search(

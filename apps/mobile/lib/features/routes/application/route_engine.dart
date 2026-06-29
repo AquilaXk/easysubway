@@ -222,12 +222,12 @@ class LocalRouteEngine {
       return '확인 필요';
     }
     if (edge.reliabilityScore >= 80) {
-      return '높은 신뢰도';
+      return '확인된 정보예요';
     }
     if (edge.reliabilityScore >= 60) {
-      return '보통 신뢰도';
+      return '일부 확인된 정보예요';
     }
-    return '낮은 신뢰도';
+    return '확인이 더 필요해요';
   }
 
   String _warningMessage(String code) {
