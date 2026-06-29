@@ -8789,6 +8789,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('이동 순서'), findsOneWidget);
     expect(find.byKey(const Key('routeStartGuidanceButton')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('routeOpenInternalRouteButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeOpenInternalRouteButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('역 안 이동 순서'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('전체 순서'), findsWidgets);
+    expect(
+      find.byKey(const Key('routeOpenInternalRouteButton')),
+      findsOneWidget,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('이동 순서'), findsOneWidget);
+    expect(find.byKey(const Key('routeOpenFeedbackButton')), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeOpenFeedbackButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeOpenFeedbackButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('routeFeedbackHelpfulButton')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('이동 순서'), findsOneWidget);
+    expect(find.byKey(const Key('routeOpenFeedbackButton')), findsOneWidget);
   });
 
   testWidgets('경로 검색 단순 보기를 끄면 화면에서 이동 조건을 바꿀 수 있다', (tester) async {
