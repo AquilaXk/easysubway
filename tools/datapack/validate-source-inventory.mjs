@@ -66,7 +66,7 @@ function validateSource(source, label) {
   assertDate(source.retrievedAt, `${id}.retrievedAt`);
 
   if (typeof source.requiredForProductionPack !== "boolean") {
-    throw new Error(`${id}.requiredForProductionPack must be boolean`);
+    throw new TypeError(`${id}.requiredForProductionPack must be boolean`);
   }
   assertDate(source.observedDataUpdatedAt, `${id}.observedDataUpdatedAt`);
   validateLicense(source.license, id);

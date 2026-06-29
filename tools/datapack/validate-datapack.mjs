@@ -739,33 +739,53 @@ function validateProductionFacilityProvenance(database, pack) {
     `)
     .all();
   for (const row of rows) {
-    if (!sourceIds.has(requiredString(row.source_id, `facilities.${row.id}.source_id`))) {
-      throw new Error(`${pack.id}@${pack.version} facilities source_id is not in sourceInventory: ${row.id}`);
-    }
-    requiredString(row.provider_facility_ref, `facilities.${row.id}.provider_facility_ref`);
-    const provenanceKind = requiredString(row.provenance_kind, `facilities.${row.id}.provenance_kind`);
-    if (!["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(provenanceKind)) {
-      throw new Error(`${pack.id}@${pack.version} facilities provenance_kind is not allowed: ${row.id}`);
-    }
-    if (!Number.isInteger(row.verified_at) || row.verified_at <= 0) {
-      throw new Error(`${pack.id}@${pack.version} facilities verified_at is required: ${row.id}`);
-    }
-    if (!Number.isInteger(row.retrieved_at) || row.retrieved_at <= 0) {
-      throw new Error(`${pack.id}@${pack.version} facilities retrieved_at is required: ${row.id}`);
-    }
-    requiredSha256(row.evidence_hash, `facilities.${row.id}.evidence_hash`);
-    const statusMeaning = requiredString(row.status_meaning, `facilities.${row.id}.status_meaning`);
-    requiredString(row.operational_status, `facilities.${row.id}.operational_status`);
-    requiredString(row.installation_status, `facilities.${row.id}.installation_status`);
-    if (!Number.isInteger(row.confidence) || row.confidence < 0 || row.confidence > 100) {
-      throw new Error(`${pack.id}@${pack.version} facilities confidence must be between 0 and 100: ${row.id}`);
-    }
-    const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
-      String(row.status ?? "").toUpperCase(),
-    );
-    if (positiveStatus && statusMeaning !== "REALTIME_OPERATION") {
-      throw new Error(`${pack.id}@${pack.version} facilities positive status requires REALTIME_OPERATION evidence: ${row.id}`);
-    }
+    validateProductionFacilityRow(row, sourceIds, pack);
+  }
+}
+
+function validateProductionFacilityRow(row, sourceIds, pack) {
+  if (!sourceIds.has(requiredString(row.source_id, `facilities.${row.id}.source_id`))) {
+    throw new Error(`${pack.id}@${pack.version} facilities source_id is not in sourceInventory: ${row.id}`);
+  }
+  requiredString(row.provider_facility_ref, `facilities.${row.id}.provider_facility_ref`);
+  validateProductionFacilityProvenanceKind(row, pack);
+  validateProductionFacilityEvidenceTimestamps(row, pack);
+  requiredSha256(row.evidence_hash, `facilities.${row.id}.evidence_hash`);
+  const statusMeaning = requiredString(row.status_meaning, `facilities.${row.id}.status_meaning`);
+  requiredString(row.operational_status, `facilities.${row.id}.operational_status`);
+  requiredString(row.installation_status, `facilities.${row.id}.installation_status`);
+  validateProductionFacilityConfidence(row, pack);
+  validateProductionFacilityPositiveStatus(row, statusMeaning, pack);
+}
+
+function validateProductionFacilityProvenanceKind(row, pack) {
+  const provenanceKind = requiredString(row.provenance_kind, `facilities.${row.id}.provenance_kind`);
+  if (!["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(provenanceKind)) {
+    throw new Error(`${pack.id}@${pack.version} facilities provenance_kind is not allowed: ${row.id}`);
+  }
+}
+
+function validateProductionFacilityEvidenceTimestamps(row, pack) {
+  if (!Number.isInteger(row.verified_at) || row.verified_at <= 0) {
+    throw new Error(`${pack.id}@${pack.version} facilities verified_at is required: ${row.id}`);
+  }
+  if (!Number.isInteger(row.retrieved_at) || row.retrieved_at <= 0) {
+    throw new Error(`${pack.id}@${pack.version} facilities retrieved_at is required: ${row.id}`);
+  }
+}
+
+function validateProductionFacilityConfidence(row, pack) {
+  if (!Number.isInteger(row.confidence) || row.confidence < 0 || row.confidence > 100) {
+    throw new Error(`${pack.id}@${pack.version} facilities confidence must be between 0 and 100: ${row.id}`);
+  }
+}
+
+function validateProductionFacilityPositiveStatus(row, statusMeaning, pack) {
+  const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
+    String(row.status ?? "").toUpperCase(),
+  );
+  if (positiveStatus && statusMeaning !== "REALTIME_OPERATION") {
+    throw new Error(`${pack.id}@${pack.version} facilities positive status requires REALTIME_OPERATION evidence: ${row.id}`);
   }
 }
 

@@ -168,32 +168,37 @@ function sourceCoverageIndex(selectedSources, supportedV1Scope = {}) {
   const supportedOperatorIds = new Set(supportedV1Scope.includedOperatorIds ?? []);
   for (const source of selectedSources) {
     const sourceId = requiredString(source.id, "source.id");
-    const coverage = source.coverageScope;
-    if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
-      throw new Error(`${sourceId}.coverageScope must be an object`);
-    }
-    const keys = new Set();
-    for (const regionId of requiredStringArray(coverage.regionIds, `${sourceId}.coverageScope.regionIds`)) {
-      if (supportedRegionIds.size > 0 && !supportedRegionIds.has(regionId)) {
-        continue;
-      }
-      for (const operatorId of requiredStringArray(coverage.operatorIds, `${sourceId}.coverageScope.operatorIds`)) {
-        if (supportedOperatorIds.size > 0 && !supportedOperatorIds.has(operatorId)) {
-          continue;
-        }
-        for (const sourceDomain of requiredStringArray(coverage.sourceDomains, `${sourceId}.coverageScope.sourceDomains`)) {
-          const key = coverageKey(regionId, operatorId, sourceDomain);
-          keys.add(key);
-          requiredKeys.add(key);
-        }
-      }
-    }
+    const keys = coverageKeysForSource(source, supportedRegionIds, supportedOperatorIds);
+    for (const key of keys) requiredKeys.add(key);
     bySourceId.set(sourceId, keys);
   }
   return {
     bySourceId,
-    requiredKeys: [...requiredKeys].sort(),
+    requiredKeys: [...requiredKeys].sort((left, right) => left.localeCompare(right)),
   };
+}
+
+function coverageKeysForSource(source, supportedRegionIds, supportedOperatorIds) {
+  const sourceId = requiredString(source.id, "source.id");
+  const coverage = source.coverageScope;
+  if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
+    throw new Error(`${sourceId}.coverageScope must be an object`);
+  }
+  const keys = new Set();
+  for (const regionId of requiredStringArray(coverage.regionIds, `${sourceId}.coverageScope.regionIds`)) {
+    if (supportedRegionIds.size > 0 && !supportedRegionIds.has(regionId)) continue;
+    addOperatorCoverageKeys(sourceId, coverage, regionId, supportedOperatorIds, keys);
+  }
+  return keys;
+}
+
+function addOperatorCoverageKeys(sourceId, coverage, regionId, supportedOperatorIds, keys) {
+  for (const operatorId of requiredStringArray(coverage.operatorIds, `${sourceId}.coverageScope.operatorIds`)) {
+    if (supportedOperatorIds.size > 0 && !supportedOperatorIds.has(operatorId)) continue;
+    for (const sourceDomain of requiredStringArray(coverage.sourceDomains, `${sourceId}.coverageScope.sourceDomains`)) {
+      keys.add(coverageKey(regionId, operatorId, sourceDomain));
+    }
+  }
 }
 
 function validateSelectedSourceRows(input, sourceIds) {
@@ -230,7 +235,7 @@ function validateSupportedFacilityCoverage(input, stationRows, facilities) {
   const facilityKeys = new Set(
     facilities.map((facility) => `${facility.stationId}:${requiredString(facility.type, "facilities.type")}`),
   );
-  for (const stationId of [...stationIds].sort()) {
+  for (const stationId of [...stationIds].sort((left, right) => left.localeCompare(right))) {
     for (const facilityType of requiredStringArray(requiredFacilityTypes, "supportedV1Scope.requiredFacilityTypes")) {
       const key = `${stationId}:${facilityType}`;
       if (!facilityKeys.has(key)) {
@@ -317,7 +322,7 @@ function inventorySourceMap(inventory) {
   for (const source of inventory.sources) {
     const id = requiredString(source.id, "inventory.sources.id");
     if (typeof source.requiredForProductionPack !== "boolean") {
-      throw new Error(`${id}.requiredForProductionPack must be boolean`);
+      throw new TypeError(`${id}.requiredForProductionPack must be boolean`);
     }
     if (!source.license || source.license.redistributionAllowed !== true) {
       throw new Error(`${id}.license.redistributionAllowed must be true`);
