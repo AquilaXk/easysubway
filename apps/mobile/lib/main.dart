@@ -2453,11 +2453,7 @@ class _HomeProfilePill extends StatelessWidget {
             ),
           ),
           icon: Icon(profile.icon, size: 16),
-          label: Text(
-            '이동 조건: ${profile.title} 〉',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          label: Text('이동 조건: ${profile.title} 〉'),
         ),
       ),
     );
@@ -3051,8 +3047,6 @@ class _HomeRouteStationLabel extends StatelessWidget {
         Flexible(
           child: Text(
             stationName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: EasySubwayAccessibleColors.text,
               fontSize: _stationFontSize,
