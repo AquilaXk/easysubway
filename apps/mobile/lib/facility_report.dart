@@ -1926,7 +1926,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
             const Text(_facilityReportUploadDisclosurePurpose),
             if (_submitWithoutLocation) ...[
               const SizedBox(height: 8),
-              const Text('현재 위치 없이 제보하면 담당자가 현장 위치를 살펴볼 수 있습니다.'),
+              const Text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
             ],
             const SizedBox(height: 8),
             const Text(_facilityReportUploadDisclosureScope),

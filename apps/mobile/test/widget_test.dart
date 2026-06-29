@@ -10979,7 +10979,10 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(find.text('현재 위치 없이 제보하면 담당자가 현장 위치를 살펴볼 수 있습니다.'), findsOneWidget);
+    expect(
+      find.text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('보내기'));
     await tester.pumpAndSettle();
 
