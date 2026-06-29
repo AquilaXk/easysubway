@@ -4677,7 +4677,15 @@ test("백엔드 운영 프로필은 인메모리 bean을 제외하고 임시 mas
   for (const file of files) {
     const source = read(file);
     assert.match(source, /import org\.springframework\.context\.annotation\.Profile;/, `${file} must import Profile`);
-    assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
+    if (file.endsWith("InMemoryRouteSearchRepository.java")) {
+      assert.match(
+        source,
+        /@Repository\s+@Profile\("!prod & !staging & !release & !prod-like"\)/,
+        `${file} must be disabled on prod-like profiles`,
+      );
+    } else {
+      assert.match(source, /@Repository\s+@Profile\("!prod"\)/, `${file} must be disabled on prod profile`);
+    }
   }
   assert.match(readinessConfiguration, /@Profile\("prod"\)/);
   assert.match(readinessConfiguration, /HealthIndicator/);
@@ -7088,7 +7096,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(feedbackDashboardService, /implements RouteFeedbackDashboardUseCase/);
   assert.match(feedbackDashboardService, /SummarizeRouteFeedbackPort/);
   assert.match(repository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort/);
-  assert.match(repository, /@Profile\("!prod"\)/);
+  assert.match(repository, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
   assert.match(jdbcRepository, /@Profile\("prod"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadRouteSearchPort[\s\S]*SaveRouteSearchPort[\s\S]*SaveRouteFeedbackPort[\s\S]*SummarizeRouteFeedbackPort[\s\S]*SummarizeRouteSearchPort[\s\S]*AnonymizeUserRouteFeedbackPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);

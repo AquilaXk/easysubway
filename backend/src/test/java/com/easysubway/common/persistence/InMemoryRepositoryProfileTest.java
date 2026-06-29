@@ -33,8 +33,12 @@ class InMemoryRepositoryProfileTest {
 		Profile profile = repositoryType.getAnnotation(Profile.class);
 
 		assertThat(profile)
-			.as("%s 클래스는 @Profile(\"!prod\")가 필요합니다.", repositoryType.getSimpleName())
+			.as("%s 클래스는 @Profile 선언이 필요합니다.", repositoryType.getSimpleName())
 			.isNotNull();
+		if (repositoryType.equals(InMemoryRouteSearchRepository.class)) {
+			assertThat(profile.value()).containsExactly("!prod & !staging & !release & !prod-like");
+			return;
+		}
 		assertThat(profile.value()).containsExactly("!prod");
 	}
 
