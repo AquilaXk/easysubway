@@ -5794,6 +5794,39 @@ void main() {
     }
   });
 
+  testWidgets('경로 검색 최근 도착지 실패는 빈 화면으로 숨기지 않는다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute()],
+    )..error = Exception('network');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: favoriteRouteRepository,
+          initialMobilityType: 'SENIOR',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('최근 도착지를 불러오지 못했어요.'), findsOneWidget);
+    expect(
+      find.byKey(const Key('routeRecentDestinationRetryButton')),
+      findsOneWidget,
+    );
+
+    favoriteRouteRepository.error = null;
+    await tester.tap(
+      find.byKey(const Key('routeRecentDestinationRetryButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('최근 도착지를 불러오지 못했어요.'), findsNothing);
+    expect(find.text('최근 도착지'), findsOneWidget);
+  });
+
   testWidgets('경로 검색은 출발 도착 선택 전 CTA 사유와 입력창 검색 아이콘을 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
