@@ -266,8 +266,8 @@ class FavoriteFacility {
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
-      'NEEDS_CHECK' => '다시 확인해 주세요',
-      _ => '다시 확인해 주세요',
+      'NEEDS_CHECK' => '상태 정보가 부족해요',
+      _ => '상태 정보가 부족해요',
     };
   }
 
@@ -303,7 +303,7 @@ class FavoriteFacility {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치를 다시 확인해 주세요';
+    return '위치 안내가 부족해요';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
@@ -767,8 +767,8 @@ String _dataConfidenceLabel(String dataConfidence) {
 String _facilityVerificationStatusLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus.trim().toUpperCase()) {
     'VERIFIED' => '시설 상태가 확인됐어요',
-    'STALE' => '상태를 다시 확인해 주세요',
-    _ => '상태를 다시 확인해 주세요',
+    'STALE' => '최신 상태를 준비 중이에요',
+    _ => '최신 상태를 준비 중이에요',
   };
 }
 
@@ -788,6 +788,6 @@ String _dataSourceLabel(String dataSourceType) {
     'USER_REPORT' => '이용자 제보',
     'ADMIN_VERIFIED' => '확인된 안내',
     'PARTNER_FEED' => '연계 안내',
-    _ => '안내를 다시 확인 중이에요',
+    _ => '안내를 준비 중이에요',
   };
 }

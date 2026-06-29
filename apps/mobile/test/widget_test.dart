@@ -2817,7 +2817,7 @@ void main() {
     expect(find.byKey(const Key('homeHeroCard')), findsOneWidget);
     expect(find.text('시설 알림'), findsOneWidget);
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('한 번 더 확인 · 엘리베이터 다시 확인해 주세요'), findsOneWidget);
+    expect(find.text('한 번 더 확인 · 엘리베이터 상태 정보가 부족해요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
@@ -5159,7 +5159,7 @@ void main() {
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('이용 가능'), findsOneWidget);
-      expect(find.text('상태를 다시 확인해 주세요'), findsOneWidget);
+      expect(find.text('최신 상태를 준비 중이에요'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '상태 제보'), findsOneWidget);
@@ -5171,7 +5171,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 상태를 다시 확인해 주세요, 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 상태 제보',
         ),
         findsOneWidget,
       );
@@ -5269,16 +5269,16 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요'),
+        find.text('예상 시간 정보가 부족해요 · 환승 정보가 부족해요 · 걷는 거리 정보가 부족해요'),
         findsOneWidget,
       );
       expect(
-        find.text('계단 여부는 다시 확인해 주세요 · 엘리베이터 연결은 다시 확인해 주세요'),
+        find.text('계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요'),
         findsOneWidget,
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간은 다시 확인해 주세요, 환승은 다시 확인해 주세요, 걷는 거리는 다시 확인해 주세요, 계단 여부는 다시 확인해 주세요, 엘리베이터 연결은 다시 확인해 주세요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 상세 이동 정보는 다시 검색해 확인, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 정보가 부족해요, 환승 정보가 부족해요, 걷는 거리 정보가 부족해요, 계단 여부를 아직 알 수 없어요, 엘리베이터 연결을 아직 알 수 없어요',
         ),
         findsOneWidget,
       );
@@ -8467,7 +8467,7 @@ void main() {
       expect(find.text('환승 적은 순'), findsNothing);
       expect(find.text('상록수 → 사당'), findsNothing);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
-      expect(find.text('계단 여부를 다시 확인해 주세요'), findsWidgets);
+      expect(find.text('계단 여부를 아직 알 수 없어요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
       expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
@@ -8505,18 +8505,18 @@ void main() {
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
-      expect(find.text('일부 시설 정보는 다시 확인해 주세요.'), findsOneWidget);
+      expect(find.text('일부 시설 정보가 부족해요.'), findsOneWidget);
       expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 다시 확인해 주세요')),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
           matching: find.byIcon(Icons.help_outline),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 다시 확인해 주세요')),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
           matching: find.byIcon(Icons.check),
         ),
         findsNothing,
@@ -9233,7 +9233,7 @@ void main() {
           .getSemantics(find.byKey(const Key('routeResultListItem')))
           .getSemanticsData();
       expect(routeItemSemantics.hasAction(SemanticsAction.tap), isTrue);
-      expect(routeItemSemantics.label, contains('계단 여부를 다시 확인해 주세요'));
+      expect(routeItemSemantics.label, contains('계단 여부를 아직 알 수 없어요'));
     } finally {
       semanticsHandle.dispose();
     }
@@ -10322,7 +10322,7 @@ void main() {
             facilityId: 'facility-sangnoksu-toilet-1',
             facilityName: '장애인 화장실',
             facilityTypeLabel: '장애인 화장실',
-            facilityStatusLabel: '다시 확인해 주세요',
+            facilityStatusLabel: '상태 정보가 부족해요',
           ),
           draftTargetStore: draftTargetStore,
           photoPicker: () async => const FacilityReportPhotoAttachment(
@@ -10364,7 +10364,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '다시 확인해 주세요',
+        facilityStatusLabel: '상태 정보가 부족해요',
       ),
     );
     var restoreCount = 0;
@@ -10401,7 +10401,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 다시 확인해 주세요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태 정보가 부족해요'),
       findsOneWidget,
     );
 
@@ -10450,7 +10450,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '다시 확인해 주세요',
+        facilityStatusLabel: '상태 정보가 부족해요',
       ),
     );
     var restoreCount = 0;
@@ -10497,7 +10497,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 다시 확인해 주세요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태 정보가 부족해요'),
       findsOneWidget,
     );
   });
@@ -10511,7 +10511,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '다시 확인해 주세요',
+        facilityStatusLabel: '상태 정보가 부족해요',
       ),
     )..throwOnClear = true;
 
@@ -10979,10 +10979,7 @@ void main() {
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(
-      find.text('현재 위치 없이 제보하면 담당자가 현장 위치를 다시 확인해야 할 수 있습니다.'),
-      findsOneWidget,
-    );
+    expect(find.text('현재 위치 없이 제보하면 담당자가 현장 위치를 살펴볼 수 있습니다.'), findsOneWidget);
     await tester.tap(find.text('보내기'));
     await tester.pumpAndSettle();
 
@@ -12481,7 +12478,7 @@ RouteSearchResult _sampleRouteSearchResult({
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 정보는 다시 확인해 주세요.',
+        message: '일부 시설 정보가 부족해요.',
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',

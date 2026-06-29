@@ -40,7 +40,7 @@ String _routeDateLabel(String value) {
   if (trimmed.length >= 10) {
     return '최근 확인 ${trimmed.substring(0, 10)}';
   }
-  return '최근 확인일을 다시 확인해 주세요';
+  return '최근 확인일을 아직 알 수 없어요';
 }
 
 abstract class RouteSearchRepository {
@@ -458,7 +458,7 @@ class FavoriteRoute {
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
-  String get lineLabel => lineName.isEmpty ? '노선을 다시 확인해 주세요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
 
   String get scoreLabel => '상세 이동 정보는 다시 검색해 확인';
 
@@ -471,10 +471,10 @@ class FavoriteRoute {
       '$mobilityLabel 조건, $lineLabel, ${_routeDateLabel(routeCreatedAt)}';
 
   String get movementMetricLabel =>
-      '예상 시간은 다시 확인해 주세요 · 환승은 다시 확인해 주세요 · 걷는 거리는 다시 확인해 주세요';
+      '예상 시간 정보가 부족해요 · 환승 정보가 부족해요 · 걷는 거리 정보가 부족해요';
 
   String get accessibilityMetricLabel =>
-      '계단 여부는 다시 확인해 주세요 · 엘리베이터 연결은 다시 확인해 주세요';
+      '계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요';
 
   String get semanticLabel {
     return [
@@ -484,11 +484,11 @@ class FavoriteRoute {
       mobilityLabel,
       scoreLabel,
       scoreBasisSemanticLabel,
-      '예상 시간은 다시 확인해 주세요',
-      '환승은 다시 확인해 주세요',
-      '걷는 거리는 다시 확인해 주세요',
-      '계단 여부는 다시 확인해 주세요',
-      '엘리베이터 연결은 다시 확인해 주세요',
+      '예상 시간 정보가 부족해요',
+      '환승 정보가 부족해요',
+      '걷는 거리 정보가 부족해요',
+      '계단 여부를 아직 알 수 없어요',
+      '엘리베이터 연결을 아직 알 수 없어요',
     ].join(', ');
   }
 }
@@ -700,7 +700,7 @@ class RouteSearchResult {
         steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
       return '계단 없음 확인';
     }
-    return '계단 여부를 다시 확인해 주세요';
+    return '계단 여부를 아직 알 수 없어요';
   }
 
   int get walkingDistanceMeters {
@@ -740,13 +740,13 @@ class RouteSearchResult {
     return switch (status) {
       'FOUND' => '경로를 찾았습니다',
       'BLOCKED' => '안내할 수 있는 경로가 없습니다',
-      _ => '다시 확인해 주세요',
+      _ => '경로 상태를 아직 알 수 없어요',
     };
   }
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선을 다시 확인해 주세요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
@@ -806,7 +806,7 @@ class RouteSearchResult {
       return '안내 불가 이유';
     }
     if (needsConfirmation) {
-      return '다시 확인할 내용';
+      return '살펴볼 내용';
     }
     return warnings.isEmpty ? '주의 없음' : '주의 확인';
   }
@@ -860,10 +860,10 @@ class RouteSearchResult {
 
   String get burdenLevelLabel {
     if (isBlocked) {
-      return '이동 부담을 다시 확인해 주세요';
+      return '이동 부담 정보가 부족해요';
     }
     if (movementSteps.isEmpty) {
-      return '이동 부담을 다시 확인해 주세요';
+      return '이동 부담 정보가 부족해요';
     }
     if (_hasHighBurdenFact) {
       return '이동 부담 높음';
@@ -960,7 +960,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '다시 확인해 주세요',
+        fallback: '정보가 부족해요',
       ),
     );
   }
@@ -1035,7 +1035,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리를 다시 확인해 주세요';
+      return '시간 또는 거리 정보가 부족해요';
     }
     return '앱에 저장된 길 안내 기준';
   }
@@ -1043,14 +1043,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간을 다시 확인해 주세요';
+    return '시간 정보가 부족해요';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리를 다시 확인해 주세요';
+    return '거리 정보가 부족해요';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
@@ -1065,13 +1065,13 @@ String _routeDistanceLabel(int distanceMeters) {
 
 String _routeWarningLabel(String code) {
   return switch (code.trim()) {
-    'LOW_DATA_CONFIDENCE' => '일부 시설 정보는 다시 확인해 주세요.',
+    'LOW_DATA_CONFIDENCE' => '일부 시설 정보가 부족해요.',
     'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
     'GENERATED_CONNECTOR_UNVERIFIED' =>
       '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
-    'DURATION_UNKNOWN' => '소요 시간을 다시 확인해 주세요.',
+    'DURATION_UNKNOWN' => '소요 시간 정보가 부족해요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
     _ => '일부 이동 정보를 확인하지 못했어요.',
@@ -2960,7 +2960,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                       ? '현재 조건에서 막힌 이유를 확인하세요'
                       : _isRecommendedRoute(result)
                       ? '시간·환승·걷기와 편한 정도를 확인하세요.'
-                      : '이 경로는 이동 전 다시 확인해 주세요',
+                      : '이 경로는 이동 전에 안내를 살펴봐 주세요',
                 ),
                 Container(
                   decoration: BoxDecoration(

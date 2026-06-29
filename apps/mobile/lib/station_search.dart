@@ -393,7 +393,7 @@ class FavoriteStation {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 다시 확인해 주세요';
+      return '노선을 아직 알 수 없어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -460,7 +460,7 @@ class StationSearchResult {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 다시 확인해 주세요';
+      return '노선을 아직 알 수 없어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -545,7 +545,7 @@ class StationDetail {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 다시 확인해 주세요';
+      return '노선을 아직 알 수 없어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -603,7 +603,7 @@ class StationExitInfo {
   final String fieldValidationStatus;
 
   String get elevatorConnectionLabel {
-    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결은 다시 확인해 주세요';
+    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결을 아직 알 수 없어요';
   }
 
   String get stairPathLabel {
@@ -747,8 +747,8 @@ class StationFacilityInfo {
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
-      'NEEDS_CHECK' => '다시 확인해 주세요',
-      _ => '다시 확인해 주세요',
+      'NEEDS_CHECK' => '상태 정보가 부족해요',
+      _ => '상태 정보가 부족해요',
     };
   }
 
@@ -787,7 +787,7 @@ class StationFacilityInfo {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치를 다시 확인해 주세요';
+    return '위치 안내가 부족해요';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
@@ -958,8 +958,8 @@ String _fieldVerificationStatusLabel(String fieldValidationStatus) {
   final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
   return switch (normalizedStatus) {
     'VERIFIED' => '시설 상태가 확인됐어요',
-    'STALE' => '상태를 다시 확인해 주세요',
-    _ => '상태를 다시 확인해 주세요',
+    'STALE' => '최신 상태를 준비 중이에요',
+    _ => '최신 상태를 준비 중이에요',
   };
 }
 
@@ -979,7 +979,7 @@ String _dataSourceLabel(String dataSourceType) {
     'USER_REPORT' => '이용자 제보',
     'ADMIN_VERIFIED' => '확인된 안내',
     'PARTNER_FEED' => '연계 안내',
-    _ => '안내를 다시 확인 중이에요',
+    _ => '안내를 준비 중이에요',
   };
 }
 
@@ -5568,7 +5568,7 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   final from = facility.floorFrom.trim();
   final to = facility.floorTo.trim();
   if (from.isEmpty && to.isEmpty) {
-    return '연결 위치를 다시 확인해 주세요';
+    return '연결 위치를 아직 알 수 없어요';
   }
   if (from.isEmpty || to.isEmpty) {
     return '연결 위치 ${from.isEmpty ? to : from}';

@@ -1464,7 +1464,7 @@ void main() {
     expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 상태를 다시 확인해 주세요, 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 최신 상태를 준비 중이에요, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');
