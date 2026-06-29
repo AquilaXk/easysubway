@@ -769,6 +769,12 @@ void main() {
       expect(find.text('알림을 불러오지 못했어요'), findsOneWidget);
       expect(find.text('새 알림이 없습니다'), findsNothing);
 
+      await tester.tap(find.widgetWithText(OutlinedButton, '다시 시도'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림을 불러오지 못했어요'), findsOneWidget);
+      expect(find.text('새 알림이 없습니다'), findsNothing);
+
       reportRepository.error = null;
       await tester.tap(find.widgetWithText(OutlinedButton, '다시 시도'));
       await tester.pumpAndSettle();

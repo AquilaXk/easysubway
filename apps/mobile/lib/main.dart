@@ -1917,7 +1917,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
   @override
   void initState() {
     super.initState();
-    _itemsFuture = _loadItems();
+    _itemsFuture = _loadItemsForDisplay();
   }
 
   @override
@@ -1941,7 +1941,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
             final items = snapshot.data ?? const <_NotificationInboxItem>[];
             return RefreshIndicator(
               onRefresh: () async {
-                final next = _loadItems();
+                final next = _loadItemsForDisplay();
                 setState(() {
                   _itemsFuture = next;
                 });
@@ -1970,7 +1970,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                       actionLabel: '다시 시도',
                       onAction: () {
                         setState(() {
-                          _itemsFuture = _loadItems();
+                          _itemsFuture = _loadItemsForDisplay();
                         });
                       },
                     )
@@ -2000,6 +2000,16 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
         ),
       ),
     );
+  }
+
+  Future<List<_NotificationInboxItem>> _loadItemsForDisplay() {
+    final next = _loadItems();
+    unawaited(
+      next.catchError((Object error, StackTrace stackTrace) {
+        return const <_NotificationInboxItem>[];
+      }),
+    );
+    return next;
   }
 
   Future<List<_NotificationInboxItem>> _loadItems() async {
