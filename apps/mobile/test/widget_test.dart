@@ -741,6 +741,50 @@ void main() {
     expect(find.text('새 알림이 없습니다'), findsOneWidget);
   });
 
+  testWidgets('알림함은 로드 실패를 빈 알림으로 숨기지 않는다', (tester) async {
+    final reportedErrors = <FlutterErrorDetails>[];
+    final reportRepository = FakeFacilityReportRepository()
+      ..error = Exception('network');
+
+    await runWithMobileErrorReporter(reportedErrors.add, () async {
+      await tester.pumpWidget(
+        EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: reportRepository,
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('notificationInboxErrorState')),
+        findsOneWidget,
+      );
+      expect(find.text('알림을 불러오지 못했어요'), findsOneWidget);
+      expect(find.text('새 알림이 없습니다'), findsNothing);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, '다시 시도'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림을 불러오지 못했어요'), findsOneWidget);
+      expect(find.text('새 알림이 없습니다'), findsNothing);
+
+      reportRepository.error = null;
+      await tester.tap(find.widgetWithText(OutlinedButton, '다시 시도'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림을 불러오지 못했어요'), findsNothing);
+      expect(find.text('새 알림이 없습니다'), findsOneWidget);
+    });
+    expect(reportedErrors, isNotEmpty);
+  });
+
   testWidgets('홈 알림 버튼은 확인할 알림이 있으면 배지와 상태를 알려준다', (tester) async {
     final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
       favorites: [_favoriteFacility(status: 'USER_REPORTED')],
