@@ -262,12 +262,12 @@ class FavoriteFacility {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '확인 필요',
+      'UNKNOWN' => '확인이 필요해요',
       'USER_REPORTED' => '제보됨',
-      'ADMIN_VERIFIED' => '검수 완료',
-      'NEEDS_REPORT' => '제보 필요',
-      'NEEDS_CHECK' => '확인 필요',
-      _ => '상태 확인 필요',
+      'ADMIN_VERIFIED' => '확인 완료',
+      'NEEDS_REPORT' => '알려 주세요',
+      'NEEDS_CHECK' => '다시 확인해 주세요',
+      _ => '다시 확인해 주세요',
     };
   }
 
@@ -757,18 +757,18 @@ String _stringOrDefault(
 
 String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
-    'HIGH' => '확인 수준 높음',
-    'MEDIUM' => '확인 수준 보통',
-    'LOW' => '정보 확인 필요',
-    _ => '정보 확인 필요',
+    'HIGH' => '최근 확인된 정보예요',
+    'MEDIUM' => '일부 확인된 정보예요',
+    'LOW' => '확인이 더 필요해요',
+    _ => '확인이 더 필요해요',
   };
 }
 
 String _facilityVerificationStatusLabel(String fieldValidationStatus) {
   return switch (fieldValidationStatus.trim().toUpperCase()) {
-    'VERIFIED' => '시설 상태 확인됨',
-    'STALE' => '상태 재확인 필요',
-    _ => '상태 확인 필요',
+    'VERIFIED' => '시설 상태가 확인됐어요',
+    'STALE' => '상태를 다시 확인해 주세요',
+    _ => '상태를 다시 확인해 주세요',
   };
 }
 
