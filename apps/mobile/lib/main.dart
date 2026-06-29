@@ -1352,6 +1352,39 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
+    void openRouteTab() {
+      if (_selectedTabIndex == 2) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 2;
+      });
+    }
+
+    void openMoreTab() {
+      if (_selectedTabIndex == 4) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 4;
+      });
+    }
+
+    void openSavedTab() {
+      if (favoriteRepository == null &&
+          favoriteFacilityRepository == null &&
+          favoriteRouteRepository == null) {
+        openMoreTab();
+        return;
+      }
+      if (_selectedTabIndex == 3) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 3;
+      });
+    }
+
     Future<void> refreshHomeState() async {
       final facilitiesFuture = widget.favoriteFacilityRepository
           ?.listFavoriteFacilities();
@@ -1513,13 +1546,13 @@ class _HomeScreenState extends State<HomeScreen> {
             openNetworkMap();
             break;
           case 2:
-            unawaited(openRouteSearch());
+            openRouteTab();
             break;
           case 3:
-            openSavedItems();
+            openSavedTab();
             break;
           case 4:
-            openSettings();
+            openMoreTab();
             break;
         }
       },
@@ -1566,6 +1599,51 @@ class _HomeScreenState extends State<HomeScreen> {
         onOpenSaved: openSavedItems,
         onOpenSettings: openSettings,
         onOpenHome: openHomeTab,
+        bottomNavigationBar: bottomNavigationBar,
+      );
+    }
+
+    if (_selectedTabIndex == 2) {
+      return RouteSearchScreen(
+        repository: routeRepository,
+        stationRepository: repository,
+        routeFeedbackRepository: routeFeedbackRepository,
+        favoriteRouteRepository: favoriteRouteRepository,
+        initialMobilityType: initialMobilityType,
+        initialDraft: _routeDraftController.draft,
+        simpleViewEnabled: simpleViewEnabled,
+        shellNavigationBar: bottomNavigationBar,
+      );
+    }
+
+    if (_selectedTabIndex == 3) {
+      return FavoriteHomeScreen(
+        favoriteRepository: favoriteRepository,
+        favoriteFacilityRepository: favoriteFacilityRepository,
+        favoriteRouteRepository: favoriteRouteRepository,
+        stationRepository: repository,
+        reportRepository: reportRepository,
+        locationProvider: locationProvider,
+        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+        internalRouteRepository: internalRouteRepository,
+        realtimeRepository: realtimeRepository,
+        routeDraftController: _routeDraftController,
+        initialMobilityType: initialMobilityType,
+        onOpenRouteSearch: ([mobilityType]) async => openRouteTab(),
+        bottomNavigationBar: bottomNavigationBar,
+      );
+    }
+
+    if (_selectedTabIndex == 4) {
+      return AppSettingsScreen(
+        currentProfile: currentProfile,
+        viewPreferences: widget.viewPreferences,
+        notificationRepository: notificationRepository,
+        notificationPermissionProvider: notificationPermissionProvider,
+        onViewPreferencesChanged: widget.onViewPreferencesChanged,
+        onOpenMobilityProfile: _openMobilityProfile,
+        onOpenSupportAccess: openSupportAccess,
+        onOpenMyReports: openMyReports,
         bottomNavigationBar: bottomNavigationBar,
       );
     }
@@ -3205,6 +3283,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
+    this.bottomNavigationBar,
     super.key,
   });
 
@@ -3217,6 +3296,7 @@ class AppSettingsScreen extends StatefulWidget {
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
+  final Widget? bottomNavigationBar;
 
   @override
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
@@ -3239,7 +3319,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     return _OnboardingPreferenceScope(
       preferences: _viewPreferences,
       child: Scaffold(
+        key: const Key('settingsScreen'),
         appBar: AppBar(title: const Text('설정')),
+        bottomNavigationBar: widget.bottomNavigationBar,
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -3649,6 +3731,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.initialMobilityType,
     this.onOpenRouteSearch,
+    this.bottomNavigationBar,
     super.key,
   });
 
@@ -3664,6 +3747,7 @@ class FavoriteHomeScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final String initialMobilityType;
   final Future<void> Function([String? mobilityType])? onOpenRouteSearch;
+  final Widget? bottomNavigationBar;
 
   @override
   State<FavoriteHomeScreen> createState() => _FavoriteHomeScreenState();
@@ -3681,7 +3765,9 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const Key('favoriteHomeScreen'),
       appBar: AppBar(title: const Text('즐겨찾기')),
+      bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: FutureBuilder<_FavoriteHomeData>(
           future: _dataFuture,
