@@ -407,6 +407,17 @@ void main() {
     expect(result.semanticLabel, contains('길이 이어지는지 아직 확인하지 못했어요.'));
   });
 
+  test('경로 검색 localized reason은 쉬운 문구를 generic으로 바꾸지 않는다', () {
+    final result = _sampleRouteSearchResult(
+      status: 'BLOCKED',
+      blockedReasons: const ['꼭 필요한 시설을 지금 이용하기 어려워요.'],
+    );
+
+    expect(result.blockedReasonLabels, ['꼭 필요한 시설을 지금 이용하기 어려워요.']);
+    expect(result.semanticLabel, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
+    expect(result.semanticLabel, isNot(contains('안내할 수 있는 경로를 아직 찾지 못했어요.')));
+  });
+
   test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {
     final result = RouteSearchResult.fromJson({
       'routeSearchId': 'route-unknown-warning',

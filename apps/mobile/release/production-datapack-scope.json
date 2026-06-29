@@ -18,7 +18,7 @@
     "supportedClaimKo": "수도권 pilot",
     "supportedClaimPolicyKo": "앱 화면과 Play listing은 production coverage evidence가 통과한 수도권 범위만 지원 범위로 표현한다.",
     "unsupportedRegionPolicy": {
-      "requiredAppStatus": ["UNSUPPORTED_REGION", "확인 필요"],
+      "requiredAppStatus": ["UNSUPPORTED_REGION", "다시 확인"],
       "policyKo": "coverageEvidence와 P0 gap 0을 만족하지 못한 지역, 운영기관, 노선은 지원 지역으로 표시하지 않는다."
     },
     "storeListingPolicyKo": "대한민국 도시철도 전체 또는 전국 완전 지원처럼 검증 범위를 넘는 문구를 사용하지 않는다."
