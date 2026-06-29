@@ -229,7 +229,7 @@ final class TopisRealtimeProvider implements RealtimeProvider {
 			firstNonBlank(deployEnv, propertyOrEnv("EASYSUBWAY_DEPLOY_ENV")),
 			firstNonBlank(activeProfiles, propertyOrEnv("spring.profiles.active"))
 		);
-		return !containsAny(runtime, "prod", "staging", "release")
+		return !containsAny(runtime, "prod", "staging", "release", "prod-like")
 			&& containsAny(runtime, "local", "test");
 	}
 

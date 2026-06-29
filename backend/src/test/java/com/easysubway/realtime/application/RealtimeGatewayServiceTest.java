@@ -372,6 +372,21 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("TOPIS fixture는 prod-like deploy env에서 test profile이어도 시작하지 않는다")
+	void topisFixtureFailsOnProdLikeDeployEnv() {
+		assertThatThrownBy(() -> new TopisRealtimeProvider(
+			"",
+			new ObjectMapper(),
+			java.net.http.HttpClient.newHttpClient(),
+			new FixtureRealtimeProvider(),
+			true,
+			"prod-like",
+			"test"
+		)).isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("TOPIS fixture");
+	}
+
+	@Test
 	@DisplayName("TOPIS INFO-200 empty result는 quota exception으로 처리하지 않는다")
 	void topisInfo200DoesNotOpenQuotaCircuit() throws Exception {
 		ObjectMapper objectMapper = new ObjectMapper();
