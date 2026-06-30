@@ -3669,8 +3669,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 7/);
+  assert.match(schema, /PRAGMA user_version = 8/);
   assert.match(schema, /CREATE TABLE stations/);
+  assert.match(schema, /CREATE TABLE station_facility_evidence/);
   assert.match(schema, /CREATE TABLE realtime_provider_line_mappings/);
   assert.match(schema, /CREATE TABLE realtime_provider_station_mappings/);
   assert.match(schema, /source_id TEXT NOT NULL DEFAULT ''/);
@@ -4255,17 +4256,22 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
 
   assert.match(schema, /CREATE TABLE network_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(schema, /CREATE TABLE facilities \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(schema, /CREATE TABLE station_facility_evidence \([\s\S]+provider_record_hash TEXT NOT NULL[\s\S]+strict_route_eligible INTEGER NOT NULL DEFAULT 0/);
   assert.match(schema, /CREATE TABLE internal_route_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(builder, /"station_facility_evidence"/);
   assert.match(builder, /"source_snapshot_id"/);
   assert.match(builder, /"provider_record_hash"/);
+  assert.match(validator, /validateProductionStationFacilityEvidence/);
   assert.match(validator, /"source_snapshot_id"/);
   assert.match(validator, /"provider_record_hash"/);
   assert.match(validator, /validateProductionInternalRouteEdgeProvenance/);
   assert.match(validator, /validateNetworkEdgeBaseProvenance/);
   assert.match(validator, /is placeholder evidence/);
+  assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /int get schemaVersion => 7/);
+  assert.match(mobileDatabase, /int get schemaVersion => 8/);
+  assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
 });
 
@@ -4313,6 +4319,7 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
     })),
   );
   assert.equal(importedPack.networkEdges.some((edge) => edge.edgeType === "MOVEMENT"), false);
+  assert.equal(importedPack.stationFacilityEvidence.length, input.supportedV1Scope.facilityCoverageDenominator.expectedRows);
 });
 
 test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {
@@ -4957,8 +4964,11 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
   for (const source of [builder, validator]) {
-    assert.match(source, /productionMinimumTableRowNames = \["stations", "station_lines", "network_edges", "facilities"\]/);
-    assert.match(source, /production minimumTableRows must define positive stations, station_lines, network_edges, and facilities/);
+    assert.match(source, /productionMinimumTableRowNames = \[[\s\S]+"station_facility_evidence"[\s\S]+\]/);
+    assert.match(
+      source,
+      /production minimumTableRows must define positive stations, station_lines, network_edges, facilities, and station_facility_evidence/,
+    );
     assert.match(source, /validateSourceInventoryCoverageScope/);
     assert.match(source, /production sourceInventory\.coverageScope/);
     assert.match(source, /sourceInventory\.coverageScope/);
