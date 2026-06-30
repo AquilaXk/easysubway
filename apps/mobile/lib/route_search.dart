@@ -38,6 +38,8 @@ const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 const _routeTextPrimaryColor = Color(0xFF102A2C);
 const _routeTextSecondaryColor = Color(0xFF29484B);
 const _routeTextMutedColor = Color(0xFF405A5D);
+const _routeTextSubtleColor = Color(0xFF50656F);
+const _routeNextActionTextColor = Color(0xFF506B6F);
 const _routeAccentColor = Color(0xFF006D77);
 const _routeCardBorderColor = Color(0xFFD5E2E4);
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
@@ -1615,7 +1617,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                             '상황에 맞는 이동 조건을 고른 뒤 적용해 주세요.',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  color: const Color(0xFF50656F),
+                                  color: _routeTextSubtleColor,
                                   fontWeight: FontWeight.w700,
                                   height: 1.35,
                                 ),
@@ -2095,7 +2097,7 @@ class _RouteRecentLine extends StatelessWidget {
         Text(
           line.name,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF50656F),
+            color: _routeTextSubtleColor,
             fontSize: 16,
             height: 1.2,
           ),
@@ -2132,7 +2134,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
         Text(
           _routeMobilityConditionLabel(option),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF50656F),
+            color: _routeTextSubtleColor,
             fontWeight: FontWeight.w700,
             height: 1.3,
           ),
@@ -2639,7 +2641,7 @@ class _RouteSearchFailureMessage extends StatelessWidget {
             child: Text(
               _routeSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF506B6F),
+                color: _routeNextActionTextColor,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -4057,7 +4059,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
             child: Text(
               _routeFeedbackFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF506B6F),
+                color: _routeNextActionTextColor,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -4188,7 +4190,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
             child: Text(
               _favoriteRouteSaveFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF506B6F),
+                color: _routeNextActionTextColor,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -4522,7 +4524,7 @@ class _FavoriteRouteListBody extends StatelessWidget {
                 child: Text(
                   _favoriteRouteLoadFailureNextAction,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF506B6F),
+                    color: _routeNextActionTextColor,
                     fontWeight: FontWeight.w700,
                     height: 1.35,
                   ),
