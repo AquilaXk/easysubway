@@ -853,7 +853,7 @@ class RouteSearchResult {
     }
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
     if (isBlocked) {
-      parts.add('이동 전 확인 $_routeBlockedConfirmationNotice');
+      parts.add('이동 전 살펴보기 $_routeBlockedConfirmationNotice');
     }
     return parts.join(', ');
   }

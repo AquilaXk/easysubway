@@ -911,6 +911,7 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
     ["상태 제보", /['"`][^'"`\n]*상태\s*제보[^'"`\n]*['"`]/u],
     ["시설 상태 제보", /['"`][^'"`\n]*시설\s*상태\s*제보[^'"`\n]*['"`]/u],
     ["가기 전 확인", /['"`][^'"`\n]*가기\s*전\s*확인[^'"`\n]*['"`]/u],
+    ["이동 전 확인", /['"`][^'"`\n]*이동\s*전\s*확인[^'"`\n]*['"`]/u],
     ["확인 필요", /['"`][^'"`\n]*확인\s*필요[^'"`\n]*['"`]/u],
     ["추정", /['"`][^'"`\n]*추정[^'"`\n]*['"`]/u],
     ["측정값", /['"`][^'"`\n]*측정값[^'"`\n]*['"`]/u],
@@ -8596,7 +8597,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /도움말은 이동 전 확인 안내를 함께 보여준다/);
+  assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
   assert.match(main, /보안 문의 안내/);
   assert.match(main, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
@@ -8655,7 +8656,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
   assert.match(main, /개인정보 사용 안내/);
-  assert.match(main, /이동 전 확인/);
+  assert.match(main, /이동 전 살펴보기/);
   assert.match(main, /현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다/);
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
