@@ -808,7 +808,7 @@ class RouteSearchResult {
     if (needsConfirmation) {
       return '살펴볼 내용';
     }
-    return warnings.isEmpty ? '주의 없음' : '주의 확인';
+    return warnings.isEmpty ? '주의 안내가 없어요' : '주의 안내 보기';
   }
 
   String get semanticLabel {
