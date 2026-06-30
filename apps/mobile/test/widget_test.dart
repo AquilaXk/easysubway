@@ -7492,6 +7492,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('승강장'), findsOneWidget);
+      final platformText = tester.widget<Text>(find.text('승강장'));
+      expect(platformText.maxLines, isNot(2));
+      expect(platformText.overflow, isNot(TextOverflow.ellipsis));
       expect(find.bySemanticsLabel('이동 구조, 1번 출구, 엘리베이터, 승강장'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('지도 위치 목록'),
