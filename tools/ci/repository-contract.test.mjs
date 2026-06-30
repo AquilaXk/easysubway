@@ -4110,6 +4110,35 @@ test("official source importer는 production route edge verifiedAt alias를 유�
   assert.equal(fixture.packs[0].networkEdges[0].lastVerifiedAt, verifiedAt);
 });
 
+test("official source importer는 fixture route edge 검증 timestamp 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-fixture-route-timestamp-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.pack.artifactKind = "fixture";
+  delete input.routeEdges[0].lastVerifiedAt;
+  delete input.routeEdges[0].verifiedAt;
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /routeEdges\.lastVerifiedAt must be a non-empty string/,
+  );
+});
+
 test("official source importer는 production facility 검증 기본값 누락을 거부한다", async () => {
   const cases = [
     ["providerFacilityRef", /facilityRows\.providerFacilityRef must be a non-empty string/],
