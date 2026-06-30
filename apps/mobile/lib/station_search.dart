@@ -4660,8 +4660,6 @@ class _StationLayoutStep extends StatelessWidget {
           Text(
             item.text,
             textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: textTheme.bodyLarge?.copyWith(
               color: const Color(0xFF102A2C),
               fontWeight: FontWeight.w900,
