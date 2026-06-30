@@ -390,6 +390,8 @@ class _RouteCatalogSnapshot {
           hasDataQualityRecords
               ? '''
           SELECT f.id,
+                 f.station_id,
+                 f.type,
                  f.status,
                  $operationalStatusSql AS operational_status,
                  (
@@ -413,6 +415,8 @@ class _RouteCatalogSnapshot {
           '''
               : '''
           SELECT f.id,
+                 f.station_id,
+                 f.type,
                  f.status,
                  $operationalStatusSql AS operational_status,
                  NULL AS quality_level,
@@ -426,12 +430,15 @@ class _RouteCatalogSnapshot {
       for (final row in facilityRows)
         row.read<String>('id'): _FacilitySnapshot(
           id: row.read<String>('id'),
+          stationId: row.read<String>('station_id'),
+          type: row.read<String>('type'),
           status: row.read<String>('status'),
           operationalStatus: row.readNullable<String>('operational_status'),
           qualityLevel: row.readNullable<String>('quality_level'),
           checkedAtSeconds: row.readNullable<int>('checked_at'),
         ),
     };
+    final eligibleFacilityEvidence = await _eligibleFacilityEvidence(database);
     final networkEdgeRows = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, duration_seconds,
                  $edgeTypeSql AS edge_type,
@@ -469,6 +476,18 @@ class _RouteCatalogSnapshot {
           .map((row) {
             final facility =
                 facilitiesById[row.readNullable<String>('facility_id')];
+            final facilityHasEligibleEvidence =
+                facility == null ||
+                eligibleFacilityEvidence.contains(
+                  _stationFacilityEvidenceKey(
+                    stationId: facility.stationId,
+                    lineId: _facilityLineIdForEdge(
+                      row.read<String>('from_node_id'),
+                      row.read<String>('to_node_id'),
+                    ),
+                    facilityType: facility.type,
+                  ),
+                );
             final accessibilityStatus = row.read<String>(
               'accessibility_status',
             );
@@ -489,6 +508,7 @@ class _RouteCatalogSnapshot {
               accessibilityStatus: _effectiveAccessibilityStatus(
                 accessibilityStatus,
                 facility,
+                facilityHasEligibleEvidence,
               ),
               reliabilityScore: _effectiveReliabilityScore(
                 reliabilityScore,
@@ -937,6 +957,8 @@ class _StationLineSnapshot {
 class _FacilitySnapshot {
   const _FacilitySnapshot({
     required this.id,
+    required this.stationId,
+    required this.type,
     required this.status,
     required this.operationalStatus,
     required this.qualityLevel,
@@ -944,6 +966,8 @@ class _FacilitySnapshot {
   });
 
   final String id;
+  final String stationId;
+  final String type;
   final String status;
   final String? operationalStatus;
   final String? qualityLevel;
@@ -953,20 +977,31 @@ class _FacilitySnapshot {
 String _effectiveAccessibilityStatus(
   String edgeStatus,
   _FacilitySnapshot? facility,
+  bool facilityHasEligibleEvidence,
 ) {
   final edgeStatusUpper = edgeStatus.toUpperCase();
   if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
     return edgeStatus;
   }
   final operationalStatus = facility.operationalStatus?.toUpperCase();
-  if (operationalStatus == 'UNKNOWN' || operationalStatus == 'CHECK_REQUIRED') {
-    return 'UNKNOWN';
-  }
   if (operationalStatus == 'UNAVAILABLE' ||
       operationalStatus == 'OUT_OF_SERVICE') {
     return 'UNAVAILABLE';
   }
   final status = facility.status.toUpperCase();
+  if (status == 'BROKEN' ||
+      status == 'UNDER_CONSTRUCTION' ||
+      status == 'CLOSED' ||
+      status == 'UNAVAILABLE' ||
+      status == 'OUT_OF_SERVICE') {
+    return 'UNAVAILABLE';
+  }
+  if (!facilityHasEligibleEvidence) {
+    return 'UNKNOWN';
+  }
+  if (operationalStatus == 'UNKNOWN' || operationalStatus == 'CHECK_REQUIRED') {
+    return 'UNKNOWN';
+  }
   if (status == 'NORMAL' ||
       status == 'AVAILABLE' ||
       status == 'IN_SERVICE' ||
@@ -979,6 +1014,42 @@ String _effectiveAccessibilityStatus(
     return 'UNKNOWN';
   }
   return 'UNAVAILABLE';
+}
+
+Future<Set<String>> _eligibleFacilityEvidence(CatalogDatabase database) async {
+  if (!await _tableExists(database, 'station_facility_evidence')) {
+    return const {};
+  }
+  final rows = await database.customSelect('''
+        SELECT station_id, line_id, facility_type
+        FROM station_facility_evidence
+        WHERE strict_route_eligible != 0
+          AND UPPER(evidence_kind) = 'EXISTS'
+        ''').get();
+  return {
+    for (final row in rows)
+      _stationFacilityEvidenceKey(
+        stationId: row.read<String>('station_id'),
+        lineId: row.read<String>('line_id'),
+        facilityType: row.read<String>('facility_type'),
+      ),
+  };
+}
+
+String _stationFacilityEvidenceKey({
+  required String stationId,
+  required String lineId,
+  required String facilityType,
+}) {
+  return '$stationId:$lineId:${facilityType.toUpperCase()}';
+}
+
+String _facilityLineIdForEdge(String fromNodeId, String toNodeId) {
+  final fromLineId = _lineIdForNode(fromNodeId);
+  if (fromLineId.isNotEmpty) {
+    return fromLineId;
+  }
+  return _lineIdForNode(toNodeId);
 }
 
 String _selectFacilityColumn(

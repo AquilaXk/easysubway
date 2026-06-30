@@ -262,6 +262,43 @@ class Facilities extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class StationFacilityEvidence extends Table {
+  @override
+  String get tableName => 'station_facility_evidence';
+
+  TextColumn get stationId => text().named('station_id')();
+  TextColumn get lineId => text().named('line_id')();
+  TextColumn get facilityType => text().named('facility_type')();
+  TextColumn get evidenceKind => text().named('evidence_kind')();
+  TextColumn get sourceId => text().named('source_id')();
+  TextColumn get sourceSnapshotId => text().named('source_snapshot_id')();
+  TextColumn get providerRecordHash => text().named('provider_record_hash')();
+  TextColumn get evidenceHash => text().named('evidence_hash')();
+  TextColumn get provenanceKind => text().named('provenance_kind')();
+  TextColumn get installationStatus => text()
+      .named('installation_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get operationalStatus => text()
+      .named('operational_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get statusMeaning =>
+      text().named('status_meaning').withDefault(const Constant(''))();
+  IntColumn get confidence =>
+      integer().named('confidence').withDefault(const Constant(0))();
+  DateTimeColumn get verifiedAt => dateTime().named('verified_at').nullable()();
+  DateTimeColumn get retrievedAt =>
+      dateTime().named('retrieved_at').nullable()();
+  BoolColumn get strictRouteEligible => boolean()
+      .named('strict_route_eligible')
+      .withDefault(const Constant(false))();
+  TextColumn get strictRouteEligibleReason => text()
+      .named('strict_route_eligible_reason')
+      .withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {stationId, lineId, facilityType};
+}
+
 class StationAccessibilitySummaries extends Table {
   @override
   String get tableName => 'station_accessibility_summaries';
