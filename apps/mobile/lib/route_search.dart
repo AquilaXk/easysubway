@@ -35,6 +35,11 @@ const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
 const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
+const _routeTextPrimaryColor = Color(0xFF102A2C);
+const _routeTextSecondaryColor = Color(0xFF29484B);
+const _routeTextMutedColor = Color(0xFF405A5D);
+const _routeAccentColor = Color(0xFF006D77);
+const _routeCardBorderColor = Color(0xFFD5E2E4);
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
 const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
 const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
@@ -1600,7 +1605,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                             '이동 조건',
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
-                                  color: const Color(0xFF102A2C),
+                                  color: _routeTextPrimaryColor,
                                   fontWeight: FontWeight.w900,
                                   height: 1.25,
                                 ),
@@ -1712,7 +1717,7 @@ class _RoutePointPickerCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFD5E2E4)),
+        border: Border.all(color: _routeCardBorderColor),
         borderRadius: _routeSearchLargeRadius,
         boxShadow: const [
           BoxShadow(
@@ -1760,7 +1765,7 @@ class _RoutePointPickerCard extends StatelessWidget {
                   key: const Key('routeSwapStationsButton'),
                   onPressed: onSwap,
                   icon: const Icon(Icons.swap_vert),
-                  color: const Color(0xFF102A2C),
+                  color: _routeTextPrimaryColor,
                   style: IconButton.styleFrom(
                     fixedSize: const Size(48, 48),
                     side: const BorderSide(color: Color(0xFF9DB6BA)),
@@ -1813,7 +1818,7 @@ class _RoutePointRow extends StatelessWidget {
                   child: Text(
                     stationName,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF102A2C),
+                      color: _routeTextPrimaryColor,
                       fontSize: 22,
                       height: 1.2,
                     ),
@@ -1842,7 +1847,7 @@ class _RouteSectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: _routeTextPrimaryColor,
               fontWeight: FontWeight.w900,
               height: 1.25,
             ),
@@ -1930,7 +1935,7 @@ class _RouteRecentDestinationListState
             DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: const Color(0xFFD5E2E4)),
+                border: Border.all(color: _routeCardBorderColor),
                 borderRadius: _routeSearchMediumRadius,
               ),
               child: Column(
@@ -2044,11 +2049,11 @@ class _RouteRecentDestinationRow extends StatelessWidget {
           onTap: onSelected,
           borderRadius: _routeSearchMediumRadius,
           child: ListTile(
-            leading: const Icon(Icons.train_outlined, color: Color(0xFF006D77)),
+            leading: const Icon(Icons.train_outlined, color: _routeAccentColor),
             title: Text(
               title,
               style: const TextStyle(
-                color: Color(0xFF102A2C),
+                color: _routeTextPrimaryColor,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -2118,7 +2123,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
         Text(
           option.title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: const Color(0xFF102A2C),
+            color: _routeTextPrimaryColor,
             fontWeight: FontWeight.w900,
             height: 1.25,
           ),
@@ -2154,11 +2159,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
                 child: ExcludeSemantics(
                   child: Row(
                     children: [
-                      Icon(
-                        option.icon,
-                        color: const Color(0xFF006D77),
-                        size: 26,
-                      ),
+                      Icon(option.icon, color: _routeAccentColor, size: 26),
                       const SizedBox(width: 10),
                       Expanded(child: content),
                     ],
@@ -2511,7 +2512,7 @@ class _RouteStationOptionTile extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: _routeSearchSmallRadius,
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
+              side: const BorderSide(color: _routeCardBorderColor),
             ),
             child: InkWell(
               onTap: () => onSelected(result),
@@ -2528,7 +2529,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                           Text(
                             result.nameKo,
                             style: textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFF102A2C),
+                              color: _routeTextPrimaryColor,
                               fontWeight: FontWeight.w900,
                               height: 1.25,
                             ),
@@ -2539,7 +2540,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                           Text(
                             result.lineLabel,
                             style: textTheme.bodyLarge?.copyWith(
-                              color: const Color(0xFF29484B),
+                              color: _routeTextSecondaryColor,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
                             ),
@@ -2548,7 +2549,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                           Text(
                             result.dataQualityLabel,
                             style: textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF405A5D),
+                              color: _routeTextMutedColor,
                               height: 1.3,
                             ),
                           ),
@@ -2558,7 +2559,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                     const SizedBox(width: 12),
                     const Icon(
                       Icons.chevron_right,
-                      color: Color(0xFF006D77),
+                      color: _routeAccentColor,
                       size: 32,
                     ),
                   ],
@@ -2669,7 +2670,7 @@ class _RouteSearchMessage extends StatelessWidget {
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: const Color(0xFF405A5D),
+          color: _routeTextMutedColor,
           fontWeight: FontWeight.w700,
           height: 1.35,
         ),
@@ -3274,7 +3275,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
           '계단 없는 경로가 없습니다',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: const Color(0xFF102A2C),
+            color: _routeTextPrimaryColor,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -3321,7 +3322,7 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
         Text(
           '방금 안내가\n실제 이동에 도움이 됐나요?',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: const Color(0xFF102A2C),
+            color: _routeTextPrimaryColor,
             fontWeight: FontWeight.w900,
             height: 1.25,
           ),
@@ -3379,7 +3380,7 @@ class _RouteResultListButton extends StatelessWidget {
                             totalMinutes > 0 ? '$totalMinutes분' : '시간 확인',
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
-                                  color: const Color(0xFF102A2C),
+                                  color: _routeTextPrimaryColor,
                                   fontWeight: FontWeight.w900,
                                 ),
                           ),
@@ -3770,7 +3771,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                   Text(
                     step.userDescription,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF102A2C),
+                      color: _routeTextPrimaryColor,
                       fontWeight: FontWeight.w800,
                       height: 1.35,
                     ),
@@ -3870,7 +3871,7 @@ class _RouteStepSection extends StatelessWidget {
         Text(
           '이동 순서',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: const Color(0xFF102A2C),
+            color: _routeTextPrimaryColor,
             fontWeight: FontWeight.w900,
             height: 1.25,
           ),
@@ -3897,7 +3898,7 @@ class _RouteStepTile extends StatelessWidget {
           CircleAvatar(
             key: Key('routeStepNumber-${step.sequence}'),
             radius: 22,
-            backgroundColor: const Color(0xFF006D77),
+            backgroundColor: _routeAccentColor,
             child: Text(
               '${step.sequence}',
               style: const TextStyle(
@@ -3926,7 +3927,7 @@ class _RouteStepTile extends StatelessWidget {
                 Text(
                   step.userTitle,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF102A2C),
+                    color: _routeTextPrimaryColor,
                     fontWeight: FontWeight.w900,
                     height: 1.3,
                   ),
@@ -3935,7 +3936,7 @@ class _RouteStepTile extends StatelessWidget {
                 Text(
                   step.burdenLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF29484B),
+                    color: _routeTextSecondaryColor,
                     fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
@@ -3944,7 +3945,7 @@ class _RouteStepTile extends StatelessWidget {
                 Text(
                   step.userDescription,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF405A5D),
+                    color: _routeTextMutedColor,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
@@ -3954,7 +3955,7 @@ class _RouteStepTile extends StatelessWidget {
                   Text(
                     step.userReason,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
+                      color: _routeTextMutedColor,
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
@@ -4038,7 +4039,7 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
             child: Text(
               _message,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF29484B),
+                color: _routeTextSecondaryColor,
                 fontWeight: FontWeight.w800,
                 height: 1.35,
               ),
@@ -4169,7 +4170,7 @@ class _RouteFavoriteSaveButtonState extends State<_RouteFavoriteSaveButton> {
             child: Text(
               _message,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF29484B),
+                color: _routeTextSecondaryColor,
                 fontWeight: FontWeight.w800,
                 height: 1.35,
               ),
@@ -4610,7 +4611,7 @@ class _FavoriteRouteTile extends StatelessWidget {
               Text(
                 '삭제 중',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF405A5D),
+                  color: _routeTextMutedColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -4706,7 +4707,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: _routeSearchSmallRadius,
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
+              side: const BorderSide(color: _routeCardBorderColor),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -4716,7 +4717,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.summaryTitle,
                     style: textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF102A2C),
+                      color: _routeTextPrimaryColor,
                       fontWeight: FontWeight.w900,
                       height: 1.25,
                     ),
@@ -4725,7 +4726,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.lineLabel,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
+                      color: _routeTextSecondaryColor,
                       fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
@@ -4734,7 +4735,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.mobilityLabel,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
+                      color: _routeTextSecondaryColor,
                       fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
@@ -4743,7 +4744,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.scoreLabel,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
+                      color: _routeTextSecondaryColor,
                       fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
@@ -4752,7 +4753,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.scoreBasisText,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
+                      color: _routeTextMutedColor,
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
@@ -4761,7 +4762,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.movementMetricLabel,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
+                      color: _routeTextMutedColor,
                       height: 1.3,
                     ),
                   ),
@@ -4769,7 +4770,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                   Text(
                     favorite.accessibilityMetricLabel,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
+                      color: _routeTextMutedColor,
                       height: 1.3,
                     ),
                   ),
