@@ -31,7 +31,7 @@ const _routeSearchPagePadding = EdgeInsets.only(
   right: 20,
   bottom: 32,
 );
-const _routeSearchButtonRadius = BorderRadius.all(Radius.circular(8));
+const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1356,7 +1356,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(60),
                   shape: RoundedRectangleBorder(
-                    borderRadius: _routeSearchButtonRadius,
+                    borderRadius: _routeSearchSmallRadius,
                   ),
                 ),
                 child: Text(isLoading ? '경로 검색 중' : '길찾기'),
@@ -2136,7 +2136,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFE9F5F6),
           border: Border.all(color: const Color(0xFFB9D4D8)),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2502,12 +2502,12 @@ class _RouteStationOptionTile extends StatelessWidget {
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               side: const BorderSide(color: Color(0xFFD5E2E4)),
             ),
             child: InkWell(
               onTap: () => onSelected(result),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -3352,12 +3352,12 @@ class _RouteResultListButton extends StatelessWidget {
           child: InkWell(
             key: const Key('routeResultListItem'),
             onTap: onPressed,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _routeSearchSmallRadius,
             child: Ink(
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xFF0D8A6D), width: 2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: _routeSearchSmallRadius,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -3435,7 +3435,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF073245),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3737,7 +3737,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         border: Border.all(color: const Color(0xFF9FCACE)),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -3799,7 +3799,7 @@ class _RouteNotice extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFFFF7E0),
           border: Border.all(color: const Color(0xFFE6C875)),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -4697,7 +4697,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               side: const BorderSide(color: Color(0xFFD5E2E4)),
             ),
             child: Padding(
