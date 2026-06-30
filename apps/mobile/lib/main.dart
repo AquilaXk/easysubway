@@ -1819,7 +1819,7 @@ class _HomeNotificationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: hasNotificationItems ? '알림, 확인할 알림 있음' : '알림, 새 알림 없음',
+      label: hasNotificationItems ? '알림, 확인할 알림 있음' : '알림, 새 알림이 없어요',
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Tooltip(
@@ -5408,7 +5408,7 @@ class _SupportAccessItem extends StatelessWidget {
     final targetUri = uri;
     final fallbackTarget = value.trim();
     final displayValue = targetUri == null
-        ? '현재 이용할 수 없음 · 준비 중'
+        ? '아직 준비 중이에요'
         : this.displayValue ?? fallbackTarget;
     final secondaryText = helperText;
     final semanticLabelParts = [title, displayValue];
