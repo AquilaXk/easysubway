@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 const _forbiddenUserCopy = <String>[
   '실기기 QA',
   '데이터팩',
+  '개인정보 및 데이터',
   '공공 API',
   '공식 파일',
   '관리자 검수',
@@ -34,6 +35,7 @@ const _forbiddenUserCopy = <String>[
   '정보 확인 필요',
   '상태 확인 필요',
   '현장 확인 필요',
+  '현장 위치 확인',
   '노선 정보 없음',
   '살펴볼 시설 없음',
   '다시 볼 시설 없음',
