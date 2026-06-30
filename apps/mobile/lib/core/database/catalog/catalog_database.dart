@@ -20,6 +20,7 @@ part 'catalog_database.g.dart';
     NetworkEdges,
     StationExits,
     Facilities,
+    StationFacilityEvidence,
     StationAccessibilitySummaries,
     InternalRouteNodes,
     InternalRouteEdges,
@@ -42,7 +43,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -72,6 +73,10 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 7) {
           await _addSourceEvidenceProvenanceColumns();
+        }
+        if (from < 8) {
+          await migrator.createTable(stationFacilityEvidence);
+          await _createStationFacilityEvidenceIndexes();
         }
       },
       beforeOpen: (_) async {
@@ -542,6 +547,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_facilities_station '
       'ON facilities(station_id)',
     );
+    await _createStationFacilityEvidenceIndexes();
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_internal_route_edges_from '
       'ON internal_route_edges(from_node_id)',
@@ -580,6 +586,13 @@ class CatalogDatabase extends _$CatalogDatabase {
         PRIMARY KEY (station_id, line_id, region)
       )
       ''');
+  }
+
+  Future<void> _createStationFacilityEvidenceIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_station_facility_evidence_station '
+      'ON station_facility_evidence(station_id, line_id)',
+    );
   }
 
   Future<void> _addRouteMapPathColumns() async {
