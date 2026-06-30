@@ -471,7 +471,7 @@ class FavoriteRoute {
       '$mobilityLabel 조건, $lineLabel, ${_routeDateLabel(routeCreatedAt)}';
 
   String get movementMetricLabel =>
-      '예상 시간 정보가 부족해요 · 환승 정보가 부족해요 · 걷는 거리 정보가 부족해요';
+      '예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요';
 
   String get accessibilityMetricLabel =>
       '계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요';
@@ -484,9 +484,9 @@ class FavoriteRoute {
       mobilityLabel,
       scoreLabel,
       scoreBasisSemanticLabel,
-      '예상 시간 정보가 부족해요',
-      '환승 정보가 부족해요',
-      '걷는 거리 정보가 부족해요',
+      '예상 시간을 확인하고 있어요',
+      '환승 안내를 확인하고 있어요',
+      '걷는 거리를 확인하고 있어요',
       '계단 여부를 아직 알 수 없어요',
       '엘리베이터 연결을 아직 알 수 없어요',
     ].join(', ');
@@ -860,10 +860,10 @@ class RouteSearchResult {
 
   String get burdenLevelLabel {
     if (isBlocked) {
-      return '이동 부담 정보가 부족해요';
+      return '이동 부담을 확인하고 있어요';
     }
     if (movementSteps.isEmpty) {
-      return '이동 부담 정보가 부족해요';
+      return '이동 부담을 확인하고 있어요';
     }
     if (_hasHighBurdenFact) {
       return '이동 부담 높음';
@@ -960,7 +960,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '정보가 부족해요',
+        fallback: '안내를 준비 중이에요',
       ),
     );
   }
@@ -1035,7 +1035,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리 정보가 부족해요';
+      return '시간 또는 거리를 확인하고 있어요';
     }
     return '앱에 저장된 길 안내예요';
   }
@@ -1043,14 +1043,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간 정보가 부족해요';
+    return '시간을 확인하고 있어요';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리 정보가 부족해요';
+    return '거리를 확인하고 있어요';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
@@ -1065,13 +1065,13 @@ String _routeDistanceLabel(int distanceMeters) {
 
 String _routeWarningLabel(String code) {
   return switch (code.trim()) {
-    'LOW_DATA_CONFIDENCE' => '일부 시설 정보가 부족해요.',
-    'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
+    'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
+    'STALE_ACCESSIBILITY_DATA' => '시설 상태를 최근에 확인하지 못했어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
     'GENERATED_CONNECTOR_UNVERIFIED' =>
       '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
-    'DURATION_UNKNOWN' => '소요 시간 정보가 부족해요.',
+    'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
     _ => '일부 이동 정보를 확인하지 못했어요.',

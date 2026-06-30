@@ -3001,7 +3001,7 @@ void main() {
     expect(find.byKey(const Key('homeHeroCard')), findsOneWidget);
     expect(find.text('시설 알림'), findsOneWidget);
     expect(find.text('상록수역 3번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('정보 부족 · 엘리베이터 상태 정보가 부족해요'), findsOneWidget);
+    expect(find.text('확인 중 · 엘리베이터 상태를 확인하고 있어요'), findsOneWidget);
     expect(find.text('주의'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '저장한 시설 보기'), findsOneWidget);
     expect(find.text('대체 1번 출구'), findsNothing);
@@ -5522,7 +5522,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('예상 시간 정보가 부족해요 · 환승 정보가 부족해요 · 걷는 거리 정보가 부족해요'),
+        find.text('예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요'),
         findsOneWidget,
       );
       expect(
@@ -5531,7 +5531,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 다시 찾으면 자세히 볼 수 있어요, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간 정보가 부족해요, 환승 정보가 부족해요, 걷는 거리 정보가 부족해요, 계단 여부를 아직 알 수 없어요, 엘리베이터 연결을 아직 알 수 없어요',
+          '즐겨찾기 경로, 상록수에서 사당까지, 수도권 4호선, 천천히 이동, 다시 찾으면 자세히 볼 수 있어요, 천천히 이동 조건, 수도권 4호선, 최근 확인 2026-06-13, 예상 시간을 확인하고 있어요, 환승 안내를 확인하고 있어요, 걷는 거리를 확인하고 있어요, 계단 여부를 아직 알 수 없어요, 엘리베이터 연결을 아직 알 수 없어요',
         ),
         findsOneWidget,
       );
@@ -7618,7 +7618,7 @@ void main() {
           of: find.byKey(
             const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
           ),
-          matching: find.text('상태 정보가 부족해요'),
+          matching: find.text('상태를 확인하고 있어요'),
         ),
         findsOneWidget,
       );
@@ -7851,7 +7851,7 @@ void main() {
       for (var index = 0; index < 8; index += 1) {
         sawNormal |= find.text('이용 가능').evaluate().isNotEmpty;
         sawBroken |= find.text('이용할 수 없어요').evaluate().isNotEmpty;
-        sawNeedsCheck |= find.text('상태 정보가 부족해요').evaluate().isNotEmpty;
+        sawNeedsCheck |= find.text('상태를 확인하고 있어요').evaluate().isNotEmpty;
         if (sawNormal && sawBroken && sawNeedsCheck) {
           break;
         }
@@ -8768,8 +8768,8 @@ void main() {
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
-      expect(find.text('일부 시설 정보가 부족해요.'), findsOneWidget);
-      expect(find.text('접근성 시설 정보가 최근 확인되지 않았습니다.'), findsOneWidget);
+      expect(find.text('일부 시설 안내를 준비 중이에요.'), findsOneWidget);
+      expect(find.text('시설 상태를 최근에 확인하지 못했어요.'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
@@ -10621,7 +10621,7 @@ void main() {
             facilityId: 'facility-sangnoksu-toilet-1',
             facilityName: '장애인 화장실',
             facilityTypeLabel: '장애인 화장실',
-            facilityStatusLabel: '상태 정보가 부족해요',
+            facilityStatusLabel: '상태를 확인하고 있어요',
           ),
           draftTargetStore: draftTargetStore,
           photoPicker: () async => const FacilityReportPhotoAttachment(
@@ -10663,7 +10663,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '상태 정보가 부족해요',
+        facilityStatusLabel: '상태를 확인하고 있어요',
       ),
     );
     var restoreCount = 0;
@@ -10700,7 +10700,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태 정보가 부족해요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
     );
 
@@ -10749,7 +10749,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '상태 정보가 부족해요',
+        facilityStatusLabel: '상태를 확인하고 있어요',
       ),
     );
     var restoreCount = 0;
@@ -10796,7 +10796,7 @@ void main() {
     expect(draftTargetStore.clearCount, 1);
     expect(find.text('시설 상태 제보'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태 정보가 부족해요'),
+      find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
     );
   });
@@ -10810,7 +10810,7 @@ void main() {
         facilityId: 'facility-sangnoksu-toilet-1',
         facilityName: '장애인 화장실',
         facilityTypeLabel: '장애인 화장실',
-        facilityStatusLabel: '상태 정보가 부족해요',
+        facilityStatusLabel: '상태를 확인하고 있어요',
       ),
     )..throwOnClear = true;
 
@@ -12780,7 +12780,7 @@ RouteSearchResult _sampleRouteSearchResult({
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 정보가 부족해요.',
+        message: '일부 시설 안내를 준비 중이에요.',
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',

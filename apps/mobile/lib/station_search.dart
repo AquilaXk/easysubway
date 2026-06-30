@@ -743,12 +743,12 @@ class StationFacilityInfo {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '상태 정보가 부족해요',
+      'UNKNOWN' => '상태를 확인하고 있어요',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
-      'NEEDS_CHECK' => '상태 정보가 부족해요',
-      _ => '상태 정보가 부족해요',
+      'NEEDS_CHECK' => '상태를 확인하고 있어요',
+      _ => '상태를 확인하고 있어요',
     };
   }
 
@@ -939,8 +939,8 @@ String _dataConfidenceLabel(String dataConfidence) {
   return switch (dataConfidence) {
     'HIGH' => '최근 확인된 정보예요',
     'MEDIUM' => '일부 확인된 정보예요',
-    'LOW' => '정보가 부족해요',
-    _ => '정보가 부족해요',
+    'LOW' => '안내를 준비 중이에요',
+    _ => '안내를 준비 중이에요',
   };
 }
 

@@ -219,7 +219,7 @@ class LocalRouteEngine {
         edge.isDataStale ||
         edge.accessibilityState == RouteAccessibilityState.unknown ||
         edge.stairAccessState == RouteStairAccessState.unknown) {
-      return '정보가 부족해요';
+      return '안내를 준비 중이에요';
     }
     if (edge.reliabilityScore >= 80) {
       return '확인된 정보예요';
@@ -227,18 +227,18 @@ class LocalRouteEngine {
     if (edge.reliabilityScore >= 60) {
       return '일부 확인된 정보예요';
     }
-    return '정보가 부족해요';
+    return '안내를 준비 중이에요';
   }
 
   String _warningMessage(String code) {
     return switch (code) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 정보가 부족해요.',
-      'STALE_ACCESSIBILITY_DATA' => '접근성 시설 정보가 최근 확인되지 않았습니다.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
+      'STALE_ACCESSIBILITY_DATA' => '시설 상태를 최근에 확인하지 못했어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
       'GENERATED_CONNECTOR_UNVERIFIED' =>
         '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
-      'DURATION_UNKNOWN' => '소요 시간 정보가 부족해요.',
+      'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '이동 전 현장 안내를 확인해 주세요.',
