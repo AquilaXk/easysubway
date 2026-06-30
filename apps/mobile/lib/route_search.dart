@@ -574,6 +574,226 @@ class RouteSearchRequest {
   }
 }
 
+class RouteSearchV2Result {
+  const RouteSearchV2Result({
+    required this.contractVersion,
+    required this.originStationId,
+    required this.destinationStationId,
+    required this.departureTime,
+    required this.mobilityType,
+    required this.constraintMode,
+    required this.useRealtime,
+    required this.maxTransfers,
+    required this.alternativeCount,
+    required this.statuses,
+    required this.itineraries,
+  });
+
+  factory RouteSearchV2Result.fromJson(Map<String, Object?> json) {
+    final rawItineraries = json['itineraries'];
+    if (rawItineraries is! List<Object?>) {
+      throw const FormatException('Invalid route v2 itinerary payload');
+    }
+    return RouteSearchV2Result(
+      contractVersion: _requiredRouteString(json, 'contractVersion'),
+      originStationId: _requiredRouteString(json, 'originStationId'),
+      destinationStationId: _requiredRouteString(json, 'destinationStationId'),
+      departureTime: _requiredRouteString(json, 'departureTime'),
+      mobilityType: _requiredRouteString(json, 'mobilityType'),
+      constraintMode: _requiredRouteString(json, 'constraintMode'),
+      useRealtime: _requiredRouteBool(json, 'useRealtime'),
+      maxTransfers: _requiredRouteInt(json, 'maxTransfers'),
+      alternativeCount: _requiredRouteInt(json, 'alternativeCount'),
+      statuses: _routeStringList(json['statuses'], 'route v2 status'),
+      itineraries: rawItineraries
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid route v2 itinerary payload');
+            }
+            return RouteSearchV2Itinerary.fromJson(item);
+          })
+          .toList(growable: false),
+    );
+  }
+
+  final String contractVersion;
+  final String originStationId;
+  final String destinationStationId;
+  final String departureTime;
+  final String mobilityType;
+  final String constraintMode;
+  final bool useRealtime;
+  final int maxTransfers;
+  final int alternativeCount;
+  final List<String> statuses;
+  final List<RouteSearchV2Itinerary> itineraries;
+}
+
+class RouteSearchV2Itinerary {
+  const RouteSearchV2Itinerary({
+    required this.itineraryId,
+    required this.status,
+    required this.plannedArrivalTime,
+    required this.realtimeArrivalTime,
+    required this.etaSource,
+    required this.etaConfidence,
+    required this.durationSeconds,
+    required this.transferCount,
+    required this.walkingDistanceMeters,
+    required this.accessibilityRisk,
+    required this.legs,
+    required this.commercialEtaEligible,
+  });
+
+  factory RouteSearchV2Itinerary.fromJson(Map<String, Object?> json) {
+    final rawLegs = json['legs'];
+    final rawAccessibilityRisk = json['accessibilityRisk'];
+    if (rawLegs is! List<Object?> ||
+        rawAccessibilityRisk is! Map<String, Object?>) {
+      throw const FormatException('Invalid route v2 itinerary payload');
+    }
+    return RouteSearchV2Itinerary(
+      itineraryId: _requiredRouteString(json, 'itineraryId'),
+      status: _requiredRouteString(json, 'status'),
+      plannedArrivalTime: _requiredRouteString(json, 'plannedArrivalTime'),
+      realtimeArrivalTime: _optionalNullableRouteString(
+        json,
+        'realtimeArrivalTime',
+      ),
+      etaSource: _requiredRouteString(json, 'etaSource'),
+      etaConfidence: _requiredRouteString(json, 'etaConfidence'),
+      durationSeconds: _requiredRouteInt(json, 'durationSeconds'),
+      transferCount: _requiredRouteInt(json, 'transferCount'),
+      walkingDistanceMeters: _requiredRouteInt(json, 'walkingDistanceMeters'),
+      accessibilityRisk: RouteSearchV2AccessibilityRisk.fromJson(
+        rawAccessibilityRisk,
+      ),
+      legs: rawLegs
+          .map((item) {
+            if (item is! Map<String, Object?>) {
+              throw const FormatException('Invalid route v2 leg payload');
+            }
+            return RouteSearchV2Leg.fromJson(item);
+          })
+          .toList(growable: false),
+      commercialEtaEligible: _requiredRouteBool(json, 'commercialEtaEligible'),
+    );
+  }
+
+  final String itineraryId;
+  final String status;
+  final String plannedArrivalTime;
+  final String? realtimeArrivalTime;
+  final String etaSource;
+  final String etaConfidence;
+  final int durationSeconds;
+  final int transferCount;
+  final int walkingDistanceMeters;
+  final RouteSearchV2AccessibilityRisk accessibilityRisk;
+  final List<RouteSearchV2Leg> legs;
+  final bool commercialEtaEligible;
+}
+
+class RouteSearchV2Leg {
+  const RouteSearchV2Leg({
+    required this.legType,
+    required this.fromStationId,
+    required this.toStationId,
+    required this.fromNodeId,
+    required this.toNodeId,
+    required this.lineId,
+    required this.tripId,
+    required this.trainNo,
+    required this.plannedDepartureTime,
+    required this.realtimeDepartureTime,
+    required this.plannedArrivalTime,
+    required this.realtimeArrivalTime,
+    required this.waitTimeSeconds,
+    required this.slackSeconds,
+    required this.durationSeconds,
+    required this.distanceMeters,
+    required this.etaSource,
+    required this.confidence,
+    required this.accessibilityRisk,
+  });
+
+  factory RouteSearchV2Leg.fromJson(Map<String, Object?> json) {
+    final rawAccessibilityRisk = json['accessibilityRisk'];
+    if (rawAccessibilityRisk is! Map<String, Object?>) {
+      throw const FormatException('Invalid route v2 leg payload');
+    }
+    return RouteSearchV2Leg(
+      legType: _requiredRouteString(json, 'legType'),
+      fromStationId: _optionalRouteString(json, 'fromStationId'),
+      toStationId: _optionalRouteString(json, 'toStationId'),
+      fromNodeId: _optionalRouteString(json, 'fromNodeId'),
+      toNodeId: _optionalRouteString(json, 'toNodeId'),
+      lineId: _optionalRouteString(json, 'lineId'),
+      tripId: _optionalRouteString(json, 'tripId'),
+      trainNo: _optionalRouteString(json, 'trainNo'),
+      plannedDepartureTime: _requiredRouteString(json, 'plannedDepartureTime'),
+      realtimeDepartureTime: _optionalNullableRouteString(
+        json,
+        'realtimeDepartureTime',
+      ),
+      plannedArrivalTime: _requiredRouteString(json, 'plannedArrivalTime'),
+      realtimeArrivalTime: _optionalNullableRouteString(
+        json,
+        'realtimeArrivalTime',
+      ),
+      waitTimeSeconds: _requiredRouteInt(json, 'waitTimeSeconds'),
+      slackSeconds: _requiredRouteInt(json, 'slackSeconds'),
+      durationSeconds: _requiredRouteInt(json, 'durationSeconds'),
+      distanceMeters: _requiredRouteInt(json, 'distanceMeters'),
+      etaSource: _requiredRouteString(json, 'etaSource'),
+      confidence: _requiredRouteString(json, 'confidence'),
+      accessibilityRisk: RouteSearchV2AccessibilityRisk.fromJson(
+        rawAccessibilityRisk,
+      ),
+    );
+  }
+
+  final String legType;
+  final String fromStationId;
+  final String toStationId;
+  final String fromNodeId;
+  final String toNodeId;
+  final String lineId;
+  final String tripId;
+  final String trainNo;
+  final String plannedDepartureTime;
+  final String? realtimeDepartureTime;
+  final String plannedArrivalTime;
+  final String? realtimeArrivalTime;
+  final int waitTimeSeconds;
+  final int slackSeconds;
+  final int durationSeconds;
+  final int distanceMeters;
+  final String etaSource;
+  final String confidence;
+  final RouteSearchV2AccessibilityRisk accessibilityRisk;
+}
+
+class RouteSearchV2AccessibilityRisk {
+  const RouteSearchV2AccessibilityRisk({
+    required this.level,
+    required this.reasons,
+  });
+
+  factory RouteSearchV2AccessibilityRisk.fromJson(Map<String, Object?> json) {
+    return RouteSearchV2AccessibilityRisk(
+      level: _requiredRouteString(json, 'level'),
+      reasons: _routeStringList(
+        json['reasons'],
+        'route v2 accessibility risk reason',
+      ),
+    );
+  }
+
+  final String level;
+  final List<String> reasons;
+}
+
 class RouteSearchResult {
   const RouteSearchResult({
     required this.routeSearchId,
@@ -4835,6 +5055,18 @@ String _optionalRouteString(
     return trimmed.isEmpty ? fallback : trimmed;
   }
   return fallback;
+}
+
+String? _optionalNullableRouteString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value == null) {
+    return null;
+  }
+  if (value is String) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+  throw FormatException('Invalid route field: $key');
 }
 
 List<String> _routeStringList(Object? value, String label) {
