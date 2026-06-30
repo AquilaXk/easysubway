@@ -2271,6 +2271,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.deepEqual(gate.gateStatusEnum, [
     "NOT_STARTED",
     "IN_PROGRESS",
+    "DENOMINATOR_LOCKED",
     "BLOCKED_EXTERNAL",
     "BLOCKED_TECHNICAL",
     "SATISFIED",
@@ -3828,6 +3829,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
 test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
   const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
 
@@ -3836,9 +3838,28 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.androidApplicationId, "com.easysubway.app");
   assert.equal(scope.releaseGate, "production-datapack-scope");
   assert.equal(scope.issue, 547);
+  assert.equal(scope.status, "DENOMINATOR_LOCKED");
+  assert.equal(scope.statusDetail, "SUPPORTED_STATION_LINE_OPERATOR_DENOMINATOR_LOCKED");
   assert.equal(scope.decision.approvalState, "qa-approved");
   assert.equal(scope.supportScope.id, "capital_pilot_android_v1");
   assert.deepEqual(scope.supportScope.regionIds, ["capital"]);
+  assert.equal(scope.supportScope.supportedClaimKo, "상록수·사당 검증 pilot");
+  assert.deepEqual(scope.supportScope.includedOperatorIds, ["seoul-metro"]);
+  assert.deepEqual(scope.supportScope.includedLineIds, ["seoul-4"]);
+  assert.deepEqual(scope.supportScope.includedStationIds, ["station-sangnoksu", "station-sadang"]);
+  assert.deepEqual(scope.supportScope.requiredFacilityTypes, ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"]);
+  assert.deepEqual(scope.supportScope.facilityCoverageDenominator, {
+    kind: "station_x_required_facility_type",
+    expectedRows: 6,
+  });
+  assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.supportScope.includedOperatorIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.supportScope.includedLineIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, scope.supportScope.includedStationIds);
+  assert.deepEqual(productionInput.supportedV1Scope.requiredFacilityTypes, scope.supportScope.requiredFacilityTypes);
+  assert.deepEqual(
+    productionInput.supportedV1Scope.facilityCoverageDenominator,
+    scope.supportScope.facilityCoverageDenominator,
+  );
   assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
     "UNSUPPORTED_REGION",
     "다시 확인",
