@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'accessible_design.dart';
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
 
@@ -15,6 +16,7 @@ const _deviceRegistrationErrorMessage = '알림을 켜지 못했어요.';
 const _notificationPermissionErrorMessage = '알림을 켤 수 있는지 확인하지 못했어요.';
 const _notificationRegistrationFailureNextAction =
     '휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
+const _notificationSwitchTileRadius = BorderRadius.all(Radius.circular(8));
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -883,7 +885,7 @@ class _NotificationSettingsMessage extends StatelessWidget {
             message,
             key: const Key('notificationSettingsMessage'),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w700,
               height: 1.35,
             ),
@@ -900,7 +902,7 @@ class _NotificationSettingsMessage extends StatelessWidget {
             child: Text(
               _notificationRegistrationFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF506B6F),
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -939,9 +941,9 @@ class _NotificationSwitchTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       color: Colors.white,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: Color(0xFFD5E2E4)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: _notificationSwitchTileRadius,
+        side: BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Semantics(
         container: true,
@@ -959,7 +961,7 @@ class _NotificationSwitchTile extends StatelessWidget {
           title: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w800,
               height: 1.35,
             ),
@@ -1007,7 +1009,7 @@ class _NotificationSettingsFailure extends StatelessWidget {
           child: Text(
             message,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w800,
               height: 1.35,
             ),
