@@ -38,6 +38,8 @@ const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
 const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
 const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
+const _routePointSelectorPadding = EdgeInsets.fromLTRB(8, 8, 58, 8);
+const _routeResultSectionPadding = EdgeInsets.fromLTRB(1, 0, 1, 11);
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1724,7 +1726,7 @@ class _RoutePointPickerCard extends StatelessWidget {
         alignment: Alignment.centerRight,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 58, 8),
+            padding: _routePointSelectorPadding,
             child: Column(
               children: [
                 originPicker ??
@@ -3589,7 +3591,7 @@ class _RouteResultSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(1, 0, 1, 11),
+      padding: _routeResultSectionPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
