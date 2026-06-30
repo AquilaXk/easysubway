@@ -80,3 +80,35 @@ jobs:
             ${{ runner.temp }}/google-play-api-access.txt
           if-no-files-found: warn
           retention-days: 14
+
+  notify-slack-store-result:
+    name: Slack / Store distribution evidence result
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: preflight
+    if: ${{ always() }}
+    env:
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+    steps:
+      - name: Slack / Skip missing release webhook
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Slack notification::SLACK_RELEASE_WEBHOOK_URL is not configured."
+
+      - name: Slack / Notify store distribution evidence result
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway store distribution evidence ${{ needs.preflight.result }}"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway Store Distribution Evidence ${{ needs.preflight.result }}*
+                    • repo: `${{ github.repository }}`
+                    • ref: `${{ github.ref_name }}`
+                    • actor: `${{ github.actor }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>

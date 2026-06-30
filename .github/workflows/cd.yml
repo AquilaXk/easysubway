@@ -344,3 +344,41 @@ jobs:
             rm -f "${EASYSUBWAY_ENV_FILE}"
           fi
           rm -rf "${RUNNER_TEMP}/deploy-env"
+
+  notify-slack-cd-result:
+    name: Slack / CD result
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - plan
+      - deploy
+    if: >-
+      ${{
+        always() &&
+        (needs.plan.result == 'success' || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+      }}
+    env:
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+    steps:
+      - name: Slack / Skip missing release webhook
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Slack notification::SLACK_RELEASE_WEBHOOK_URL is not configured."
+
+      - name: Slack / Notify CD result
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway CD ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway CD ${{ contains(needs.*.result, 'failure') && '실패' || contains(needs.*.result, 'cancelled') && '취소' || '성공' }}*
+                    • repo: `${{ github.repository }}`
+                    • ref: `${{ github.ref_name }}`
+                    • actor: `${{ github.actor }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>

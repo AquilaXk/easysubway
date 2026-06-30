@@ -368,3 +368,47 @@ jobs:
           set -euo pipefail
           flutter pub get
           flutter build apk --debug
+
+  notify-slack-ci-failure:
+    name: Slack / CI failure
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - release-gate-consistency
+      - repository-contracts
+      - backend
+      - mobile-app
+      - android
+      - dependency-vulnerability-scan
+    if: >-
+      ${{
+        always() &&
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+      }}
+    env:
+      SLACK_CI_WEBHOOK_URL: ${{ secrets.SLACK_CI_WEBHOOK_URL }}
+    steps:
+      - name: Slack / Skip missing CI webhook
+        if: ${{ env.SLACK_CI_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Slack notification::SLACK_CI_WEBHOOK_URL is not configured."
+
+      - name: Slack / Notify CI failure
+        if: ${{ env.SLACK_CI_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_CI_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway CI failed"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway CI 실패*
+                    • repo: `${{ github.repository }}`
+                    • ref: `${{ github.ref_name }}`
+                    • actor: `${{ github.actor }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>
