@@ -266,6 +266,10 @@ class LocalRouteRepository implements RouteSearchRepository {
       'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
       'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
+      'BLOCKED_UNVERIFIED_EDGE' => '검증되지 않은 경로는 안내하지 않아요.',
+      'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
+      'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
+      'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
     };
@@ -360,6 +364,36 @@ class _RouteCatalogSnapshot {
       'last_verified_at',
       'NULL',
     );
+    final sourceIdSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'source_id',
+      "''",
+    );
+    final sourceSnapshotIdSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'source_snapshot_id',
+      "''",
+    );
+    final providerRecordHashSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'provider_record_hash',
+      "''",
+    );
+    final provenanceKindSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'provenance_kind',
+      "'UNKNOWN'",
+    );
+    final verificationStatusSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'verification_status',
+      "'UNKNOWN'",
+    );
+    final evidenceHashSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'evidence_hash',
+      "''",
+    );
     final distanceMetersSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'distance_meters',
@@ -449,6 +483,12 @@ class _RouteCatalogSnapshot {
                  $accessibilityStatusSql AS accessibility_status,
                  $reliabilityScoreSql AS reliability_score,
                  $lastVerifiedAtSql AS last_verified_at,
+                 $sourceIdSql AS source_id,
+                 $sourceSnapshotIdSql AS source_snapshot_id,
+                 $providerRecordHashSql AS provider_record_hash,
+                 $provenanceKindSql AS provenance_kind,
+                 $verificationStatusSql AS verification_status,
+                 $evidenceHashSql AS evidence_hash,
                  $facilityIdSql AS facility_id
           FROM network_edges
           ORDER BY id
@@ -518,6 +558,12 @@ class _RouteCatalogSnapshot {
                 lastVerifiedAtSeconds,
                 facility,
               ),
+              sourceId: row.read<String>('source_id'),
+              sourceSnapshotId: row.read<String>('source_snapshot_id'),
+              providerRecordHash: row.read<String>('provider_record_hash'),
+              provenanceKind: row.read<String>('provenance_kind'),
+              verificationStatus: row.read<String>('verification_status'),
+              evidenceHash: row.read<String>('evidence_hash'),
             );
           })
           .toList(growable: false),
@@ -902,6 +948,7 @@ graph.RouteEdge _toGraphRouteEdge(
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
+    safetyEvidence: networkEdge.safetyEvidence,
   );
 }
 
@@ -1173,6 +1220,12 @@ class _NetworkEdgeSnapshot {
     required this.accessibilityStatus,
     required this.reliabilityScore,
     required this.lastVerifiedAtSeconds,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    required this.evidenceHash,
   });
 
   final String id;
@@ -1187,6 +1240,12 @@ class _NetworkEdgeSnapshot {
   final String accessibilityStatus;
   final int reliabilityScore;
   final int? lastVerifiedAtSeconds;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String evidenceHash;
 
   graph.RouteEdgeType? get routeEdgeType {
     return switch (edgeType.toUpperCase()) {
@@ -1243,4 +1302,82 @@ class _NetworkEdgeSnapshot {
       DateTime.now().toUtc().subtract(const Duration(days: 365)),
     );
   }
+
+  graph.RouteEdgeSafetyEvidence get safetyEvidence {
+    final verifiedAt = lastVerifiedAtSeconds == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(
+            lastVerifiedAtSeconds! * 1000,
+            isUtc: true,
+          );
+    final evidenceHashValid = _isValidEvidenceHash(evidenceHash);
+    final isPlaceholderEvidence = _isPlaceholderEvidenceHash(evidenceHash);
+    final blockerReasons = _strictRouteBlockerReasons(
+      sourceId: sourceId,
+      provenanceKind: provenanceKind,
+      verificationStatus: verificationStatus,
+      evidenceHash: evidenceHash,
+      evidenceHashValid: evidenceHashValid,
+      isPlaceholderEvidence: isPlaceholderEvidence,
+    );
+    return graph.RouteEdgeSafetyEvidence(
+      sourceId: sourceId,
+      sourceSnapshotId: sourceSnapshotId,
+      providerRecordHash: providerRecordHash,
+      provenanceKind: provenanceKind,
+      verificationStatus: verificationStatus,
+      evidenceHash: evidenceHash,
+      evidenceHashValid: evidenceHashValid,
+      isPlaceholderEvidence: isPlaceholderEvidence,
+      lastVerifiedAt: verifiedAt,
+      isStale: isDataStale,
+      isGeneratedConnector: false,
+      strictRouteEligible: blockerReasons.isEmpty,
+      blockerReasons: blockerReasons,
+    );
+  }
+}
+
+List<String> _strictRouteBlockerReasons({
+  required String sourceId,
+  required String provenanceKind,
+  required String verificationStatus,
+  required String evidenceHash,
+  required bool evidenceHashValid,
+  required bool isPlaceholderEvidence,
+}) {
+  // ponytail: legacy fixture rows predate provenance; production rows carry source_id.
+  if (sourceId.isEmpty &&
+      provenanceKind.toUpperCase() == 'UNKNOWN' &&
+      verificationStatus.toUpperCase() == 'UNKNOWN' &&
+      evidenceHash.isEmpty) {
+    return const [];
+  }
+  if (verificationStatus.toUpperCase() != 'VERIFIED') {
+    return const ['BLOCKED_UNVERIFIED_EDGE'];
+  }
+  if (!_allowedStrictProvenanceKinds.contains(provenanceKind.toUpperCase())) {
+    return const ['BLOCKED_UNSUPPORTED_SCOPE'];
+  }
+  if (!evidenceHashValid) {
+    return const ['BLOCKED_MISSING_EVIDENCE_HASH'];
+  }
+  if (isPlaceholderEvidence) {
+    return const ['BLOCKED_PLACEHOLDER_EVIDENCE_HASH'];
+  }
+  return const [];
+}
+
+const _allowedStrictProvenanceKinds = {
+  'OFFICIAL_SOURCE',
+  'OPERATOR_CONFIRMED',
+  'FIELD_SURVEY',
+};
+
+bool _isValidEvidenceHash(String value) {
+  return RegExp(r'^[0-9a-f]{64}$').hasMatch(value);
+}
+
+bool _isPlaceholderEvidenceHash(String value) {
+  return RegExp(r'^([0-9a-f])\1{63}$').hasMatch(value);
 }
