@@ -142,6 +142,82 @@ void main() {
     expect(edge.read<int>('reliability_score'), 30);
   });
 
+  test('기존 baseline edge provenance를 보강해 strict 경로를 유지한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET source_id = '',
+          source_snapshot_id = '',
+          provider_record_hash = '',
+          provenance_kind = 'UNKNOWN',
+          verification_status = 'UNKNOWN',
+          evidence_hash = ''
+      WHERE id IN (
+        'edge-sangnoksu-sadang-seoul-4',
+        'edge-sadang-sangnoksu-seoul-4',
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT source_id, verification_status, evidence_hash
+            FROM network_edges
+            WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+          ''').getSingle();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(edge.read<String>('source_id'), 'baseline-route-source-capital');
+    expect(edge.read<String>('verification_status'), 'VERIFIED');
+    expect(edge.read<String>('evidence_hash'), hasLength(64));
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+  });
+
+  test('기존 baseline edge의 명시 non-verified 상태는 보강 과정에서 덮어쓰지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET verification_status = 'STALE'
+      WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT verification_status
+            FROM network_edges
+            WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+          ''').getSingle();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(edge.read<String>('verification_status'), 'STALE');
+    expect(result.status, 'UNKNOWN');
+    expect(result.blockedReasons, contains('검증되지 않은 경로는 안내하지 않아요.'));
+  });
+
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -432,6 +508,292 @@ void main() {
     expect(result.recommendationReasons.join('\n'), isNot(contains('확인했어요')));
   });
 
+  test('검증되지 않은 network edge는 strict 경로에서 FOUND로 안내하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'entry-a-line-test',
+      fromNodeId: 'station-a',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'ENTRY',
+      durationSeconds: 90,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-a-c-unverified',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 180,
+      verificationStatus: 'PENDING',
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'exit-c-line-test',
+      fromNodeId: 'station-c:line-test',
+      toNodeId: 'station-c',
+      edgeType: 'EXIT',
+      durationSeconds: 60,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STROLLER',
+      ),
+    );
+
+    expect(result.status, 'UNKNOWN');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('검증되지 않은 경로는 안내하지 않아요.'));
+    expect(result.warnings, isEmpty);
+  });
+
+  test('오래된 network edge는 strict 경로에서 stale 사유를 표시한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-a-c-stale',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 180,
+      lastVerifiedAtSeconds: 0,
+    );
+
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'UNKNOWN');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('오래된 안내라 계단 없는 경로로 안내하지 않아요.'));
+    expect(result.warnings, isEmpty);
+  });
+
+  test('잘못된 provenance와 evidence hash는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
+    for (final fixture in const [
+      (
+        id: 'edge-a-c-missing-evidence',
+        provenanceKind: 'OFFICIAL_SOURCE',
+        evidenceHash: '',
+        expectedReason: '검증 근거가 없는 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-placeholder-evidence',
+        provenanceKind: 'OFFICIAL_SOURCE',
+        evidenceHash:
+            '0000000000000000000000000000000000000000000000000000000000000000',
+        expectedReason: '임시 근거만 있는 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-unsupported-provenance',
+        provenanceKind: 'GENERATED',
+        evidenceHash:
+            '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        expectedReason: '지원 범위 밖 경로는 안내하지 않아요.',
+      ),
+    ]) {
+      final database = CatalogDatabase.memory();
+      try {
+        await _seedLineWithoutNetworkEdges(
+          database,
+          includeExplicitAccessEdges: false,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'entry-a-line-test-${fixture.id}',
+          fromNodeId: 'station-a',
+          toNodeId: 'station-a:line-test',
+          edgeType: 'ENTRY',
+          durationSeconds: 90,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: fixture.id,
+          fromNodeId: 'station-a:line-test',
+          toNodeId: 'station-c:line-test',
+          edgeType: 'RIDE',
+          durationSeconds: 180,
+          provenanceKind: fixture.provenanceKind,
+          evidenceHash: fixture.evidenceHash,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'exit-c-line-test-${fixture.id}',
+          fromNodeId: 'station-c:line-test',
+          toNodeId: 'station-c',
+          edgeType: 'EXIT',
+          durationSeconds: 60,
+        );
+        final repository = LocalRouteRepository(catalogDatabase: database);
+
+        final result = await repository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-c',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+        expect(result.status, 'UNKNOWN');
+        expect(result.steps, isEmpty);
+        expect(result.blockedReasons, contains(fixture.expectedReason));
+        expect(result.warnings, isEmpty);
+      } finally {
+        await database.close();
+      }
+    }
+  });
+
+  test('부분 edge 근거 metadata는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
+    for (final fixture in const [
+      (
+        id: 'edge-a-c-missing-source-snapshot',
+        setSql: "source_snapshot_id = ''",
+        expectedReason: '검증되지 않은 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-missing-provider-hash',
+        setSql: "provider_record_hash = ''",
+        expectedReason: '검증 근거가 없는 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-missing-verified-at',
+        setSql: 'last_verified_at = NULL',
+        expectedReason: '검증되지 않은 경로는 안내하지 않아요.',
+      ),
+    ]) {
+      final database = CatalogDatabase.memory();
+      try {
+        await _seedLineWithoutNetworkEdges(
+          database,
+          includeExplicitAccessEdges: false,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'entry-a-line-test-${fixture.id}',
+          fromNodeId: 'station-a',
+          toNodeId: 'station-a:line-test',
+          edgeType: 'ENTRY',
+          durationSeconds: 90,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: fixture.id,
+          fromNodeId: 'station-a:line-test',
+          toNodeId: 'station-c:line-test',
+          edgeType: 'RIDE',
+          durationSeconds: 180,
+        );
+        await database.customStatement(
+          'UPDATE network_edges SET ${fixture.setSql} WHERE id = ?',
+          [fixture.id],
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'exit-c-line-test-${fixture.id}',
+          fromNodeId: 'station-c:line-test',
+          toNodeId: 'station-c',
+          edgeType: 'EXIT',
+          durationSeconds: 60,
+        );
+        final repository = LocalRouteRepository(catalogDatabase: database);
+
+        final result = await repository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-c',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+        expect(result.status, 'UNKNOWN');
+        expect(result.steps, isEmpty);
+        expect(result.blockedReasons, contains(fixture.expectedReason));
+        expect(result.warnings, isEmpty);
+      } finally {
+        await database.close();
+      }
+    }
+  });
+
+  test('마이그레이션된 빈 근거 컬럼은 strict 지원으로 보지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'entry-a-line-test-empty-evidence',
+          'station-a',
+          'station-a:line-test',
+          90,
+          'ENTRY',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-empty-evidence',
+          'station-a:line-test',
+          'station-c:line-test',
+          180,
+          'RIDE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'exit-c-line-test-empty-evidence',
+          'station-c:line-test',
+          'station-c',
+          60,
+          'EXIT',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'UNKNOWN');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.'));
+    expect(result.warnings, isEmpty);
+  });
+
   test('구형 catalog의 network_edges는 미확인 접근성 상태로 안전하게 차단한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -470,7 +832,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.'));
     expect(result.warnings, isEmpty);
   });
 
@@ -517,7 +879,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.'));
     expect(result.warnings, isEmpty);
   });
 
@@ -1206,7 +1568,7 @@ void main() {
       const RouteSearchRequest(
         originStationId: 'station-a',
         destinationStationId: 'station-b',
-        mobilityType: 'WHEELCHAIR',
+        mobilityType: 'SENIOR',
       ),
     );
 
@@ -1567,7 +1929,7 @@ void main() {
       const RouteSearchRequest(
         originStationId: 'station-a',
         destinationStationId: 'station-b',
-        mobilityType: 'WHEELCHAIR',
+        mobilityType: 'SENIOR',
       ),
     );
 
@@ -1613,7 +1975,7 @@ void main() {
       const RouteSearchRequest(
         originStationId: 'station-a',
         destinationStationId: 'station-b',
-        mobilityType: 'WHEELCHAIR',
+        mobilityType: 'SENIOR',
       ),
     );
 
@@ -1654,7 +2016,7 @@ void main() {
       const RouteSearchRequest(
         originStationId: 'station-a',
         destinationStationId: 'station-b',
-        mobilityType: 'WHEELCHAIR',
+        mobilityType: 'SENIOR',
       ),
     );
 
@@ -1697,7 +2059,7 @@ void main() {
       const RouteSearchRequest(
         originStationId: 'station-a',
         destinationStationId: 'station-b',
-        mobilityType: 'WHEELCHAIR',
+        mobilityType: 'SENIOR',
       ),
     );
 
@@ -2232,6 +2594,7 @@ void main() {
 Future<void> _seedLineWithoutNetworkEdges(
   CatalogDatabase database, {
   bool includeExplicitAccessEdges = true,
+  bool fillInsertedNetworkEdgeEvidence = true,
 }) async {
   await database.customStatement('''
     INSERT INTO catalog_metadata (key, value, updated_at)
@@ -2273,13 +2636,40 @@ Future<void> _seedLineWithoutNetworkEdges(
   if (includeExplicitAccessEdges) {
     await _addExplicitAccessEdges(database);
   }
+  if (fillInsertedNetworkEdgeEvidence) {
+    await _fillInsertedNetworkEdgeEvidence(database);
+  }
+}
+
+Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
+  await database.customStatement('''
+    CREATE TRIGGER test_fill_network_edge_evidence
+    AFTER INSERT ON network_edges
+    WHEN NEW.source_id = ''
+    BEGIN
+      UPDATE network_edges
+      SET source_id = 'test-source',
+          source_snapshot_id = 'test-source-snapshot',
+          provider_record_hash =
+            'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          provenance_kind = 'OFFICIAL_SOURCE',
+          verification_status = 'VERIFIED',
+          last_verified_at = COALESCE(NEW.last_verified_at, 1781827200),
+          evidence_hash =
+            '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+      WHERE id = NEW.id
+        AND source_id = '';
+    END
+  ''');
 }
 
 Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
   await database.customStatement('''
     INSERT INTO network_edges (
       id, from_node_id, to_node_id, duration_seconds, edge_type,
-      stair_access_state, accessibility_status, reliability_score
+      stair_access_state, accessibility_status, reliability_score,
+      source_id, source_snapshot_id, provider_record_hash, provenance_kind,
+      verification_status, last_verified_at, evidence_hash
     )
     VALUES
       (
@@ -2290,7 +2680,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-a-line-test',
@@ -2300,7 +2697,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-b-line-test',
@@ -2310,7 +2714,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-b-line-test',
@@ -2320,7 +2731,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-c-line-test',
@@ -2330,7 +2748,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-c-line-test',
@@ -2340,9 +2765,56 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
+}
+
+Future<void> _insertVerifiedNetworkEdge(
+  CatalogDatabase database, {
+  required String id,
+  required String fromNodeId,
+  required String toNodeId,
+  required String edgeType,
+  required int durationSeconds,
+  String verificationStatus = 'VERIFIED',
+  String provenanceKind = 'OFFICIAL_SOURCE',
+  int lastVerifiedAtSeconds = 1781827200,
+  String evidenceHash =
+      '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+}) async {
+  await database.customStatement(
+    '''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score,
+        source_id, source_snapshot_id, provider_record_hash, provenance_kind,
+        verification_status, last_verified_at, evidence_hash
+      )
+      VALUES (?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ?, ?, ?, ?)
+    ''',
+    [
+      id,
+      fromNodeId,
+      toNodeId,
+      durationSeconds,
+      edgeType,
+      provenanceKind,
+      verificationStatus,
+      lastVerifiedAtSeconds,
+      evidenceHash,
+    ],
+  );
 }
 
 Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
@@ -2364,7 +2836,9 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
   await database.customStatement('''
     INSERT INTO network_edges (
       id, from_node_id, to_node_id, duration_seconds, edge_type,
-      stair_access_state, accessibility_status, reliability_score
+      stair_access_state, accessibility_status, reliability_score,
+      source_id, source_snapshot_id, provider_record_hash, provenance_kind,
+      verification_status, last_verified_at, evidence_hash
     )
     VALUES
       (
@@ -2375,7 +2849,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-a-line-alt',
@@ -2385,7 +2866,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-c-line-alt',
@@ -2395,7 +2883,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-c-line-alt',
@@ -2405,7 +2900,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
 }

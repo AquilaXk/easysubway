@@ -225,14 +225,14 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
-    test('확인이 더 필요한 오래된 데이터는 경고 코드와 비용에 반영한다', () {
+    test('일반 조건의 오래된 데이터는 경고 코드와 비용에 반영한다', () {
       final engine = LocalRouteEngine(graph: _lowQualityFixtureGraph());
 
       final result = engine.search(
         const RouteRequest(
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
-          mobilityType: MobilityType.stroller,
+          mobilityType: MobilityType.senior,
         ),
       );
 
@@ -241,7 +241,7 @@ void main() {
         'LOW_DATA_CONFIDENCE',
         'STALE_ACCESSIBILITY_DATA',
       ]);
-      expect(result.totalCost, 674);
+      expect(result.totalCost, 666);
       expect(result.includesStairs, isFalse);
     });
 
@@ -359,7 +359,87 @@ void main() {
       expect(result.status, RouteStatus.unknown);
       expect(result.blockedReasonCodes, ['GENERATED_CONNECTOR_UNVERIFIED']);
     });
+
+    test('유모차 strict 경로는 미확인, 생성, 오래된 edge를 FOUND로 사용하지 않는다', () {
+      final unknownResult =
+          LocalRouteEngine(graph: _unknownAccessibilityFixtureGraph()).search(
+            const RouteRequest(
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityType: MobilityType.stroller,
+            ),
+          );
+      final staleResult = LocalRouteEngine(graph: _lowQualityFixtureGraph())
+          .search(
+            const RouteRequest(
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityType: MobilityType.stroller,
+            ),
+          );
+      final generatedResult =
+          LocalRouteEngine(graph: _generatedConnectorFixtureGraph()).search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-b',
+              mobilityType: MobilityType.stroller,
+            ),
+          );
+
+      expect(unknownResult.status, RouteStatus.unknown);
+      expect(unknownResult.blockedReasonCodes, ['ACCESSIBILITY_STATE_UNKNOWN']);
+      expect(staleResult.status, RouteStatus.unknown);
+      expect(staleResult.blockedReasonCodes, ['STALE_ACCESSIBILITY_DATA']);
+      expect(generatedResult.status, RouteStatus.unknown);
+      expect(generatedResult.blockedReasonCodes, [
+        'GENERATED_CONNECTOR_UNVERIFIED',
+      ]);
+    });
   });
+}
+
+NetworkGraph _generatedConnectorFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-generated',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+        isGeneratedConnector: true,
+      ),
+      RouteEdge(
+        id: 'ride-a-b',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'exit-b-step-free',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-b',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
 }
 
 NetworkGraph _capitalFixtureGraph() {

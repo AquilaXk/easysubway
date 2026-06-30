@@ -5440,7 +5440,7 @@ void main() {
       expect(find.text('최신 상태를 준비 중이에요'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.widgetWithText(OutlinedButton, '상태 제보'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '시설 알려주기'), findsOneWidget);
       expect(
         find.byKey(
           const Key('favoriteFacilityTile-facility-sangnoksu-elevator-1'),
@@ -5449,7 +5449,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 상태 제보',
+          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 시설 알려주기',
         ),
         findsOneWidget,
       );
@@ -5495,7 +5495,7 @@ void main() {
       tester,
       tabKey: const Key('favoriteFacilitiesTabButton'),
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, '상태 제보'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '시설 알려주기'));
     await tester.pumpAndSettle();
 
     expect(locationProvider.permissionCheckCount, 1);
@@ -7608,7 +7608,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 상태 제보, 지도 위치',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 시설 알려주기, 지도 위치',
         ),
         findsOneWidget,
       );
@@ -7668,7 +7668,7 @@ void main() {
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 상태 제보',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 시설 알려주기',
         ),
         findsOneWidget,
       );
@@ -7678,7 +7678,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 제보'), findsOneWidget);
+      expect(find.bySemanticsLabel('1번 출구 엘리베이터 시설 알려주기'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -7903,7 +7903,7 @@ void main() {
     }
   });
 
-  testWidgets('시설 상세는 실제 시설 데이터로 위치 상태 제보 진입을 보여준다', (tester) async {
+  testWidgets('시설 상세는 실제 시설 데이터로 시설 알려주기 진입을 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -7974,7 +7974,7 @@ void main() {
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('이용할 수 없어요'), findsOneWidget);
     expect(find.text('고장·폐쇄 · 고장'), findsOneWidget);
-    expect(find.text('현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.'), findsOneWidget);
+    expect(find.text('현장 안내와 다르면 시설 알려주기로 알려 주세요.'), findsOneWidget);
     expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
     expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
@@ -8004,7 +8004,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 상태 제보'), findsOneWidget);
+    expect(find.text('시설 알려주기'), findsOneWidget);
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
   });
 
@@ -10238,7 +10238,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('시설 상태 제보'), findsOneWidget);
+      expect(find.text('시설 알려주기'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('무엇을 알려드릴까요?'), findsOneWidget);
@@ -10731,7 +10731,7 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 상태 제보'), findsOneWidget);
+    expect(find.text('시설 알려주기'), findsOneWidget);
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
@@ -10827,7 +10827,7 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 상태 제보'), findsOneWidget);
+    expect(find.text('시설 알려주기'), findsOneWidget);
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
@@ -10879,7 +10879,7 @@ void main() {
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<StateError>());
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 상태 제보'), findsOneWidget);
+    expect(find.text('시설 알려주기'), findsOneWidget);
     await tester.dragUntilVisible(
       find.bySemanticsLabel('사진 1장 추가됨'),
       find.byType(Scrollable).first,
@@ -11530,7 +11530,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 상태 제보'), findsOneWidget);
+    expect(find.text('시설 알려주기'), findsOneWidget);
     await tester.ensureVisible(
       find.byKey(const Key('facilityReportDescriptionInput')),
     );

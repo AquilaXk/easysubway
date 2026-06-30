@@ -19,15 +19,17 @@ class LocalRouteRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
-    final routeGraph = catalog.toGraph();
-    final engine = LocalRouteEngine(graph: routeGraph);
-    final result = engine.search(
-      local.RouteRequest(
-        originStationId: request.originStationId,
-        destinationStationId: request.destinationStationId,
-        mobilityType: _mobilityType(request.mobilityType),
-      ),
-    );
+    final mobilityType = _mobilityType(request.mobilityType);
+    final result =
+        mobilityType.blocksStairOnlyAccess && !catalog.strictEvidenceSupported
+        ? local.LocalRouteResult.unknown(const ['STRICT_EVIDENCE_UNSUPPORTED'])
+        : LocalRouteEngine(graph: catalog.toGraph()).search(
+            local.RouteRequest(
+              originStationId: request.originStationId,
+              destinationStationId: request.destinationStationId,
+              mobilityType: mobilityType,
+            ),
+          );
 
     return _toRouteSearchResult(request, result, catalog);
   }
@@ -266,6 +268,12 @@ class LocalRouteRepository implements RouteSearchRepository {
       'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
       'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
+      'STALE_ACCESSIBILITY_DATA' => '오래된 안내라 계단 없는 경로로 안내하지 않아요.',
+      'BLOCKED_UNVERIFIED_EDGE' => '검증되지 않은 경로는 안내하지 않아요.',
+      'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
+      'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
+      'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
+      'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
     };
@@ -301,12 +309,14 @@ class _RouteCatalogSnapshot {
     required this.linesById,
     required this.stationLines,
     required this.networkEdges,
+    required this.strictEvidenceSupported,
   });
 
   final Map<String, String> stationsById;
   final Map<String, String> linesById;
   final List<_StationLineSnapshot> stationLines;
   final List<_NetworkEdgeSnapshot> networkEdges;
+  final bool strictEvidenceSupported;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final stationRows = await database
@@ -359,6 +369,36 @@ class _RouteCatalogSnapshot {
       networkEdgeColumnNames,
       'last_verified_at',
       'NULL',
+    );
+    final sourceIdSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'source_id',
+      "''",
+    );
+    final sourceSnapshotIdSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'source_snapshot_id',
+      "''",
+    );
+    final providerRecordHashSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'provider_record_hash',
+      "''",
+    );
+    final provenanceKindSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'provenance_kind',
+      "'UNKNOWN'",
+    );
+    final verificationStatusSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'verification_status',
+      "'UNKNOWN'",
+    );
+    final evidenceHashSql = _selectNetworkEdgeColumn(
+      networkEdgeColumnNames,
+      'evidence_hash',
+      "''",
     );
     final distanceMetersSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
@@ -449,10 +489,77 @@ class _RouteCatalogSnapshot {
                  $accessibilityStatusSql AS accessibility_status,
                  $reliabilityScoreSql AS reliability_score,
                  $lastVerifiedAtSql AS last_verified_at,
+                 $sourceIdSql AS source_id,
+                 $sourceSnapshotIdSql AS source_snapshot_id,
+                 $providerRecordHashSql AS provider_record_hash,
+                 $provenanceKindSql AS provenance_kind,
+                 $verificationStatusSql AS verification_status,
+                 $evidenceHashSql AS evidence_hash,
                  $facilityIdSql AS facility_id
           FROM network_edges
           ORDER BY id
           ''').get();
+    final networkEdges = networkEdgeRows
+        .map((row) {
+          final facility =
+              facilitiesById[row.readNullable<String>('facility_id')];
+          final facilityHasEligibleEvidence =
+              facility == null ||
+              eligibleFacilityEvidence.contains(
+                _stationFacilityEvidenceKey(
+                  stationId: facility.stationId,
+                  lineId: _facilityLineIdForEdge(
+                    row.read<String>('from_node_id'),
+                    row.read<String>('to_node_id'),
+                  ),
+                  facilityType: facility.type,
+                ),
+              );
+          final accessibilityStatus = row.read<String>('accessibility_status');
+          final reliabilityScore = row.read<int>('reliability_score');
+          final lastVerifiedAtSeconds = row.readNullable<int>(
+            'last_verified_at',
+          );
+          return _NetworkEdgeSnapshot(
+            id: row.read<String>('id'),
+            fromNodeId: row.read<String>('from_node_id'),
+            toNodeId: row.read<String>('to_node_id'),
+            durationSeconds: row.read<int>('duration_seconds'),
+            distanceMeters: row.read<int>('distance_meters'),
+            edgeType: row.read<String>('edge_type'),
+            servicePattern: row.read<String>('service_pattern'),
+            includesStairs: row.read<int>('includes_stairs') != 0,
+            stairAccessState: row.read<String>('stair_access_state'),
+            accessibilityStatus: _effectiveAccessibilityStatus(
+              accessibilityStatus,
+              facility,
+              facilityHasEligibleEvidence,
+            ),
+            reliabilityScore: _effectiveReliabilityScore(
+              reliabilityScore,
+              facility,
+            ),
+            lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
+              lastVerifiedAtSeconds,
+              facility,
+            ),
+            sourceId: row.read<String>('source_id'),
+            sourceSnapshotId: row.read<String>('source_snapshot_id'),
+            providerRecordHash: row.read<String>('provider_record_hash'),
+            provenanceKind: row.read<String>('provenance_kind'),
+            verificationStatus: row.read<String>('verification_status'),
+            evidenceHash: row.read<String>('evidence_hash'),
+          );
+        })
+        .toList(growable: false);
+    final strictEvidenceSupported =
+        networkEdgeColumnNames.containsAll({
+          'source_id',
+          'provenance_kind',
+          'verification_status',
+          'evidence_hash',
+        }) &&
+        networkEdges.any((edge) => edge.safetyEvidence.strictRouteEligible);
 
     return _RouteCatalogSnapshot(
       stationsById: {
@@ -472,55 +579,8 @@ class _RouteCatalogSnapshot {
             ),
           )
           .toList(growable: false),
-      networkEdges: networkEdgeRows
-          .map((row) {
-            final facility =
-                facilitiesById[row.readNullable<String>('facility_id')];
-            final facilityHasEligibleEvidence =
-                facility == null ||
-                eligibleFacilityEvidence.contains(
-                  _stationFacilityEvidenceKey(
-                    stationId: facility.stationId,
-                    lineId: _facilityLineIdForEdge(
-                      row.read<String>('from_node_id'),
-                      row.read<String>('to_node_id'),
-                    ),
-                    facilityType: facility.type,
-                  ),
-                );
-            final accessibilityStatus = row.read<String>(
-              'accessibility_status',
-            );
-            final reliabilityScore = row.read<int>('reliability_score');
-            final lastVerifiedAtSeconds = row.readNullable<int>(
-              'last_verified_at',
-            );
-            return _NetworkEdgeSnapshot(
-              id: row.read<String>('id'),
-              fromNodeId: row.read<String>('from_node_id'),
-              toNodeId: row.read<String>('to_node_id'),
-              durationSeconds: row.read<int>('duration_seconds'),
-              distanceMeters: row.read<int>('distance_meters'),
-              edgeType: row.read<String>('edge_type'),
-              servicePattern: row.read<String>('service_pattern'),
-              includesStairs: row.read<int>('includes_stairs') != 0,
-              stairAccessState: row.read<String>('stair_access_state'),
-              accessibilityStatus: _effectiveAccessibilityStatus(
-                accessibilityStatus,
-                facility,
-                facilityHasEligibleEvidence,
-              ),
-              reliabilityScore: _effectiveReliabilityScore(
-                reliabilityScore,
-                facility,
-              ),
-              lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
-                lastVerifiedAtSeconds,
-                facility,
-              ),
-            );
-          })
-          .toList(growable: false),
+      networkEdges: networkEdges,
+      strictEvidenceSupported: strictEvidenceSupported,
     );
   }
 
@@ -902,6 +962,7 @@ graph.RouteEdge _toGraphRouteEdge(
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
+    safetyEvidence: networkEdge.safetyEvidence,
   );
 }
 
@@ -1173,6 +1234,12 @@ class _NetworkEdgeSnapshot {
     required this.accessibilityStatus,
     required this.reliabilityScore,
     required this.lastVerifiedAtSeconds,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    required this.evidenceHash,
   });
 
   final String id;
@@ -1187,6 +1254,12 @@ class _NetworkEdgeSnapshot {
   final String accessibilityStatus;
   final int reliabilityScore;
   final int? lastVerifiedAtSeconds;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String evidenceHash;
 
   graph.RouteEdgeType? get routeEdgeType {
     return switch (edgeType.toUpperCase()) {
@@ -1243,4 +1316,84 @@ class _NetworkEdgeSnapshot {
       DateTime.now().toUtc().subtract(const Duration(days: 365)),
     );
   }
+
+  graph.RouteEdgeSafetyEvidence get safetyEvidence {
+    final verifiedAt = lastVerifiedAtSeconds == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(
+            lastVerifiedAtSeconds! * 1000,
+            isUtc: true,
+          );
+    final evidenceHashValid = _isValidEvidenceHash(evidenceHash);
+    final isPlaceholderEvidence = _isPlaceholderEvidenceHash(evidenceHash);
+    final blockerReasons = _strictRouteBlockerReasons(
+      sourceId: sourceId,
+      sourceSnapshotId: sourceSnapshotId,
+      providerRecordHash: providerRecordHash,
+      provenanceKind: provenanceKind,
+      verificationStatus: verificationStatus,
+      evidenceHash: evidenceHash,
+      lastVerifiedAt: verifiedAt,
+      evidenceHashValid: evidenceHashValid,
+      isPlaceholderEvidence: isPlaceholderEvidence,
+    );
+    return graph.RouteEdgeSafetyEvidence(
+      sourceId: sourceId,
+      sourceSnapshotId: sourceSnapshotId,
+      providerRecordHash: providerRecordHash,
+      provenanceKind: provenanceKind,
+      verificationStatus: verificationStatus,
+      evidenceHash: evidenceHash,
+      evidenceHashValid: evidenceHashValid,
+      isPlaceholderEvidence: isPlaceholderEvidence,
+      lastVerifiedAt: verifiedAt,
+      isStale: isDataStale,
+      isGeneratedConnector: false,
+      strictRouteEligible: blockerReasons.isEmpty,
+      blockerReasons: blockerReasons,
+    );
+  }
+}
+
+List<String> _strictRouteBlockerReasons({
+  required String sourceId,
+  required String sourceSnapshotId,
+  required String providerRecordHash,
+  required String provenanceKind,
+  required String verificationStatus,
+  required String evidenceHash,
+  required DateTime? lastVerifiedAt,
+  required bool evidenceHashValid,
+  required bool isPlaceholderEvidence,
+}) {
+  if (sourceId.isEmpty || sourceSnapshotId.isEmpty || lastVerifiedAt == null) {
+    return const ['BLOCKED_UNVERIFIED_EDGE'];
+  }
+  if (verificationStatus.toUpperCase() != 'VERIFIED') {
+    return const ['BLOCKED_UNVERIFIED_EDGE'];
+  }
+  if (!_allowedStrictProvenanceKinds.contains(provenanceKind.toUpperCase())) {
+    return const ['BLOCKED_UNSUPPORTED_SCOPE'];
+  }
+  if (!evidenceHashValid || !_isValidEvidenceHash(providerRecordHash)) {
+    return const ['BLOCKED_MISSING_EVIDENCE_HASH'];
+  }
+  if (isPlaceholderEvidence) {
+    return const ['BLOCKED_PLACEHOLDER_EVIDENCE_HASH'];
+  }
+  return const [];
+}
+
+const _allowedStrictProvenanceKinds = {
+  'OFFICIAL_SOURCE',
+  'OPERATOR_CONFIRMED',
+  'FIELD_SURVEY',
+};
+
+bool _isValidEvidenceHash(String value) {
+  return RegExp(r'^[0-9a-f]{64}$').hasMatch(value);
+}
+
+bool _isPlaceholderEvidenceHash(String value) {
+  return RegExp(r'^([0-9a-f])\1{63}$').hasMatch(value);
 }
