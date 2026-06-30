@@ -91,6 +91,7 @@ class CatalogDatabase extends _$CatalogDatabase {
     ).getSingleOrNull();
     if (existing != null) {
       await _backfillBaselineAccessEdges();
+      await _backfillBaselineNetworkEdgeEvidence();
       await _backfillBaselineRouteMapPositions();
       return;
     }
@@ -219,7 +220,19 @@ class CatalogDatabase extends _$CatalogDatabase {
             stairAccessState: const Value('STEP_FREE'),
             accessibilityStatus: const Value('AVAILABLE'),
             reliabilityScore: const Value(90),
+            sourceId: const Value('baseline-route-source-capital'),
+            sourceSnapshotId: const Value(
+              'baseline-route-source-capital-20260619',
+            ),
+            providerRecordHash: const Value(
+              '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+            ),
+            provenanceKind: const Value('OFFICIAL_SOURCE'),
+            verificationStatus: const Value('VERIFIED'),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+            evidenceHash: const Value(
+              'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            ),
           ),
           NetworkEdgesCompanion.insert(
             id: 'edge-sadang-sangnoksu-seoul-4',
@@ -231,7 +244,19 @@ class CatalogDatabase extends _$CatalogDatabase {
             stairAccessState: const Value('STEP_FREE'),
             accessibilityStatus: const Value('AVAILABLE'),
             reliabilityScore: const Value(90),
+            sourceId: const Value('baseline-route-source-capital'),
+            sourceSnapshotId: const Value(
+              'baseline-route-source-capital-20260619',
+            ),
+            providerRecordHash: const Value(
+              '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+            ),
+            provenanceKind: const Value('OFFICIAL_SOURCE'),
+            verificationStatus: const Value('VERIFIED'),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+            evidenceHash: const Value(
+              'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            ),
           ),
           ..._baselineAccessEdges(),
         ]);
@@ -421,6 +446,73 @@ class CatalogDatabase extends _$CatalogDatabase {
       'accessibility_status',
       'reliability_score',
       'last_verified_at',
+      'source_id',
+      'source_snapshot_id',
+      'provider_record_hash',
+      'provenance_kind',
+      'verification_status',
+      'evidence_hash',
+    };
+    return columnNames.containsAll(requiredColumns);
+  }
+
+  Future<void> _backfillBaselineNetworkEdgeEvidence() async {
+    if (!await _canBackfillBaselineNetworkEdgeEvidence()) {
+      return;
+    }
+    if (!await _isBaselineFixtureCatalog()) {
+      return;
+    }
+    await customStatement('''
+      UPDATE network_edges
+      SET source_id = CASE
+            WHEN source_id = '' THEN 'baseline-route-source-capital'
+            ELSE source_id
+          END,
+          source_snapshot_id = CASE
+            WHEN source_snapshot_id = '' THEN 'baseline-route-source-capital-20260619'
+            ELSE source_snapshot_id
+          END,
+          provider_record_hash = CASE
+            WHEN provider_record_hash = '' THEN '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+            ELSE provider_record_hash
+          END,
+          provenance_kind = CASE
+            WHEN UPPER(provenance_kind) = 'UNKNOWN' THEN 'OFFICIAL_SOURCE'
+            ELSE provenance_kind
+          END,
+          verification_status = CASE
+            WHEN verification_status = '' OR UPPER(verification_status) = 'UNKNOWN' THEN 'VERIFIED'
+            ELSE verification_status
+          END,
+          evidence_hash = CASE
+            WHEN evidence_hash = '' THEN 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+            ELSE evidence_hash
+          END
+      WHERE id IN (
+        'edge-sangnoksu-sadang-seoul-4',
+        'edge-sadang-sangnoksu-seoul-4',
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''');
+  }
+
+  Future<bool> _canBackfillBaselineNetworkEdgeEvidence() async {
+    final columns = await customSelect(
+      'PRAGMA table_info(network_edges)',
+    ).get();
+    final columnNames = {for (final row in columns) row.read<String>('name')};
+    const requiredColumns = {
+      'id',
+      'source_id',
+      'source_snapshot_id',
+      'provider_record_hash',
+      'provenance_kind',
+      'verification_status',
+      'evidence_hash',
     };
     return columnNames.containsAll(requiredColumns);
   }
@@ -487,7 +579,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'exit-sangnoksu-seoul-4',
@@ -498,7 +600,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'entry-sadang-seoul-4',
@@ -509,7 +621,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'exit-sadang-seoul-4',
@@ -520,7 +642,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
     ];
   }

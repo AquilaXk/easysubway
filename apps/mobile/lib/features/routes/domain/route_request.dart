@@ -6,7 +6,8 @@ enum MobilityType {
   temporaryInjury,
   luggage;
 
-  bool get blocksStairOnlyAccess => this == MobilityType.wheelchair;
+  bool get blocksStairOnlyAccess =>
+      this == MobilityType.wheelchair || this == MobilityType.stroller;
 }
 
 class RouteRequest {
