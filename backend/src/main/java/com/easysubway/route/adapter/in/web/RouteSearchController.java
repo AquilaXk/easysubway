@@ -1,5 +1,6 @@
 package com.easysubway.route.adapter.in.web;
 
+import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.common.web.ApiResponse;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
@@ -16,6 +17,8 @@ import jakarta.validation.constraints.Pattern;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,7 +40,9 @@ class RouteSearchController {
 
 	@PostMapping("/api/v2/routes/search")
 	ApiResponse<RouteSearchV2Response> searchRouteV2(@Valid @RequestBody RouteSearchV2Request request) {
-		return ApiResponse.ok(RouteSearchV2Response.from(routeSearchUseCase.searchRoute(request.toCommand()), request));
+		OffsetDateTime departureTime = request.parsedDepartureTime();
+		SearchRouteCommand command = request.toCommand();
+		return ApiResponse.ok(RouteSearchV2Response.from(routeSearchUseCase.searchRoute(command), request, departureTime));
 	}
 
 	private record RouteSearchRequest(
@@ -126,14 +131,32 @@ class RouteSearchController {
 		String constraintMode,
 		@NotNull(message = "실시간 반영 여부를 선택해야 합니다.")
 		Boolean useRealtime,
-		@Min(value = 0, message = "최대 환승 수는 0 이상이어야 합니다.")
+		@Min(value = 1, message = "V2 skeleton은 최대 환승 수 1 이상만 지원합니다.")
 		int maxTransfers,
 		@Min(value = 1, message = "대안 경로 수는 1 이상이어야 합니다.")
 		int alternativeCount
 	) {
 
 		SearchRouteCommand toCommand() {
-			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType);
+			return new SearchRouteCommand(originStationId, destinationStationId, effectiveMobilityType());
+		}
+
+		OffsetDateTime parsedDepartureTime() {
+			try {
+				return OffsetDateTime.parse(departureTime);
+			} catch (DateTimeParseException exception) {
+				throw new InvalidRequestException("출발 시간은 ISO offset 형식이어야 합니다.", exception);
+			}
+		}
+
+		private MobilityType effectiveMobilityType() {
+			if ("PROFILE_DEFAULT".equals(constraintMode)) {
+				return mobilityType;
+			}
+			if ("STRICT_STEP_FREE".equals(constraintMode)) {
+				return MobilityType.WHEELCHAIR;
+			}
+			throw new InvalidRequestException("지원하지 않는 이동 제약 조건입니다.");
 		}
 	}
 
@@ -151,7 +174,11 @@ class RouteSearchController {
 		List<ItineraryDto> itineraries
 	) {
 
-		private static RouteSearchV2Response from(RouteSearchResult result, RouteSearchV2Request request) {
+		private static RouteSearchV2Response from(
+			RouteSearchResult result,
+			RouteSearchV2Request request,
+			OffsetDateTime departureTime
+		) {
 			return new RouteSearchV2Response(
 				"ROUTE_SEARCH_V2",
 				request.originStationId(),
@@ -170,7 +197,7 @@ class RouteSearchController {
 					"UNSUPPORTED_REGION",
 					"ROUTE_GRAPH_UNKNOWN"
 				),
-				List.of(ItineraryDto.from(result, OffsetDateTime.parse(request.departureTime())))
+				List.of(ItineraryDto.from(result, departureTime))
 			);
 		}
 	}
@@ -192,6 +219,7 @@ class RouteSearchController {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime) {
 			OffsetDateTime plannedArrivalTime = departureTime.plusSeconds(result.estimatedDurationSeconds());
+			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime);
 			return new ItineraryDto(
 				result.routeSearchId() + "-primary",
 				statusOf(result),
@@ -203,9 +231,7 @@ class RouteSearchController {
 				result.transferCount(),
 				result.walkingDistanceMeters(),
 				AccessibilityRiskDto.from(result),
-				result.steps().stream()
-					.map(step -> LegDto.from(step, departureTime, plannedArrivalTime))
-					.toList(),
+				legs,
 				false
 			);
 		}
@@ -223,7 +249,7 @@ class RouteSearchController {
 
 		private static AccessibilityRiskDto from(RouteSearchResult result) {
 			List<String> reasons = result.evidenceSummary().stream()
-				.filter(reason -> reason.contains("ACCESSIBILITY"))
+				.filter("ACCESSIBILITY_CHECK_REQUIRED"::equals)
 				.toList();
 			String level = reasons.isEmpty() ? "LOW" : "REVIEW_REQUIRED";
 			return new AccessibilityRiskDto(level, reasons);
@@ -252,7 +278,24 @@ class RouteSearchController {
 		AccessibilityRiskDto accessibilityRisk
 	) {
 
-		private static LegDto from(RouteStep step, OffsetDateTime departureTime, OffsetDateTime plannedArrivalTime) {
+		private static List<LegDto> fromSteps(List<RouteStep> steps, OffsetDateTime departureTime) {
+			List<LegDto> legs = new ArrayList<>();
+			OffsetDateTime cursor = departureTime;
+			for (RouteStep step : steps) {
+				int durationSeconds = Math.max(0, step.estimatedMinutes()) * 60;
+				OffsetDateTime plannedArrivalTime = cursor.plusSeconds(durationSeconds);
+				legs.add(from(step, cursor, plannedArrivalTime, durationSeconds));
+				cursor = plannedArrivalTime;
+			}
+			return List.copyOf(legs);
+		}
+
+		private static LegDto from(
+			RouteStep step,
+			OffsetDateTime departureTime,
+			OffsetDateTime plannedArrivalTime,
+			int durationSeconds
+		) {
 			return new LegDto(
 				legTypeOf(step),
 				step.fromStationId(),
@@ -268,7 +311,7 @@ class RouteSearchController {
 				null,
 				0,
 				0,
-				Math.max(0, step.estimatedMinutes()) * 60,
+				durationSeconds,
 				Math.max(0, step.distanceMeters()),
 				"STATIC_BACKEND_V1",
 				"LOW",

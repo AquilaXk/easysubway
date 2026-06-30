@@ -1,6 +1,7 @@
 package com.easysubway.route.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -43,7 +44,7 @@ class RouteSearchV2ControllerTest {
 		when(routeSearchUseCase.searchRoute(argThat(command ->
 			"station-sangnoksu".equals(command.originStationId())
 				&& "station-sadang".equals(command.destinationStationId())
-				&& command.mobilityType() == MobilityType.STROLLER
+				&& command.mobilityType() == MobilityType.WHEELCHAIR
 		))).thenReturn(foundRouteSearch());
 
 		mockMvc.perform(post("/api/v2/routes/search")
@@ -85,15 +86,42 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.data.itineraries[0].etaConfidence").value("LOW"))
 			.andExpect(jsonPath("$.data.itineraries[0].durationSeconds").value(420))
 			.andExpect(jsonPath("$.data.itineraries[0].transferCount").value(0))
-			.andExpect(jsonPath("$.data.itineraries[0].walkingDistanceMeters").value(180))
-			.andExpect(jsonPath("$.data.itineraries[0].accessibilityRisk.level").value("REVIEW_REQUIRED"))
+			.andExpect(jsonPath("$.data.itineraries[0].walkingDistanceMeters").value(300))
+			.andExpect(jsonPath("$.data.itineraries[0].accessibilityRisk.level").value("LOW"))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].legType").value("ACCESS"))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].plannedDepartureTime").value("2026-06-30T09:15:00+09:00"))
-			.andExpect(jsonPath("$.data.itineraries[0].legs[0].plannedArrivalTime").value("2026-06-30T09:22:00+09:00"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].plannedArrivalTime").value("2026-06-30T09:19:00+09:00"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].plannedDepartureTime").value("2026-06-30T09:19:00+09:00"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].plannedArrivalTime").value("2026-06-30T09:22:00+09:00"))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].waitTimeSeconds").value(0))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].slackSeconds").value(0))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].etaSource").value("STATIC_BACKEND_V1"))
 			.andExpect(jsonPath("$.data.itineraries[0].commercialEtaEligible").value(false));
+	}
+
+	@Test
+	@DisplayName("잘못된 V2 출발 시간은 search 저장 전에 JSON 400으로 거부한다")
+	void invalidRouteSearchV2DepartureTimeReturnsBadRequestBeforeSearch() throws Exception {
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "departureTime": "2026-99-99T09:15:00+09:00",
+					  "mobilityType": "STROLLER",
+					  "constraintMode": "STRICT_STEP_FREE",
+					  "useRealtime": true,
+					  "maxTransfers": 3,
+					  "alternativeCount": 3
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.message").value("출발 시간은 ISO offset 형식이어야 합니다."));
+
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	private RouteSearchResult foundRouteSearch() {
@@ -117,8 +145,25 @@ class RouteSearchV2ControllerTest {
 				"수도권 4호선",
 				"station-sangnoksu",
 				"station-sangnoksu",
-				7,
+				4,
 				180,
+				false,
+				"VERIFIED",
+				false,
+				"STATIC_BACKEND_V1",
+				"STATIC_BACKEND_V1",
+				"LEGACY_STATIC"
+			), new RouteStep(
+				2,
+				"exit",
+				"사당역 출구 이동",
+				"출구 엘리베이터를 확인합니다.",
+				"line-4",
+				"수도권 4호선",
+				"station-sadang",
+				"station-sadang",
+				3,
+				120,
 				false,
 				"VERIFIED",
 				false,
