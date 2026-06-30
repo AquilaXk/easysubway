@@ -21,6 +21,15 @@ class AccessibilityCostCalculator {
     final weight = RouteWeight.from(mobilityType);
     final warningCodes = <String>[];
 
+    if (mobilityType.blocksStairOnlyAccess &&
+        !edge.safetyEvidence.strictRouteEligible) {
+      return AccessibilityCost(
+        cost: 0,
+        isBlocked: true,
+        warningCodes: edge.safetyEvidence.blockerReasons,
+      );
+    }
+
     // route contract: generated connector strict block
     // Generated connectors are topology scaffolding, not verified step-free
     // accessibility evidence for profiles that cannot safely use stairs.
@@ -74,6 +83,14 @@ class AccessibilityCostCalculator {
         cost: 0,
         isBlocked: true,
         warningCodes: ['STAIR_ONLY_ACCESS'],
+      );
+    }
+
+    if (edge.isDataStale && mobilityType.blocksStairOnlyAccess) {
+      return const AccessibilityCost(
+        cost: 0,
+        isBlocked: true,
+        warningCodes: ['STALE_ACCESSIBILITY_DATA'],
       );
     }
 
