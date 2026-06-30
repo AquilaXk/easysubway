@@ -30,7 +30,7 @@ scripts/github/sync-actions-env-secret.sh .env
 
 워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
 
-Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. `Slack Notifications` workflow는 CI와 SonarCloud는 실패, 취소, timeout 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소, timeout 결과만 보냅니다.
+Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. Slack 알림은 별도 `workflow_run` workflow가 아니라 원본 workflow 내부 notify job에서 전송합니다. CI와 SonarCloud는 `main` push 실패, 취소 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소 결과를 보냅니다.
 
 CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. self-hosted production runner에서 직접 배포하므로 GitHub `production` environment approval을 기다리지 않습니다. `DEPLOY_ROOT`, `DEPLOY_COMPOSE_PROJECT`, 선택 값 `DEPLOY_PUBLIC_API_BASE_URL`은 repository variable로 둘 수 있고, 없으면 `/opt/easysubway`와 `easysubway` 기본값을 사용합니다.
 
