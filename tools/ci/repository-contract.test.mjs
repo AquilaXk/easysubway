@@ -100,7 +100,7 @@ function workflowFiles() {
   return execFileSync("git", ["ls-files", ".github/workflows/*.yml", ".github/workflows/*.yaml"], {
     cwd: root,
     encoding: "utf8",
-  }).trim().split("\n").filter(Boolean);
+  }).trim().split("\n").filter((file) => file && existsSync(path.join(root, file)));
 }
 
 function assertActionsEnvSecretPolicy(file, source) {
@@ -401,7 +401,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
 
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
-  const androidJob = workflow.match(/\n  android:[\s\S]*$/)?.[0] ?? "";
+  const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
 
   assert.match(workflow, /Repository CI \/ Skip unchanged area/);
   assert.match(workflow, /Backend CI \/ Skip unchanged area/);
@@ -642,40 +642,49 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
 });
 
 test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한다", () => {
-  const workflowPath = ".github/workflows/slack-notifications.yml";
-  assert.ok(existsSync(path.join(root, workflowPath)), "Slack notification workflow must exist");
-
-  const workflow = read(workflowPath);
+  const removedWorkflowPath = ".github/workflows/slack-notifications.yml";
+  const ciWorkflow = read(".github/workflows/ci.yml");
+  const cdWorkflow = read(".github/workflows/cd.yml");
+  const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
+  const dataPackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
+  const sonarCloudWorkflow = read(".github/workflows/sonarcloud.yml");
+  const storeDistributionWorkflow = read(".github/workflows/store-distribution-evidence.yml");
+  const inlineSlackWorkflows = [
+    ciWorkflow,
+    cdWorkflow,
+    releaseArtifactsWorkflow,
+    dataPackReleaseWorkflow,
+    sonarCloudWorkflow,
+    storeDistributionWorkflow,
+  ].join("\n---\n");
   const readme = read("README.md");
   const envExample = read(".env.example");
 
-  assert.match(workflow, /^name: Slack Notifications$/m);
-  assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*CI\n\s*-\s*CD\n\s*-\s*Data Pack Release\n\s*-\s*Release Artifacts\n\s*-\s*SonarCloud\n\s*-\s*Store Distribution Evidence/);
-  assert.match(workflow, /types:\s*\n\s*-\s*completed/);
-  assert.doesNotMatch(workflow, /\npermissions:\s*\n\s*contents: read\n\nconcurrency:/);
-  assert.doesNotMatch(workflow, /permissions:\s*\n\s*contents: read/);
-  assert.equal((workflow.match(/permissions: \{\}/g) ?? []).length, 3);
-  assert.match(workflow, /SLACK_CI_WEBHOOK_URL: \$\{\{ secrets\.SLACK_CI_WEBHOOK_URL \}\}/);
-  assert.match(workflow, /SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/);
-  assert.match(workflow, /SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/);
-  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_ENV/);
-  assert.doesNotMatch(workflow, /\bchannel:\s|username:\s|icon_emoji:\s|icon_url:\s/);
-  assert.equal((workflow.match(/uses: slackapi\/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c/g) ?? []).length, 3);
-  assert.doesNotMatch(workflow, /uses: slackapi\/slack-github-action@v3\.0\.3/);
-  assert.equal((workflow.match(/webhook-type: incoming-webhook/g) ?? []).length, 3);
-  assert.equal((workflow.match(/github\.event\.workflow_run\.event != 'pull_request'/g) ?? []).length, 3);
-  assert.equal((workflow.match(/github\.event\.workflow_run\.head_repository\.full_name == github\.repository/g) ?? []).length, 3);
-  assert.match(workflow, /notify-ci-failure:[\s\S]*contains\(fromJSON\('\["failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)[\s\S]*github\.event\.workflow_run\.name == 'CI'/);
-  assert.match(workflow, /notify-release:[\s\S]*contains\(fromJSON\('\["CD","Data Pack Release","Release Artifacts","Store Distribution Evidence"\]'\), github\.event\.workflow_run\.name\)/);
-  assert.match(workflow, /notify-release:[\s\S]*contains\(fromJSON\('\["success","failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)/);
-  assert.match(workflow, /notify-security-failure:[\s\S]*contains\(fromJSON\('\["failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)[\s\S]*github\.event\.workflow_run\.name == 'SonarCloud'/);
-  assert.match(workflow, /run: <\$\{\{ github\.event\.workflow_run\.html_url \}\}\|GitHub Actions 열기>/);
+  assert.ok(!existsSync(path.join(root, removedWorkflowPath)), "Slack notification workflow must not create standalone skipped runs");
+  assert.equal((inlineSlackWorkflows.match(/uses: slackapi\/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c/g) ?? []).length, 6);
+  assert.equal((inlineSlackWorkflows.match(/webhook-type: incoming-webhook/g) ?? []).length, 6);
+  assert.doesNotMatch(inlineSlackWorkflows, /uses: slackapi\/slack-github-action@v3\.0\.3/);
+  const slackPayloads = inlineSlackWorkflows.match(/payload: \|\n(?: {10,}.+\n?)*/g) ?? [];
+  assert.equal(slackPayloads.length, 6);
+  for (const payload of slackPayloads) {
+    assert.doesNotMatch(payload, /^\s+(channel|username|icon_emoji|icon_url):/m);
+  }
+  assert.doesNotMatch(inlineSlackWorkflows, /webhook:\s*\$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
+  assert.equal((inlineSlackWorkflows.match(/SLACK_CI_WEBHOOK_URL: \$\{\{ secrets\.SLACK_CI_WEBHOOK_URL \}\}/g) ?? []).length, 1);
+  assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
+  assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 1);
+  assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
+  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(sonarCloudWorkflow, /notify-slack-security-failure:[\s\S]*github\.event_name == 'push'[\s\S]*SLACK_SECURITY_WEBHOOK_URL/);
 
   assert.match(readme, /Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다/);
   assert.match(readme, /SLACK_CI_WEBHOOK_URL/);
   assert.match(readme, /SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(readme, /SLACK_SECURITY_WEBHOOK_URL/);
-  assert.match(readme, /실패, 취소, timeout/);
+  assert.match(readme, /원본 workflow 내부 notify job/);
   assert.match(envExample, /^SLACK_CI_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_RELEASE_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_SECURITY_WEBHOOK_URL=$/m);
