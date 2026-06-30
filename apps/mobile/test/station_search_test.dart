@@ -1300,10 +1300,10 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 확인 1개 · 정보 부족 1개');
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 확인 1개 · 확인 중 1개');
     expect(
       state.facilityAttentionSemanticLabel,
-      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 확인 1개, 정보 부족 1개',
+      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 확인 1개, 확인 중 1개',
     );
   });
 
@@ -1474,7 +1474,7 @@ void main() {
     expect(ramp.statusLabel, '공사 중');
     expect(ramp.severityLabel, '가기 전 확인');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
-    expect(ramp.confidenceLabel, '정보가 부족해요');
+    expect(ramp.confidenceLabel, '안내를 준비 중이에요');
     expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,

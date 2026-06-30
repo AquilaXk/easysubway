@@ -395,7 +395,7 @@ class InternalRouteStep {
       _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
-      if (requiresEscalator) '에스컬레이터 정보가 부족해요',
+      if (requiresEscalator) '에스컬레이터 안내를 확인하고 있어요',
       if (reliabilityScore < 80) '이동 전 역무원에게 확인해 주세요',
     ];
     return labels.join(' · ');
@@ -422,7 +422,7 @@ class InternalRouteWarning {
 
   String get userMessage {
     return switch (code.trim()) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 정보가 부족해요.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
       'STALE_ACCESSIBILITY_DATA' => '엘리베이터와 통로 상태를 최근에 확인하지 못했어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 확인하지 못했어요.',
