@@ -57,6 +57,59 @@ test("route ETA accuracy evaluator report contract is machine-readable", async (
   assert.deepEqual(report.failures, []);
 });
 
+test("route commercialization release gate blocks unsupported commercial route claims", () => {
+  const gatePath = "apps/mobile/release/route-commercialization-gate.json";
+  assert.equal(existsSync(path.join(root, gatePath)), true, "route commercialization gate must exist");
+
+  const gate = readJson(gatePath);
+  const readme = read("README.md");
+  const prTemplate = read(".github/pull_request_template.md");
+
+  assert.equal(gate.schemaVersion, 1);
+  assert.equal(gate.applicationId, "easysubway");
+  assert.equal(gate.androidApplicationId, "com.easysubway.app");
+  assert.equal(gate.releaseGate, "route-commercialization");
+  assert.equal(gate.issue, 1210);
+  assert.equal(gate.releaseBlockerPolicy, true);
+  assert.equal(gate.storeReadyStatus, "blocked_route_commercialization_evidence_missing");
+  assert.equal(gate.routeEtaAccuracy.singleRideP50ErrorSecondsMax, 60);
+  assert.equal(gate.routeEtaAccuracy.singleRideP90ErrorSecondsMax, 180);
+  assert.equal(gate.routeEtaAccuracy.transferP50ErrorSecondsMax, 120);
+  assert.equal(gate.routeEtaAccuracy.transferP90ErrorSecondsMax, 300);
+  assert.equal(gate.routeEtaAccuracy.sampleSizeMin, 100);
+  assert.equal(gate.realtimeCoverage.supportedStationLinePairsMin, 100);
+  assert.equal(gate.realtimeCoverage.providerFreshnessSecondsMax, 90);
+  assert.equal(gate.realtimeCoverage.staleFallbackRequired, true);
+  assert.equal(gate.accessibility.strictStepFreeKnownStairFalsePositiveAllowed, 0);
+  assert.equal(gate.accessibility.generatedConnectorAsVerifiedAllowed, false);
+  assert.equal(gate.accessibility.unknownAccessibilityMustBeLabeled, true);
+  assert.equal(gate.routing.multiTransferSupported, true);
+  assert.equal(gate.routing.outOfStationTransferSupported, true);
+  assert.equal(gate.routing.alternativeItinerariesMin, 2);
+  assert.equal(gate.etaSourceIntegrity.realtimeEtaWithoutFreshProviderAllowed, false);
+  assert.equal(gate.etaSourceIntegrity.staleRealtimeUsedAsFreshAllowed, false);
+  assert.equal(gate.etaSourceIntegrity.staticLocalMustBeLabeled, true);
+  assert.equal(gate.etaSourceIntegrity.plannedOnlyMustBeLabeled, true);
+  assert.equal(gate.routeQuality.wrongTransferCountAllowed, 0);
+  assert.equal(gate.routeQuality.wrongLineSequenceAllowed, 0);
+  assert.equal(gate.routeQuality.routeNotFoundRateMax, 0.02);
+  assert.equal(gate.evidence.routeAccuracyReportRequired, true);
+  assert.equal(gate.evidence.providerCoverageReportRequired, true);
+  assert.equal(gate.evidence.accessibilityRegressionReportRequired, true);
+  assert.deepEqual(gate.requiredReports, {
+    accuracy: "artifacts/route-accuracy-report.json",
+    accessibility: "artifacts/route-accessibility-regression-report.json",
+    coverage: "artifacts/realtime-provider-coverage-report.json",
+    contract: "artifacts/route-v2-contract-report.json",
+  });
+  assert.deepEqual(gate.outOfStationTransferReleaseBlockers, ["D-2", "D-3", "H-1"]);
+
+  assert.match(readme, /Route commercialization gate/);
+  assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
+  assert.match(prTemplate, /Route commercialization gate impact/);
+  assert.match(prTemplate, /route-commercialization-gate\.json/);
+});
+
 function currentMobileVersionCode() {
   const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
   assert.ok(match, "mobile pubspec must contain versionName+versionCode");
