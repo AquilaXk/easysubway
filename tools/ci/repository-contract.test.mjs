@@ -5397,6 +5397,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /public-edge-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /docker-runtime-probe:[\s\S]*image: ghcr\.io\/google\/cadvisor:v0\.60\.3/);
   assert.match(compose, /docker-runtime-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
