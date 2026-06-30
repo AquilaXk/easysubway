@@ -4416,7 +4416,7 @@ void main() {
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(find.text('데이터 삭제 요청'), findsOneWidget);
+      expect(find.text('내 정보 삭제 요청'), findsOneWidget);
 
       final deletionButtonSize = tester.getSize(
         find.byKey(const Key('dataDeletionAccessItem')),
@@ -4428,7 +4428,7 @@ void main() {
           .getSemanticsData();
       expect(
         deletionSemantics.label,
-        '데이터 삭제 요청, 이메일 보내기, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
+        '내 정보 삭제 요청, 이메일 보내기, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
 
@@ -4481,15 +4481,15 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.'),
+        find.text('즐겨찾기, 이동 조건, 제보 내용과 사진은 앱 기능 제공에 사용됩니다.'),
         findsOneWidget,
       );
       expect(
-        find.text('데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.'),
+        find.text('내 정보 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.'),
         findsOneWidget,
       );
       expect(
-        find.text('앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.'),
+        find.text('앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.'),
         findsOneWidget,
       );
       expect(find.text('법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관합니다.'), findsOneWidget);
@@ -4508,7 +4508,7 @@ void main() {
       );
       expect(
         summarySemantics.label,
-        contains('앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.'),
+        contains('앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.'),
       );
       expect(summarySemantics.label, isNot(contains('익명화')));
     } finally {
@@ -4516,7 +4516,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 안전과 데이터 안내를 함께 보여준다', (tester) async {
+  testWidgets('도움말은 이동 전 확인 안내를 함께 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -4537,7 +4537,7 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('안전과 데이터 안내'), findsWidgets);
+      expect(find.text('이동 전 확인'), findsWidgets);
       expect(find.text('경로와 시설 정보는 이동을 돕는 참고 정보입니다.'), findsOneWidget);
       expect(
         find.text('실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.'),
@@ -4555,7 +4555,7 @@ void main() {
           .getSemanticsData();
       expect(
         noticeSemantics.label,
-        '안전과 데이터 안내, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
+        '이동 전 확인, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
       );
     } finally {
       semanticsHandle.dispose();
@@ -4594,6 +4594,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('보안 문의 안내'), findsOneWidget);
       expect(find.text('앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.'), findsOneWidget);
+      expect(
+        find.text('위치, 제보 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.'),
+        findsOneWidget,
+      );
       expect(find.textContaining('취약점'), findsNothing);
       expect(find.textContaining('계정 접근'), findsNothing);
       await tester.scrollUntilVisible(
@@ -4735,13 +4739,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dataDeletionStartButton')), findsOneWidget);
-    expect(find.text('이 기기의 앱 데이터 삭제'), findsWidgets);
+    expect(find.text('이 기기의 앱 정보 삭제'), findsWidgets);
     expect(find.textContaining('즐겨찾기, 최근 검색, 이동 조건, 화면 설정'), findsOneWidget);
     expect(
       find.text('이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.'),
       findsOneWidget,
     );
-    expect(find.text('삭제한 데이터는 앱에서 복구할 수 없습니다.'), findsOneWidget);
+    expect(find.text('삭제한 정보는 앱에서 복구할 수 없습니다.'), findsOneWidget);
     expect(find.textContaining('로그인 정보'), findsNothing);
     expect(find.textContaining('익명화'), findsNothing);
 
@@ -4751,7 +4755,7 @@ void main() {
     expect(find.text('정말 삭제할까요?'), findsOneWidget);
     expect(find.textContaining('인증 정보'), findsNothing);
     expect(
-      find.text('삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.'),
+      find.text('삭제 후에는 이 기기에 저장된 앱 정보와 설정이 지워지고 되돌릴 수 없습니다.'),
       findsOneWidget,
     );
 
@@ -4760,7 +4764,7 @@ void main() {
 
     expect(deletionRepository.deleteCount, 1);
     expect(find.text('삭제 완료'), findsOneWidget);
-    expect(find.text('내 데이터가 삭제됐어요'), findsOneWidget);
+    expect(find.text('내 정보가 삭제됐어요'), findsOneWidget);
     expect(find.text('즐겨찾기한 역'), findsOneWidget);
     expect(find.text('1개 삭제'), findsWidgets);
     expect(find.text('이 기기의 제보 기록'), findsOneWidget);
@@ -4894,7 +4898,7 @@ void main() {
 
       expect(
         find.text(
-          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
+          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
         ),
         findsOneWidget,
       );
@@ -4909,7 +4913,7 @@ void main() {
       expect(
         summarySemantics.label,
         contains(
-          '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
+          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.',
         ),
       );
       expect(
@@ -4925,16 +4929,16 @@ void main() {
       await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
       await tester.pumpAndSettle();
 
-      expect(find.text('서버 데이터 삭제'), findsWidgets);
+      expect(find.text('보낸 정보 삭제'), findsWidgets);
       expect(
         find.text(
-          '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+          '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         ),
         findsOneWidget,
       );
       expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
       expect(
-        find.text('삭제가 끝나면 서버에 연결된 데이터가 정리되고 앱의 임시 설정이 초기화됩니다.'),
+        find.text('삭제가 끝나면 보낸 정보가 정리되고 앱의 임시 설정이 초기화됩니다.'),
         findsOneWidget,
       );
       expect(find.text('앱은 처음 설정 화면으로 돌아갑니다.'), findsOneWidget);
@@ -4945,7 +4949,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(
         find.text(
-          '삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
+          '삭제 후에는 보낸 정보와 설정이 삭제되거나 익명화되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
         ),
         findsOneWidget,
       );
@@ -4957,7 +4961,7 @@ void main() {
   testWidgets('데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다', (tester) async {
     final deletionRepository = FakeUserDataDeletionRepository(
       error: const UserDataDeletionException(
-        '데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        '정보 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
       ),
     );
     final onboardingStore = MemoryOnboardingResultStore(
@@ -5004,7 +5008,7 @@ void main() {
     expect(deletionRepository.deleteCount, 1);
     expect(onboardingStore.savedResult, isNotNull);
     expect(draftTargetStore.target, isNotNull);
-    expect(find.text('데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+    expect(find.text('정보 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
   });
 
   testWidgets('도움말은 연결값이 비어 있으면 준비 중으로 보여주고 실행하지 않는다', (tester) async {
@@ -5055,7 +5059,7 @@ void main() {
           .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
           .getSemanticsData()
           .label,
-      '데이터 삭제 요청, 아직 준비 중이에요, 삭제 범위와 처리 절차를 메일로 문의해요',
+      '내 정보 삭제 요청, 아직 준비 중이에요, 삭제 범위와 처리 절차를 메일로 문의해요',
     );
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.scrollUntilVisible(
