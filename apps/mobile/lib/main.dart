@@ -4932,7 +4932,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     title: '알림 설정',
                     value: result.notificationSettingsDeleted
                         ? '삭제'
-                        : '삭제할 항목 없음',
+                        : '알림 설정은 이미 비어 있어요',
                   ),
                   const SizedBox(height: 12),
                   _DataDeletionResultRow(
