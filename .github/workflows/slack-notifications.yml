@@ -19,10 +19,15 @@ concurrency:
 jobs:
   notify-ci-failure:
     name: Slack / CI failure
-    if: ${{ contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) && github.event.workflow_run.name == 'CI' }}
+    if: >-
+      ${{
+        github.event.workflow_run.event != 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) &&
+        github.event.workflow_run.name == 'CI'
+      }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    permissions: {}
     env:
       SLACK_CI_WEBHOOK_URL: ${{ secrets.SLACK_CI_WEBHOOK_URL }}
 
@@ -52,10 +57,15 @@ jobs:
 
   notify-release:
     name: Slack / Release workflow result
-    if: ${{ contains(fromJSON('["CD","Data Pack Release","Release Artifacts","Store Distribution Evidence"]'), github.event.workflow_run.name) && contains(fromJSON('["success","failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) }}
+    if: >-
+      ${{
+        github.event.workflow_run.event != 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        contains(fromJSON('["CD","Data Pack Release","Release Artifacts","Store Distribution Evidence"]'), github.event.workflow_run.name) &&
+        contains(fromJSON('["success","failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion)
+      }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    permissions: {}
     env:
       SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
 
@@ -86,10 +96,15 @@ jobs:
 
   notify-security-failure:
     name: Slack / Security failure
-    if: ${{ contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) && github.event.workflow_run.name == 'SonarCloud' }}
+    if: >-
+      ${{
+        github.event.workflow_run.event != 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) &&
+        github.event.workflow_run.name == 'SonarCloud'
+      }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    permissions: {}
     env:
       SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
 
