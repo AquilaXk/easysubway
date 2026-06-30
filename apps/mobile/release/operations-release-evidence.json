@@ -116,6 +116,7 @@
         "/api/v1/reports",
         "/api/v1/reports/{reportId}",
         "/api/v1/reports/{reportId}/confirm",
+        "/api/v1/routes/search",
         "/api/v1/realtime/arrivals",
         "/api/v1/realtime/train-positions"
       ],
@@ -125,6 +126,7 @@
         "/api/v1/reports",
         "/api/v1/reports/*",
         "/api/v1/reports/*/confirm",
+        "/api/v1/routes/search",
         "/api/health",
         "/actuator/health",
         "/actuator/health/liveness",
