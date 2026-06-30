@@ -4263,10 +4263,12 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
 });
 
-test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 제외한다", () => {
+test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 제외한다", async () => {
   const validator = read("tools/datapack/validate-datapack.mjs");
   const importer = read("tools/datapack/import-official-sources.mjs");
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-strict-route-coverage-"));
+  const importedFixturePath = path.join(outputDir, "capital-pilot-production.json");
 
   assert.doesNotMatch(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes/);
   assert.match(validator, /String\(edge\.accessibility_status \?\? ""\)\.toUpperCase\(\) === "AVAILABLE"/);
@@ -4277,7 +4279,32 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
   }
   assert.match(importer, /reviewStatus: "PENDING_ADMIN_REVIEW"/);
   assert.doesNotMatch(importer, /APPROVED_FOR_GRAPH/);
-  assert.equal(input.routeEdges.some((edge) => edge.edgeType === "MOVEMENT"), false);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/import-official-sources.mjs",
+      "--inventory",
+      "tools/datapack/source-inventory.json",
+      "--input",
+      "tools/datapack/inputs/capital-pilot-production-source-input.json",
+      "--output",
+      importedFixturePath,
+    ],
+    { cwd: root },
+  );
+  const importedPack = JSON.parse(readFileSync(importedFixturePath, "utf8")).packs[0];
+  assert.deepEqual(
+    importedPack.movementPathCandidates.map((candidate) => ({
+      id: candidate.id,
+      reviewStatus: candidate.reviewStatus,
+    })),
+    input.movementPathCandidates.map((candidate) => ({
+      id: candidate.id,
+      reviewStatus: "PENDING_ADMIN_REVIEW",
+    })),
+  );
+  assert.equal(importedPack.networkEdges.some((edge) => edge.edgeType === "MOVEMENT"), false);
 });
 
 test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {
