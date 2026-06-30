@@ -865,6 +865,12 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
     ["추정", /['"`][^'"`\n]*추정[^'"`\n]*['"`]/u],
     ["측정값", /['"`][^'"`\n]*측정값[^'"`\n]*['"`]/u],
     ["기준점", /['"`][^'"`\n]*기준점[^'"`\n]*['"`]/u],
+    ["제보 처리", /['"`][^'"`\n]*제보\s*처리[^'"`\n]*['"`]/u],
+    ["처리 절차", /['"`][^'"`\n]*처리\s*절차[^'"`\n]*['"`]/u],
+    ["처리 결과", /['"`][^'"`\n]*처리\s*결과[^'"`\n]*['"`]/u],
+    ["처리 상태", /['"`][^'"`\n]*처리\s*상태[^'"`\n]*['"`]/u],
+    ["처리 상황", /['"`][^'"`\n]*처리\s*상황[^'"`\n]*['"`]/u],
+    ["답변 안내에 따라 처리", /['"`][^'"`\n]*답변\s*안내에\s*따라\s*처리[^'"`\n]*['"`]/u],
   ];
 
   const mobileFiles = mobileProductionDartFiles();
@@ -8423,13 +8429,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReport, /Future<FacilityReportResult> getReport\(String reportId\)/);
   assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
   assert.match(facilityReport, /refreshCurrentReport/);
-  assert.match(facilityReport, /처리 상태 확인 중/);
+  assert.match(facilityReport, /제보 진행 상황 확인 중/);
   assert.match(facilityReport, /제보 번호/);
   assert.match(facilityReport, /facilityReportRefreshButton/);
   assert.match(facilityReport, /facilityReportFailureNextAction/);
   assert.match(facilityReport, /내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요\./);
-  assert.match(facilityReportTest, /접수번호로 처리 상태를 조회한다/);
-  assert.match(facilityReportTest, /접수 후 처리 상태를 다시 확인한다/);
+  assert.match(facilityReportTest, /접수번호로 제보 진행 상황을 조회한다/);
+  assert.match(facilityReportTest, /접수 후 제보 진행 상황을 다시 확인한다/);
   assert.match(widgetTest, /제보 번호 ES-1001, 현재 상태 반영됨/);
   assert.match(widgetTest, /시설 신고 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(notificationSettings, /class NotificationSettingsApiRepository/);
@@ -8440,7 +8446,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(notificationSettings, /class NotificationSettingsScreen extends StatefulWidget/);
   assert.match(notificationSettings, /역 시설 알림/);
   assert.match(notificationSettings, /경로 시설 알림/);
-  assert.match(notificationSettings, /제보 처리 알림/);
+  assert.match(notificationSettings, /제보 진행 알림/);
   assert.match(notificationSettings, /최신 안내 알림/);
   assert.match(notificationSettings, /즐겨찾는 역과 경로의 시설 변경/);
   assert.match(notificationSettings, /알림 설정에서 언제든 끌 수 있습니다/);
