@@ -730,6 +730,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
   assert.match(validator, /EASYSUBWAY_ADMIN_CUTOVER_ENFORCED/);
+  assert.match(validator, /SLACK_CI_WEBHOOK_URL\|SLACK_RELEASE_WEBHOOK_URL\|SLACK_SECURITY_WEBHOOK_URL/);
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, [
