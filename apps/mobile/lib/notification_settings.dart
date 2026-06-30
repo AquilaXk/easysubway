@@ -17,6 +17,8 @@ const _notificationPermissionErrorMessage = '알림을 켤 수 있는지 확인�
 const _notificationRegistrationFailureNextAction =
     '휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
 const _notificationSwitchTileRadius = BorderRadius.all(Radius.circular(8));
+const _notificationSettingsContentPadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
+const _notificationSettingsFailurePadding = EdgeInsets.fromLTRB(20, 32, 20, 32);
 
 abstract class NotificationSettingsRepository {
   Future<NotificationSettings> getNotificationSettings();
@@ -780,7 +782,7 @@ class _NotificationSettingsContent extends StatelessWidget {
     final isSaving = state.isSaving;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: _notificationSettingsContentPadding,
       children: [
         if (notificationPermissionProvider != null) ...[
           Semantics(
@@ -1001,7 +1003,7 @@ class _NotificationSettingsFailure extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
+      padding: _notificationSettingsFailurePadding,
       children: [
         Semantics(
           liveRegion: true,
