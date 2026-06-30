@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'accessible_design.dart';
 import 'mobility_profile.dart';
 import 'mobile_error_reporter.dart';
 import 'notification_settings.dart';
@@ -294,7 +295,7 @@ class OnboardingIntroScreen extends StatelessWidget {
               child: Text(
                 '계단 없는 길을\n먼저 찾습니다',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w900,
                   height: 1.25,
                 ),
@@ -468,7 +469,7 @@ class _IntroCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFD5E2E4)),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
@@ -510,7 +511,7 @@ class _IntroInfoRow extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -674,7 +675,7 @@ class _PermissionInfoRow extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -805,7 +806,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       '어떤 도움이 필요한가요?',
                       style: textTheme.headlineSmall?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
                         height: 1.25,
                       ),
@@ -832,7 +833,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       '적용할 조건을 확인하세요',
                       style: textTheme.headlineSmall?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
                         height: 1.25,
                       ),
@@ -880,7 +881,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Text(
                     '보기 설정',
                     style: textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF102A2C),
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -939,7 +940,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       '위치와 알림은 나중에도 켤 수 있어요',
                       style: textTheme.headlineSmall?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
                         height: 1.25,
                       ),
@@ -1174,7 +1175,7 @@ class _OnboardingProfileCard extends StatelessWidget {
                               _profileDisplayTitle(profile),
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
-                                    color: const Color(0xFF102A2C),
+                                    color: EasySubwayAccessibleColors.text,
                                     fontWeight: FontWeight.w900,
                                     height: 1.25,
                                   ),
@@ -1308,7 +1309,7 @@ class _OnboardingConditionRow extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -1399,7 +1400,7 @@ class _OnboardingViewPreferenceSwitch extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
