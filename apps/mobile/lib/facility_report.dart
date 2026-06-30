@@ -36,6 +36,13 @@ const _facilityReportUploadDisclosureScope =
     '제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다.';
 const _facilityReportDraftTargetStorageKey =
     'easysubway.facilityReport.draftTarget';
+const _facilityReportPagePadding = EdgeInsets.only(
+  left: 20,
+  top: 20,
+  right: 20,
+  bottom: 32,
+);
+const _facilityReportCardRadius = BorderRadius.all(Radius.circular(8));
 
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
@@ -1316,7 +1323,7 @@ class _MyFacilityReportListScreenState
             }
 
             return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              padding: _facilityReportPagePadding,
               itemCount: reports.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
@@ -1436,12 +1443,12 @@ class _MyReportListItem extends StatelessWidget {
         child: Material(
           color: EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _facilityReportCardRadius,
             side: const BorderSide(color: EasySubwayAccessibleColors.line),
           ),
           child: InkWell(
             key: Key('myReport-${report.id}'),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _facilityReportCardRadius,
             onTap: openReportDetail,
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -1515,7 +1522,7 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
           label:
               '내 제보 상세, ${report.reportTypeLabel}, 현재 상태 ${report.statusLabel}, 제보 번호 ${report.displayReceiptCode}',
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            padding: _facilityReportPagePadding,
             children: [
               Text(
                 report.reportTypeLabel,
@@ -1556,7 +1563,7 @@ class _MyReportDetailStatus extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: EasySubwayAccessibleColors.mintSoft,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _facilityReportCardRadius,
           border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
         ),
         child: Padding(
@@ -1618,7 +1625,7 @@ class _MyReportStatusPill extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _facilityReportCardRadius,
         border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
       ),
       child: Padding(
@@ -1718,7 +1725,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       appBar: AppBar(title: const Text('시설 알려주기')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _facilityReportPagePadding,
           children: [
             _FacilityReportHeader(target: widget.target),
             const SizedBox(height: 24),
@@ -1760,7 +1767,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 hintText: '상황을 짧게 적어 주세요',
                 floatingLabelBehavior: FloatingLabelBehavior.always,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  borderRadius: _facilityReportCardRadius,
                 ),
               ),
             ),
@@ -2294,7 +2301,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _facilityReportCardRadius,
         border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
       ),
       child: Padding(
@@ -2472,12 +2479,12 @@ class _FacilityReportTypeCard extends StatelessWidget {
         child: Material(
           color: selected ? color : EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _facilityReportCardRadius,
             side: BorderSide(color: color, width: 1.5),
           ),
           child: InkWell(
             key: Key('facilityReportType-${option.reportType}'),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _facilityReportCardRadius,
             onTap: onTap,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 72),
