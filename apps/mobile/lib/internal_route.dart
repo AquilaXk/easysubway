@@ -285,7 +285,7 @@ class InternalRouteResult {
     return switch (status) {
       'FOUND' => '역 안 이동 경로를 찾았어요',
       'BLOCKED' => '계단 없는 역 안 이동 경로를 찾지 못했어요',
-      _ => '역 안 이동 안내가 부족해요',
+      _ => '역 안 이동 안내를 준비 중이에요',
     };
   }
 

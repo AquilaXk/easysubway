@@ -84,7 +84,7 @@ class ApiClient {
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
+        '인터넷 연결을 확인하지 못했어요. 연결 상태를 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
@@ -137,7 +137,7 @@ class ApiClient {
       );
     } on SocketException catch (error, stackTrace) {
       throw ApiException(
-        '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
+        '인터넷 연결을 확인하지 못했어요. 연결 상태를 확인해 주세요.',
         path: uri.path,
         cause: error,
         causeStackTrace: stackTrace,
