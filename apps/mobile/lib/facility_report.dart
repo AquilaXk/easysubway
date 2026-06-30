@@ -24,7 +24,7 @@ const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 
 const _facilityReportPhotoUploadMaxAttempts = 2;
 const _facilityReportLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
-const _facilityReportLocationPermissionMessage = '위치 설정에서 현재 위치 사용을 켜 주세요.';
+const _facilityReportLocationPermissionMessage = '현재 위치를 사용할 수 없어요.';
 const _facilityReportLocationRationaleTitle = '현재 위치 사용';
 const _facilityReportLocationRationalePurpose =
     '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
@@ -1893,8 +1893,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
 
   bool get _canOpenLocationSettings =>
       widget.openLocationSettings != null &&
-      (_locationMessage == _facilityReportLocationPermissionMessage ||
-          _locationMessage == _facilityReportLocationDisabledMessage);
+      _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
     if (_photoAttachment != null ||

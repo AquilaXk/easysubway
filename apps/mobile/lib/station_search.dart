@@ -22,7 +22,7 @@ export 'features/stations/domain/station_line.dart';
 
 const _currentLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
-const _currentLocationPermissionMessage = '위치 설정에서 현재 위치 사용을 켜 주세요.';
+const _currentLocationPermissionMessage = '현재 위치를 사용할 수 없어요.';
 const _nearbyLocationMaxAge = Duration(minutes: 5);
 const _nearbyLocationMaxAccuracyMeters = 500.0;
 const _locationQualityUnavailableMessage =
@@ -3226,7 +3226,6 @@ class _StationSearchFailureMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shouldShowLocationSettings =
-        message == _currentLocationPermissionMessage ||
         message == _currentLocationDisabledMessage;
     final shouldShowStationSearchFallback =
         _shouldShowStationSearchFailureNextAction(message);

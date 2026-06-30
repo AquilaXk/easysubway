@@ -7317,8 +7317,8 @@ void main() {
 
       expect(locationProvider.requestCount, 1);
       expect(repository.requestedNearbyLocations, isEmpty);
-      expect(find.text('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
-      expect(find.bySemanticsLabel('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
+      expect(find.text('현재 위치를 사용할 수 없어요.'), findsOneWidget);
+      expect(find.bySemanticsLabel('현재 위치를 사용할 수 없어요.'), findsOneWidget);
       expect(
         find.text('역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
         findsOneWidget,
@@ -7329,7 +7329,7 @@ void main() {
       );
       expect(
         find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
-        findsOneWidget,
+        findsNothing,
       );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -11676,11 +11676,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
+    expect(find.text('현재 위치를 사용할 수 없어요.'), findsOneWidget);
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
-      findsOneWidget,
+      findsNothing,
     );
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
