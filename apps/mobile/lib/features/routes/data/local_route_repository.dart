@@ -336,12 +336,6 @@ class _RouteCatalogSnapshot {
     final networkEdgeColumnNames = {
       for (final row in networkEdgeColumns) row.read<String>('name'),
     };
-    final strictEvidenceSupported = networkEdgeColumnNames.containsAll({
-      'source_id',
-      'provenance_kind',
-      'verification_status',
-      'evidence_hash',
-    });
     final servicePatternSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'service_pattern',
@@ -505,6 +499,67 @@ class _RouteCatalogSnapshot {
           FROM network_edges
           ORDER BY id
           ''').get();
+    final networkEdges = networkEdgeRows
+        .map((row) {
+          final facility =
+              facilitiesById[row.readNullable<String>('facility_id')];
+          final facilityHasEligibleEvidence =
+              facility == null ||
+              eligibleFacilityEvidence.contains(
+                _stationFacilityEvidenceKey(
+                  stationId: facility.stationId,
+                  lineId: _facilityLineIdForEdge(
+                    row.read<String>('from_node_id'),
+                    row.read<String>('to_node_id'),
+                  ),
+                  facilityType: facility.type,
+                ),
+              );
+          final accessibilityStatus = row.read<String>('accessibility_status');
+          final reliabilityScore = row.read<int>('reliability_score');
+          final lastVerifiedAtSeconds = row.readNullable<int>(
+            'last_verified_at',
+          );
+          return _NetworkEdgeSnapshot(
+            id: row.read<String>('id'),
+            fromNodeId: row.read<String>('from_node_id'),
+            toNodeId: row.read<String>('to_node_id'),
+            durationSeconds: row.read<int>('duration_seconds'),
+            distanceMeters: row.read<int>('distance_meters'),
+            edgeType: row.read<String>('edge_type'),
+            servicePattern: row.read<String>('service_pattern'),
+            includesStairs: row.read<int>('includes_stairs') != 0,
+            stairAccessState: row.read<String>('stair_access_state'),
+            accessibilityStatus: _effectiveAccessibilityStatus(
+              accessibilityStatus,
+              facility,
+              facilityHasEligibleEvidence,
+            ),
+            reliabilityScore: _effectiveReliabilityScore(
+              reliabilityScore,
+              facility,
+            ),
+            lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
+              lastVerifiedAtSeconds,
+              facility,
+            ),
+            sourceId: row.read<String>('source_id'),
+            sourceSnapshotId: row.read<String>('source_snapshot_id'),
+            providerRecordHash: row.read<String>('provider_record_hash'),
+            provenanceKind: row.read<String>('provenance_kind'),
+            verificationStatus: row.read<String>('verification_status'),
+            evidenceHash: row.read<String>('evidence_hash'),
+          );
+        })
+        .toList(growable: false);
+    final strictEvidenceSupported =
+        networkEdgeColumnNames.containsAll({
+          'source_id',
+          'provenance_kind',
+          'verification_status',
+          'evidence_hash',
+        }) &&
+        networkEdges.any((edge) => edge.safetyEvidence.strictRouteEligible);
 
     return _RouteCatalogSnapshot(
       stationsById: {
@@ -524,61 +579,7 @@ class _RouteCatalogSnapshot {
             ),
           )
           .toList(growable: false),
-      networkEdges: networkEdgeRows
-          .map((row) {
-            final facility =
-                facilitiesById[row.readNullable<String>('facility_id')];
-            final facilityHasEligibleEvidence =
-                facility == null ||
-                eligibleFacilityEvidence.contains(
-                  _stationFacilityEvidenceKey(
-                    stationId: facility.stationId,
-                    lineId: _facilityLineIdForEdge(
-                      row.read<String>('from_node_id'),
-                      row.read<String>('to_node_id'),
-                    ),
-                    facilityType: facility.type,
-                  ),
-                );
-            final accessibilityStatus = row.read<String>(
-              'accessibility_status',
-            );
-            final reliabilityScore = row.read<int>('reliability_score');
-            final lastVerifiedAtSeconds = row.readNullable<int>(
-              'last_verified_at',
-            );
-            return _NetworkEdgeSnapshot(
-              id: row.read<String>('id'),
-              fromNodeId: row.read<String>('from_node_id'),
-              toNodeId: row.read<String>('to_node_id'),
-              durationSeconds: row.read<int>('duration_seconds'),
-              distanceMeters: row.read<int>('distance_meters'),
-              edgeType: row.read<String>('edge_type'),
-              servicePattern: row.read<String>('service_pattern'),
-              includesStairs: row.read<int>('includes_stairs') != 0,
-              stairAccessState: row.read<String>('stair_access_state'),
-              accessibilityStatus: _effectiveAccessibilityStatus(
-                accessibilityStatus,
-                facility,
-                facilityHasEligibleEvidence,
-              ),
-              reliabilityScore: _effectiveReliabilityScore(
-                reliabilityScore,
-                facility,
-              ),
-              lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
-                lastVerifiedAtSeconds,
-                facility,
-              ),
-              sourceId: row.read<String>('source_id'),
-              sourceSnapshotId: row.read<String>('source_snapshot_id'),
-              providerRecordHash: row.read<String>('provider_record_hash'),
-              provenanceKind: row.read<String>('provenance_kind'),
-              verificationStatus: row.read<String>('verification_status'),
-              evidenceHash: row.read<String>('evidence_hash'),
-            );
-          })
-          .toList(growable: false),
+      networkEdges: networkEdges,
       strictEvidenceSupported: strictEvidenceSupported,
     );
   }
