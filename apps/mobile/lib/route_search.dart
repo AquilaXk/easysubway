@@ -33,6 +33,7 @@ const _routeSearchPagePadding = EdgeInsets.only(
 );
 const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
+const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1706,7 +1707,7 @@ class _RoutePointPickerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: const Color(0xFFD5E2E4)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: _routeSearchLargeRadius,
         boxShadow: const [
           BoxShadow(
             color: Color(0x0F071B2F),
@@ -2945,7 +2946,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: const Color(0xFF073245),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: _routeSearchLargeRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -2958,7 +2959,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                     border: Border.all(
                       color: EasySubwayAccessibleColors.mintBorder,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: _routeSearchLargeRadius,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -3040,7 +3041,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                           : EasySubwayAccessibleColors.mint,
                       width: 2,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: _routeSearchLargeRadius,
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x1A0D8A6D),
