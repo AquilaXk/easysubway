@@ -9213,7 +9213,7 @@ void main() {
       },
     );
     final favoriteRouteRepository = FakeFavoriteRouteRepository()
-      ..error = const FavoriteRouteException('즐겨찾기 경로를 처리하지 못했어요.');
+      ..error = const FavoriteRouteException('즐겨찾기 경로를 바꾸지 못했어요.');
 
     try {
       await tester.pumpWidget(
@@ -9268,7 +9268,7 @@ void main() {
       await tester.tap(find.byKey(const Key('routeFavoriteSaveButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('즐겨찾기 경로를 처리하지 못했어요.'), findsOneWidget);
+      expect(find.text('즐겨찾기 경로를 바꾸지 못했어요.'), findsOneWidget);
       expect(
         find.text('네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.'),
         findsOneWidget,

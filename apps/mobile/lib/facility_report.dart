@@ -913,7 +913,7 @@ class FacilityReportResult {
       'ACCEPTED' => '반영됨',
       'REJECTED' => '반려됨',
       'DUPLICATE' => '중복 제보',
-      'RESOLVED' => '처리 완료',
+      'RESOLVED' => '확인 완료',
       _ => '접수 상태를 불러오지 못했어요',
     };
   }
