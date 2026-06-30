@@ -689,7 +689,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       reportMobileError(
         error,
         stackTrace,
-        context: '데이터 삭제 후 기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
+        context: '정보 삭제 후 기존 익명 인증 저장값을 정리하는 중 예외가 발생했습니다.',
       );
     }
     await widget.onboardingStore?.clearResult();
@@ -950,7 +950,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       reportMobileError(
         error,
         stackTrace,
-        context: '앱 시작 시 시설 신고 사진 복구 중 예외가 발생했습니다.',
+        context: '앱 시작 시 시설 제보 사진 복구 중 예외가 발생했습니다.',
       );
       await _clearFacilityReportDraftTargetQuietly(draftTargetStore);
       return;
@@ -991,7 +991,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 신고 사진 복구 대상 정리 중 예외가 발생했습니다.',
+        context: '시설 제보 사진 복구 대상 정리 중 예외가 발생했습니다.',
       );
     }
   }
@@ -4408,13 +4408,13 @@ class SupportAccessScreen extends StatelessWidget {
               _SupportAccessItem(
                 key: const Key('dataDeletionAccessItem'),
                 icon: Icons.delete_outline,
-                title: '데이터 삭제 요청',
+                title: '내 정보 삭제 요청',
                 value: accessInfo.dataDeletionEmail,
                 displayValue: '이메일 보내기',
                 helperText: '삭제 범위와 처리 절차를 메일로 문의해요',
                 uri: _mailtoUri(
                   accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 데이터 삭제 요청',
+                  '쉬운 지하철 내 정보 삭제 요청',
                 ),
                 launcher: launcher,
               )
@@ -4425,7 +4425,7 @@ class SupportAccessScreen extends StatelessWidget {
                 onDeleted: onUserDataDeleted,
               ),
             const SizedBox(height: 20),
-            const _SupportSectionTitle(title: '안전과 데이터 안내'),
+            const _SupportSectionTitle(title: '이동 전 확인'),
             const _SafetyDataNotice(),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
@@ -4514,7 +4514,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
         child: Material(
-          color: Colors.white,
+          color: EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
             side: BorderSide(
@@ -4530,7 +4530,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                 children: [
                   const Icon(
                     Icons.delete_outline,
-                    color: Color(0xFF8B1E1E),
+                    color: EasySubwayAccessibleColors.red,
                     size: 28,
                   ),
                   const SizedBox(width: 14),
@@ -4541,7 +4541,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                         Text(
                           copy.title,
                           style: const TextStyle(
-                            color: Color(0xFF102A2C),
+                            color: EasySubwayAccessibleColors.text,
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                             height: 1.25,
@@ -4551,7 +4551,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                         Text(
                           copy.helperText,
                           style: const TextStyle(
-                            color: Color(0xFF466467),
+                            color: EasySubwayAccessibleColors.mutedText,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             height: 1.3,
@@ -4560,7 +4560,10 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Color(0xFF466467)),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: EasySubwayAccessibleColors.mutedText,
+                  ),
                 ],
               ),
             ),
@@ -4605,56 +4608,56 @@ class _UserDataDeletionCopy {
   factory _UserDataDeletionCopy.forScope(UserDataDeletionScope scope) {
     return switch (scope) {
       UserDataDeletionScope.requestOnly => const _UserDataDeletionCopy(
-        title: '데이터 삭제 요청',
+        title: '내 정보 삭제 요청',
         helperText: '삭제 범위와 처리 절차를 메일로 문의합니다.',
-        body: '삭제가 필요한 데이터와 처리 절차를 지원 메일로 문의합니다.',
+        body: '삭제가 필요한 정보와 처리 절차를 지원 메일로 문의합니다.',
         notices: [
-          '앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.',
+          '앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.',
           '요청 전 개인정보처리방침에서 보관 범위와 기간을 확인할 수 있습니다.',
         ],
-        confirmText: '데이터 삭제 요청 메일을 보낼까요?',
+        confirmText: '내 정보 삭제 요청 메일을 보낼까요?',
       ),
       UserDataDeletionScope.deviceOnly => const _UserDataDeletionCopy(
-        title: '이 기기의 앱 데이터 삭제',
-        helperText: '로컬 삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
+        title: '이 기기의 앱 정보 삭제',
+        helperText: '이 기기에서 지울 범위와 되돌릴 수 없는 항목을 확인하고 진행합니다.',
         body:
             '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
         notices: [
           '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
           '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
-          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
+          '삭제한 정보는 앱에서 복구할 수 없습니다.',
           '삭제를 완료하지 못하면 오류 안내를 보고 다시 시도할 수 있습니다.',
           '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
         ],
-        confirmText: '삭제 후에는 이 기기에 저장된 앱 데이터와 설정이 지워지고 되돌릴 수 없습니다.',
+        confirmText: '삭제 후에는 이 기기에 저장된 앱 정보와 설정이 지워지고 되돌릴 수 없습니다.',
       ),
       UserDataDeletionScope.remoteOnly => const _UserDataDeletionCopy(
-        title: '서버 데이터 삭제',
-        helperText: '서버 삭제 범위와 앱 초기화 여부를 확인하고 진행합니다.',
+        title: '보낸 정보 삭제',
+        helperText: '보낸 정보 중 지울 범위와 앱 초기화 여부를 확인하고 진행합니다.',
         body:
-            '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+            '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
-          '삭제가 끝나면 서버에 연결된 데이터가 정리되고 앱의 임시 설정이 초기화됩니다.',
+          '삭제가 끝나면 보낸 정보가 정리되고 앱의 임시 설정이 초기화됩니다.',
           '앱은 처음 설정 화면으로 돌아갑니다.',
-          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
-          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '삭제한 정보는 앱에서 복구할 수 없습니다.',
+          '네트워크 오류가 나면 기존 정보는 지우지 않고 다시 시도할 수 있습니다.',
           '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
         ],
         confirmText:
-            '삭제 후에는 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
+            '삭제 후에는 보낸 정보와 설정이 삭제되거나 익명화되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
       ),
       UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
-        title: '내 데이터 삭제',
+        title: '내 정보 삭제',
         helperText: '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
         body:
-            '데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
+            '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다.',
         notices: [
-          '삭제가 끝나면 이 기기와 서버에 연결된 데이터가 함께 정리됩니다.',
-          '삭제한 데이터는 앱에서 복구할 수 없습니다.',
-          '네트워크 오류가 나면 기존 데이터는 지우지 않고 다시 시도할 수 있습니다.',
+          '삭제가 끝나면 이 기기와 보낸 정보가 함께 정리됩니다.',
+          '삭제한 정보는 앱에서 복구할 수 없습니다.',
+          '네트워크 오류가 나면 기존 정보는 지우지 않고 다시 시도할 수 있습니다.',
           '법적·보안상 필요한 최소 기록은 정해진 기간 동안만 보관될 수 있습니다.',
         ],
-        confirmText: '삭제 후에는 이 기기와 서버에 연결된 데이터와 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.',
+        confirmText: '삭제 후에는 이 기기와 보낸 정보, 설정이 삭제되거나 익명화되고 되돌릴 수 없습니다.',
       ),
     };
   }
@@ -4705,8 +4708,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               : const Icon(Icons.delete_forever_outlined),
           label: Text(_isDeleting ? '삭제 중' : copy.title),
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF8B1E1E),
-            foregroundColor: Colors.white,
+            backgroundColor: EasySubwayAccessibleColors.red,
+            foregroundColor: EasySubwayAccessibleColors.surface,
           ),
         ),
       ),
@@ -4719,7 +4722,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               child: Text(
                 '삭제 전에 확인해 주세요',
                 style: textTheme.headlineSmall?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
@@ -4729,7 +4732,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             Text(
               copy.body,
               style: textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF102A2C),
+                color: EasySubwayAccessibleColors.text,
                 height: 1.4,
               ),
             ),
@@ -4759,8 +4762,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             key: const Key('dataDeletionConfirmButton'),
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8B1E1E),
-              foregroundColor: Colors.white,
+              backgroundColor: EasySubwayAccessibleColors.red,
+              foregroundColor: EasySubwayAccessibleColors.surface,
             ),
             child: const Text('삭제'),
           ),
@@ -4793,7 +4796,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       reportMobileError(
         error,
         stackTrace,
-        context: '사용자 데이터 삭제 처리 중 예외가 발생했습니다.',
+        context: '사용자 정보 삭제 처리 중 예외가 발생했습니다.',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -4824,14 +4827,18 @@ class _DataDeletionNoticeLine extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 7),
-            child: Icon(Icons.circle, size: 7, color: Color(0xFF8B1E1E)),
+            child: Icon(
+              Icons.circle,
+              size: 7,
+              color: EasySubwayAccessibleColors.red,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF3B2020),
+                color: EasySubwayAccessibleColors.text,
                 height: 1.35,
               ),
             ),
@@ -4886,7 +4893,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '내 데이터가 삭제됐어요',
+                    '내 정보가 삭제됐어요',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w900,
@@ -5016,9 +5023,9 @@ class _DataDeletionResultRow extends StatelessWidget {
       key: Key('dataDeletionResultStatus-$id'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFDFF4EC),
+        color: EasySubwayAccessibleColors.mintSoft,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF8AC7B7)),
+        border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
       ),
       child: const Text(
         '완료',
@@ -5086,7 +5093,7 @@ class _SecurityContactNotice extends StatelessWidget {
 
   static const _title = '보안 문의 안내';
   static const _contactNotice = '앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.';
-  static const _scopeNotice = '위치, 신고 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.';
+  static const _scopeNotice = '위치, 제보 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.';
 
   @override
   Widget build(BuildContext context) {
@@ -5098,8 +5105,8 @@ class _SecurityContactNotice extends StatelessWidget {
       child: ExcludeSemantics(
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFF0F2FF),
-            border: Border.all(color: const Color(0xFFC3C9E8)),
+            color: EasySubwayAccessibleColors.skySoft,
+            border: Border.all(color: EasySubwayAccessibleColors.line),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Padding(
@@ -5112,7 +5119,7 @@ class _SecurityContactNotice extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.security_outlined,
-                      color: Color(0xFF23306E),
+                      color: EasySubwayAccessibleColors.brand,
                       size: 24,
                     ),
                     const SizedBox(width: 10),
@@ -5120,7 +5127,7 @@ class _SecurityContactNotice extends StatelessWidget {
                       child: Text(
                         _title,
                         style: textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF17204B),
+                          color: EasySubwayAccessibleColors.text,
                           fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
@@ -5154,14 +5161,18 @@ class _SecurityContactNoticeLine extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 7),
-            child: Icon(Icons.circle, size: 7, color: Color(0xFF30408F)),
+            child: Icon(
+              Icons.circle,
+              size: 7,
+              color: EasySubwayAccessibleColors.brand,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF27315C),
+                color: EasySubwayAccessibleColors.text,
                 height: 1.35,
               ),
             ),
@@ -5175,7 +5186,7 @@ class _SecurityContactNoticeLine extends StatelessWidget {
 class _SafetyDataNotice extends StatelessWidget {
   const _SafetyDataNotice();
 
-  static const _title = '안전과 데이터 안내';
+  static const _title = '이동 전 확인';
   static const _referenceNotice = '경로와 시설 정보는 이동을 돕는 참고 정보입니다.';
   static const _fieldNotice = '실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.';
   static const _limitationNotice = '실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.';
@@ -5190,8 +5201,8 @@ class _SafetyDataNotice extends StatelessWidget {
       child: ExcludeSemantics(
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF7E8),
-            border: Border.all(color: const Color(0xFFE3C37D)),
+            color: EasySubwayAccessibleColors.amberSoft,
+            border: Border.all(color: EasySubwayAccessibleColors.amber),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Padding(
@@ -5204,7 +5215,7 @@ class _SafetyDataNotice extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.info_outline,
-                      color: Color(0xFF6B4D00),
+                      color: EasySubwayAccessibleColors.amber,
                       size: 24,
                     ),
                     const SizedBox(width: 10),
@@ -5212,7 +5223,7 @@ class _SafetyDataNotice extends StatelessWidget {
                       child: Text(
                         _title,
                         style: textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF2C2200),
+                          color: EasySubwayAccessibleColors.text,
                           fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
@@ -5247,14 +5258,18 @@ class _SafetyDataNoticeLine extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 7),
-            child: Icon(Icons.circle, size: 7, color: Color(0xFF8A6400)),
+            child: Icon(
+              Icons.circle,
+              size: 7,
+              color: EasySubwayAccessibleColors.amber,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF3A2A00),
+                color: EasySubwayAccessibleColors.text,
                 height: 1.35,
               ),
             ),
@@ -5272,16 +5287,16 @@ class _PrivacyDataUseSummary extends StatelessWidget {
 
   static const _title = '개인정보 사용 안내';
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.';
-  static const _appDataPurpose = '즐겨찾기, 이동 조건, 신고 내용과 사진은 앱 기능 제공에 사용됩니다.';
+  static const _appDataPurpose = '즐겨찾기, 이동 조건, 제보 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _requestDeletionScope =
-      '데이터 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';
+      '내 정보 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';
   static const _deviceDeletionScope =
-      '이 기기의 앱 데이터 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
+      '이 기기의 앱 정보 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
   static const _remoteDeletionScope =
-      '서버 데이터 삭제는 즐겨찾기, 신고 접수 기록, 신고 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.';
+      '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 익명화하고 앱의 임시 설정을 초기화합니다.';
   static const _combinedDeletionScope =
-      '내 데이터 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 서버에 연결된 신고 내용·사진·위치, 경로 피드백 정보를 삭제하거나 익명화합니다.';
-  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 데이터는 답변 안내에 따라 처리됩니다.';
+      '내 정보 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 보낸 제보 내용·사진·위치, 경로 피드백 정보를 삭제하거나 익명화합니다.';
+  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.';
   static const _deviceSentReportNotice =
       '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
   static const _remoteSentReportNotice =
