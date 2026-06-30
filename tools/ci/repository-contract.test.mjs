@@ -5129,7 +5129,10 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  prometheus:/)?.[0] ?? "";
 
   assert.match(compose, /postgres:\n/);
-  assert.match(compose, /image: imresamu\/postgis:16-3\.5/);
+  assert.match(
+    compose,
+    /image: imresamu\/postgis:16-3\.5@sha256:92031b614897082103c00729ea26e62f118ecb59b71e27b5c3ac3a8dc13bff23/,
+  );
   assert.doesNotMatch(postgresBlock, /profiles:/);
   assert.match(compose, /POSTGRES_DB: \$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
   assert.match(compose, /POSTGRES_USER: \$\{EASYSUBWAY_POSTGRES_USER:-easysubway\}/);
