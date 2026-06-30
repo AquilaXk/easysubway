@@ -7646,7 +7646,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 신고'), findsOneWidget);
+      expect(find.bySemanticsLabel('1번 출구 엘리베이터 상태 제보'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));

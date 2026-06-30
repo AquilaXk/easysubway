@@ -5325,7 +5325,7 @@ class _StationFacilityCard extends StatelessWidget {
                     Expanded(
                       child: Semantics(
                         container: true,
-                        label: '${facility.name} 상태 신고',
+                        label: '${facility.name} 상태 제보',
                         button: true,
                         onTap: onReportTap,
                         child: ExcludeSemantics(
