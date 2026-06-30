@@ -11269,7 +11269,10 @@ void main() {
       find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('위치 없이 제보합니다. 현장 위치 확인이 늦어질 수 있어요.'), findsOneWidget);
+    expect(
+      find.text('위치 없이 제보합니다. 정확한 위치를 찾는 데 시간이 걸릴 수 있어요.'),
+      findsOneWidget,
+    );
 
     final noLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),

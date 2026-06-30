@@ -4391,7 +4391,7 @@ class SupportAccessScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            const _SupportSectionTitle(title: '개인정보 및 데이터'),
+            const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _PrivacyDataUseSummary(deletionScope: deletionScope),
             const SizedBox(height: 12),
             _SupportAccessItem(
