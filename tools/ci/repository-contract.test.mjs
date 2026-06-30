@@ -3069,7 +3069,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/actuator/health",
       "/actuator/health/liveness",
       "/actuator/health/readiness",
-      "/actuator/prometheus",
       "/api/v1/report-uploads",
       "/api/v1/report-uploads/{uploadId}",
       "/api/v1/reports",
@@ -3091,7 +3090,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/actuator/health",
       "/actuator/health/liveness",
       "/actuator/health/readiness",
-      "/actuator/prometheus",
       "/api/v1/realtime/**",
     ],
   );
@@ -5381,7 +5379,8 @@ test("백엔드 런타임 의존성은 보안 패치 기준 버전을 사용한�
 test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고 관측성 선택 서비스를 profile로 분리한다", () => {
   const compose = read("infra/docker-compose.yml");
   const postgresBlock = compose.match(/  postgres:\n[\s\S]*?\n\n  object-storage:/)?.[0] ?? "";
-  const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  prometheus:/)?.[0] ?? "";
+  const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  backend:/)?.[0] ?? "";
+  const backWorkerBlock = compose.match(/  back-worker:\n[\s\S]*?\n\n  public-edge-probe:/)?.[0] ?? "";
 
   assert.match(compose, /postgres:\n/);
   assert.match(
@@ -5407,9 +5406,19 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
 
   assert.doesNotMatch(compose, /redis:\n/);
   assert.doesNotMatch(compose, /EASYSUBWAY_REDIS_/);
+  assert.match(compose, /back-worker:\n/);
+  assert.match(compose, /back-worker:[\s\S]*image: easysubway-backend:\$\{EASYSUBWAY_BACKEND_IMAGE_TAG:-local\}/);
+  assert.match(compose, /backend:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: "false"/);
+  assert.match(compose, /back-worker:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: "true"/);
+  assert.doesNotMatch(backWorkerBlock, /ports:/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
+  assert.match(compose, /public-edge-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /docker-runtime-probe:[\s\S]*image: ghcr\.io\/google\/cadvisor:v0\.60\.3/);
+  assert.match(compose, /docker-runtime-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
   assert.match(compose, /^volumes:\n  postgres-data:\n  object-storage-data:\n  prometheus-data:/m);
   assert.doesNotMatch(compose, /^  redis-data:/m);
 });
@@ -5596,29 +5605,39 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
 
   assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
   assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
-  assert.doesNotMatch(applicationYml, /prometheus/);
+  assert.doesNotMatch(applicationYml, /include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
   assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
 
   assert.match(compose, /prometheus:\n/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: prom\/prometheus:v[0-9]+\.[0-9]+\.[0-9]+/);
   assert.match(compose, /\.\/prometheus\/prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
-  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /prometheus-data:\/prometheus/);
   assert.match(compose, /wget --spider -q http:\/\/localhost:9090\/-\/healthy/);
 
   assert.match(compose, /grafana:\n/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/grafana:[0-9]+\.[0-9]+\.[0-9]+/);
-  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
   assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
   assert.match(compose, /grafana-data:\/var\/lib\/grafana/);
   assert.match(compose, /\.\/grafana\/provisioning:\/etc\/grafana\/provisioning:ro/);
   assert.match(compose, /depends_on:\s*\n\s*prometheus:\s*\n\s*condition: service_healthy[\s\S]*loki:\s*\n\s*condition: service_healthy/);
 
   assert.match(prometheusConfig, /job_name: "easysubway-backend"/);
-  assert.match(prometheusConfig, /metrics_path: "\/actuator\/prometheus"/);
-  assert.match(prometheusConfig, /targets: \["host\.docker\.internal:8080"\]/);
+  assert.match(prometheusConfig, /http:\/\/backend:8080\/actuator\/health\/readiness/);
+  assert.match(prometheusConfig, /job_name: "back_worker"/);
+  assert.match(prometheusConfig, /http:\/\/back-worker:8080\/actuator\/health\/readiness/);
+  assert.match(prometheusConfig, /job_name: "docker_runtime_probe"/);
+  assert.match(prometheusConfig, /targets: \["docker-runtime-probe:8080"\]/);
+  assert.match(prometheusConfig, /job_name: "public_edge_probe"/);
+  assert.match(prometheusConfig, /metrics_path: "\/probe"/);
+  assert.match(prometheusConfig, /module: \[http_2xx\]/);
+  assert.match(prometheusConfig, /https:\/\/easysubway-api\.aquilaxk\.site\/actuator\/health\/readiness/);
+  assert.match(prometheusConfig, /replacement: public-edge-probe:9115/);
+  assert.doesNotMatch(prometheusConfig, /\/actuator\/prometheus/);
+  assert.doesNotMatch(prometheusConfig, /host\.docker\.internal:8080/);
 
   assert.match(grafanaDatasource, /name: easysubway-prometheus/);
   assert.match(grafanaDatasource, /type: prometheus/);
@@ -5633,12 +5652,18 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   const prometheusDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(compose, /loki:\n/);
+  assert.match(compose, /loki-volume-init:\n/);
+  assert.match(compose, /loki-volume-init:[\s\S]*image: busybox:1\.37\.0/);
+  assert.match(compose, /loki-volume-init:[\s\S]*command: \["sh", "-c", "mkdir -p \/loki\/chunks \/loki\/rules \/loki\/rules-temp \/loki\/retention && chown -R 10001:10001 \/loki"\]/);
+  assert.match(compose, /loki-volume-init:[\s\S]*loki-data:\/loki/);
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/loki:3\.6\.0/);
+  assert.match(compose, /loki:[\s\S]*user: "10001:10001"/);
   assert.match(compose, /--config\.file=\/etc\/loki\/loki\.yml/);
   assert.match(compose, /\.\/loki\/loki\.yml:\/etc\/loki\/loki\.yml:ro/);
   assert.match(compose, /"127\.0\.0\.1:\$\{EASYSUBWAY_LOKI_PORT:-3100\}:3100"/);
   assert.match(compose, /loki-data:\/loki/);
+  assert.match(compose, /loki:[\s\S]*depends_on:\s*\n\s*loki-volume-init:\s*\n\s*condition: service_completed_successfully/);
   assert.match(compose, /test: \["CMD", "loki", "-config\.file=\/etc\/loki\/loki\.yml", "-verify-config"\]/);
 
   assert.match(lokiConfig, /auth_enabled: false/);
@@ -6960,8 +6985,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(security, /@Order\(4\)[\s\S]*?publicSecurityFilterChain/);
   assert.match(
     security,
-    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/liveness"[\s\S]*"\/actuator\/health\/readiness"[\s\S]*"\/actuator\/prometheus"[\s\S]*\)\.permitAll\(\)/,
+    /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/liveness"[\s\S]*"\/actuator\/health\/readiness"[\s\S]*\)\.permitAll\(\)/,
   );
+  assert.doesNotMatch(security, /"\/actuator\/prometheus"/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
