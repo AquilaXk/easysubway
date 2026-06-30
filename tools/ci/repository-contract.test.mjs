@@ -4051,6 +4051,8 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   const schema = read("tools/datapack/schema/catalog-schema.sql");
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
+  const mobileTables = read("apps/mobile/lib/core/database/catalog/catalog_tables.dart");
+  const mobileDatabase = read("apps/mobile/lib/core/database/catalog/catalog_database.dart");
 
   for (const row of input.facilityRows) {
     assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
@@ -4082,7 +4084,12 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(validator, /"source_snapshot_id"/);
   assert.match(validator, /"provider_record_hash"/);
   assert.match(validator, /validateProductionInternalRouteEdgeProvenance/);
+  assert.match(validator, /validateNetworkEdgeBaseProvenance/);
   assert.match(validator, /is placeholder evidence/);
+  assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
+  assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
+  assert.match(mobileDatabase, /int get schemaVersion => 7/);
+  assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
 });
 
 test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {

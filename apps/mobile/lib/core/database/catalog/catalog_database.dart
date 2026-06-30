@@ -42,7 +42,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -69,6 +69,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 6) {
           await _addRelease100ProvenanceColumns();
+        }
+        if (from < 7) {
+          await _addSourceEvidenceProvenanceColumns();
         }
       },
       beforeOpen: (_) async {
@@ -698,6 +701,41 @@ class CatalogDatabase extends _$CatalogDatabase {
     await _addColumnIfMissing(
       'internal_route_edges',
       'evidence_hash',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  Future<void> _addSourceEvidenceProvenanceColumns() async {
+    await _addColumnIfMissing(
+      'network_edges',
+      'source_snapshot_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'network_edges',
+      'provider_record_hash',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+
+    await _addColumnIfMissing(
+      'facilities',
+      'source_snapshot_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'facilities',
+      'provider_record_hash',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'source_snapshot_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'internal_route_edges',
+      'provider_record_hash',
       "TEXT NOT NULL DEFAULT ''",
     );
   }
