@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
 
+const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(8));
+
 class MobilityProfileOption {
   const MobilityProfileOption({
     required this.id,
@@ -203,8 +205,10 @@ class _MobilityProfileCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final borderColor = selected
         ? colorScheme.primary
-        : const Color(0xFFD5E2E4);
-    final backgroundColor = selected ? const Color(0xFFE6F2F0) : Colors.white;
+        : EasySubwayAccessibleColors.line;
+    final backgroundColor = selected
+        ? EasySubwayAccessibleColors.mintSoft
+        : EasySubwayAccessibleColors.surface;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -217,12 +221,12 @@ class _MobilityProfileCard extends StatelessWidget {
           child: Material(
             color: backgroundColor,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _mobilityProfileCardRadius,
               side: BorderSide(color: borderColor, width: selected ? 2 : 1),
             ),
             child: InkWell(
               key: Key('mobilityProfileCard-${option.id}'),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _mobilityProfileCardRadius,
               onTap: onTap,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 76),
@@ -241,7 +245,7 @@ class _MobilityProfileCard extends StatelessWidget {
                               option.title,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
-                                    color: const Color(0xFF102A2C),
+                                    color: EasySubwayAccessibleColors.text,
                                     fontWeight: FontWeight.w900,
                                     height: 1.25,
                                   ),
@@ -251,7 +255,7 @@ class _MobilityProfileCard extends StatelessWidget {
                               option.summary,
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
-                                    color: const Color(0xFF29484B),
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -290,7 +294,7 @@ class _SelectionStatus extends StatelessWidget {
       child: Text(
         '${selectedOption.title} 조건을 선택했습니다',
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: const Color(0xFF102A2C),
+          color: EasySubwayAccessibleColors.text,
           fontWeight: FontWeight.w800,
           height: 1.35,
         ),
