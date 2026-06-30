@@ -17,7 +17,7 @@ import 'secure_key_value_storage.dart';
 
 const _facilityReportTimeout = Duration(seconds: 8);
 const _facilityReportErrorMessage = '제보를 보내지 못했어요.';
-const _facilityReportStatusErrorMessage = '처리 상태를 확인하지 못했어요.';
+const _facilityReportStatusErrorMessage = '제보 진행 상황을 확인하지 못했어요.';
 const _facilityReportListErrorMessage = '제보 내역을 불러오지 못했어요.';
 const _facilityReportFailureNextAction = '내용을 확인한 뒤 네트워크 상태를 보고 다시 보내 주세요.';
 const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 사진을 선택해 주세요.';
@@ -296,7 +296,7 @@ class FacilityReportApiRepository implements FacilityReportRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 제보 처리 상태 응답 처리 중 예외가 발생했습니다.',
+        context: '시설 제보 진행 상황 응답 처리 중 예외가 발생했습니다.',
       );
       throw const FacilityReportException(_facilityReportStatusErrorMessage);
     }
@@ -1190,7 +1190,7 @@ class FacilityReportController extends ChangeNotifier {
     _emitState(
       FacilityReportState(
         status: FacilityReportViewStatus.loading,
-        message: '처리 상태 확인 중',
+        message: '제보 진행 상황 확인 중',
         result: currentResult,
       ),
     );
@@ -1200,7 +1200,7 @@ class FacilityReportController extends ChangeNotifier {
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.success,
-          message: '처리 상태를 확인했습니다.',
+          message: '제보 진행 상황을 확인했어요.',
           result: result,
         ),
       );
@@ -1217,13 +1217,13 @@ class FacilityReportController extends ChangeNotifier {
       reportMobileError(
         error,
         stackTrace,
-        context: '시설 제보 처리 상태 새로고침 중 예외가 발생했습니다.',
+        context: '시설 제보 진행 상황 새로고침 중 예외가 발생했습니다.',
       );
       // 알 수 없는 오류도 같은 화면에서 살펴볼 수 있게 접수 결과를 보존한다.
       _emitState(
         FacilityReportState(
           status: FacilityReportViewStatus.failure,
-          message: '처리 상태를 확인하지 못했어요.',
+          message: '제보 진행 상황을 확인하지 못했어요.',
           result: currentResult,
         ),
       );
@@ -2307,7 +2307,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     _FacilityReportStatusRow(
-                      label: '처리 상태',
+                      label: '진행 상황',
                       value: result.statusLabel,
                     ),
                   ],
@@ -2319,7 +2319,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
               key: const Key('facilityReportRefreshButton'),
               onPressed: isLoading ? null : onRefresh,
               icon: const Icon(Icons.refresh),
-              label: Text(isLoading ? '확인 중' : '처리 상태 확인'),
+              label: Text(isLoading ? '확인 중' : '진행 상황 확인'),
             ),
           ],
         ),
