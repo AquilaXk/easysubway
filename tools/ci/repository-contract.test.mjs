@@ -682,7 +682,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_POSTGRES_DB=easysubway",
     "EASYSUBWAY_POSTGRES_USER=easysubway",
     "EASYSUBWAY_POSTGRES_PASSWORD=secret",
-    "EASYSUBWAY_POSTGRES_PORT=5432",
+    "EASYSUBWAY_POSTGRES_PORT=15432",
     "EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://db:5432/easysubway",
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",

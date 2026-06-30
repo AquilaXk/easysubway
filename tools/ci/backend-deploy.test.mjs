@@ -42,7 +42,7 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
 
   assert.match(composeEnv, /^EASYSUBWAY_BACKEND_IMAGE_TAG=fixture$/m);
   assert.match(composeEnv, /^EASYSUBWAY_BACKEND_JAR_SHA256=fixture$/m);
-  assert.match(composeEnv, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
+  assert.match(composeEnv, /^EASYSUBWAY_POSTGRES_PORT=15432$/m);
   assert.doesNotMatch(composeEnv, /^EASYSUBWAY_DATASOURCE_PASSWORD=/m);
   assert.doesNotMatch(composeEnv, /^EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=/m);
   assert.match(backendEnv, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/postgres:5432\/easysubway$/m);
@@ -78,6 +78,10 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
   await assert.rejects(
     prepare(fixtureEnv().replace("jdbc:postgresql://postgres:5432/easysubway", "jdbc:postgresql://localhost:5432/easysubway")),
     /datasource must target postgres:5432 inside Compose/,
+  );
+  await assert.rejects(
+    prepare(fixtureEnv().replace("EASYSUBWAY_POSTGRES_PORT=15432", "EASYSUBWAY_POSTGRES_PORT=5432")),
+    /postgres host port 5432 is reserved on the production host/,
   );
   await assert.rejects(
     prepare(fixtureEnv().replace("EASYSUBWAY_DATASOURCE_PASSWORD=prod-postgres-password", "EASYSUBWAY_DATASOURCE_PASSWORD=wrong-password")),
