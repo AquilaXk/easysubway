@@ -482,7 +482,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             ELSE provenance_kind
           END,
           verification_status = CASE
-            WHEN UPPER(verification_status) != 'VERIFIED' THEN 'VERIFIED'
+            WHEN verification_status = '' OR UPPER(verification_status) = 'UNKNOWN' THEN 'VERIFIED'
             ELSE verification_status
           END,
           evidence_hash = CASE

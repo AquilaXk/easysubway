@@ -187,6 +187,37 @@ void main() {
     expect(result.blockedReasons, isEmpty);
   });
 
+  test('기존 baseline edge의 명시 non-verified 상태는 보강 과정에서 덮어쓰지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET verification_status = 'STALE'
+      WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT verification_status
+            FROM network_edges
+            WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+          ''').getSingle();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(edge.read<String>('verification_status'), 'STALE');
+    expect(result.status, 'UNKNOWN');
+    expect(result.blockedReasons, contains('검증되지 않은 경로는 안내하지 않아요.'));
+  });
+
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -601,6 +632,78 @@ void main() {
           durationSeconds: 180,
           provenanceKind: fixture.provenanceKind,
           evidenceHash: fixture.evidenceHash,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'exit-c-line-test-${fixture.id}',
+          fromNodeId: 'station-c:line-test',
+          toNodeId: 'station-c',
+          edgeType: 'EXIT',
+          durationSeconds: 60,
+        );
+        final repository = LocalRouteRepository(catalogDatabase: database);
+
+        final result = await repository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-c',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+        expect(result.status, 'UNKNOWN');
+        expect(result.steps, isEmpty);
+        expect(result.blockedReasons, contains(fixture.expectedReason));
+        expect(result.warnings, isEmpty);
+      } finally {
+        await database.close();
+      }
+    }
+  });
+
+  test('부분 edge 근거 metadata는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
+    for (final fixture in const [
+      (
+        id: 'edge-a-c-missing-source-snapshot',
+        setSql: "source_snapshot_id = ''",
+        expectedReason: '검증되지 않은 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-missing-provider-hash',
+        setSql: "provider_record_hash = ''",
+        expectedReason: '검증 근거가 없는 경로는 안내하지 않아요.',
+      ),
+      (
+        id: 'edge-a-c-missing-verified-at',
+        setSql: 'last_verified_at = NULL',
+        expectedReason: '검증되지 않은 경로는 안내하지 않아요.',
+      ),
+    ]) {
+      final database = CatalogDatabase.memory();
+      try {
+        await _seedLineWithoutNetworkEdges(
+          database,
+          includeExplicitAccessEdges: false,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'entry-a-line-test-${fixture.id}',
+          fromNodeId: 'station-a',
+          toNodeId: 'station-a:line-test',
+          edgeType: 'ENTRY',
+          durationSeconds: 90,
+        );
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: fixture.id,
+          fromNodeId: 'station-a:line-test',
+          toNodeId: 'station-c:line-test',
+          edgeType: 'RIDE',
+          durationSeconds: 180,
+        );
+        await database.customStatement(
+          'UPDATE network_edges SET ${fixture.setSql} WHERE id = ?',
+          [fixture.id],
         );
         await _insertVerifiedNetworkEdge(
           database,
