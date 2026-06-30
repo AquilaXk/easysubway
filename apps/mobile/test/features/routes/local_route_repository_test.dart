@@ -142,6 +142,51 @@ void main() {
     expect(edge.read<int>('reliability_score'), 30);
   });
 
+  test('기존 baseline edge provenance를 보강해 strict 경로를 유지한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE network_edges
+      SET source_id = '',
+          source_snapshot_id = '',
+          provider_record_hash = '',
+          provenance_kind = 'UNKNOWN',
+          verification_status = 'UNKNOWN',
+          evidence_hash = ''
+      WHERE id IN (
+        'edge-sangnoksu-sadang-seoul-4',
+        'edge-sadang-sangnoksu-seoul-4',
+        'entry-sangnoksu-seoul-4',
+        'exit-sangnoksu-seoul-4',
+        'entry-sadang-seoul-4',
+        'exit-sadang-seoul-4'
+      )
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final edge = await database.customSelect('''
+            SELECT source_id, verification_status, evidence_hash
+            FROM network_edges
+            WHERE id = 'edge-sangnoksu-sadang-seoul-4'
+          ''').getSingle();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(edge.read<String>('source_id'), 'baseline-route-source-capital');
+    expect(edge.read<String>('verification_status'), 'VERIFIED');
+    expect(edge.read<String>('evidence_hash'), hasLength(64));
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+  });
+
   test('로컬 경로 추천 이유는 확인되지 않은 접근성 검증을 단정하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
