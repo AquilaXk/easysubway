@@ -4019,6 +4019,86 @@ test("official source importer는 locked production denominator 밖 station을 �
   );
 });
 
+test("official source importer는 locked production operator 밖 line metadata를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-operator-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.operators.push({
+    id: "other-operator",
+    nameKo: "다른 운영사",
+    nameEn: "Other Operator",
+  });
+  input.lines[0].operatorId = "other-operator";
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope operator outside supportedV1Scope\.includedOperatorIds: other-operator/,
+  );
+});
+
+test("official source importer는 locked production denominator 밖 route endpoint를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-route-endpoint-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.stationMappings.push({
+    sourceId: "seoulmetro-station-line-info",
+    sourceStationCode: "999",
+    lineId: "seoul-4",
+    stationId: "station-extra",
+    stationLineId: "station-extra:seoul-4",
+    mappingStatus: "active",
+  });
+  input.routeEdges.push({
+    ...input.routeEdges[0],
+    id: "edge-extra-route-endpoint",
+    from: {
+      sourceId: "seoulmetro-station-line-info",
+      sourceStationCode: "448",
+      lineId: "seoul-4",
+    },
+    to: {
+      sourceId: "seoulmetro-station-line-info",
+      sourceStationCode: "999",
+      lineId: "seoul-4",
+    },
+  });
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+  );
+});
+
 test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");

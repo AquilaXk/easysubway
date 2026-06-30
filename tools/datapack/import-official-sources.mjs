@@ -36,7 +36,7 @@ function buildFixture(inventory, input) {
   const movementCandidates = movementPathCandidates(input.movementPathCandidates ?? [], allowedSourceIds, mappingBySourceKey);
   const routeMapPositions = routeMapPositionRows(input.routeMapPositions ?? [], allowedSourceIds, mappingBySourceKey);
   validateSelectedSourceRows(input, sourceIds);
-  validateSupportedScopeDenominator(input, stationRows, facilities);
+  validateSupportedScopeDenominator(input, stationRows, networkEdges, facilities, movementCandidates, routeMapPositions);
   validateSupportedFacilityCoverage(input, stationRows, facilities);
   const requiresRouteMapPositions = sourceDomainEnabled(selectedSources, "route_map_positions");
   if (requiresRouteMapPositions && routeMapPositions.length === 0) {
@@ -224,7 +224,7 @@ function validateSelectedSourceRows(input, sourceIds) {
   }
 }
 
-function validateSupportedScopeDenominator(input, stationRows, facilities) {
+function validateSupportedScopeDenominator(input, stationRows, networkEdges, facilities, movementCandidates, routeMapPositions) {
   if ((input.pack.artifactKind ?? "fixture") !== "production") {
     return;
   }
@@ -236,8 +236,34 @@ function validateSupportedScopeDenominator(input, stationRows, facilities) {
     requiredStringArray(supportedV1Scope.includedStationIds, "supportedV1Scope.includedStationIds"),
   );
   const includedLineIds = new Set(requiredStringArray(supportedV1Scope.includedLineIds, "supportedV1Scope.includedLineIds"));
+  const includedOperatorIds = new Set(
+    requiredStringArray(supportedV1Scope.includedOperatorIds, "supportedV1Scope.includedOperatorIds"),
+  );
   const actualStationIds = new Set(stationRows.map(({ mapping }) => mapping.stationId));
   const actualLineIds = new Set(stationRows.map(({ mapping }) => mapping.lineId));
+  const actualOperatorIds = new Set();
+
+  for (const line of input.lines ?? []) {
+    actualLineIds.add(requiredString(line.id, "lines.id"));
+    actualOperatorIds.add(requiredString(line.operatorId, "lines.operatorId"));
+  }
+  for (const operator of input.operators ?? []) {
+    actualOperatorIds.add(requiredString(operator.id, "operators.id"));
+  }
+  for (const edge of networkEdges) {
+    addNodeScopeIds(edge.fromNodeId, actualStationIds, actualLineIds);
+    addNodeScopeIds(edge.toNodeId, actualStationIds, actualLineIds);
+  }
+  for (const facility of facilities) {
+    actualStationIds.add(facility.stationId);
+  }
+  for (const candidate of movementCandidates) {
+    actualStationIds.add(candidate.stationId);
+  }
+  for (const position of routeMapPositions) {
+    actualStationIds.add(position.stationId);
+    actualLineIds.add(position.lineId);
+  }
 
   assertActualIdsWithinScope(
     actualStationIds,
@@ -252,11 +278,24 @@ function validateSupportedScopeDenominator(input, stationRows, facilities) {
   assertActualIdsWithinScope(actualLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
   assertScopeIdsHaveRows(includedLineIds, actualLineIds, "supportedV1Scope.includedLineIds missing production station row");
   assertActualIdsWithinScope(
-    new Set(facilities.map((facility) => facility.stationId)),
-    includedStationIds,
-    "production scope facility outside supportedV1Scope.includedStationIds",
+    actualOperatorIds,
+    includedOperatorIds,
+    "production scope operator outside supportedV1Scope.includedOperatorIds",
+  );
+  assertScopeIdsHaveRows(
+    includedOperatorIds,
+    actualOperatorIds,
+    "supportedV1Scope.includedOperatorIds missing production operator metadata",
   );
   validateFacilityCoverageDenominator(supportedV1Scope.facilityCoverageDenominator, includedStationIds.size, supportedV1Scope);
+}
+
+function addNodeScopeIds(nodeId, stationIds, lineIds) {
+  const [stationId, lineId] = requiredString(nodeId, "networkEdges.nodeId").split(":");
+  stationIds.add(stationId);
+  if (lineId) {
+    lineIds.add(lineId);
+  }
 }
 
 function validateFacilityCoverageDenominator(value, stationCount, supportedV1Scope) {
