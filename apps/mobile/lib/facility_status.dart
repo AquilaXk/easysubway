@@ -92,7 +92,7 @@ String buildFacilityAttentionSummary(Iterable<String> statuses) {
 String buildFacilityAttentionSemanticLabel(Iterable<String> statuses) {
   final counts = _attentionCounts(statuses);
   if (counts.isEmpty) {
-    return '살펴볼 시설 없음';
+    return '살펴볼 시설이 없어요';
   }
   final summary = counts.entries
       .map((entry) => '${entry.key.severityLabel} ${entry.value}개')
