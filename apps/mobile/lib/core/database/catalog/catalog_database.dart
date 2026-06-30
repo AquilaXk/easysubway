@@ -357,7 +357,7 @@ class CatalogDatabase extends _$CatalogDatabase {
     const sourceName = '수도권 도시철도 노선도';
     const sourceUrl = 'https://www.seoulmetro.co.kr/kr/cyberStation.do';
     const license = 'public-reference';
-    const licenseStatus = '출처 표기 필요';
+    const licenseStatus = '기관 안내 자료를 바탕으로 함';
     final rows = [
       ['station-sangnoksu', 'seoul-4', '수도권', 156, 250],
       ['station-sadang', 'seoul-4', '수도권', 390, 320],
