@@ -480,6 +480,36 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('오래된 network edge는 strict 경로에서 stale 사유를 표시한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-a-c-stale',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 180,
+      lastVerifiedAtSeconds: 0,
+    );
+
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'UNKNOWN');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('오래된 안내라 계단 없는 경로로 안내하지 않아요.'));
+    expect(result.warnings, isEmpty);
+  });
+
   test('잘못된 provenance와 evidence hash는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
     for (final fixture in const [
       (
@@ -2355,6 +2385,7 @@ void main() {
 Future<void> _seedLineWithoutNetworkEdges(
   CatalogDatabase database, {
   bool includeExplicitAccessEdges = true,
+  bool fillInsertedNetworkEdgeEvidence = true,
 }) async {
   await database.customStatement('''
     INSERT INTO catalog_metadata (key, value, updated_at)
@@ -2396,13 +2427,40 @@ Future<void> _seedLineWithoutNetworkEdges(
   if (includeExplicitAccessEdges) {
     await _addExplicitAccessEdges(database);
   }
+  if (fillInsertedNetworkEdgeEvidence) {
+    await _fillInsertedNetworkEdgeEvidence(database);
+  }
+}
+
+Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
+  await database.customStatement('''
+    CREATE TRIGGER test_fill_network_edge_evidence
+    AFTER INSERT ON network_edges
+    WHEN NEW.source_id = ''
+    BEGIN
+      UPDATE network_edges
+      SET source_id = 'test-source',
+          source_snapshot_id = 'test-source-snapshot',
+          provider_record_hash =
+            'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          provenance_kind = 'OFFICIAL_SOURCE',
+          verification_status = 'VERIFIED',
+          last_verified_at = COALESCE(NEW.last_verified_at, 1781827200),
+          evidence_hash =
+            '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+      WHERE id = NEW.id
+        AND source_id = '';
+    END
+  ''');
 }
 
 Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
   await database.customStatement('''
     INSERT INTO network_edges (
       id, from_node_id, to_node_id, duration_seconds, edge_type,
-      stair_access_state, accessibility_status, reliability_score
+      stair_access_state, accessibility_status, reliability_score,
+      source_id, source_snapshot_id, provider_record_hash, provenance_kind,
+      verification_status, last_verified_at, evidence_hash
     )
     VALUES
       (
@@ -2413,7 +2471,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-a-line-test',
@@ -2423,7 +2488,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-b-line-test',
@@ -2433,7 +2505,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-b-line-test',
@@ -2443,7 +2522,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-c-line-test',
@@ -2453,7 +2539,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-c-line-test',
@@ -2463,7 +2556,14 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
 }
@@ -2477,6 +2577,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required int durationSeconds,
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
+  int lastVerifiedAtSeconds = 1781827200,
   String evidenceHash =
       '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
 }) async {
@@ -2491,7 +2592,7 @@ Future<void> _insertVerifiedNetworkEdge(
       VALUES (?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-        ?, ?, 1781827200, ?)
+        ?, ?, ?, ?)
     ''',
     [
       id,
@@ -2501,6 +2602,7 @@ Future<void> _insertVerifiedNetworkEdge(
       edgeType,
       provenanceKind,
       verificationStatus,
+      lastVerifiedAtSeconds,
       evidenceHash,
     ],
   );
@@ -2525,7 +2627,9 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
   await database.customStatement('''
     INSERT INTO network_edges (
       id, from_node_id, to_node_id, duration_seconds, edge_type,
-      stair_access_state, accessibility_status, reliability_score
+      stair_access_state, accessibility_status, reliability_score,
+      source_id, source_snapshot_id, provider_record_hash, provenance_kind,
+      verification_status, last_verified_at, evidence_hash
     )
     VALUES
       (
@@ -2536,7 +2640,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-a-line-alt',
@@ -2546,7 +2657,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'entry-station-c-line-alt',
@@ -2556,7 +2674,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'ENTRY',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
         'exit-station-c-line-alt',
@@ -2566,7 +2691,14 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'EXIT',
         'STEP_FREE',
         'AVAILABLE',
-        95
+        95,
+        'test-source',
+        'test-source-snapshot',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        'OFFICIAL_SOURCE',
+        'VERIFIED',
+        1781827200,
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
 }
