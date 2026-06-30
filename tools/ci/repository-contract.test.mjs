@@ -4051,6 +4051,33 @@ test("official source importer는 locked production operator 밖 line metadata�
   );
 });
 
+test("official source importer는 locked production operator metadata 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-operator-metadata-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.operators = [];
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /supportedV1Scope\.includedOperatorIds missing production operator metadata: seoul-metro/,
+  );
+});
+
 test("official source importer는 locked production denominator 밖 route endpoint를 거부한다", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-route-endpoint-"));
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");

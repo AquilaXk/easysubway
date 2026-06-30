@@ -244,17 +244,18 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
   const scopedStationIds = new Set(rowStationIds);
   const scopedLineIds = new Set(rowLineIds);
   const lineOperatorIds = new Map();
-  const metadataOperatorIds = new Set();
+  const lineReferenceOperatorIds = new Set();
+  const operatorMetadataIds = new Set();
 
   for (const line of input.lines ?? []) {
     const lineId = requiredString(line.id, "lines.id");
     const operatorId = requiredString(line.operatorId, "lines.operatorId");
     scopedLineIds.add(lineId);
-    metadataOperatorIds.add(operatorId);
+    lineReferenceOperatorIds.add(operatorId);
     lineOperatorIds.set(lineId, operatorId);
   }
   for (const operator of input.operators ?? []) {
-    metadataOperatorIds.add(requiredString(operator.id, "operators.id"));
+    operatorMetadataIds.add(requiredString(operator.id, "operators.id"));
   }
   const rowOperatorIds = operatorIdsForLines(rowLineIds, lineOperatorIds);
   addPassThroughScopeIds(input, scopedStationIds, scopedLineIds);
@@ -286,13 +287,13 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
   assertActualIdsWithinScope(scopedLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
   assertScopeIdsHaveRows(includedLineIds, rowLineIds, "supportedV1Scope.includedLineIds missing production station row");
   assertActualIdsWithinScope(
-    metadataOperatorIds,
+    new Set([...lineReferenceOperatorIds, ...operatorMetadataIds]),
     includedOperatorIds,
     "production scope operator outside supportedV1Scope.includedOperatorIds",
   );
   assertScopeIdsHaveRows(
     includedOperatorIds,
-    metadataOperatorIds,
+    operatorMetadataIds,
     "supportedV1Scope.includedOperatorIds missing production operator metadata",
   );
   assertScopeIdsHaveRows(
