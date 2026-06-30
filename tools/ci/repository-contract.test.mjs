@@ -3414,6 +3414,15 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
+  const nodeTerminatorIndents = workflow
+    .split("\n")
+    .filter((line) => /^\s*NODE$/.test(line))
+    .map((line) => line.match(/^\s*/)[0].length);
+  assert.deepEqual(
+    nodeTerminatorIndents,
+    [10, 10, 10],
+    "workflow heredoc terminators must start at shell column 1 after YAML indentation is stripped",
+  );
 
   for (const field of [
     "releaseRequestId",
