@@ -874,10 +874,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('가기 전 확인 · 엘리베이터 제보됨'), findsOneWidget);
+    expect(find.text('가기 전 살펴보기 · 엘리베이터 제보됨'), findsOneWidget);
     expect(find.text('역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('가기 전 확인, .*공식 안내, 역무원 도움 요청')),
+      find.bySemanticsLabel(RegExp('가기 전 살펴보기, .*공식 안내, 역무원 도움 요청')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
