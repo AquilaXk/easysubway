@@ -14,6 +14,7 @@ import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_line_badges.dart';
 import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
@@ -6898,6 +6899,13 @@ void main() {
       expect(
         (lineFilterImage.image as AssetImage).assetName,
         'assets/metro_symbols/line_badges/seoul_4_compact_256.png',
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationLineFilter-seoul-4')),
+          matching: find.byType(StationLineBadge),
+        ),
+        findsOneWidget,
       );
       expect(find.bySemanticsLabel('수도권 4호선 선택 안 됨'), findsOneWidget);
 
