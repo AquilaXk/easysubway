@@ -4844,6 +4844,32 @@ void main() {
     expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
   });
 
+  testWidgets('데이터 삭제 결과는 지울 알림 설정이 없을 때 쉬운 문구로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UserDataDeletionResultScreen(
+          result: const UserDataDeletionResult(
+            userId: 'anonymous-user-1',
+            deletedFavoriteStationCount: 0,
+            deletedFavoriteFacilityCount: 0,
+            deletedFavoriteRouteCount: 0,
+            anonymizedRouteFeedbackCount: 0,
+            notificationSettingsDeleted: false,
+            deletedRegisteredDeviceCount: 0,
+            deletedPushNotificationCount: 0,
+            mobilityProfileDeleted: false,
+            anonymizedReportCount: 0,
+          ),
+          deletionScope: UserDataDeletionScope.deviceOnly,
+          onRestart: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('알림 설정은 이미 비어 있어요'), findsOneWidget);
+    expect(find.text('삭제할 항목 없음'), findsNothing);
+  });
+
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final deletionRepository = UserDataDeletionApiRepository(
@@ -8704,7 +8730,7 @@ void main() {
       expect(find.text('계단 없음'), findsNothing);
       expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
-      expect(find.text('환승 없음 · 걷기 300m'), findsOneWidget);
+      expect(find.text('환승 없이 이동 · 걷기 300m'), findsOneWidget);
       expect(find.text('추천'), findsNothing);
       expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.textContaining('이동 점수'), findsNothing);

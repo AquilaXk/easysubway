@@ -1307,6 +1307,23 @@ void main() {
     );
   });
 
+  test('역 상세 상태는 살펴볼 시설이 없을 때 쉬운 문구를 만든다', () {
+    final state = StationDetailState(
+      status: StationDetailStatus.success,
+      detail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      facilities: [
+        _stationFacility(
+          id: 'facility-sangnoksu-elevator-1',
+          name: '1번 출구 엘리베이터',
+          status: 'NORMAL',
+        ),
+      ],
+    );
+
+    expect(state.facilityAttentionSummary, '');
+    expect(state.facilityAttentionSemanticLabel, '다시 볼 시설이 없어요');
+  });
+
   test('역 상세 상태는 쉬운 역 안 이동 안내 요약을 만든다', () {
     final state = StationDetailState(
       status: StationDetailStatus.success,

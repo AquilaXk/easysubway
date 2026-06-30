@@ -3484,7 +3484,7 @@ int _routeTotalMinutes(RouteSearchResult result) {
 
 String _routeTransferLabel(RouteSearchResult result) {
   final transfers = result.transferCount;
-  return transfers == 0 ? '환승 없음' : '환승 $transfers회';
+  return transfers == 0 ? '환승 없이 이동' : '환승 $transfers회';
 }
 
 String _routeWalkingDistanceLabel(RouteSearchResult result) {

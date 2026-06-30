@@ -1249,7 +1249,7 @@ class StationDetailState {
   String get facilityAttentionSemanticLabel {
     final count = attentionFacilityCount;
     if (count == 0) {
-      return '다시 볼 시설 없음';
+      return '다시 볼 시설이 없어요';
     }
     return buildFacilityAttentionSemanticLabel(
       facilities.map((facility) => facility.status),
