@@ -30,6 +30,9 @@ part 'catalog_database.g.dart';
     StationAccessibilitySummaries,
     InternalRouteNodes,
     InternalRouteEdges,
+    StationPathwayNodes,
+    StationPathwayEdges,
+    TransferRules,
     DataQualityRecords,
   ],
 )
@@ -49,7 +52,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -92,6 +95,12 @@ class CatalogDatabase extends _$CatalogDatabase {
           await migrator.createTable(transitStopTimes);
           await migrator.createTable(transitFrequencies);
           await _createTransitScheduleIndexes();
+        }
+        if (from < 10) {
+          await migrator.createTable(stationPathwayNodes);
+          await migrator.createTable(stationPathwayEdges);
+          await migrator.createTable(transferRules);
+          await _createStationPathwayIndexes();
         }
       },
       beforeOpen: (_) async {
@@ -700,6 +709,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_internal_route_edges_from '
       'ON internal_route_edges(from_node_id)',
     );
+    await _createStationPathwayIndexes();
   }
 
   Future<void> _createRealtimeProviderIndexes() async {
@@ -721,6 +731,21 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_transit_trips_route_service_pattern '
       'ON transit_trips(route_id, service_id, service_pattern)',
+    );
+  }
+
+  Future<void> _createStationPathwayIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_station_pathway_nodes_station '
+      'ON station_pathway_nodes(station_id, line_id, node_type)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_station_pathway_edges_from '
+      'ON station_pathway_edges(from_node_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transfer_rules_from_line '
+      'ON transfer_rules(from_station_id, from_line_id)',
     );
   }
 
