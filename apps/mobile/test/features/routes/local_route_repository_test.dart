@@ -1050,6 +1050,7 @@ void main() {
           NULL
         )
     ''');
+    await _addEligibleStationFacilityEvidence(database);
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -1063,6 +1064,73 @@ void main() {
     expect(result.status, 'FOUND');
     expect(result.blockedReasons, isEmpty);
     expect(result.warnings, isEmpty);
+  });
+
+  test('eligible evidence가 없는 검수 완료 시설 edge는 strict 경로에서 제외한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addFacilityIdColumnIfMissing(database);
+    await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'ADMIN_VERIFIED',
+        'B1',
+        '1F',
+        '관리자 검수 완료'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          NULL
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, isNot('FOUND'));
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
   });
 
   test('낮은 시설 품질 레코드는 연결된 edge의 신뢰도와 갱신 시각으로 전파된다', () async {
@@ -1131,6 +1199,7 @@ void main() {
           NULL
         )
     ''');
+    await _addEligibleStationFacilityEvidence(database);
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -1214,6 +1283,7 @@ void main() {
           NULL
         )
     ''');
+    await _addEligibleStationFacilityEvidence(database);
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -1286,6 +1356,7 @@ void main() {
           NULL
         )
     ''');
+    await _addEligibleStationFacilityEvidence(database);
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -2337,6 +2408,30 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         95
       )
   ''');
+}
+
+Future<void> _addEligibleStationFacilityEvidence(
+  CatalogDatabase database, {
+  String stationId = 'station-a',
+  String lineId = 'line-test',
+  String facilityType = 'ELEVATOR',
+}) async {
+  await database.customStatement(
+    '''
+      INSERT INTO station_facility_evidence (
+        station_id, line_id, facility_type, evidence_kind, source_id,
+        source_snapshot_id, provider_record_hash, evidence_hash,
+        provenance_kind, installation_status, operational_status,
+        status_meaning, confidence, verified_at, retrieved_at,
+        strict_route_eligible, strict_route_eligible_reason
+      )
+      VALUES (?, ?, ?, 'EXISTS', 'test-source', 'test-source-snapshot',
+        'provider-hash', 'evidence-hash', 'OFFICIAL_SOURCE', 'INSTALLED',
+        'AVAILABLE', 'REALTIME_OPERATION', 100, 1781827200, 1781827200, 1,
+        'FACILITY_EXISTS_AND_PROVENANCE_VERIFIED')
+    ''',
+    [stationId, lineId, facilityType],
+  );
 }
 
 Future<void> _addFacilityIdColumnIfMissing(CatalogDatabase database) async {

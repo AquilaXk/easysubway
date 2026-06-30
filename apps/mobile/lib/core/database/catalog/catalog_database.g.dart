@@ -6003,6 +6003,1036 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
   }
 }
 
+class $StationFacilityEvidenceTable extends StationFacilityEvidence
+    with TableInfo<$StationFacilityEvidenceTable, StationFacilityEvidenceData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StationFacilityEvidenceTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _facilityTypeMeta = const VerificationMeta(
+    'facilityType',
+  );
+  @override
+  late final GeneratedColumn<String> facilityType = GeneratedColumn<String>(
+    'facility_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _evidenceKindMeta = const VerificationMeta(
+    'evidenceKind',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceKind = GeneratedColumn<String>(
+    'evidence_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _installationStatusMeta =
+      const VerificationMeta('installationStatus');
+  @override
+  late final GeneratedColumn<String> installationStatus =
+      GeneratedColumn<String>(
+        'installation_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _operationalStatusMeta = const VerificationMeta(
+    'operationalStatus',
+  );
+  @override
+  late final GeneratedColumn<String> operationalStatus =
+      GeneratedColumn<String>(
+        'operational_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _statusMeaningMeta = const VerificationMeta(
+    'statusMeaning',
+  );
+  @override
+  late final GeneratedColumn<String> statusMeaning = GeneratedColumn<String>(
+    'status_meaning',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _confidenceMeta = const VerificationMeta(
+    'confidence',
+  );
+  @override
+  late final GeneratedColumn<int> confidence = GeneratedColumn<int>(
+    'confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _verifiedAtMeta = const VerificationMeta(
+    'verifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> verifiedAt = GeneratedColumn<DateTime>(
+    'verified_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _retrievedAtMeta = const VerificationMeta(
+    'retrievedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> retrievedAt = GeneratedColumn<DateTime>(
+    'retrieved_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _strictRouteEligibleMeta =
+      const VerificationMeta('strictRouteEligible');
+  @override
+  late final GeneratedColumn<bool> strictRouteEligible = GeneratedColumn<bool>(
+    'strict_route_eligible',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("strict_route_eligible" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _strictRouteEligibleReasonMeta =
+      const VerificationMeta('strictRouteEligibleReason');
+  @override
+  late final GeneratedColumn<String> strictRouteEligibleReason =
+      GeneratedColumn<String>(
+        'strict_route_eligible_reason',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    stationId,
+    lineId,
+    facilityType,
+    evidenceKind,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    evidenceHash,
+    provenanceKind,
+    installationStatus,
+    operationalStatus,
+    statusMeaning,
+    confidence,
+    verifiedAt,
+    retrievedAt,
+    strictRouteEligible,
+    strictRouteEligibleReason,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'station_facility_evidence';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StationFacilityEvidenceData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('facility_type')) {
+      context.handle(
+        _facilityTypeMeta,
+        facilityType.isAcceptableOrUnknown(
+          data['facility_type']!,
+          _facilityTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_facilityTypeMeta);
+    }
+    if (data.containsKey('evidence_kind')) {
+      context.handle(
+        _evidenceKindMeta,
+        evidenceKind.isAcceptableOrUnknown(
+          data['evidence_kind']!,
+          _evidenceKindMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_evidenceKindMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceSnapshotIdMeta);
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerRecordHashMeta);
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_evidenceHashMeta);
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_provenanceKindMeta);
+    }
+    if (data.containsKey('installation_status')) {
+      context.handle(
+        _installationStatusMeta,
+        installationStatus.isAcceptableOrUnknown(
+          data['installation_status']!,
+          _installationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('operational_status')) {
+      context.handle(
+        _operationalStatusMeta,
+        operationalStatus.isAcceptableOrUnknown(
+          data['operational_status']!,
+          _operationalStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status_meaning')) {
+      context.handle(
+        _statusMeaningMeta,
+        statusMeaning.isAcceptableOrUnknown(
+          data['status_meaning']!,
+          _statusMeaningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('confidence')) {
+      context.handle(
+        _confidenceMeta,
+        confidence.isAcceptableOrUnknown(data['confidence']!, _confidenceMeta),
+      );
+    }
+    if (data.containsKey('verified_at')) {
+      context.handle(
+        _verifiedAtMeta,
+        verifiedAt.isAcceptableOrUnknown(data['verified_at']!, _verifiedAtMeta),
+      );
+    }
+    if (data.containsKey('retrieved_at')) {
+      context.handle(
+        _retrievedAtMeta,
+        retrievedAt.isAcceptableOrUnknown(
+          data['retrieved_at']!,
+          _retrievedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('strict_route_eligible')) {
+      context.handle(
+        _strictRouteEligibleMeta,
+        strictRouteEligible.isAcceptableOrUnknown(
+          data['strict_route_eligible']!,
+          _strictRouteEligibleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('strict_route_eligible_reason')) {
+      context.handle(
+        _strictRouteEligibleReasonMeta,
+        strictRouteEligibleReason.isAcceptableOrUnknown(
+          data['strict_route_eligible_reason']!,
+          _strictRouteEligibleReasonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {stationId, lineId, facilityType};
+  @override
+  StationFacilityEvidenceData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StationFacilityEvidenceData(
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      facilityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}facility_type'],
+      )!,
+      evidenceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_kind'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      installationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}installation_status'],
+      )!,
+      operationalStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operational_status'],
+      )!,
+      statusMeaning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status_meaning'],
+      )!,
+      confidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}confidence'],
+      )!,
+      verifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}verified_at'],
+      ),
+      retrievedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}retrieved_at'],
+      ),
+      strictRouteEligible: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}strict_route_eligible'],
+      )!,
+      strictRouteEligibleReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}strict_route_eligible_reason'],
+      )!,
+    );
+  }
+
+  @override
+  $StationFacilityEvidenceTable createAlias(String alias) {
+    return $StationFacilityEvidenceTable(attachedDatabase, alias);
+  }
+}
+
+class StationFacilityEvidenceData extends DataClass
+    implements Insertable<StationFacilityEvidenceData> {
+  final String stationId;
+  final String lineId;
+  final String facilityType;
+  final String evidenceKind;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String evidenceHash;
+  final String provenanceKind;
+  final String installationStatus;
+  final String operationalStatus;
+  final String statusMeaning;
+  final int confidence;
+  final DateTime? verifiedAt;
+  final DateTime? retrievedAt;
+  final bool strictRouteEligible;
+  final String strictRouteEligibleReason;
+  const StationFacilityEvidenceData({
+    required this.stationId,
+    required this.lineId,
+    required this.facilityType,
+    required this.evidenceKind,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.evidenceHash,
+    required this.provenanceKind,
+    required this.installationStatus,
+    required this.operationalStatus,
+    required this.statusMeaning,
+    required this.confidence,
+    this.verifiedAt,
+    this.retrievedAt,
+    required this.strictRouteEligible,
+    required this.strictRouteEligibleReason,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
+    map['facility_type'] = Variable<String>(facilityType);
+    map['evidence_kind'] = Variable<String>(evidenceKind);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
+    map['evidence_hash'] = Variable<String>(evidenceHash);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['installation_status'] = Variable<String>(installationStatus);
+    map['operational_status'] = Variable<String>(operationalStatus);
+    map['status_meaning'] = Variable<String>(statusMeaning);
+    map['confidence'] = Variable<int>(confidence);
+    if (!nullToAbsent || verifiedAt != null) {
+      map['verified_at'] = Variable<DateTime>(verifiedAt);
+    }
+    if (!nullToAbsent || retrievedAt != null) {
+      map['retrieved_at'] = Variable<DateTime>(retrievedAt);
+    }
+    map['strict_route_eligible'] = Variable<bool>(strictRouteEligible);
+    map['strict_route_eligible_reason'] = Variable<String>(
+      strictRouteEligibleReason,
+    );
+    return map;
+  }
+
+  StationFacilityEvidenceCompanion toCompanion(bool nullToAbsent) {
+    return StationFacilityEvidenceCompanion(
+      stationId: Value(stationId),
+      lineId: Value(lineId),
+      facilityType: Value(facilityType),
+      evidenceKind: Value(evidenceKind),
+      sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
+      evidenceHash: Value(evidenceHash),
+      provenanceKind: Value(provenanceKind),
+      installationStatus: Value(installationStatus),
+      operationalStatus: Value(operationalStatus),
+      statusMeaning: Value(statusMeaning),
+      confidence: Value(confidence),
+      verifiedAt: verifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(verifiedAt),
+      retrievedAt: retrievedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(retrievedAt),
+      strictRouteEligible: Value(strictRouteEligible),
+      strictRouteEligibleReason: Value(strictRouteEligibleReason),
+    );
+  }
+
+  factory StationFacilityEvidenceData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StationFacilityEvidenceData(
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      facilityType: serializer.fromJson<String>(json['facilityType']),
+      evidenceKind: serializer.fromJson<String>(json['evidenceKind']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      installationStatus: serializer.fromJson<String>(
+        json['installationStatus'],
+      ),
+      operationalStatus: serializer.fromJson<String>(json['operationalStatus']),
+      statusMeaning: serializer.fromJson<String>(json['statusMeaning']),
+      confidence: serializer.fromJson<int>(json['confidence']),
+      verifiedAt: serializer.fromJson<DateTime?>(json['verifiedAt']),
+      retrievedAt: serializer.fromJson<DateTime?>(json['retrievedAt']),
+      strictRouteEligible: serializer.fromJson<bool>(
+        json['strictRouteEligible'],
+      ),
+      strictRouteEligibleReason: serializer.fromJson<String>(
+        json['strictRouteEligibleReason'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
+      'facilityType': serializer.toJson<String>(facilityType),
+      'evidenceKind': serializer.toJson<String>(evidenceKind),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'installationStatus': serializer.toJson<String>(installationStatus),
+      'operationalStatus': serializer.toJson<String>(operationalStatus),
+      'statusMeaning': serializer.toJson<String>(statusMeaning),
+      'confidence': serializer.toJson<int>(confidence),
+      'verifiedAt': serializer.toJson<DateTime?>(verifiedAt),
+      'retrievedAt': serializer.toJson<DateTime?>(retrievedAt),
+      'strictRouteEligible': serializer.toJson<bool>(strictRouteEligible),
+      'strictRouteEligibleReason': serializer.toJson<String>(
+        strictRouteEligibleReason,
+      ),
+    };
+  }
+
+  StationFacilityEvidenceData copyWith({
+    String? stationId,
+    String? lineId,
+    String? facilityType,
+    String? evidenceKind,
+    String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
+    String? evidenceHash,
+    String? provenanceKind,
+    String? installationStatus,
+    String? operationalStatus,
+    String? statusMeaning,
+    int? confidence,
+    Value<DateTime?> verifiedAt = const Value.absent(),
+    Value<DateTime?> retrievedAt = const Value.absent(),
+    bool? strictRouteEligible,
+    String? strictRouteEligibleReason,
+  }) => StationFacilityEvidenceData(
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    facilityType: facilityType ?? this.facilityType,
+    evidenceKind: evidenceKind ?? this.evidenceKind,
+    sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    installationStatus: installationStatus ?? this.installationStatus,
+    operationalStatus: operationalStatus ?? this.operationalStatus,
+    statusMeaning: statusMeaning ?? this.statusMeaning,
+    confidence: confidence ?? this.confidence,
+    verifiedAt: verifiedAt.present ? verifiedAt.value : this.verifiedAt,
+    retrievedAt: retrievedAt.present ? retrievedAt.value : this.retrievedAt,
+    strictRouteEligible: strictRouteEligible ?? this.strictRouteEligible,
+    strictRouteEligibleReason:
+        strictRouteEligibleReason ?? this.strictRouteEligibleReason,
+  );
+  StationFacilityEvidenceData copyWithCompanion(
+    StationFacilityEvidenceCompanion data,
+  ) {
+    return StationFacilityEvidenceData(
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      facilityType: data.facilityType.present
+          ? data.facilityType.value
+          : this.facilityType,
+      evidenceKind: data.evidenceKind.present
+          ? data.evidenceKind.value
+          : this.evidenceKind,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      installationStatus: data.installationStatus.present
+          ? data.installationStatus.value
+          : this.installationStatus,
+      operationalStatus: data.operationalStatus.present
+          ? data.operationalStatus.value
+          : this.operationalStatus,
+      statusMeaning: data.statusMeaning.present
+          ? data.statusMeaning.value
+          : this.statusMeaning,
+      confidence: data.confidence.present
+          ? data.confidence.value
+          : this.confidence,
+      verifiedAt: data.verifiedAt.present
+          ? data.verifiedAt.value
+          : this.verifiedAt,
+      retrievedAt: data.retrievedAt.present
+          ? data.retrievedAt.value
+          : this.retrievedAt,
+      strictRouteEligible: data.strictRouteEligible.present
+          ? data.strictRouteEligible.value
+          : this.strictRouteEligible,
+      strictRouteEligibleReason: data.strictRouteEligibleReason.present
+          ? data.strictRouteEligibleReason.value
+          : this.strictRouteEligibleReason,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationFacilityEvidenceData(')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('facilityType: $facilityType, ')
+          ..write('evidenceKind: $evidenceKind, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('installationStatus: $installationStatus, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('statusMeaning: $statusMeaning, ')
+          ..write('confidence: $confidence, ')
+          ..write('verifiedAt: $verifiedAt, ')
+          ..write('retrievedAt: $retrievedAt, ')
+          ..write('strictRouteEligible: $strictRouteEligible, ')
+          ..write('strictRouteEligibleReason: $strictRouteEligibleReason')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    stationId,
+    lineId,
+    facilityType,
+    evidenceKind,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    evidenceHash,
+    provenanceKind,
+    installationStatus,
+    operationalStatus,
+    statusMeaning,
+    confidence,
+    verifiedAt,
+    retrievedAt,
+    strictRouteEligible,
+    strictRouteEligibleReason,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StationFacilityEvidenceData &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.facilityType == this.facilityType &&
+          other.evidenceKind == this.evidenceKind &&
+          other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
+          other.evidenceHash == this.evidenceHash &&
+          other.provenanceKind == this.provenanceKind &&
+          other.installationStatus == this.installationStatus &&
+          other.operationalStatus == this.operationalStatus &&
+          other.statusMeaning == this.statusMeaning &&
+          other.confidence == this.confidence &&
+          other.verifiedAt == this.verifiedAt &&
+          other.retrievedAt == this.retrievedAt &&
+          other.strictRouteEligible == this.strictRouteEligible &&
+          other.strictRouteEligibleReason == this.strictRouteEligibleReason);
+}
+
+class StationFacilityEvidenceCompanion
+    extends UpdateCompanion<StationFacilityEvidenceData> {
+  final Value<String> stationId;
+  final Value<String> lineId;
+  final Value<String> facilityType;
+  final Value<String> evidenceKind;
+  final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
+  final Value<String> evidenceHash;
+  final Value<String> provenanceKind;
+  final Value<String> installationStatus;
+  final Value<String> operationalStatus;
+  final Value<String> statusMeaning;
+  final Value<int> confidence;
+  final Value<DateTime?> verifiedAt;
+  final Value<DateTime?> retrievedAt;
+  final Value<bool> strictRouteEligible;
+  final Value<String> strictRouteEligibleReason;
+  final Value<int> rowid;
+  const StationFacilityEvidenceCompanion({
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.facilityType = const Value.absent(),
+    this.evidenceKind = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.installationStatus = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.statusMeaning = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.verifiedAt = const Value.absent(),
+    this.retrievedAt = const Value.absent(),
+    this.strictRouteEligible = const Value.absent(),
+    this.strictRouteEligibleReason = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StationFacilityEvidenceCompanion.insert({
+    required String stationId,
+    required String lineId,
+    required String facilityType,
+    required String evidenceKind,
+    required String sourceId,
+    required String sourceSnapshotId,
+    required String providerRecordHash,
+    required String evidenceHash,
+    required String provenanceKind,
+    this.installationStatus = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.statusMeaning = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.verifiedAt = const Value.absent(),
+    this.retrievedAt = const Value.absent(),
+    this.strictRouteEligible = const Value.absent(),
+    this.strictRouteEligibleReason = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : stationId = Value(stationId),
+       lineId = Value(lineId),
+       facilityType = Value(facilityType),
+       evidenceKind = Value(evidenceKind),
+       sourceId = Value(sourceId),
+       sourceSnapshotId = Value(sourceSnapshotId),
+       providerRecordHash = Value(providerRecordHash),
+       evidenceHash = Value(evidenceHash),
+       provenanceKind = Value(provenanceKind);
+  static Insertable<StationFacilityEvidenceData> custom({
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? facilityType,
+    Expression<String>? evidenceKind,
+    Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
+    Expression<String>? evidenceHash,
+    Expression<String>? provenanceKind,
+    Expression<String>? installationStatus,
+    Expression<String>? operationalStatus,
+    Expression<String>? statusMeaning,
+    Expression<int>? confidence,
+    Expression<DateTime>? verifiedAt,
+    Expression<DateTime>? retrievedAt,
+    Expression<bool>? strictRouteEligible,
+    Expression<String>? strictRouteEligibleReason,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (facilityType != null) 'facility_type': facilityType,
+      if (evidenceKind != null) 'evidence_kind': evidenceKind,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (installationStatus != null) 'installation_status': installationStatus,
+      if (operationalStatus != null) 'operational_status': operationalStatus,
+      if (statusMeaning != null) 'status_meaning': statusMeaning,
+      if (confidence != null) 'confidence': confidence,
+      if (verifiedAt != null) 'verified_at': verifiedAt,
+      if (retrievedAt != null) 'retrieved_at': retrievedAt,
+      if (strictRouteEligible != null)
+        'strict_route_eligible': strictRouteEligible,
+      if (strictRouteEligibleReason != null)
+        'strict_route_eligible_reason': strictRouteEligibleReason,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StationFacilityEvidenceCompanion copyWith({
+    Value<String>? stationId,
+    Value<String>? lineId,
+    Value<String>? facilityType,
+    Value<String>? evidenceKind,
+    Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
+    Value<String>? evidenceHash,
+    Value<String>? provenanceKind,
+    Value<String>? installationStatus,
+    Value<String>? operationalStatus,
+    Value<String>? statusMeaning,
+    Value<int>? confidence,
+    Value<DateTime?>? verifiedAt,
+    Value<DateTime?>? retrievedAt,
+    Value<bool>? strictRouteEligible,
+    Value<String>? strictRouteEligibleReason,
+    Value<int>? rowid,
+  }) {
+    return StationFacilityEvidenceCompanion(
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      facilityType: facilityType ?? this.facilityType,
+      evidenceKind: evidenceKind ?? this.evidenceKind,
+      sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      installationStatus: installationStatus ?? this.installationStatus,
+      operationalStatus: operationalStatus ?? this.operationalStatus,
+      statusMeaning: statusMeaning ?? this.statusMeaning,
+      confidence: confidence ?? this.confidence,
+      verifiedAt: verifiedAt ?? this.verifiedAt,
+      retrievedAt: retrievedAt ?? this.retrievedAt,
+      strictRouteEligible: strictRouteEligible ?? this.strictRouteEligible,
+      strictRouteEligibleReason:
+          strictRouteEligibleReason ?? this.strictRouteEligibleReason,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (facilityType.present) {
+      map['facility_type'] = Variable<String>(facilityType.value);
+    }
+    if (evidenceKind.present) {
+      map['evidence_kind'] = Variable<String>(evidenceKind.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (installationStatus.present) {
+      map['installation_status'] = Variable<String>(installationStatus.value);
+    }
+    if (operationalStatus.present) {
+      map['operational_status'] = Variable<String>(operationalStatus.value);
+    }
+    if (statusMeaning.present) {
+      map['status_meaning'] = Variable<String>(statusMeaning.value);
+    }
+    if (confidence.present) {
+      map['confidence'] = Variable<int>(confidence.value);
+    }
+    if (verifiedAt.present) {
+      map['verified_at'] = Variable<DateTime>(verifiedAt.value);
+    }
+    if (retrievedAt.present) {
+      map['retrieved_at'] = Variable<DateTime>(retrievedAt.value);
+    }
+    if (strictRouteEligible.present) {
+      map['strict_route_eligible'] = Variable<bool>(strictRouteEligible.value);
+    }
+    if (strictRouteEligibleReason.present) {
+      map['strict_route_eligible_reason'] = Variable<String>(
+        strictRouteEligibleReason.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationFacilityEvidenceCompanion(')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('facilityType: $facilityType, ')
+          ..write('evidenceKind: $evidenceKind, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('installationStatus: $installationStatus, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('statusMeaning: $statusMeaning, ')
+          ..write('confidence: $confidence, ')
+          ..write('verifiedAt: $verifiedAt, ')
+          ..write('retrievedAt: $retrievedAt, ')
+          ..write('strictRouteEligible: $strictRouteEligible, ')
+          ..write('strictRouteEligibleReason: $strictRouteEligibleReason, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StationAccessibilitySummariesTable extends StationAccessibilitySummaries
     with
         TableInfo<
@@ -8234,6 +9264,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $NetworkEdgesTable networkEdges = $NetworkEdgesTable(this);
   late final $StationExitsTable stationExits = $StationExitsTable(this);
   late final $FacilitiesTable facilities = $FacilitiesTable(this);
+  late final $StationFacilityEvidenceTable stationFacilityEvidence =
+      $StationFacilityEvidenceTable(this);
   late final $StationAccessibilitySummariesTable stationAccessibilitySummaries =
       $StationAccessibilitySummariesTable(this);
   late final $InternalRouteNodesTable internalRouteNodes =
@@ -8258,6 +9290,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     networkEdges,
     stationExits,
     facilities,
+    stationFacilityEvidence,
     stationAccessibilitySummaries,
     internalRouteNodes,
     internalRouteEdges,
@@ -11308,6 +12341,481 @@ typedef $$FacilitiesTableProcessedTableManager =
       Facility,
       PrefetchHooks Function()
     >;
+typedef $$StationFacilityEvidenceTableCreateCompanionBuilder =
+    StationFacilityEvidenceCompanion Function({
+      required String stationId,
+      required String lineId,
+      required String facilityType,
+      required String evidenceKind,
+      required String sourceId,
+      required String sourceSnapshotId,
+      required String providerRecordHash,
+      required String evidenceHash,
+      required String provenanceKind,
+      Value<String> installationStatus,
+      Value<String> operationalStatus,
+      Value<String> statusMeaning,
+      Value<int> confidence,
+      Value<DateTime?> verifiedAt,
+      Value<DateTime?> retrievedAt,
+      Value<bool> strictRouteEligible,
+      Value<String> strictRouteEligibleReason,
+      Value<int> rowid,
+    });
+typedef $$StationFacilityEvidenceTableUpdateCompanionBuilder =
+    StationFacilityEvidenceCompanion Function({
+      Value<String> stationId,
+      Value<String> lineId,
+      Value<String> facilityType,
+      Value<String> evidenceKind,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> evidenceHash,
+      Value<String> provenanceKind,
+      Value<String> installationStatus,
+      Value<String> operationalStatus,
+      Value<String> statusMeaning,
+      Value<int> confidence,
+      Value<DateTime?> verifiedAt,
+      Value<DateTime?> retrievedAt,
+      Value<bool> strictRouteEligible,
+      Value<String> strictRouteEligibleReason,
+      Value<int> rowid,
+    });
+
+class $$StationFacilityEvidenceTableFilterComposer
+    extends Composer<_$CatalogDatabase, $StationFacilityEvidenceTable> {
+  $$StationFacilityEvidenceTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get facilityType => $composableBuilder(
+    column: $table.facilityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceKind => $composableBuilder(
+    column: $table.evidenceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get strictRouteEligible => $composableBuilder(
+    column: $table.strictRouteEligible,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get strictRouteEligibleReason => $composableBuilder(
+    column: $table.strictRouteEligibleReason,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StationFacilityEvidenceTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $StationFacilityEvidenceTable> {
+  $$StationFacilityEvidenceTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get facilityType => $composableBuilder(
+    column: $table.facilityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceKind => $composableBuilder(
+    column: $table.evidenceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get strictRouteEligible => $composableBuilder(
+    column: $table.strictRouteEligible,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get strictRouteEligibleReason => $composableBuilder(
+    column: $table.strictRouteEligibleReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StationFacilityEvidenceTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $StationFacilityEvidenceTable> {
+  $$StationFacilityEvidenceTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get facilityType => $composableBuilder(
+    column: $table.facilityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceKind => $composableBuilder(
+    column: $table.evidenceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get installationStatus => $composableBuilder(
+    column: $table.installationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get statusMeaning => $composableBuilder(
+    column: $table.statusMeaning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get verifiedAt => $composableBuilder(
+    column: $table.verifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get retrievedAt => $composableBuilder(
+    column: $table.retrievedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get strictRouteEligible => $composableBuilder(
+    column: $table.strictRouteEligible,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get strictRouteEligibleReason => $composableBuilder(
+    column: $table.strictRouteEligibleReason,
+    builder: (column) => column,
+  );
+}
+
+class $$StationFacilityEvidenceTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $StationFacilityEvidenceTable,
+          StationFacilityEvidenceData,
+          $$StationFacilityEvidenceTableFilterComposer,
+          $$StationFacilityEvidenceTableOrderingComposer,
+          $$StationFacilityEvidenceTableAnnotationComposer,
+          $$StationFacilityEvidenceTableCreateCompanionBuilder,
+          $$StationFacilityEvidenceTableUpdateCompanionBuilder,
+          (
+            StationFacilityEvidenceData,
+            BaseReferences<
+              _$CatalogDatabase,
+              $StationFacilityEvidenceTable,
+              StationFacilityEvidenceData
+            >,
+          ),
+          StationFacilityEvidenceData,
+          PrefetchHooks Function()
+        > {
+  $$StationFacilityEvidenceTableTableManager(
+    _$CatalogDatabase db,
+    $StationFacilityEvidenceTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StationFacilityEvidenceTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$StationFacilityEvidenceTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$StationFacilityEvidenceTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> facilityType = const Value.absent(),
+                Value<String> evidenceKind = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> installationStatus = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<String> statusMeaning = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
+                Value<DateTime?> verifiedAt = const Value.absent(),
+                Value<DateTime?> retrievedAt = const Value.absent(),
+                Value<bool> strictRouteEligible = const Value.absent(),
+                Value<String> strictRouteEligibleReason = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationFacilityEvidenceCompanion(
+                stationId: stationId,
+                lineId: lineId,
+                facilityType: facilityType,
+                evidenceKind: evidenceKind,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                evidenceHash: evidenceHash,
+                provenanceKind: provenanceKind,
+                installationStatus: installationStatus,
+                operationalStatus: operationalStatus,
+                statusMeaning: statusMeaning,
+                confidence: confidence,
+                verifiedAt: verifiedAt,
+                retrievedAt: retrievedAt,
+                strictRouteEligible: strictRouteEligible,
+                strictRouteEligibleReason: strictRouteEligibleReason,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String stationId,
+                required String lineId,
+                required String facilityType,
+                required String evidenceKind,
+                required String sourceId,
+                required String sourceSnapshotId,
+                required String providerRecordHash,
+                required String evidenceHash,
+                required String provenanceKind,
+                Value<String> installationStatus = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<String> statusMeaning = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
+                Value<DateTime?> verifiedAt = const Value.absent(),
+                Value<DateTime?> retrievedAt = const Value.absent(),
+                Value<bool> strictRouteEligible = const Value.absent(),
+                Value<String> strictRouteEligibleReason = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationFacilityEvidenceCompanion.insert(
+                stationId: stationId,
+                lineId: lineId,
+                facilityType: facilityType,
+                evidenceKind: evidenceKind,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                evidenceHash: evidenceHash,
+                provenanceKind: provenanceKind,
+                installationStatus: installationStatus,
+                operationalStatus: operationalStatus,
+                statusMeaning: statusMeaning,
+                confidence: confidence,
+                verifiedAt: verifiedAt,
+                retrievedAt: retrievedAt,
+                strictRouteEligible: strictRouteEligible,
+                strictRouteEligibleReason: strictRouteEligibleReason,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StationFacilityEvidenceTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $StationFacilityEvidenceTable,
+      StationFacilityEvidenceData,
+      $$StationFacilityEvidenceTableFilterComposer,
+      $$StationFacilityEvidenceTableOrderingComposer,
+      $$StationFacilityEvidenceTableAnnotationComposer,
+      $$StationFacilityEvidenceTableCreateCompanionBuilder,
+      $$StationFacilityEvidenceTableUpdateCompanionBuilder,
+      (
+        StationFacilityEvidenceData,
+        BaseReferences<
+          _$CatalogDatabase,
+          $StationFacilityEvidenceTable,
+          StationFacilityEvidenceData
+        >,
+      ),
+      StationFacilityEvidenceData,
+      PrefetchHooks Function()
+    >;
 typedef $$StationAccessibilitySummariesTableCreateCompanionBuilder =
     StationAccessibilitySummariesCompanion Function({
       required String stationId,
@@ -12506,6 +14014,11 @@ class $CatalogDatabaseManager {
       $$StationExitsTableTableManager(_db, _db.stationExits);
   $$FacilitiesTableTableManager get facilities =>
       $$FacilitiesTableTableManager(_db, _db.facilities);
+  $$StationFacilityEvidenceTableTableManager get stationFacilityEvidence =>
+      $$StationFacilityEvidenceTableTableManager(
+        _db,
+        _db.stationFacilityEvidence,
+      );
   $$StationAccessibilitySummariesTableTableManager
   get stationAccessibilitySummaries =>
       $$StationAccessibilitySummariesTableTableManager(
