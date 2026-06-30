@@ -8241,6 +8241,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
   assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
+  assert.doesNotMatch(stationSearch, /상태 신고/);
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
   assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
   assert.match(widgetTest, /역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
