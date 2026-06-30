@@ -4,6 +4,53 @@ enum RouteAccessibilityState { available, unavailable, unknown }
 
 enum RouteStairAccessState { stepFree, stairOnly, unknown }
 
+class RouteEdgeSafetyEvidence {
+  const RouteEdgeSafetyEvidence({
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    required this.evidenceHash,
+    required this.evidenceHashValid,
+    required this.isPlaceholderEvidence,
+    required this.lastVerifiedAt,
+    required this.isStale,
+    required this.isGeneratedConnector,
+    required this.strictRouteEligible,
+    required this.blockerReasons,
+  });
+
+  const RouteEdgeSafetyEvidence.verified()
+    : sourceId = '',
+      sourceSnapshotId = '',
+      providerRecordHash = '',
+      provenanceKind = 'OFFICIAL_SOURCE',
+      verificationStatus = 'VERIFIED',
+      evidenceHash = '',
+      evidenceHashValid = true,
+      isPlaceholderEvidence = false,
+      lastVerifiedAt = null,
+      isStale = false,
+      isGeneratedConnector = false,
+      strictRouteEligible = true,
+      blockerReasons = const [];
+
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String evidenceHash;
+  final bool evidenceHashValid;
+  final bool isPlaceholderEvidence;
+  final DateTime? lastVerifiedAt;
+  final bool isStale;
+  final bool isGeneratedConnector;
+  final bool strictRouteEligible;
+  final List<String> blockerReasons;
+}
+
 class RouteNode {
   const RouteNode({
     required this.id,
@@ -32,6 +79,7 @@ class RouteEdge {
     this.reliabilityScore = 100,
     this.isDataStale = false,
     this.isGeneratedConnector = false,
+    this.safetyEvidence = const RouteEdgeSafetyEvidence.verified(),
     RouteAccessibilityState accessibilityState =
         RouteAccessibilityState.available,
     bool? isAvailable,
@@ -78,6 +126,7 @@ class RouteEdge {
   final int reliabilityScore;
   final bool isDataStale;
   final bool isGeneratedConnector;
+  final RouteEdgeSafetyEvidence safetyEvidence;
   final RouteAccessibilityState accessibilityState;
 
   bool get isAvailable =>
