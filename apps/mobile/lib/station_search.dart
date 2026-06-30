@@ -59,6 +59,16 @@ const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(14));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHeroCardRadius = BorderRadius.all(Radius.circular(18));
+const _stationTextMutedColor = Color(0xFF405A5D);
+const _stationTextSubtleColor = Color(0xFF506B6F);
+const _stationDetailTextColor = Color(0xFF2C5558);
+const _stationFacilityDividerColor = Color(0xFFC8D9E2);
+const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
+const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
+const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
+const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
+const _stationDetailNoticeColor = Color(0xFFE6F2F0);
+const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -3262,7 +3272,7 @@ class _StationSearchFailureMessage extends StatelessWidget {
             child: Text(
               _stationSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF506B6F),
+                color: _stationTextSubtleColor,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -3319,7 +3329,7 @@ class _StationSearchMessage extends StatelessWidget {
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: const Color(0xFF405A5D),
+          color: _stationTextMutedColor,
           fontWeight: FontWeight.w700,
           height: 1.35,
         ),
@@ -3416,7 +3426,7 @@ class _StationSearchResultTile extends StatelessWidget {
                                 Text(
                                   result.dataQualityLabel,
                                   style: textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF405A5D),
+                                    color: _stationTextMutedColor,
                                     fontWeight: FontWeight.w600,
                                     height: 1.25,
                                   ),
@@ -3427,7 +3437,7 @@ class _StationSearchResultTile extends StatelessWidget {
                           const SizedBox(width: 8),
                           const Icon(
                             Icons.chevron_right,
-                            color: Color(0xFF405A5D),
+                            color: _stationTextMutedColor,
                             size: 30,
                           ),
                         ],
@@ -3876,7 +3886,7 @@ class _FavoriteStationTile extends StatelessWidget {
                           Text(
                             favorite.region,
                             style: textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF405A5D),
+                              color: _stationTextMutedColor,
                               height: 1.3,
                             ),
                           ),
@@ -3884,7 +3894,7 @@ class _FavoriteStationTile extends StatelessWidget {
                           Text(
                             favorite.dataQualityLabel,
                             style: textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF405A5D),
+                              color: _stationTextMutedColor,
                               height: 1.3,
                             ),
                           ),
@@ -4678,9 +4688,9 @@ class _StationLayoutStep extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 82),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF6F4),
+        color: _stationDetailSoftPanelColor,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: const Color(0xFFB9D7D2)),
+        border: Border.all(color: _stationDetailSoftPanelBorderColor),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -4795,7 +4805,7 @@ class _StationDetailHeader extends StatelessWidget {
                       Text(
                         detail.lineLabel,
                         style: textTheme.bodyLarge?.copyWith(
-                          color: const Color(0xFFC8D9E2),
+                          color: _stationFacilityDividerColor,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
                         ),
@@ -4804,7 +4814,7 @@ class _StationDetailHeader extends StatelessWidget {
                       Text(
                         detail.dataQualityLabel,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFC8D9E2),
+                          color: _stationFacilityDividerColor,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
                         ),
@@ -4813,7 +4823,7 @@ class _StationDetailHeader extends StatelessWidget {
                       Text(
                         '마지막 확인 ${detail.lastVerifiedAt}',
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFC8D9E2),
+                          color: _stationFacilityDividerColor,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
                         ),
@@ -4970,9 +4980,9 @@ class _StationInternalRouteResultCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF8F6),
+            color: _stationDetailMintPanelColor,
             borderRadius: _stationDetailInfoCardRadius,
-            border: Border.all(color: const Color(0xFFB7D8D2)),
+            border: Border.all(color: _stationDetailMintPanelBorderColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4994,7 +5004,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
               Text(
                 result.totalBurdenLabel,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: const Color(0xFF2C5558),
+                  color: _stationDetailTextColor,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -5048,7 +5058,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.burdenLabel,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF2C5558),
+                  color: _stationDetailTextColor,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -5200,7 +5210,7 @@ class _StationDetailEmptyMessage extends StatelessWidget {
     return Text(
       message,
       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: const Color(0xFF405A5D),
+        color: _stationTextMutedColor,
         fontWeight: FontWeight.w700,
         height: 1.35,
       ),
@@ -5258,7 +5268,7 @@ class _StationExitCard extends StatelessWidget {
                   Text(
                     exit.verificationStatusLabel,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF405A5D),
+                      color: _stationTextMutedColor,
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
@@ -5344,7 +5354,7 @@ class _StationFacilityCard extends StatelessWidget {
                 Text(
                   facility.verificationStatusLabel,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF405A5D),
+                    color: _stationTextMutedColor,
                     fontWeight: FontWeight.w600,
                     height: 1.3,
                   ),
@@ -5689,9 +5699,9 @@ class _StationDetailTextPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFE6F2F0),
+        color: _stationDetailNoticeColor,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: const Color(0xFFB8D8D3)),
+        border: Border.all(color: _stationDetailNoticeBorderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
