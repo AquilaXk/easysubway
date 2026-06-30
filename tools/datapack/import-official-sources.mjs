@@ -36,6 +36,7 @@ function buildFixture(inventory, input) {
   const movementCandidates = movementPathCandidates(input.movementPathCandidates ?? [], allowedSourceIds, mappingBySourceKey);
   const routeMapPositions = routeMapPositionRows(input.routeMapPositions ?? [], allowedSourceIds, mappingBySourceKey);
   validateSelectedSourceRows(input, sourceIds);
+  validateSupportedScopeDenominator(input, stationRows, facilities);
   validateSupportedFacilityCoverage(input, stationRows, facilities);
   const requiresRouteMapPositions = sourceDomainEnabled(selectedSources, "route_map_positions");
   if (requiresRouteMapPositions && routeMapPositions.length === 0) {
@@ -219,6 +220,80 @@ function validateSelectedSourceRows(input, sourceIds) {
   for (const sourceId of sourceIds) {
     if ((counts.get(sourceId) ?? 0) === 0) {
       throw new Error(`selected production source has no row provenance: ${sourceId}`);
+    }
+  }
+}
+
+function validateSupportedScopeDenominator(input, stationRows, facilities) {
+  if ((input.pack.artifactKind ?? "fixture") !== "production") {
+    return;
+  }
+  const supportedV1Scope = input.supportedV1Scope;
+  if (!supportedV1Scope || typeof supportedV1Scope !== "object" || Array.isArray(supportedV1Scope)) {
+    throw new Error("supportedV1Scope must be an object for production pack");
+  }
+  const includedStationIds = new Set(
+    requiredStringArray(supportedV1Scope.includedStationIds, "supportedV1Scope.includedStationIds"),
+  );
+  const includedLineIds = new Set(requiredStringArray(supportedV1Scope.includedLineIds, "supportedV1Scope.includedLineIds"));
+  const actualStationIds = new Set(stationRows.map(({ mapping }) => mapping.stationId));
+  const actualLineIds = new Set(stationRows.map(({ mapping }) => mapping.lineId));
+
+  assertActualIdsWithinScope(
+    actualStationIds,
+    includedStationIds,
+    "production scope station outside supportedV1Scope.includedStationIds",
+  );
+  assertScopeIdsHaveRows(
+    includedStationIds,
+    actualStationIds,
+    "supportedV1Scope.includedStationIds missing production station row",
+  );
+  assertActualIdsWithinScope(actualLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
+  assertScopeIdsHaveRows(includedLineIds, actualLineIds, "supportedV1Scope.includedLineIds missing production station row");
+  assertActualIdsWithinScope(
+    new Set(facilities.map((facility) => facility.stationId)),
+    includedStationIds,
+    "production scope facility outside supportedV1Scope.includedStationIds",
+  );
+  validateFacilityCoverageDenominator(supportedV1Scope.facilityCoverageDenominator, includedStationIds.size, supportedV1Scope);
+}
+
+function validateFacilityCoverageDenominator(value, stationCount, supportedV1Scope) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("supportedV1Scope.facilityCoverageDenominator must be an object for production pack");
+  }
+  if (value.kind !== "station_x_required_facility_type") {
+    throw new Error("supportedV1Scope.facilityCoverageDenominator.kind must be station_x_required_facility_type");
+  }
+  const requiredFacilityTypes = requiredStringArray(
+    supportedV1Scope.requiredFacilityTypes,
+    "supportedV1Scope.requiredFacilityTypes",
+  );
+  const expectedRows = requiredInteger(
+    value.expectedRows,
+    "supportedV1Scope.facilityCoverageDenominator.expectedRows",
+  );
+  const computedRows = stationCount * requiredFacilityTypes.length;
+  if (expectedRows !== computedRows) {
+    throw new Error(
+      `supportedV1Scope.facilityCoverageDenominator.expectedRows must equal includedStationIds x requiredFacilityTypes: ${computedRows}`,
+    );
+  }
+}
+
+function assertActualIdsWithinScope(actualIds, allowedIds, message) {
+  for (const id of [...actualIds].sort((left, right) => left.localeCompare(right))) {
+    if (!allowedIds.has(id)) {
+      throw new Error(`${message}: ${id}`);
+    }
+  }
+}
+
+function assertScopeIdsHaveRows(allowedIds, actualIds, message) {
+  for (const id of [...allowedIds].sort((left, right) => left.localeCompare(right))) {
+    if (!actualIds.has(id)) {
+      throw new Error(`${message}: ${id}`);
     }
   }
 }
