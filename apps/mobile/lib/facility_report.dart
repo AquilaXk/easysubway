@@ -1809,7 +1809,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                             _submitWithoutLocation = true;
                             _isLocationFailure = false;
                             _locationMessage =
-                                '위치 없이 제보합니다. 현장 위치 확인이 늦어질 수 있어요.';
+                                '위치 없이 제보합니다. 정확한 위치를 찾는 데 시간이 걸릴 수 있어요.';
                           });
                         },
                   icon: const Icon(Icons.location_off_outlined),
