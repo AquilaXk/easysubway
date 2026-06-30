@@ -630,6 +630,70 @@ void main() {
     }
   });
 
+  test('마이그레이션된 빈 근거 컬럼은 strict 지원으로 보지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES
+        (
+          'entry-a-line-test-empty-evidence',
+          'station-a',
+          'station-a:line-test',
+          90,
+          'ENTRY',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'edge-a-c-empty-evidence',
+          'station-a:line-test',
+          'station-c:line-test',
+          180,
+          'RIDE',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        ),
+        (
+          'exit-c-line-test-empty-evidence',
+          'station-c:line-test',
+          'station-c',
+          60,
+          'EXIT',
+          'STEP_FREE',
+          'AVAILABLE',
+          95
+        )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'UNKNOWN');
+    expect(result.steps, isEmpty);
+    expect(
+      result.blockedReasons,
+      contains('검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.'),
+    );
+    expect(result.warnings, isEmpty);
+  });
+
   test('구형 catalog의 network_edges는 미확인 접근성 상태로 안전하게 차단한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
