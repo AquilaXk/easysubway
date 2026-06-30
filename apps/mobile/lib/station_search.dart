@@ -69,6 +69,10 @@ const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
 const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
 const _stationDetailNoticeColor = Color(0xFFE6F2F0);
 const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
+const _stationLineFilterSelectedColor = Color(0xFF007A80);
+const _stationLineFilterBorderColor = Color(0xFF93C7C2);
+const _stationDetailHeroSecondaryColor = Color(0xFFAFC6D4);
+const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -2818,9 +2822,9 @@ class _StationLineRegionButton extends StatelessWidget {
             color: selected ? Colors.white : EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w800,
           ),
-          selectedColor: const Color(0xFF007A80),
+          selectedColor: _stationLineFilterSelectedColor,
           backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFF93C7C2)),
+          side: const BorderSide(color: _stationLineFilterBorderColor),
           shape: const RoundedRectangleBorder(
             borderRadius: _stationLineRegionChipRadius,
           ),
@@ -2867,13 +2871,15 @@ class _StationLineFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = selected ? const Color(0xFF007A80) : Colors.white;
+    final backgroundColor = selected
+        ? _stationLineFilterSelectedColor
+        : Colors.white;
     final foregroundColor = selected
         ? Colors.white
         : EasySubwayAccessibleColors.text;
     final borderColor = selected
-        ? const Color(0xFF007A80)
-        : const Color(0xFF93C7C2);
+        ? _stationLineFilterSelectedColor
+        : _stationLineFilterBorderColor;
 
     return Semantics(
       label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
@@ -5467,7 +5473,7 @@ class FacilityDetailScreen extends StatelessWidget {
                             '${station.nameKo}역',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  color: const Color(0xFFAFC6D4),
+                                  color: _stationDetailHeroSecondaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -5669,7 +5675,7 @@ class _StationDetailStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = positive
         ? EasySubwayAccessibleColors.primary
-        : const Color(0xFF8A4B00);
+        : _stationDetailCautionColor;
 
     return Row(
       children: [
