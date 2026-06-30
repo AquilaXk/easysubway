@@ -630,6 +630,46 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   }
 });
 
+test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한다", () => {
+  const workflowPath = ".github/workflows/slack-notifications.yml";
+  assert.ok(existsSync(path.join(root, workflowPath)), "Slack notification workflow must exist");
+
+  const workflow = read(workflowPath);
+  const readme = read("README.md");
+  const envExample = read(".env.example");
+
+  assert.match(workflow, /^name: Slack Notifications$/m);
+  assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*CI\n\s*-\s*CD\n\s*-\s*Data Pack Release\n\s*-\s*Release Artifacts\n\s*-\s*SonarCloud\n\s*-\s*Store Distribution Evidence/);
+  assert.match(workflow, /types:\s*\n\s*-\s*completed/);
+  assert.doesNotMatch(workflow, /\npermissions:\s*\n\s*contents: read\n\nconcurrency:/);
+  assert.doesNotMatch(workflow, /permissions:\s*\n\s*contents: read/);
+  assert.equal((workflow.match(/permissions: \{\}/g) ?? []).length, 3);
+  assert.match(workflow, /SLACK_CI_WEBHOOK_URL: \$\{\{ secrets\.SLACK_CI_WEBHOOK_URL \}\}/);
+  assert.match(workflow, /SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/);
+  assert.match(workflow, /SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/);
+  assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_ENV/);
+  assert.doesNotMatch(workflow, /\bchannel:\s|username:\s|icon_emoji:\s|icon_url:\s/);
+  assert.equal((workflow.match(/uses: slackapi\/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c/g) ?? []).length, 3);
+  assert.doesNotMatch(workflow, /uses: slackapi\/slack-github-action@v3\.0\.3/);
+  assert.equal((workflow.match(/webhook-type: incoming-webhook/g) ?? []).length, 3);
+  assert.equal((workflow.match(/github\.event\.workflow_run\.event != 'pull_request'/g) ?? []).length, 3);
+  assert.equal((workflow.match(/github\.event\.workflow_run\.head_repository\.full_name == github\.repository/g) ?? []).length, 3);
+  assert.match(workflow, /notify-ci-failure:[\s\S]*contains\(fromJSON\('\["failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)[\s\S]*github\.event\.workflow_run\.name == 'CI'/);
+  assert.match(workflow, /notify-release:[\s\S]*contains\(fromJSON\('\["CD","Data Pack Release","Release Artifacts","Store Distribution Evidence"\]'\), github\.event\.workflow_run\.name\)/);
+  assert.match(workflow, /notify-release:[\s\S]*contains\(fromJSON\('\["success","failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)/);
+  assert.match(workflow, /notify-security-failure:[\s\S]*contains\(fromJSON\('\["failure","cancelled","timed_out"\]'\), github\.event\.workflow_run\.conclusion\)[\s\S]*github\.event\.workflow_run\.name == 'SonarCloud'/);
+  assert.match(workflow, /run: <\$\{\{ github\.event\.workflow_run\.html_url \}\}\|GitHub Actions 열기>/);
+
+  assert.match(readme, /Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다/);
+  assert.match(readme, /SLACK_CI_WEBHOOK_URL/);
+  assert.match(readme, /SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(readme, /SLACK_SECURITY_WEBHOOK_URL/);
+  assert.match(readme, /실패, 취소, timeout/);
+  assert.match(envExample, /^SLACK_CI_WEBHOOK_URL=$/m);
+  assert.match(envExample, /^SLACK_RELEASE_WEBHOOK_URL=$/m);
+  assert.match(envExample, /^SLACK_SECURITY_WEBHOOK_URL=$/m);
+});
+
 test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-cd-env-"));
   const envFile = path.join(dir, "deploy.env");
@@ -696,6 +736,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_OWNER/);
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
   assert.match(validator, /EASYSUBWAY_ADMIN_CUTOVER_ENFORCED/);
+  assert.match(validator, /SLACK_CI_WEBHOOK_URL\|SLACK_RELEASE_WEBHOOK_URL\|SLACK_SECURITY_WEBHOOK_URL/);
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, [
