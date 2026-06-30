@@ -45,6 +45,10 @@ const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했어
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했어요.';
 const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했어요.';
 const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어요.';
+const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
+const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
+const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
+const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -2085,8 +2089,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             );
             return ListView(
               padding: isLargeScreen
-                  ? const EdgeInsets.fromLTRB(24, 24, 24, 40)
-                  : const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                  ? _stationSearchLargePagePadding
+                  : _stationSearchPagePadding,
               children: [
                 _StationSearchAdaptiveContent(
                   isLargeScreen: isLargeScreen,
@@ -2720,7 +2724,7 @@ class _StationLineFilterSection extends StatelessWidget {
         return SafeArea(
           child: ListView(
             key: const Key('stationLineAllSheet'),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            padding: _stationLineSheetPadding,
             children: [
               Text(
                 '전체 노선 보기',
@@ -3448,7 +3452,7 @@ class _StationRoleActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: _stationRoleActionPadding,
       child: Row(
         children: [
           Expanded(
@@ -3756,7 +3760,7 @@ class _FavoriteStationListBody extends StatelessWidget {
         ),
       ),
       FavoriteStationListStatus.success => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: _stationSearchPagePadding,
         children: [
           Semantics(
             label: '즐겨찾기 역 ${state.favorites.length}개',
@@ -4206,8 +4210,8 @@ class _StationDetailContent extends StatelessWidget {
         return ListView(
           key: const Key('stationDetailList'),
           padding: isLargeScreen
-              ? const EdgeInsets.fromLTRB(24, 24, 24, 40)
-              : const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              ? _stationSearchLargePagePadding
+              : _stationSearchPagePadding,
           children: isLargeScreen
               ? [
                   _StationDetailAdaptiveContent(
@@ -5405,7 +5409,7 @@ class FacilityDetailScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('시설 상세')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _stationSearchPagePadding,
           children: [
             Card(
               margin: EdgeInsets.zero,
