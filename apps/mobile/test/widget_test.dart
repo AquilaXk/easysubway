@@ -7484,7 +7484,7 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 접기'));
       await tester.pumpAndSettle();
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.text('이동 구조'), findsOneWidget);
+      expect(find.text('역 안 이동 안내'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('승강장'),
         120,
@@ -7495,7 +7495,10 @@ void main() {
       final platformText = tester.widget<Text>(find.text('승강장'));
       expect(platformText.maxLines, isNot(2));
       expect(platformText.overflow, isNot(TextOverflow.ellipsis));
-      expect(find.bySemanticsLabel('이동 구조, 1번 출구, 엘리베이터, 승강장'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('역 안 이동 안내, 1번 출구, 엘리베이터, 승강장'),
+        findsOneWidget,
+      );
       await tester.scrollUntilVisible(
         find.text('지도 위치 목록'),
         120,

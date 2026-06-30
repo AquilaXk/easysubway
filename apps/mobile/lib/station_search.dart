@@ -1288,9 +1288,9 @@ class StationDetailState {
   String get layoutSummarySemanticLabel {
     final items = layoutSummaryItems;
     if (items.isEmpty) {
-      return '이동 구조 정보 없음';
+      return '역 안 이동 안내가 아직 없어요';
     }
-    return '이동 구조, ${items.map((item) => item.text).join(', ')}';
+    return '역 안 이동 안내, ${items.map((item) => item.text).join(', ')}';
   }
 
   List<StationFacilityInfo> _layoutSummaryFacilities() {
@@ -4144,7 +4144,7 @@ class _StationDetailContent extends StatelessWidget {
     ];
     final detailChildren = <Widget>[
       if (layoutSummaryItems.isNotEmpty) ...[
-        const _StationDetailSectionTitle(title: '이동 구조'),
+        const _StationDetailSectionTitle(title: '역 안 이동 안내'),
         const SizedBox(height: 12),
         _StationLayoutSummary(
           items: layoutSummaryItems,
