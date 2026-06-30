@@ -5635,12 +5635,18 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   const prometheusDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(compose, /loki:\n/);
+  assert.match(compose, /loki-volume-init:\n/);
+  assert.match(compose, /loki-volume-init:[\s\S]*image: busybox:1\.37\.0/);
+  assert.match(compose, /loki-volume-init:[\s\S]*command: \["sh", "-c", "mkdir -p \/loki\/chunks \/loki\/rules \/loki\/rules-temp \/loki\/retention && chown -R 10001:10001 \/loki"\]/);
+  assert.match(compose, /loki-volume-init:[\s\S]*loki-data:\/loki/);
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/loki:3\.6\.0/);
+  assert.match(compose, /loki:[\s\S]*user: "10001:10001"/);
   assert.match(compose, /--config\.file=\/etc\/loki\/loki\.yml/);
   assert.match(compose, /\.\/loki\/loki\.yml:\/etc\/loki\/loki\.yml:ro/);
   assert.match(compose, /"127\.0\.0\.1:\$\{EASYSUBWAY_LOKI_PORT:-3100\}:3100"/);
   assert.match(compose, /loki-data:\/loki/);
+  assert.match(compose, /loki:[\s\S]*depends_on:\s*\n\s*loki-volume-init:\s*\n\s*condition: service_completed_successfully/);
   assert.match(compose, /test: \["CMD", "loki", "-config\.file=\/etc\/loki\/loki\.yml", "-verify-config"\]/);
 
   assert.match(lokiConfig, /auth_enabled: false/);
