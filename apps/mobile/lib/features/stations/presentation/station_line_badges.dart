@@ -64,7 +64,7 @@ class StationLineBadge extends StatelessWidget {
         height: size,
         child: stationLineBadgeNeedsRoundedCorners(assetPath)
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(size * 0.16),
+                borderRadius: BorderRadius.all(Radius.circular(size * 0.16)),
                 child: image,
               )
             : image,
