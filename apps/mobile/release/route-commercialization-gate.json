@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "route-commercialization",
+  "issue": 1210,
+  "releaseBlockerPolicy": true,
+  "storeReadyStatus": "blocked_route_commercialization_evidence_missing",
+  "requiredReports": {
+    "accuracy": "artifacts/route-accuracy-report.json",
+    "accessibility": "artifacts/route-accessibility-regression-report.json",
+    "coverage": "artifacts/realtime-provider-coverage-report.json",
+    "contract": "artifacts/route-v2-contract-report.json"
+  },
+  "routeEtaAccuracy": {
+    "singleRideP50ErrorSecondsMax": 60,
+    "singleRideP90ErrorSecondsMax": 180,
+    "transferP50ErrorSecondsMax": 120,
+    "transferP90ErrorSecondsMax": 300,
+    "sampleSizeMin": 100
+  },
+  "realtimeCoverage": {
+    "supportedStationLinePairsMin": 100,
+    "providerFreshnessSecondsMax": 90,
+    "staleFallbackRequired": true
+  },
+  "accessibility": {
+    "strictStepFreeKnownStairFalsePositiveAllowed": 0,
+    "generatedConnectorAsVerifiedAllowed": false,
+    "unknownAccessibilityMustBeLabeled": true
+  },
+  "routing": {
+    "multiTransferSupported": true,
+    "outOfStationTransferSupported": true,
+    "alternativeItinerariesMin": 2
+  },
+  "etaSourceIntegrity": {
+    "realtimeEtaWithoutFreshProviderAllowed": false,
+    "staleRealtimeUsedAsFreshAllowed": false,
+    "staticLocalMustBeLabeled": true,
+    "plannedOnlyMustBeLabeled": true
+  },
+  "routeQuality": {
+    "wrongTransferCountAllowed": 0,
+    "wrongLineSequenceAllowed": 0,
+    "routeNotFoundRateMax": 0.02
+  },
+  "evidence": {
+    "routeAccuracyReportRequired": true,
+    "providerCoverageReportRequired": true,
+    "accessibilityRegressionReportRequired": true
+  },
+  "outOfStationTransferReleaseBlockers": ["D-2", "D-3", "H-1"]
+}
