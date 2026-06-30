@@ -90,6 +90,7 @@ class LocalRouteEngine {
       'BLOCKED_MISSING_EVIDENCE_HASH',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH',
       'BLOCKED_UNSUPPORTED_SCOPE',
+      'STRICT_EVIDENCE_UNSUPPORTED',
       'ROUTE_GRAPH_UNKNOWN',
     };
     return reasonCodes.isNotEmpty &&
@@ -247,6 +248,7 @@ class LocalRouteEngine {
       'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
+      'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.',
       'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',

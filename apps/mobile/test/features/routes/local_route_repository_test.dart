@@ -668,7 +668,10 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(
+      result.blockedReasons,
+      contains('검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.'),
+    );
     expect(result.warnings, isEmpty);
   });
 
@@ -715,7 +718,10 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(
+      result.blockedReasons,
+      contains('검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.'),
+    );
     expect(result.warnings, isEmpty);
   });
 
