@@ -7,7 +7,7 @@ import 'core/database/user/user_database.dart';
 import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
-const userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
+const userDataDeletionErrorMessage = '정보 삭제를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
 const _userDataDeletionTimeout = defaultApiTimeout;
 
 abstract class UserDataDeletionRepository {
@@ -41,7 +41,7 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '사용자 데이터 삭제 API 응답 처리 중 예외가 발생했습니다.',
+        context: '사용자 정보 삭제 API 응답 처리 중 예외가 발생했습니다.',
       );
       throw const UserDataDeletionException(userDataDeletionErrorMessage);
     }
@@ -143,7 +143,7 @@ class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
       reportMobileError(
         error,
         stackTrace,
-        context: '로컬 사용자 데이터 삭제 처리 중 예외가 발생했습니다.',
+        context: '로컬 사용자 정보 삭제 처리 중 예외가 발생했습니다.',
       );
       throw const UserDataDeletionException(userDataDeletionErrorMessage);
     }
