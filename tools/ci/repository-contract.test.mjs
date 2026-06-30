@@ -4178,6 +4178,34 @@ test("official source importer는 production facility 검증 기본값 누락을
   }
 });
 
+test("official source importer는 production facility confidence 범위를 검증한다", async () => {
+  for (const confidence of [-1, 101]) {
+    const outputDir = await mkdtemp(path.join(tmpdir(), `easysubway-production-facility-confidence-${confidence}-`));
+    const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+    const inputPath = path.join(outputDir, "input.json");
+    const outputPath = path.join(outputDir, "output.json");
+    input.facilityRows[0].confidence = confidence;
+
+    await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          inputPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: root },
+      ),
+      /facilityRows\.confidence must be between 0 and 100/,
+    );
+  }
+});
+
 test("production row provenance는 snapshot/provider/evidence hash gate를 유지한다", () => {
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const schema = read("tools/datapack/schema/catalog-schema.sql");
