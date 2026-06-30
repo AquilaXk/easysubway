@@ -3490,14 +3490,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     const _AppSettingsInfoTile(
                       icon: Icons.notifications_off_outlined,
                       title: '알림은 아직 사용할 수 없어요',
-                      subtitle: '시설 상태와 제보 처리 안내는 앱 안에서 확인할 수 있어요',
+                      subtitle: '시설 상태와 제보 진행 상황은 앱 안에서 확인할 수 있어요',
                     )
                   else
                     _AppSettingsActionTile(
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
-                      subtitle: '시설 상태, 제보 처리, 최신 안내 알림을 관리해요',
+                      subtitle: '시설 상태, 제보 진행 상황, 최신 안내 알림을 관리해요',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -3520,7 +3520,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('myReportsSettingsButton'),
                     icon: Icons.receipt_long_outlined,
                     title: '내 제보',
-                    subtitle: '접수한 시설 제보와 처리 상태를 확인해요',
+                    subtitle: '접수한 시설 제보와 진행 상황을 확인해요',
                     onTap: widget.onOpenMyReports,
                   ),
                 ],
@@ -4411,7 +4411,7 @@ class SupportAccessScreen extends StatelessWidget {
                 title: '내 정보 삭제 요청',
                 value: accessInfo.dataDeletionEmail,
                 displayValue: '이메일 보내기',
-                helperText: '삭제 범위와 처리 절차를 메일로 문의해요',
+                helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
                 uri: _mailtoUri(
                   accessInfo.dataDeletionEmail,
                   '쉬운 지하철 내 정보 삭제 요청',
@@ -4609,10 +4609,10 @@ class _UserDataDeletionCopy {
     return switch (scope) {
       UserDataDeletionScope.requestOnly => const _UserDataDeletionCopy(
         title: '내 정보 삭제 요청',
-        helperText: '삭제 범위와 처리 절차를 메일로 문의합니다.',
-        body: '삭제가 필요한 정보와 처리 절차를 지원 메일로 문의합니다.',
+        helperText: '어떤 정보를 지울 수 있는지 메일로 문의합니다.',
+        body: '삭제가 필요한 정보와 방법을 지원 메일로 문의합니다.',
         notices: [
-          '앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.',
+          '앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.',
           '요청 전 개인정보처리방침에서 보관 범위와 기간을 확인할 수 있습니다.',
         ],
         confirmText: '내 정보 삭제 요청 메일을 보낼까요?',
@@ -4909,7 +4909,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const _AppSectionTitle(title: '처리 결과'),
+            const _AppSectionTitle(title: '삭제 결과'),
             _AppCard(
               child: Column(
                 children: [
@@ -5290,14 +5290,14 @@ class _PrivacyDataUseSummary extends StatelessWidget {
   static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.';
   static const _appDataPurpose = '즐겨찾기, 이동 조건, 제보 내용과 사진은 앱 기능 제공에 사용됩니다.';
   static const _requestDeletionScope =
-      '내 정보 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.';
+      '내 정보 삭제 요청은 지원 메일로 지울 수 있는 정보와 방법을 문의할 수 있습니다.';
   static const _deviceDeletionScope =
       '이 기기의 앱 정보 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
   static const _remoteDeletionScope =
       '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 개인을 알 수 없게 처리하고 앱의 임시 설정을 초기화합니다.';
   static const _combinedDeletionScope =
       '내 정보 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 보낸 제보 내용·사진·위치, 경로 피드백 정보를 삭제하거나 개인을 알 수 없게 처리합니다.';
-  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.';
+  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.';
   static const _deviceSentReportNotice =
       '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
   static const _remoteSentReportNotice =

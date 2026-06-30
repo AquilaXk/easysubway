@@ -3603,7 +3603,7 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '알림 설정, 시설 상태, 제보 처리, 최신 안내 알림을 관리해요',
+          '알림 설정, 시설 상태, 제보 진행 상황, 최신 안내 알림을 관리해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -4428,7 +4428,7 @@ void main() {
           .getSemanticsData();
       expect(
         deletionSemantics.label,
-        '내 정보 삭제 요청, 이메일 보내기, privacy@easysubway.example, 삭제 범위와 처리 절차를 메일로 문의해요',
+        '내 정보 삭제 요청, 이메일 보내기, privacy@easysubway.example, 어떤 정보를 지울 수 있는지 메일로 문의해요',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
 
@@ -4485,13 +4485,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('내 정보 삭제 요청은 지원 메일로 삭제 범위와 처리 절차를 문의할 수 있습니다.'),
+        find.text('내 정보 삭제 요청은 지원 메일로 지울 수 있는 정보와 방법을 문의할 수 있습니다.'),
         findsOneWidget,
       );
-      expect(
-        find.text('앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.'),
-        findsOneWidget,
-      );
+      expect(find.text('앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.'), findsOneWidget);
       expect(find.text('법으로 꼭 필요한 기록은 정해진 기간 동안만 보관합니다.'), findsOneWidget);
 
       final summarySize = tester.getSize(
@@ -4508,7 +4505,7 @@ void main() {
       );
       expect(
         summarySemantics.label,
-        contains('앱 안에서 바로 삭제할 수 없는 정보는 답변 안내에 따라 처리됩니다.'),
+        contains('앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.'),
       );
       expect(summarySemantics.label, isNot(contains('익명화')));
     } finally {
@@ -5059,7 +5056,7 @@ void main() {
           .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
           .getSemanticsData()
           .label,
-      '내 정보 삭제 요청, 아직 준비 중이에요, 삭제 범위와 처리 절차를 메일로 문의해요',
+      '내 정보 삭제 요청, 아직 준비 중이에요, 어떤 정보를 지울 수 있는지 메일로 문의해요',
     );
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.scrollUntilVisible(
@@ -5146,7 +5143,7 @@ void main() {
       expect(find.text('알림 설정'), findsOneWidget);
       expect(find.text('역 시설 알림'), findsOneWidget);
       expect(find.text('경로 시설 알림'), findsOneWidget);
-      expect(find.text('제보 처리 알림'), findsOneWidget);
+      expect(find.text('제보 진행 알림'), findsOneWidget);
       expect(find.text('정보 갱신 알림'), findsNothing);
       expect(find.text('최신 안내 알림'), findsOneWidget);
       expect(find.bySemanticsLabel('역 시설 알림 켜짐'), findsOneWidget);
@@ -5206,7 +5203,7 @@ void main() {
     expect(find.text('알림 받기'), findsOneWidget);
     expect(
       find.text(
-        '즐겨찾는 역과 경로의 시설 변경, 제보 처리 상황, 최신 안내를 알려드려요. 알림 설정에서 언제든 끌 수 있습니다.',
+        '즐겨찾는 역과 경로의 시설 변경, 제보 진행 상황, 최신 안내를 알려드려요. 알림 설정에서 언제든 끌 수 있습니다.',
       ),
       findsOneWidget,
     );
@@ -10248,7 +10245,7 @@ void main() {
       expect(find.text('제보 번호'), findsOneWidget);
       expect(find.text('ES-1001'), findsOneWidget);
       expect(find.text('report-1'), findsNothing);
-      expect(find.text('처리 상태'), findsOneWidget);
+      expect(find.text('진행 상황'), findsOneWidget);
       expect(find.text('접수됨'), findsOneWidget);
       expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 접수됨'), findsOneWidget);
       expect(
@@ -10265,7 +10262,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(reportRepository.loadedReportIds, ['report-1']);
-      expect(find.text('처리 상태를 확인했습니다.'), findsOneWidget);
+      expect(find.text('제보 진행 상황을 확인했어요.'), findsOneWidget);
       expect(find.text('반영됨'), findsOneWidget);
       expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 반영됨'), findsOneWidget);
       expectNoForbiddenUserCopy(tester);
