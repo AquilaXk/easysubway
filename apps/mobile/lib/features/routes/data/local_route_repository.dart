@@ -19,15 +19,17 @@ class LocalRouteRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
-    final routeGraph = catalog.toGraph();
-    final engine = LocalRouteEngine(graph: routeGraph);
-    final result = engine.search(
-      local.RouteRequest(
-        originStationId: request.originStationId,
-        destinationStationId: request.destinationStationId,
-        mobilityType: _mobilityType(request.mobilityType),
-      ),
-    );
+    final mobilityType = _mobilityType(request.mobilityType);
+    final result =
+        mobilityType.blocksStairOnlyAccess && !catalog.strictEvidenceSupported
+        ? local.LocalRouteResult.unknown(const ['STRICT_EVIDENCE_UNSUPPORTED'])
+        : LocalRouteEngine(graph: catalog.toGraph()).search(
+            local.RouteRequest(
+              originStationId: request.originStationId,
+              destinationStationId: request.destinationStationId,
+              mobilityType: mobilityType,
+            ),
+          );
 
     return _toRouteSearchResult(request, result, catalog);
   }
@@ -271,6 +273,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
+      'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
     };
@@ -306,12 +309,14 @@ class _RouteCatalogSnapshot {
     required this.linesById,
     required this.stationLines,
     required this.networkEdges,
+    required this.strictEvidenceSupported,
   });
 
   final Map<String, String> stationsById;
   final Map<String, String> linesById;
   final List<_StationLineSnapshot> stationLines;
   final List<_NetworkEdgeSnapshot> networkEdges;
+  final bool strictEvidenceSupported;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final stationRows = await database
@@ -331,6 +336,12 @@ class _RouteCatalogSnapshot {
     final networkEdgeColumnNames = {
       for (final row in networkEdgeColumns) row.read<String>('name'),
     };
+    final strictEvidenceSupported = networkEdgeColumnNames.containsAll({
+      'source_id',
+      'provenance_kind',
+      'verification_status',
+      'evidence_hash',
+    });
     final servicePatternSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'service_pattern',
@@ -568,6 +579,7 @@ class _RouteCatalogSnapshot {
             );
           })
           .toList(growable: false),
+      strictEvidenceSupported: strictEvidenceSupported,
     );
   }
 
