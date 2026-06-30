@@ -3,9 +3,6 @@ name: Store Distribution Evidence
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: store-distribution-evidence-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,6 +11,8 @@ jobs:
   preflight:
     name: Store Distribution Evidence / Preflight
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
 

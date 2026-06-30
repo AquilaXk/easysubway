@@ -23,14 +23,13 @@ on:
         required: false
         type: string
 
-permissions:
-  actions: read
-  contents: read
-
 jobs:
   plan:
     name: CD Plan
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
       deploy_target_relevant: ${{ steps.changes.outputs.deploy }}
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) }}
@@ -103,6 +102,9 @@ jobs:
     runs-on:
       - self-hosted
       - easysubway-production
+    permissions:
+      actions: read
+      contents: read
     concurrency:
       group: cd-production-deploy
       cancel-in-progress: false

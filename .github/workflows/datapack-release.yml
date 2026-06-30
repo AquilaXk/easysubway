@@ -53,9 +53,6 @@ on:
         description: Strict route regression evidence path
         required: false
 
-permissions:
-  contents: read
-
 concurrency:
   group: datapack-release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -64,6 +61,8 @@ jobs:
   data-pack-release:
     name: Data Pack Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     environment:
       name: ${{ github.event.inputs.mode == 'production-publish' && 'production-datapack' || 'datapack-release-check' }}
     env:
