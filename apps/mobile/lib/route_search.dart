@@ -4482,7 +4482,7 @@ class _FavoriteRouteListBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: _routeSearchPagePadding,
       children: [
         switch (state.status) {
           FavoriteRouteListStatus.loading => Semantics(
