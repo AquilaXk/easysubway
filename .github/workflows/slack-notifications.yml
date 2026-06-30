@@ -12,9 +12,6 @@ on:
     types:
       - completed
 
-permissions:
-  contents: read
-
 concurrency:
   group: slack-notifications-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
@@ -24,6 +21,8 @@ jobs:
     name: Slack / CI failure
     if: ${{ contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) && github.event.workflow_run.name == 'CI' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       SLACK_CI_WEBHOOK_URL: ${{ secrets.SLACK_CI_WEBHOOK_URL }}
 
@@ -34,7 +33,7 @@ jobs:
 
       - name: Slack / Notify CI failure
         if: ${{ env.SLACK_CI_WEBHOOK_URL != '' }}
-        uses: slackapi/slack-github-action@v3.0.3
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
         with:
           webhook: ${{ env.SLACK_CI_WEBHOOK_URL }}
           webhook-type: incoming-webhook
@@ -55,6 +54,8 @@ jobs:
     name: Slack / Release workflow result
     if: ${{ contains(fromJSON('["CD","Data Pack Release","Release Artifacts","Store Distribution Evidence"]'), github.event.workflow_run.name) && contains(fromJSON('["success","failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
 
@@ -65,7 +66,7 @@ jobs:
 
       - name: Slack / Notify release workflow result
         if: ${{ env.SLACK_RELEASE_WEBHOOK_URL != '' }}
-        uses: slackapi/slack-github-action@v3.0.3
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
         with:
           webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
           webhook-type: incoming-webhook
@@ -87,6 +88,8 @@ jobs:
     name: Slack / Security failure
     if: ${{ contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) && github.event.workflow_run.name == 'SonarCloud' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
 
@@ -97,7 +100,7 @@ jobs:
 
       - name: Slack / Notify security failure
         if: ${{ env.SLACK_SECURITY_WEBHOOK_URL != '' }}
-        uses: slackapi/slack-github-action@v3.0.3
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
         with:
           webhook: ${{ env.SLACK_SECURITY_WEBHOOK_URL }}
           webhook-type: incoming-webhook
