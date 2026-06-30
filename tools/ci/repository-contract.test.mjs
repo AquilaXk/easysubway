@@ -3875,9 +3875,12 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 8/);
+  assert.match(schema, /PRAGMA user_version = 9/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
+  assert.match(schema, /CREATE TABLE service_calendars/);
+  assert.match(schema, /CREATE TABLE transit_trips/);
+  assert.match(schema, /CREATE TABLE transit_stop_times/);
   assert.match(schema, /CREATE TABLE realtime_provider_line_mappings/);
   assert.match(schema, /CREATE TABLE realtime_provider_station_mappings/);
   assert.match(schema, /source_id TEXT NOT NULL DEFAULT ''/);
@@ -3900,6 +3903,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(builder, /--build-spec/);
   assert.match(builder, /datapack-candidate-build-spec/);
   assert.match(builder, /candidateBuild/);
+  assert.match(builder, /"transit_stop_times"/);
   assert.match(validator, /PRAGMA quick_check/);
   assert.match(validator, /PRAGMA foreign_key_check/);
   assert.match(validator, /PRAGMA user_version/);
@@ -3909,6 +3913,8 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(validator, /validateProductionNetworkEdgeProvenance/);
   assert.match(validator, /datapack_verified_edge_coverage/);
   assert.match(validator, /validateRepresentativeRouteRegressions/);
+  assert.match(validator, /validateTransitSchedule/);
+  assert.match(validator, /transit_stop_times must be monotonic/);
   assert.match(validator, /manifest\.schema\.json/);
   assert.match(validator, /validateManifestJsonSchema/);
   assert.match(validator, /validateRegionalQualityMetricsMatchDatabase/);
@@ -4490,6 +4496,8 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   const validator = read("tools/datapack/validate-datapack.mjs");
   const mobileTables = read("apps/mobile/lib/core/database/catalog/catalog_tables.dart");
   const mobileDatabase = read("apps/mobile/lib/core/database/catalog/catalog_database.dart");
+  const schedulePostgresMigration = read("backend/src/main/resources/db/migration/postgresql/V29__canonical_transit_schedule.sql");
+  const scheduleH2Migration = read("backend/src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql");
 
   for (const row of input.facilityRows) {
     assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
@@ -4516,20 +4524,28 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(schema, /CREATE TABLE network_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(schema, /CREATE TABLE facilities \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(schema, /CREATE TABLE station_facility_evidence \([\s\S]+provider_record_hash TEXT NOT NULL[\s\S]+strict_route_eligible INTEGER NOT NULL DEFAULT 0/);
+  assert.match(schema, /CREATE TABLE transit_stop_times \([\s\S]+arrival_seconds INTEGER NOT NULL[\s\S]+departure_seconds INTEGER NOT NULL/);
   assert.match(schema, /CREATE TABLE internal_route_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(builder, /"station_facility_evidence"/);
+  assert.match(builder, /"transit_stop_times"/);
   assert.match(builder, /"source_snapshot_id"/);
   assert.match(builder, /"provider_record_hash"/);
   assert.match(validator, /validateProductionStationFacilityEvidence/);
+  assert.match(validator, /validateTransitSchedule/);
   assert.match(validator, /"source_snapshot_id"/);
   assert.match(validator, /"provider_record_hash"/);
+  assert.match(mobileTables, /class TransitStopTimes extends Table/);
+  assert.match(mobileDatabase, /int get schemaVersion => 9/);
+  assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
+  assert.match(schedulePostgresMigration, /CREATE TABLE IF NOT EXISTS transit_stop_times/);
+  assert.match(scheduleH2Migration, /CREATE TABLE IF NOT EXISTS transit_stop_times/);
   assert.match(validator, /validateProductionInternalRouteEdgeProvenance/);
   assert.match(validator, /validateNetworkEdgeBaseProvenance/);
   assert.match(validator, /is placeholder evidence/);
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /int get schemaVersion => 8/);
+  assert.match(mobileDatabase, /int get schemaVersion => 9/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
 });

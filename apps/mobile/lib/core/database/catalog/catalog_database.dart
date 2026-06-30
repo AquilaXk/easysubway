@@ -15,6 +15,12 @@ part 'catalog_database.g.dart';
     Stations,
     StationAliases,
     StationLines,
+    ServiceCalendars,
+    ServiceCalendarDates,
+    TransitRoutes,
+    TransitTrips,
+    TransitStopTimes,
+    TransitFrequencies,
     RealtimeProviderLineMappings,
     RealtimeProviderStationMappings,
     NetworkEdges,
@@ -43,7 +49,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -77,6 +83,15 @@ class CatalogDatabase extends _$CatalogDatabase {
         if (from < 8) {
           await migrator.createTable(stationFacilityEvidence);
           await _createStationFacilityEvidenceIndexes();
+        }
+        if (from < 9) {
+          await migrator.createTable(serviceCalendars);
+          await migrator.createTable(serviceCalendarDates);
+          await migrator.createTable(transitRoutes);
+          await migrator.createTable(transitTrips);
+          await migrator.createTable(transitStopTimes);
+          await migrator.createTable(transitFrequencies);
+          await _createTransitScheduleIndexes();
         }
       },
       beforeOpen: (_) async {
@@ -666,6 +681,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_station_lines_line_sequence '
       'ON station_lines(line_id, line_sequence)',
     );
+    await _createTransitScheduleIndexes();
     await _createRealtimeProviderIndexes();
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_network_edges_from_node '
@@ -690,6 +706,21 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_realtime_provider_stations_internal '
       'ON realtime_provider_station_mappings(station_id, line_id)',
+    );
+  }
+
+  Future<void> _createTransitScheduleIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transit_stop_times_station_line_departure '
+      'ON transit_stop_times(station_id, line_id, departure_seconds)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transit_stop_times_trip_sequence '
+      'ON transit_stop_times(trip_id, stop_sequence)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transit_trips_route_service_pattern '
+      'ON transit_trips(route_id, service_id, service_pattern)',
     );
   }
 
