@@ -35,6 +35,7 @@ const defaultDemoHomeDataEnabled = bool.fromEnvironment(
   'EASYSUBWAY_DEMO_HOME_DATA',
   defaultValue: false,
 );
+const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -4255,7 +4256,7 @@ class OfflineDataScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: const [
             _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
@@ -4389,7 +4390,7 @@ class SupportAccessScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('도움말·문의')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _PrivacyDataUseSummary(deletionScope: deletionScope),
@@ -4716,7 +4717,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             Semantics(
               header: true,
@@ -4880,7 +4881,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
