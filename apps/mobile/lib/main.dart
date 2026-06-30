@@ -4186,7 +4186,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _mainThemeControlRadius,
           child: _AppCard(
             backgroundColor: Colors.white,
             borderRadius: 8,
@@ -4198,7 +4198,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: EasySubwayAccessibleColors.mintSoft,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: _mainThemeControlRadius,
                   ),
                   child: SizedBox(
                     width: 44,
@@ -4537,13 +4537,13 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
         child: Material(
           color: EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _mainThemeControlRadius,
             side: BorderSide(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _mainThemeControlRadius,
             onTap: openDeletionScreen,
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -5047,7 +5047,7 @@ class _DataDeletionResultRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _mainThemeControlRadius,
         border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
       ),
       child: const Text(
@@ -5130,7 +5130,7 @@ class _SecurityContactNotice extends StatelessWidget {
           decoration: BoxDecoration(
             color: EasySubwayAccessibleColors.skySoft,
             border: Border.all(color: EasySubwayAccessibleColors.line),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _mainThemeControlRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
