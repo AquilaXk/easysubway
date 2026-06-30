@@ -42,6 +42,14 @@ const _routeTextSubtleColor = Color(0xFF50656F);
 const _routeNextActionTextColor = Color(0xFF506B6F);
 const _routeAccentColor = Color(0xFF006D77);
 const _routeCardBorderColor = Color(0xFFD5E2E4);
+const _routeDividerColor = Color(0xFFE0E7EC);
+const _routeControlBorderColor = Color(0xFF9DB6BA);
+const _routeSoftPanelColor = Color(0xFFE9F5F6);
+const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
+const _routeGuidanceDarkColor = Color(0xFF073245);
+const _routeBlockedBorderColor = Color(0xFFEFCCCC);
+const _routeCardShadowColor = Color(0x0F071B2F);
+const _routeAccentShadowColor = Color(0x1A0D8A6D);
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
 const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
 const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
@@ -1723,7 +1731,7 @@ class _RoutePointPickerCard extends StatelessWidget {
         borderRadius: _routeSearchLargeRadius,
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0F071B2F),
+            color: _routeCardShadowColor,
             blurRadius: 16,
             offset: Offset(0, 5),
           ),
@@ -1744,7 +1752,7 @@ class _RoutePointPickerCard extends StatelessWidget {
                       fallback: '출발역 선택',
                       onTap: onOriginTap,
                     ),
-                const Divider(height: 1, color: Color(0xFFE0E7EC)),
+                const Divider(height: 1, color: _routeDividerColor),
                 destinationPicker ??
                     _RoutePointRow(
                       key: const Key('routeDestinationPointButton'),
@@ -1770,7 +1778,7 @@ class _RoutePointPickerCard extends StatelessWidget {
                   color: _routeTextPrimaryColor,
                   style: IconButton.styleFrom(
                     fixedSize: const Size(48, 48),
-                    side: const BorderSide(color: Color(0xFF9DB6BA)),
+                    side: const BorderSide(color: _routeControlBorderColor),
                   ),
                 ),
               ),
@@ -1826,7 +1834,7 @@ class _RoutePointRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(Icons.map_outlined, color: Color(0xFF50656F)),
+                const Icon(Icons.map_outlined, color: _routeTextSubtleColor),
               ],
             ),
           ),
@@ -1944,7 +1952,7 @@ class _RouteRecentDestinationListState
                 children: [
                   for (final entry in destinations.indexed) ...[
                     if (entry.$1 > 0)
-                      const Divider(height: 1, color: Color(0xFFE0E7EC)),
+                      const Divider(height: 1, color: _routeDividerColor),
                     _RouteRecentDestinationRow(
                       route: entry.$2,
                       onSelected: () => widget.onSelected(
@@ -2149,8 +2157,8 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
       liveRegion: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFE9F5F6),
-          border: Border.all(color: const Color(0xFFB9D4D8)),
+          color: _routeSoftPanelColor,
+          border: Border.all(color: _routeSoftPanelBorderColor),
           borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
@@ -2954,7 +2962,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
         const SizedBox(height: 8),
         DecoratedBox(
           decoration: BoxDecoration(
-            color: const Color(0xFF073245),
+            color: _routeGuidanceDarkColor,
             borderRadius: _routeSearchLargeRadius,
           ),
           child: Padding(
@@ -3046,14 +3054,14 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                     color: Colors.white,
                     border: Border.all(
                       color: result.isBlocked
-                          ? const Color(0xFFEFCCCC)
+                          ? _routeBlockedBorderColor
                           : EasySubwayAccessibleColors.mint,
                       width: 2,
                     ),
                     borderRadius: _routeSearchLargeRadius,
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x1A0D8A6D),
+                        color: _routeAccentShadowColor,
                         blurRadius: 18,
                         offset: Offset(0, 6),
                       ),
@@ -3445,7 +3453,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF073245),
+        color: _routeGuidanceDarkColor,
         borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
