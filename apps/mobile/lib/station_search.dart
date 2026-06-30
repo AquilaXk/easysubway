@@ -54,6 +54,9 @@ const _stationResultCardRadius = BorderRadius.all(Radius.circular(18));
 const _stationCompactCardRadius = BorderRadius.all(Radius.circular(8));
 const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(8));
 const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(14));
+const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(8));
+const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(14));
+const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -4408,7 +4411,7 @@ class _StationRealtimeSummary extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _stationDetailInfoCardRadius,
           border: Border.all(color: EasySubwayAccessibleColors.line),
         ),
         child: Column(
@@ -4544,7 +4547,9 @@ class _StationPointButton extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: EasySubwayAccessibleColors.text,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: const RoundedRectangleBorder(
+          borderRadius: _stationDetailActionButtonRadius,
+        ),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
       icon: CircleAvatar(
@@ -4669,7 +4674,7 @@ class _StationLayoutStep extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFEAF6F4),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _stationDetailInfoCardRadius,
         border: Border.all(color: const Color(0xFFB9D7D2)),
       ),
       child: Column(
@@ -4961,7 +4966,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFFEFF8F6),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _stationDetailInfoCardRadius,
             border: Border.all(color: const Color(0xFFB7D8D2)),
           ),
           child: Column(
@@ -5215,9 +5220,9 @@ class _StationExitCard extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 12),
             color: Colors.white,
             elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _stationDetailInfoCardRadius,
+              side: BorderSide(color: Color(0xFFD5E2E4)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -5288,13 +5293,13 @@ class _StationFacilityCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         color: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFD5E2E4)),
+        shape: const RoundedRectangleBorder(
+          borderRadius: _stationDetailFacilityCardRadius,
+          side: BorderSide(color: Color(0xFFD5E2E4)),
         ),
         child: InkWell(
           key: Key('stationFacilityCard-${facility.id}'),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: _stationDetailFacilityCardRadius,
           onTap: () => _openFacilityDetail(context),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -5678,7 +5683,7 @@ class _StationDetailTextPill extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _stationDetailInfoCardRadius,
         border: Border.all(color: const Color(0xFFB8D8D3)),
       ),
       child: Padding(
