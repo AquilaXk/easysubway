@@ -22,6 +22,7 @@ export 'features/stations/domain/station_line.dart';
 
 const _currentLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _currentLocationPermissionMessage = '현재 위치를 사용할 수 없어요.';
 const _nearbyLocationMaxAge = Duration(minutes: 5);
 const _nearbyLocationMaxAccuracyMeters = 500.0;
 const _locationQualityUnavailableMessage =
@@ -36,8 +37,9 @@ const _locationPermissionRationaleTitle = '현재 위치 사용';
 const _locationPermissionRationalePurpose =
     '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
 const _locationPermissionRationaleFallback =
-    '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
-const _stationSearchFailureNextAction = '역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.';
+    '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
+const _stationSearchFailureNextAction =
+    '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
 const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했어요.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했어요.';
@@ -299,7 +301,7 @@ class MethodChannelCurrentLocationProvider implements CurrentLocationProvider {
 
   String _locationErrorMessage(String code) {
     return switch (code) {
-      'permissionDenied' => '위치 권한을 확인해 주세요.',
+      'permissionDenied' => _currentLocationPermissionMessage,
       'locationDisabled' => _currentLocationDisabledMessage,
       'locationUnavailable' => '현재 위치를 확인하지 못했어요.',
       _ => '현재 위치를 확인하지 못했어요.',
@@ -1145,7 +1147,7 @@ class StationSearchController extends ChangeNotifier {
       _state = StationSearchState(
         status: StationSearchStatus.failure,
         results: const [],
-        message: error.message,
+        message: _friendlyCurrentLocationErrorMessage(error.message),
       );
     } on StationSearchException catch (error) {
       if (!_isActiveRequest(requestId)) {
@@ -3272,10 +3274,17 @@ class _StationSearchFailureMessage extends StatelessWidget {
 }
 
 bool _shouldShowStationSearchFailureNextAction(String message) {
-  return message == '위치 권한을 확인해 주세요.' ||
+  return message == _currentLocationPermissionMessage ||
       message == _currentLocationDisabledMessage ||
       message == '현재 위치를 확인하지 못했어요.' ||
       message == '주변 역을 찾지 못했어요.';
+}
+
+String _friendlyCurrentLocationErrorMessage(String message) {
+  if (message.contains('권한')) {
+    return _currentLocationPermissionMessage;
+  }
+  return message.isEmpty ? '현재 위치를 확인하지 못했어요.' : message;
 }
 
 class _StationSearchMessage extends StatelessWidget {
