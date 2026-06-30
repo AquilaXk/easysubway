@@ -745,7 +745,7 @@ void main() {
     expect(notificationButtonSide?.color, EasySubwayAccessibleColors.line);
     expect(notificationButtonSide?.width, 1.5);
     expect(notificationBadge.isLabelVisible, isFalse);
-    expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsOneWidget);
+    expect(find.bySemanticsLabel('알림, 새 알림이 없어요'), findsOneWidget);
     expect(find.bySemanticsLabel('알림, 확인할 알림 있음'), findsNothing);
 
     await tester.tap(find.byKey(const Key('homeNotificationActionButton')));
@@ -825,7 +825,7 @@ void main() {
     );
     expect(notificationBadge.isLabelVisible, isTrue);
     expect(find.bySemanticsLabel('알림, 확인할 알림 있음'), findsOneWidget);
-    expect(find.bySemanticsLabel('알림, 새 알림 없음'), findsNothing);
+    expect(find.bySemanticsLabel('알림, 새 알림이 없어요'), findsNothing);
     expect(favoriteFacilityRepository.listCount, 1);
   });
 
@@ -4448,7 +4448,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('보안 문의'), findsOneWidget);
-      expect(find.text('현재 이용할 수 없음 · 준비 중'), findsOneWidget);
+      expect(find.text('아직 준비 중이에요'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -5040,7 +5040,7 @@ void main() {
           .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
           .getSemanticsData()
           .label,
-      '개인정보처리방침, 현재 이용할 수 없음 · 준비 중',
+      '개인정보처리방침, 아직 준비 중이에요',
     );
 
     await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
@@ -5055,7 +5055,7 @@ void main() {
           .getSemantics(find.byKey(const Key('dataDeletionAccessItem')))
           .getSemanticsData()
           .label,
-      '데이터 삭제 요청, 현재 이용할 수 없음 · 준비 중, 삭제 범위와 처리 절차를 메일로 문의해요',
+      '데이터 삭제 요청, 아직 준비 중이에요, 삭제 범위와 처리 절차를 메일로 문의해요',
     );
     await tester.tap(find.byKey(const Key('dataDeletionAccessItem')));
     await tester.scrollUntilVisible(
@@ -5069,7 +5069,7 @@ void main() {
           .getSemantics(find.byKey(const Key('supportAccessItem')))
           .getSemanticsData()
           .label,
-      '고객지원, 현재 이용할 수 없음 · 준비 중',
+      '고객지원, 아직 준비 중이에요',
     );
     await tester.tap(find.byKey(const Key('supportAccessItem')));
     await tester.scrollUntilVisible(
@@ -5083,7 +5083,7 @@ void main() {
           .getSemantics(find.byKey(const Key('securityContactAccessItem')))
           .getSemanticsData()
           .label,
-      '보안 문의, 현재 이용할 수 없음 · 준비 중',
+      '보안 문의, 아직 준비 중이에요',
     );
     await tester.tap(find.byKey(const Key('securityContactAccessItem')));
     await tester.pumpAndSettle();

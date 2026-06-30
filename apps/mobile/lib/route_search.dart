@@ -698,7 +698,7 @@ class RouteSearchResult {
     }
     if (steps.isNotEmpty &&
         steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
-      return '계단 없음 확인';
+      return '계단 없는 길이에요';
     }
     return '계단 여부를 아직 알 수 없어요';
   }
@@ -3527,7 +3527,7 @@ String _routeWorkflowSummarySubtitle(RouteSearchResult result) {
 
 IconData _routeStairAccessIcon(RouteSearchResult result) {
   return switch (result.stairAccessLabel) {
-    '계단 없음 확인' => Icons.check,
+    '계단 없는 길이에요' => Icons.check,
     '계단 포함' => Icons.stairs_outlined,
     _ => Icons.help_outline,
   };
