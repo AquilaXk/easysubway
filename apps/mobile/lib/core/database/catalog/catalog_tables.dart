@@ -90,6 +90,138 @@ class StationLines extends Table {
   Set<Column> get primaryKey => {stationId, lineId};
 }
 
+class ServiceCalendars extends Table {
+  @override
+  String get tableName => 'service_calendars';
+
+  TextColumn get serviceId => text().named('service_id')();
+  BoolColumn get monday => boolean()();
+  BoolColumn get tuesday => boolean()();
+  BoolColumn get wednesday => boolean()();
+  BoolColumn get thursday => boolean()();
+  BoolColumn get friday => boolean()();
+  BoolColumn get saturday => boolean()();
+  BoolColumn get sunday => boolean()();
+  TextColumn get startDate => text().named('start_date')();
+  TextColumn get endDate => text().named('end_date')();
+  TextColumn get timezone => text().withDefault(const Constant('Asia/Seoul'))();
+
+  @override
+  Set<Column> get primaryKey => {serviceId};
+}
+
+class ServiceCalendarDates extends Table {
+  @override
+  String get tableName => 'service_calendar_dates';
+
+  TextColumn get serviceId => text().named('service_id')();
+  TextColumn get date => text()();
+  IntColumn get exceptionType => integer().named('exception_type')();
+
+  @override
+  Set<Column> get primaryKey => {serviceId, date};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (service_id) REFERENCES service_calendars(service_id)',
+  ];
+}
+
+class TransitRoutes extends Table {
+  @override
+  String get tableName => 'transit_routes';
+
+  TextColumn get id => text()();
+  TextColumn get lineId => text().named('line_id')();
+  TextColumn get routeShortName =>
+      text().named('route_short_name').withDefault(const Constant(''))();
+  TextColumn get routeLongName =>
+      text().named('route_long_name').withDefault(const Constant(''))();
+  TextColumn get directionName =>
+      text().named('direction_name').withDefault(const Constant(''))();
+  TextColumn get timezone => text().withDefault(const Constant('Asia/Seoul'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (line_id) REFERENCES lines(id)',
+  ];
+}
+
+class TransitTrips extends Table {
+  @override
+  String get tableName => 'transit_trips';
+
+  TextColumn get id => text()();
+  TextColumn get routeId => text().named('route_id')();
+  TextColumn get serviceId => text().named('service_id')();
+  TextColumn get tripHeadsign =>
+      text().named('trip_headsign').withDefault(const Constant(''))();
+  TextColumn get directionId =>
+      text().named('direction_id').withDefault(const Constant(''))();
+  TextColumn get servicePattern =>
+      text().named('service_pattern').withDefault(const Constant('LOCAL'))();
+  IntColumn get serviceDayStartSeconds => integer()
+      .named('service_day_start_seconds')
+      .withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (route_id) REFERENCES transit_routes(id)',
+    'FOREIGN KEY (service_id) REFERENCES service_calendars(service_id)',
+  ];
+}
+
+class TransitStopTimes extends Table {
+  @override
+  String get tableName => 'transit_stop_times';
+
+  TextColumn get tripId => text().named('trip_id')();
+  IntColumn get stopSequence => integer().named('stop_sequence')();
+  TextColumn get stationId => text().named('station_id')();
+  TextColumn get lineId => text().named('line_id')();
+  IntColumn get arrivalSeconds => integer().named('arrival_seconds')();
+  IntColumn get departureSeconds => integer().named('departure_seconds')();
+  IntColumn get pickupType =>
+      integer().named('pickup_type').withDefault(const Constant(0))();
+  IntColumn get dropOffType =>
+      integer().named('drop_off_type').withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {tripId, stopSequence};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (trip_id) REFERENCES transit_trips(id)',
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+  ];
+}
+
+class TransitFrequencies extends Table {
+  @override
+  String get tableName => 'transit_frequencies';
+
+  TextColumn get tripId => text().named('trip_id')();
+  IntColumn get startTimeSeconds => integer().named('start_time_seconds')();
+  IntColumn get endTimeSeconds => integer().named('end_time_seconds')();
+  IntColumn get headwaySeconds => integer().named('headway_seconds')();
+  BoolColumn get exactTimes =>
+      boolean().named('exact_times').withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {tripId, startTimeSeconds};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (trip_id) REFERENCES transit_trips(id)',
+  ];
+}
+
 class RealtimeProviderLineMappings extends Table {
   @override
   String get tableName => 'realtime_provider_line_mappings';

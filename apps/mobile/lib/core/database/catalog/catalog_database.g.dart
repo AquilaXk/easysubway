@@ -2139,6 +2139,2778 @@ class StationLinesCompanion extends UpdateCompanion<StationLine> {
   }
 }
 
+class $ServiceCalendarsTable extends ServiceCalendars
+    with TableInfo<$ServiceCalendarsTable, ServiceCalendar> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceCalendarsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _serviceIdMeta = const VerificationMeta(
+    'serviceId',
+  );
+  @override
+  late final GeneratedColumn<String> serviceId = GeneratedColumn<String>(
+    'service_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mondayMeta = const VerificationMeta('monday');
+  @override
+  late final GeneratedColumn<bool> monday = GeneratedColumn<bool>(
+    'monday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("monday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _tuesdayMeta = const VerificationMeta(
+    'tuesday',
+  );
+  @override
+  late final GeneratedColumn<bool> tuesday = GeneratedColumn<bool>(
+    'tuesday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("tuesday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _wednesdayMeta = const VerificationMeta(
+    'wednesday',
+  );
+  @override
+  late final GeneratedColumn<bool> wednesday = GeneratedColumn<bool>(
+    'wednesday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("wednesday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _thursdayMeta = const VerificationMeta(
+    'thursday',
+  );
+  @override
+  late final GeneratedColumn<bool> thursday = GeneratedColumn<bool>(
+    'thursday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("thursday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _fridayMeta = const VerificationMeta('friday');
+  @override
+  late final GeneratedColumn<bool> friday = GeneratedColumn<bool>(
+    'friday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("friday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _saturdayMeta = const VerificationMeta(
+    'saturday',
+  );
+  @override
+  late final GeneratedColumn<bool> saturday = GeneratedColumn<bool>(
+    'saturday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("saturday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _sundayMeta = const VerificationMeta('sunday');
+  @override
+  late final GeneratedColumn<bool> sunday = GeneratedColumn<bool>(
+    'sunday',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sunday" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<String> startDate = GeneratedColumn<String>(
+    'start_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endDateMeta = const VerificationMeta(
+    'endDate',
+  );
+  @override
+  late final GeneratedColumn<String> endDate = GeneratedColumn<String>(
+    'end_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timezoneMeta = const VerificationMeta(
+    'timezone',
+  );
+  @override
+  late final GeneratedColumn<String> timezone = GeneratedColumn<String>(
+    'timezone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Asia/Seoul'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    serviceId,
+    monday,
+    tuesday,
+    wednesday,
+    thursday,
+    friday,
+    saturday,
+    sunday,
+    startDate,
+    endDate,
+    timezone,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_calendars';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ServiceCalendar> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('service_id')) {
+      context.handle(
+        _serviceIdMeta,
+        serviceId.isAcceptableOrUnknown(data['service_id']!, _serviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serviceIdMeta);
+    }
+    if (data.containsKey('monday')) {
+      context.handle(
+        _mondayMeta,
+        monday.isAcceptableOrUnknown(data['monday']!, _mondayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mondayMeta);
+    }
+    if (data.containsKey('tuesday')) {
+      context.handle(
+        _tuesdayMeta,
+        tuesday.isAcceptableOrUnknown(data['tuesday']!, _tuesdayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tuesdayMeta);
+    }
+    if (data.containsKey('wednesday')) {
+      context.handle(
+        _wednesdayMeta,
+        wednesday.isAcceptableOrUnknown(data['wednesday']!, _wednesdayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wednesdayMeta);
+    }
+    if (data.containsKey('thursday')) {
+      context.handle(
+        _thursdayMeta,
+        thursday.isAcceptableOrUnknown(data['thursday']!, _thursdayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_thursdayMeta);
+    }
+    if (data.containsKey('friday')) {
+      context.handle(
+        _fridayMeta,
+        friday.isAcceptableOrUnknown(data['friday']!, _fridayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fridayMeta);
+    }
+    if (data.containsKey('saturday')) {
+      context.handle(
+        _saturdayMeta,
+        saturday.isAcceptableOrUnknown(data['saturday']!, _saturdayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_saturdayMeta);
+    }
+    if (data.containsKey('sunday')) {
+      context.handle(
+        _sundayMeta,
+        sunday.isAcceptableOrUnknown(data['sunday']!, _sundayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sundayMeta);
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startDateMeta);
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(
+        _endDateMeta,
+        endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_endDateMeta);
+    }
+    if (data.containsKey('timezone')) {
+      context.handle(
+        _timezoneMeta,
+        timezone.isAcceptableOrUnknown(data['timezone']!, _timezoneMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {serviceId};
+  @override
+  ServiceCalendar map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceCalendar(
+      serviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_id'],
+      )!,
+      monday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}monday'],
+      )!,
+      tuesday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}tuesday'],
+      )!,
+      wednesday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}wednesday'],
+      )!,
+      thursday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}thursday'],
+      )!,
+      friday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}friday'],
+      )!,
+      saturday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}saturday'],
+      )!,
+      sunday: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sunday'],
+      )!,
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_date'],
+      )!,
+      endDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_date'],
+      )!,
+      timezone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}timezone'],
+      )!,
+    );
+  }
+
+  @override
+  $ServiceCalendarsTable createAlias(String alias) {
+    return $ServiceCalendarsTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceCalendar extends DataClass implements Insertable<ServiceCalendar> {
+  final String serviceId;
+  final bool monday;
+  final bool tuesday;
+  final bool wednesday;
+  final bool thursday;
+  final bool friday;
+  final bool saturday;
+  final bool sunday;
+  final String startDate;
+  final String endDate;
+  final String timezone;
+  const ServiceCalendar({
+    required this.serviceId,
+    required this.monday,
+    required this.tuesday,
+    required this.wednesday,
+    required this.thursday,
+    required this.friday,
+    required this.saturday,
+    required this.sunday,
+    required this.startDate,
+    required this.endDate,
+    required this.timezone,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['service_id'] = Variable<String>(serviceId);
+    map['monday'] = Variable<bool>(monday);
+    map['tuesday'] = Variable<bool>(tuesday);
+    map['wednesday'] = Variable<bool>(wednesday);
+    map['thursday'] = Variable<bool>(thursday);
+    map['friday'] = Variable<bool>(friday);
+    map['saturday'] = Variable<bool>(saturday);
+    map['sunday'] = Variable<bool>(sunday);
+    map['start_date'] = Variable<String>(startDate);
+    map['end_date'] = Variable<String>(endDate);
+    map['timezone'] = Variable<String>(timezone);
+    return map;
+  }
+
+  ServiceCalendarsCompanion toCompanion(bool nullToAbsent) {
+    return ServiceCalendarsCompanion(
+      serviceId: Value(serviceId),
+      monday: Value(monday),
+      tuesday: Value(tuesday),
+      wednesday: Value(wednesday),
+      thursday: Value(thursday),
+      friday: Value(friday),
+      saturday: Value(saturday),
+      sunday: Value(sunday),
+      startDate: Value(startDate),
+      endDate: Value(endDate),
+      timezone: Value(timezone),
+    );
+  }
+
+  factory ServiceCalendar.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceCalendar(
+      serviceId: serializer.fromJson<String>(json['serviceId']),
+      monday: serializer.fromJson<bool>(json['monday']),
+      tuesday: serializer.fromJson<bool>(json['tuesday']),
+      wednesday: serializer.fromJson<bool>(json['wednesday']),
+      thursday: serializer.fromJson<bool>(json['thursday']),
+      friday: serializer.fromJson<bool>(json['friday']),
+      saturday: serializer.fromJson<bool>(json['saturday']),
+      sunday: serializer.fromJson<bool>(json['sunday']),
+      startDate: serializer.fromJson<String>(json['startDate']),
+      endDate: serializer.fromJson<String>(json['endDate']),
+      timezone: serializer.fromJson<String>(json['timezone']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'serviceId': serializer.toJson<String>(serviceId),
+      'monday': serializer.toJson<bool>(monday),
+      'tuesday': serializer.toJson<bool>(tuesday),
+      'wednesday': serializer.toJson<bool>(wednesday),
+      'thursday': serializer.toJson<bool>(thursday),
+      'friday': serializer.toJson<bool>(friday),
+      'saturday': serializer.toJson<bool>(saturday),
+      'sunday': serializer.toJson<bool>(sunday),
+      'startDate': serializer.toJson<String>(startDate),
+      'endDate': serializer.toJson<String>(endDate),
+      'timezone': serializer.toJson<String>(timezone),
+    };
+  }
+
+  ServiceCalendar copyWith({
+    String? serviceId,
+    bool? monday,
+    bool? tuesday,
+    bool? wednesday,
+    bool? thursday,
+    bool? friday,
+    bool? saturday,
+    bool? sunday,
+    String? startDate,
+    String? endDate,
+    String? timezone,
+  }) => ServiceCalendar(
+    serviceId: serviceId ?? this.serviceId,
+    monday: monday ?? this.monday,
+    tuesday: tuesday ?? this.tuesday,
+    wednesday: wednesday ?? this.wednesday,
+    thursday: thursday ?? this.thursday,
+    friday: friday ?? this.friday,
+    saturday: saturday ?? this.saturday,
+    sunday: sunday ?? this.sunday,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
+    timezone: timezone ?? this.timezone,
+  );
+  ServiceCalendar copyWithCompanion(ServiceCalendarsCompanion data) {
+    return ServiceCalendar(
+      serviceId: data.serviceId.present ? data.serviceId.value : this.serviceId,
+      monday: data.monday.present ? data.monday.value : this.monday,
+      tuesday: data.tuesday.present ? data.tuesday.value : this.tuesday,
+      wednesday: data.wednesday.present ? data.wednesday.value : this.wednesday,
+      thursday: data.thursday.present ? data.thursday.value : this.thursday,
+      friday: data.friday.present ? data.friday.value : this.friday,
+      saturday: data.saturday.present ? data.saturday.value : this.saturday,
+      sunday: data.sunday.present ? data.sunday.value : this.sunday,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      timezone: data.timezone.present ? data.timezone.value : this.timezone,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCalendar(')
+          ..write('serviceId: $serviceId, ')
+          ..write('monday: $monday, ')
+          ..write('tuesday: $tuesday, ')
+          ..write('wednesday: $wednesday, ')
+          ..write('thursday: $thursday, ')
+          ..write('friday: $friday, ')
+          ..write('saturday: $saturday, ')
+          ..write('sunday: $sunday, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('timezone: $timezone')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    serviceId,
+    monday,
+    tuesday,
+    wednesday,
+    thursday,
+    friday,
+    saturday,
+    sunday,
+    startDate,
+    endDate,
+    timezone,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceCalendar &&
+          other.serviceId == this.serviceId &&
+          other.monday == this.monday &&
+          other.tuesday == this.tuesday &&
+          other.wednesday == this.wednesday &&
+          other.thursday == this.thursday &&
+          other.friday == this.friday &&
+          other.saturday == this.saturday &&
+          other.sunday == this.sunday &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.timezone == this.timezone);
+}
+
+class ServiceCalendarsCompanion extends UpdateCompanion<ServiceCalendar> {
+  final Value<String> serviceId;
+  final Value<bool> monday;
+  final Value<bool> tuesday;
+  final Value<bool> wednesday;
+  final Value<bool> thursday;
+  final Value<bool> friday;
+  final Value<bool> saturday;
+  final Value<bool> sunday;
+  final Value<String> startDate;
+  final Value<String> endDate;
+  final Value<String> timezone;
+  final Value<int> rowid;
+  const ServiceCalendarsCompanion({
+    this.serviceId = const Value.absent(),
+    this.monday = const Value.absent(),
+    this.tuesday = const Value.absent(),
+    this.wednesday = const Value.absent(),
+    this.thursday = const Value.absent(),
+    this.friday = const Value.absent(),
+    this.saturday = const Value.absent(),
+    this.sunday = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.timezone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ServiceCalendarsCompanion.insert({
+    required String serviceId,
+    required bool monday,
+    required bool tuesday,
+    required bool wednesday,
+    required bool thursday,
+    required bool friday,
+    required bool saturday,
+    required bool sunday,
+    required String startDate,
+    required String endDate,
+    this.timezone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : serviceId = Value(serviceId),
+       monday = Value(monday),
+       tuesday = Value(tuesday),
+       wednesday = Value(wednesday),
+       thursday = Value(thursday),
+       friday = Value(friday),
+       saturday = Value(saturday),
+       sunday = Value(sunday),
+       startDate = Value(startDate),
+       endDate = Value(endDate);
+  static Insertable<ServiceCalendar> custom({
+    Expression<String>? serviceId,
+    Expression<bool>? monday,
+    Expression<bool>? tuesday,
+    Expression<bool>? wednesday,
+    Expression<bool>? thursday,
+    Expression<bool>? friday,
+    Expression<bool>? saturday,
+    Expression<bool>? sunday,
+    Expression<String>? startDate,
+    Expression<String>? endDate,
+    Expression<String>? timezone,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (serviceId != null) 'service_id': serviceId,
+      if (monday != null) 'monday': monday,
+      if (tuesday != null) 'tuesday': tuesday,
+      if (wednesday != null) 'wednesday': wednesday,
+      if (thursday != null) 'thursday': thursday,
+      if (friday != null) 'friday': friday,
+      if (saturday != null) 'saturday': saturday,
+      if (sunday != null) 'sunday': sunday,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (timezone != null) 'timezone': timezone,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ServiceCalendarsCompanion copyWith({
+    Value<String>? serviceId,
+    Value<bool>? monday,
+    Value<bool>? tuesday,
+    Value<bool>? wednesday,
+    Value<bool>? thursday,
+    Value<bool>? friday,
+    Value<bool>? saturday,
+    Value<bool>? sunday,
+    Value<String>? startDate,
+    Value<String>? endDate,
+    Value<String>? timezone,
+    Value<int>? rowid,
+  }) {
+    return ServiceCalendarsCompanion(
+      serviceId: serviceId ?? this.serviceId,
+      monday: monday ?? this.monday,
+      tuesday: tuesday ?? this.tuesday,
+      wednesday: wednesday ?? this.wednesday,
+      thursday: thursday ?? this.thursday,
+      friday: friday ?? this.friday,
+      saturday: saturday ?? this.saturday,
+      sunday: sunday ?? this.sunday,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      timezone: timezone ?? this.timezone,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (serviceId.present) {
+      map['service_id'] = Variable<String>(serviceId.value);
+    }
+    if (monday.present) {
+      map['monday'] = Variable<bool>(monday.value);
+    }
+    if (tuesday.present) {
+      map['tuesday'] = Variable<bool>(tuesday.value);
+    }
+    if (wednesday.present) {
+      map['wednesday'] = Variable<bool>(wednesday.value);
+    }
+    if (thursday.present) {
+      map['thursday'] = Variable<bool>(thursday.value);
+    }
+    if (friday.present) {
+      map['friday'] = Variable<bool>(friday.value);
+    }
+    if (saturday.present) {
+      map['saturday'] = Variable<bool>(saturday.value);
+    }
+    if (sunday.present) {
+      map['sunday'] = Variable<bool>(sunday.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<String>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<String>(endDate.value);
+    }
+    if (timezone.present) {
+      map['timezone'] = Variable<String>(timezone.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCalendarsCompanion(')
+          ..write('serviceId: $serviceId, ')
+          ..write('monday: $monday, ')
+          ..write('tuesday: $tuesday, ')
+          ..write('wednesday: $wednesday, ')
+          ..write('thursday: $thursday, ')
+          ..write('friday: $friday, ')
+          ..write('saturday: $saturday, ')
+          ..write('sunday: $sunday, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('timezone: $timezone, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ServiceCalendarDatesTable extends ServiceCalendarDates
+    with TableInfo<$ServiceCalendarDatesTable, ServiceCalendarDate> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceCalendarDatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _serviceIdMeta = const VerificationMeta(
+    'serviceId',
+  );
+  @override
+  late final GeneratedColumn<String> serviceId = GeneratedColumn<String>(
+    'service_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _exceptionTypeMeta = const VerificationMeta(
+    'exceptionType',
+  );
+  @override
+  late final GeneratedColumn<int> exceptionType = GeneratedColumn<int>(
+    'exception_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [serviceId, date, exceptionType];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_calendar_dates';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ServiceCalendarDate> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('service_id')) {
+      context.handle(
+        _serviceIdMeta,
+        serviceId.isAcceptableOrUnknown(data['service_id']!, _serviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serviceIdMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('exception_type')) {
+      context.handle(
+        _exceptionTypeMeta,
+        exceptionType.isAcceptableOrUnknown(
+          data['exception_type']!,
+          _exceptionTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_exceptionTypeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {serviceId, date};
+  @override
+  ServiceCalendarDate map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceCalendarDate(
+      serviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date'],
+      )!,
+      exceptionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}exception_type'],
+      )!,
+    );
+  }
+
+  @override
+  $ServiceCalendarDatesTable createAlias(String alias) {
+    return $ServiceCalendarDatesTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceCalendarDate extends DataClass
+    implements Insertable<ServiceCalendarDate> {
+  final String serviceId;
+  final String date;
+  final int exceptionType;
+  const ServiceCalendarDate({
+    required this.serviceId,
+    required this.date,
+    required this.exceptionType,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['service_id'] = Variable<String>(serviceId);
+    map['date'] = Variable<String>(date);
+    map['exception_type'] = Variable<int>(exceptionType);
+    return map;
+  }
+
+  ServiceCalendarDatesCompanion toCompanion(bool nullToAbsent) {
+    return ServiceCalendarDatesCompanion(
+      serviceId: Value(serviceId),
+      date: Value(date),
+      exceptionType: Value(exceptionType),
+    );
+  }
+
+  factory ServiceCalendarDate.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceCalendarDate(
+      serviceId: serializer.fromJson<String>(json['serviceId']),
+      date: serializer.fromJson<String>(json['date']),
+      exceptionType: serializer.fromJson<int>(json['exceptionType']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'serviceId': serializer.toJson<String>(serviceId),
+      'date': serializer.toJson<String>(date),
+      'exceptionType': serializer.toJson<int>(exceptionType),
+    };
+  }
+
+  ServiceCalendarDate copyWith({
+    String? serviceId,
+    String? date,
+    int? exceptionType,
+  }) => ServiceCalendarDate(
+    serviceId: serviceId ?? this.serviceId,
+    date: date ?? this.date,
+    exceptionType: exceptionType ?? this.exceptionType,
+  );
+  ServiceCalendarDate copyWithCompanion(ServiceCalendarDatesCompanion data) {
+    return ServiceCalendarDate(
+      serviceId: data.serviceId.present ? data.serviceId.value : this.serviceId,
+      date: data.date.present ? data.date.value : this.date,
+      exceptionType: data.exceptionType.present
+          ? data.exceptionType.value
+          : this.exceptionType,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCalendarDate(')
+          ..write('serviceId: $serviceId, ')
+          ..write('date: $date, ')
+          ..write('exceptionType: $exceptionType')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(serviceId, date, exceptionType);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceCalendarDate &&
+          other.serviceId == this.serviceId &&
+          other.date == this.date &&
+          other.exceptionType == this.exceptionType);
+}
+
+class ServiceCalendarDatesCompanion
+    extends UpdateCompanion<ServiceCalendarDate> {
+  final Value<String> serviceId;
+  final Value<String> date;
+  final Value<int> exceptionType;
+  final Value<int> rowid;
+  const ServiceCalendarDatesCompanion({
+    this.serviceId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.exceptionType = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ServiceCalendarDatesCompanion.insert({
+    required String serviceId,
+    required String date,
+    required int exceptionType,
+    this.rowid = const Value.absent(),
+  }) : serviceId = Value(serviceId),
+       date = Value(date),
+       exceptionType = Value(exceptionType);
+  static Insertable<ServiceCalendarDate> custom({
+    Expression<String>? serviceId,
+    Expression<String>? date,
+    Expression<int>? exceptionType,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (serviceId != null) 'service_id': serviceId,
+      if (date != null) 'date': date,
+      if (exceptionType != null) 'exception_type': exceptionType,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ServiceCalendarDatesCompanion copyWith({
+    Value<String>? serviceId,
+    Value<String>? date,
+    Value<int>? exceptionType,
+    Value<int>? rowid,
+  }) {
+    return ServiceCalendarDatesCompanion(
+      serviceId: serviceId ?? this.serviceId,
+      date: date ?? this.date,
+      exceptionType: exceptionType ?? this.exceptionType,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (serviceId.present) {
+      map['service_id'] = Variable<String>(serviceId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
+    }
+    if (exceptionType.present) {
+      map['exception_type'] = Variable<int>(exceptionType.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCalendarDatesCompanion(')
+          ..write('serviceId: $serviceId, ')
+          ..write('date: $date, ')
+          ..write('exceptionType: $exceptionType, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransitRoutesTable extends TransitRoutes
+    with TableInfo<$TransitRoutesTable, TransitRoute> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransitRoutesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routeShortNameMeta = const VerificationMeta(
+    'routeShortName',
+  );
+  @override
+  late final GeneratedColumn<String> routeShortName = GeneratedColumn<String>(
+    'route_short_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _routeLongNameMeta = const VerificationMeta(
+    'routeLongName',
+  );
+  @override
+  late final GeneratedColumn<String> routeLongName = GeneratedColumn<String>(
+    'route_long_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _directionNameMeta = const VerificationMeta(
+    'directionName',
+  );
+  @override
+  late final GeneratedColumn<String> directionName = GeneratedColumn<String>(
+    'direction_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _timezoneMeta = const VerificationMeta(
+    'timezone',
+  );
+  @override
+  late final GeneratedColumn<String> timezone = GeneratedColumn<String>(
+    'timezone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Asia/Seoul'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    lineId,
+    routeShortName,
+    routeLongName,
+    directionName,
+    timezone,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transit_routes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransitRoute> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('route_short_name')) {
+      context.handle(
+        _routeShortNameMeta,
+        routeShortName.isAcceptableOrUnknown(
+          data['route_short_name']!,
+          _routeShortNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('route_long_name')) {
+      context.handle(
+        _routeLongNameMeta,
+        routeLongName.isAcceptableOrUnknown(
+          data['route_long_name']!,
+          _routeLongNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('direction_name')) {
+      context.handle(
+        _directionNameMeta,
+        directionName.isAcceptableOrUnknown(
+          data['direction_name']!,
+          _directionNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('timezone')) {
+      context.handle(
+        _timezoneMeta,
+        timezone.isAcceptableOrUnknown(data['timezone']!, _timezoneMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TransitRoute map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransitRoute(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      routeShortName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}route_short_name'],
+      )!,
+      routeLongName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}route_long_name'],
+      )!,
+      directionName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction_name'],
+      )!,
+      timezone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}timezone'],
+      )!,
+    );
+  }
+
+  @override
+  $TransitRoutesTable createAlias(String alias) {
+    return $TransitRoutesTable(attachedDatabase, alias);
+  }
+}
+
+class TransitRoute extends DataClass implements Insertable<TransitRoute> {
+  final String id;
+  final String lineId;
+  final String routeShortName;
+  final String routeLongName;
+  final String directionName;
+  final String timezone;
+  const TransitRoute({
+    required this.id,
+    required this.lineId,
+    required this.routeShortName,
+    required this.routeLongName,
+    required this.directionName,
+    required this.timezone,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['line_id'] = Variable<String>(lineId);
+    map['route_short_name'] = Variable<String>(routeShortName);
+    map['route_long_name'] = Variable<String>(routeLongName);
+    map['direction_name'] = Variable<String>(directionName);
+    map['timezone'] = Variable<String>(timezone);
+    return map;
+  }
+
+  TransitRoutesCompanion toCompanion(bool nullToAbsent) {
+    return TransitRoutesCompanion(
+      id: Value(id),
+      lineId: Value(lineId),
+      routeShortName: Value(routeShortName),
+      routeLongName: Value(routeLongName),
+      directionName: Value(directionName),
+      timezone: Value(timezone),
+    );
+  }
+
+  factory TransitRoute.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransitRoute(
+      id: serializer.fromJson<String>(json['id']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      routeShortName: serializer.fromJson<String>(json['routeShortName']),
+      routeLongName: serializer.fromJson<String>(json['routeLongName']),
+      directionName: serializer.fromJson<String>(json['directionName']),
+      timezone: serializer.fromJson<String>(json['timezone']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'lineId': serializer.toJson<String>(lineId),
+      'routeShortName': serializer.toJson<String>(routeShortName),
+      'routeLongName': serializer.toJson<String>(routeLongName),
+      'directionName': serializer.toJson<String>(directionName),
+      'timezone': serializer.toJson<String>(timezone),
+    };
+  }
+
+  TransitRoute copyWith({
+    String? id,
+    String? lineId,
+    String? routeShortName,
+    String? routeLongName,
+    String? directionName,
+    String? timezone,
+  }) => TransitRoute(
+    id: id ?? this.id,
+    lineId: lineId ?? this.lineId,
+    routeShortName: routeShortName ?? this.routeShortName,
+    routeLongName: routeLongName ?? this.routeLongName,
+    directionName: directionName ?? this.directionName,
+    timezone: timezone ?? this.timezone,
+  );
+  TransitRoute copyWithCompanion(TransitRoutesCompanion data) {
+    return TransitRoute(
+      id: data.id.present ? data.id.value : this.id,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      routeShortName: data.routeShortName.present
+          ? data.routeShortName.value
+          : this.routeShortName,
+      routeLongName: data.routeLongName.present
+          ? data.routeLongName.value
+          : this.routeLongName,
+      directionName: data.directionName.present
+          ? data.directionName.value
+          : this.directionName,
+      timezone: data.timezone.present ? data.timezone.value : this.timezone,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitRoute(')
+          ..write('id: $id, ')
+          ..write('lineId: $lineId, ')
+          ..write('routeShortName: $routeShortName, ')
+          ..write('routeLongName: $routeLongName, ')
+          ..write('directionName: $directionName, ')
+          ..write('timezone: $timezone')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    lineId,
+    routeShortName,
+    routeLongName,
+    directionName,
+    timezone,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransitRoute &&
+          other.id == this.id &&
+          other.lineId == this.lineId &&
+          other.routeShortName == this.routeShortName &&
+          other.routeLongName == this.routeLongName &&
+          other.directionName == this.directionName &&
+          other.timezone == this.timezone);
+}
+
+class TransitRoutesCompanion extends UpdateCompanion<TransitRoute> {
+  final Value<String> id;
+  final Value<String> lineId;
+  final Value<String> routeShortName;
+  final Value<String> routeLongName;
+  final Value<String> directionName;
+  final Value<String> timezone;
+  final Value<int> rowid;
+  const TransitRoutesCompanion({
+    this.id = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.routeShortName = const Value.absent(),
+    this.routeLongName = const Value.absent(),
+    this.directionName = const Value.absent(),
+    this.timezone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransitRoutesCompanion.insert({
+    required String id,
+    required String lineId,
+    this.routeShortName = const Value.absent(),
+    this.routeLongName = const Value.absent(),
+    this.directionName = const Value.absent(),
+    this.timezone = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       lineId = Value(lineId);
+  static Insertable<TransitRoute> custom({
+    Expression<String>? id,
+    Expression<String>? lineId,
+    Expression<String>? routeShortName,
+    Expression<String>? routeLongName,
+    Expression<String>? directionName,
+    Expression<String>? timezone,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (lineId != null) 'line_id': lineId,
+      if (routeShortName != null) 'route_short_name': routeShortName,
+      if (routeLongName != null) 'route_long_name': routeLongName,
+      if (directionName != null) 'direction_name': directionName,
+      if (timezone != null) 'timezone': timezone,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransitRoutesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? lineId,
+    Value<String>? routeShortName,
+    Value<String>? routeLongName,
+    Value<String>? directionName,
+    Value<String>? timezone,
+    Value<int>? rowid,
+  }) {
+    return TransitRoutesCompanion(
+      id: id ?? this.id,
+      lineId: lineId ?? this.lineId,
+      routeShortName: routeShortName ?? this.routeShortName,
+      routeLongName: routeLongName ?? this.routeLongName,
+      directionName: directionName ?? this.directionName,
+      timezone: timezone ?? this.timezone,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (routeShortName.present) {
+      map['route_short_name'] = Variable<String>(routeShortName.value);
+    }
+    if (routeLongName.present) {
+      map['route_long_name'] = Variable<String>(routeLongName.value);
+    }
+    if (directionName.present) {
+      map['direction_name'] = Variable<String>(directionName.value);
+    }
+    if (timezone.present) {
+      map['timezone'] = Variable<String>(timezone.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitRoutesCompanion(')
+          ..write('id: $id, ')
+          ..write('lineId: $lineId, ')
+          ..write('routeShortName: $routeShortName, ')
+          ..write('routeLongName: $routeLongName, ')
+          ..write('directionName: $directionName, ')
+          ..write('timezone: $timezone, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransitTripsTable extends TransitTrips
+    with TableInfo<$TransitTripsTable, TransitTrip> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransitTripsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routeIdMeta = const VerificationMeta(
+    'routeId',
+  );
+  @override
+  late final GeneratedColumn<String> routeId = GeneratedColumn<String>(
+    'route_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _serviceIdMeta = const VerificationMeta(
+    'serviceId',
+  );
+  @override
+  late final GeneratedColumn<String> serviceId = GeneratedColumn<String>(
+    'service_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tripHeadsignMeta = const VerificationMeta(
+    'tripHeadsign',
+  );
+  @override
+  late final GeneratedColumn<String> tripHeadsign = GeneratedColumn<String>(
+    'trip_headsign',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _directionIdMeta = const VerificationMeta(
+    'directionId',
+  );
+  @override
+  late final GeneratedColumn<String> directionId = GeneratedColumn<String>(
+    'direction_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _servicePatternMeta = const VerificationMeta(
+    'servicePattern',
+  );
+  @override
+  late final GeneratedColumn<String> servicePattern = GeneratedColumn<String>(
+    'service_pattern',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('LOCAL'),
+  );
+  static const VerificationMeta _serviceDayStartSecondsMeta =
+      const VerificationMeta('serviceDayStartSeconds');
+  @override
+  late final GeneratedColumn<int> serviceDayStartSeconds = GeneratedColumn<int>(
+    'service_day_start_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    routeId,
+    serviceId,
+    tripHeadsign,
+    directionId,
+    servicePattern,
+    serviceDayStartSeconds,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transit_trips';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransitTrip> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('route_id')) {
+      context.handle(
+        _routeIdMeta,
+        routeId.isAcceptableOrUnknown(data['route_id']!, _routeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_routeIdMeta);
+    }
+    if (data.containsKey('service_id')) {
+      context.handle(
+        _serviceIdMeta,
+        serviceId.isAcceptableOrUnknown(data['service_id']!, _serviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serviceIdMeta);
+    }
+    if (data.containsKey('trip_headsign')) {
+      context.handle(
+        _tripHeadsignMeta,
+        tripHeadsign.isAcceptableOrUnknown(
+          data['trip_headsign']!,
+          _tripHeadsignMeta,
+        ),
+      );
+    }
+    if (data.containsKey('direction_id')) {
+      context.handle(
+        _directionIdMeta,
+        directionId.isAcceptableOrUnknown(
+          data['direction_id']!,
+          _directionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('service_pattern')) {
+      context.handle(
+        _servicePatternMeta,
+        servicePattern.isAcceptableOrUnknown(
+          data['service_pattern']!,
+          _servicePatternMeta,
+        ),
+      );
+    }
+    if (data.containsKey('service_day_start_seconds')) {
+      context.handle(
+        _serviceDayStartSecondsMeta,
+        serviceDayStartSeconds.isAcceptableOrUnknown(
+          data['service_day_start_seconds']!,
+          _serviceDayStartSecondsMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TransitTrip map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransitTrip(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      routeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}route_id'],
+      )!,
+      serviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_id'],
+      )!,
+      tripHeadsign: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trip_headsign'],
+      )!,
+      directionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction_id'],
+      )!,
+      servicePattern: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_pattern'],
+      )!,
+      serviceDayStartSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}service_day_start_seconds'],
+      )!,
+    );
+  }
+
+  @override
+  $TransitTripsTable createAlias(String alias) {
+    return $TransitTripsTable(attachedDatabase, alias);
+  }
+}
+
+class TransitTrip extends DataClass implements Insertable<TransitTrip> {
+  final String id;
+  final String routeId;
+  final String serviceId;
+  final String tripHeadsign;
+  final String directionId;
+  final String servicePattern;
+  final int serviceDayStartSeconds;
+  const TransitTrip({
+    required this.id,
+    required this.routeId,
+    required this.serviceId,
+    required this.tripHeadsign,
+    required this.directionId,
+    required this.servicePattern,
+    required this.serviceDayStartSeconds,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['route_id'] = Variable<String>(routeId);
+    map['service_id'] = Variable<String>(serviceId);
+    map['trip_headsign'] = Variable<String>(tripHeadsign);
+    map['direction_id'] = Variable<String>(directionId);
+    map['service_pattern'] = Variable<String>(servicePattern);
+    map['service_day_start_seconds'] = Variable<int>(serviceDayStartSeconds);
+    return map;
+  }
+
+  TransitTripsCompanion toCompanion(bool nullToAbsent) {
+    return TransitTripsCompanion(
+      id: Value(id),
+      routeId: Value(routeId),
+      serviceId: Value(serviceId),
+      tripHeadsign: Value(tripHeadsign),
+      directionId: Value(directionId),
+      servicePattern: Value(servicePattern),
+      serviceDayStartSeconds: Value(serviceDayStartSeconds),
+    );
+  }
+
+  factory TransitTrip.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransitTrip(
+      id: serializer.fromJson<String>(json['id']),
+      routeId: serializer.fromJson<String>(json['routeId']),
+      serviceId: serializer.fromJson<String>(json['serviceId']),
+      tripHeadsign: serializer.fromJson<String>(json['tripHeadsign']),
+      directionId: serializer.fromJson<String>(json['directionId']),
+      servicePattern: serializer.fromJson<String>(json['servicePattern']),
+      serviceDayStartSeconds: serializer.fromJson<int>(
+        json['serviceDayStartSeconds'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'routeId': serializer.toJson<String>(routeId),
+      'serviceId': serializer.toJson<String>(serviceId),
+      'tripHeadsign': serializer.toJson<String>(tripHeadsign),
+      'directionId': serializer.toJson<String>(directionId),
+      'servicePattern': serializer.toJson<String>(servicePattern),
+      'serviceDayStartSeconds': serializer.toJson<int>(serviceDayStartSeconds),
+    };
+  }
+
+  TransitTrip copyWith({
+    String? id,
+    String? routeId,
+    String? serviceId,
+    String? tripHeadsign,
+    String? directionId,
+    String? servicePattern,
+    int? serviceDayStartSeconds,
+  }) => TransitTrip(
+    id: id ?? this.id,
+    routeId: routeId ?? this.routeId,
+    serviceId: serviceId ?? this.serviceId,
+    tripHeadsign: tripHeadsign ?? this.tripHeadsign,
+    directionId: directionId ?? this.directionId,
+    servicePattern: servicePattern ?? this.servicePattern,
+    serviceDayStartSeconds:
+        serviceDayStartSeconds ?? this.serviceDayStartSeconds,
+  );
+  TransitTrip copyWithCompanion(TransitTripsCompanion data) {
+    return TransitTrip(
+      id: data.id.present ? data.id.value : this.id,
+      routeId: data.routeId.present ? data.routeId.value : this.routeId,
+      serviceId: data.serviceId.present ? data.serviceId.value : this.serviceId,
+      tripHeadsign: data.tripHeadsign.present
+          ? data.tripHeadsign.value
+          : this.tripHeadsign,
+      directionId: data.directionId.present
+          ? data.directionId.value
+          : this.directionId,
+      servicePattern: data.servicePattern.present
+          ? data.servicePattern.value
+          : this.servicePattern,
+      serviceDayStartSeconds: data.serviceDayStartSeconds.present
+          ? data.serviceDayStartSeconds.value
+          : this.serviceDayStartSeconds,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitTrip(')
+          ..write('id: $id, ')
+          ..write('routeId: $routeId, ')
+          ..write('serviceId: $serviceId, ')
+          ..write('tripHeadsign: $tripHeadsign, ')
+          ..write('directionId: $directionId, ')
+          ..write('servicePattern: $servicePattern, ')
+          ..write('serviceDayStartSeconds: $serviceDayStartSeconds')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    routeId,
+    serviceId,
+    tripHeadsign,
+    directionId,
+    servicePattern,
+    serviceDayStartSeconds,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransitTrip &&
+          other.id == this.id &&
+          other.routeId == this.routeId &&
+          other.serviceId == this.serviceId &&
+          other.tripHeadsign == this.tripHeadsign &&
+          other.directionId == this.directionId &&
+          other.servicePattern == this.servicePattern &&
+          other.serviceDayStartSeconds == this.serviceDayStartSeconds);
+}
+
+class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
+  final Value<String> id;
+  final Value<String> routeId;
+  final Value<String> serviceId;
+  final Value<String> tripHeadsign;
+  final Value<String> directionId;
+  final Value<String> servicePattern;
+  final Value<int> serviceDayStartSeconds;
+  final Value<int> rowid;
+  const TransitTripsCompanion({
+    this.id = const Value.absent(),
+    this.routeId = const Value.absent(),
+    this.serviceId = const Value.absent(),
+    this.tripHeadsign = const Value.absent(),
+    this.directionId = const Value.absent(),
+    this.servicePattern = const Value.absent(),
+    this.serviceDayStartSeconds = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransitTripsCompanion.insert({
+    required String id,
+    required String routeId,
+    required String serviceId,
+    this.tripHeadsign = const Value.absent(),
+    this.directionId = const Value.absent(),
+    this.servicePattern = const Value.absent(),
+    this.serviceDayStartSeconds = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       routeId = Value(routeId),
+       serviceId = Value(serviceId);
+  static Insertable<TransitTrip> custom({
+    Expression<String>? id,
+    Expression<String>? routeId,
+    Expression<String>? serviceId,
+    Expression<String>? tripHeadsign,
+    Expression<String>? directionId,
+    Expression<String>? servicePattern,
+    Expression<int>? serviceDayStartSeconds,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (routeId != null) 'route_id': routeId,
+      if (serviceId != null) 'service_id': serviceId,
+      if (tripHeadsign != null) 'trip_headsign': tripHeadsign,
+      if (directionId != null) 'direction_id': directionId,
+      if (servicePattern != null) 'service_pattern': servicePattern,
+      if (serviceDayStartSeconds != null)
+        'service_day_start_seconds': serviceDayStartSeconds,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransitTripsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? routeId,
+    Value<String>? serviceId,
+    Value<String>? tripHeadsign,
+    Value<String>? directionId,
+    Value<String>? servicePattern,
+    Value<int>? serviceDayStartSeconds,
+    Value<int>? rowid,
+  }) {
+    return TransitTripsCompanion(
+      id: id ?? this.id,
+      routeId: routeId ?? this.routeId,
+      serviceId: serviceId ?? this.serviceId,
+      tripHeadsign: tripHeadsign ?? this.tripHeadsign,
+      directionId: directionId ?? this.directionId,
+      servicePattern: servicePattern ?? this.servicePattern,
+      serviceDayStartSeconds:
+          serviceDayStartSeconds ?? this.serviceDayStartSeconds,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (routeId.present) {
+      map['route_id'] = Variable<String>(routeId.value);
+    }
+    if (serviceId.present) {
+      map['service_id'] = Variable<String>(serviceId.value);
+    }
+    if (tripHeadsign.present) {
+      map['trip_headsign'] = Variable<String>(tripHeadsign.value);
+    }
+    if (directionId.present) {
+      map['direction_id'] = Variable<String>(directionId.value);
+    }
+    if (servicePattern.present) {
+      map['service_pattern'] = Variable<String>(servicePattern.value);
+    }
+    if (serviceDayStartSeconds.present) {
+      map['service_day_start_seconds'] = Variable<int>(
+        serviceDayStartSeconds.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitTripsCompanion(')
+          ..write('id: $id, ')
+          ..write('routeId: $routeId, ')
+          ..write('serviceId: $serviceId, ')
+          ..write('tripHeadsign: $tripHeadsign, ')
+          ..write('directionId: $directionId, ')
+          ..write('servicePattern: $servicePattern, ')
+          ..write('serviceDayStartSeconds: $serviceDayStartSeconds, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransitStopTimesTable extends TransitStopTimes
+    with TableInfo<$TransitStopTimesTable, TransitStopTime> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransitStopTimesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _tripIdMeta = const VerificationMeta('tripId');
+  @override
+  late final GeneratedColumn<String> tripId = GeneratedColumn<String>(
+    'trip_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stopSequenceMeta = const VerificationMeta(
+    'stopSequence',
+  );
+  @override
+  late final GeneratedColumn<int> stopSequence = GeneratedColumn<int>(
+    'stop_sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _arrivalSecondsMeta = const VerificationMeta(
+    'arrivalSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> arrivalSeconds = GeneratedColumn<int>(
+    'arrival_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _departureSecondsMeta = const VerificationMeta(
+    'departureSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> departureSeconds = GeneratedColumn<int>(
+    'departure_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pickupTypeMeta = const VerificationMeta(
+    'pickupType',
+  );
+  @override
+  late final GeneratedColumn<int> pickupType = GeneratedColumn<int>(
+    'pickup_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _dropOffTypeMeta = const VerificationMeta(
+    'dropOffType',
+  );
+  @override
+  late final GeneratedColumn<int> dropOffType = GeneratedColumn<int>(
+    'drop_off_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    tripId,
+    stopSequence,
+    stationId,
+    lineId,
+    arrivalSeconds,
+    departureSeconds,
+    pickupType,
+    dropOffType,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transit_stop_times';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransitStopTime> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('trip_id')) {
+      context.handle(
+        _tripIdMeta,
+        tripId.isAcceptableOrUnknown(data['trip_id']!, _tripIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tripIdMeta);
+    }
+    if (data.containsKey('stop_sequence')) {
+      context.handle(
+        _stopSequenceMeta,
+        stopSequence.isAcceptableOrUnknown(
+          data['stop_sequence']!,
+          _stopSequenceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_stopSequenceMeta);
+    }
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('arrival_seconds')) {
+      context.handle(
+        _arrivalSecondsMeta,
+        arrivalSeconds.isAcceptableOrUnknown(
+          data['arrival_seconds']!,
+          _arrivalSecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_arrivalSecondsMeta);
+    }
+    if (data.containsKey('departure_seconds')) {
+      context.handle(
+        _departureSecondsMeta,
+        departureSeconds.isAcceptableOrUnknown(
+          data['departure_seconds']!,
+          _departureSecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_departureSecondsMeta);
+    }
+    if (data.containsKey('pickup_type')) {
+      context.handle(
+        _pickupTypeMeta,
+        pickupType.isAcceptableOrUnknown(data['pickup_type']!, _pickupTypeMeta),
+      );
+    }
+    if (data.containsKey('drop_off_type')) {
+      context.handle(
+        _dropOffTypeMeta,
+        dropOffType.isAcceptableOrUnknown(
+          data['drop_off_type']!,
+          _dropOffTypeMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tripId, stopSequence};
+  @override
+  TransitStopTime map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransitStopTime(
+      tripId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trip_id'],
+      )!,
+      stopSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}stop_sequence'],
+      )!,
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      arrivalSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}arrival_seconds'],
+      )!,
+      departureSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}departure_seconds'],
+      )!,
+      pickupType: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pickup_type'],
+      )!,
+      dropOffType: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}drop_off_type'],
+      )!,
+    );
+  }
+
+  @override
+  $TransitStopTimesTable createAlias(String alias) {
+    return $TransitStopTimesTable(attachedDatabase, alias);
+  }
+}
+
+class TransitStopTime extends DataClass implements Insertable<TransitStopTime> {
+  final String tripId;
+  final int stopSequence;
+  final String stationId;
+  final String lineId;
+  final int arrivalSeconds;
+  final int departureSeconds;
+  final int pickupType;
+  final int dropOffType;
+  const TransitStopTime({
+    required this.tripId,
+    required this.stopSequence,
+    required this.stationId,
+    required this.lineId,
+    required this.arrivalSeconds,
+    required this.departureSeconds,
+    required this.pickupType,
+    required this.dropOffType,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['trip_id'] = Variable<String>(tripId);
+    map['stop_sequence'] = Variable<int>(stopSequence);
+    map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
+    map['arrival_seconds'] = Variable<int>(arrivalSeconds);
+    map['departure_seconds'] = Variable<int>(departureSeconds);
+    map['pickup_type'] = Variable<int>(pickupType);
+    map['drop_off_type'] = Variable<int>(dropOffType);
+    return map;
+  }
+
+  TransitStopTimesCompanion toCompanion(bool nullToAbsent) {
+    return TransitStopTimesCompanion(
+      tripId: Value(tripId),
+      stopSequence: Value(stopSequence),
+      stationId: Value(stationId),
+      lineId: Value(lineId),
+      arrivalSeconds: Value(arrivalSeconds),
+      departureSeconds: Value(departureSeconds),
+      pickupType: Value(pickupType),
+      dropOffType: Value(dropOffType),
+    );
+  }
+
+  factory TransitStopTime.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransitStopTime(
+      tripId: serializer.fromJson<String>(json['tripId']),
+      stopSequence: serializer.fromJson<int>(json['stopSequence']),
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      arrivalSeconds: serializer.fromJson<int>(json['arrivalSeconds']),
+      departureSeconds: serializer.fromJson<int>(json['departureSeconds']),
+      pickupType: serializer.fromJson<int>(json['pickupType']),
+      dropOffType: serializer.fromJson<int>(json['dropOffType']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'tripId': serializer.toJson<String>(tripId),
+      'stopSequence': serializer.toJson<int>(stopSequence),
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
+      'arrivalSeconds': serializer.toJson<int>(arrivalSeconds),
+      'departureSeconds': serializer.toJson<int>(departureSeconds),
+      'pickupType': serializer.toJson<int>(pickupType),
+      'dropOffType': serializer.toJson<int>(dropOffType),
+    };
+  }
+
+  TransitStopTime copyWith({
+    String? tripId,
+    int? stopSequence,
+    String? stationId,
+    String? lineId,
+    int? arrivalSeconds,
+    int? departureSeconds,
+    int? pickupType,
+    int? dropOffType,
+  }) => TransitStopTime(
+    tripId: tripId ?? this.tripId,
+    stopSequence: stopSequence ?? this.stopSequence,
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    arrivalSeconds: arrivalSeconds ?? this.arrivalSeconds,
+    departureSeconds: departureSeconds ?? this.departureSeconds,
+    pickupType: pickupType ?? this.pickupType,
+    dropOffType: dropOffType ?? this.dropOffType,
+  );
+  TransitStopTime copyWithCompanion(TransitStopTimesCompanion data) {
+    return TransitStopTime(
+      tripId: data.tripId.present ? data.tripId.value : this.tripId,
+      stopSequence: data.stopSequence.present
+          ? data.stopSequence.value
+          : this.stopSequence,
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      arrivalSeconds: data.arrivalSeconds.present
+          ? data.arrivalSeconds.value
+          : this.arrivalSeconds,
+      departureSeconds: data.departureSeconds.present
+          ? data.departureSeconds.value
+          : this.departureSeconds,
+      pickupType: data.pickupType.present
+          ? data.pickupType.value
+          : this.pickupType,
+      dropOffType: data.dropOffType.present
+          ? data.dropOffType.value
+          : this.dropOffType,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitStopTime(')
+          ..write('tripId: $tripId, ')
+          ..write('stopSequence: $stopSequence, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('arrivalSeconds: $arrivalSeconds, ')
+          ..write('departureSeconds: $departureSeconds, ')
+          ..write('pickupType: $pickupType, ')
+          ..write('dropOffType: $dropOffType')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    tripId,
+    stopSequence,
+    stationId,
+    lineId,
+    arrivalSeconds,
+    departureSeconds,
+    pickupType,
+    dropOffType,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransitStopTime &&
+          other.tripId == this.tripId &&
+          other.stopSequence == this.stopSequence &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.arrivalSeconds == this.arrivalSeconds &&
+          other.departureSeconds == this.departureSeconds &&
+          other.pickupType == this.pickupType &&
+          other.dropOffType == this.dropOffType);
+}
+
+class TransitStopTimesCompanion extends UpdateCompanion<TransitStopTime> {
+  final Value<String> tripId;
+  final Value<int> stopSequence;
+  final Value<String> stationId;
+  final Value<String> lineId;
+  final Value<int> arrivalSeconds;
+  final Value<int> departureSeconds;
+  final Value<int> pickupType;
+  final Value<int> dropOffType;
+  final Value<int> rowid;
+  const TransitStopTimesCompanion({
+    this.tripId = const Value.absent(),
+    this.stopSequence = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.arrivalSeconds = const Value.absent(),
+    this.departureSeconds = const Value.absent(),
+    this.pickupType = const Value.absent(),
+    this.dropOffType = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransitStopTimesCompanion.insert({
+    required String tripId,
+    required int stopSequence,
+    required String stationId,
+    required String lineId,
+    required int arrivalSeconds,
+    required int departureSeconds,
+    this.pickupType = const Value.absent(),
+    this.dropOffType = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : tripId = Value(tripId),
+       stopSequence = Value(stopSequence),
+       stationId = Value(stationId),
+       lineId = Value(lineId),
+       arrivalSeconds = Value(arrivalSeconds),
+       departureSeconds = Value(departureSeconds);
+  static Insertable<TransitStopTime> custom({
+    Expression<String>? tripId,
+    Expression<int>? stopSequence,
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<int>? arrivalSeconds,
+    Expression<int>? departureSeconds,
+    Expression<int>? pickupType,
+    Expression<int>? dropOffType,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (tripId != null) 'trip_id': tripId,
+      if (stopSequence != null) 'stop_sequence': stopSequence,
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (arrivalSeconds != null) 'arrival_seconds': arrivalSeconds,
+      if (departureSeconds != null) 'departure_seconds': departureSeconds,
+      if (pickupType != null) 'pickup_type': pickupType,
+      if (dropOffType != null) 'drop_off_type': dropOffType,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransitStopTimesCompanion copyWith({
+    Value<String>? tripId,
+    Value<int>? stopSequence,
+    Value<String>? stationId,
+    Value<String>? lineId,
+    Value<int>? arrivalSeconds,
+    Value<int>? departureSeconds,
+    Value<int>? pickupType,
+    Value<int>? dropOffType,
+    Value<int>? rowid,
+  }) {
+    return TransitStopTimesCompanion(
+      tripId: tripId ?? this.tripId,
+      stopSequence: stopSequence ?? this.stopSequence,
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      arrivalSeconds: arrivalSeconds ?? this.arrivalSeconds,
+      departureSeconds: departureSeconds ?? this.departureSeconds,
+      pickupType: pickupType ?? this.pickupType,
+      dropOffType: dropOffType ?? this.dropOffType,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (tripId.present) {
+      map['trip_id'] = Variable<String>(tripId.value);
+    }
+    if (stopSequence.present) {
+      map['stop_sequence'] = Variable<int>(stopSequence.value);
+    }
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (arrivalSeconds.present) {
+      map['arrival_seconds'] = Variable<int>(arrivalSeconds.value);
+    }
+    if (departureSeconds.present) {
+      map['departure_seconds'] = Variable<int>(departureSeconds.value);
+    }
+    if (pickupType.present) {
+      map['pickup_type'] = Variable<int>(pickupType.value);
+    }
+    if (dropOffType.present) {
+      map['drop_off_type'] = Variable<int>(dropOffType.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitStopTimesCompanion(')
+          ..write('tripId: $tripId, ')
+          ..write('stopSequence: $stopSequence, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('arrivalSeconds: $arrivalSeconds, ')
+          ..write('departureSeconds: $departureSeconds, ')
+          ..write('pickupType: $pickupType, ')
+          ..write('dropOffType: $dropOffType, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransitFrequenciesTable extends TransitFrequencies
+    with TableInfo<$TransitFrequenciesTable, TransitFrequency> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransitFrequenciesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _tripIdMeta = const VerificationMeta('tripId');
+  @override
+  late final GeneratedColumn<String> tripId = GeneratedColumn<String>(
+    'trip_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startTimeSecondsMeta = const VerificationMeta(
+    'startTimeSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> startTimeSeconds = GeneratedColumn<int>(
+    'start_time_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endTimeSecondsMeta = const VerificationMeta(
+    'endTimeSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> endTimeSeconds = GeneratedColumn<int>(
+    'end_time_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _headwaySecondsMeta = const VerificationMeta(
+    'headwaySeconds',
+  );
+  @override
+  late final GeneratedColumn<int> headwaySeconds = GeneratedColumn<int>(
+    'headway_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _exactTimesMeta = const VerificationMeta(
+    'exactTimes',
+  );
+  @override
+  late final GeneratedColumn<bool> exactTimes = GeneratedColumn<bool>(
+    'exact_times',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("exact_times" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    tripId,
+    startTimeSeconds,
+    endTimeSeconds,
+    headwaySeconds,
+    exactTimes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transit_frequencies';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransitFrequency> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('trip_id')) {
+      context.handle(
+        _tripIdMeta,
+        tripId.isAcceptableOrUnknown(data['trip_id']!, _tripIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tripIdMeta);
+    }
+    if (data.containsKey('start_time_seconds')) {
+      context.handle(
+        _startTimeSecondsMeta,
+        startTimeSeconds.isAcceptableOrUnknown(
+          data['start_time_seconds']!,
+          _startTimeSecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_startTimeSecondsMeta);
+    }
+    if (data.containsKey('end_time_seconds')) {
+      context.handle(
+        _endTimeSecondsMeta,
+        endTimeSeconds.isAcceptableOrUnknown(
+          data['end_time_seconds']!,
+          _endTimeSecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_endTimeSecondsMeta);
+    }
+    if (data.containsKey('headway_seconds')) {
+      context.handle(
+        _headwaySecondsMeta,
+        headwaySeconds.isAcceptableOrUnknown(
+          data['headway_seconds']!,
+          _headwaySecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_headwaySecondsMeta);
+    }
+    if (data.containsKey('exact_times')) {
+      context.handle(
+        _exactTimesMeta,
+        exactTimes.isAcceptableOrUnknown(data['exact_times']!, _exactTimesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tripId, startTimeSeconds};
+  @override
+  TransitFrequency map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransitFrequency(
+      tripId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trip_id'],
+      )!,
+      startTimeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_time_seconds'],
+      )!,
+      endTimeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_time_seconds'],
+      )!,
+      headwaySeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}headway_seconds'],
+      )!,
+      exactTimes: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}exact_times'],
+      )!,
+    );
+  }
+
+  @override
+  $TransitFrequenciesTable createAlias(String alias) {
+    return $TransitFrequenciesTable(attachedDatabase, alias);
+  }
+}
+
+class TransitFrequency extends DataClass
+    implements Insertable<TransitFrequency> {
+  final String tripId;
+  final int startTimeSeconds;
+  final int endTimeSeconds;
+  final int headwaySeconds;
+  final bool exactTimes;
+  const TransitFrequency({
+    required this.tripId,
+    required this.startTimeSeconds,
+    required this.endTimeSeconds,
+    required this.headwaySeconds,
+    required this.exactTimes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['trip_id'] = Variable<String>(tripId);
+    map['start_time_seconds'] = Variable<int>(startTimeSeconds);
+    map['end_time_seconds'] = Variable<int>(endTimeSeconds);
+    map['headway_seconds'] = Variable<int>(headwaySeconds);
+    map['exact_times'] = Variable<bool>(exactTimes);
+    return map;
+  }
+
+  TransitFrequenciesCompanion toCompanion(bool nullToAbsent) {
+    return TransitFrequenciesCompanion(
+      tripId: Value(tripId),
+      startTimeSeconds: Value(startTimeSeconds),
+      endTimeSeconds: Value(endTimeSeconds),
+      headwaySeconds: Value(headwaySeconds),
+      exactTimes: Value(exactTimes),
+    );
+  }
+
+  factory TransitFrequency.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransitFrequency(
+      tripId: serializer.fromJson<String>(json['tripId']),
+      startTimeSeconds: serializer.fromJson<int>(json['startTimeSeconds']),
+      endTimeSeconds: serializer.fromJson<int>(json['endTimeSeconds']),
+      headwaySeconds: serializer.fromJson<int>(json['headwaySeconds']),
+      exactTimes: serializer.fromJson<bool>(json['exactTimes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'tripId': serializer.toJson<String>(tripId),
+      'startTimeSeconds': serializer.toJson<int>(startTimeSeconds),
+      'endTimeSeconds': serializer.toJson<int>(endTimeSeconds),
+      'headwaySeconds': serializer.toJson<int>(headwaySeconds),
+      'exactTimes': serializer.toJson<bool>(exactTimes),
+    };
+  }
+
+  TransitFrequency copyWith({
+    String? tripId,
+    int? startTimeSeconds,
+    int? endTimeSeconds,
+    int? headwaySeconds,
+    bool? exactTimes,
+  }) => TransitFrequency(
+    tripId: tripId ?? this.tripId,
+    startTimeSeconds: startTimeSeconds ?? this.startTimeSeconds,
+    endTimeSeconds: endTimeSeconds ?? this.endTimeSeconds,
+    headwaySeconds: headwaySeconds ?? this.headwaySeconds,
+    exactTimes: exactTimes ?? this.exactTimes,
+  );
+  TransitFrequency copyWithCompanion(TransitFrequenciesCompanion data) {
+    return TransitFrequency(
+      tripId: data.tripId.present ? data.tripId.value : this.tripId,
+      startTimeSeconds: data.startTimeSeconds.present
+          ? data.startTimeSeconds.value
+          : this.startTimeSeconds,
+      endTimeSeconds: data.endTimeSeconds.present
+          ? data.endTimeSeconds.value
+          : this.endTimeSeconds,
+      headwaySeconds: data.headwaySeconds.present
+          ? data.headwaySeconds.value
+          : this.headwaySeconds,
+      exactTimes: data.exactTimes.present
+          ? data.exactTimes.value
+          : this.exactTimes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitFrequency(')
+          ..write('tripId: $tripId, ')
+          ..write('startTimeSeconds: $startTimeSeconds, ')
+          ..write('endTimeSeconds: $endTimeSeconds, ')
+          ..write('headwaySeconds: $headwaySeconds, ')
+          ..write('exactTimes: $exactTimes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    tripId,
+    startTimeSeconds,
+    endTimeSeconds,
+    headwaySeconds,
+    exactTimes,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransitFrequency &&
+          other.tripId == this.tripId &&
+          other.startTimeSeconds == this.startTimeSeconds &&
+          other.endTimeSeconds == this.endTimeSeconds &&
+          other.headwaySeconds == this.headwaySeconds &&
+          other.exactTimes == this.exactTimes);
+}
+
+class TransitFrequenciesCompanion extends UpdateCompanion<TransitFrequency> {
+  final Value<String> tripId;
+  final Value<int> startTimeSeconds;
+  final Value<int> endTimeSeconds;
+  final Value<int> headwaySeconds;
+  final Value<bool> exactTimes;
+  final Value<int> rowid;
+  const TransitFrequenciesCompanion({
+    this.tripId = const Value.absent(),
+    this.startTimeSeconds = const Value.absent(),
+    this.endTimeSeconds = const Value.absent(),
+    this.headwaySeconds = const Value.absent(),
+    this.exactTimes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransitFrequenciesCompanion.insert({
+    required String tripId,
+    required int startTimeSeconds,
+    required int endTimeSeconds,
+    required int headwaySeconds,
+    this.exactTimes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : tripId = Value(tripId),
+       startTimeSeconds = Value(startTimeSeconds),
+       endTimeSeconds = Value(endTimeSeconds),
+       headwaySeconds = Value(headwaySeconds);
+  static Insertable<TransitFrequency> custom({
+    Expression<String>? tripId,
+    Expression<int>? startTimeSeconds,
+    Expression<int>? endTimeSeconds,
+    Expression<int>? headwaySeconds,
+    Expression<bool>? exactTimes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (tripId != null) 'trip_id': tripId,
+      if (startTimeSeconds != null) 'start_time_seconds': startTimeSeconds,
+      if (endTimeSeconds != null) 'end_time_seconds': endTimeSeconds,
+      if (headwaySeconds != null) 'headway_seconds': headwaySeconds,
+      if (exactTimes != null) 'exact_times': exactTimes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransitFrequenciesCompanion copyWith({
+    Value<String>? tripId,
+    Value<int>? startTimeSeconds,
+    Value<int>? endTimeSeconds,
+    Value<int>? headwaySeconds,
+    Value<bool>? exactTimes,
+    Value<int>? rowid,
+  }) {
+    return TransitFrequenciesCompanion(
+      tripId: tripId ?? this.tripId,
+      startTimeSeconds: startTimeSeconds ?? this.startTimeSeconds,
+      endTimeSeconds: endTimeSeconds ?? this.endTimeSeconds,
+      headwaySeconds: headwaySeconds ?? this.headwaySeconds,
+      exactTimes: exactTimes ?? this.exactTimes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (tripId.present) {
+      map['trip_id'] = Variable<String>(tripId.value);
+    }
+    if (startTimeSeconds.present) {
+      map['start_time_seconds'] = Variable<int>(startTimeSeconds.value);
+    }
+    if (endTimeSeconds.present) {
+      map['end_time_seconds'] = Variable<int>(endTimeSeconds.value);
+    }
+    if (headwaySeconds.present) {
+      map['headway_seconds'] = Variable<int>(headwaySeconds.value);
+    }
+    if (exactTimes.present) {
+      map['exact_times'] = Variable<bool>(exactTimes.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransitFrequenciesCompanion(')
+          ..write('tripId: $tripId, ')
+          ..write('startTimeSeconds: $startTimeSeconds, ')
+          ..write('endTimeSeconds: $endTimeSeconds, ')
+          ..write('headwaySeconds: $headwaySeconds, ')
+          ..write('exactTimes: $exactTimes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RealtimeProviderLineMappingsTable extends RealtimeProviderLineMappings
     with
         TableInfo<
@@ -9257,6 +12029,18 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $StationsTable stations = $StationsTable(this);
   late final $StationAliasesTable stationAliases = $StationAliasesTable(this);
   late final $StationLinesTable stationLines = $StationLinesTable(this);
+  late final $ServiceCalendarsTable serviceCalendars = $ServiceCalendarsTable(
+    this,
+  );
+  late final $ServiceCalendarDatesTable serviceCalendarDates =
+      $ServiceCalendarDatesTable(this);
+  late final $TransitRoutesTable transitRoutes = $TransitRoutesTable(this);
+  late final $TransitTripsTable transitTrips = $TransitTripsTable(this);
+  late final $TransitStopTimesTable transitStopTimes = $TransitStopTimesTable(
+    this,
+  );
+  late final $TransitFrequenciesTable transitFrequencies =
+      $TransitFrequenciesTable(this);
   late final $RealtimeProviderLineMappingsTable realtimeProviderLineMappings =
       $RealtimeProviderLineMappingsTable(this);
   late final $RealtimeProviderStationMappingsTable
@@ -9285,6 +12069,12 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     stations,
     stationAliases,
     stationLines,
+    serviceCalendars,
+    serviceCalendarDates,
+    transitRoutes,
+    transitTrips,
+    transitStopTimes,
+    transitFrequencies,
     realtimeProviderLineMappings,
     realtimeProviderStationMappings,
     networkEdges,
@@ -10498,6 +13288,1487 @@ typedef $$StationLinesTableProcessedTableManager =
         BaseReferences<_$CatalogDatabase, $StationLinesTable, StationLine>,
       ),
       StationLine,
+      PrefetchHooks Function()
+    >;
+typedef $$ServiceCalendarsTableCreateCompanionBuilder =
+    ServiceCalendarsCompanion Function({
+      required String serviceId,
+      required bool monday,
+      required bool tuesday,
+      required bool wednesday,
+      required bool thursday,
+      required bool friday,
+      required bool saturday,
+      required bool sunday,
+      required String startDate,
+      required String endDate,
+      Value<String> timezone,
+      Value<int> rowid,
+    });
+typedef $$ServiceCalendarsTableUpdateCompanionBuilder =
+    ServiceCalendarsCompanion Function({
+      Value<String> serviceId,
+      Value<bool> monday,
+      Value<bool> tuesday,
+      Value<bool> wednesday,
+      Value<bool> thursday,
+      Value<bool> friday,
+      Value<bool> saturday,
+      Value<bool> sunday,
+      Value<String> startDate,
+      Value<String> endDate,
+      Value<String> timezone,
+      Value<int> rowid,
+    });
+
+class $$ServiceCalendarsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarsTable> {
+  $$ServiceCalendarsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get monday => $composableBuilder(
+    column: $table.monday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get tuesday => $composableBuilder(
+    column: $table.tuesday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get wednesday => $composableBuilder(
+    column: $table.wednesday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get thursday => $composableBuilder(
+    column: $table.thursday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get friday => $composableBuilder(
+    column: $table.friday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get saturday => $composableBuilder(
+    column: $table.saturday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sunday => $composableBuilder(
+    column: $table.sunday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timezone => $composableBuilder(
+    column: $table.timezone,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ServiceCalendarsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarsTable> {
+  $$ServiceCalendarsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get monday => $composableBuilder(
+    column: $table.monday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get tuesday => $composableBuilder(
+    column: $table.tuesday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get wednesday => $composableBuilder(
+    column: $table.wednesday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get thursday => $composableBuilder(
+    column: $table.thursday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get friday => $composableBuilder(
+    column: $table.friday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get saturday => $composableBuilder(
+    column: $table.saturday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sunday => $composableBuilder(
+    column: $table.sunday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timezone => $composableBuilder(
+    column: $table.timezone,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ServiceCalendarsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarsTable> {
+  $$ServiceCalendarsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get serviceId =>
+      $composableBuilder(column: $table.serviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get monday =>
+      $composableBuilder(column: $table.monday, builder: (column) => column);
+
+  GeneratedColumn<bool> get tuesday =>
+      $composableBuilder(column: $table.tuesday, builder: (column) => column);
+
+  GeneratedColumn<bool> get wednesday =>
+      $composableBuilder(column: $table.wednesday, builder: (column) => column);
+
+  GeneratedColumn<bool> get thursday =>
+      $composableBuilder(column: $table.thursday, builder: (column) => column);
+
+  GeneratedColumn<bool> get friday =>
+      $composableBuilder(column: $table.friday, builder: (column) => column);
+
+  GeneratedColumn<bool> get saturday =>
+      $composableBuilder(column: $table.saturday, builder: (column) => column);
+
+  GeneratedColumn<bool> get sunday =>
+      $composableBuilder(column: $table.sunday, builder: (column) => column);
+
+  GeneratedColumn<String> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<String> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<String> get timezone =>
+      $composableBuilder(column: $table.timezone, builder: (column) => column);
+}
+
+class $$ServiceCalendarsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $ServiceCalendarsTable,
+          ServiceCalendar,
+          $$ServiceCalendarsTableFilterComposer,
+          $$ServiceCalendarsTableOrderingComposer,
+          $$ServiceCalendarsTableAnnotationComposer,
+          $$ServiceCalendarsTableCreateCompanionBuilder,
+          $$ServiceCalendarsTableUpdateCompanionBuilder,
+          (
+            ServiceCalendar,
+            BaseReferences<
+              _$CatalogDatabase,
+              $ServiceCalendarsTable,
+              ServiceCalendar
+            >,
+          ),
+          ServiceCalendar,
+          PrefetchHooks Function()
+        > {
+  $$ServiceCalendarsTableTableManager(
+    _$CatalogDatabase db,
+    $ServiceCalendarsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceCalendarsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceCalendarsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServiceCalendarsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> serviceId = const Value.absent(),
+                Value<bool> monday = const Value.absent(),
+                Value<bool> tuesday = const Value.absent(),
+                Value<bool> wednesday = const Value.absent(),
+                Value<bool> thursday = const Value.absent(),
+                Value<bool> friday = const Value.absent(),
+                Value<bool> saturday = const Value.absent(),
+                Value<bool> sunday = const Value.absent(),
+                Value<String> startDate = const Value.absent(),
+                Value<String> endDate = const Value.absent(),
+                Value<String> timezone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCalendarsCompanion(
+                serviceId: serviceId,
+                monday: monday,
+                tuesday: tuesday,
+                wednesday: wednesday,
+                thursday: thursday,
+                friday: friday,
+                saturday: saturday,
+                sunday: sunday,
+                startDate: startDate,
+                endDate: endDate,
+                timezone: timezone,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String serviceId,
+                required bool monday,
+                required bool tuesday,
+                required bool wednesday,
+                required bool thursday,
+                required bool friday,
+                required bool saturday,
+                required bool sunday,
+                required String startDate,
+                required String endDate,
+                Value<String> timezone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCalendarsCompanion.insert(
+                serviceId: serviceId,
+                monday: monday,
+                tuesday: tuesday,
+                wednesday: wednesday,
+                thursday: thursday,
+                friday: friday,
+                saturday: saturday,
+                sunday: sunday,
+                startDate: startDate,
+                endDate: endDate,
+                timezone: timezone,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ServiceCalendarsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $ServiceCalendarsTable,
+      ServiceCalendar,
+      $$ServiceCalendarsTableFilterComposer,
+      $$ServiceCalendarsTableOrderingComposer,
+      $$ServiceCalendarsTableAnnotationComposer,
+      $$ServiceCalendarsTableCreateCompanionBuilder,
+      $$ServiceCalendarsTableUpdateCompanionBuilder,
+      (
+        ServiceCalendar,
+        BaseReferences<
+          _$CatalogDatabase,
+          $ServiceCalendarsTable,
+          ServiceCalendar
+        >,
+      ),
+      ServiceCalendar,
+      PrefetchHooks Function()
+    >;
+typedef $$ServiceCalendarDatesTableCreateCompanionBuilder =
+    ServiceCalendarDatesCompanion Function({
+      required String serviceId,
+      required String date,
+      required int exceptionType,
+      Value<int> rowid,
+    });
+typedef $$ServiceCalendarDatesTableUpdateCompanionBuilder =
+    ServiceCalendarDatesCompanion Function({
+      Value<String> serviceId,
+      Value<String> date,
+      Value<int> exceptionType,
+      Value<int> rowid,
+    });
+
+class $$ServiceCalendarDatesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarDatesTable> {
+  $$ServiceCalendarDatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get exceptionType => $composableBuilder(
+    column: $table.exceptionType,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ServiceCalendarDatesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarDatesTable> {
+  $$ServiceCalendarDatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get exceptionType => $composableBuilder(
+    column: $table.exceptionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ServiceCalendarDatesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $ServiceCalendarDatesTable> {
+  $$ServiceCalendarDatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get serviceId =>
+      $composableBuilder(column: $table.serviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get exceptionType => $composableBuilder(
+    column: $table.exceptionType,
+    builder: (column) => column,
+  );
+}
+
+class $$ServiceCalendarDatesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $ServiceCalendarDatesTable,
+          ServiceCalendarDate,
+          $$ServiceCalendarDatesTableFilterComposer,
+          $$ServiceCalendarDatesTableOrderingComposer,
+          $$ServiceCalendarDatesTableAnnotationComposer,
+          $$ServiceCalendarDatesTableCreateCompanionBuilder,
+          $$ServiceCalendarDatesTableUpdateCompanionBuilder,
+          (
+            ServiceCalendarDate,
+            BaseReferences<
+              _$CatalogDatabase,
+              $ServiceCalendarDatesTable,
+              ServiceCalendarDate
+            >,
+          ),
+          ServiceCalendarDate,
+          PrefetchHooks Function()
+        > {
+  $$ServiceCalendarDatesTableTableManager(
+    _$CatalogDatabase db,
+    $ServiceCalendarDatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceCalendarDatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceCalendarDatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ServiceCalendarDatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> serviceId = const Value.absent(),
+                Value<String> date = const Value.absent(),
+                Value<int> exceptionType = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCalendarDatesCompanion(
+                serviceId: serviceId,
+                date: date,
+                exceptionType: exceptionType,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String serviceId,
+                required String date,
+                required int exceptionType,
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCalendarDatesCompanion.insert(
+                serviceId: serviceId,
+                date: date,
+                exceptionType: exceptionType,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ServiceCalendarDatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $ServiceCalendarDatesTable,
+      ServiceCalendarDate,
+      $$ServiceCalendarDatesTableFilterComposer,
+      $$ServiceCalendarDatesTableOrderingComposer,
+      $$ServiceCalendarDatesTableAnnotationComposer,
+      $$ServiceCalendarDatesTableCreateCompanionBuilder,
+      $$ServiceCalendarDatesTableUpdateCompanionBuilder,
+      (
+        ServiceCalendarDate,
+        BaseReferences<
+          _$CatalogDatabase,
+          $ServiceCalendarDatesTable,
+          ServiceCalendarDate
+        >,
+      ),
+      ServiceCalendarDate,
+      PrefetchHooks Function()
+    >;
+typedef $$TransitRoutesTableCreateCompanionBuilder =
+    TransitRoutesCompanion Function({
+      required String id,
+      required String lineId,
+      Value<String> routeShortName,
+      Value<String> routeLongName,
+      Value<String> directionName,
+      Value<String> timezone,
+      Value<int> rowid,
+    });
+typedef $$TransitRoutesTableUpdateCompanionBuilder =
+    TransitRoutesCompanion Function({
+      Value<String> id,
+      Value<String> lineId,
+      Value<String> routeShortName,
+      Value<String> routeLongName,
+      Value<String> directionName,
+      Value<String> timezone,
+      Value<int> rowid,
+    });
+
+class $$TransitRoutesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $TransitRoutesTable> {
+  $$TransitRoutesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get routeShortName => $composableBuilder(
+    column: $table.routeShortName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get routeLongName => $composableBuilder(
+    column: $table.routeLongName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get directionName => $composableBuilder(
+    column: $table.directionName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timezone => $composableBuilder(
+    column: $table.timezone,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransitRoutesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $TransitRoutesTable> {
+  $$TransitRoutesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get routeShortName => $composableBuilder(
+    column: $table.routeShortName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get routeLongName => $composableBuilder(
+    column: $table.routeLongName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get directionName => $composableBuilder(
+    column: $table.directionName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timezone => $composableBuilder(
+    column: $table.timezone,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransitRoutesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $TransitRoutesTable> {
+  $$TransitRoutesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get routeShortName => $composableBuilder(
+    column: $table.routeShortName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get routeLongName => $composableBuilder(
+    column: $table.routeLongName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get directionName => $composableBuilder(
+    column: $table.directionName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get timezone =>
+      $composableBuilder(column: $table.timezone, builder: (column) => column);
+}
+
+class $$TransitRoutesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $TransitRoutesTable,
+          TransitRoute,
+          $$TransitRoutesTableFilterComposer,
+          $$TransitRoutesTableOrderingComposer,
+          $$TransitRoutesTableAnnotationComposer,
+          $$TransitRoutesTableCreateCompanionBuilder,
+          $$TransitRoutesTableUpdateCompanionBuilder,
+          (
+            TransitRoute,
+            BaseReferences<
+              _$CatalogDatabase,
+              $TransitRoutesTable,
+              TransitRoute
+            >,
+          ),
+          TransitRoute,
+          PrefetchHooks Function()
+        > {
+  $$TransitRoutesTableTableManager(
+    _$CatalogDatabase db,
+    $TransitRoutesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransitRoutesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransitRoutesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransitRoutesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> routeShortName = const Value.absent(),
+                Value<String> routeLongName = const Value.absent(),
+                Value<String> directionName = const Value.absent(),
+                Value<String> timezone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitRoutesCompanion(
+                id: id,
+                lineId: lineId,
+                routeShortName: routeShortName,
+                routeLongName: routeLongName,
+                directionName: directionName,
+                timezone: timezone,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String lineId,
+                Value<String> routeShortName = const Value.absent(),
+                Value<String> routeLongName = const Value.absent(),
+                Value<String> directionName = const Value.absent(),
+                Value<String> timezone = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitRoutesCompanion.insert(
+                id: id,
+                lineId: lineId,
+                routeShortName: routeShortName,
+                routeLongName: routeLongName,
+                directionName: directionName,
+                timezone: timezone,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransitRoutesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $TransitRoutesTable,
+      TransitRoute,
+      $$TransitRoutesTableFilterComposer,
+      $$TransitRoutesTableOrderingComposer,
+      $$TransitRoutesTableAnnotationComposer,
+      $$TransitRoutesTableCreateCompanionBuilder,
+      $$TransitRoutesTableUpdateCompanionBuilder,
+      (
+        TransitRoute,
+        BaseReferences<_$CatalogDatabase, $TransitRoutesTable, TransitRoute>,
+      ),
+      TransitRoute,
+      PrefetchHooks Function()
+    >;
+typedef $$TransitTripsTableCreateCompanionBuilder =
+    TransitTripsCompanion Function({
+      required String id,
+      required String routeId,
+      required String serviceId,
+      Value<String> tripHeadsign,
+      Value<String> directionId,
+      Value<String> servicePattern,
+      Value<int> serviceDayStartSeconds,
+      Value<int> rowid,
+    });
+typedef $$TransitTripsTableUpdateCompanionBuilder =
+    TransitTripsCompanion Function({
+      Value<String> id,
+      Value<String> routeId,
+      Value<String> serviceId,
+      Value<String> tripHeadsign,
+      Value<String> directionId,
+      Value<String> servicePattern,
+      Value<int> serviceDayStartSeconds,
+      Value<int> rowid,
+    });
+
+class $$TransitTripsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $TransitTripsTable> {
+  $$TransitTripsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get routeId => $composableBuilder(
+    column: $table.routeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tripHeadsign => $composableBuilder(
+    column: $table.tripHeadsign,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get directionId => $composableBuilder(
+    column: $table.directionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serviceDayStartSeconds => $composableBuilder(
+    column: $table.serviceDayStartSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransitTripsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $TransitTripsTable> {
+  $$TransitTripsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get routeId => $composableBuilder(
+    column: $table.routeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serviceId => $composableBuilder(
+    column: $table.serviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tripHeadsign => $composableBuilder(
+    column: $table.tripHeadsign,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get directionId => $composableBuilder(
+    column: $table.directionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serviceDayStartSeconds => $composableBuilder(
+    column: $table.serviceDayStartSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransitTripsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $TransitTripsTable> {
+  $$TransitTripsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get routeId =>
+      $composableBuilder(column: $table.routeId, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceId =>
+      $composableBuilder(column: $table.serviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get tripHeadsign => $composableBuilder(
+    column: $table.tripHeadsign,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get directionId => $composableBuilder(
+    column: $table.directionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get servicePattern => $composableBuilder(
+    column: $table.servicePattern,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serviceDayStartSeconds => $composableBuilder(
+    column: $table.serviceDayStartSeconds,
+    builder: (column) => column,
+  );
+}
+
+class $$TransitTripsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $TransitTripsTable,
+          TransitTrip,
+          $$TransitTripsTableFilterComposer,
+          $$TransitTripsTableOrderingComposer,
+          $$TransitTripsTableAnnotationComposer,
+          $$TransitTripsTableCreateCompanionBuilder,
+          $$TransitTripsTableUpdateCompanionBuilder,
+          (
+            TransitTrip,
+            BaseReferences<_$CatalogDatabase, $TransitTripsTable, TransitTrip>,
+          ),
+          TransitTrip,
+          PrefetchHooks Function()
+        > {
+  $$TransitTripsTableTableManager(
+    _$CatalogDatabase db,
+    $TransitTripsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransitTripsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransitTripsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransitTripsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> routeId = const Value.absent(),
+                Value<String> serviceId = const Value.absent(),
+                Value<String> tripHeadsign = const Value.absent(),
+                Value<String> directionId = const Value.absent(),
+                Value<String> servicePattern = const Value.absent(),
+                Value<int> serviceDayStartSeconds = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitTripsCompanion(
+                id: id,
+                routeId: routeId,
+                serviceId: serviceId,
+                tripHeadsign: tripHeadsign,
+                directionId: directionId,
+                servicePattern: servicePattern,
+                serviceDayStartSeconds: serviceDayStartSeconds,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String routeId,
+                required String serviceId,
+                Value<String> tripHeadsign = const Value.absent(),
+                Value<String> directionId = const Value.absent(),
+                Value<String> servicePattern = const Value.absent(),
+                Value<int> serviceDayStartSeconds = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitTripsCompanion.insert(
+                id: id,
+                routeId: routeId,
+                serviceId: serviceId,
+                tripHeadsign: tripHeadsign,
+                directionId: directionId,
+                servicePattern: servicePattern,
+                serviceDayStartSeconds: serviceDayStartSeconds,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransitTripsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $TransitTripsTable,
+      TransitTrip,
+      $$TransitTripsTableFilterComposer,
+      $$TransitTripsTableOrderingComposer,
+      $$TransitTripsTableAnnotationComposer,
+      $$TransitTripsTableCreateCompanionBuilder,
+      $$TransitTripsTableUpdateCompanionBuilder,
+      (
+        TransitTrip,
+        BaseReferences<_$CatalogDatabase, $TransitTripsTable, TransitTrip>,
+      ),
+      TransitTrip,
+      PrefetchHooks Function()
+    >;
+typedef $$TransitStopTimesTableCreateCompanionBuilder =
+    TransitStopTimesCompanion Function({
+      required String tripId,
+      required int stopSequence,
+      required String stationId,
+      required String lineId,
+      required int arrivalSeconds,
+      required int departureSeconds,
+      Value<int> pickupType,
+      Value<int> dropOffType,
+      Value<int> rowid,
+    });
+typedef $$TransitStopTimesTableUpdateCompanionBuilder =
+    TransitStopTimesCompanion Function({
+      Value<String> tripId,
+      Value<int> stopSequence,
+      Value<String> stationId,
+      Value<String> lineId,
+      Value<int> arrivalSeconds,
+      Value<int> departureSeconds,
+      Value<int> pickupType,
+      Value<int> dropOffType,
+      Value<int> rowid,
+    });
+
+class $$TransitStopTimesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $TransitStopTimesTable> {
+  $$TransitStopTimesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get tripId => $composableBuilder(
+    column: $table.tripId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get stopSequence => $composableBuilder(
+    column: $table.stopSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get arrivalSeconds => $composableBuilder(
+    column: $table.arrivalSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get departureSeconds => $composableBuilder(
+    column: $table.departureSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pickupType => $composableBuilder(
+    column: $table.pickupType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dropOffType => $composableBuilder(
+    column: $table.dropOffType,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransitStopTimesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $TransitStopTimesTable> {
+  $$TransitStopTimesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get tripId => $composableBuilder(
+    column: $table.tripId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get stopSequence => $composableBuilder(
+    column: $table.stopSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get arrivalSeconds => $composableBuilder(
+    column: $table.arrivalSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get departureSeconds => $composableBuilder(
+    column: $table.departureSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pickupType => $composableBuilder(
+    column: $table.pickupType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dropOffType => $composableBuilder(
+    column: $table.dropOffType,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransitStopTimesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $TransitStopTimesTable> {
+  $$TransitStopTimesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get tripId =>
+      $composableBuilder(column: $table.tripId, builder: (column) => column);
+
+  GeneratedColumn<int> get stopSequence => $composableBuilder(
+    column: $table.stopSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<int> get arrivalSeconds => $composableBuilder(
+    column: $table.arrivalSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get departureSeconds => $composableBuilder(
+    column: $table.departureSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get pickupType => $composableBuilder(
+    column: $table.pickupType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dropOffType => $composableBuilder(
+    column: $table.dropOffType,
+    builder: (column) => column,
+  );
+}
+
+class $$TransitStopTimesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $TransitStopTimesTable,
+          TransitStopTime,
+          $$TransitStopTimesTableFilterComposer,
+          $$TransitStopTimesTableOrderingComposer,
+          $$TransitStopTimesTableAnnotationComposer,
+          $$TransitStopTimesTableCreateCompanionBuilder,
+          $$TransitStopTimesTableUpdateCompanionBuilder,
+          (
+            TransitStopTime,
+            BaseReferences<
+              _$CatalogDatabase,
+              $TransitStopTimesTable,
+              TransitStopTime
+            >,
+          ),
+          TransitStopTime,
+          PrefetchHooks Function()
+        > {
+  $$TransitStopTimesTableTableManager(
+    _$CatalogDatabase db,
+    $TransitStopTimesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransitStopTimesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransitStopTimesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransitStopTimesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> tripId = const Value.absent(),
+                Value<int> stopSequence = const Value.absent(),
+                Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<int> arrivalSeconds = const Value.absent(),
+                Value<int> departureSeconds = const Value.absent(),
+                Value<int> pickupType = const Value.absent(),
+                Value<int> dropOffType = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitStopTimesCompanion(
+                tripId: tripId,
+                stopSequence: stopSequence,
+                stationId: stationId,
+                lineId: lineId,
+                arrivalSeconds: arrivalSeconds,
+                departureSeconds: departureSeconds,
+                pickupType: pickupType,
+                dropOffType: dropOffType,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String tripId,
+                required int stopSequence,
+                required String stationId,
+                required String lineId,
+                required int arrivalSeconds,
+                required int departureSeconds,
+                Value<int> pickupType = const Value.absent(),
+                Value<int> dropOffType = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitStopTimesCompanion.insert(
+                tripId: tripId,
+                stopSequence: stopSequence,
+                stationId: stationId,
+                lineId: lineId,
+                arrivalSeconds: arrivalSeconds,
+                departureSeconds: departureSeconds,
+                pickupType: pickupType,
+                dropOffType: dropOffType,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransitStopTimesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $TransitStopTimesTable,
+      TransitStopTime,
+      $$TransitStopTimesTableFilterComposer,
+      $$TransitStopTimesTableOrderingComposer,
+      $$TransitStopTimesTableAnnotationComposer,
+      $$TransitStopTimesTableCreateCompanionBuilder,
+      $$TransitStopTimesTableUpdateCompanionBuilder,
+      (
+        TransitStopTime,
+        BaseReferences<
+          _$CatalogDatabase,
+          $TransitStopTimesTable,
+          TransitStopTime
+        >,
+      ),
+      TransitStopTime,
+      PrefetchHooks Function()
+    >;
+typedef $$TransitFrequenciesTableCreateCompanionBuilder =
+    TransitFrequenciesCompanion Function({
+      required String tripId,
+      required int startTimeSeconds,
+      required int endTimeSeconds,
+      required int headwaySeconds,
+      Value<bool> exactTimes,
+      Value<int> rowid,
+    });
+typedef $$TransitFrequenciesTableUpdateCompanionBuilder =
+    TransitFrequenciesCompanion Function({
+      Value<String> tripId,
+      Value<int> startTimeSeconds,
+      Value<int> endTimeSeconds,
+      Value<int> headwaySeconds,
+      Value<bool> exactTimes,
+      Value<int> rowid,
+    });
+
+class $$TransitFrequenciesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $TransitFrequenciesTable> {
+  $$TransitFrequenciesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get tripId => $composableBuilder(
+    column: $table.tripId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startTimeSeconds => $composableBuilder(
+    column: $table.startTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endTimeSeconds => $composableBuilder(
+    column: $table.endTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get headwaySeconds => $composableBuilder(
+    column: $table.headwaySeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get exactTimes => $composableBuilder(
+    column: $table.exactTimes,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransitFrequenciesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $TransitFrequenciesTable> {
+  $$TransitFrequenciesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get tripId => $composableBuilder(
+    column: $table.tripId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startTimeSeconds => $composableBuilder(
+    column: $table.startTimeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endTimeSeconds => $composableBuilder(
+    column: $table.endTimeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get headwaySeconds => $composableBuilder(
+    column: $table.headwaySeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get exactTimes => $composableBuilder(
+    column: $table.exactTimes,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransitFrequenciesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $TransitFrequenciesTable> {
+  $$TransitFrequenciesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get tripId =>
+      $composableBuilder(column: $table.tripId, builder: (column) => column);
+
+  GeneratedColumn<int> get startTimeSeconds => $composableBuilder(
+    column: $table.startTimeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get endTimeSeconds => $composableBuilder(
+    column: $table.endTimeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get headwaySeconds => $composableBuilder(
+    column: $table.headwaySeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get exactTimes => $composableBuilder(
+    column: $table.exactTimes,
+    builder: (column) => column,
+  );
+}
+
+class $$TransitFrequenciesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $TransitFrequenciesTable,
+          TransitFrequency,
+          $$TransitFrequenciesTableFilterComposer,
+          $$TransitFrequenciesTableOrderingComposer,
+          $$TransitFrequenciesTableAnnotationComposer,
+          $$TransitFrequenciesTableCreateCompanionBuilder,
+          $$TransitFrequenciesTableUpdateCompanionBuilder,
+          (
+            TransitFrequency,
+            BaseReferences<
+              _$CatalogDatabase,
+              $TransitFrequenciesTable,
+              TransitFrequency
+            >,
+          ),
+          TransitFrequency,
+          PrefetchHooks Function()
+        > {
+  $$TransitFrequenciesTableTableManager(
+    _$CatalogDatabase db,
+    $TransitFrequenciesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransitFrequenciesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransitFrequenciesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransitFrequenciesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> tripId = const Value.absent(),
+                Value<int> startTimeSeconds = const Value.absent(),
+                Value<int> endTimeSeconds = const Value.absent(),
+                Value<int> headwaySeconds = const Value.absent(),
+                Value<bool> exactTimes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitFrequenciesCompanion(
+                tripId: tripId,
+                startTimeSeconds: startTimeSeconds,
+                endTimeSeconds: endTimeSeconds,
+                headwaySeconds: headwaySeconds,
+                exactTimes: exactTimes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String tripId,
+                required int startTimeSeconds,
+                required int endTimeSeconds,
+                required int headwaySeconds,
+                Value<bool> exactTimes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransitFrequenciesCompanion.insert(
+                tripId: tripId,
+                startTimeSeconds: startTimeSeconds,
+                endTimeSeconds: endTimeSeconds,
+                headwaySeconds: headwaySeconds,
+                exactTimes: exactTimes,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransitFrequenciesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $TransitFrequenciesTable,
+      TransitFrequency,
+      $$TransitFrequenciesTableFilterComposer,
+      $$TransitFrequenciesTableOrderingComposer,
+      $$TransitFrequenciesTableAnnotationComposer,
+      $$TransitFrequenciesTableCreateCompanionBuilder,
+      $$TransitFrequenciesTableUpdateCompanionBuilder,
+      (
+        TransitFrequency,
+        BaseReferences<
+          _$CatalogDatabase,
+          $TransitFrequenciesTable,
+          TransitFrequency
+        >,
+      ),
+      TransitFrequency,
       PrefetchHooks Function()
     >;
 typedef $$RealtimeProviderLineMappingsTableCreateCompanionBuilder =
@@ -13996,6 +18267,18 @@ class $CatalogDatabaseManager {
       $$StationAliasesTableTableManager(_db, _db.stationAliases);
   $$StationLinesTableTableManager get stationLines =>
       $$StationLinesTableTableManager(_db, _db.stationLines);
+  $$ServiceCalendarsTableTableManager get serviceCalendars =>
+      $$ServiceCalendarsTableTableManager(_db, _db.serviceCalendars);
+  $$ServiceCalendarDatesTableTableManager get serviceCalendarDates =>
+      $$ServiceCalendarDatesTableTableManager(_db, _db.serviceCalendarDates);
+  $$TransitRoutesTableTableManager get transitRoutes =>
+      $$TransitRoutesTableTableManager(_db, _db.transitRoutes);
+  $$TransitTripsTableTableManager get transitTrips =>
+      $$TransitTripsTableTableManager(_db, _db.transitTrips);
+  $$TransitStopTimesTableTableManager get transitStopTimes =>
+      $$TransitStopTimesTableTableManager(_db, _db.transitStopTimes);
+  $$TransitFrequenciesTableTableManager get transitFrequencies =>
+      $$TransitFrequenciesTableTableManager(_db, _db.transitFrequencies);
   $$RealtimeProviderLineMappingsTableTableManager
   get realtimeProviderLineMappings =>
       $$RealtimeProviderLineMappingsTableTableManager(
