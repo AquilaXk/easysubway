@@ -50,6 +50,8 @@ const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 const _stationSearchInputRadius = BorderRadius.all(Radius.circular(18));
+const _stationResultCardRadius = BorderRadius.all(Radius.circular(18));
+const _stationCompactCardRadius = BorderRadius.all(Radius.circular(8));
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -2450,7 +2452,7 @@ class _StationRecentSearchItem extends StatelessWidget {
       child: Material(
         color: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _stationCompactCardRadius,
           side: const BorderSide(color: EasySubwayAccessibleColors.line),
         ),
         child: Padding(
@@ -2466,7 +2468,7 @@ class _StationRecentSearchItem extends StatelessWidget {
                   child: ExcludeSemantics(
                     child: InkWell(
                       key: Key('stationRecentSearchQuery-$query'),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: _stationCompactCardRadius,
                       onTap: enabled ? () => onQuerySelected(query) : null,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -3131,7 +3133,7 @@ class _NearbyStationOverview extends StatelessWidget {
       color: EasySubwayAccessibleColors.skySoft,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: _stationResultCardRadius,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Column(
@@ -3144,7 +3146,7 @@ class _NearbyStationOverview extends StatelessWidget {
             child: ExcludeSemantics(
               child: InkWell(
                 key: const Key('nearbyStationPrimaryCard'),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: _stationResultCardRadius,
                 onTap: onTap,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -3340,7 +3342,7 @@ class _StationSearchResultTile extends StatelessWidget {
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: _stationResultCardRadius,
         side: const BorderSide(color: Color(0xFFD5E2E4)),
       ),
       child: Column(
@@ -3353,7 +3355,7 @@ class _StationSearchResultTile extends StatelessWidget {
               child: ExcludeSemantics(
                 child: InkWell(
                   key: Key('stationSearchResult-${result.id}'),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: _stationCompactCardRadius,
                   onTap: onTap,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 78),
@@ -3816,7 +3818,7 @@ class _FavoriteStationTile extends StatelessWidget {
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _stationCompactCardRadius,
         side: const BorderSide(color: Color(0xFFD5E2E4)),
       ),
       child: Padding(
@@ -3832,7 +3834,7 @@ class _FavoriteStationTile extends StatelessWidget {
                 child: ExcludeSemantics(
                   child: InkWell(
                     key: Key('favoriteStationTile-${favorite.stationId}'),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: _stationCompactCardRadius,
                     onTap: onOpenDetail,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 12),
