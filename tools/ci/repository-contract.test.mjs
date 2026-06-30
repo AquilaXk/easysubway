@@ -423,11 +423,12 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /workflow_run:[\s\S]*branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:[\s\S]*actions:\s*read[\s\S]*contents:\s*read/);
-  assert.match(workflow, /group: cd-production-deploy/);
-  assert.match(workflow, /cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /\nconcurrency:\s*\n\s*group: cd-production-deploy/);
   assert.match(workflow, /environment: production/);
   assert.match(workflow, /runs-on:[\s\S]*-\s*self-hosted[\s\S]*-\s*easysubway-production/);
   assert.match(workflow, /name: CD Deploy/);
+  const deployJob = workflow.match(/\n  deploy:[\s\S]*$/)?.[0] ?? "";
+  assert.match(deployJob, /\n    concurrency:\s*\n\s*group: cd-production-deploy\s*\n\s*cancel-in-progress: false/);
   assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
   assert.match(workflow, /CD Deploy \/ Validate manual dispatch CI/);
   assert.match(workflow, /manual deployment requires a successful CI workflow/);
