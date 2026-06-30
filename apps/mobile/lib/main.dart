@@ -40,6 +40,8 @@ const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _homeHeroCardPadding = EdgeInsets.fromLTRB(20, 24, 20, 24);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
+const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
+const _mainThemeControlRadius = BorderRadius.all(Radius.circular(8));
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -355,13 +357,15 @@ class EasySubwayApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF006D77)),
-        scaffoldBackgroundColor: const Color(0xFFF6F8F9),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: EasySubwayAccessibleColors.primary,
+        ),
+        scaffoldBackgroundColor: _mainScaffoldBackgroundColor,
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           toolbarHeight: 64,
           titleTextStyle: TextStyle(
-            color: Color(0xFF102A2C),
+            color: EasySubwayAccessibleColors.text,
             fontSize: 22,
             fontWeight: FontWeight.w700,
           ),
@@ -369,8 +373,8 @@ class EasySubwayApp extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _mainThemeControlRadius,
             ),
             textStyle: const TextStyle(
               fontSize: 18,
@@ -381,9 +385,12 @@ class EasySubwayApp extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(60),
-            side: const BorderSide(color: Color(0xFF006D77), width: 2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(
+              color: EasySubwayAccessibleColors.primary,
+              width: 2,
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _mainThemeControlRadius,
             ),
             textStyle: const TextStyle(
               fontSize: 18,
