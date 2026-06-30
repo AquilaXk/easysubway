@@ -920,6 +920,13 @@ void main() {
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.text('저장'), findsNothing);
     expect(find.text('수도권'), findsOneWidget);
+    final regionText = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const Key('mapRegionTabs')),
+        matching: find.text('수도권'),
+      ),
+    );
+    expect(regionText.overflow, isNot(TextOverflow.ellipsis));
     expect(find.text('전국'), findsNothing);
     expect(
       tester.getSize(find.byKey(const Key('mapRegionTabs'))).height,
