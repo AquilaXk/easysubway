@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
 
+const _mobilityProfilePagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(8));
 
 class MobilityProfileOption {
@@ -165,7 +166,7 @@ class _MobilityProfileScreenState extends State<MobilityProfileScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mobilityProfilePagePadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
