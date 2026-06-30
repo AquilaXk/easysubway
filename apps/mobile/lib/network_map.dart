@@ -520,9 +520,9 @@ class _RegionMenuButton extends StatelessWidget {
           height: EasySubwayTouchTarget.general,
           padding: const EdgeInsets.only(left: 10, right: 6),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: EasySubwayAccessibleColors.surface,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFD7E1E3)),
+            border: Border.all(color: EasySubwayAccessibleColors.line),
           ),
           child: Row(
             children: [
@@ -532,14 +532,14 @@ class _RegionMenuButton extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF102A2C),
+                    color: EasySubwayAccessibleColors.text,
                   ),
                 ),
               ),
               const Icon(
                 Icons.arrow_drop_down,
                 size: 22,
-                color: Color(0xFF4C5759),
+                color: EasySubwayAccessibleColors.mutedText,
               ),
             ],
           ),
@@ -561,8 +561,8 @@ class _StationLineChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FBFB),
-          border: Border.all(color: const Color(0xFFD7E2E4)),
+          color: EasySubwayAccessibleColors.mintSoft,
+          border: Border.all(color: EasySubwayAccessibleColors.line),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -593,7 +593,7 @@ class _LineCircleBadge extends StatelessWidget {
     final foreground =
         ThemeData.estimateBrightnessForColor(color) == Brightness.dark
         ? Colors.white
-        : const Color(0xFF102A2D);
+        : EasySubwayAccessibleColors.text;
     return ExcludeSemantics(
       child: Container(
         width: size,
@@ -2798,7 +2798,10 @@ class _StationSheet extends StatelessWidget {
             const SizedBox(height: 6),
             const Text(
               '노선 순서에 맞춰 표시됩니다.',
-              style: TextStyle(fontSize: 15, color: Color(0xFF4D6367)),
+              style: TextStyle(
+                fontSize: 15,
+                color: EasySubwayAccessibleColors.mutedText,
+              ),
             ),
             const SizedBox(height: 18),
             Row(
