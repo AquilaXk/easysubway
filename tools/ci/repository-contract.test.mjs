@@ -506,8 +506,8 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_DB=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_USER=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PASSWORD=easysubway_local$/m);
-  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
-  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:5432\/easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=15432$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:15432\/easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_USERNAME=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_DATA_PACK_BASE_URL=http:\/\/localhost:9000\/easysubway-datapacks$/m);
