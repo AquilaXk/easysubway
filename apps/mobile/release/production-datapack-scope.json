@@ -4,8 +4,8 @@
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "production-datapack-scope",
   "issue": 547,
-  "status": "IN_PROGRESS",
-  "statusDetail": "SCOPE_APPROVED_IMPLEMENTATION_PENDING",
+  "status": "DENOMINATOR_LOCKED",
+  "statusDetail": "SUPPORTED_STATION_LINE_OPERATOR_DENOMINATOR_LOCKED",
   "decision": {
     "approvalState": "qa-approved",
     "approvedAt": "2026-06-28",
@@ -15,8 +15,16 @@
   "supportScope": {
     "id": "capital_pilot_android_v1",
     "regionIds": ["capital"],
-    "supportedClaimKo": "수도권 pilot",
-    "supportedClaimPolicyKo": "앱 화면과 Play listing은 production coverage evidence가 통과한 수도권 범위만 지원 범위로 표현한다.",
+    "includedOperatorIds": ["seoul-metro"],
+    "includedLineIds": ["seoul-4"],
+    "includedStationIds": ["station-sangnoksu", "station-sadang"],
+    "requiredFacilityTypes": ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"],
+    "facilityCoverageDenominator": {
+      "kind": "station_x_required_facility_type",
+      "expectedRows": 6
+    },
+    "supportedClaimKo": "상록수·사당 검증 pilot",
+    "supportedClaimPolicyKo": "앱 화면과 Play listing은 production coverage evidence가 통과한 상록수·사당 검증 범위만 지원 범위로 표현한다.",
     "unsupportedRegionPolicy": {
       "requiredAppStatus": ["UNSUPPORTED_REGION", "다시 확인"],
       "policyKo": "coverageEvidence와 P0 gap 0을 만족하지 못한 지역, 운영기관, 노선은 지원 지역으로 표시하지 않는다."
