@@ -17,6 +17,7 @@ class EasySubwayAccessibleColors {
   static const skySoft = Color(0xFFE6F5FF);
   static const line = Color(0xFFDBE3E9);
   static const text = Color(0xFF102A2C);
+  static const secondaryText = Color(0xFF29484B);
   static const mutedText = Color(0xFF466467);
   static const surface = Colors.white;
 }

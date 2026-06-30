@@ -5341,8 +5341,8 @@ class _PrivacyDataUseSummary extends StatelessWidget {
       child: ExcludeSemantics(
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF5F4),
-            border: Border.all(color: const Color(0xFFB7D7D3)),
+            color: EasySubwayAccessibleColors.mintSoft,
+            border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Padding(
@@ -5353,7 +5353,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
                 Text(
                   _title,
                   style: textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF102A2C),
+                    color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w800,
                     height: 1.25,
                   ),
@@ -5387,14 +5387,18 @@ class _PrivacyDataUseLine extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 7),
-            child: Icon(Icons.circle, size: 7, color: Color(0xFF006D77)),
+            child: Icon(
+              Icons.circle,
+              size: 7,
+              color: EasySubwayAccessibleColors.primary,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: const Color(0xFF29484B),
+                color: EasySubwayAccessibleColors.secondaryText,
                 height: 1.35,
               ),
             ),
@@ -5467,7 +5471,7 @@ class _SupportAccessItem extends StatelessWidget {
                   Text(
                     displayValue,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF29484B),
+                      color: EasySubwayAccessibleColors.secondaryText,
                       height: 1.25,
                     ),
                   ),
@@ -5476,7 +5480,7 @@ class _SupportAccessItem extends StatelessWidget {
                     Text(
                       secondaryText,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF466467),
+                        color: EasySubwayAccessibleColors.mutedText,
                         fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
@@ -5563,7 +5567,7 @@ class FeatureTile extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFD5E2E4)),
+              side: const BorderSide(color: EasySubwayAccessibleColors.line),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -5576,7 +5580,7 @@ class FeatureTile extends StatelessWidget {
                     child: Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF102A2C),
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w800,
                         height: 1.35,
                       ),
