@@ -3896,7 +3896,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                     ),
                     if (_firstFacilityAlert(data.facilities)
                         case final alert?) ...[
-                      const _AppSectionTitle(title: '가기 전 확인'),
+                      const _AppSectionTitle(title: '가기 전 살펴보기'),
                       _HomeFacilityAlertCard(
                         facility: alert,
                         onOpenFacilities: _openFavoriteFacilities,
