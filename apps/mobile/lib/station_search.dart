@@ -4167,14 +4167,14 @@ class _StationDetailContent extends StatelessWidget {
       const _StationDetailSectionTitle(title: '출구'),
       const SizedBox(height: 12),
       if (exits.isEmpty)
-        const _StationDetailEmptyMessage(message: '출구 정보가 아직 없습니다.')
+        const _StationDetailEmptyMessage(message: '출구 안내를 준비 중이에요.')
       else
         for (final exit in exits) _StationExitCard(exit: exit),
       const SizedBox(height: 24),
       const _StationDetailSectionTitle(title: '시설'),
       const SizedBox(height: 12),
       if (facilities.isEmpty)
-        const _StationDetailEmptyMessage(message: '시설 정보가 아직 없습니다.')
+        const _StationDetailEmptyMessage(message: '시설 안내를 준비 중이에요.')
       else
         for (final facility in facilities)
           _StationFacilityCard(
