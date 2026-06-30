@@ -49,6 +49,7 @@ const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
+const _stationSearchInputRadius = BorderRadius.all(Radius.circular(18));
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -1917,19 +1918,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: _stationSearchInputRadius,
                 borderSide: const BorderSide(
                   color: EasySubwayAccessibleColors.line,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: _stationSearchInputRadius,
                 borderSide: const BorderSide(
                   color: EasySubwayAccessibleColors.line,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: _stationSearchInputRadius,
                 borderSide: const BorderSide(
                   color: EasySubwayAccessibleColors.primary,
                   width: 2,
