@@ -4871,6 +4871,35 @@ void main() {
     expect(find.text('삭제할 항목 없음'), findsNothing);
   });
 
+  testWidgets('데이터 삭제 결과는 보낸 정보 정리를 쉬운 문구로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UserDataDeletionResultScreen(
+          result: const UserDataDeletionResult(
+            userId: 'anonymous-user-1',
+            deletedFavoriteStationCount: 0,
+            deletedFavoriteFacilityCount: 0,
+            deletedFavoriteRouteCount: 0,
+            anonymizedRouteFeedbackCount: 1,
+            notificationSettingsDeleted: false,
+            deletedRegisteredDeviceCount: 0,
+            deletedPushNotificationCount: 0,
+            mobilityProfileDeleted: false,
+            anonymizedReportCount: 2,
+          ),
+          deletionScope: UserDataDeletionScope.remoteAndDevice,
+          onRestart: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('보낸 제보 기록'), findsOneWidget);
+    expect(find.text('2건을 누구의 정보인지 알 수 없게 바꿈'), findsOneWidget);
+    expect(find.text('경로 의견'), findsOneWidget);
+    expect(find.text('1건을 누구의 정보인지 알 수 없게 바꿈'), findsOneWidget);
+    expectNoForbiddenUserCopy(tester);
+  });
+
   testWidgets('도움말은 원격 삭제 저장소에서 서버 삭제 범위를 유지해 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final deletionRepository = UserDataDeletionApiRepository(
