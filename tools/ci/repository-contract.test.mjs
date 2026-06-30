@@ -31,6 +31,32 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+test("route ETA accuracy evaluator report contract is machine-readable", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "route-accuracy-"));
+  const output = path.join(outputDir, "route-accuracy-report.json");
+  await execFileAsync(process.execPath, [
+    "tools/routes/evaluate-eta-accuracy.mjs",
+    "--dataset",
+    "tools/routes/golden-od",
+    "--output",
+    output,
+  ], { cwd: root });
+
+  const report = JSON.parse(readFileSync(output, "utf8"));
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.sampleSize, 100);
+  assert.equal(report.metrics.sampleSize, 100);
+  assert.equal(report.coverage.singleRide, true);
+  assert.equal(report.coverage.oneTransfer, true);
+  assert.equal(report.coverage.twoTransfer, true);
+  assert.equal(report.coverage.express, true);
+  assert.equal(report.coverage.outOfStationTransfer, true);
+  assert.equal(report.coverage.strictStepFree, true);
+  assert.equal(report.coverage.realtimeSupported, true);
+  assert.equal(report.coverage.realtimeUnsupported, true);
+  assert.deepEqual(report.failures, []);
+});
+
 function currentMobileVersionCode() {
   const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
   assert.ok(match, "mobile pubspec must contain versionName+versionCode");
