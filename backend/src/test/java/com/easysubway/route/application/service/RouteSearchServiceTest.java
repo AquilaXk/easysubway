@@ -272,6 +272,30 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("유모차 strict step-free 조건은 계단만 있는 역 접근 경로를 차단한다")
+	void strollerStrictStepFreeBlocksStairOnlyStationAccess() {
+		var repository = new InMemoryRouteSearchRepository();
+		var stairOnlyService = new RouteSearchService(
+			repository,
+			repository,
+			new StairOnlyTransitMasterPort(),
+			CLOCK
+		);
+
+		var result = stairOnlyService.searchRoute(new SearchRouteCommand(
+			"station-a",
+			"station-b",
+			MobilityType.STROLLER,
+			ConstraintMode.STRICT_STEP_FREE
+		));
+
+		assertThat(result.status()).isEqualTo(RouteSearchStatus.BLOCKED);
+		assertThat(result.steps()).isEmpty();
+		assertThat(result.blockedReasons())
+			.containsExactly("계단 없는 역 접근 경로를 확인할 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("공통 노선이 없으면 한 번 환승 가능한 역을 경로로 반환한다")
 	void searchRouteReturnsOneTransferRecommendation() {
 		var repository = new InMemoryRouteSearchRepository();
