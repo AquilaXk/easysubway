@@ -931,6 +931,35 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
 
   await writeFile(envFile, [
     ...deploymentEnvLines,
+    "EASYSUBWAY_ALERT_EMAIL_ENABLED=true",
+    "EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[::1]:9093/alerts",
+    "EASYSUBWAY_ALERT_EMAIL_TO=ops@example.com",
+    "EASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com",
+    "EASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587",
+    "EASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com",
+    "EASYSUBWAY_ALERT_SMTP_PASSWORD=secret",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /Invalid alert email env values/
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_ALERT_EMAIL_ENABLED=true",
+    "EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[2001:db8::10]:9093/alerts",
+    "EASYSUBWAY_ALERT_EMAIL_TO=ops@example.com",
+    "EASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com",
+    "EASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587",
+    "EASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com",
+    "EASYSUBWAY_ALERT_SMTP_PASSWORD=secret",
+    "",
+  ].join("\n"));
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
     "EASYSUBWAY_ADMIN_CUTOVER_ENFORCED=true",
     "",
   ].join("\n"));
