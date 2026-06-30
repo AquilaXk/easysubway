@@ -31,7 +31,7 @@ const _blockedPresentation = FacilityStatusPresentation(
 
 const _cautionPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.caution,
-  severityLabel: '가기 전 확인',
+  severityLabel: '가기 전 살펴보기',
   statusTitle: '가기 전에 확인해 주세요',
   nextActionLabel: '역무원 도움 요청',
   nextActionDescription: '현장 안내를 확인하고 필요하면 역무원 도움을 요청하세요.',

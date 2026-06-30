@@ -506,8 +506,8 @@ test("환경 예시는 비밀값 없는 로컬 데이터 인프라 기본값을 
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_DB=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_USER=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_POSTGRES_PASSWORD=easysubway_local$/m);
-  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=5432$/m);
-  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:5432\/easysubway$/m);
+  assert.match(envExample, /^EASYSUBWAY_POSTGRES_PORT=15432$/m);
+  assert.match(envExample, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/localhost:15432\/easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_USERNAME=easysubway$/m);
   assert.match(envExample, /^EASYSUBWAY_DATASOURCE_PASSWORD=easysubway_local$/m);
   assert.match(envExample, /^EASYSUBWAY_DATA_PACK_BASE_URL=http:\/\/localhost:9000\/easysubway-datapacks$/m);
@@ -682,7 +682,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_POSTGRES_DB=easysubway",
     "EASYSUBWAY_POSTGRES_USER=easysubway",
     "EASYSUBWAY_POSTGRES_PASSWORD=secret",
-    "EASYSUBWAY_POSTGRES_PORT=5432",
+    "EASYSUBWAY_POSTGRES_PORT=15432",
     "EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://db:5432/easysubway",
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
@@ -910,6 +910,7 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
     ["출처", /['"`][^'"`\n]*출처[^'"`\n]*['"`]/u],
     ["상태 제보", /['"`][^'"`\n]*상태\s*제보[^'"`\n]*['"`]/u],
     ["시설 상태 제보", /['"`][^'"`\n]*시설\s*상태\s*제보[^'"`\n]*['"`]/u],
+    ["가기 전 확인", /['"`][^'"`\n]*가기\s*전\s*확인[^'"`\n]*['"`]/u],
     ["확인 필요", /['"`][^'"`\n]*확인\s*필요[^'"`\n]*['"`]/u],
     ["추정", /['"`][^'"`\n]*추정[^'"`\n]*['"`]/u],
     ["측정값", /['"`][^'"`\n]*측정값[^'"`\n]*['"`]/u],
@@ -5185,7 +5186,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /POSTGRES_DB: \$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
   assert.match(compose, /POSTGRES_USER: \$\{EASYSUBWAY_POSTGRES_USER:-easysubway\}/);
   assert.match(compose, /POSTGRES_PASSWORD: \$\{EASYSUBWAY_POSTGRES_PASSWORD:-easysubway_local\}/);
-  assert.match(compose, /"\$\{EASYSUBWAY_POSTGRES_PORT:-5432\}:5432"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_POSTGRES_PORT:-15432\}:5432"/);
   assert.match(compose, /pg_isready -U \$\$\{POSTGRES_USER\} -d \$\$\{POSTGRES_DB\}/);
   assert.match(compose, /postgres-data:\/var\/lib\/postgresql\/data/);
 
