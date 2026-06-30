@@ -3652,7 +3652,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 6/);
+  assert.match(schema, /PRAGMA user_version = 7/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE realtime_provider_line_mappings/);
   assert.match(schema, /CREATE TABLE realtime_provider_station_mappings/);
@@ -3955,6 +3955,141 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.evidencePolicy.githubSummaryOnly, true);
   assert.ok(scope.linkedReleaseBlockers.includes(571));
   assert.ok(scope.linkedReleaseBlockers.includes(1020));
+});
+
+test("official source importer는 production placeholder evidence hash를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-placeholder-evidence-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.facilityRows[0].evidenceHash = "1".repeat(64);
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /facilityRows\.evidenceHash is placeholder evidence: facility-sangnoksu-elevator-kric-1/,
+  );
+});
+
+test("official source importer는 production facility source snapshot id 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-source-snapshot-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  for (const row of input.facilityRows) {
+    row.evidenceHash = createHash("sha256").update(`evidence:${row.id}`).digest("hex");
+    row.providerRecordHash = createHash("sha256").update(`provider:${row.id}`).digest("hex");
+  }
+  delete input.facilityRows[0].sourceSnapshotId;
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /facilityRows\.sourceSnapshotId must be a non-empty string/,
+  );
+});
+
+test("official source importer는 production facility provider record hash 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-provider-record-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  for (const row of input.facilityRows) {
+    row.sourceSnapshotId = `${row.sourceId}-snapshot-20260622`;
+    row.evidenceHash = createHash("sha256").update(`evidence:${row.id}`).digest("hex");
+  }
+  delete input.facilityRows[0].providerRecordHash;
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /facilityRows\.providerRecordHash must be a non-empty string/,
+  );
+});
+
+test("production row provenance는 snapshot/provider/evidence hash gate를 유지한다", () => {
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const schema = read("tools/datapack/schema/catalog-schema.sql");
+  const builder = read("tools/datapack/build-datapack.mjs");
+  const validator = read("tools/datapack/validate-datapack.mjs");
+  const mobileTables = read("apps/mobile/lib/core/database/catalog/catalog_tables.dart");
+  const mobileDatabase = read("apps/mobile/lib/core/database/catalog/catalog_database.dart");
+
+  for (const row of input.facilityRows) {
+    assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
+    assert.match(row.providerRecordHash, /^[0-9a-f]{64}$/);
+    assert.match(row.evidenceHash, /^[0-9a-f]{64}$/);
+    assert.doesNotMatch(row.providerRecordHash, /^([0-9a-f])\1{63}$/);
+    assert.doesNotMatch(row.evidenceHash, /^([0-9a-f])\1{63}$/);
+  }
+  for (const row of input.routeEdges) {
+    assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
+    assert.match(row.providerRecordHash, /^[0-9a-f]{64}$/);
+    assert.match(row.evidenceHash, /^[0-9a-f]{64}$/);
+    assert.doesNotMatch(row.providerRecordHash, /^([0-9a-f])\1{63}$/);
+    assert.doesNotMatch(row.evidenceHash, /^([0-9a-f])\1{63}$/);
+  }
+  for (const row of input.movementPathCandidates) {
+    assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
+    assert.match(row.providerRecordHash, /^[0-9a-f]{64}$/);
+    assert.match(row.evidenceHash, /^[0-9a-f]{64}$/);
+    assert.doesNotMatch(row.providerRecordHash, /^([0-9a-f])\1{63}$/);
+    assert.doesNotMatch(row.evidenceHash, /^([0-9a-f])\1{63}$/);
+  }
+
+  assert.match(schema, /CREATE TABLE network_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(schema, /CREATE TABLE facilities \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(schema, /CREATE TABLE internal_route_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(builder, /"source_snapshot_id"/);
+  assert.match(builder, /"provider_record_hash"/);
+  assert.match(validator, /"source_snapshot_id"/);
+  assert.match(validator, /"provider_record_hash"/);
+  assert.match(validator, /validateProductionInternalRouteEdgeProvenance/);
+  assert.match(validator, /validateNetworkEdgeBaseProvenance/);
+  assert.match(validator, /is placeholder evidence/);
+  assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
+  assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
+  assert.match(mobileDatabase, /int get schemaVersion => 7/);
+  assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
 });
 
 test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {

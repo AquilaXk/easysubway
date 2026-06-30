@@ -3563,6 +3563,30 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
     'provenanceKind',
   );
@@ -3636,6 +3660,8 @@ class $NetworkEdgesTable extends NetworkEdges
     accessibilityStatus,
     reliabilityScore,
     sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
     provenanceKind,
     verificationStatus,
     facilityId,
@@ -3753,6 +3779,24 @@ class $NetworkEdgesTable extends NetworkEdges
         sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
       );
     }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    }
     if (data.containsKey('provenance_kind')) {
       context.handle(
         _provenanceKindMeta,
@@ -3852,6 +3896,14 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.string,
         data['${effectivePrefix}source_id'],
       )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
       provenanceKind: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}provenance_kind'],
@@ -3894,6 +3946,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final String accessibilityStatus;
   final int reliabilityScore;
   final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
   final String provenanceKind;
   final String verificationStatus;
   final String? facilityId;
@@ -3912,6 +3966,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     required this.accessibilityStatus,
     required this.reliabilityScore,
     required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
     required this.provenanceKind,
     required this.verificationStatus,
     this.facilityId,
@@ -3933,6 +3989,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['reliability_score'] = Variable<int>(reliabilityScore);
     map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
     map['provenance_kind'] = Variable<String>(provenanceKind);
     map['verification_status'] = Variable<String>(verificationStatus);
     if (!nullToAbsent || facilityId != null) {
@@ -3959,6 +4017,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       accessibilityStatus: Value(accessibilityStatus),
       reliabilityScore: Value(reliabilityScore),
       sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
       provenanceKind: Value(provenanceKind),
       verificationStatus: Value(verificationStatus),
       facilityId: facilityId == null && nullToAbsent
@@ -3991,6 +4051,10 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       ),
       reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
       sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
       provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
       verificationStatus: serializer.fromJson<String>(
         json['verificationStatus'],
@@ -4016,6 +4080,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
       'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
       'provenanceKind': serializer.toJson<String>(provenanceKind),
       'verificationStatus': serializer.toJson<String>(verificationStatus),
       'facilityId': serializer.toJson<String?>(facilityId),
@@ -4037,6 +4103,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     String? accessibilityStatus,
     int? reliabilityScore,
     String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
     String? provenanceKind,
     String? verificationStatus,
     Value<String?> facilityId = const Value.absent(),
@@ -4055,6 +4123,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
     sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
     provenanceKind: provenanceKind ?? this.provenanceKind,
     verificationStatus: verificationStatus ?? this.verificationStatus,
     facilityId: facilityId.present ? facilityId.value : this.facilityId,
@@ -4093,6 +4163,12 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ? data.reliabilityScore.value
           : this.reliabilityScore,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
       provenanceKind: data.provenanceKind.present
           ? data.provenanceKind.value
           : this.provenanceKind,
@@ -4126,6 +4202,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
@@ -4149,6 +4227,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     accessibilityStatus,
     reliabilityScore,
     sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
     provenanceKind,
     verificationStatus,
     facilityId,
@@ -4171,6 +4251,8 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.accessibilityStatus == this.accessibilityStatus &&
           other.reliabilityScore == this.reliabilityScore &&
           other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
           other.provenanceKind == this.provenanceKind &&
           other.verificationStatus == this.verificationStatus &&
           other.facilityId == this.facilityId &&
@@ -4191,6 +4273,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<String> accessibilityStatus;
   final Value<int> reliabilityScore;
   final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
   final Value<String> provenanceKind;
   final Value<String> verificationStatus;
   final Value<String?> facilityId;
@@ -4210,6 +4294,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
@@ -4230,6 +4316,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.accessibilityStatus = const Value.absent(),
     this.reliabilityScore = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
@@ -4252,6 +4340,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<String>? accessibilityStatus,
     Expression<int>? reliabilityScore,
     Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
     Expression<String>? provenanceKind,
     Expression<String>? verificationStatus,
     Expression<String>? facilityId,
@@ -4273,6 +4363,9 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
         'accessibility_status': accessibilityStatus,
       if (reliabilityScore != null) 'reliability_score': reliabilityScore,
       if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
       if (provenanceKind != null) 'provenance_kind': provenanceKind,
       if (verificationStatus != null) 'verification_status': verificationStatus,
       if (facilityId != null) 'facility_id': facilityId,
@@ -4295,6 +4388,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<String>? accessibilityStatus,
     Value<int>? reliabilityScore,
     Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
     Value<String>? provenanceKind,
     Value<String>? verificationStatus,
     Value<String?>? facilityId,
@@ -4315,6 +4410,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
       provenanceKind: provenanceKind ?? this.provenanceKind,
       verificationStatus: verificationStatus ?? this.verificationStatus,
       facilityId: facilityId ?? this.facilityId,
@@ -4363,6 +4460,12 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     if (sourceId.present) {
       map['source_id'] = Variable<String>(sourceId.value);
     }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
     if (provenanceKind.present) {
       map['provenance_kind'] = Variable<String>(provenanceKind.value);
     }
@@ -4399,6 +4502,8 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
@@ -4841,12 +4946,36 @@ class $FacilitiesTable extends Facilities
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _providerFacilityRefMeta =
       const VerificationMeta('providerFacilityRef');
   @override
   late final GeneratedColumn<String> providerFacilityRef =
       GeneratedColumn<String>(
         'provider_facility_ref',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
         aliasedName,
         false,
         type: DriftSqlType.string,
@@ -4960,7 +5089,9 @@ class $FacilitiesTable extends Facilities
     floorTo,
     description,
     sourceId,
+    sourceSnapshotId,
     providerFacilityRef,
+    providerRecordHash,
     provenanceKind,
     verifiedAt,
     retrievedAt,
@@ -5050,12 +5181,30 @@ class $FacilitiesTable extends Facilities
         sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
       );
     }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('provider_facility_ref')) {
       context.handle(
         _providerFacilityRefMeta,
         providerFacilityRef.isAcceptableOrUnknown(
           data['provider_facility_ref']!,
           _providerFacilityRefMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
         ),
       );
     }
@@ -5174,9 +5323,17 @@ class $FacilitiesTable extends Facilities
         DriftSqlType.string,
         data['${effectivePrefix}source_id'],
       )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
       providerFacilityRef: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}provider_facility_ref'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
       )!,
       provenanceKind: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -5230,7 +5387,9 @@ class Facility extends DataClass implements Insertable<Facility> {
   final String floorTo;
   final String description;
   final String sourceId;
+  final String sourceSnapshotId;
   final String providerFacilityRef;
+  final String providerRecordHash;
   final String provenanceKind;
   final DateTime? verifiedAt;
   final DateTime? retrievedAt;
@@ -5250,7 +5409,9 @@ class Facility extends DataClass implements Insertable<Facility> {
     required this.floorTo,
     required this.description,
     required this.sourceId,
+    required this.sourceSnapshotId,
     required this.providerFacilityRef,
+    required this.providerRecordHash,
     required this.provenanceKind,
     this.verifiedAt,
     this.retrievedAt,
@@ -5275,7 +5436,9 @@ class Facility extends DataClass implements Insertable<Facility> {
     map['floor_to'] = Variable<String>(floorTo);
     map['description'] = Variable<String>(description);
     map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
     map['provider_facility_ref'] = Variable<String>(providerFacilityRef);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
     map['provenance_kind'] = Variable<String>(provenanceKind);
     if (!nullToAbsent || verifiedAt != null) {
       map['verified_at'] = Variable<DateTime>(verifiedAt);
@@ -5305,7 +5468,9 @@ class Facility extends DataClass implements Insertable<Facility> {
       floorTo: Value(floorTo),
       description: Value(description),
       sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
       providerFacilityRef: Value(providerFacilityRef),
+      providerRecordHash: Value(providerRecordHash),
       provenanceKind: Value(provenanceKind),
       verifiedAt: verifiedAt == null && nullToAbsent
           ? const Value.absent()
@@ -5337,8 +5502,12 @@ class Facility extends DataClass implements Insertable<Facility> {
       floorTo: serializer.fromJson<String>(json['floorTo']),
       description: serializer.fromJson<String>(json['description']),
       sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
       providerFacilityRef: serializer.fromJson<String>(
         json['providerFacilityRef'],
+      ),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
       ),
       provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
       verifiedAt: serializer.fromJson<DateTime?>(json['verifiedAt']),
@@ -5366,7 +5535,9 @@ class Facility extends DataClass implements Insertable<Facility> {
       'floorTo': serializer.toJson<String>(floorTo),
       'description': serializer.toJson<String>(description),
       'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
       'providerFacilityRef': serializer.toJson<String>(providerFacilityRef),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
       'provenanceKind': serializer.toJson<String>(provenanceKind),
       'verifiedAt': serializer.toJson<DateTime?>(verifiedAt),
       'retrievedAt': serializer.toJson<DateTime?>(retrievedAt),
@@ -5389,7 +5560,9 @@ class Facility extends DataClass implements Insertable<Facility> {
     String? floorTo,
     String? description,
     String? sourceId,
+    String? sourceSnapshotId,
     String? providerFacilityRef,
+    String? providerRecordHash,
     String? provenanceKind,
     Value<DateTime?> verifiedAt = const Value.absent(),
     Value<DateTime?> retrievedAt = const Value.absent(),
@@ -5409,7 +5582,9 @@ class Facility extends DataClass implements Insertable<Facility> {
     floorTo: floorTo ?? this.floorTo,
     description: description ?? this.description,
     sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
     providerFacilityRef: providerFacilityRef ?? this.providerFacilityRef,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
     provenanceKind: provenanceKind ?? this.provenanceKind,
     verifiedAt: verifiedAt.present ? verifiedAt.value : this.verifiedAt,
     retrievedAt: retrievedAt.present ? retrievedAt.value : this.retrievedAt,
@@ -5433,9 +5608,15 @@ class Facility extends DataClass implements Insertable<Facility> {
           ? data.description.value
           : this.description,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
       providerFacilityRef: data.providerFacilityRef.present
           ? data.providerFacilityRef.value
           : this.providerFacilityRef,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
       provenanceKind: data.provenanceKind.present
           ? data.provenanceKind.value
           : this.provenanceKind,
@@ -5476,7 +5657,9 @@ class Facility extends DataClass implements Insertable<Facility> {
           ..write('floorTo: $floorTo, ')
           ..write('description: $description, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
           ..write('providerFacilityRef: $providerFacilityRef, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verifiedAt: $verifiedAt, ')
           ..write('retrievedAt: $retrievedAt, ')
@@ -5490,7 +5673,7 @@ class Facility extends DataClass implements Insertable<Facility> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     stationId,
     exitId,
@@ -5501,7 +5684,9 @@ class Facility extends DataClass implements Insertable<Facility> {
     floorTo,
     description,
     sourceId,
+    sourceSnapshotId,
     providerFacilityRef,
+    providerRecordHash,
     provenanceKind,
     verifiedAt,
     retrievedAt,
@@ -5510,7 +5695,7 @@ class Facility extends DataClass implements Insertable<Facility> {
     operationalStatus,
     installationStatus,
     confidence,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5525,7 +5710,9 @@ class Facility extends DataClass implements Insertable<Facility> {
           other.floorTo == this.floorTo &&
           other.description == this.description &&
           other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
           other.providerFacilityRef == this.providerFacilityRef &&
+          other.providerRecordHash == this.providerRecordHash &&
           other.provenanceKind == this.provenanceKind &&
           other.verifiedAt == this.verifiedAt &&
           other.retrievedAt == this.retrievedAt &&
@@ -5547,7 +5734,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
   final Value<String> floorTo;
   final Value<String> description;
   final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
   final Value<String> providerFacilityRef;
+  final Value<String> providerRecordHash;
   final Value<String> provenanceKind;
   final Value<DateTime?> verifiedAt;
   final Value<DateTime?> retrievedAt;
@@ -5568,7 +5757,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     this.floorTo = const Value.absent(),
     this.description = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
     this.providerFacilityRef = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verifiedAt = const Value.absent(),
     this.retrievedAt = const Value.absent(),
@@ -5590,7 +5781,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     this.floorTo = const Value.absent(),
     this.description = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
     this.providerFacilityRef = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verifiedAt = const Value.absent(),
     this.retrievedAt = const Value.absent(),
@@ -5615,7 +5808,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     Expression<String>? floorTo,
     Expression<String>? description,
     Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
     Expression<String>? providerFacilityRef,
+    Expression<String>? providerRecordHash,
     Expression<String>? provenanceKind,
     Expression<DateTime>? verifiedAt,
     Expression<DateTime>? retrievedAt,
@@ -5637,8 +5832,11 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
       if (floorTo != null) 'floor_to': floorTo,
       if (description != null) 'description': description,
       if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
       if (providerFacilityRef != null)
         'provider_facility_ref': providerFacilityRef,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
       if (provenanceKind != null) 'provenance_kind': provenanceKind,
       if (verifiedAt != null) 'verified_at': verifiedAt,
       if (retrievedAt != null) 'retrieved_at': retrievedAt,
@@ -5662,7 +5860,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     Value<String>? floorTo,
     Value<String>? description,
     Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
     Value<String>? providerFacilityRef,
+    Value<String>? providerRecordHash,
     Value<String>? provenanceKind,
     Value<DateTime?>? verifiedAt,
     Value<DateTime?>? retrievedAt,
@@ -5684,7 +5884,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
       floorTo: floorTo ?? this.floorTo,
       description: description ?? this.description,
       sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
       providerFacilityRef: providerFacilityRef ?? this.providerFacilityRef,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
       provenanceKind: provenanceKind ?? this.provenanceKind,
       verifiedAt: verifiedAt ?? this.verifiedAt,
       retrievedAt: retrievedAt ?? this.retrievedAt,
@@ -5730,10 +5932,16 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
     if (sourceId.present) {
       map['source_id'] = Variable<String>(sourceId.value);
     }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
     if (providerFacilityRef.present) {
       map['provider_facility_ref'] = Variable<String>(
         providerFacilityRef.value,
       );
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
     }
     if (provenanceKind.present) {
       map['provenance_kind'] = Variable<String>(provenanceKind.value);
@@ -5778,7 +5986,9 @@ class FacilitiesCompanion extends UpdateCompanion<Facility> {
           ..write('floorTo: $floorTo, ')
           ..write('description: $description, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
           ..write('providerFacilityRef: $providerFacilityRef, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verifiedAt: $verifiedAt, ')
           ..write('retrievedAt: $retrievedAt, ')
@@ -6558,6 +6768,30 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
     'provenanceKind',
   );
@@ -6645,6 +6879,8 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
     reliabilityScore,
     accessibilityStatus,
     sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
     provenanceKind,
     verificationStatus,
     facilityId,
@@ -6775,6 +7011,24 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
       );
     }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    }
     if (data.containsKey('provenance_kind')) {
       context.handle(
         _provenanceKindMeta,
@@ -6891,6 +7145,14 @@ class $InternalRouteEdgesTable extends InternalRouteEdges
         DriftSqlType.string,
         data['${effectivePrefix}source_id'],
       )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
       provenanceKind: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}provenance_kind'],
@@ -6940,6 +7202,8 @@ class InternalRouteEdge extends DataClass
   final int reliabilityScore;
   final String accessibilityStatus;
   final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
   final String provenanceKind;
   final String verificationStatus;
   final String? facilityId;
@@ -6961,6 +7225,8 @@ class InternalRouteEdge extends DataClass
     required this.reliabilityScore,
     required this.accessibilityStatus,
     required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
     required this.provenanceKind,
     required this.verificationStatus,
     this.facilityId,
@@ -6985,6 +7251,8 @@ class InternalRouteEdge extends DataClass
     map['reliability_score'] = Variable<int>(reliabilityScore);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
     map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
     map['provenance_kind'] = Variable<String>(provenanceKind);
     map['verification_status'] = Variable<String>(verificationStatus);
     if (!nullToAbsent || facilityId != null) {
@@ -7014,6 +7282,8 @@ class InternalRouteEdge extends DataClass
       reliabilityScore: Value(reliabilityScore),
       accessibilityStatus: Value(accessibilityStatus),
       sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
       provenanceKind: Value(provenanceKind),
       verificationStatus: Value(verificationStatus),
       facilityId: facilityId == null && nullToAbsent
@@ -7049,6 +7319,10 @@ class InternalRouteEdge extends DataClass
         json['accessibilityStatus'],
       ),
       sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
       provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
       verificationStatus: serializer.fromJson<String>(
         json['verificationStatus'],
@@ -7077,6 +7351,8 @@ class InternalRouteEdge extends DataClass
       'reliabilityScore': serializer.toJson<int>(reliabilityScore),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
       'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
       'provenanceKind': serializer.toJson<String>(provenanceKind),
       'verificationStatus': serializer.toJson<String>(verificationStatus),
       'facilityId': serializer.toJson<String?>(facilityId),
@@ -7101,6 +7377,8 @@ class InternalRouteEdge extends DataClass
     int? reliabilityScore,
     String? accessibilityStatus,
     String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
     String? provenanceKind,
     String? verificationStatus,
     Value<String?> facilityId = const Value.absent(),
@@ -7122,6 +7400,8 @@ class InternalRouteEdge extends DataClass
     reliabilityScore: reliabilityScore ?? this.reliabilityScore,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
     sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
     provenanceKind: provenanceKind ?? this.provenanceKind,
     verificationStatus: verificationStatus ?? this.verificationStatus,
     facilityId: facilityId.present ? facilityId.value : this.facilityId,
@@ -7167,6 +7447,12 @@ class InternalRouteEdge extends DataClass
           ? data.accessibilityStatus.value
           : this.accessibilityStatus,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
       provenanceKind: data.provenanceKind.present
           ? data.provenanceKind.value
           : this.provenanceKind,
@@ -7205,6 +7491,8 @@ class InternalRouteEdge extends DataClass
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
@@ -7216,7 +7504,7 @@ class InternalRouteEdge extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     fromNodeId,
     toNodeId,
@@ -7231,13 +7519,15 @@ class InternalRouteEdge extends DataClass
     reliabilityScore,
     accessibilityStatus,
     sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
     provenanceKind,
     verificationStatus,
     facilityId,
     lastVerifiedAt,
     evidenceHash,
     instruction,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7256,6 +7546,8 @@ class InternalRouteEdge extends DataClass
           other.reliabilityScore == this.reliabilityScore &&
           other.accessibilityStatus == this.accessibilityStatus &&
           other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
           other.provenanceKind == this.provenanceKind &&
           other.verificationStatus == this.verificationStatus &&
           other.facilityId == this.facilityId &&
@@ -7279,6 +7571,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
   final Value<int> reliabilityScore;
   final Value<String> accessibilityStatus;
   final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
   final Value<String> provenanceKind;
   final Value<String> verificationStatus;
   final Value<String?> facilityId;
@@ -7301,6 +7595,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.reliabilityScore = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
@@ -7324,6 +7620,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     this.reliabilityScore = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
     this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
     this.provenanceKind = const Value.absent(),
     this.verificationStatus = const Value.absent(),
     this.facilityId = const Value.absent(),
@@ -7349,6 +7647,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Expression<int>? reliabilityScore,
     Expression<String>? accessibilityStatus,
     Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
     Expression<String>? provenanceKind,
     Expression<String>? verificationStatus,
     Expression<String>? facilityId,
@@ -7373,6 +7673,9 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       if (accessibilityStatus != null)
         'accessibility_status': accessibilityStatus,
       if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
       if (provenanceKind != null) 'provenance_kind': provenanceKind,
       if (verificationStatus != null) 'verification_status': verificationStatus,
       if (facilityId != null) 'facility_id': facilityId,
@@ -7398,6 +7701,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     Value<int>? reliabilityScore,
     Value<String>? accessibilityStatus,
     Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
     Value<String>? provenanceKind,
     Value<String>? verificationStatus,
     Value<String?>? facilityId,
@@ -7421,6 +7726,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
       sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
       provenanceKind: provenanceKind ?? this.provenanceKind,
       verificationStatus: verificationStatus ?? this.verificationStatus,
       facilityId: facilityId ?? this.facilityId,
@@ -7476,6 +7783,12 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
     if (sourceId.present) {
       map['source_id'] = Variable<String>(sourceId.value);
     }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
     if (provenanceKind.present) {
       map['provenance_kind'] = Variable<String>(provenanceKind.value);
     }
@@ -7517,6 +7830,8 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
           ..write('reliabilityScore: $reliabilityScore, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
           ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
           ..write('provenanceKind: $provenanceKind, ')
           ..write('verificationStatus: $verificationStatus, ')
           ..write('facilityId: $facilityId, ')
@@ -9797,6 +10112,8 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<String> verificationStatus,
       Value<String?> facilityId,
@@ -9818,6 +10135,8 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<String> accessibilityStatus,
       Value<int> reliabilityScore,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<String> verificationStatus,
       Value<String?> facilityId,
@@ -9892,6 +10211,16 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<String> get sourceId => $composableBuilder(
     column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9990,6 +10319,16 @@ class $$NetworkEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get provenanceKind => $composableBuilder(
     column: $table.provenanceKind,
     builder: (column) => ColumnOrderings(column),
@@ -10077,6 +10416,16 @@ class $$NetworkEdgesTableAnnotationComposer
   GeneratedColumn<String> get sourceId =>
       $composableBuilder(column: $table.sourceId, builder: (column) => column);
 
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get provenanceKind => $composableBuilder(
     column: $table.provenanceKind,
     builder: (column) => column,
@@ -10148,6 +10497,8 @@ class $$NetworkEdgesTableTableManager
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
@@ -10167,6 +10518,8 @@ class $$NetworkEdgesTableTableManager
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verificationStatus: verificationStatus,
                 facilityId: facilityId,
@@ -10188,6 +10541,8 @@ class $$NetworkEdgesTableTableManager
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
@@ -10207,6 +10562,8 @@ class $$NetworkEdgesTableTableManager
                 accessibilityStatus: accessibilityStatus,
                 reliabilityScore: reliabilityScore,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verificationStatus: verificationStatus,
                 facilityId: facilityId,
@@ -10438,7 +10795,9 @@ typedef $$FacilitiesTableCreateCompanionBuilder =
       Value<String> floorTo,
       Value<String> description,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
       Value<String> providerFacilityRef,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<DateTime?> verifiedAt,
       Value<DateTime?> retrievedAt,
@@ -10461,7 +10820,9 @@ typedef $$FacilitiesTableUpdateCompanionBuilder =
       Value<String> floorTo,
       Value<String> description,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
       Value<String> providerFacilityRef,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<DateTime?> verifiedAt,
       Value<DateTime?> retrievedAt,
@@ -10532,8 +10893,18 @@ class $$FacilitiesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get providerFacilityRef => $composableBuilder(
     column: $table.providerFacilityRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10637,8 +11008,18 @@ class $$FacilitiesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get providerFacilityRef => $composableBuilder(
     column: $table.providerFacilityRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10724,8 +11105,18 @@ class $$FacilitiesTableAnnotationComposer
   GeneratedColumn<String> get sourceId =>
       $composableBuilder(column: $table.sourceId, builder: (column) => column);
 
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get providerFacilityRef => $composableBuilder(
     column: $table.providerFacilityRef,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
     builder: (column) => column,
   );
 
@@ -10811,7 +11202,9 @@ class $$FacilitiesTableTableManager
                 Value<String> floorTo = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
                 Value<String> providerFacilityRef = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<DateTime?> verifiedAt = const Value.absent(),
                 Value<DateTime?> retrievedAt = const Value.absent(),
@@ -10832,7 +11225,9 @@ class $$FacilitiesTableTableManager
                 floorTo: floorTo,
                 description: description,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
                 providerFacilityRef: providerFacilityRef,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verifiedAt: verifiedAt,
                 retrievedAt: retrievedAt,
@@ -10855,7 +11250,9 @@ class $$FacilitiesTableTableManager
                 Value<String> floorTo = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
                 Value<String> providerFacilityRef = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<DateTime?> verifiedAt = const Value.absent(),
                 Value<DateTime?> retrievedAt = const Value.absent(),
@@ -10876,7 +11273,9 @@ class $$FacilitiesTableTableManager
                 floorTo: floorTo,
                 description: description,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
                 providerFacilityRef: providerFacilityRef,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verifiedAt: verifiedAt,
                 retrievedAt: retrievedAt,
@@ -11300,6 +11699,8 @@ typedef $$InternalRouteEdgesTableCreateCompanionBuilder =
       Value<int> reliabilityScore,
       Value<String> accessibilityStatus,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<String> verificationStatus,
       Value<String?> facilityId,
@@ -11324,6 +11725,8 @@ typedef $$InternalRouteEdgesTableUpdateCompanionBuilder =
       Value<int> reliabilityScore,
       Value<String> accessibilityStatus,
       Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
       Value<String> provenanceKind,
       Value<String> verificationStatus,
       Value<String?> facilityId,
@@ -11409,6 +11812,16 @@ class $$InternalRouteEdgesTableFilterComposer
 
   ColumnFilters<String> get sourceId => $composableBuilder(
     column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11522,6 +11935,16 @@ class $$InternalRouteEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get provenanceKind => $composableBuilder(
     column: $table.provenanceKind,
     builder: (column) => ColumnOrderings(column),
@@ -11624,6 +12047,16 @@ class $$InternalRouteEdgesTableAnnotationComposer
   GeneratedColumn<String> get sourceId =>
       $composableBuilder(column: $table.sourceId, builder: (column) => column);
 
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get provenanceKind => $composableBuilder(
     column: $table.provenanceKind,
     builder: (column) => column,
@@ -11709,6 +12142,8 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
@@ -11731,6 +12166,8 @@ class $$InternalRouteEdgesTableTableManager
                 reliabilityScore: reliabilityScore,
                 accessibilityStatus: accessibilityStatus,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verificationStatus: verificationStatus,
                 facilityId: facilityId,
@@ -11755,6 +12192,8 @@ class $$InternalRouteEdgesTableTableManager
                 Value<int> reliabilityScore = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
                 Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
                 Value<String> provenanceKind = const Value.absent(),
                 Value<String> verificationStatus = const Value.absent(),
                 Value<String?> facilityId = const Value.absent(),
@@ -11777,6 +12216,8 @@ class $$InternalRouteEdgesTableTableManager
                 reliabilityScore: reliabilityScore,
                 accessibilityStatus: accessibilityStatus,
                 sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
                 provenanceKind: provenanceKind,
                 verificationStatus: verificationStatus,
                 facilityId: facilityId,
