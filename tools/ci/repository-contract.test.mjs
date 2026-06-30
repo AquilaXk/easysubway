@@ -5416,6 +5416,10 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /back-worker:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: "true"/);
   assert.doesNotMatch(backWorkerBlock, /ports:/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /alertmanager:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /image: prom\/alertmanager:v0\.33\.0/);
+  assert.match(compose, /--web\.external-url=\$\{EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL:-http:\/\/localhost:9093\}/);
+  assert.match(compose, /"\$\{EASYSUBWAY_ALERTMANAGER_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_ALERTMANAGER_PORT:-9093\}:9093"/);
   assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /public-edge-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /docker-runtime-probe:[\s\S]*image: ghcr\.io\/google\/cadvisor:v0\.60\.3/);
@@ -5423,7 +5427,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
-  assert.match(compose, /^volumes:\n  postgres-data:\n  object-storage-data:\n  prometheus-data:/m);
+  assert.match(compose, /^volumes:\n  postgres-data:\n  object-storage-data:\n  alertmanager-data:\n  prometheus-data:/m);
   assert.doesNotMatch(compose, /^  redis-data:/m);
 });
 
@@ -5605,6 +5609,9 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   const applicationDevYml = read("backend/src/main/resources/application-dev.yml");
   const compose = read("infra/docker-compose.yml");
   const prometheusConfig = read("infra/prometheus/prometheus.yml");
+  const prometheusAlerts = read("infra/prometheus/alerts.yml");
+  const alertmanagerConfig = read("infra/alertmanager/alertmanager.local.yml");
+  const alertmanagerTemplate = read("infra/alertmanager/templates/email.tmpl");
   const grafanaDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
@@ -5615,10 +5622,20 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(compose, /prometheus:\n/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: prom\/prometheus:v[0-9]+\.[0-9]+\.[0-9]+/);
+  assert.match(compose, /--web\.external-url=\$\{EASYSUBWAY_PROMETHEUS_EXTERNAL_URL:-http:\/\/localhost:9090\}/);
   assert.match(compose, /\.\/prometheus\/prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
+  assert.match(compose, /\.\/prometheus\/alerts\.yml:\/etc\/prometheus\/alerts\.yml:ro/);
   assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /prometheus-data:\/prometheus/);
   assert.match(compose, /wget --spider -q http:\/\/localhost:9090\/-\/healthy/);
+
+  assert.match(compose, /alertmanager:\n/);
+  assert.match(compose, /alertmanager:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /image: prom\/alertmanager:v0\.33\.0/);
+  assert.match(compose, /--web\.external-url=\$\{EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL:-http:\/\/localhost:9093\}/);
+  assert.match(compose, /\$\{EASYSUBWAY_ALERTMANAGER_CONFIG_FILE:-\.\/alertmanager\/alertmanager\.local\.yml\}:\/etc\/alertmanager\/alertmanager\.yml:ro/);
+  assert.match(compose, /\.\/alertmanager\/templates:\/etc\/alertmanager\/templates:ro/);
+  assert.match(compose, /alertmanager-data:\/alertmanager/);
 
   assert.match(compose, /grafana:\n/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
@@ -5642,6 +5659,16 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusConfig, /replacement: public-edge-probe:9115/);
   assert.doesNotMatch(prometheusConfig, /\/actuator\/prometheus/);
   assert.doesNotMatch(prometheusConfig, /host\.docker\.internal:8080/);
+  assert.match(prometheusConfig, /alertmanagers:\s*\n\s*-\s*static_configs:\s*\n\s*-\s*targets: \["alertmanager:9093"\]/);
+  assert.match(prometheusConfig, /rule_files:\s*\n\s*-\s*\/etc\/prometheus\/alerts\.yml/);
+
+  assert.match(prometheusAlerts, /alert: AquilaPublicEdgeProbeScrapeDown/);
+  assert.match(prometheusAlerts, /alert: AquilaDockerRuntimeProbeScrapeDown/);
+  assert.match(prometheusAlerts, /alert: AquilaBackWorkerScrapeDown/);
+  assert.match(alertmanagerConfig, /receiver: operations-null/);
+  assert.match(alertmanagerConfig, /templates:\s*\n\s*-\s*\/etc\/alertmanager\/templates\/\*\.tmpl/);
+  assert.match(alertmanagerTemplate, /define "easysubway\.email\.subject"/);
+  assert.doesNotMatch(alertmanagerTemplate, /\.GeneratorURL/);
 
   assert.match(grafanaDatasource, /name: easysubway-prometheus/);
   assert.match(grafanaDatasource, /type: prometheus/);
