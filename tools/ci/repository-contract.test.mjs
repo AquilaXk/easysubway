@@ -4099,6 +4099,55 @@ test("official source importer는 locked production denominator 밖 route endpoi
   );
 });
 
+test("official source importer는 locked production denominator 밖 pass-through station을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-pass-through-station-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.stationMappings.push({
+    sourceId: "molit-urban-rail-full-route",
+    sourceStationCode: "MOLIT-SEOUL-4-999",
+    lineId: "seoul-4",
+    stationId: "station-extra",
+    stationLineId: "station-extra:seoul-4",
+    mappingStatus: "renamed",
+    previousNames: ["추가역"],
+  });
+  input.stationExits = [
+    {
+      id: "exit-extra",
+      stationId: "station-extra",
+      exitNumber: "1",
+      description: "scope 밖 station exit",
+    },
+  ];
+  input.stationAccessibilitySummaries = [
+    {
+      stationId: "station-extra",
+      summary: "scope 밖 station 접근성 요약",
+    },
+  ];
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+  );
+});
+
 test("official source importer는 locked production line denominator의 metadata-only 확장을 거부한다", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-line-metadata-"));
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");

@@ -257,6 +257,7 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
     metadataOperatorIds.add(requiredString(operator.id, "operators.id"));
   }
   const rowOperatorIds = operatorIdsForLines(rowLineIds, lineOperatorIds);
+  addPassThroughScopeIds(input, scopedStationIds, scopedLineIds);
   for (const edge of networkEdges) {
     addNodeScopeIds(edge.fromNodeId, scopedStationIds, scopedLineIds);
     addNodeScopeIds(edge.toNodeId, scopedStationIds, scopedLineIds);
@@ -314,8 +315,25 @@ function operatorIdsForLines(lineIds, lineOperatorIds) {
   return operatorIds;
 }
 
-function addNodeScopeIds(nodeId, stationIds, lineIds) {
-  const [stationId, lineId] = requiredString(nodeId, "networkEdges.nodeId").split(":");
+function addPassThroughScopeIds(input, stationIds, lineIds) {
+  for (const mapping of input.stationMappings ?? []) {
+    stationIds.add(requiredString(mapping.stationId, "stationMappings.stationId"));
+    lineIds.add(requiredString(mapping.lineId, "stationMappings.lineId"));
+  }
+  for (const exit of input.stationExits ?? []) {
+    stationIds.add(requiredString(exit.stationId, "stationExits.stationId"));
+  }
+  for (const summary of input.stationAccessibilitySummaries ?? []) {
+    stationIds.add(requiredString(summary.stationId, "stationAccessibilitySummaries.stationId"));
+  }
+  for (const route of input.representativeRouteRegressions ?? []) {
+    addNodeScopeIds(route.fromNodeId, stationIds, lineIds, "representativeRouteRegressions.fromNodeId");
+    addNodeScopeIds(route.toNodeId, stationIds, lineIds, "representativeRouteRegressions.toNodeId");
+  }
+}
+
+function addNodeScopeIds(nodeId, stationIds, lineIds, label = "networkEdges.nodeId") {
+  const [stationId, lineId] = requiredString(nodeId, label).split(":");
   stationIds.add(stationId);
   if (lineId) {
     lineIds.add(lineId);
