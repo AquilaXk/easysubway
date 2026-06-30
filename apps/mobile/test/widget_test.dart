@@ -8792,6 +8792,7 @@ void main() {
       expect(find.text('이동 순서'), findsOneWidget);
       expect(find.text('도착 안내'), findsOneWidget);
       expect(find.text('도착역에서 계단 없는 출구 동선을 확인합니다.'), findsOneWidget);
+      expect(find.textContaining('접근성 정보'), findsNothing);
       expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
       expect(find.text('열차 이동'), findsOneWidget);
       expect(find.text('선택한 길을 따라 안내합니다.'), findsOneWidget);
@@ -8799,9 +8800,9 @@ void main() {
       expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
-      expect(find.text('약 4분 · 180m · 접근성 확인'), findsOneWidget);
+      expect(find.text('약 4분 · 180m · 엘리베이터 안내 준비 중'), findsOneWidget);
       expect(find.text('일부 시설 안내를 준비 중이에요.'), findsOneWidget);
-      expect(find.text('시설 상태를 최근에 확인하지 못했어요.'), findsOneWidget);
+      expect(find.text('시설 상태 안내가 오래됐을 수 있어요.'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
@@ -12823,7 +12824,7 @@ RouteSearchResult _sampleRouteSearchResult({
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',
-        message: '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 안내를 확인하세요.',
+        message: '엘리베이터와 시설 안내가 오래됐을 수 있어요.',
       ),
     ],
     recommendationReasons: recommendationReasons,

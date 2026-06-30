@@ -231,8 +231,7 @@ void main() {
                 },
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
-                  'message':
-                      '접근성 시설 정보가 최근 30일 이내 확인되지 않았습니다. 이동 전 역 안내를 확인하세요.',
+                  'message': '엘리베이터와 시설 안내가 오래됐을 수 있어요.',
                 },
               ],
               'recommendationReasons': [
@@ -296,7 +295,9 @@ void main() {
     expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 접근성 확인');
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 준비 중');
+    expect(result.steps[1].userTitle, '사당역에서 출구 엘리베이터와 통로 안내를 확인');
+    expect(result.semanticLabel, isNot(contains('접근성 정보')));
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
     expect(
       result.warnings.map((warning) => warning.code),
@@ -304,7 +305,7 @@ void main() {
     );
     expect(
       result.warnings.map((warning) => warning.userMessage),
-      contains('시설 상태를 최근에 확인하지 못했어요.'),
+      contains('시설 상태 안내가 오래됐을 수 있어요.'),
     );
     expect(result.semanticLabel, contains('시간 또는 거리를 확인하고 있어요'));
   });

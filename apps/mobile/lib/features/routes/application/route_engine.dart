@@ -233,7 +233,7 @@ class LocalRouteEngine {
   String _warningMessage(String code) {
     return switch (code) {
       'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
-      'STALE_ACCESSIBILITY_DATA' => '시설 상태를 최근에 확인하지 못했어요.',
+      'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
       'GENERATED_CONNECTOR_UNVERIFIED' =>
