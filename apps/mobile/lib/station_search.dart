@@ -52,6 +52,8 @@ const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 const _stationSearchInputRadius = BorderRadius.all(Radius.circular(18));
 const _stationResultCardRadius = BorderRadius.all(Radius.circular(18));
 const _stationCompactCardRadius = BorderRadius.all(Radius.circular(8));
+const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(8));
+const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(14));
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -2804,7 +2806,9 @@ class _StationLineRegionButton extends StatelessWidget {
           selectedColor: const Color(0xFF007A80),
           backgroundColor: Colors.white,
           side: const BorderSide(color: Color(0xFF93C7C2)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: const RoundedRectangleBorder(
+            borderRadius: _stationLineRegionChipRadius,
+          ),
         ),
       ),
     );
@@ -2869,8 +2873,8 @@ class _StationLineFilterButton extends StatelessWidget {
             backgroundColor: backgroundColor,
             foregroundColor: foregroundColor,
             side: BorderSide(color: borderColor, width: selected ? 2 : 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _stationLineFilterButtonRadius,
             ),
             textStyle: const TextStyle(
               fontSize: 15,
