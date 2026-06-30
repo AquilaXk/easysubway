@@ -515,6 +515,102 @@ void main() {
     expect(legacyResult.burdenCost, 92);
   });
 
+  test('경로 V2 contract는 itinerary와 leg 단위 ETA 필드를 읽는다', () {
+    final result = RouteSearchV2Result.fromJson({
+      'contractVersion': 'ROUTE_SEARCH_V2',
+      'originStationId': 'station-sangnoksu',
+      'destinationStationId': 'station-sadang',
+      'departureTime': '2026-06-30T09:15:00+09:00',
+      'mobilityType': 'STROLLER',
+      'constraintMode': 'STRICT_STEP_FREE',
+      'useRealtime': true,
+      'maxTransfers': 3,
+      'alternativeCount': 2,
+      'statuses': [
+        'FOUND',
+        'BLOCKED_ACCESSIBILITY',
+        'NO_TIMETABLE_SERVICE',
+        'REALTIME_UNAVAILABLE_PLANNED_USED',
+        'UNSUPPORTED_REGION',
+        'ROUTE_GRAPH_UNKNOWN',
+      ],
+      'itineraries': [
+        {
+          'itineraryId': 'route-1-primary',
+          'status': 'FOUND',
+          'plannedArrivalTime': '2026-06-30T09:22:00+09:00',
+          'realtimeArrivalTime': null,
+          'etaSource': 'STATIC_BACKEND_V1',
+          'etaConfidence': 'LOW',
+          'durationSeconds': 420,
+          'transferCount': 0,
+          'walkingDistanceMeters': 180,
+          'accessibilityRisk': {
+            'level': 'REVIEW_REQUIRED',
+            'reasons': ['ACCESSIBILITY_CHECK_REQUIRED'],
+          },
+          'legs': [
+            {
+              'legType': 'ACCESS',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sangnoksu',
+              'fromNodeId': '',
+              'toNodeId': '',
+              'lineId': 'line-4',
+              'tripId': '',
+              'trainNo': '',
+              'plannedDepartureTime': '2026-06-30T09:15:00+09:00',
+              'realtimeDepartureTime': null,
+              'plannedArrivalTime': '2026-06-30T09:22:00+09:00',
+              'realtimeArrivalTime': null,
+              'waitTimeSeconds': 0,
+              'slackSeconds': 0,
+              'durationSeconds': 420,
+              'distanceMeters': 180,
+              'etaSource': 'STATIC_BACKEND_V1',
+              'confidence': 'LOW',
+              'accessibilityRisk': {
+                'level': 'REVIEW_REQUIRED',
+                'reasons': ['ACCESSIBILITY_CHECK_REQUIRED'],
+              },
+            },
+          ],
+          'commercialEtaEligible': false,
+        },
+        {
+          'itineraryId': 'route-1-review',
+          'status': 'ROUTE_GRAPH_UNKNOWN',
+          'plannedArrivalTime': '2026-06-30T09:22:00+09:00',
+          'realtimeArrivalTime': null,
+          'etaSource': 'STATIC_BACKEND_V1',
+          'etaConfidence': 'UNKNOWN',
+          'durationSeconds': 420,
+          'transferCount': 0,
+          'walkingDistanceMeters': 180,
+          'accessibilityRisk': {'level': 'UNKNOWN', 'reasons': <Object?>[]},
+          'legs': <Object?>[],
+          'commercialEtaEligible': false,
+        },
+      ],
+    });
+
+    expect(result.contractVersion, 'ROUTE_SEARCH_V2');
+    expect(result.statuses, contains('REALTIME_UNAVAILABLE_PLANNED_USED'));
+    expect(result.itineraries, hasLength(2));
+    expect(result.itineraries.first.status, 'FOUND');
+    expect(
+      result.itineraries.first.plannedArrivalTime,
+      '2026-06-30T09:22:00+09:00',
+    );
+    expect(result.itineraries.first.realtimeArrivalTime, isNull);
+    expect(result.itineraries.first.commercialEtaEligible, isFalse);
+    expect(result.itineraries.first.accessibilityRisk.level, 'REVIEW_REQUIRED');
+    expect(result.itineraries.first.legs.single.legType, 'ACCESS');
+    expect(result.itineraries.first.legs.single.waitTimeSeconds, 0);
+    expect(result.itineraries.first.legs.single.slackSeconds, 0);
+    expect(result.itineraries.first.legs.single.etaSource, 'STATIC_BACKEND_V1');
+  });
+
   test('경로 contract는 accessibilityScore만으로 이동 비용을 대체하지 않는다', () {
     expect(
       () => RouteSearchResult.fromJson({
