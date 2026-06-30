@@ -4425,7 +4425,7 @@ class SupportAccessScreen extends StatelessWidget {
                 onDeleted: onUserDataDeleted,
               ),
             const SizedBox(height: 20),
-            const _SupportSectionTitle(title: '이동 전 확인'),
+            const _SupportSectionTitle(title: '이동 전 살펴보기'),
             const _SafetyDataNotice(),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
@@ -5188,7 +5188,7 @@ class _SecurityContactNoticeLine extends StatelessWidget {
 class _SafetyDataNotice extends StatelessWidget {
   const _SafetyDataNotice();
 
-  static const _title = '이동 전 확인';
+  static const _title = '이동 전 살펴보기';
   static const _referenceNotice = '경로와 시설 정보는 이동을 돕는 참고 정보입니다.';
   static const _fieldNotice = '실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.';
   static const _limitationNotice = '실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.';

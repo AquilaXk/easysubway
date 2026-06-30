@@ -416,6 +416,8 @@ void main() {
 
     expect(result.blockedReasonLabels, ['꼭 필요한 시설을 지금 이용하기 어려워요.']);
     expect(result.semanticLabel, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
+    expect(result.semanticLabel, contains('이동 전 살펴보기'));
+    expect(result.semanticLabel, isNot(contains('이동 전 확인')));
     expect(result.semanticLabel, isNot(contains('안내할 수 있는 경로를 아직 찾지 못했어요.')));
   });
 

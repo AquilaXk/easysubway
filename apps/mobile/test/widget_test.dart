@@ -4513,7 +4513,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 이동 전 확인 안내를 함께 보여준다', (tester) async {
+  testWidgets('도움말은 이동 전 살펴보기 안내를 함께 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -4534,7 +4534,7 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('이동 전 확인'), findsWidgets);
+      expect(find.text('이동 전 살펴보기'), findsWidgets);
       expect(find.text('경로와 시설 정보는 이동을 돕는 참고 정보입니다.'), findsOneWidget);
       expect(
         find.text('실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요.'),
@@ -4552,7 +4552,7 @@ void main() {
           .getSemanticsData();
       expect(
         noticeSemantics.label,
-        '이동 전 확인, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
+        '이동 전 살펴보기, 경로와 시설 정보는 이동을 돕는 참고 정보입니다. 실제 이동 전에는 현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요. 실시간 상태나 무조건 안전한 경로를 보장하지 않습니다.',
       );
     } finally {
       semanticsHandle.dispose();
