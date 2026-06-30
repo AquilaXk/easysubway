@@ -41,6 +41,12 @@ const _homeHeroCardPadding = EdgeInsets.fromLTRB(20, 24, 20, 24);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
+const _appCardRadius = 20.0;
+const _homeActionButtonRadius = 12.0;
+const _homeRouteDraftRadius = 18.0;
+const _homeRouteDraftIconRadius = 13.0;
+const _homeRecentRouteRadius = 26.0;
+const _dataDeletionResultIconRadius = 16.0;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(8));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(14));
 const _appCardShadowColor = Color(0x0A071B2F);
@@ -2247,7 +2253,7 @@ class _NotificationInboxCard extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: open,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(_appCardRadius),
           child: card,
         ),
       ),
@@ -2436,7 +2442,9 @@ class _HomeStationActionButton extends StatelessWidget {
         foregroundColor: EasySubwayAccessibleColors.brandDark,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         minimumSize: const Size.fromHeight(72),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_homeActionButtonRadius),
+        ),
         textStyle: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
       ),
       icon: Icon(icon, size: 28),
@@ -2504,11 +2512,11 @@ class _HomeRouteDraftCard extends StatelessWidget {
           child: InkWell(
             key: const Key('homeRouteDraftPanel'),
             onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(_homeRouteDraftRadius),
             child: _AppCard(
               backgroundColor: EasySubwayAccessibleColors.skySoft,
               borderColor: _homeInfoBorderColor,
-              borderRadius: 18,
+              borderRadius: _homeRouteDraftRadius,
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
@@ -2517,7 +2525,9 @@ class _HomeRouteDraftCard extends StatelessWidget {
                     height: 42,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(13),
+                      borderRadius: BorderRadius.circular(
+                        _homeRouteDraftIconRadius,
+                      ),
                     ),
                     child: const Icon(
                       Icons.route_outlined,
@@ -2771,7 +2781,9 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
       color: Colors.white,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_homeActionButtonRadius),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
         child: Column(
@@ -3004,9 +3016,9 @@ class _HomeRecentRouteCard extends StatelessWidget {
         child: InkWell(
           key: const Key('homeRecentRouteCard'),
           onTap: () => unawaited(onTap()),
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(_homeRecentRouteRadius),
           child: _AppCard(
-            borderRadius: 26,
+            borderRadius: _homeRecentRouteRadius,
             showBorder: true,
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
             child: Row(
@@ -3101,7 +3113,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(_appCardRadius),
           child: _AppCard(
             showBorder: true,
             child: Row(
@@ -5073,7 +5085,9 @@ class _DataDeletionResultRow extends StatelessWidget {
               height: 60,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(
+                  _dataDeletionResultIconRadius,
+                ),
                 border: Border.all(
                   color: EasySubwayAccessibleColors.mintDark,
                   width: 2,
@@ -5226,7 +5240,7 @@ class _SafetyDataNotice extends StatelessWidget {
           decoration: BoxDecoration(
             color: EasySubwayAccessibleColors.amberSoft,
             border: Border.all(color: EasySubwayAccessibleColors.amber),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _mainThemeControlRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -5359,7 +5373,7 @@ class _PrivacyDataUseSummary extends StatelessWidget {
           decoration: BoxDecoration(
             color: EasySubwayAccessibleColors.mintSoft,
             border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _mainThemeControlRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -5582,7 +5596,7 @@ class FeatureTile extends StatelessWidget {
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _mainThemeControlRadius,
               side: const BorderSide(color: EasySubwayAccessibleColors.line),
             ),
             child: Padding(
