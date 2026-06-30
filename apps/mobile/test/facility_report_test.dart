@@ -800,7 +800,7 @@ void main() {
     expect(reportedErrors.single.stack, isNotNull);
   });
 
-  test('시설 신고 API 저장소는 접수번호로 처리 상태를 조회한다', () async {
+  test('시설 신고 API 저장소는 접수번호로 제보 진행 상황을 조회한다', () async {
     late String requestMethod;
     late String requestPath;
     late String? receiptTokenHeader;
@@ -1011,7 +1011,7 @@ void main() {
         isA<FacilityReportException>().having(
           (error) => error.message,
           'message',
-          '처리 상태를 확인하지 못했어요.',
+          '제보 진행 상황을 확인하지 못했어요.',
         ),
       ),
     );
@@ -1046,7 +1046,7 @@ void main() {
     expect(controller.state.message, '제보를 보냈어요.');
   });
 
-  test('시설 신고 컨트롤러는 접수 후 처리 상태를 다시 확인한다', () async {
+  test('시설 신고 컨트롤러는 접수 후 제보 진행 상황을 다시 확인한다', () async {
     final repository = RefreshableFacilityReportRepository();
     final controller = FacilityReportController(repository: repository);
     addTearDown(controller.dispose);
@@ -1063,14 +1063,14 @@ void main() {
 
     expect(repository.loadedReportIds, ['report-1']);
     expect(controller.state.status, FacilityReportViewStatus.loading);
-    expect(controller.state.message, '처리 상태 확인 중');
+    expect(controller.state.message, '제보 진행 상황 확인 중');
     expect(controller.state.result?.statusLabel, '접수됨');
 
     repository.completeRefresh();
     await refresh;
 
     expect(controller.state.status, FacilityReportViewStatus.success);
-    expect(controller.state.message, '처리 상태를 확인했습니다.');
+    expect(controller.state.message, '제보 진행 상황을 확인했어요.');
     expect(controller.state.result?.statusLabel, '반영됨');
   });
 
@@ -1089,7 +1089,7 @@ void main() {
 
     expect(repository.loadedReportIds, ['report-1']);
     expect(controller.state.status, FacilityReportViewStatus.failure);
-    expect(controller.state.message, '처리 상태를 확인하지 못했어요.');
+    expect(controller.state.message, '제보 진행 상황을 확인하지 못했어요.');
     expect(controller.state.result?.id, 'report-1');
     expect(controller.state.result?.statusLabel, '접수됨');
   });
@@ -1227,7 +1227,7 @@ class FailingRefreshFacilityReportRepository
   @override
   Future<FacilityReportResult> getReport(String reportId) {
     loadedReportIds.add(reportId);
-    return Future.error(const FacilityReportException('처리 상태를 확인하지 못했어요.'));
+    return Future.error(const FacilityReportException('제보 진행 상황을 확인하지 못했어요.'));
   }
 
   @override
