@@ -8125,7 +8125,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('시설'), findsOneWidget);
-      expect(find.text('시설 정보가 아직 없습니다.'), findsOneWidget);
+      expect(find.text('시설 안내를 준비 중이에요.'), findsOneWidget);
       expect(find.text('확인 필요 없음'), findsNothing);
       expect(find.bySemanticsLabel('다시 볼 시설 없음'), findsNothing);
     } finally {
