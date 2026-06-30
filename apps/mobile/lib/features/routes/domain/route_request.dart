@@ -6,20 +6,34 @@ enum MobilityType {
   temporaryInjury,
   luggage;
 
-  bool get blocksStairOnlyAccess =>
-      this == MobilityType.wheelchair || this == MobilityType.stroller;
+  ConstraintMode get defaultConstraintMode => this == MobilityType.wheelchair
+      ? ConstraintMode.strictStepFree
+      : ConstraintMode.preferStepFree;
+
+  bool blocksStairOnlyAccess(ConstraintMode? mode) =>
+      (mode ?? defaultConstraintMode) == ConstraintMode.strictStepFree;
 }
+
+enum ConstraintMode { strictStepFree, preferStepFree, allowWithWarnings }
 
 class RouteRequest {
   const RouteRequest({
     required this.originStationId,
     required this.destinationStationId,
     required this.mobilityType,
+    this.constraintMode,
   });
 
   final String originStationId;
   final String destinationStationId;
   final MobilityType mobilityType;
+  final ConstraintMode? constraintMode;
+
+  ConstraintMode get effectiveConstraintMode =>
+      constraintMode ?? mobilityType.defaultConstraintMode;
+
+  bool get blocksStairOnlyAccess =>
+      mobilityType.blocksStairOnlyAccess(effectiveConstraintMode);
 }
 
 class InternalRouteSearchRequest {
