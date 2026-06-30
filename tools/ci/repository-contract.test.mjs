@@ -4276,8 +4276,10 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-strict-route-coverage-"));
   const importedFixturePath = path.join(outputDir, "capital-pilot-production.json");
 
-  assert.doesNotMatch(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes/);
+  assert.doesNotMatch(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes\(String\(edge\.accessibility_status/);
   assert.match(validator, /String\(edge\.accessibility_status \?\? ""\)\.toUpperCase\(\) === "AVAILABLE"/);
+  assert.match(validator, /function isAccessibilityProvenanceCandidate/);
+  assert.match(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes\(accessibilityStatus\)/);
   assert.match(validator, /unverifiedAccessibilityCoverageEdges/);
 
   for (const candidate of input.movementPathCandidates) {
