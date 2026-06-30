@@ -48,6 +48,8 @@ const _highContrastSecondaryColor = Color(0xFF005E68);
 const _homeRouteDraftBorderColor = Color(0xFFB7DDF4);
 const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
 const _homeFacilityInfoBorderColor = Color(0xFFC8E6F8);
+const _settingsSwitchActiveTrackColor = Color(0xFF0D8A6D);
+const _settingsSwitchInactiveTrackColor = Color(0xFFC8D3DC);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -3785,9 +3787,9 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 value: enabled,
                 onChanged: onChanged,
                 activeThumbColor: Colors.white,
-                activeTrackColor: const Color(0xFF0D8A6D),
+                activeTrackColor: _settingsSwitchActiveTrackColor,
                 inactiveThumbColor: Colors.white,
-                inactiveTrackColor: const Color(0xFFC8D3DC),
+                inactiveTrackColor: _settingsSwitchInactiveTrackColor,
                 materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
             ],
@@ -4986,7 +4988,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
             const SizedBox(height: 12),
             const _AppCard(
               backgroundColor: EasySubwayAccessibleColors.skySoft,
-              borderColor: Color(0xFFB7DDF4),
+              borderColor: _homeRouteDraftBorderColor,
               child: _AppInfoRow(
                 icon: Icons.map_outlined,
                 iconBackground: Colors.white,
