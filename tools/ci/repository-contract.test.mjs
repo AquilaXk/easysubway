@@ -424,10 +424,10 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:[\s\S]*actions:\s*read[\s\S]*contents:\s*read/);
   assert.doesNotMatch(workflow, /\nconcurrency:\s*\n\s*group: cd-production-deploy/);
-  assert.match(workflow, /environment: production/);
   assert.match(workflow, /runs-on:[\s\S]*-\s*self-hosted[\s\S]*-\s*easysubway-production/);
   assert.match(workflow, /name: CD Deploy/);
   const deployJob = workflow.match(/\n  deploy:[\s\S]*$/)?.[0] ?? "";
+  assert.doesNotMatch(deployJob, /environment:\s*production/, "automatic server CD must not wait for production environment review");
   assert.match(deployJob, /\n    concurrency:\s*\n\s*group: cd-production-deploy\s*\n\s*cancel-in-progress: false/);
   assert.match(workflow, /secrets\.EASYSUBWAY_ENV/);
   assert.match(workflow, /CD Deploy \/ Validate manual dispatch CI/);
@@ -455,8 +455,8 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.doesNotMatch(workflow, /DEPLOY_HOST: \$\{\{ secrets\.DEPLOY_HOST \}\}/);
   assert.doesNotMatch(workflow, /DEPLOY_USER: \$\{\{ secrets\.DEPLOY_USER \}\}/);
   assert.doesNotMatch(workflow, /DEPLOY_SSH_PRIVATE_KEY: \$\{\{ secrets\.DEPLOY_SSH_PRIVATE_KEY \}\}/);
-  assert.match(workflow, /DEPLOY_ROOT: \$\{\{ vars\.DEPLOY_ROOT \}\}/);
-  assert.match(workflow, /DEPLOY_COMPOSE_PROJECT: \$\{\{ vars\.DEPLOY_COMPOSE_PROJECT \}\}/);
+  assert.match(workflow, /DEPLOY_ROOT="\$\{DEPLOY_ROOT:-\/opt\/easysubway\}"/);
+  assert.match(workflow, /DEPLOY_COMPOSE_PROJECT="\$\{DEPLOY_COMPOSE_PROJECT:-easysubway\}"/);
   assert.doesNotMatch(workflow, /missing_ssh_credentials/);
   assert.doesNotMatch(workflow, /\bssh\b|\bscp\b/);
   assert.match(workflow, /invalid_deploy_root/);
@@ -627,7 +627,8 @@ test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
   assert.match(readme, /애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
-  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
+  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
+  assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
