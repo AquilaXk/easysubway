@@ -2271,6 +2271,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.deepEqual(gate.gateStatusEnum, [
     "NOT_STARTED",
     "IN_PROGRESS",
+    "DENOMINATOR_LOCKED",
     "BLOCKED_EXTERNAL",
     "BLOCKED_TECHNICAL",
     "SATISFIED",
@@ -3828,6 +3829,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
 test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
   const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
 
@@ -3836,9 +3838,28 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.androidApplicationId, "com.easysubway.app");
   assert.equal(scope.releaseGate, "production-datapack-scope");
   assert.equal(scope.issue, 547);
+  assert.equal(scope.status, "DENOMINATOR_LOCKED");
+  assert.equal(scope.statusDetail, "SUPPORTED_STATION_LINE_OPERATOR_DENOMINATOR_LOCKED");
   assert.equal(scope.decision.approvalState, "qa-approved");
   assert.equal(scope.supportScope.id, "capital_pilot_android_v1");
   assert.deepEqual(scope.supportScope.regionIds, ["capital"]);
+  assert.equal(scope.supportScope.supportedClaimKo, "상록수·사당 검증 pilot");
+  assert.deepEqual(scope.supportScope.includedOperatorIds, ["seoul-metro"]);
+  assert.deepEqual(scope.supportScope.includedLineIds, ["seoul-4"]);
+  assert.deepEqual(scope.supportScope.includedStationIds, ["station-sangnoksu", "station-sadang"]);
+  assert.deepEqual(scope.supportScope.requiredFacilityTypes, ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"]);
+  assert.deepEqual(scope.supportScope.facilityCoverageDenominator, {
+    kind: "station_x_required_facility_type",
+    expectedRows: 6,
+  });
+  assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.supportScope.includedOperatorIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.supportScope.includedLineIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, scope.supportScope.includedStationIds);
+  assert.deepEqual(productionInput.supportedV1Scope.requiredFacilityTypes, scope.supportScope.requiredFacilityTypes);
+  assert.deepEqual(
+    productionInput.supportedV1Scope.facilityCoverageDenominator,
+    scope.supportScope.facilityCoverageDenominator,
+  );
   assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
     "UNSUPPORTED_REGION",
     "다시 확인",
@@ -3934,6 +3955,258 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.evidencePolicy.githubSummaryOnly, true);
   assert.ok(scope.linkedReleaseBlockers.includes(571));
   assert.ok(scope.linkedReleaseBlockers.includes(1020));
+});
+
+test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-denominator-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.stationMappings.push({
+    sourceId: "molit-urban-rail-full-route",
+    sourceStationCode: "MOLIT-SEOUL-4-999",
+    lineId: "seoul-4",
+    stationId: "station-extra",
+    stationLineId: "station-extra:seoul-4",
+    mappingStatus: "active",
+  });
+  input.stationLineRows.push({
+    ...input.stationLineRows[0],
+    sourceStationCode: "MOLIT-SEOUL-4-999",
+    stationNameKo: "추가",
+    stationNameEn: "Extra",
+    normalizedName: "추가",
+    stationCode: "999",
+    lineSequence: 99,
+  });
+  for (const [sourceId, type] of [
+    ["kric-station-elevator", "ELEVATOR"],
+    ["kric-station-escalator", "ESCALATOR"],
+    ["kric-wheelchair-lift-location", "WHEELCHAIR_LIFT"],
+  ]) {
+    input.facilityRows.push({
+      ...input.facilityRows[0],
+      sourceId,
+      id: `facility-extra-${type.toLowerCase()}`,
+      station: {
+        sourceId: "molit-urban-rail-full-route",
+        sourceStationCode: "MOLIT-SEOUL-4-999",
+        lineId: "seoul-4",
+      },
+      type,
+      name: `추가 ${type}`,
+      providerFacilityRef: `extra-${type}`,
+    });
+  }
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+  );
+});
+
+test("official source importer는 locked production operator 밖 line metadata를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-operator-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.operators.push({
+    id: "other-operator",
+    nameKo: "다른 운영사",
+    nameEn: "Other Operator",
+  });
+  input.lines[0].operatorId = "other-operator";
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope operator outside supportedV1Scope\.includedOperatorIds: other-operator/,
+  );
+});
+
+test("official source importer는 locked production operator metadata 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-operator-metadata-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.operators = [];
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /supportedV1Scope\.includedOperatorIds missing production operator metadata: seoul-metro/,
+  );
+});
+
+test("official source importer는 locked production denominator 밖 route endpoint를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-route-endpoint-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.stationMappings.push({
+    sourceId: "seoulmetro-station-line-info",
+    sourceStationCode: "999",
+    lineId: "seoul-4",
+    stationId: "station-extra",
+    stationLineId: "station-extra:seoul-4",
+    mappingStatus: "active",
+  });
+  input.routeEdges.push({
+    ...input.routeEdges[0],
+    id: "edge-extra-route-endpoint",
+    from: {
+      sourceId: "seoulmetro-station-line-info",
+      sourceStationCode: "448",
+      lineId: "seoul-4",
+    },
+    to: {
+      sourceId: "seoulmetro-station-line-info",
+      sourceStationCode: "999",
+      lineId: "seoul-4",
+    },
+  });
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+  );
+});
+
+test("official source importer는 locked production denominator 밖 pass-through station을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-pass-through-station-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.stationMappings.push({
+    sourceId: "molit-urban-rail-full-route",
+    sourceStationCode: "MOLIT-SEOUL-4-999",
+    lineId: "seoul-4",
+    stationId: "station-extra",
+    stationLineId: "station-extra:seoul-4",
+    mappingStatus: "renamed",
+    previousNames: ["추가역"],
+  });
+  input.stationExits = [
+    {
+      id: "exit-extra",
+      stationId: "station-extra",
+      exitNumber: "1",
+      description: "scope 밖 station exit",
+    },
+  ];
+  input.stationAccessibilitySummaries = [
+    {
+      stationId: "station-extra",
+      summary: "scope 밖 station 접근성 요약",
+    },
+  ];
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+  );
+});
+
+test("official source importer는 locked production line denominator의 metadata-only 확장을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-line-metadata-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.supportedV1Scope.includedLineIds.push("seoul-5");
+  input.lines.push({
+    id: "seoul-5",
+    operatorId: "seoul-metro",
+    nameKo: "수도권 5호선",
+    nameEn: "Seoul Subway Line 5",
+    color: "#996CAC",
+  });
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /supportedV1Scope\.includedLineIds missing production station row: seoul-5/,
+  );
 });
 
 test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 고정한다", () => {

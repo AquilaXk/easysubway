@@ -28,6 +28,7 @@
   "gateStatusEnum": [
     "NOT_STARTED",
     "IN_PROGRESS",
+    "DENOMINATOR_LOCKED",
     "BLOCKED_EXTERNAL",
     "BLOCKED_TECHNICAL",
     "SATISFIED",
