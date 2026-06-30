@@ -155,6 +155,9 @@ is_satisfied_by_runtime_fallback() {
 is_required_env_satisfied() {
   local name="$1"
   case "${name}" in
+    SLACK_CI_WEBHOOK_URL|SLACK_RELEASE_WEBHOOK_URL|SLACK_SECURITY_WEBHOOK_URL)
+      true
+      ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
       if has_env_name "${name}"; then
         is_bool_env_value "${name}"
