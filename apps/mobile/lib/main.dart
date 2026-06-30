@@ -4948,10 +4948,10 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     icon: Icons.report_outlined,
                     title: deletionScope == UserDataDeletionScope.deviceOnly
                         ? '이 기기의 제보 기록'
-                        : '제보 연결 정보',
+                        : '보낸 제보 기록',
                     value: deletionScope == UserDataDeletionScope.deviceOnly
                         ? '${result.anonymizedReportCount}건 삭제'
-                        : '${result.anonymizedReportCount}건 개인정보 제거',
+                        : '${result.anonymizedReportCount}건을 누구의 정보인지 알 수 없게 바꿈',
                   ),
                   if (deletionScope != UserDataDeletionScope.deviceOnly)
                     const SizedBox(height: 16),
@@ -4959,8 +4959,9 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     _DataDeletionResultRow(
                       id: 'routeFeedback',
                       icon: Icons.rate_review_outlined,
-                      title: '경로 의견 연결 정보',
-                      value: '${result.anonymizedRouteFeedbackCount}건 개인정보 제거',
+                      title: '경로 의견',
+                      value:
+                          '${result.anonymizedRouteFeedbackCount}건을 누구의 정보인지 알 수 없게 바꿈',
                     ),
                 ],
               ),
