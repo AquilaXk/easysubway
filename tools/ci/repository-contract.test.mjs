@@ -436,6 +436,10 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
   assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
+  assert.match(workflow, /CD Plan \/ Detect deployment changes/);
+  assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
+  assert.match(workflow, /deploy_target_relevant: \$\{\{ steps\.changes\.outputs\.deploy \}\}/);
+  assert.match(workflow, /if: \$\{\{ needs\.plan\.outputs\.deploy_target_relevant == 'true' \}\}/);
   assert.match(workflow, /CD Deploy \/ Prepare split deployment env files/);
   assert.match(workflow, /tools\/deploy\/prepare-deployment-env\.sh/);
   assert.match(workflow, /tools\/deploy\/compose-server-env\.allowlist/);
