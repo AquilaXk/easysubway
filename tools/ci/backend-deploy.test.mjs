@@ -109,6 +109,11 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
     prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\n`),
     /alertmanager external URL must not be internal/,
   );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[::1]:9093\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\n`),
+    /alertmanager external URL must not be internal/,
+  );
+  await prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[2001:db8::10]:9093/alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\nEASYSUBWAY_ALERT_SMTP_REQUIRE_TLS=true\n`);
   const outputDir = await prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://ops.easysubway.example/alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\nEASYSUBWAY_ALERT_SMTP_REQUIRE_TLS=true\n`);
   const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
   const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
