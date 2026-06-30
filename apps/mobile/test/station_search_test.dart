@@ -1307,7 +1307,7 @@ void main() {
     );
   });
 
-  test('역 상세 상태는 쉬운 이동 구조 요약을 만든다', () {
+  test('역 상세 상태는 쉬운 역 안 이동 안내 요약을 만든다', () {
     final state = StationDetailState(
       status: StationDetailStatus.success,
       detail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
@@ -1349,7 +1349,7 @@ void main() {
     ]);
     expect(
       state.layoutSummarySemanticLabel,
-      '이동 구조, 1번 출구, 엘리베이터, 장애인 화장실, 승강장',
+      '역 안 이동 안내, 1번 출구, 엘리베이터, 장애인 화장실, 승강장',
     );
   });
 
