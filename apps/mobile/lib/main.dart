@@ -36,6 +36,7 @@ const defaultDemoHomeDataEnabled = bool.fromEnvironment(
   defaultValue: false,
 );
 const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
+const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1983,7 +1984,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                padding: _mainListPagePadding,
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
@@ -3862,7 +3863,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                padding: _mainListPagePadding,
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
