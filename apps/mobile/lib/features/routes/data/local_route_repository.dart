@@ -20,14 +20,17 @@ class LocalRouteRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
     final mobilityType = _mobilityType(request.mobilityType);
+    final constraintMode = _constraintMode(request.effectiveConstraintMode);
     final result =
-        mobilityType.blocksStairOnlyAccess && !catalog.strictEvidenceSupported
+        mobilityType.blocksStairOnlyAccess(constraintMode) &&
+            !catalog.strictEvidenceSupported
         ? local.LocalRouteResult.unknown(const ['STRICT_EVIDENCE_UNSUPPORTED'])
         : LocalRouteEngine(graph: catalog.toGraph()).search(
             local.RouteRequest(
               originStationId: request.originStationId,
               destinationStationId: request.destinationStationId,
               mobilityType: mobilityType,
+              constraintMode: constraintMode,
             ),
           );
 
@@ -288,6 +291,15 @@ class LocalRouteRepository implements RouteSearchRepository {
       'TEMPORARY_INJURY' => local.MobilityType.temporaryInjury,
       'LUGGAGE' => local.MobilityType.luggage,
       _ => throw const RouteSearchException('지원하지 않는 이동 조건입니다.'),
+    };
+  }
+
+  local.ConstraintMode _constraintMode(String constraintMode) {
+    return switch (constraintMode) {
+      'STRICT_STEP_FREE' => local.ConstraintMode.strictStepFree,
+      'PREFER_STEP_FREE' => local.ConstraintMode.preferStepFree,
+      'ALLOW_WITH_WARNINGS' => local.ConstraintMode.allowWithWarnings,
+      _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
 }

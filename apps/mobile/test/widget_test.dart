@@ -6102,6 +6102,8 @@ void main() {
       expect(find.bySemanticsLabel('출발 도착 바꾸기'), findsOneWidget);
       expect(find.text('이동 조건'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
+      expect(find.text('계단 없는 길만'), findsOneWidget);
+      expect(find.text('켜면 경로가 줄거나 없을 수 있어요.'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
 
       await tester.drag(find.byType(ListView), const Offset(0, -260));
@@ -6115,6 +6117,43 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('경로 검색 strict switch는 STRICT_STEP_FREE 요청을 보낸다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 30),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeStrictStepFreeSwitch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests.single.mobilityType, 'SENIOR');
+    expect(
+      routeRepository.requests.single.effectiveConstraintMode,
+      'STRICT_STEP_FREE',
+    );
   });
 
   testWidgets('경로 검색 최근 도착지 실패는 빈 화면으로 숨기지 않는다', (tester) async {

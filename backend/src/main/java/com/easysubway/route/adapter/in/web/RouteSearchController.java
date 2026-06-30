@@ -5,6 +5,7 @@ import com.easysubway.common.web.ApiResponse;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
+import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
@@ -51,11 +52,15 @@ class RouteSearchController {
 		@NotBlank(message = "도착역을 선택해야 합니다.")
 		String destinationStationId,
 		@NotNull(message = "이동 유형을 선택해야 합니다.")
-		MobilityType mobilityType
+		MobilityType mobilityType,
+		String constraintMode
 	) {
 
 		SearchRouteCommand toCommand() {
-			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType);
+			ConstraintMode mode = constraintMode == null || constraintMode.isBlank()
+				? ConstraintMode.defaultFor(mobilityType)
+				: parseConstraintMode(constraintMode);
+			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType, mode);
 		}
 	}
 
@@ -138,7 +143,7 @@ class RouteSearchController {
 	) {
 
 		SearchRouteCommand toCommand() {
-			return new SearchRouteCommand(originStationId, destinationStationId, effectiveMobilityType());
+			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType, parseConstraintMode(constraintMode));
 		}
 
 		OffsetDateTime parsedDepartureTime() {
@@ -149,15 +154,6 @@ class RouteSearchController {
 			}
 		}
 
-		private MobilityType effectiveMobilityType() {
-			if ("PROFILE_DEFAULT".equals(constraintMode)) {
-				return mobilityType;
-			}
-			if ("STRICT_STEP_FREE".equals(constraintMode)) {
-				return MobilityType.WHEELCHAIR;
-			}
-			throw new InvalidRequestException("지원하지 않는 이동 제약 조건입니다.");
-		}
 	}
 
 	private record RouteSearchV2Response(
@@ -334,5 +330,13 @@ class RouteSearchController {
 
 	private static String formatOffset(OffsetDateTime dateTime) {
 		return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"));
+	}
+
+	private static ConstraintMode parseConstraintMode(String value) {
+		try {
+			return ConstraintMode.valueOf(value);
+		} catch (IllegalArgumentException exception) {
+			throw new InvalidRequestException("지원하지 않는 이동 제약 조건입니다.", exception);
+		}
 	}
 }

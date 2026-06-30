@@ -128,6 +128,22 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('일시적 부상 strict 조건은 계단만 있는 경로를 차단한다', () {
+      final engine = LocalRouteEngine(graph: _stairOnlyFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.temporaryInjury,
+          constraintMode: ConstraintMode.strictStepFree,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS']);
+    });
+
     test('휠체어 조건은 미확인 접근성 edge를 안전한 경로로 사용하지 않는다', () {
       final engine = LocalRouteEngine(
         graph: _unknownAccessibilityFixtureGraph(),
@@ -367,6 +383,7 @@ void main() {
               originStationId: 'station-sangnoksu',
               destinationStationId: 'station-sadang',
               mobilityType: MobilityType.stroller,
+              constraintMode: ConstraintMode.strictStepFree,
             ),
           );
       final staleResult = LocalRouteEngine(graph: _lowQualityFixtureGraph())
@@ -375,6 +392,7 @@ void main() {
               originStationId: 'station-sangnoksu',
               destinationStationId: 'station-sadang',
               mobilityType: MobilityType.stroller,
+              constraintMode: ConstraintMode.strictStepFree,
             ),
           );
       final generatedResult =
@@ -383,6 +401,7 @@ void main() {
               originStationId: 'station-a',
               destinationStationId: 'station-b',
               mobilityType: MobilityType.stroller,
+              constraintMode: ConstraintMode.strictStepFree,
             ),
           );
 
