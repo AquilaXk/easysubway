@@ -230,7 +230,7 @@ if is_alert_email_enabled; then
   fi
   alertmanager_url_normalized="$(printf '%s' "${alertmanager_url}" | tr '[:upper:]' '[:lower:]')"
   case "${alertmanager_url_normalized}" in
-    http://*|https://localhost*|https://127.*|https://[::1]*|https://alertmanager:*|https://prometheus:*) alert_invalid_names+=(EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL) ;;
+    http://*|https://localhost*|https://127.*|https://[::1]*|https://alertmanager|https://alertmanager/*|https://alertmanager:*|https://prometheus|https://prometheus/*|https://prometheus:*) alert_invalid_names+=(EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL) ;;
   esac
 fi
 
