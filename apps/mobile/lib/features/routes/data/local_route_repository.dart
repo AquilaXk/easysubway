@@ -273,7 +273,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
-      'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 없는 데이터팩은 계단 없는 경로로 안내하지 않아요.',
+      'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
       'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
       _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
     };
