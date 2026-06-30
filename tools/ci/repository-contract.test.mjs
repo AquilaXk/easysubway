@@ -5140,7 +5140,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /POSTGRES_DB: \$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
   assert.match(compose, /POSTGRES_USER: \$\{EASYSUBWAY_POSTGRES_USER:-easysubway\}/);
   assert.match(compose, /POSTGRES_PASSWORD: \$\{EASYSUBWAY_POSTGRES_PASSWORD:-easysubway_local\}/);
-  assert.match(compose, /"\$\{EASYSUBWAY_POSTGRES_PORT:-5432\}:5432"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_POSTGRES_PORT:-15432\}:5432"/);
   assert.match(compose, /pg_isready -U \$\$\{POSTGRES_USER\} -d \$\$\{POSTGRES_DB\}/);
   assert.match(compose, /postgres-data:\/var\/lib\/postgresql\/data/);
 
