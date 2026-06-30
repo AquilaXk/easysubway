@@ -51,8 +51,8 @@ const _normalPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.normal,
   severityLabel: '정상',
   statusTitle: '이용 가능',
-  nextActionLabel: '상태 제보',
-  nextActionDescription: '시설 상태가 다르면 제보해 주세요.',
+  nextActionLabel: '시설 알려주기',
+  nextActionDescription: '시설 안내가 다르면 알려 주세요.',
   priority: 40,
 );
 

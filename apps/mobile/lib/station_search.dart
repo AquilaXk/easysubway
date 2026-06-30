@@ -5334,7 +5334,7 @@ class _StationFacilityCard extends StatelessWidget {
                     Expanded(
                       child: Semantics(
                         container: true,
-                        label: '${facility.name} 상태 제보',
+                        label: '${facility.name} 시설 알려주기',
                         button: true,
                         onTap: onReportTap,
                         child: ExcludeSemantics(
@@ -5342,7 +5342,7 @@ class _StationFacilityCard extends StatelessWidget {
                             key: Key('facilityReportButton-${facility.id}'),
                             onPressed: onReportTap,
                             icon: const Icon(Icons.report_outlined),
-                            label: const Text('상태 제보'),
+                            label: const Text('시설 알려주기'),
                           ),
                         ),
                       ),
@@ -5564,7 +5564,7 @@ class FacilityDetailScreen extends StatelessWidget {
                 onReportTap();
               },
               icon: const Icon(Icons.report_outlined),
-              label: const Text('상태 제보'),
+              label: const Text('시설 알려주기'),
             ),
           ],
         ),
@@ -5587,9 +5587,9 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
 
 String _facilityDetailStatusDescription(StationFacilityInfo facility) {
   if (facility.needsAttention) {
-    return '현장 상태를 확인하고 정보가 다르면 상태 제보로 알려 주세요.';
+    return '현장 안내와 다르면 시설 알려주기로 알려 주세요.';
   }
-  return '시설 상태가 다르면 상태 제보로 알려 주세요.';
+  return '시설 안내가 다르면 시설 알려주기로 알려 주세요.';
 }
 
 String _facilityStatusTitle(StationFacilityInfo facility) {
