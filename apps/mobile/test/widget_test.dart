@@ -4895,12 +4895,14 @@ void main() {
 
       expect(
         find.text(
-          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 개인을 알 수 없게 처리하고 앱의 임시 설정을 초기화합니다.',
+          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꾸고 앱 설정을 초기화합니다.',
         ),
         findsOneWidget,
       );
       expect(
-        find.text('이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 삭제되거나 개인을 알 수 없게 처리됩니다.'),
+        find.text(
+          '이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 삭제되거나 누구의 정보인지 알 수 없게 바뀝니다.',
+        ),
         findsOneWidget,
       );
 
@@ -4910,12 +4912,12 @@ void main() {
       expect(
         summarySemantics.label,
         contains(
-          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 개인을 알 수 없게 처리하고 앱의 임시 설정을 초기화합니다.',
+          '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꾸고 앱 설정을 초기화합니다.',
         ),
       );
       expect(
         summarySemantics.label,
-        contains('이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 삭제되거나 개인을 알 수 없게 처리됩니다.'),
+        contains('이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 삭제되거나 누구의 정보인지 알 수 없게 바뀝니다.'),
       );
 
       await tester.scrollUntilVisible(
@@ -4929,15 +4931,12 @@ void main() {
       expect(find.text('보낸 정보 삭제'), findsWidgets);
       expect(
         find.text(
-          '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 개인을 알 수 없게 처리합니다.',
+          '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다.',
         ),
         findsOneWidget,
       );
       expect(find.textContaining('이미 보낸 시설 제보'), findsNothing);
-      expect(
-        find.text('삭제가 끝나면 보낸 정보가 정리되고 앱의 임시 설정이 초기화됩니다.'),
-        findsOneWidget,
-      );
+      expect(find.text('삭제가 끝나면 보낸 정보가 정리되고 앱 설정이 초기화됩니다.'), findsOneWidget);
       expect(find.text('앱은 처음 설정 화면으로 돌아갑니다.'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('dataDeletionStartButton')));
@@ -4946,7 +4945,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(
         find.text(
-          '삭제 후에는 보낸 정보와 설정이 삭제되거나 개인을 알 수 없게 처리되고 앱의 임시 설정이 초기화됩니다. 되돌릴 수 없습니다.',
+          '삭제 후에는 보낸 정보와 설정이 삭제되거나 누구의 정보인지 알 수 없게 바뀌고 앱 설정이 초기화됩니다. 되돌릴 수 없습니다.',
         ),
         findsOneWidget,
       );
