@@ -1111,7 +1111,7 @@ void main() {
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, isEmpty);
     expect(controller.state.status, StationSearchStatus.failure);
-    expect(controller.state.message, '위치 권한을 확인해 주세요.');
+    expect(controller.state.message, '위치 설정에서 현재 위치 사용을 켜 주세요.');
   });
 
   test('역 검색 컨트롤러는 주변 검색 중 화면이 닫히면 늦은 응답을 알리지 않는다', () async {

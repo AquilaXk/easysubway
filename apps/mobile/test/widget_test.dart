@@ -7191,7 +7191,7 @@ void main() {
     expect(find.text('현재 위치 사용'), findsOneWidget);
     expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
     expect(
-      find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
+      find.text('위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.'),
       findsOneWidget,
     );
 
@@ -7317,11 +7317,14 @@ void main() {
 
       expect(locationProvider.requestCount, 1);
       expect(repository.requestedNearbyLocations, isEmpty);
-      expect(find.text('위치 권한을 확인해 주세요.'), findsOneWidget);
-      expect(find.bySemanticsLabel('위치 권한을 확인해 주세요.'), findsOneWidget);
-      expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsOneWidget);
+      expect(find.text('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
+      expect(find.bySemanticsLabel('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('도움말, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+        find.text('역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('도움말, 역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
         findsOneWidget,
       );
 
@@ -7355,9 +7358,9 @@ void main() {
 
     expect(repository.requestedQueries, ['없는역']);
     expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
-    expect(find.text('역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'), findsNothing);
+    expect(find.text('역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'), findsNothing);
     expect(
-      find.bySemanticsLabel('도움말, 역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다.'),
+      find.bySemanticsLabel('도움말, 역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
       findsNothing,
     );
   });
@@ -11038,7 +11041,7 @@ void main() {
     expect(find.text('현재 위치 사용'), findsOneWidget);
     expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
     expect(
-      find.text('위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.'),
+      find.text('위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.'),
       findsOneWidget,
     );
     expect(find.text('현재 위치 첨부됨'), findsNothing);
@@ -11669,7 +11672,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('위치 권한을 허용해 주세요.'), findsOneWidget);
+    expect(find.text('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),

@@ -24,11 +24,12 @@ const _facilityReportPhotoTooLargeMessage = '사진이 너무 큽니다. 다른 
 const _facilityReportPhotoUploadMaxAttempts = 2;
 const _facilityReportLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
+const _facilityReportLocationPermissionMessage = '위치 설정에서 현재 위치 사용을 켜 주세요.';
 const _facilityReportLocationRationaleTitle = '현재 위치 사용';
 const _facilityReportLocationRationalePurpose =
     '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
 const _facilityReportLocationRationaleFallback =
-    '위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다.';
+    '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
 const _facilityReportUploadDisclosureTitle = '사진·위치 확인';
 const _facilityReportUploadDisclosurePurpose = '사진과 제보 위치는 시설 제보 확인에만 사용됩니다.';
 const _facilityReportUploadDisclosureScope =
@@ -2241,7 +2242,9 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       }
       setState(() {
         _attachedLocation = null;
-        _locationMessage = error.message;
+        _locationMessage = _friendlyFacilityReportLocationMessage(
+          error.message,
+        );
         _isLocationFailure = true;
         _submitWithoutLocation = false;
       });
@@ -2266,6 +2269,13 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       }
     }
   }
+}
+
+String _friendlyFacilityReportLocationMessage(String message) {
+  if (message.contains('권한')) {
+    return _facilityReportLocationPermissionMessage;
+  }
+  return message.isEmpty ? '현재 위치를 확인하지 못했어요.' : message;
 }
 
 class _FacilityReportStatusPanel extends StatelessWidget {
