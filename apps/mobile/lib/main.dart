@@ -42,6 +42,8 @@ const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(8));
+const _mainIconControlRadius = BorderRadius.all(Radius.circular(14));
+const _appCardShadowColor = Color(0x0A071B2F);
 const _highContrastTextColor = Color(0xFF000000);
 const _highContrastPrimaryColor = Color(0xFF003D40);
 const _highContrastSecondaryColor = Color(0xFF005E68);
@@ -1860,7 +1862,7 @@ class _HomeNotificationButton extends StatelessWidget {
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: _mainIconControlRadius,
                 ),
               ),
               icon: const Icon(Icons.notifications_none),
@@ -3241,7 +3243,7 @@ class _AppCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       color: backgroundColor,
       elevation: 2,
-      shadowColor: const Color(0x0A071B2F),
+      shadowColor: _appCardShadowColor,
       shape: RoundedRectangleBorder(
         side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
         borderRadius: BorderRadius.circular(borderRadius),
@@ -3283,7 +3285,7 @@ class _AppInfoRow extends StatelessWidget {
       height: iconBoxSize,
       decoration: BoxDecoration(
         color: iconBackground,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: _mainIconControlRadius,
       ),
       child: Icon(icon, color: iconColor, size: iconSize),
     );
