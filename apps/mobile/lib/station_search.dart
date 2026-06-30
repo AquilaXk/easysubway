@@ -862,23 +862,14 @@ class SubwayLineOption {
   final String lineCode;
   final bool active;
 
-  String get shortLabel {
-    if (lineCode.trim().isNotEmpty) {
-      return lineCode.trim();
-    }
-    return stationLineBadgeText(name);
-  }
-
   String get semanticLabel => name;
 
-  Color get badgeColor => stationLineColor(color);
-
-  String? get badgeAssetPath {
-    final assetName = stationLineBadgeAssetNameFor(id: id, name: name);
-    return assetName == null
-        ? null
-        : 'assets/metro_symbols/line_badges/$assetName';
-  }
+  StationSearchLine get badgeLine => StationSearchLine(
+    id: id,
+    name: name,
+    color: color,
+    stationCode: lineCode,
+  );
 }
 
 String _requiredString(Map<String, Object?> json, String key) {
@@ -2716,9 +2707,7 @@ class _StationLineFilterSection extends StatelessWidget {
                     label: line.name,
                     semanticLabel: line.semanticLabel,
                     selected: selectedLine?.id == line.id,
-                    badgeText: line.shortLabel,
-                    badgeColor: line.badgeColor,
-                    badgeAssetPath: line.badgeAssetPath,
+                    badgeLine: line.badgeLine,
                     onPressed: enabled ? () => onLineSelected(line) : null,
                   ),
                 OutlinedButton.icon(
@@ -2773,9 +2762,7 @@ class _StationLineFilterSection extends StatelessWidget {
                   label: line.name,
                   semanticLabel: line.semanticLabel,
                   selected: selectedLine?.id == line.id,
-                  badgeText: line.shortLabel,
-                  badgeColor: line.badgeColor,
-                  badgeAssetPath: line.badgeAssetPath,
+                  badgeLine: line.badgeLine,
                   onPressed: () => Navigator.of(context).pop(line),
                 ),
                 const SizedBox(height: 8),
@@ -2855,9 +2842,7 @@ class _StationLineFilterButton extends StatelessWidget {
     required this.semanticLabel,
     required this.selected,
     required this.onPressed,
-    this.badgeText,
-    this.badgeColor,
-    this.badgeAssetPath,
+    this.badgeLine,
     super.key,
   });
 
@@ -2865,9 +2850,7 @@ class _StationLineFilterButton extends StatelessWidget {
   final String semanticLabel;
   final bool selected;
   final VoidCallback? onPressed;
-  final String? badgeText;
-  final Color? badgeColor;
-  final String? badgeAssetPath;
+  final StationSearchLine? badgeLine;
 
   @override
   Widget build(BuildContext context) {
@@ -2908,65 +2891,13 @@ class _StationLineFilterButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (badgeText != null && badgeColor != null) ...[
-                _LineFilterBadge(
-                  text: badgeText!,
-                  color: badgeColor!,
-                  assetPath: badgeAssetPath,
-                ),
+              if (badgeLine != null) ...[
+                StationLineBadge(line: badgeLine!, size: 26),
                 const SizedBox(width: 8),
               ],
               Text(label),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LineFilterBadge extends StatelessWidget {
-  const _LineFilterBadge({
-    required this.text,
-    required this.color,
-    this.assetPath,
-  });
-
-  final String text;
-  final Color color;
-  final String? assetPath;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = assetPath;
-    if (path != null) {
-      final image = Image.asset(
-        path,
-        width: 26,
-        height: 26,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-      );
-      return stationLineBadgeNeedsRoundedCorners(path)
-          ? ClipRRect(borderRadius: BorderRadius.circular(4), child: image)
-          : image;
-    }
-
-    final textColor = stationLineTextColor(color);
-    final fontSize = RegExp(r'^\d+$').hasMatch(text) ? 20.0 : 12.0;
-
-    return CircleAvatar(
-      radius: 13,
-      backgroundColor: color,
-      child: Text(
-        text,
-        maxLines: 2,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: textColor,
-          fontSize: fontSize * 0.8,
-          fontWeight: FontWeight.w700,
-          height: 1.0,
         ),
       ),
     );

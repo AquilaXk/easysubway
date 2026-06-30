@@ -311,7 +311,7 @@ void main() {
     final lines = await repository.listLines();
 
     expect(requestedUri.path, '/api/v1/lines');
-    expect(lines.map((line) => line.shortLabel), ['4', '경의중앙']);
+    expect(lines.map((line) => line.badgeLine.badgeText), ['4', '경의중앙']);
     expect(lines.first.semanticLabel, '수도권 4호선');
   });
 
