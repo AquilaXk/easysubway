@@ -109,6 +109,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   const deploy = read("tools/deploy/deploy-backend.sh");
   const backup = read("tools/ops/postgres-backup.sh");
 
+  assert.match(deploy, /^set -Eeuo pipefail$/m);
   assert.match(deploy, /flock 9/);
   assert.match(deploy, /"\$\{DEPLOY_ROOT\}"\/incoming\/\*/);
   assert.match(deploy, /deployment-state\.env/);
@@ -126,12 +127,54 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /timeout 900 docker compose/);
   assert.match(deploy, /wait_stateful_service/);
   assert.match(deploy, /report_upload_bucket="\$\(read_env_value "\$\{BACKEND_ENV\}" EASYSUBWAY_REPORT_UPLOAD_BUCKET\)"/);
+  assert.match(deploy, /stop_legacy_backend_service\(\)/);
+  assert.match(deploy, /restore_legacy_backend_service\(\)/);
+  assert.match(deploy, /systemctl stop "\$\{LEGACY_BACKEND_UNIT\}"/);
+  assert.match(deploy, /systemctl disable "\$\{LEGACY_BACKEND_UNIT\}"/);
+  assert.match(deploy, /systemctl start "\$\{LEGACY_BACKEND_UNIT\}"/);
+  assert.match(deploy, /legacy_backend_still_running/);
+  assert.match(deploy, /legacy_backend_was_active=1/);
+  assert.match(deploy, /legacy_backend_was_enabled=1/);
+  assert.match(deploy, /legacy_restore_on_error=1/);
+  assert.match(deploy, /restore_legacy_on_unhandled_error\(\)/);
+  assert.match(deploy, /restore_legacy_on_interruption\(\)/);
+  assert.match(deploy, /trap restore_legacy_on_unhandled_error ERR/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption INT' INT/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption TERM' TERM/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption HUP' HUP/);
+  assert.match(deploy, /legacy_restore_unhandled_error/);
+  const unhandledRestoreTrap = deploy.slice(
+    deploy.indexOf("restore_legacy_on_unhandled_error()"),
+    deploy.indexOf("stop_legacy_backend_service()"),
+  );
+  assert.match(unhandledRestoreTrap, /legacy_restore_unhandled_error"[\s\S]*write_phase "interrupted"/);
+  assert.doesNotMatch(unhandledRestoreTrap, /write_phase "completed"/);
+  assert.match(deploy, /legacy_restore_interrupted_int/);
+  assert.match(deploy, /legacy_restore_interrupted_term/);
+  assert.match(deploy, /legacy_restore_interrupted_hup/);
+  assert.match(deploy, /legacy_restore_attempted/);
+  assert.match(deploy, /legacy_restore_failed/);
+  assert.match(deploy, /legacy_backend_still_running"[\s\S]*write_phase "completed"/);
   assert.match(deploy, /mc alias set local http:\/\/127\.0\.0\.1:9000 "\$\{MINIO_ROOT_USER\}" "\$\{MINIO_ROOT_PASSWORD\}"/);
   assert.match(deploy, /mc mb --ignore-existing "local\/\$\{REPORT_UPLOAD_BUCKET\}"/);
   assert.match(deploy, /report_upload_bucket_init_failed/);
+  const legacyStopCall = "\nstop_legacy_backend_service\n";
+  const legacyStopCallIndex = deploy.lastIndexOf(legacyStopCall);
+  assert.notEqual(legacyStopCallIndex, -1);
   assert.ok(deploy.indexOf("wait_stateful_service \"${service}\"") < deploy.indexOf("mc mb --ignore-existing"));
   assert.ok(deploy.indexOf("mc alias set local") < deploy.indexOf("mc mb --ignore-existing"));
   assert.ok(deploy.indexOf("mc mb --ignore-existing") < deploy.indexOf("backend_id="));
+  assert.ok(deploy.indexOf("backend_id=") < legacyStopCallIndex);
+  assert.ok(deploy.indexOf("timeout 300 tools/ops/postgres-backup.sh") < legacyStopCallIndex);
+  assert.ok(legacyStopCallIndex < deploy.indexOf('write_phase "started"'));
+  assert.ok(legacyStopCallIndex < deploy.indexOf('mv -Tf "${SHARED_DIR}/current-env.next"'));
+  assert.ok(legacyStopCallIndex < deploy.indexOf('if ! compose "${SHARED_DIR}/current-env/backend.env"'));
+  assert.ok(legacyStopCallIndex < deploy.indexOf("trap restore_legacy_on_unhandled_error ERR"));
+  assert.ok(legacyStopCallIndex < deploy.indexOf("trap 'restore_legacy_on_interruption TERM' TERM"));
+  const legacyRestoreDisableIndex = deploy.lastIndexOf("legacy_restore_on_error=0");
+  assert.ok(deploy.indexOf('fail_backend_deployment "readiness_failed"') < legacyRestoreDisableIndex);
+  assert.ok(legacyRestoreDisableIndex < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
+  assert.ok(deploy.indexOf("trap - ERR INT TERM HUP") < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.match(deploy, /managed_image_drift/);
   assert.match(deploy, /printf 'compose\.env\\0'/);
   assert.match(deploy, /printf '\\nbackend\.env\\0'/);
