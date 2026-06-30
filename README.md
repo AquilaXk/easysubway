@@ -32,12 +32,7 @@ scripts/github/sync-actions-env-secret.sh .env
 
 Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. `Slack Notifications` workflow는 CI와 SonarCloud는 실패, 취소, timeout 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소, timeout 결과만 보냅니다.
 
-CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. 아직 secret이나 SSH 접속 정보가 없으면 bootJar와 설정 검증까지만 수행하고, 원격 배포는 `not_started`로 기록합니다.
-
-운영 SSH 배포에는 애플리케이션 환경값과 별개로 production environment에 아래 값을 둡니다.
-
-- Secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_PRIVATE_KEY`
-- Variables: `DEPLOY_ROOT`, `DEPLOY_COMPOSE_PROJECT`, 선택 값 `DEPLOY_PUBLIC_API_BASE_URL`
+CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. self-hosted production runner에서 직접 배포하므로 GitHub `production` environment approval을 기다리지 않습니다. `DEPLOY_ROOT`, `DEPLOY_COMPOSE_PROJECT`, 선택 값 `DEPLOY_PUBLIC_API_BASE_URL`은 repository variable로 둘 수 있고, 없으면 `/opt/easysubway`와 `easysubway` 기본값을 사용합니다.
 
 CD는 `main`의 CI가 성공한 뒤 `workflow_run`으로 자동 실행됩니다. 수동 실행은 대상 SHA가 `main`에 있고 해당 SHA의 CI 성공 기록이 있을 때만 배포할 수 있습니다. `preflight` 모드는 dotenv 검증, Compose config, backend bootJar 생성까지만 확인합니다.
 
