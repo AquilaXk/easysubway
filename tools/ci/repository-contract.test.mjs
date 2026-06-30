@@ -8121,7 +8121,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /도움말은 안전과 데이터 안내를 함께 보여준다/);
+  assert.match(widgetTest, /도움말은 이동 전 확인 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
   assert.match(main, /보안 문의 안내/);
   assert.match(main, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
@@ -8180,12 +8180,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
   assert.match(main, /개인정보 사용 안내/);
-  assert.match(main, /안전과 데이터 안내/);
+  assert.match(main, /이동 전 확인/);
   assert.match(main, /현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다/);
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
-  assert.match(main, /데이터 삭제 요청 시 즐겨찾기, 이동 조건, 신고 접수 기록, 신고 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
+  assert.match(main, /내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 익명화합니다/);
   assert.match(apiClient, /class ApiClient/);
   assert.match(apiClient, /const defaultApiTimeout = Duration\(seconds: 8\)/);
   assert.match(apiClient, /Future<ApiResponse> getJson/);
@@ -8219,7 +8219,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletion, /refreshExistingAuthorization/);
   assert.match(
     userDataDeletion,
-    /userDataDeletionErrorMessage = '데이터 삭제를 완료하지 못했어요\. 잠시 후 다시 시도해 주세요\.'/,
+    /userDataDeletionErrorMessage = '정보 삭제를 완료하지 못했어요\. 잠시 후 다시 시도해 주세요\.'/,
   );
   assert.match(userDataDeletionTest, /인증 헤더로 DELETE \/api\/v1\/me를 호출한다/);
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
