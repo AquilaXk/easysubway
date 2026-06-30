@@ -63,6 +63,7 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT=$/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_POSTGRES_PASSWORD=/m);
+  assert.doesNotMatch(backendEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=/m);
   assert.equal(composeMode, 0o600);
   assert.equal(backendMode, 0o600);
 });
@@ -100,6 +101,26 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
     prepare(fixtureEnv().replace("https://uploads.easysubway.example", "https://LOCALHOST")),
     /public upload URL must not be internal/,
   );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=http://127.0.0.1:9093\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\n`),
+    /alertmanager external URL must be an HTTPS URL/,
+  );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\n`),
+    /alertmanager external URL must not be internal/,
+  );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[::1]:9093\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\n`),
+    /alertmanager external URL must not be internal/,
+  );
+  await prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://[2001:db8::10]:9093/alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\nEASYSUBWAY_ALERT_SMTP_REQUIRE_TLS=true\n`);
+  const outputDir = await prepare(`${fixtureEnv()}EASYSUBWAY_ALERT_EMAIL_ENABLED=true\nEASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https://ops.easysubway.example/alertmanager\nEASYSUBWAY_ALERT_EMAIL_TO=ops@example.com\nEASYSUBWAY_ALERT_EMAIL_FROM=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_SMARTHOST=smtp.example.com:587\nEASYSUBWAY_ALERT_SMTP_USERNAME=alerts@example.com\nEASYSUBWAY_ALERT_SMTP_PASSWORD=secret\nEASYSUBWAY_ALERT_SMTP_REQUIRE_TLS=true\n`);
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  assert.match(composeEnv, /^EASYSUBWAY_ALERT_EMAIL_ENABLED=true$/m);
+  assert.match(composeEnv, /^EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL=https:\/\/ops\.easysubway\.example\/alertmanager$/m);
+  assert.match(composeEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=secret$/m);
+  assert.doesNotMatch(backendEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=/m);
 });
 
 test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤백 계약을 포함한다", async () => {
@@ -183,7 +204,10 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /tools\/ops\/postgres-backup\.sh/);
   assert.match(deploy, /EASYSUBWAY_BACKEND_ENV_FILE="\$\{BACKEND_ENV\}"/);
   assert.match(deploy, /RUNTIME_SERVICES=\(backend back-worker\)/);
-  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe prometheus loki grafana\)/);
+  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana\)/);
+  assert.match(deploy, /EASYSUBWAY_ALERTMANAGER_CONFIG_FILE=/);
+  assert.match(deploy, /write_alertmanager_config "\$\{tmp_env_set\}\/alertmanager\.yml"/);
+  assert.match(deploy, /chmod 600 "\$\{tmp_env_set\}\/compose\.env" "\$\{tmp_env_set\}\/backend\.env" "\$\{tmp_env_set\}\/alertmanager\.yml" "\$\{tmp_env_set\}\/metadata\.env"/);
   assert.match(deploy, /compose_services_running\(\)/);
   assert.match(deploy, /compose_services_running "\$\{BACKEND_ENV\}" "\$\{COMPOSE_ENV\}" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /same_sha_same_env_services_ready/);

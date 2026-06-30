@@ -74,6 +74,17 @@ is_admin_basic_auth_enabled() {
   esac
 }
 
+is_alert_email_enabled() {
+  case "$(normalized_env_value EASYSUBWAY_ALERT_EMAIL_ENABLED)" in
+    true|on|yes|1)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
 is_truthy_env_value() {
   local name="$1"
   case "$(normalized_env_value "${name}")" in
@@ -146,6 +157,12 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT)
       ! is_admin_basic_auth_enabled
       ;;
+    EASYSUBWAY_PROMETHEUS_BIND|EASYSUBWAY_PROMETHEUS_PORT|EASYSUBWAY_PROMETHEUS_EXTERNAL_URL|EASYSUBWAY_ALERTMANAGER_BIND|EASYSUBWAY_ALERTMANAGER_PORT|EASYSUBWAY_ALERT_EMAIL_ENABLED|EASYSUBWAY_ALERT_SMTP_REQUIRE_TLS)
+      true
+      ;;
+    EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL|EASYSUBWAY_ALERT_EMAIL_TO|EASYSUBWAY_ALERT_EMAIL_FROM|EASYSUBWAY_ALERT_SMTP_SMARTHOST|EASYSUBWAY_ALERT_SMTP_USERNAME|EASYSUBWAY_ALERT_SMTP_PASSWORD)
+      ! is_alert_email_enabled
+      ;;
     *)
       false
       ;;
@@ -172,6 +189,20 @@ is_required_env_satisfied() {
         has_env_name "${name}" || is_satisfied_by_runtime_fallback "${name}"
       fi
       ;;
+    EASYSUBWAY_ALERT_EMAIL_ENABLED|EASYSUBWAY_ALERT_SMTP_REQUIRE_TLS)
+      if has_env_name "${name}"; then
+        is_bool_env_value "${name}"
+      else
+        is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
+    EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL|EASYSUBWAY_ALERT_EMAIL_TO|EASYSUBWAY_ALERT_EMAIL_FROM|EASYSUBWAY_ALERT_SMTP_SMARTHOST|EASYSUBWAY_ALERT_SMTP_USERNAME|EASYSUBWAY_ALERT_SMTP_PASSWORD)
+      if is_alert_email_enabled; then
+        has_non_empty_env_value "${name}"
+      else
+        has_env_name "${name}" || is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
     *)
       has_env_name "${name}" || is_satisfied_by_runtime_fallback "${name}"
       ;;
@@ -188,6 +219,25 @@ done < <(sed -nE 's/^([A-Z0-9_]+)=.*/\1/p' .env.example)
 if (( ${#missing_names[@]} > 0 )); then
   printf 'Missing required deployment env names:\n' >&2
   printf ' - %s\n' "${missing_names[@]}" >&2
+  exit 1
+fi
+
+alert_invalid_names=()
+if is_alert_email_enabled; then
+  alertmanager_url="$(env_value EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL)"
+  if [[ ! "${alertmanager_url}" =~ ^https://(\[[0-9A-Fa-f:.]+\]|[^/@\?#:]+)(:[0-9]+)?(/.*)?$ ]]; then
+    alert_invalid_names+=(EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL)
+  fi
+  alertmanager_url_normalized="$(printf '%s' "${alertmanager_url}" | tr '[:upper:]' '[:lower:]')"
+  case "${alertmanager_url_normalized}" in
+    http://*|https://localhost*|https://127.*|https://\[::1\]*|https://alertmanager|https://alertmanager/*|https://alertmanager:*|https://prometheus|https://prometheus/*|https://prometheus:*) alert_invalid_names+=(EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL) ;;
+    *) ;;
+  esac
+fi
+
+if (( ${#alert_invalid_names[@]} > 0 )); then
+  printf 'Invalid alert email env values:\n' >&2
+  printf ' - %s\n' "${alert_invalid_names[@]}" >&2
   exit 1
 fi
 
