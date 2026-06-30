@@ -225,7 +225,10 @@ void main() {
                 },
               ],
               'warnings': [
-                {'code': 'LOW_DATA_CONFIDENCE', 'message': '일부 시설 정보가 부족해요.'},
+                {
+                  'code': 'LOW_DATA_CONFIDENCE',
+                  'message': '일부 시설 안내를 준비 중이에요.',
+                },
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
                   'message':
@@ -287,7 +290,7 @@ void main() {
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.hasMetricSourceMetadata, isTrue);
-    expect(result.steps.first.metricSourceLabel, '시간 또는 거리 정보가 부족해요');
+    expect(result.steps.first.metricSourceLabel, '시간 또는 거리를 확인하고 있어요');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.stepType, 'entry');
@@ -301,9 +304,9 @@ void main() {
     );
     expect(
       result.warnings.map((warning) => warning.userMessage),
-      contains('접근성 시설 정보가 최근 확인되지 않았습니다.'),
+      contains('시설 상태를 최근에 확인하지 못했어요.'),
     );
-    expect(result.semanticLabel, contains('시간 또는 거리 정보가 부족해요'));
+    expect(result.semanticLabel, contains('시간 또는 거리를 확인하고 있어요'));
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {
@@ -676,7 +679,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '약 30분 · 거리 정보가 부족해요');
+    expect(step.burdenLabel, '약 30분 · 거리를 확인하고 있어요');
   });
 
   test('경로 단계 이동 부담은 측정 시간 없음 상태를 0분으로 표시하지 않는다', () {
@@ -694,7 +697,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '시간 정보가 부족해요 · 180m');
+    expect(step.burdenLabel, '시간을 확인하고 있어요 · 180m');
   });
 
   test('경로 계단 상태는 unknown을 계단 없음으로 올리지 않는다', () {
@@ -975,7 +978,10 @@ RouteSearchResult _sampleRouteSearchResult({
     '천천히 이동하기 쉬운 동선을 확인했어요',
   ],
   List<RouteSearchWarning> warnings = const [
-    RouteSearchWarning(code: 'LOW_DATA_CONFIDENCE', message: '일부 시설 정보가 부족해요.'),
+    RouteSearchWarning(
+      code: 'LOW_DATA_CONFIDENCE',
+      message: '일부 시설 안내를 준비 중이에요.',
+    ),
   ],
   List<String> blockedReasons = const [],
 }) {
