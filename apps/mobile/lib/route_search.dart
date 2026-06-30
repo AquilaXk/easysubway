@@ -25,6 +25,21 @@ const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 �
 const _favoriteRouteSaveFailureNextAction =
     '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
 const _favoriteRouteLoadFailureNextAction = '네트워크 상태를 확인한 뒤 다시 불러와 주세요.';
+const _routeSearchPagePadding = EdgeInsets.only(
+  left: 20,
+  top: 20,
+  right: 20,
+  bottom: 32,
+);
+const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
+const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
+const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
+const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
+const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
+const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
+const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
+const _routePointSelectorPadding = EdgeInsets.fromLTRB(8, 8, 58, 8);
+const _routeResultSectionPadding = EdgeInsets.fromLTRB(1, 0, 1, 11);
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1349,7 +1364,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(60),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: _routeSearchSmallRadius,
                   ),
                 ),
                 child: Text(isLoading ? '경로 검색 중' : '길찾기'),
@@ -1370,7 +1385,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
             ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _routeSearchPagePadding,
           children: [
             _RoutePointPickerCard(
               key: const Key('routePointPickerCard'),
@@ -1577,7 +1592,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      padding: _routeMobilitySheetHeaderPadding,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -1607,7 +1622,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                     Expanded(
                       child: ListView(
                         key: const Key('routeMobilityOptionsList'),
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        padding: _routeMobilitySheetListPadding,
                         children: [
                           for (final option in mobilityProfileOptions)
                             _RouteMobilityTypeOptionButton(
@@ -1627,7 +1642,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      padding: _routeMobilitySheetActionPadding,
                       child: FilledButton.icon(
                         key: const Key('routeMobilityApplyButton'),
                         onPressed: () =>
@@ -1698,7 +1713,7 @@ class _RoutePointPickerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: const Color(0xFFD5E2E4)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: _routeSearchLargeRadius,
         boxShadow: const [
           BoxShadow(
             color: Color(0x0F071B2F),
@@ -1711,7 +1726,7 @@ class _RoutePointPickerCard extends StatelessWidget {
         alignment: Alignment.centerRight,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 58, 8),
+            padding: _routePointSelectorPadding,
             child: Column(
               children: [
                 originPicker ??
@@ -1789,7 +1804,7 @@ class _RoutePointRow extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: _routeSearchMediumRadius,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Row(
@@ -1916,7 +1931,7 @@ class _RouteRecentDestinationListState
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xFFD5E2E4)),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: _routeSearchMediumRadius,
               ),
               child: Column(
                 children: [
@@ -2027,7 +2042,7 @@ class _RouteRecentDestinationRow extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onSelected,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: _routeSearchMediumRadius,
           child: ListTile(
             leading: const Icon(Icons.train_outlined, color: Color(0xFF006D77)),
             title: Text(
@@ -2129,7 +2144,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFE9F5F6),
           border: Border.all(color: const Color(0xFFB9D4D8)),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2495,12 +2510,12 @@ class _RouteStationOptionTile extends StatelessWidget {
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               side: const BorderSide(color: Color(0xFFD5E2E4)),
             ),
             child: InkWell(
               onTap: () => onSelected(result),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -2937,7 +2952,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: const Color(0xFF073245),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: _routeSearchLargeRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -2950,7 +2965,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                     border: Border.all(
                       color: EasySubwayAccessibleColors.mintBorder,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: _routeSearchLargeRadius,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -3032,7 +3047,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                           : EasySubwayAccessibleColors.mint,
                       width: 2,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: _routeSearchLargeRadius,
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x1A0D8A6D),
@@ -3345,12 +3360,12 @@ class _RouteResultListButton extends StatelessWidget {
           child: InkWell(
             key: const Key('routeResultListItem'),
             onTap: onPressed,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _routeSearchSmallRadius,
             child: Ink(
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xFF0D8A6D), width: 2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: _routeSearchSmallRadius,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -3428,7 +3443,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF073245),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3576,7 +3591,7 @@ class _RouteResultSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(1, 0, 1, 11),
+      padding: _routeResultSectionPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3613,7 +3628,7 @@ class _RouteStatusChip extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFDEF5E7),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: _routeSearchPillRadius,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Wrap(
@@ -3730,7 +3745,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE6F2F0),
         border: Border.all(color: const Color(0xFF9FCACE)),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -3792,7 +3807,7 @@ class _RouteNotice extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFFFF7E0),
           border: Border.all(color: const Color(0xFFE6C875)),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -4475,7 +4490,7 @@ class _FavoriteRouteListBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: _routeSearchPagePadding,
       children: [
         switch (state.status) {
           FavoriteRouteListStatus.loading => Semantics(
@@ -4690,7 +4705,7 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
             color: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: _routeSearchSmallRadius,
               side: const BorderSide(color: Color(0xFFD5E2E4)),
             ),
             child: Padding(

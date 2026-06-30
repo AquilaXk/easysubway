@@ -35,6 +35,11 @@ const defaultDemoHomeDataEnabled = bool.fromEnvironment(
   'EASYSUBWAY_DEMO_HOME_DATA',
   defaultValue: false,
 );
+const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
+const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
+const _homeHeroCardPadding = EdgeInsets.fromLTRB(20, 24, 20, 24);
+const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
+const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1982,7 +1987,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                padding: _mainListPagePadding,
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
@@ -2268,7 +2273,7 @@ class _HomeHero extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          padding: _homeHeroCardPadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2553,7 +2558,7 @@ class _AppSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(1, 22, 1, 11),
+      padding: _appSectionTitlePadding,
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -3393,7 +3398,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         bottomNavigationBar: widget.bottomNavigationBar,
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            padding: _settingsPagePadding,
             children: [
               _AppSettingsSection(
                 key: const Key('settingsSection-mobility'),
@@ -3861,7 +3866,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(17, 18, 17, 32),
+                padding: _mainListPagePadding,
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
@@ -4255,7 +4260,7 @@ class OfflineDataScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: const [
             _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
@@ -4389,7 +4394,7 @@ class SupportAccessScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('도움말·문의')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _PrivacyDataUseSummary(deletionScope: deletionScope),
@@ -4716,7 +4721,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             Semantics(
               header: true,
@@ -4880,7 +4885,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: _mainPagePadding,
           children: [
             _AppCard(
               backgroundColor: EasySubwayAccessibleColors.mintSoft,
