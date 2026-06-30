@@ -346,7 +346,7 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
         if (response.statusCode == HttpStatus.unauthorized &&
             authorizationHeader != null &&
             attempt == 0) {
-          // 저장된 인증이 서버에서 만료된 경우 지우고 한 번만 재시도한다.
+          // 저장된 인증이 원격에서 만료된 경우 지우고 한 번만 재시도한다.
           await authProvider.invalidateAuthorization().timeout(
             _favoriteStationTimeout,
           );
