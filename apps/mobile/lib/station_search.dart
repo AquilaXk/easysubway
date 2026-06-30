@@ -3226,6 +3226,7 @@ class _StationSearchFailureMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shouldShowLocationSettings =
+        message == _currentLocationPermissionMessage ||
         message == _currentLocationDisabledMessage;
     final shouldShowStationSearchFallback =
         _shouldShowStationSearchFailureNextAction(message);

@@ -1893,7 +1893,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
 
   bool get _canOpenLocationSettings =>
       widget.openLocationSettings != null &&
-      _locationMessage == _facilityReportLocationDisabledMessage;
+      (_locationMessage == _facilityReportLocationPermissionMessage ||
+          _locationMessage == _facilityReportLocationDisabledMessage);
 
   Future<void> _submit() async {
     if (_photoAttachment != null ||

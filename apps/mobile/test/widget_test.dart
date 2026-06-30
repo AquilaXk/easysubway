@@ -7327,6 +7327,10 @@ void main() {
         find.bySemanticsLabel('도움말, 역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('stationSearchOpenLocationSettingsButton')),
+        findsOneWidget,
+      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -11606,7 +11610,7 @@ void main() {
     expect(readySubmitButton.onPressed, isNotNull);
   });
 
-  testWidgets('시설 신고 화면은 현재 위치 실패 안내를 그대로 보여준다', (tester) async {
+  testWidgets('시설 신고 화면은 현재 위치 실패 안내를 쉬운 문구로 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     final stationRepository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -11674,6 +11678,10 @@ void main() {
 
     expect(find.text('위치 설정에서 현재 위치 사용을 켜 주세요.'), findsOneWidget);
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
+    expect(
+      find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
+      findsOneWidget,
+    );
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
