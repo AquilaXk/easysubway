@@ -8359,8 +8359,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
   assert.match(onboardingAppFlowTest, /앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다/);
   assert.match(stationSearch, /stationSearchFailureNextAction/);
-  assert.match(stationSearch, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
-  assert.match(widgetTest, /역명으로 검색하면 위치 권한 없이도 계속 이용할 수 있습니다\./);
+  assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
+  assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /_OnboardingPreferenceScope/);
@@ -8527,7 +8527,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
-  assert.match(stationSearch, /위치 권한을 거부해도 역명 검색, 즐겨찾기, 접근성 정보 조회는 계속 사용할 수 있습니다/);
+  assert.match(stationSearch, /위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다/);
   assert.doesNotMatch(stationSearch, /상태 신고/);
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
   assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
