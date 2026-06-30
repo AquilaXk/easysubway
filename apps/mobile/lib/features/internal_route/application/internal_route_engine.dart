@@ -167,7 +167,7 @@ class LocalInternalRouteEngine {
     Set<String> blockedReasonCodes,
   ) {
     final accessibilityStatus = edge.accessibilityStatus.toUpperCase();
-    if (edge.includesStairs && mobilityType.blocksStairOnlyAccess) {
+    if (edge.includesStairs && mobilityType.blocksStairOnlyAccess(null)) {
       blockedReasonCodes.add('STAIR_ONLY_ACCESS');
       return true;
     }
@@ -176,7 +176,7 @@ class LocalInternalRouteEngine {
       return true;
     }
     if (accessibilityStatus == 'UNKNOWN' &&
-        mobilityType.blocksStairOnlyAccess) {
+        mobilityType.blocksStairOnlyAccess(null)) {
       blockedReasonCodes.add('ACCESSIBILITY_STATE_UNKNOWN');
       return true;
     }

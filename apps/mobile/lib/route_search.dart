@@ -550,17 +550,23 @@ class RouteSearchRequest {
     required this.originStationId,
     required this.destinationStationId,
     required this.mobilityType,
+    this.constraintMode,
   });
 
   final String originStationId;
   final String destinationStationId;
   final String mobilityType;
+  final String? constraintMode;
+
+  String get effectiveConstraintMode =>
+      constraintMode ?? _defaultConstraintMode(mobilityType);
 
   RouteSearchRequest trimmed() {
     return RouteSearchRequest(
       originStationId: originStationId.trim(),
       destinationStationId: destinationStationId.trim(),
       mobilityType: mobilityType,
+      constraintMode: constraintMode?.trim(),
     );
   }
 
@@ -570,8 +576,12 @@ class RouteSearchRequest {
       'originStationId': trimmedRequest.originStationId,
       'destinationStationId': trimmedRequest.destinationStationId,
       'mobilityType': trimmedRequest.mobilityType,
+      'constraintMode': trimmedRequest.effectiveConstraintMode,
     };
   }
+
+  static String _defaultConstraintMode(String mobilityType) =>
+      mobilityType == 'WHEELCHAIR' ? 'STRICT_STEP_FREE' : 'PREFER_STEP_FREE';
 }
 
 class RouteSearchV2Result {
@@ -1568,6 +1578,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   StationSearchResult? _destinationStation;
   _RouteStationRole? _activeStationPicker;
   late String _selectedMobilityType;
+  late String _selectedConstraintMode;
   String _validationMessage = '';
 
   @override
@@ -1577,6 +1588,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _selectedMobilityType = widget.initialMobilityType;
+    _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
+      _selectedMobilityType,
+    );
   }
 
   @override
@@ -1699,11 +1713,27 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                       }
                       setState(() {
                         _selectedMobilityType = value;
+                        _selectedConstraintMode =
+                            RouteSearchRequest._defaultConstraintMode(value);
                       });
                     },
                   ),
                 ),
               ),
+            SwitchListTile(
+              key: const Key('routeStrictStepFreeSwitch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('계단 없는 길만'),
+              subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
+              value: _selectedConstraintMode == 'STRICT_STEP_FREE',
+              onChanged: (value) {
+                setState(() {
+                  _selectedConstraintMode = value
+                      ? 'STRICT_STEP_FREE'
+                      : 'PREFER_STEP_FREE';
+                });
+              },
+            ),
             AnimatedBuilder(
               animation: _controller,
               builder: (context, _) => _RouteSearchBody(
@@ -1762,6 +1792,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         originStationId: _originStation!.id,
         destinationStationId: _destinationStation!.id,
         mobilityType: _selectedMobilityType,
+        constraintMode: _selectedConstraintMode,
       ),
     );
   }
@@ -1913,6 +1944,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     }
     setState(() {
       _selectedMobilityType = selectedMobilityType;
+      _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
+        selectedMobilityType,
+      );
     });
     _controller.reset();
   }

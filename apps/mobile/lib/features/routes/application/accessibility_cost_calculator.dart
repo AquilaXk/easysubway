@@ -17,12 +17,16 @@ class AccessibilityCost {
 class AccessibilityCostCalculator {
   const AccessibilityCostCalculator();
 
-  AccessibilityCost costFor(RouteEdge edge, MobilityType mobilityType) {
+  AccessibilityCost costFor(
+    RouteEdge edge,
+    MobilityType mobilityType, {
+    ConstraintMode? constraintMode,
+  }) {
     final weight = RouteWeight.from(mobilityType);
     final warningCodes = <String>[];
+    final blocksStairs = mobilityType.blocksStairOnlyAccess(constraintMode);
 
-    if (mobilityType.blocksStairOnlyAccess &&
-        !edge.safetyEvidence.strictRouteEligible) {
+    if (blocksStairs && !edge.safetyEvidence.strictRouteEligible) {
       return AccessibilityCost(
         cost: 0,
         isBlocked: true,
@@ -33,7 +37,7 @@ class AccessibilityCostCalculator {
     // route contract: generated connector strict block
     // Generated connectors are topology scaffolding, not verified step-free
     // accessibility evidence for profiles that cannot safely use stairs.
-    if (edge.isGeneratedConnector && mobilityType.blocksStairOnlyAccess) {
+    if (edge.isGeneratedConnector && blocksStairs) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,
@@ -53,7 +57,7 @@ class AccessibilityCostCalculator {
     // Missing source data must not be treated as accessible for profiles that
     // cannot safely use stairs; other profiles keep the route with a warning.
     if (edge.accessibilityState == RouteAccessibilityState.unknown) {
-      if (mobilityType.blocksStairOnlyAccess) {
+      if (blocksStairs) {
         return const AccessibilityCost(
           cost: 0,
           isBlocked: true,
@@ -67,7 +71,7 @@ class AccessibilityCostCalculator {
     // Stair-only or unknown stair state blocks wheelchair-style profiles and
     // only becomes a penalty/warning for profiles that can still choose it.
     if (edge.stairAccessState == RouteStairAccessState.unknown) {
-      if (mobilityType.blocksStairOnlyAccess) {
+      if (blocksStairs) {
         return const AccessibilityCost(
           cost: 0,
           isBlocked: true,
@@ -78,7 +82,7 @@ class AccessibilityCostCalculator {
     }
 
     if (edge.stairAccessState == RouteStairAccessState.stairOnly &&
-        mobilityType.blocksStairOnlyAccess) {
+        blocksStairs) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,
@@ -86,7 +90,7 @@ class AccessibilityCostCalculator {
       );
     }
 
-    if (edge.isDataStale && mobilityType.blocksStairOnlyAccess) {
+    if (edge.isDataStale && blocksStairs) {
       return const AccessibilityCost(
         cost: 0,
         isBlocked: true,

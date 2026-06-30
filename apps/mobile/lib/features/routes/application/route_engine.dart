@@ -20,6 +20,7 @@ class LocalRouteEngine {
       request.originStationId,
       request.destinationStationId,
       request.mobilityType,
+      request.effectiveConstraintMode,
       blockedReasonCodes,
     );
     if (path == null) {
@@ -38,7 +39,11 @@ class LocalRouteEngine {
     final steps = <RouteStep>[];
 
     for (final edge in path) {
-      final accessCost = costCalculator.costFor(edge, request.mobilityType);
+      final accessCost = costCalculator.costFor(
+        edge,
+        request.mobilityType,
+        constraintMode: request.effectiveConstraintMode,
+      );
       totalCost += accessCost.cost;
       for (final code in accessCost.warningCodes) {
         warnings[code] = RouteWarning(
@@ -101,6 +106,7 @@ class LocalRouteEngine {
     String originNodeId,
     String destinationNodeId,
     MobilityType mobilityType,
+    ConstraintMode constraintMode,
     Set<String> blockedReasonCodes,
   ) {
     final costs = <String, int>{originNodeId: 0};
@@ -126,7 +132,11 @@ class LocalRouteEngine {
             edge.toNodeId != destinationNodeId) {
           continue;
         }
-        final edgeCost = costCalculator.costFor(edge, mobilityType);
+        final edgeCost = costCalculator.costFor(
+          edge,
+          mobilityType,
+          constraintMode: constraintMode,
+        );
         if (edgeCost.isBlocked) {
           blockedReasonCodes.addAll(edgeCost.warningCodes);
           continue;

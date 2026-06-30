@@ -547,6 +547,7 @@ void main() {
         originStationId: 'station-a',
         destinationStationId: 'station-c',
         mobilityType: 'STROLLER',
+        constraintMode: 'STRICT_STEP_FREE',
       ),
     );
 

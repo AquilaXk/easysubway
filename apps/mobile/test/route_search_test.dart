@@ -264,6 +264,7 @@ void main() {
       'originStationId': 'station-sangnoksu',
       'destinationStationId': 'station-sadang',
       'mobilityType': 'WHEELCHAIR',
+      'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
     expect(result.summaryTitle, '상록수에서 사당까지');
@@ -513,6 +514,34 @@ void main() {
     expect(legacyResult.score, 92);
     expect(legacyResult.accessibilityScore, 92);
     expect(legacyResult.burdenCost, 92);
+  });
+
+  test('경로 검색 요청은 이동 유형별 기본 constraintMode를 직렬화한다', () {
+    expect(
+      const RouteSearchRequest(
+        originStationId: 'a',
+        destinationStationId: 'b',
+        mobilityType: 'WHEELCHAIR',
+      ).toJson()['constraintMode'],
+      'STRICT_STEP_FREE',
+    );
+    expect(
+      const RouteSearchRequest(
+        originStationId: 'a',
+        destinationStationId: 'b',
+        mobilityType: 'STROLLER',
+      ).toJson()['constraintMode'],
+      'PREFER_STEP_FREE',
+    );
+    expect(
+      const RouteSearchRequest(
+        originStationId: 'a',
+        destinationStationId: 'b',
+        mobilityType: 'TEMPORARY_INJURY',
+        constraintMode: 'STRICT_STEP_FREE',
+      ).toJson()['constraintMode'],
+      'STRICT_STEP_FREE',
+    );
   });
 
   test('경로 V2 contract는 itinerary와 leg 단위 ETA 필드를 읽는다', () {
