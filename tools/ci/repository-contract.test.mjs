@@ -4099,6 +4099,40 @@ test("official source importer는 locked production denominator 밖 route endpoi
   );
 });
 
+test("official source importer는 locked production line denominator의 metadata-only 확장을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-line-metadata-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.supportedV1Scope.includedLineIds.push("seoul-5");
+  input.lines.push({
+    id: "seoul-5",
+    operatorId: "seoul-metro",
+    nameKo: "수도권 5호선",
+    nameEn: "Seoul Subway Line 5",
+    color: "#996CAC",
+  });
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /supportedV1Scope\.includedLineIds missing production station row: seoul-5/,
+  );
+});
+
 test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");

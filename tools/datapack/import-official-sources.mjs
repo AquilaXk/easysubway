@@ -239,55 +239,79 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
   const includedOperatorIds = new Set(
     requiredStringArray(supportedV1Scope.includedOperatorIds, "supportedV1Scope.includedOperatorIds"),
   );
-  const actualStationIds = new Set(stationRows.map(({ mapping }) => mapping.stationId));
-  const actualLineIds = new Set(stationRows.map(({ mapping }) => mapping.lineId));
-  const actualOperatorIds = new Set();
+  const rowStationIds = new Set(stationRows.map(({ mapping }) => mapping.stationId));
+  const rowLineIds = new Set(stationRows.map(({ mapping }) => mapping.lineId));
+  const scopedStationIds = new Set(rowStationIds);
+  const scopedLineIds = new Set(rowLineIds);
+  const lineOperatorIds = new Map();
+  const metadataOperatorIds = new Set();
 
   for (const line of input.lines ?? []) {
-    actualLineIds.add(requiredString(line.id, "lines.id"));
-    actualOperatorIds.add(requiredString(line.operatorId, "lines.operatorId"));
+    const lineId = requiredString(line.id, "lines.id");
+    const operatorId = requiredString(line.operatorId, "lines.operatorId");
+    scopedLineIds.add(lineId);
+    metadataOperatorIds.add(operatorId);
+    lineOperatorIds.set(lineId, operatorId);
   }
   for (const operator of input.operators ?? []) {
-    actualOperatorIds.add(requiredString(operator.id, "operators.id"));
+    metadataOperatorIds.add(requiredString(operator.id, "operators.id"));
   }
+  const rowOperatorIds = operatorIdsForLines(rowLineIds, lineOperatorIds);
   for (const edge of networkEdges) {
-    addNodeScopeIds(edge.fromNodeId, actualStationIds, actualLineIds);
-    addNodeScopeIds(edge.toNodeId, actualStationIds, actualLineIds);
+    addNodeScopeIds(edge.fromNodeId, scopedStationIds, scopedLineIds);
+    addNodeScopeIds(edge.toNodeId, scopedStationIds, scopedLineIds);
   }
   for (const facility of facilities) {
-    actualStationIds.add(facility.stationId);
+    scopedStationIds.add(facility.stationId);
   }
   for (const candidate of movementCandidates) {
-    actualStationIds.add(candidate.stationId);
+    scopedStationIds.add(candidate.stationId);
   }
   for (const position of routeMapPositions) {
-    actualStationIds.add(position.stationId);
-    actualLineIds.add(position.lineId);
+    scopedStationIds.add(position.stationId);
+    scopedLineIds.add(position.lineId);
   }
 
   assertActualIdsWithinScope(
-    actualStationIds,
+    scopedStationIds,
     includedStationIds,
     "production scope station outside supportedV1Scope.includedStationIds",
   );
   assertScopeIdsHaveRows(
     includedStationIds,
-    actualStationIds,
+    rowStationIds,
     "supportedV1Scope.includedStationIds missing production station row",
   );
-  assertActualIdsWithinScope(actualLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
-  assertScopeIdsHaveRows(includedLineIds, actualLineIds, "supportedV1Scope.includedLineIds missing production station row");
+  assertActualIdsWithinScope(scopedLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
+  assertScopeIdsHaveRows(includedLineIds, rowLineIds, "supportedV1Scope.includedLineIds missing production station row");
   assertActualIdsWithinScope(
-    actualOperatorIds,
+    metadataOperatorIds,
     includedOperatorIds,
     "production scope operator outside supportedV1Scope.includedOperatorIds",
   );
   assertScopeIdsHaveRows(
     includedOperatorIds,
-    actualOperatorIds,
+    metadataOperatorIds,
     "supportedV1Scope.includedOperatorIds missing production operator metadata",
   );
+  assertScopeIdsHaveRows(
+    includedOperatorIds,
+    rowOperatorIds,
+    "supportedV1Scope.includedOperatorIds missing production station row",
+  );
   validateFacilityCoverageDenominator(supportedV1Scope.facilityCoverageDenominator, includedStationIds.size, supportedV1Scope);
+}
+
+function operatorIdsForLines(lineIds, lineOperatorIds) {
+  const operatorIds = new Set();
+  for (const lineId of lineIds) {
+    const operatorId = lineOperatorIds.get(lineId);
+    if (!operatorId) {
+      throw new Error(`production scope line metadata missing: ${lineId}`);
+    }
+    operatorIds.add(operatorId);
+  }
+  return operatorIds;
 }
 
 function addNodeScopeIds(nodeId, stationIds, lineIds) {
