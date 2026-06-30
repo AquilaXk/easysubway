@@ -15,6 +15,7 @@ import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 
 const _networkMapRadius = BorderRadius.all(Radius.circular(8));
+const _networkMapStationNodeStrokeColor = Color(0xFF2F3E42);
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -1456,7 +1457,7 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
     }
 
     final nodeStroke = Paint()
-      ..color = const Color(0xFF2F3E42)
+      ..color = _networkMapStationNodeStrokeColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2 / camera.scale;
     final nodeFill = Paint()
