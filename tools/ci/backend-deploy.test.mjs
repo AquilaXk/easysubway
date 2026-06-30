@@ -137,7 +137,11 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /legacy_backend_was_enabled=1/);
   assert.match(deploy, /legacy_restore_on_error=1/);
   assert.match(deploy, /restore_legacy_on_unhandled_error\(\)/);
+  assert.match(deploy, /restore_legacy_on_interruption\(\)/);
   assert.match(deploy, /trap restore_legacy_on_unhandled_error ERR/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption INT' INT/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption TERM' TERM/);
+  assert.match(deploy, /trap 'restore_legacy_on_interruption HUP' HUP/);
   assert.match(deploy, /legacy_restore_unhandled_error/);
   const unhandledRestoreTrap = deploy.slice(
     deploy.indexOf("restore_legacy_on_unhandled_error()"),
@@ -145,6 +149,9 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   );
   assert.match(unhandledRestoreTrap, /legacy_restore_unhandled_error"[\s\S]*write_phase "interrupted"/);
   assert.doesNotMatch(unhandledRestoreTrap, /write_phase "completed"/);
+  assert.match(deploy, /legacy_restore_interrupted_int/);
+  assert.match(deploy, /legacy_restore_interrupted_term/);
+  assert.match(deploy, /legacy_restore_interrupted_hup/);
   assert.match(deploy, /legacy_restore_attempted/);
   assert.match(deploy, /legacy_restore_failed/);
   assert.match(deploy, /legacy_backend_still_running"[\s\S]*write_phase "completed"/);
@@ -163,9 +170,11 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.ok(legacyStopCallIndex < deploy.indexOf('mv -Tf "${SHARED_DIR}/current-env.next"'));
   assert.ok(legacyStopCallIndex < deploy.indexOf('if ! compose "${SHARED_DIR}/current-env/backend.env"'));
   assert.ok(legacyStopCallIndex < deploy.indexOf("trap restore_legacy_on_unhandled_error ERR"));
+  assert.ok(legacyStopCallIndex < deploy.indexOf("trap 'restore_legacy_on_interruption TERM' TERM"));
   const legacyRestoreDisableIndex = deploy.lastIndexOf("legacy_restore_on_error=0");
   assert.ok(deploy.indexOf('fail_backend_deployment "readiness_failed"') < legacyRestoreDisableIndex);
   assert.ok(legacyRestoreDisableIndex < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
+  assert.ok(deploy.indexOf("trap - ERR INT TERM HUP") < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.match(deploy, /managed_image_drift/);
   assert.match(deploy, /printf 'compose\.env\\0'/);
   assert.match(deploy, /printf '\\nbackend\.env\\0'/);
