@@ -507,6 +507,111 @@ class InternalRouteEdges extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class StationPathwayNodes extends Table {
+  @override
+  String get tableName => 'station_pathway_nodes';
+
+  TextColumn get id => text()();
+  TextColumn get stationId => text().named('station_id')();
+  TextColumn get lineId => text().named('line_id').nullable()();
+  TextColumn get nodeType => text().named('node_type')();
+  TextColumn get label => text()();
+  TextColumn get level => text().withDefault(const Constant(''))();
+  TextColumn get legacyInternalRouteNodeId => text()
+      .named('legacy_internal_route_node_id')
+      .withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class StationPathwayEdges extends Table {
+  @override
+  String get tableName => 'station_pathway_edges';
+
+  TextColumn get id => text()();
+  TextColumn get fromNodeId => text().named('from_node_id')();
+  TextColumn get toNodeId => text().named('to_node_id')();
+  TextColumn get edgeType =>
+      text().named('edge_type').withDefault(const Constant('WALK'))();
+  IntColumn get durationSeconds =>
+      integer().named('duration_seconds').withDefault(const Constant(0))();
+  IntColumn get distanceMeters =>
+      integer().named('distance_meters').withDefault(const Constant(0))();
+  BoolColumn get bidirectional =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get includesStairs =>
+      boolean().named('includes_stairs').withDefault(const Constant(false))();
+  BoolColumn get requiresElevator =>
+      boolean().named('requires_elevator').withDefault(const Constant(false))();
+  BoolColumn get requiresEscalator => boolean()
+      .named('requires_escalator')
+      .withDefault(const Constant(false))();
+  TextColumn get levelFrom =>
+      text().named('level_from').withDefault(const Constant(''))();
+  TextColumn get levelTo =>
+      text().named('level_to').withDefault(const Constant(''))();
+  TextColumn get requiresFacilityId =>
+      text().named('requires_facility_id').nullable()();
+  IntColumn get minWidthCm => integer().named('min_width_cm').nullable()();
+  RealColumn get slopePercent => real().named('slope_percent').nullable()();
+  RealColumn get verticalMeters => real().named('vertical_meters').nullable()();
+  IntColumn get reliabilityScore =>
+      integer().named('reliability_score').withDefault(const Constant(100))();
+  TextColumn get accessibilityStatus => text()
+      .named('accessibility_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get sourceSnapshotId =>
+      text().named('source_snapshot_id').withDefault(const Constant(''))();
+  TextColumn get providerRecordHash =>
+      text().named('provider_record_hash').withDefault(const Constant(''))();
+  TextColumn get provenanceKind =>
+      text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
+  TextColumn get verificationStatus => text()
+      .named('verification_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  DateTimeColumn get lastVerifiedAt =>
+      dateTime().named('last_verified_at').nullable()();
+  TextColumn get evidenceHash =>
+      text().named('evidence_hash').withDefault(const Constant(''))();
+  TextColumn get instruction => text().withDefault(const Constant(''))();
+  TextColumn get legacyInternalRouteEdgeId => text()
+      .named('legacy_internal_route_edge_id')
+      .withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class TransferRules extends Table {
+  @override
+  String get tableName => 'transfer_rules';
+
+  TextColumn get id => text()();
+  TextColumn get fromStationId => text().named('from_station_id')();
+  TextColumn get fromLineId => text().named('from_line_id')();
+  TextColumn get toStationId => text().named('to_station_id')();
+  TextColumn get toLineId => text().named('to_line_id')();
+  TextColumn get transferType =>
+      text().named('transfer_type').withDefault(const Constant('IN_STATION'))();
+  IntColumn get minTransferSeconds => integer()
+      .named('min_transfer_seconds')
+      .withDefault(const Constant(0))();
+  TextColumn get pathwayEdgeId => text().named('pathway_edge_id').nullable()();
+  TextColumn get strictStepFreePathwayEdgeId =>
+      text().named('strict_step_free_pathway_edge_id').nullable()();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get verificationStatus => text()
+      .named('verification_status')
+      .withDefault(const Constant('UNKNOWN'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class DataQualityRecords extends Table {
   @override
   String get tableName => 'data_quality_records';

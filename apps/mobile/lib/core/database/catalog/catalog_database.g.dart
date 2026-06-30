@@ -11646,6 +11646,2724 @@ class InternalRouteEdgesCompanion extends UpdateCompanion<InternalRouteEdge> {
   }
 }
 
+class $StationPathwayNodesTable extends StationPathwayNodes
+    with TableInfo<$StationPathwayNodesTable, StationPathwayNode> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StationPathwayNodesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nodeTypeMeta = const VerificationMeta(
+    'nodeType',
+  );
+  @override
+  late final GeneratedColumn<String> nodeType = GeneratedColumn<String>(
+    'node_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _levelMeta = const VerificationMeta('level');
+  @override
+  late final GeneratedColumn<String> level = GeneratedColumn<String>(
+    'level',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _legacyInternalRouteNodeIdMeta =
+      const VerificationMeta('legacyInternalRouteNodeId');
+  @override
+  late final GeneratedColumn<String> legacyInternalRouteNodeId =
+      GeneratedColumn<String>(
+        'legacy_internal_route_node_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    stationId,
+    lineId,
+    nodeType,
+    label,
+    level,
+    legacyInternalRouteNodeId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'station_pathway_nodes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StationPathwayNode> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    }
+    if (data.containsKey('node_type')) {
+      context.handle(
+        _nodeTypeMeta,
+        nodeType.isAcceptableOrUnknown(data['node_type']!, _nodeTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nodeTypeMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('level')) {
+      context.handle(
+        _levelMeta,
+        level.isAcceptableOrUnknown(data['level']!, _levelMeta),
+      );
+    }
+    if (data.containsKey('legacy_internal_route_node_id')) {
+      context.handle(
+        _legacyInternalRouteNodeIdMeta,
+        legacyInternalRouteNodeId.isAcceptableOrUnknown(
+          data['legacy_internal_route_node_id']!,
+          _legacyInternalRouteNodeIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StationPathwayNode map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StationPathwayNode(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      ),
+      nodeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}node_type'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      level: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}level'],
+      )!,
+      legacyInternalRouteNodeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}legacy_internal_route_node_id'],
+      )!,
+    );
+  }
+
+  @override
+  $StationPathwayNodesTable createAlias(String alias) {
+    return $StationPathwayNodesTable(attachedDatabase, alias);
+  }
+}
+
+class StationPathwayNode extends DataClass
+    implements Insertable<StationPathwayNode> {
+  final String id;
+  final String stationId;
+  final String? lineId;
+  final String nodeType;
+  final String label;
+  final String level;
+  final String legacyInternalRouteNodeId;
+  const StationPathwayNode({
+    required this.id,
+    required this.stationId,
+    this.lineId,
+    required this.nodeType,
+    required this.label,
+    required this.level,
+    required this.legacyInternalRouteNodeId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['station_id'] = Variable<String>(stationId);
+    if (!nullToAbsent || lineId != null) {
+      map['line_id'] = Variable<String>(lineId);
+    }
+    map['node_type'] = Variable<String>(nodeType);
+    map['label'] = Variable<String>(label);
+    map['level'] = Variable<String>(level);
+    map['legacy_internal_route_node_id'] = Variable<String>(
+      legacyInternalRouteNodeId,
+    );
+    return map;
+  }
+
+  StationPathwayNodesCompanion toCompanion(bool nullToAbsent) {
+    return StationPathwayNodesCompanion(
+      id: Value(id),
+      stationId: Value(stationId),
+      lineId: lineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lineId),
+      nodeType: Value(nodeType),
+      label: Value(label),
+      level: Value(level),
+      legacyInternalRouteNodeId: Value(legacyInternalRouteNodeId),
+    );
+  }
+
+  factory StationPathwayNode.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StationPathwayNode(
+      id: serializer.fromJson<String>(json['id']),
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String?>(json['lineId']),
+      nodeType: serializer.fromJson<String>(json['nodeType']),
+      label: serializer.fromJson<String>(json['label']),
+      level: serializer.fromJson<String>(json['level']),
+      legacyInternalRouteNodeId: serializer.fromJson<String>(
+        json['legacyInternalRouteNodeId'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String?>(lineId),
+      'nodeType': serializer.toJson<String>(nodeType),
+      'label': serializer.toJson<String>(label),
+      'level': serializer.toJson<String>(level),
+      'legacyInternalRouteNodeId': serializer.toJson<String>(
+        legacyInternalRouteNodeId,
+      ),
+    };
+  }
+
+  StationPathwayNode copyWith({
+    String? id,
+    String? stationId,
+    Value<String?> lineId = const Value.absent(),
+    String? nodeType,
+    String? label,
+    String? level,
+    String? legacyInternalRouteNodeId,
+  }) => StationPathwayNode(
+    id: id ?? this.id,
+    stationId: stationId ?? this.stationId,
+    lineId: lineId.present ? lineId.value : this.lineId,
+    nodeType: nodeType ?? this.nodeType,
+    label: label ?? this.label,
+    level: level ?? this.level,
+    legacyInternalRouteNodeId:
+        legacyInternalRouteNodeId ?? this.legacyInternalRouteNodeId,
+  );
+  StationPathwayNode copyWithCompanion(StationPathwayNodesCompanion data) {
+    return StationPathwayNode(
+      id: data.id.present ? data.id.value : this.id,
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      nodeType: data.nodeType.present ? data.nodeType.value : this.nodeType,
+      label: data.label.present ? data.label.value : this.label,
+      level: data.level.present ? data.level.value : this.level,
+      legacyInternalRouteNodeId: data.legacyInternalRouteNodeId.present
+          ? data.legacyInternalRouteNodeId.value
+          : this.legacyInternalRouteNodeId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationPathwayNode(')
+          ..write('id: $id, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('nodeType: $nodeType, ')
+          ..write('label: $label, ')
+          ..write('level: $level, ')
+          ..write('legacyInternalRouteNodeId: $legacyInternalRouteNodeId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    stationId,
+    lineId,
+    nodeType,
+    label,
+    level,
+    legacyInternalRouteNodeId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StationPathwayNode &&
+          other.id == this.id &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.nodeType == this.nodeType &&
+          other.label == this.label &&
+          other.level == this.level &&
+          other.legacyInternalRouteNodeId == this.legacyInternalRouteNodeId);
+}
+
+class StationPathwayNodesCompanion extends UpdateCompanion<StationPathwayNode> {
+  final Value<String> id;
+  final Value<String> stationId;
+  final Value<String?> lineId;
+  final Value<String> nodeType;
+  final Value<String> label;
+  final Value<String> level;
+  final Value<String> legacyInternalRouteNodeId;
+  final Value<int> rowid;
+  const StationPathwayNodesCompanion({
+    this.id = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.nodeType = const Value.absent(),
+    this.label = const Value.absent(),
+    this.level = const Value.absent(),
+    this.legacyInternalRouteNodeId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StationPathwayNodesCompanion.insert({
+    required String id,
+    required String stationId,
+    this.lineId = const Value.absent(),
+    required String nodeType,
+    required String label,
+    this.level = const Value.absent(),
+    this.legacyInternalRouteNodeId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       stationId = Value(stationId),
+       nodeType = Value(nodeType),
+       label = Value(label);
+  static Insertable<StationPathwayNode> custom({
+    Expression<String>? id,
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? nodeType,
+    Expression<String>? label,
+    Expression<String>? level,
+    Expression<String>? legacyInternalRouteNodeId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (nodeType != null) 'node_type': nodeType,
+      if (label != null) 'label': label,
+      if (level != null) 'level': level,
+      if (legacyInternalRouteNodeId != null)
+        'legacy_internal_route_node_id': legacyInternalRouteNodeId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StationPathwayNodesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? stationId,
+    Value<String?>? lineId,
+    Value<String>? nodeType,
+    Value<String>? label,
+    Value<String>? level,
+    Value<String>? legacyInternalRouteNodeId,
+    Value<int>? rowid,
+  }) {
+    return StationPathwayNodesCompanion(
+      id: id ?? this.id,
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      nodeType: nodeType ?? this.nodeType,
+      label: label ?? this.label,
+      level: level ?? this.level,
+      legacyInternalRouteNodeId:
+          legacyInternalRouteNodeId ?? this.legacyInternalRouteNodeId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (nodeType.present) {
+      map['node_type'] = Variable<String>(nodeType.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (level.present) {
+      map['level'] = Variable<String>(level.value);
+    }
+    if (legacyInternalRouteNodeId.present) {
+      map['legacy_internal_route_node_id'] = Variable<String>(
+        legacyInternalRouteNodeId.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationPathwayNodesCompanion(')
+          ..write('id: $id, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('nodeType: $nodeType, ')
+          ..write('label: $label, ')
+          ..write('level: $level, ')
+          ..write('legacyInternalRouteNodeId: $legacyInternalRouteNodeId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StationPathwayEdgesTable extends StationPathwayEdges
+    with TableInfo<$StationPathwayEdgesTable, StationPathwayEdge> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StationPathwayEdgesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fromNodeIdMeta = const VerificationMeta(
+    'fromNodeId',
+  );
+  @override
+  late final GeneratedColumn<String> fromNodeId = GeneratedColumn<String>(
+    'from_node_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toNodeIdMeta = const VerificationMeta(
+    'toNodeId',
+  );
+  @override
+  late final GeneratedColumn<String> toNodeId = GeneratedColumn<String>(
+    'to_node_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _edgeTypeMeta = const VerificationMeta(
+    'edgeType',
+  );
+  @override
+  late final GeneratedColumn<String> edgeType = GeneratedColumn<String>(
+    'edge_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('WALK'),
+  );
+  static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
+    'durationSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> durationSeconds = GeneratedColumn<int>(
+    'duration_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _distanceMetersMeta = const VerificationMeta(
+    'distanceMeters',
+  );
+  @override
+  late final GeneratedColumn<int> distanceMeters = GeneratedColumn<int>(
+    'distance_meters',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _bidirectionalMeta = const VerificationMeta(
+    'bidirectional',
+  );
+  @override
+  late final GeneratedColumn<bool> bidirectional = GeneratedColumn<bool>(
+    'bidirectional',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("bidirectional" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _includesStairsMeta = const VerificationMeta(
+    'includesStairs',
+  );
+  @override
+  late final GeneratedColumn<bool> includesStairs = GeneratedColumn<bool>(
+    'includes_stairs',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("includes_stairs" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _requiresElevatorMeta = const VerificationMeta(
+    'requiresElevator',
+  );
+  @override
+  late final GeneratedColumn<bool> requiresElevator = GeneratedColumn<bool>(
+    'requires_elevator',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_elevator" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _requiresEscalatorMeta = const VerificationMeta(
+    'requiresEscalator',
+  );
+  @override
+  late final GeneratedColumn<bool> requiresEscalator = GeneratedColumn<bool>(
+    'requires_escalator',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_escalator" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _levelFromMeta = const VerificationMeta(
+    'levelFrom',
+  );
+  @override
+  late final GeneratedColumn<String> levelFrom = GeneratedColumn<String>(
+    'level_from',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _levelToMeta = const VerificationMeta(
+    'levelTo',
+  );
+  @override
+  late final GeneratedColumn<String> levelTo = GeneratedColumn<String>(
+    'level_to',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _requiresFacilityIdMeta =
+      const VerificationMeta('requiresFacilityId');
+  @override
+  late final GeneratedColumn<String> requiresFacilityId =
+      GeneratedColumn<String>(
+        'requires_facility_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _minWidthCmMeta = const VerificationMeta(
+    'minWidthCm',
+  );
+  @override
+  late final GeneratedColumn<int> minWidthCm = GeneratedColumn<int>(
+    'min_width_cm',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _slopePercentMeta = const VerificationMeta(
+    'slopePercent',
+  );
+  @override
+  late final GeneratedColumn<double> slopePercent = GeneratedColumn<double>(
+    'slope_percent',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _verticalMetersMeta = const VerificationMeta(
+    'verticalMeters',
+  );
+  @override
+  late final GeneratedColumn<double> verticalMeters = GeneratedColumn<double>(
+    'vertical_meters',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reliabilityScoreMeta = const VerificationMeta(
+    'reliabilityScore',
+  );
+  @override
+  late final GeneratedColumn<int> reliabilityScore = GeneratedColumn<int>(
+    'reliability_score',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _accessibilityStatusMeta =
+      const VerificationMeta('accessibilityStatus');
+  @override
+  late final GeneratedColumn<String> accessibilityStatus =
+      GeneratedColumn<String>(
+        'accessibility_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _instructionMeta = const VerificationMeta(
+    'instruction',
+  );
+  @override
+  late final GeneratedColumn<String> instruction = GeneratedColumn<String>(
+    'instruction',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _legacyInternalRouteEdgeIdMeta =
+      const VerificationMeta('legacyInternalRouteEdgeId');
+  @override
+  late final GeneratedColumn<String> legacyInternalRouteEdgeId =
+      GeneratedColumn<String>(
+        'legacy_internal_route_edge_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    fromNodeId,
+    toNodeId,
+    edgeType,
+    durationSeconds,
+    distanceMeters,
+    bidirectional,
+    includesStairs,
+    requiresElevator,
+    requiresEscalator,
+    levelFrom,
+    levelTo,
+    requiresFacilityId,
+    minWidthCm,
+    slopePercent,
+    verticalMeters,
+    reliabilityScore,
+    accessibilityStatus,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    provenanceKind,
+    verificationStatus,
+    lastVerifiedAt,
+    evidenceHash,
+    instruction,
+    legacyInternalRouteEdgeId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'station_pathway_edges';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StationPathwayEdge> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('from_node_id')) {
+      context.handle(
+        _fromNodeIdMeta,
+        fromNodeId.isAcceptableOrUnknown(
+          data['from_node_id']!,
+          _fromNodeIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fromNodeIdMeta);
+    }
+    if (data.containsKey('to_node_id')) {
+      context.handle(
+        _toNodeIdMeta,
+        toNodeId.isAcceptableOrUnknown(data['to_node_id']!, _toNodeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_toNodeIdMeta);
+    }
+    if (data.containsKey('edge_type')) {
+      context.handle(
+        _edgeTypeMeta,
+        edgeType.isAcceptableOrUnknown(data['edge_type']!, _edgeTypeMeta),
+      );
+    }
+    if (data.containsKey('duration_seconds')) {
+      context.handle(
+        _durationSecondsMeta,
+        durationSeconds.isAcceptableOrUnknown(
+          data['duration_seconds']!,
+          _durationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('distance_meters')) {
+      context.handle(
+        _distanceMetersMeta,
+        distanceMeters.isAcceptableOrUnknown(
+          data['distance_meters']!,
+          _distanceMetersMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bidirectional')) {
+      context.handle(
+        _bidirectionalMeta,
+        bidirectional.isAcceptableOrUnknown(
+          data['bidirectional']!,
+          _bidirectionalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('includes_stairs')) {
+      context.handle(
+        _includesStairsMeta,
+        includesStairs.isAcceptableOrUnknown(
+          data['includes_stairs']!,
+          _includesStairsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_elevator')) {
+      context.handle(
+        _requiresElevatorMeta,
+        requiresElevator.isAcceptableOrUnknown(
+          data['requires_elevator']!,
+          _requiresElevatorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_escalator')) {
+      context.handle(
+        _requiresEscalatorMeta,
+        requiresEscalator.isAcceptableOrUnknown(
+          data['requires_escalator']!,
+          _requiresEscalatorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('level_from')) {
+      context.handle(
+        _levelFromMeta,
+        levelFrom.isAcceptableOrUnknown(data['level_from']!, _levelFromMeta),
+      );
+    }
+    if (data.containsKey('level_to')) {
+      context.handle(
+        _levelToMeta,
+        levelTo.isAcceptableOrUnknown(data['level_to']!, _levelToMeta),
+      );
+    }
+    if (data.containsKey('requires_facility_id')) {
+      context.handle(
+        _requiresFacilityIdMeta,
+        requiresFacilityId.isAcceptableOrUnknown(
+          data['requires_facility_id']!,
+          _requiresFacilityIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('min_width_cm')) {
+      context.handle(
+        _minWidthCmMeta,
+        minWidthCm.isAcceptableOrUnknown(
+          data['min_width_cm']!,
+          _minWidthCmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('slope_percent')) {
+      context.handle(
+        _slopePercentMeta,
+        slopePercent.isAcceptableOrUnknown(
+          data['slope_percent']!,
+          _slopePercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('vertical_meters')) {
+      context.handle(
+        _verticalMetersMeta,
+        verticalMeters.isAcceptableOrUnknown(
+          data['vertical_meters']!,
+          _verticalMetersMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reliability_score')) {
+      context.handle(
+        _reliabilityScoreMeta,
+        reliabilityScore.isAcceptableOrUnknown(
+          data['reliability_score']!,
+          _reliabilityScoreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('accessibility_status')) {
+      context.handle(
+        _accessibilityStatusMeta,
+        accessibilityStatus.isAcceptableOrUnknown(
+          data['accessibility_status']!,
+          _accessibilityStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    }
+    if (data.containsKey('instruction')) {
+      context.handle(
+        _instructionMeta,
+        instruction.isAcceptableOrUnknown(
+          data['instruction']!,
+          _instructionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('legacy_internal_route_edge_id')) {
+      context.handle(
+        _legacyInternalRouteEdgeIdMeta,
+        legacyInternalRouteEdgeId.isAcceptableOrUnknown(
+          data['legacy_internal_route_edge_id']!,
+          _legacyInternalRouteEdgeIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StationPathwayEdge map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StationPathwayEdge(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fromNodeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}from_node_id'],
+      )!,
+      toNodeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_node_id'],
+      )!,
+      edgeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}edge_type'],
+      )!,
+      durationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_seconds'],
+      )!,
+      distanceMeters: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}distance_meters'],
+      )!,
+      bidirectional: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}bidirectional'],
+      )!,
+      includesStairs: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}includes_stairs'],
+      )!,
+      requiresElevator: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_elevator'],
+      )!,
+      requiresEscalator: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_escalator'],
+      )!,
+      levelFrom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}level_from'],
+      )!,
+      levelTo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}level_to'],
+      )!,
+      requiresFacilityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}requires_facility_id'],
+      ),
+      minWidthCm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}min_width_cm'],
+      ),
+      slopePercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}slope_percent'],
+      ),
+      verticalMeters: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}vertical_meters'],
+      ),
+      reliabilityScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reliability_score'],
+      )!,
+      accessibilityStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accessibility_status'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
+      instruction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}instruction'],
+      )!,
+      legacyInternalRouteEdgeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}legacy_internal_route_edge_id'],
+      )!,
+    );
+  }
+
+  @override
+  $StationPathwayEdgesTable createAlias(String alias) {
+    return $StationPathwayEdgesTable(attachedDatabase, alias);
+  }
+}
+
+class StationPathwayEdge extends DataClass
+    implements Insertable<StationPathwayEdge> {
+  final String id;
+  final String fromNodeId;
+  final String toNodeId;
+  final String edgeType;
+  final int durationSeconds;
+  final int distanceMeters;
+  final bool bidirectional;
+  final bool includesStairs;
+  final bool requiresElevator;
+  final bool requiresEscalator;
+  final String levelFrom;
+  final String levelTo;
+  final String? requiresFacilityId;
+  final int? minWidthCm;
+  final double? slopePercent;
+  final double? verticalMeters;
+  final int reliabilityScore;
+  final String accessibilityStatus;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final DateTime? lastVerifiedAt;
+  final String evidenceHash;
+  final String instruction;
+  final String legacyInternalRouteEdgeId;
+  const StationPathwayEdge({
+    required this.id,
+    required this.fromNodeId,
+    required this.toNodeId,
+    required this.edgeType,
+    required this.durationSeconds,
+    required this.distanceMeters,
+    required this.bidirectional,
+    required this.includesStairs,
+    required this.requiresElevator,
+    required this.requiresEscalator,
+    required this.levelFrom,
+    required this.levelTo,
+    this.requiresFacilityId,
+    this.minWidthCm,
+    this.slopePercent,
+    this.verticalMeters,
+    required this.reliabilityScore,
+    required this.accessibilityStatus,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    this.lastVerifiedAt,
+    required this.evidenceHash,
+    required this.instruction,
+    required this.legacyInternalRouteEdgeId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['from_node_id'] = Variable<String>(fromNodeId);
+    map['to_node_id'] = Variable<String>(toNodeId);
+    map['edge_type'] = Variable<String>(edgeType);
+    map['duration_seconds'] = Variable<int>(durationSeconds);
+    map['distance_meters'] = Variable<int>(distanceMeters);
+    map['bidirectional'] = Variable<bool>(bidirectional);
+    map['includes_stairs'] = Variable<bool>(includesStairs);
+    map['requires_elevator'] = Variable<bool>(requiresElevator);
+    map['requires_escalator'] = Variable<bool>(requiresEscalator);
+    map['level_from'] = Variable<String>(levelFrom);
+    map['level_to'] = Variable<String>(levelTo);
+    if (!nullToAbsent || requiresFacilityId != null) {
+      map['requires_facility_id'] = Variable<String>(requiresFacilityId);
+    }
+    if (!nullToAbsent || minWidthCm != null) {
+      map['min_width_cm'] = Variable<int>(minWidthCm);
+    }
+    if (!nullToAbsent || slopePercent != null) {
+      map['slope_percent'] = Variable<double>(slopePercent);
+    }
+    if (!nullToAbsent || verticalMeters != null) {
+      map['vertical_meters'] = Variable<double>(verticalMeters);
+    }
+    map['reliability_score'] = Variable<int>(reliabilityScore);
+    map['accessibility_status'] = Variable<String>(accessibilityStatus);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['verification_status'] = Variable<String>(verificationStatus);
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
+    map['evidence_hash'] = Variable<String>(evidenceHash);
+    map['instruction'] = Variable<String>(instruction);
+    map['legacy_internal_route_edge_id'] = Variable<String>(
+      legacyInternalRouteEdgeId,
+    );
+    return map;
+  }
+
+  StationPathwayEdgesCompanion toCompanion(bool nullToAbsent) {
+    return StationPathwayEdgesCompanion(
+      id: Value(id),
+      fromNodeId: Value(fromNodeId),
+      toNodeId: Value(toNodeId),
+      edgeType: Value(edgeType),
+      durationSeconds: Value(durationSeconds),
+      distanceMeters: Value(distanceMeters),
+      bidirectional: Value(bidirectional),
+      includesStairs: Value(includesStairs),
+      requiresElevator: Value(requiresElevator),
+      requiresEscalator: Value(requiresEscalator),
+      levelFrom: Value(levelFrom),
+      levelTo: Value(levelTo),
+      requiresFacilityId: requiresFacilityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(requiresFacilityId),
+      minWidthCm: minWidthCm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(minWidthCm),
+      slopePercent: slopePercent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(slopePercent),
+      verticalMeters: verticalMeters == null && nullToAbsent
+          ? const Value.absent()
+          : Value(verticalMeters),
+      reliabilityScore: Value(reliabilityScore),
+      accessibilityStatus: Value(accessibilityStatus),
+      sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
+      provenanceKind: Value(provenanceKind),
+      verificationStatus: Value(verificationStatus),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
+      evidenceHash: Value(evidenceHash),
+      instruction: Value(instruction),
+      legacyInternalRouteEdgeId: Value(legacyInternalRouteEdgeId),
+    );
+  }
+
+  factory StationPathwayEdge.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StationPathwayEdge(
+      id: serializer.fromJson<String>(json['id']),
+      fromNodeId: serializer.fromJson<String>(json['fromNodeId']),
+      toNodeId: serializer.fromJson<String>(json['toNodeId']),
+      edgeType: serializer.fromJson<String>(json['edgeType']),
+      durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
+      distanceMeters: serializer.fromJson<int>(json['distanceMeters']),
+      bidirectional: serializer.fromJson<bool>(json['bidirectional']),
+      includesStairs: serializer.fromJson<bool>(json['includesStairs']),
+      requiresElevator: serializer.fromJson<bool>(json['requiresElevator']),
+      requiresEscalator: serializer.fromJson<bool>(json['requiresEscalator']),
+      levelFrom: serializer.fromJson<String>(json['levelFrom']),
+      levelTo: serializer.fromJson<String>(json['levelTo']),
+      requiresFacilityId: serializer.fromJson<String?>(
+        json['requiresFacilityId'],
+      ),
+      minWidthCm: serializer.fromJson<int?>(json['minWidthCm']),
+      slopePercent: serializer.fromJson<double?>(json['slopePercent']),
+      verticalMeters: serializer.fromJson<double?>(json['verticalMeters']),
+      reliabilityScore: serializer.fromJson<int>(json['reliabilityScore']),
+      accessibilityStatus: serializer.fromJson<String>(
+        json['accessibilityStatus'],
+      ),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
+      instruction: serializer.fromJson<String>(json['instruction']),
+      legacyInternalRouteEdgeId: serializer.fromJson<String>(
+        json['legacyInternalRouteEdgeId'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fromNodeId': serializer.toJson<String>(fromNodeId),
+      'toNodeId': serializer.toJson<String>(toNodeId),
+      'edgeType': serializer.toJson<String>(edgeType),
+      'durationSeconds': serializer.toJson<int>(durationSeconds),
+      'distanceMeters': serializer.toJson<int>(distanceMeters),
+      'bidirectional': serializer.toJson<bool>(bidirectional),
+      'includesStairs': serializer.toJson<bool>(includesStairs),
+      'requiresElevator': serializer.toJson<bool>(requiresElevator),
+      'requiresEscalator': serializer.toJson<bool>(requiresEscalator),
+      'levelFrom': serializer.toJson<String>(levelFrom),
+      'levelTo': serializer.toJson<String>(levelTo),
+      'requiresFacilityId': serializer.toJson<String?>(requiresFacilityId),
+      'minWidthCm': serializer.toJson<int?>(minWidthCm),
+      'slopePercent': serializer.toJson<double?>(slopePercent),
+      'verticalMeters': serializer.toJson<double?>(verticalMeters),
+      'reliabilityScore': serializer.toJson<int>(reliabilityScore),
+      'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
+      'instruction': serializer.toJson<String>(instruction),
+      'legacyInternalRouteEdgeId': serializer.toJson<String>(
+        legacyInternalRouteEdgeId,
+      ),
+    };
+  }
+
+  StationPathwayEdge copyWith({
+    String? id,
+    String? fromNodeId,
+    String? toNodeId,
+    String? edgeType,
+    int? durationSeconds,
+    int? distanceMeters,
+    bool? bidirectional,
+    bool? includesStairs,
+    bool? requiresElevator,
+    bool? requiresEscalator,
+    String? levelFrom,
+    String? levelTo,
+    Value<String?> requiresFacilityId = const Value.absent(),
+    Value<int?> minWidthCm = const Value.absent(),
+    Value<double?> slopePercent = const Value.absent(),
+    Value<double?> verticalMeters = const Value.absent(),
+    int? reliabilityScore,
+    String? accessibilityStatus,
+    String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
+    String? provenanceKind,
+    String? verificationStatus,
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
+    String? evidenceHash,
+    String? instruction,
+    String? legacyInternalRouteEdgeId,
+  }) => StationPathwayEdge(
+    id: id ?? this.id,
+    fromNodeId: fromNodeId ?? this.fromNodeId,
+    toNodeId: toNodeId ?? this.toNodeId,
+    edgeType: edgeType ?? this.edgeType,
+    durationSeconds: durationSeconds ?? this.durationSeconds,
+    distanceMeters: distanceMeters ?? this.distanceMeters,
+    bidirectional: bidirectional ?? this.bidirectional,
+    includesStairs: includesStairs ?? this.includesStairs,
+    requiresElevator: requiresElevator ?? this.requiresElevator,
+    requiresEscalator: requiresEscalator ?? this.requiresEscalator,
+    levelFrom: levelFrom ?? this.levelFrom,
+    levelTo: levelTo ?? this.levelTo,
+    requiresFacilityId: requiresFacilityId.present
+        ? requiresFacilityId.value
+        : this.requiresFacilityId,
+    minWidthCm: minWidthCm.present ? minWidthCm.value : this.minWidthCm,
+    slopePercent: slopePercent.present ? slopePercent.value : this.slopePercent,
+    verticalMeters: verticalMeters.present
+        ? verticalMeters.value
+        : this.verticalMeters,
+    reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+    accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+    sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
+    instruction: instruction ?? this.instruction,
+    legacyInternalRouteEdgeId:
+        legacyInternalRouteEdgeId ?? this.legacyInternalRouteEdgeId,
+  );
+  StationPathwayEdge copyWithCompanion(StationPathwayEdgesCompanion data) {
+    return StationPathwayEdge(
+      id: data.id.present ? data.id.value : this.id,
+      fromNodeId: data.fromNodeId.present
+          ? data.fromNodeId.value
+          : this.fromNodeId,
+      toNodeId: data.toNodeId.present ? data.toNodeId.value : this.toNodeId,
+      edgeType: data.edgeType.present ? data.edgeType.value : this.edgeType,
+      durationSeconds: data.durationSeconds.present
+          ? data.durationSeconds.value
+          : this.durationSeconds,
+      distanceMeters: data.distanceMeters.present
+          ? data.distanceMeters.value
+          : this.distanceMeters,
+      bidirectional: data.bidirectional.present
+          ? data.bidirectional.value
+          : this.bidirectional,
+      includesStairs: data.includesStairs.present
+          ? data.includesStairs.value
+          : this.includesStairs,
+      requiresElevator: data.requiresElevator.present
+          ? data.requiresElevator.value
+          : this.requiresElevator,
+      requiresEscalator: data.requiresEscalator.present
+          ? data.requiresEscalator.value
+          : this.requiresEscalator,
+      levelFrom: data.levelFrom.present ? data.levelFrom.value : this.levelFrom,
+      levelTo: data.levelTo.present ? data.levelTo.value : this.levelTo,
+      requiresFacilityId: data.requiresFacilityId.present
+          ? data.requiresFacilityId.value
+          : this.requiresFacilityId,
+      minWidthCm: data.minWidthCm.present
+          ? data.minWidthCm.value
+          : this.minWidthCm,
+      slopePercent: data.slopePercent.present
+          ? data.slopePercent.value
+          : this.slopePercent,
+      verticalMeters: data.verticalMeters.present
+          ? data.verticalMeters.value
+          : this.verticalMeters,
+      reliabilityScore: data.reliabilityScore.present
+          ? data.reliabilityScore.value
+          : this.reliabilityScore,
+      accessibilityStatus: data.accessibilityStatus.present
+          ? data.accessibilityStatus.value
+          : this.accessibilityStatus,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
+      instruction: data.instruction.present
+          ? data.instruction.value
+          : this.instruction,
+      legacyInternalRouteEdgeId: data.legacyInternalRouteEdgeId.present
+          ? data.legacyInternalRouteEdgeId.value
+          : this.legacyInternalRouteEdgeId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationPathwayEdge(')
+          ..write('id: $id, ')
+          ..write('fromNodeId: $fromNodeId, ')
+          ..write('toNodeId: $toNodeId, ')
+          ..write('edgeType: $edgeType, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('distanceMeters: $distanceMeters, ')
+          ..write('bidirectional: $bidirectional, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('requiresElevator: $requiresElevator, ')
+          ..write('requiresEscalator: $requiresEscalator, ')
+          ..write('levelFrom: $levelFrom, ')
+          ..write('levelTo: $levelTo, ')
+          ..write('requiresFacilityId: $requiresFacilityId, ')
+          ..write('minWidthCm: $minWidthCm, ')
+          ..write('slopePercent: $slopePercent, ')
+          ..write('verticalMeters: $verticalMeters, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('instruction: $instruction, ')
+          ..write('legacyInternalRouteEdgeId: $legacyInternalRouteEdgeId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    fromNodeId,
+    toNodeId,
+    edgeType,
+    durationSeconds,
+    distanceMeters,
+    bidirectional,
+    includesStairs,
+    requiresElevator,
+    requiresEscalator,
+    levelFrom,
+    levelTo,
+    requiresFacilityId,
+    minWidthCm,
+    slopePercent,
+    verticalMeters,
+    reliabilityScore,
+    accessibilityStatus,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    provenanceKind,
+    verificationStatus,
+    lastVerifiedAt,
+    evidenceHash,
+    instruction,
+    legacyInternalRouteEdgeId,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StationPathwayEdge &&
+          other.id == this.id &&
+          other.fromNodeId == this.fromNodeId &&
+          other.toNodeId == this.toNodeId &&
+          other.edgeType == this.edgeType &&
+          other.durationSeconds == this.durationSeconds &&
+          other.distanceMeters == this.distanceMeters &&
+          other.bidirectional == this.bidirectional &&
+          other.includesStairs == this.includesStairs &&
+          other.requiresElevator == this.requiresElevator &&
+          other.requiresEscalator == this.requiresEscalator &&
+          other.levelFrom == this.levelFrom &&
+          other.levelTo == this.levelTo &&
+          other.requiresFacilityId == this.requiresFacilityId &&
+          other.minWidthCm == this.minWidthCm &&
+          other.slopePercent == this.slopePercent &&
+          other.verticalMeters == this.verticalMeters &&
+          other.reliabilityScore == this.reliabilityScore &&
+          other.accessibilityStatus == this.accessibilityStatus &&
+          other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verificationStatus == this.verificationStatus &&
+          other.lastVerifiedAt == this.lastVerifiedAt &&
+          other.evidenceHash == this.evidenceHash &&
+          other.instruction == this.instruction &&
+          other.legacyInternalRouteEdgeId == this.legacyInternalRouteEdgeId);
+}
+
+class StationPathwayEdgesCompanion extends UpdateCompanion<StationPathwayEdge> {
+  final Value<String> id;
+  final Value<String> fromNodeId;
+  final Value<String> toNodeId;
+  final Value<String> edgeType;
+  final Value<int> durationSeconds;
+  final Value<int> distanceMeters;
+  final Value<bool> bidirectional;
+  final Value<bool> includesStairs;
+  final Value<bool> requiresElevator;
+  final Value<bool> requiresEscalator;
+  final Value<String> levelFrom;
+  final Value<String> levelTo;
+  final Value<String?> requiresFacilityId;
+  final Value<int?> minWidthCm;
+  final Value<double?> slopePercent;
+  final Value<double?> verticalMeters;
+  final Value<int> reliabilityScore;
+  final Value<String> accessibilityStatus;
+  final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
+  final Value<String> provenanceKind;
+  final Value<String> verificationStatus;
+  final Value<DateTime?> lastVerifiedAt;
+  final Value<String> evidenceHash;
+  final Value<String> instruction;
+  final Value<String> legacyInternalRouteEdgeId;
+  final Value<int> rowid;
+  const StationPathwayEdgesCompanion({
+    this.id = const Value.absent(),
+    this.fromNodeId = const Value.absent(),
+    this.toNodeId = const Value.absent(),
+    this.edgeType = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
+    this.bidirectional = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.requiresElevator = const Value.absent(),
+    this.requiresEscalator = const Value.absent(),
+    this.levelFrom = const Value.absent(),
+    this.levelTo = const Value.absent(),
+    this.requiresFacilityId = const Value.absent(),
+    this.minWidthCm = const Value.absent(),
+    this.slopePercent = const Value.absent(),
+    this.verticalMeters = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.instruction = const Value.absent(),
+    this.legacyInternalRouteEdgeId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StationPathwayEdgesCompanion.insert({
+    required String id,
+    required String fromNodeId,
+    required String toNodeId,
+    this.edgeType = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
+    this.distanceMeters = const Value.absent(),
+    this.bidirectional = const Value.absent(),
+    this.includesStairs = const Value.absent(),
+    this.requiresElevator = const Value.absent(),
+    this.requiresEscalator = const Value.absent(),
+    this.levelFrom = const Value.absent(),
+    this.levelTo = const Value.absent(),
+    this.requiresFacilityId = const Value.absent(),
+    this.minWidthCm = const Value.absent(),
+    this.slopePercent = const Value.absent(),
+    this.verticalMeters = const Value.absent(),
+    this.reliabilityScore = const Value.absent(),
+    this.accessibilityStatus = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.instruction = const Value.absent(),
+    this.legacyInternalRouteEdgeId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fromNodeId = Value(fromNodeId),
+       toNodeId = Value(toNodeId);
+  static Insertable<StationPathwayEdge> custom({
+    Expression<String>? id,
+    Expression<String>? fromNodeId,
+    Expression<String>? toNodeId,
+    Expression<String>? edgeType,
+    Expression<int>? durationSeconds,
+    Expression<int>? distanceMeters,
+    Expression<bool>? bidirectional,
+    Expression<bool>? includesStairs,
+    Expression<bool>? requiresElevator,
+    Expression<bool>? requiresEscalator,
+    Expression<String>? levelFrom,
+    Expression<String>? levelTo,
+    Expression<String>? requiresFacilityId,
+    Expression<int>? minWidthCm,
+    Expression<double>? slopePercent,
+    Expression<double>? verticalMeters,
+    Expression<int>? reliabilityScore,
+    Expression<String>? accessibilityStatus,
+    Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
+    Expression<String>? provenanceKind,
+    Expression<String>? verificationStatus,
+    Expression<DateTime>? lastVerifiedAt,
+    Expression<String>? evidenceHash,
+    Expression<String>? instruction,
+    Expression<String>? legacyInternalRouteEdgeId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fromNodeId != null) 'from_node_id': fromNodeId,
+      if (toNodeId != null) 'to_node_id': toNodeId,
+      if (edgeType != null) 'edge_type': edgeType,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (distanceMeters != null) 'distance_meters': distanceMeters,
+      if (bidirectional != null) 'bidirectional': bidirectional,
+      if (includesStairs != null) 'includes_stairs': includesStairs,
+      if (requiresElevator != null) 'requires_elevator': requiresElevator,
+      if (requiresEscalator != null) 'requires_escalator': requiresEscalator,
+      if (levelFrom != null) 'level_from': levelFrom,
+      if (levelTo != null) 'level_to': levelTo,
+      if (requiresFacilityId != null)
+        'requires_facility_id': requiresFacilityId,
+      if (minWidthCm != null) 'min_width_cm': minWidthCm,
+      if (slopePercent != null) 'slope_percent': slopePercent,
+      if (verticalMeters != null) 'vertical_meters': verticalMeters,
+      if (reliabilityScore != null) 'reliability_score': reliabilityScore,
+      if (accessibilityStatus != null)
+        'accessibility_status': accessibilityStatus,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
+      if (instruction != null) 'instruction': instruction,
+      if (legacyInternalRouteEdgeId != null)
+        'legacy_internal_route_edge_id': legacyInternalRouteEdgeId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StationPathwayEdgesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fromNodeId,
+    Value<String>? toNodeId,
+    Value<String>? edgeType,
+    Value<int>? durationSeconds,
+    Value<int>? distanceMeters,
+    Value<bool>? bidirectional,
+    Value<bool>? includesStairs,
+    Value<bool>? requiresElevator,
+    Value<bool>? requiresEscalator,
+    Value<String>? levelFrom,
+    Value<String>? levelTo,
+    Value<String?>? requiresFacilityId,
+    Value<int?>? minWidthCm,
+    Value<double?>? slopePercent,
+    Value<double?>? verticalMeters,
+    Value<int>? reliabilityScore,
+    Value<String>? accessibilityStatus,
+    Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
+    Value<String>? provenanceKind,
+    Value<String>? verificationStatus,
+    Value<DateTime?>? lastVerifiedAt,
+    Value<String>? evidenceHash,
+    Value<String>? instruction,
+    Value<String>? legacyInternalRouteEdgeId,
+    Value<int>? rowid,
+  }) {
+    return StationPathwayEdgesCompanion(
+      id: id ?? this.id,
+      fromNodeId: fromNodeId ?? this.fromNodeId,
+      toNodeId: toNodeId ?? this.toNodeId,
+      edgeType: edgeType ?? this.edgeType,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      bidirectional: bidirectional ?? this.bidirectional,
+      includesStairs: includesStairs ?? this.includesStairs,
+      requiresElevator: requiresElevator ?? this.requiresElevator,
+      requiresEscalator: requiresEscalator ?? this.requiresEscalator,
+      levelFrom: levelFrom ?? this.levelFrom,
+      levelTo: levelTo ?? this.levelTo,
+      requiresFacilityId: requiresFacilityId ?? this.requiresFacilityId,
+      minWidthCm: minWidthCm ?? this.minWidthCm,
+      slopePercent: slopePercent ?? this.slopePercent,
+      verticalMeters: verticalMeters ?? this.verticalMeters,
+      reliabilityScore: reliabilityScore ?? this.reliabilityScore,
+      accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
+      sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
+      instruction: instruction ?? this.instruction,
+      legacyInternalRouteEdgeId:
+          legacyInternalRouteEdgeId ?? this.legacyInternalRouteEdgeId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fromNodeId.present) {
+      map['from_node_id'] = Variable<String>(fromNodeId.value);
+    }
+    if (toNodeId.present) {
+      map['to_node_id'] = Variable<String>(toNodeId.value);
+    }
+    if (edgeType.present) {
+      map['edge_type'] = Variable<String>(edgeType.value);
+    }
+    if (durationSeconds.present) {
+      map['duration_seconds'] = Variable<int>(durationSeconds.value);
+    }
+    if (distanceMeters.present) {
+      map['distance_meters'] = Variable<int>(distanceMeters.value);
+    }
+    if (bidirectional.present) {
+      map['bidirectional'] = Variable<bool>(bidirectional.value);
+    }
+    if (includesStairs.present) {
+      map['includes_stairs'] = Variable<bool>(includesStairs.value);
+    }
+    if (requiresElevator.present) {
+      map['requires_elevator'] = Variable<bool>(requiresElevator.value);
+    }
+    if (requiresEscalator.present) {
+      map['requires_escalator'] = Variable<bool>(requiresEscalator.value);
+    }
+    if (levelFrom.present) {
+      map['level_from'] = Variable<String>(levelFrom.value);
+    }
+    if (levelTo.present) {
+      map['level_to'] = Variable<String>(levelTo.value);
+    }
+    if (requiresFacilityId.present) {
+      map['requires_facility_id'] = Variable<String>(requiresFacilityId.value);
+    }
+    if (minWidthCm.present) {
+      map['min_width_cm'] = Variable<int>(minWidthCm.value);
+    }
+    if (slopePercent.present) {
+      map['slope_percent'] = Variable<double>(slopePercent.value);
+    }
+    if (verticalMeters.present) {
+      map['vertical_meters'] = Variable<double>(verticalMeters.value);
+    }
+    if (reliabilityScore.present) {
+      map['reliability_score'] = Variable<int>(reliabilityScore.value);
+    }
+    if (accessibilityStatus.present) {
+      map['accessibility_status'] = Variable<String>(accessibilityStatus.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
+    if (instruction.present) {
+      map['instruction'] = Variable<String>(instruction.value);
+    }
+    if (legacyInternalRouteEdgeId.present) {
+      map['legacy_internal_route_edge_id'] = Variable<String>(
+        legacyInternalRouteEdgeId.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationPathwayEdgesCompanion(')
+          ..write('id: $id, ')
+          ..write('fromNodeId: $fromNodeId, ')
+          ..write('toNodeId: $toNodeId, ')
+          ..write('edgeType: $edgeType, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('distanceMeters: $distanceMeters, ')
+          ..write('bidirectional: $bidirectional, ')
+          ..write('includesStairs: $includesStairs, ')
+          ..write('requiresElevator: $requiresElevator, ')
+          ..write('requiresEscalator: $requiresEscalator, ')
+          ..write('levelFrom: $levelFrom, ')
+          ..write('levelTo: $levelTo, ')
+          ..write('requiresFacilityId: $requiresFacilityId, ')
+          ..write('minWidthCm: $minWidthCm, ')
+          ..write('slopePercent: $slopePercent, ')
+          ..write('verticalMeters: $verticalMeters, ')
+          ..write('reliabilityScore: $reliabilityScore, ')
+          ..write('accessibilityStatus: $accessibilityStatus, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('instruction: $instruction, ')
+          ..write('legacyInternalRouteEdgeId: $legacyInternalRouteEdgeId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TransferRulesTable extends TransferRules
+    with TableInfo<$TransferRulesTable, TransferRule> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TransferRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fromStationIdMeta = const VerificationMeta(
+    'fromStationId',
+  );
+  @override
+  late final GeneratedColumn<String> fromStationId = GeneratedColumn<String>(
+    'from_station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fromLineIdMeta = const VerificationMeta(
+    'fromLineId',
+  );
+  @override
+  late final GeneratedColumn<String> fromLineId = GeneratedColumn<String>(
+    'from_line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toStationIdMeta = const VerificationMeta(
+    'toStationId',
+  );
+  @override
+  late final GeneratedColumn<String> toStationId = GeneratedColumn<String>(
+    'to_station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toLineIdMeta = const VerificationMeta(
+    'toLineId',
+  );
+  @override
+  late final GeneratedColumn<String> toLineId = GeneratedColumn<String>(
+    'to_line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _transferTypeMeta = const VerificationMeta(
+    'transferType',
+  );
+  @override
+  late final GeneratedColumn<String> transferType = GeneratedColumn<String>(
+    'transfer_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('IN_STATION'),
+  );
+  static const VerificationMeta _minTransferSecondsMeta =
+      const VerificationMeta('minTransferSeconds');
+  @override
+  late final GeneratedColumn<int> minTransferSeconds = GeneratedColumn<int>(
+    'min_transfer_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _pathwayEdgeIdMeta = const VerificationMeta(
+    'pathwayEdgeId',
+  );
+  @override
+  late final GeneratedColumn<String> pathwayEdgeId = GeneratedColumn<String>(
+    'pathway_edge_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _strictStepFreePathwayEdgeIdMeta =
+      const VerificationMeta('strictStepFreePathwayEdgeId');
+  @override
+  late final GeneratedColumn<String> strictStepFreePathwayEdgeId =
+      GeneratedColumn<String>(
+        'strict_step_free_pathway_edge_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    fromStationId,
+    fromLineId,
+    toStationId,
+    toLineId,
+    transferType,
+    minTransferSeconds,
+    pathwayEdgeId,
+    strictStepFreePathwayEdgeId,
+    sourceId,
+    verificationStatus,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'transfer_rules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TransferRule> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('from_station_id')) {
+      context.handle(
+        _fromStationIdMeta,
+        fromStationId.isAcceptableOrUnknown(
+          data['from_station_id']!,
+          _fromStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fromStationIdMeta);
+    }
+    if (data.containsKey('from_line_id')) {
+      context.handle(
+        _fromLineIdMeta,
+        fromLineId.isAcceptableOrUnknown(
+          data['from_line_id']!,
+          _fromLineIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fromLineIdMeta);
+    }
+    if (data.containsKey('to_station_id')) {
+      context.handle(
+        _toStationIdMeta,
+        toStationId.isAcceptableOrUnknown(
+          data['to_station_id']!,
+          _toStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_toStationIdMeta);
+    }
+    if (data.containsKey('to_line_id')) {
+      context.handle(
+        _toLineIdMeta,
+        toLineId.isAcceptableOrUnknown(data['to_line_id']!, _toLineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_toLineIdMeta);
+    }
+    if (data.containsKey('transfer_type')) {
+      context.handle(
+        _transferTypeMeta,
+        transferType.isAcceptableOrUnknown(
+          data['transfer_type']!,
+          _transferTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('min_transfer_seconds')) {
+      context.handle(
+        _minTransferSecondsMeta,
+        minTransferSeconds.isAcceptableOrUnknown(
+          data['min_transfer_seconds']!,
+          _minTransferSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pathway_edge_id')) {
+      context.handle(
+        _pathwayEdgeIdMeta,
+        pathwayEdgeId.isAcceptableOrUnknown(
+          data['pathway_edge_id']!,
+          _pathwayEdgeIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('strict_step_free_pathway_edge_id')) {
+      context.handle(
+        _strictStepFreePathwayEdgeIdMeta,
+        strictStepFreePathwayEdgeId.isAcceptableOrUnknown(
+          data['strict_step_free_pathway_edge_id']!,
+          _strictStepFreePathwayEdgeIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TransferRule map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TransferRule(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fromStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}from_station_id'],
+      )!,
+      fromLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}from_line_id'],
+      )!,
+      toStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_station_id'],
+      )!,
+      toLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_line_id'],
+      )!,
+      transferType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transfer_type'],
+      )!,
+      minTransferSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}min_transfer_seconds'],
+      )!,
+      pathwayEdgeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pathway_edge_id'],
+      ),
+      strictStepFreePathwayEdgeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}strict_step_free_pathway_edge_id'],
+      ),
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
+    );
+  }
+
+  @override
+  $TransferRulesTable createAlias(String alias) {
+    return $TransferRulesTable(attachedDatabase, alias);
+  }
+}
+
+class TransferRule extends DataClass implements Insertable<TransferRule> {
+  final String id;
+  final String fromStationId;
+  final String fromLineId;
+  final String toStationId;
+  final String toLineId;
+  final String transferType;
+  final int minTransferSeconds;
+  final String? pathwayEdgeId;
+  final String? strictStepFreePathwayEdgeId;
+  final String sourceId;
+  final String verificationStatus;
+  const TransferRule({
+    required this.id,
+    required this.fromStationId,
+    required this.fromLineId,
+    required this.toStationId,
+    required this.toLineId,
+    required this.transferType,
+    required this.minTransferSeconds,
+    this.pathwayEdgeId,
+    this.strictStepFreePathwayEdgeId,
+    required this.sourceId,
+    required this.verificationStatus,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['from_station_id'] = Variable<String>(fromStationId);
+    map['from_line_id'] = Variable<String>(fromLineId);
+    map['to_station_id'] = Variable<String>(toStationId);
+    map['to_line_id'] = Variable<String>(toLineId);
+    map['transfer_type'] = Variable<String>(transferType);
+    map['min_transfer_seconds'] = Variable<int>(minTransferSeconds);
+    if (!nullToAbsent || pathwayEdgeId != null) {
+      map['pathway_edge_id'] = Variable<String>(pathwayEdgeId);
+    }
+    if (!nullToAbsent || strictStepFreePathwayEdgeId != null) {
+      map['strict_step_free_pathway_edge_id'] = Variable<String>(
+        strictStepFreePathwayEdgeId,
+      );
+    }
+    map['source_id'] = Variable<String>(sourceId);
+    map['verification_status'] = Variable<String>(verificationStatus);
+    return map;
+  }
+
+  TransferRulesCompanion toCompanion(bool nullToAbsent) {
+    return TransferRulesCompanion(
+      id: Value(id),
+      fromStationId: Value(fromStationId),
+      fromLineId: Value(fromLineId),
+      toStationId: Value(toStationId),
+      toLineId: Value(toLineId),
+      transferType: Value(transferType),
+      minTransferSeconds: Value(minTransferSeconds),
+      pathwayEdgeId: pathwayEdgeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pathwayEdgeId),
+      strictStepFreePathwayEdgeId:
+          strictStepFreePathwayEdgeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(strictStepFreePathwayEdgeId),
+      sourceId: Value(sourceId),
+      verificationStatus: Value(verificationStatus),
+    );
+  }
+
+  factory TransferRule.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TransferRule(
+      id: serializer.fromJson<String>(json['id']),
+      fromStationId: serializer.fromJson<String>(json['fromStationId']),
+      fromLineId: serializer.fromJson<String>(json['fromLineId']),
+      toStationId: serializer.fromJson<String>(json['toStationId']),
+      toLineId: serializer.fromJson<String>(json['toLineId']),
+      transferType: serializer.fromJson<String>(json['transferType']),
+      minTransferSeconds: serializer.fromJson<int>(json['minTransferSeconds']),
+      pathwayEdgeId: serializer.fromJson<String?>(json['pathwayEdgeId']),
+      strictStepFreePathwayEdgeId: serializer.fromJson<String?>(
+        json['strictStepFreePathwayEdgeId'],
+      ),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fromStationId': serializer.toJson<String>(fromStationId),
+      'fromLineId': serializer.toJson<String>(fromLineId),
+      'toStationId': serializer.toJson<String>(toStationId),
+      'toLineId': serializer.toJson<String>(toLineId),
+      'transferType': serializer.toJson<String>(transferType),
+      'minTransferSeconds': serializer.toJson<int>(minTransferSeconds),
+      'pathwayEdgeId': serializer.toJson<String?>(pathwayEdgeId),
+      'strictStepFreePathwayEdgeId': serializer.toJson<String?>(
+        strictStepFreePathwayEdgeId,
+      ),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
+    };
+  }
+
+  TransferRule copyWith({
+    String? id,
+    String? fromStationId,
+    String? fromLineId,
+    String? toStationId,
+    String? toLineId,
+    String? transferType,
+    int? minTransferSeconds,
+    Value<String?> pathwayEdgeId = const Value.absent(),
+    Value<String?> strictStepFreePathwayEdgeId = const Value.absent(),
+    String? sourceId,
+    String? verificationStatus,
+  }) => TransferRule(
+    id: id ?? this.id,
+    fromStationId: fromStationId ?? this.fromStationId,
+    fromLineId: fromLineId ?? this.fromLineId,
+    toStationId: toStationId ?? this.toStationId,
+    toLineId: toLineId ?? this.toLineId,
+    transferType: transferType ?? this.transferType,
+    minTransferSeconds: minTransferSeconds ?? this.minTransferSeconds,
+    pathwayEdgeId: pathwayEdgeId.present
+        ? pathwayEdgeId.value
+        : this.pathwayEdgeId,
+    strictStepFreePathwayEdgeId: strictStepFreePathwayEdgeId.present
+        ? strictStepFreePathwayEdgeId.value
+        : this.strictStepFreePathwayEdgeId,
+    sourceId: sourceId ?? this.sourceId,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
+  );
+  TransferRule copyWithCompanion(TransferRulesCompanion data) {
+    return TransferRule(
+      id: data.id.present ? data.id.value : this.id,
+      fromStationId: data.fromStationId.present
+          ? data.fromStationId.value
+          : this.fromStationId,
+      fromLineId: data.fromLineId.present
+          ? data.fromLineId.value
+          : this.fromLineId,
+      toStationId: data.toStationId.present
+          ? data.toStationId.value
+          : this.toStationId,
+      toLineId: data.toLineId.present ? data.toLineId.value : this.toLineId,
+      transferType: data.transferType.present
+          ? data.transferType.value
+          : this.transferType,
+      minTransferSeconds: data.minTransferSeconds.present
+          ? data.minTransferSeconds.value
+          : this.minTransferSeconds,
+      pathwayEdgeId: data.pathwayEdgeId.present
+          ? data.pathwayEdgeId.value
+          : this.pathwayEdgeId,
+      strictStepFreePathwayEdgeId: data.strictStepFreePathwayEdgeId.present
+          ? data.strictStepFreePathwayEdgeId.value
+          : this.strictStepFreePathwayEdgeId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransferRule(')
+          ..write('id: $id, ')
+          ..write('fromStationId: $fromStationId, ')
+          ..write('fromLineId: $fromLineId, ')
+          ..write('toStationId: $toStationId, ')
+          ..write('toLineId: $toLineId, ')
+          ..write('transferType: $transferType, ')
+          ..write('minTransferSeconds: $minTransferSeconds, ')
+          ..write('pathwayEdgeId: $pathwayEdgeId, ')
+          ..write('strictStepFreePathwayEdgeId: $strictStepFreePathwayEdgeId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('verificationStatus: $verificationStatus')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    fromStationId,
+    fromLineId,
+    toStationId,
+    toLineId,
+    transferType,
+    minTransferSeconds,
+    pathwayEdgeId,
+    strictStepFreePathwayEdgeId,
+    sourceId,
+    verificationStatus,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TransferRule &&
+          other.id == this.id &&
+          other.fromStationId == this.fromStationId &&
+          other.fromLineId == this.fromLineId &&
+          other.toStationId == this.toStationId &&
+          other.toLineId == this.toLineId &&
+          other.transferType == this.transferType &&
+          other.minTransferSeconds == this.minTransferSeconds &&
+          other.pathwayEdgeId == this.pathwayEdgeId &&
+          other.strictStepFreePathwayEdgeId ==
+              this.strictStepFreePathwayEdgeId &&
+          other.sourceId == this.sourceId &&
+          other.verificationStatus == this.verificationStatus);
+}
+
+class TransferRulesCompanion extends UpdateCompanion<TransferRule> {
+  final Value<String> id;
+  final Value<String> fromStationId;
+  final Value<String> fromLineId;
+  final Value<String> toStationId;
+  final Value<String> toLineId;
+  final Value<String> transferType;
+  final Value<int> minTransferSeconds;
+  final Value<String?> pathwayEdgeId;
+  final Value<String?> strictStepFreePathwayEdgeId;
+  final Value<String> sourceId;
+  final Value<String> verificationStatus;
+  final Value<int> rowid;
+  const TransferRulesCompanion({
+    this.id = const Value.absent(),
+    this.fromStationId = const Value.absent(),
+    this.fromLineId = const Value.absent(),
+    this.toStationId = const Value.absent(),
+    this.toLineId = const Value.absent(),
+    this.transferType = const Value.absent(),
+    this.minTransferSeconds = const Value.absent(),
+    this.pathwayEdgeId = const Value.absent(),
+    this.strictStepFreePathwayEdgeId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TransferRulesCompanion.insert({
+    required String id,
+    required String fromStationId,
+    required String fromLineId,
+    required String toStationId,
+    required String toLineId,
+    this.transferType = const Value.absent(),
+    this.minTransferSeconds = const Value.absent(),
+    this.pathwayEdgeId = const Value.absent(),
+    this.strictStepFreePathwayEdgeId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fromStationId = Value(fromStationId),
+       fromLineId = Value(fromLineId),
+       toStationId = Value(toStationId),
+       toLineId = Value(toLineId);
+  static Insertable<TransferRule> custom({
+    Expression<String>? id,
+    Expression<String>? fromStationId,
+    Expression<String>? fromLineId,
+    Expression<String>? toStationId,
+    Expression<String>? toLineId,
+    Expression<String>? transferType,
+    Expression<int>? minTransferSeconds,
+    Expression<String>? pathwayEdgeId,
+    Expression<String>? strictStepFreePathwayEdgeId,
+    Expression<String>? sourceId,
+    Expression<String>? verificationStatus,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fromStationId != null) 'from_station_id': fromStationId,
+      if (fromLineId != null) 'from_line_id': fromLineId,
+      if (toStationId != null) 'to_station_id': toStationId,
+      if (toLineId != null) 'to_line_id': toLineId,
+      if (transferType != null) 'transfer_type': transferType,
+      if (minTransferSeconds != null)
+        'min_transfer_seconds': minTransferSeconds,
+      if (pathwayEdgeId != null) 'pathway_edge_id': pathwayEdgeId,
+      if (strictStepFreePathwayEdgeId != null)
+        'strict_step_free_pathway_edge_id': strictStepFreePathwayEdgeId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TransferRulesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fromStationId,
+    Value<String>? fromLineId,
+    Value<String>? toStationId,
+    Value<String>? toLineId,
+    Value<String>? transferType,
+    Value<int>? minTransferSeconds,
+    Value<String?>? pathwayEdgeId,
+    Value<String?>? strictStepFreePathwayEdgeId,
+    Value<String>? sourceId,
+    Value<String>? verificationStatus,
+    Value<int>? rowid,
+  }) {
+    return TransferRulesCompanion(
+      id: id ?? this.id,
+      fromStationId: fromStationId ?? this.fromStationId,
+      fromLineId: fromLineId ?? this.fromLineId,
+      toStationId: toStationId ?? this.toStationId,
+      toLineId: toLineId ?? this.toLineId,
+      transferType: transferType ?? this.transferType,
+      minTransferSeconds: minTransferSeconds ?? this.minTransferSeconds,
+      pathwayEdgeId: pathwayEdgeId ?? this.pathwayEdgeId,
+      strictStepFreePathwayEdgeId:
+          strictStepFreePathwayEdgeId ?? this.strictStepFreePathwayEdgeId,
+      sourceId: sourceId ?? this.sourceId,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fromStationId.present) {
+      map['from_station_id'] = Variable<String>(fromStationId.value);
+    }
+    if (fromLineId.present) {
+      map['from_line_id'] = Variable<String>(fromLineId.value);
+    }
+    if (toStationId.present) {
+      map['to_station_id'] = Variable<String>(toStationId.value);
+    }
+    if (toLineId.present) {
+      map['to_line_id'] = Variable<String>(toLineId.value);
+    }
+    if (transferType.present) {
+      map['transfer_type'] = Variable<String>(transferType.value);
+    }
+    if (minTransferSeconds.present) {
+      map['min_transfer_seconds'] = Variable<int>(minTransferSeconds.value);
+    }
+    if (pathwayEdgeId.present) {
+      map['pathway_edge_id'] = Variable<String>(pathwayEdgeId.value);
+    }
+    if (strictStepFreePathwayEdgeId.present) {
+      map['strict_step_free_pathway_edge_id'] = Variable<String>(
+        strictStepFreePathwayEdgeId.value,
+      );
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TransferRulesCompanion(')
+          ..write('id: $id, ')
+          ..write('fromStationId: $fromStationId, ')
+          ..write('fromLineId: $fromLineId, ')
+          ..write('toStationId: $toStationId, ')
+          ..write('toLineId: $toLineId, ')
+          ..write('transferType: $transferType, ')
+          ..write('minTransferSeconds: $minTransferSeconds, ')
+          ..write('pathwayEdgeId: $pathwayEdgeId, ')
+          ..write('strictStepFreePathwayEdgeId: $strictStepFreePathwayEdgeId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $DataQualityRecordsTable extends DataQualityRecords
     with TableInfo<$DataQualityRecordsTable, DataQualityRecord> {
   @override
@@ -12056,6 +14774,11 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
       $InternalRouteNodesTable(this);
   late final $InternalRouteEdgesTable internalRouteEdges =
       $InternalRouteEdgesTable(this);
+  late final $StationPathwayNodesTable stationPathwayNodes =
+      $StationPathwayNodesTable(this);
+  late final $StationPathwayEdgesTable stationPathwayEdges =
+      $StationPathwayEdgesTable(this);
+  late final $TransferRulesTable transferRules = $TransferRulesTable(this);
   late final $DataQualityRecordsTable dataQualityRecords =
       $DataQualityRecordsTable(this);
   @override
@@ -12084,6 +14807,9 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     stationAccessibilitySummaries,
     internalRouteNodes,
     internalRouteEdges,
+    stationPathwayNodes,
+    stationPathwayEdges,
+    transferRules,
     dataQualityRecords,
   ];
 }
@@ -18034,6 +20760,1276 @@ typedef $$InternalRouteEdgesTableProcessedTableManager =
       InternalRouteEdge,
       PrefetchHooks Function()
     >;
+typedef $$StationPathwayNodesTableCreateCompanionBuilder =
+    StationPathwayNodesCompanion Function({
+      required String id,
+      required String stationId,
+      Value<String?> lineId,
+      required String nodeType,
+      required String label,
+      Value<String> level,
+      Value<String> legacyInternalRouteNodeId,
+      Value<int> rowid,
+    });
+typedef $$StationPathwayNodesTableUpdateCompanionBuilder =
+    StationPathwayNodesCompanion Function({
+      Value<String> id,
+      Value<String> stationId,
+      Value<String?> lineId,
+      Value<String> nodeType,
+      Value<String> label,
+      Value<String> level,
+      Value<String> legacyInternalRouteNodeId,
+      Value<int> rowid,
+    });
+
+class $$StationPathwayNodesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayNodesTable> {
+  $$StationPathwayNodesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nodeType => $composableBuilder(
+    column: $table.nodeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get level => $composableBuilder(
+    column: $table.level,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get legacyInternalRouteNodeId => $composableBuilder(
+    column: $table.legacyInternalRouteNodeId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StationPathwayNodesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayNodesTable> {
+  $$StationPathwayNodesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nodeType => $composableBuilder(
+    column: $table.nodeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get level => $composableBuilder(
+    column: $table.level,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get legacyInternalRouteNodeId => $composableBuilder(
+    column: $table.legacyInternalRouteNodeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StationPathwayNodesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayNodesTable> {
+  $$StationPathwayNodesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get nodeType =>
+      $composableBuilder(column: $table.nodeType, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get level =>
+      $composableBuilder(column: $table.level, builder: (column) => column);
+
+  GeneratedColumn<String> get legacyInternalRouteNodeId => $composableBuilder(
+    column: $table.legacyInternalRouteNodeId,
+    builder: (column) => column,
+  );
+}
+
+class $$StationPathwayNodesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $StationPathwayNodesTable,
+          StationPathwayNode,
+          $$StationPathwayNodesTableFilterComposer,
+          $$StationPathwayNodesTableOrderingComposer,
+          $$StationPathwayNodesTableAnnotationComposer,
+          $$StationPathwayNodesTableCreateCompanionBuilder,
+          $$StationPathwayNodesTableUpdateCompanionBuilder,
+          (
+            StationPathwayNode,
+            BaseReferences<
+              _$CatalogDatabase,
+              $StationPathwayNodesTable,
+              StationPathwayNode
+            >,
+          ),
+          StationPathwayNode,
+          PrefetchHooks Function()
+        > {
+  $$StationPathwayNodesTableTableManager(
+    _$CatalogDatabase db,
+    $StationPathwayNodesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StationPathwayNodesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StationPathwayNodesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$StationPathwayNodesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> stationId = const Value.absent(),
+                Value<String?> lineId = const Value.absent(),
+                Value<String> nodeType = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> level = const Value.absent(),
+                Value<String> legacyInternalRouteNodeId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationPathwayNodesCompanion(
+                id: id,
+                stationId: stationId,
+                lineId: lineId,
+                nodeType: nodeType,
+                label: label,
+                level: level,
+                legacyInternalRouteNodeId: legacyInternalRouteNodeId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String stationId,
+                Value<String?> lineId = const Value.absent(),
+                required String nodeType,
+                required String label,
+                Value<String> level = const Value.absent(),
+                Value<String> legacyInternalRouteNodeId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationPathwayNodesCompanion.insert(
+                id: id,
+                stationId: stationId,
+                lineId: lineId,
+                nodeType: nodeType,
+                label: label,
+                level: level,
+                legacyInternalRouteNodeId: legacyInternalRouteNodeId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StationPathwayNodesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $StationPathwayNodesTable,
+      StationPathwayNode,
+      $$StationPathwayNodesTableFilterComposer,
+      $$StationPathwayNodesTableOrderingComposer,
+      $$StationPathwayNodesTableAnnotationComposer,
+      $$StationPathwayNodesTableCreateCompanionBuilder,
+      $$StationPathwayNodesTableUpdateCompanionBuilder,
+      (
+        StationPathwayNode,
+        BaseReferences<
+          _$CatalogDatabase,
+          $StationPathwayNodesTable,
+          StationPathwayNode
+        >,
+      ),
+      StationPathwayNode,
+      PrefetchHooks Function()
+    >;
+typedef $$StationPathwayEdgesTableCreateCompanionBuilder =
+    StationPathwayEdgesCompanion Function({
+      required String id,
+      required String fromNodeId,
+      required String toNodeId,
+      Value<String> edgeType,
+      Value<int> durationSeconds,
+      Value<int> distanceMeters,
+      Value<bool> bidirectional,
+      Value<bool> includesStairs,
+      Value<bool> requiresElevator,
+      Value<bool> requiresEscalator,
+      Value<String> levelFrom,
+      Value<String> levelTo,
+      Value<String?> requiresFacilityId,
+      Value<int?> minWidthCm,
+      Value<double?> slopePercent,
+      Value<double?> verticalMeters,
+      Value<int> reliabilityScore,
+      Value<String> accessibilityStatus,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
+      Value<String> instruction,
+      Value<String> legacyInternalRouteEdgeId,
+      Value<int> rowid,
+    });
+typedef $$StationPathwayEdgesTableUpdateCompanionBuilder =
+    StationPathwayEdgesCompanion Function({
+      Value<String> id,
+      Value<String> fromNodeId,
+      Value<String> toNodeId,
+      Value<String> edgeType,
+      Value<int> durationSeconds,
+      Value<int> distanceMeters,
+      Value<bool> bidirectional,
+      Value<bool> includesStairs,
+      Value<bool> requiresElevator,
+      Value<bool> requiresEscalator,
+      Value<String> levelFrom,
+      Value<String> levelTo,
+      Value<String?> requiresFacilityId,
+      Value<int?> minWidthCm,
+      Value<double?> slopePercent,
+      Value<double?> verticalMeters,
+      Value<int> reliabilityScore,
+      Value<String> accessibilityStatus,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
+      Value<String> instruction,
+      Value<String> legacyInternalRouteEdgeId,
+      Value<int> rowid,
+    });
+
+class $$StationPathwayEdgesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayEdgesTable> {
+  $$StationPathwayEdgesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fromNodeId => $composableBuilder(
+    column: $table.fromNodeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get toNodeId => $composableBuilder(
+    column: $table.toNodeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get edgeType => $composableBuilder(
+    column: $table.edgeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get bidirectional => $composableBuilder(
+    column: $table.bidirectional,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get levelFrom => $composableBuilder(
+    column: $table.levelFrom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get levelTo => $composableBuilder(
+    column: $table.levelTo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requiresFacilityId => $composableBuilder(
+    column: $table.requiresFacilityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get minWidthCm => $composableBuilder(
+    column: $table.minWidthCm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get slopePercent => $composableBuilder(
+    column: $table.slopePercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get verticalMeters => $composableBuilder(
+    column: $table.verticalMeters,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get instruction => $composableBuilder(
+    column: $table.instruction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get legacyInternalRouteEdgeId => $composableBuilder(
+    column: $table.legacyInternalRouteEdgeId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StationPathwayEdgesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayEdgesTable> {
+  $$StationPathwayEdgesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fromNodeId => $composableBuilder(
+    column: $table.fromNodeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toNodeId => $composableBuilder(
+    column: $table.toNodeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get edgeType => $composableBuilder(
+    column: $table.edgeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get bidirectional => $composableBuilder(
+    column: $table.bidirectional,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get levelFrom => $composableBuilder(
+    column: $table.levelFrom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get levelTo => $composableBuilder(
+    column: $table.levelTo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get requiresFacilityId => $composableBuilder(
+    column: $table.requiresFacilityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get minWidthCm => $composableBuilder(
+    column: $table.minWidthCm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get slopePercent => $composableBuilder(
+    column: $table.slopePercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get verticalMeters => $composableBuilder(
+    column: $table.verticalMeters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get instruction => $composableBuilder(
+    column: $table.instruction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get legacyInternalRouteEdgeId => $composableBuilder(
+    column: $table.legacyInternalRouteEdgeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StationPathwayEdgesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $StationPathwayEdgesTable> {
+  $$StationPathwayEdgesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fromNodeId => $composableBuilder(
+    column: $table.fromNodeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get toNodeId =>
+      $composableBuilder(column: $table.toNodeId, builder: (column) => column);
+
+  GeneratedColumn<String> get edgeType =>
+      $composableBuilder(column: $table.edgeType, builder: (column) => column);
+
+  GeneratedColumn<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get distanceMeters => $composableBuilder(
+    column: $table.distanceMeters,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get bidirectional => $composableBuilder(
+    column: $table.bidirectional,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get includesStairs => $composableBuilder(
+    column: $table.includesStairs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresElevator => $composableBuilder(
+    column: $table.requiresElevator,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresEscalator => $composableBuilder(
+    column: $table.requiresEscalator,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get levelFrom =>
+      $composableBuilder(column: $table.levelFrom, builder: (column) => column);
+
+  GeneratedColumn<String> get levelTo =>
+      $composableBuilder(column: $table.levelTo, builder: (column) => column);
+
+  GeneratedColumn<String> get requiresFacilityId => $composableBuilder(
+    column: $table.requiresFacilityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get minWidthCm => $composableBuilder(
+    column: $table.minWidthCm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get slopePercent => $composableBuilder(
+    column: $table.slopePercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get verticalMeters => $composableBuilder(
+    column: $table.verticalMeters,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reliabilityScore => $composableBuilder(
+    column: $table.reliabilityScore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get accessibilityStatus => $composableBuilder(
+    column: $table.accessibilityStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get instruction => $composableBuilder(
+    column: $table.instruction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get legacyInternalRouteEdgeId => $composableBuilder(
+    column: $table.legacyInternalRouteEdgeId,
+    builder: (column) => column,
+  );
+}
+
+class $$StationPathwayEdgesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $StationPathwayEdgesTable,
+          StationPathwayEdge,
+          $$StationPathwayEdgesTableFilterComposer,
+          $$StationPathwayEdgesTableOrderingComposer,
+          $$StationPathwayEdgesTableAnnotationComposer,
+          $$StationPathwayEdgesTableCreateCompanionBuilder,
+          $$StationPathwayEdgesTableUpdateCompanionBuilder,
+          (
+            StationPathwayEdge,
+            BaseReferences<
+              _$CatalogDatabase,
+              $StationPathwayEdgesTable,
+              StationPathwayEdge
+            >,
+          ),
+          StationPathwayEdge,
+          PrefetchHooks Function()
+        > {
+  $$StationPathwayEdgesTableTableManager(
+    _$CatalogDatabase db,
+    $StationPathwayEdgesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StationPathwayEdgesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StationPathwayEdgesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$StationPathwayEdgesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fromNodeId = const Value.absent(),
+                Value<String> toNodeId = const Value.absent(),
+                Value<String> edgeType = const Value.absent(),
+                Value<int> durationSeconds = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
+                Value<bool> bidirectional = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<bool> requiresElevator = const Value.absent(),
+                Value<bool> requiresEscalator = const Value.absent(),
+                Value<String> levelFrom = const Value.absent(),
+                Value<String> levelTo = const Value.absent(),
+                Value<String?> requiresFacilityId = const Value.absent(),
+                Value<int?> minWidthCm = const Value.absent(),
+                Value<double?> slopePercent = const Value.absent(),
+                Value<double?> verticalMeters = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> instruction = const Value.absent(),
+                Value<String> legacyInternalRouteEdgeId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationPathwayEdgesCompanion(
+                id: id,
+                fromNodeId: fromNodeId,
+                toNodeId: toNodeId,
+                edgeType: edgeType,
+                durationSeconds: durationSeconds,
+                distanceMeters: distanceMeters,
+                bidirectional: bidirectional,
+                includesStairs: includesStairs,
+                requiresElevator: requiresElevator,
+                requiresEscalator: requiresEscalator,
+                levelFrom: levelFrom,
+                levelTo: levelTo,
+                requiresFacilityId: requiresFacilityId,
+                minWidthCm: minWidthCm,
+                slopePercent: slopePercent,
+                verticalMeters: verticalMeters,
+                reliabilityScore: reliabilityScore,
+                accessibilityStatus: accessibilityStatus,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
+                instruction: instruction,
+                legacyInternalRouteEdgeId: legacyInternalRouteEdgeId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fromNodeId,
+                required String toNodeId,
+                Value<String> edgeType = const Value.absent(),
+                Value<int> durationSeconds = const Value.absent(),
+                Value<int> distanceMeters = const Value.absent(),
+                Value<bool> bidirectional = const Value.absent(),
+                Value<bool> includesStairs = const Value.absent(),
+                Value<bool> requiresElevator = const Value.absent(),
+                Value<bool> requiresEscalator = const Value.absent(),
+                Value<String> levelFrom = const Value.absent(),
+                Value<String> levelTo = const Value.absent(),
+                Value<String?> requiresFacilityId = const Value.absent(),
+                Value<int?> minWidthCm = const Value.absent(),
+                Value<double?> slopePercent = const Value.absent(),
+                Value<double?> verticalMeters = const Value.absent(),
+                Value<int> reliabilityScore = const Value.absent(),
+                Value<String> accessibilityStatus = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> instruction = const Value.absent(),
+                Value<String> legacyInternalRouteEdgeId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationPathwayEdgesCompanion.insert(
+                id: id,
+                fromNodeId: fromNodeId,
+                toNodeId: toNodeId,
+                edgeType: edgeType,
+                durationSeconds: durationSeconds,
+                distanceMeters: distanceMeters,
+                bidirectional: bidirectional,
+                includesStairs: includesStairs,
+                requiresElevator: requiresElevator,
+                requiresEscalator: requiresEscalator,
+                levelFrom: levelFrom,
+                levelTo: levelTo,
+                requiresFacilityId: requiresFacilityId,
+                minWidthCm: minWidthCm,
+                slopePercent: slopePercent,
+                verticalMeters: verticalMeters,
+                reliabilityScore: reliabilityScore,
+                accessibilityStatus: accessibilityStatus,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
+                instruction: instruction,
+                legacyInternalRouteEdgeId: legacyInternalRouteEdgeId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StationPathwayEdgesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $StationPathwayEdgesTable,
+      StationPathwayEdge,
+      $$StationPathwayEdgesTableFilterComposer,
+      $$StationPathwayEdgesTableOrderingComposer,
+      $$StationPathwayEdgesTableAnnotationComposer,
+      $$StationPathwayEdgesTableCreateCompanionBuilder,
+      $$StationPathwayEdgesTableUpdateCompanionBuilder,
+      (
+        StationPathwayEdge,
+        BaseReferences<
+          _$CatalogDatabase,
+          $StationPathwayEdgesTable,
+          StationPathwayEdge
+        >,
+      ),
+      StationPathwayEdge,
+      PrefetchHooks Function()
+    >;
+typedef $$TransferRulesTableCreateCompanionBuilder =
+    TransferRulesCompanion Function({
+      required String id,
+      required String fromStationId,
+      required String fromLineId,
+      required String toStationId,
+      required String toLineId,
+      Value<String> transferType,
+      Value<int> minTransferSeconds,
+      Value<String?> pathwayEdgeId,
+      Value<String?> strictStepFreePathwayEdgeId,
+      Value<String> sourceId,
+      Value<String> verificationStatus,
+      Value<int> rowid,
+    });
+typedef $$TransferRulesTableUpdateCompanionBuilder =
+    TransferRulesCompanion Function({
+      Value<String> id,
+      Value<String> fromStationId,
+      Value<String> fromLineId,
+      Value<String> toStationId,
+      Value<String> toLineId,
+      Value<String> transferType,
+      Value<int> minTransferSeconds,
+      Value<String?> pathwayEdgeId,
+      Value<String?> strictStepFreePathwayEdgeId,
+      Value<String> sourceId,
+      Value<String> verificationStatus,
+      Value<int> rowid,
+    });
+
+class $$TransferRulesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $TransferRulesTable> {
+  $$TransferRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fromStationId => $composableBuilder(
+    column: $table.fromStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fromLineId => $composableBuilder(
+    column: $table.fromLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get toStationId => $composableBuilder(
+    column: $table.toStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get toLineId => $composableBuilder(
+    column: $table.toLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get transferType => $composableBuilder(
+    column: $table.transferType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get minTransferSeconds => $composableBuilder(
+    column: $table.minTransferSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pathwayEdgeId => $composableBuilder(
+    column: $table.pathwayEdgeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get strictStepFreePathwayEdgeId => $composableBuilder(
+    column: $table.strictStepFreePathwayEdgeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TransferRulesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $TransferRulesTable> {
+  $$TransferRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fromStationId => $composableBuilder(
+    column: $table.fromStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fromLineId => $composableBuilder(
+    column: $table.fromLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toStationId => $composableBuilder(
+    column: $table.toStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toLineId => $composableBuilder(
+    column: $table.toLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transferType => $composableBuilder(
+    column: $table.transferType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get minTransferSeconds => $composableBuilder(
+    column: $table.minTransferSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pathwayEdgeId => $composableBuilder(
+    column: $table.pathwayEdgeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get strictStepFreePathwayEdgeId => $composableBuilder(
+    column: $table.strictStepFreePathwayEdgeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TransferRulesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $TransferRulesTable> {
+  $$TransferRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fromStationId => $composableBuilder(
+    column: $table.fromStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get fromLineId => $composableBuilder(
+    column: $table.fromLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get toStationId => $composableBuilder(
+    column: $table.toStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get toLineId =>
+      $composableBuilder(column: $table.toLineId, builder: (column) => column);
+
+  GeneratedColumn<String> get transferType => $composableBuilder(
+    column: $table.transferType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get minTransferSeconds => $composableBuilder(
+    column: $table.minTransferSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pathwayEdgeId => $composableBuilder(
+    column: $table.pathwayEdgeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get strictStepFreePathwayEdgeId => $composableBuilder(
+    column: $table.strictStepFreePathwayEdgeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+}
+
+class $$TransferRulesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $TransferRulesTable,
+          TransferRule,
+          $$TransferRulesTableFilterComposer,
+          $$TransferRulesTableOrderingComposer,
+          $$TransferRulesTableAnnotationComposer,
+          $$TransferRulesTableCreateCompanionBuilder,
+          $$TransferRulesTableUpdateCompanionBuilder,
+          (
+            TransferRule,
+            BaseReferences<
+              _$CatalogDatabase,
+              $TransferRulesTable,
+              TransferRule
+            >,
+          ),
+          TransferRule,
+          PrefetchHooks Function()
+        > {
+  $$TransferRulesTableTableManager(
+    _$CatalogDatabase db,
+    $TransferRulesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TransferRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TransferRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TransferRulesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fromStationId = const Value.absent(),
+                Value<String> fromLineId = const Value.absent(),
+                Value<String> toStationId = const Value.absent(),
+                Value<String> toLineId = const Value.absent(),
+                Value<String> transferType = const Value.absent(),
+                Value<int> minTransferSeconds = const Value.absent(),
+                Value<String?> pathwayEdgeId = const Value.absent(),
+                Value<String?> strictStepFreePathwayEdgeId =
+                    const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransferRulesCompanion(
+                id: id,
+                fromStationId: fromStationId,
+                fromLineId: fromLineId,
+                toStationId: toStationId,
+                toLineId: toLineId,
+                transferType: transferType,
+                minTransferSeconds: minTransferSeconds,
+                pathwayEdgeId: pathwayEdgeId,
+                strictStepFreePathwayEdgeId: strictStepFreePathwayEdgeId,
+                sourceId: sourceId,
+                verificationStatus: verificationStatus,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fromStationId,
+                required String fromLineId,
+                required String toStationId,
+                required String toLineId,
+                Value<String> transferType = const Value.absent(),
+                Value<int> minTransferSeconds = const Value.absent(),
+                Value<String?> pathwayEdgeId = const Value.absent(),
+                Value<String?> strictStepFreePathwayEdgeId =
+                    const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TransferRulesCompanion.insert(
+                id: id,
+                fromStationId: fromStationId,
+                fromLineId: fromLineId,
+                toStationId: toStationId,
+                toLineId: toLineId,
+                transferType: transferType,
+                minTransferSeconds: minTransferSeconds,
+                pathwayEdgeId: pathwayEdgeId,
+                strictStepFreePathwayEdgeId: strictStepFreePathwayEdgeId,
+                sourceId: sourceId,
+                verificationStatus: verificationStatus,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TransferRulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $TransferRulesTable,
+      TransferRule,
+      $$TransferRulesTableFilterComposer,
+      $$TransferRulesTableOrderingComposer,
+      $$TransferRulesTableAnnotationComposer,
+      $$TransferRulesTableCreateCompanionBuilder,
+      $$TransferRulesTableUpdateCompanionBuilder,
+      (
+        TransferRule,
+        BaseReferences<_$CatalogDatabase, $TransferRulesTable, TransferRule>,
+      ),
+      TransferRule,
+      PrefetchHooks Function()
+    >;
 typedef $$DataQualityRecordsTableCreateCompanionBuilder =
     DataQualityRecordsCompanion Function({
       required String id,
@@ -18312,6 +22308,12 @@ class $CatalogDatabaseManager {
       $$InternalRouteNodesTableTableManager(_db, _db.internalRouteNodes);
   $$InternalRouteEdgesTableTableManager get internalRouteEdges =>
       $$InternalRouteEdgesTableTableManager(_db, _db.internalRouteEdges);
+  $$StationPathwayNodesTableTableManager get stationPathwayNodes =>
+      $$StationPathwayNodesTableTableManager(_db, _db.stationPathwayNodes);
+  $$StationPathwayEdgesTableTableManager get stationPathwayEdges =>
+      $$StationPathwayEdgesTableTableManager(_db, _db.stationPathwayEdges);
+  $$TransferRulesTableTableManager get transferRules =>
+      $$TransferRulesTableTableManager(_db, _db.transferRules);
   $$DataQualityRecordsTableTableManager get dataQualityRecords =>
       $$DataQualityRecordsTableTableManager(_db, _db.dataQualityRecords);
 }
