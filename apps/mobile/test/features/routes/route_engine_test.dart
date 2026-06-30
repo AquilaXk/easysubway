@@ -144,6 +144,24 @@ void main() {
       expect(result.blockedReasonCodes, ['STAIR_ONLY_ACCESS']);
     });
 
+    test('휠체어 prefer 조건은 계단 포함 경로 비용을 경고와 함께 유지한다', () {
+      final engine = LocalRouteEngine(graph: _stairOnlyFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+          constraintMode: ConstraintMode.preferStepFree,
+        ),
+      );
+
+      expect(result.status, RouteStatus.found);
+      expect(result.totalCost, 749);
+      expect(result.steps.map((step) => step.cost), [160, 420, 145]);
+      expect(result.warningCodes, ['STAIR_ONLY_ACCESS']);
+    });
+
     test('휠체어 조건은 미확인 접근성 edge를 안전한 경로로 사용하지 않는다', () {
       final engine = LocalRouteEngine(
         graph: _unknownAccessibilityFixtureGraph(),

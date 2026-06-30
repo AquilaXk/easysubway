@@ -39,7 +39,11 @@ class LocalRouteEngine {
     final steps = <RouteStep>[];
 
     for (final edge in path) {
-      final accessCost = costCalculator.costFor(edge, request.mobilityType);
+      final accessCost = costCalculator.costFor(
+        edge,
+        request.mobilityType,
+        constraintMode: request.effectiveConstraintMode,
+      );
       totalCost += accessCost.cost;
       for (final code in accessCost.warningCodes) {
         warnings[code] = RouteWarning(

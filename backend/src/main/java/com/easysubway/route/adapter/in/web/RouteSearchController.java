@@ -59,7 +59,7 @@ class RouteSearchController {
 		SearchRouteCommand toCommand() {
 			ConstraintMode mode = constraintMode == null || constraintMode.isBlank()
 				? ConstraintMode.defaultFor(mobilityType)
-				: parseConstraintMode(constraintMode);
+				: parseConstraintMode(mobilityType, constraintMode);
 			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType, mode);
 		}
 	}
@@ -143,7 +143,12 @@ class RouteSearchController {
 	) {
 
 		SearchRouteCommand toCommand() {
-			return new SearchRouteCommand(originStationId, destinationStationId, mobilityType, parseConstraintMode(constraintMode));
+			return new SearchRouteCommand(
+				originStationId,
+				destinationStationId,
+				mobilityType,
+				parseConstraintMode(mobilityType, constraintMode)
+			);
 		}
 
 		OffsetDateTime parsedDepartureTime() {
@@ -338,5 +343,12 @@ class RouteSearchController {
 		} catch (IllegalArgumentException exception) {
 			throw new InvalidRequestException("지원하지 않는 이동 제약 조건입니다.", exception);
 		}
+	}
+
+	private static ConstraintMode parseConstraintMode(MobilityType mobilityType, String value) {
+		if ("PROFILE_DEFAULT".equals(value)) {
+			return ConstraintMode.defaultFor(mobilityType);
+		}
+		return parseConstraintMode(value);
 	}
 }

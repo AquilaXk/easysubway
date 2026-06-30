@@ -153,6 +153,32 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
+	@DisplayName("V2 PROFILE_DEFAULT는 기존 client 호환을 위해 mobility type 기본 constraint로 처리한다")
+	void routeSearchV2ProfileDefaultUsesMobilityTypeDefaultConstraintMode() throws Exception {
+		when(routeSearchUseCase.searchRoute(argThat(command ->
+			command.mobilityType() == MobilityType.STROLLER
+				&& command.constraintMode() == ConstraintMode.PREFER_STEP_FREE
+		))).thenReturn(foundRouteSearch());
+
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "departureTime": "2026-06-30T09:15:00+09:00",
+					  "mobilityType": "STROLLER",
+					  "constraintMode": "PROFILE_DEFAULT",
+					  "useRealtime": true,
+					  "maxTransfers": 3,
+					  "alternativeCount": 3
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.constraintMode").value("PROFILE_DEFAULT"));
+	}
+
+	@Test
 	@DisplayName("알 수 없는 V2 constraintMode는 search 저장 전에 JSON 400으로 거부한다")
 	void unknownRouteSearchV2ConstraintModeReturnsBadRequestBeforeSearch() throws Exception {
 		mockMvc.perform(post("/api/v2/routes/search")
