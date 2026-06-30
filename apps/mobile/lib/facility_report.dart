@@ -1715,7 +1715,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         needsLocationChoice;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('시설 상태 제보')),
+      appBar: AppBar(title: const Text('시설 알려주기')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
