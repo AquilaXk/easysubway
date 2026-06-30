@@ -1,4 +1,18 @@
-enum RouteStepType { ride, transfer, entry, exit, internal }
+enum RouteStepType {
+  ride,
+  transfer,
+  inStationTransfer,
+  outOfStationTransfer,
+  entry,
+  exit,
+  walkway,
+  elevator,
+  ramp,
+  stair,
+  escalator,
+  facilityConnector,
+  internal,
+}
 
 class RouteStep {
   const RouteStep({

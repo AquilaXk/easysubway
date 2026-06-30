@@ -99,7 +99,7 @@ class AccessibilityCostCalculator {
     }
 
     var cost = edge.baseCost;
-    if (edge.type == RouteEdgeType.transfer) {
+    if (isRouteTransferEdgeType(edge.type)) {
       cost += weight.transferPenalty;
     }
     if (edge.stairAccessState == RouteStairAccessState.stairOnly) {
