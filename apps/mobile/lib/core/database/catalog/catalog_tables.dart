@@ -187,6 +187,10 @@ class NetworkEdges extends Table {
       integer().named('reliability_score').withDefault(const Constant(100))();
   TextColumn get sourceId =>
       text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get sourceSnapshotId =>
+      text().named('source_snapshot_id').withDefault(const Constant(''))();
+  TextColumn get providerRecordHash =>
+      text().named('provider_record_hash').withDefault(const Constant(''))();
   TextColumn get provenanceKind =>
       text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
   TextColumn get verificationStatus => text()
@@ -232,8 +236,12 @@ class Facilities extends Table {
   TextColumn get description => text().withDefault(const Constant(''))();
   TextColumn get sourceId =>
       text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get sourceSnapshotId =>
+      text().named('source_snapshot_id').withDefault(const Constant(''))();
   TextColumn get providerFacilityRef =>
       text().named('provider_facility_ref').withDefault(const Constant(''))();
+  TextColumn get providerRecordHash =>
+      text().named('provider_record_hash').withDefault(const Constant(''))();
   TextColumn get provenanceKind =>
       text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
   DateTimeColumn get verifiedAt => dateTime().named('verified_at').nullable()();
@@ -310,6 +318,10 @@ class InternalRouteEdges extends Table {
       .withDefault(const Constant('UNKNOWN'))();
   TextColumn get sourceId =>
       text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get sourceSnapshotId =>
+      text().named('source_snapshot_id').withDefault(const Constant(''))();
+  TextColumn get providerRecordHash =>
+      text().named('provider_record_hash').withDefault(const Constant(''))();
   TextColumn get provenanceKind =>
       text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
   TextColumn get verificationStatus => text()
