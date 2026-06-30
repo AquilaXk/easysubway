@@ -4046,6 +4046,166 @@ test("official source importer는 production facility provider record hash 누�
   );
 });
 
+test("official source importer는 production route edge 검증 기본값 누락을 거부한다", async () => {
+  const cases = [
+    ["provenanceKind", /routeEdges\.provenanceKind must be a non-empty string/],
+    ["verificationStatus", /routeEdges\.verificationStatus must be a non-empty string/],
+    ["accessibilityStatus", /routeEdges\.accessibilityStatus must be a non-empty string/],
+    ["reliabilityScore", /routeEdges\.reliabilityScore must be an integer/],
+  ];
+
+  for (const [field, expected] of cases) {
+    const outputDir = await mkdtemp(path.join(tmpdir(), `easysubway-production-route-${field}-`));
+    const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+    const inputPath = path.join(outputDir, "input.json");
+    const outputPath = path.join(outputDir, "output.json");
+    delete input.routeEdges[0][field];
+
+    await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          inputPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: root },
+      ),
+      expected,
+    );
+  }
+});
+
+test("official source importer는 production route edge verifiedAt alias를 유지한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-route-verified-at-alias-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+  const verifiedAt = "2026-06-21T01:02:03.000Z";
+
+  delete input.routeEdges[0].lastVerifiedAt;
+  input.routeEdges[0].verifiedAt = verifiedAt;
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/import-official-sources.mjs",
+      "--inventory",
+      "tools/datapack/source-inventory.json",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: root },
+  );
+
+  const fixture = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.equal(fixture.packs[0].networkEdges[0].lastVerifiedAt, verifiedAt);
+});
+
+test("official source importer는 fixture route edge 검증 timestamp 누락을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-fixture-route-timestamp-"));
+  const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inputPath = path.join(outputDir, "input.json");
+  const outputPath = path.join(outputDir, "output.json");
+
+  input.pack.artifactKind = "fixture";
+  delete input.routeEdges[0].lastVerifiedAt;
+  delete input.routeEdges[0].verifiedAt;
+
+  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root },
+    ),
+    /routeEdges\.lastVerifiedAt must be a non-empty string/,
+  );
+});
+
+test("official source importer는 production facility 검증 기본값 누락을 거부한다", async () => {
+  const cases = [
+    ["providerFacilityRef", /facilityRows\.providerFacilityRef must be a non-empty string/],
+    ["provenanceKind", /facilityRows\.provenanceKind must be a non-empty string/],
+    ["statusMeaning", /facilityRows\.statusMeaning must be a non-empty string/],
+    ["operationalStatus", /facilityRows\.operationalStatus must be a non-empty string/],
+    ["installationStatus", /facilityRows\.installationStatus must be a non-empty string/],
+    ["verifiedAt", /facilityRows\.verifiedAt must be a non-empty string/],
+    ["retrievedAt", /facilityRows\.retrievedAt must be a non-empty string/],
+    ["confidence", /facilityRows\.confidence must be an integer/],
+  ];
+
+  for (const [field, expected] of cases) {
+    const outputDir = await mkdtemp(path.join(tmpdir(), `easysubway-production-facility-${field}-`));
+    const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+    const inputPath = path.join(outputDir, "input.json");
+    const outputPath = path.join(outputDir, "output.json");
+    delete input.facilityRows[0][field];
+
+    await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          inputPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: root },
+      ),
+      expected,
+    );
+  }
+});
+
+test("official source importer는 production facility confidence 범위를 검증한다", async () => {
+  for (const confidence of [-1, 101]) {
+    const outputDir = await mkdtemp(path.join(tmpdir(), `easysubway-production-facility-confidence-${confidence}-`));
+    const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+    const inputPath = path.join(outputDir, "input.json");
+    const outputPath = path.join(outputDir, "output.json");
+    input.facilityRows[0].confidence = confidence;
+
+    await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          inputPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: root },
+      ),
+      /facilityRows\.confidence must be between 0 and 100/,
+    );
+  }
+});
+
 test("production row provenance는 snapshot/provider/evidence hash gate를 유지한다", () => {
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const schema = read("tools/datapack/schema/catalog-schema.sql");
