@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'auth_headers.dart';
+import 'accessible_design.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'mobile_error_reporter.dart';
@@ -12,6 +13,7 @@ import 'mobile_error_reporter.dart';
 const _favoriteFacilityTimeout = Duration(seconds: 8);
 const _favoriteFacilityLoadErrorMessage = '즐겨찾기 시설을 불러오지 못했어요.';
 const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 처리하지 못했어요.';
+const _favoriteFacilityCardRadius = BorderRadius.all(Radius.circular(8));
 
 abstract class FavoriteFacilityRepository {
   Future<List<FavoriteFacility>> listFavoriteFacilities();
@@ -608,11 +610,11 @@ class _FavoriteFacilityTile extends StatelessWidget {
     return Card(
       key: Key('favoriteFacilityTile-${favorite.facilityId}'),
       margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.white,
+      color: EasySubwayAccessibleColors.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: Color(0xFFD5E2E4)),
+        borderRadius: _favoriteFacilityCardRadius,
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -629,7 +631,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.name,
                         style: textTheme.titleLarge?.copyWith(
-                          color: const Color(0xFF102A2C),
+                          color: EasySubwayAccessibleColors.text,
                           fontWeight: FontWeight.w900,
                           height: 1.25,
                         ),
@@ -638,7 +640,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.stationLabel,
                         style: textTheme.bodyLarge?.copyWith(
-                          color: const Color(0xFF29484B),
+                          color: EasySubwayAccessibleColors.mutedText,
                           fontWeight: FontWeight.w800,
                           height: 1.3,
                         ),
@@ -647,7 +649,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.statusTitle,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
+                          color: EasySubwayAccessibleColors.mutedText,
                           height: 1.3,
                         ),
                       ),
@@ -655,7 +657,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         '${favorite.severityLabel} · ${favorite.nextActionLabel}',
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
+                          color: EasySubwayAccessibleColors.mutedText,
                           fontWeight: FontWeight.w700,
                           height: 1.3,
                         ),
@@ -664,7 +666,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.locationLabel,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
+                          color: EasySubwayAccessibleColors.mutedText,
                           height: 1.3,
                         ),
                       ),
@@ -672,7 +674,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.updatedLabel,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
+                          color: EasySubwayAccessibleColors.mutedText,
                           height: 1.3,
                         ),
                       ),
@@ -680,7 +682,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                       Text(
                         favorite.verificationStatusLabel,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF405A5D),
+                          color: EasySubwayAccessibleColors.mutedText,
                           height: 1.3,
                         ),
                       ),
@@ -721,7 +723,7 @@ class _FavoriteFacilityMessage extends StatelessWidget {
       child: Text(
         message,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: const Color(0xFF102A2C),
+          color: EasySubwayAccessibleColors.text,
           fontWeight: FontWeight.w800,
           height: 1.35,
         ),
