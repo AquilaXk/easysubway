@@ -14,6 +14,8 @@ import 'features/network_map/infrastructure/route_map_renderer.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 
+const _networkMapRadius = BorderRadius.all(Radius.circular(8));
+
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
 }
@@ -521,7 +523,7 @@ class _RegionMenuButton extends StatelessWidget {
           padding: const EdgeInsets.only(left: 10, right: 6),
           decoration: BoxDecoration(
             color: EasySubwayAccessibleColors.surface,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: _networkMapRadius,
             border: Border.all(color: EasySubwayAccessibleColors.line),
           ),
           child: Row(
@@ -563,7 +565,7 @@ class _StationLineChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: EasySubwayAccessibleColors.mintSoft,
           border: Border.all(color: EasySubwayAccessibleColors.line),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: _networkMapRadius,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1321,7 +1323,7 @@ class _MapControlButton extends StatelessWidget {
     return Material(
       color: Colors.white,
       elevation: 2,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: _networkMapRadius,
       child: IconButton(
         tooltip: tooltip,
         onPressed: onPressed,
@@ -1469,7 +1471,7 @@ class _AndroidRouteMapFallbackPainter extends CustomPainter {
     canvas.restore();
 
     final labelStyle = const TextStyle(
-      color: Color(0xFF102A2C),
+      color: EasySubwayAccessibleColors.text,
       fontSize: 16,
       fontWeight: FontWeight.w800,
     );
@@ -2778,7 +2780,7 @@ class _StationSheet extends StatelessWidget {
     return SafeArea(
       key: const Key('networkMapStationSheet'),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
+        padding: const EdgeInsets.only(left: 20, top: 6, right: 20, bottom: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
