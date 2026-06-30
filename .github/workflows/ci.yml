@@ -374,6 +374,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs:
+      - changes
       - release-gate-consistency
       - repository-contracts
       - backend
