@@ -14,6 +14,7 @@ const _favoriteFacilityTimeout = Duration(seconds: 8);
 const _favoriteFacilityLoadErrorMessage = '즐겨찾기 시설을 불러오지 못했어요.';
 const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 바꾸지 못했어요.';
 const _favoriteFacilityCardRadius = BorderRadius.all(Radius.circular(8));
+const _favoriteFacilityListPadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 
 abstract class FavoriteFacilityRepository {
   Future<List<FavoriteFacility>> listFavoriteFacilities();
@@ -574,7 +575,7 @@ class _FavoriteFacilityListBody extends StatelessWidget {
         ),
       ),
       FavoriteFacilityListStatus.success => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: _favoriteFacilityListPadding,
         children: [
           Semantics(
             label: '즐겨찾기 시설 ${state.favorites.length}개',
