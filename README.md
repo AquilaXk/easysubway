@@ -30,6 +30,8 @@ scripts/github/sync-actions-env-secret.sh .env
 
 워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
 
+Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. `Slack Notifications` workflow는 CI와 SonarCloud는 실패, 취소, timeout 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소, timeout 결과만 보냅니다.
+
 CD workflow는 `EASYSUBWAY_ENV` secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. 아직 secret이나 SSH 접속 정보가 없으면 bootJar와 설정 검증까지만 수행하고, 원격 배포는 `not_started`로 기록합니다.
 
 운영 SSH 배포에는 애플리케이션 환경값과 별개로 production environment에 아래 값을 둡니다.
