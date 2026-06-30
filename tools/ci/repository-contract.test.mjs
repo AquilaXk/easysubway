@@ -5140,6 +5140,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
 
   assert.match(compose, /object-storage:\n/);
   assert.match(compose, /image: minio\/minio:/);
+  assert.match(compose, /image: minio\/minio:RELEASE\.2025-06-13T11-33-47Z/);
   assert.doesNotMatch(objectStorageBlock, /profiles:/);
   assert.match(compose, /MINIO_ROOT_USER: \$\{EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY:-easysubway_local\}/);
   assert.match(compose, /MINIO_ROOT_PASSWORD: \$\{EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY:-easysubway_local_secret\}/);
