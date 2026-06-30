@@ -2636,7 +2636,7 @@ class _StationLineFilterSection extends StatelessWidget {
           return Text(
             '노선을 불러오지 못했어요.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF29484B),
+              color: EasySubwayAccessibleColors.secondaryText,
               fontWeight: FontWeight.w700,
               height: 1.3,
             ),
@@ -2739,7 +2739,7 @@ class _StationLineFilterSection extends StatelessWidget {
               Text(
                 '전체 노선 보기',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w900,
                   height: 1.25,
                 ),
@@ -2805,7 +2805,7 @@ class _StationLineRegionButton extends StatelessWidget {
           selected: selected,
           onSelected: onPressed == null ? null : (_) => onPressed?.call(),
           labelStyle: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF102A2C),
+            color: selected ? Colors.white : EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w800,
           ),
           selectedColor: const Color(0xFF007A80),
@@ -2858,7 +2858,9 @@ class _StationLineFilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = selected ? const Color(0xFF007A80) : Colors.white;
-    final foregroundColor = selected ? Colors.white : const Color(0xFF102A2C);
+    final foregroundColor = selected
+        ? Colors.white
+        : EasySubwayAccessibleColors.text;
     final borderColor = selected
         ? const Color(0xFF007A80)
         : const Color(0xFF93C7C2);
@@ -3352,7 +3354,7 @@ class _StationSearchResultTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: _stationResultCardRadius,
-        side: const BorderSide(color: Color(0xFFD5E2E4)),
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Column(
         children: [
@@ -3393,7 +3395,7 @@ class _StationSearchResultTile extends StatelessWidget {
                                 Text(
                                   stationName,
                                   style: textTheme.titleLarge?.copyWith(
-                                    color: const Color(0xFF102A2C),
+                                    color: EasySubwayAccessibleColors.text,
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
@@ -3404,7 +3406,8 @@ class _StationSearchResultTile extends StatelessWidget {
                                       ? result.lineLabel
                                       : '${result.distanceLabel} · ${result.lineLabel}',
                                   style: textTheme.bodyLarge?.copyWith(
-                                    color: const Color(0xFF29484B),
+                                    color: EasySubwayAccessibleColors
+                                        .secondaryText,
                                     fontWeight: FontWeight.w600,
                                     height: 1.25,
                                   ),
@@ -3828,7 +3831,7 @@ class _FavoriteStationTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: _stationCompactCardRadius,
-        side: const BorderSide(color: Color(0xFFD5E2E4)),
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -3853,7 +3856,7 @@ class _FavoriteStationTile extends StatelessWidget {
                           Text(
                             favorite.nameKo,
                             style: textTheme.titleLarge?.copyWith(
-                              color: const Color(0xFF102A2C),
+                              color: EasySubwayAccessibleColors.text,
                               fontWeight: FontWeight.w900,
                               height: 1.25,
                             ),
@@ -3864,7 +3867,7 @@ class _FavoriteStationTile extends StatelessWidget {
                           Text(
                             favorite.lineLabel,
                             style: textTheme.bodyLarge?.copyWith(
-                              color: const Color(0xFF29484B),
+                              color: EasySubwayAccessibleColors.secondaryText,
                               fontWeight: FontWeight.w800,
                               height: 1.3,
                             ),
@@ -4590,7 +4593,7 @@ class _StationMapTextFallbackItem extends StatelessWidget {
               Icon(
                 _mapMarkerIcon(marker.type),
                 size: 22,
-                color: const Color(0xFF006D77),
+                color: EasySubwayAccessibleColors.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -4598,7 +4601,7 @@ class _StationMapTextFallbackItem extends StatelessWidget {
                   marker.title,
                   key: Key('stationMapTextFallbackItem-${marker.id}'),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF102A2C),
+                    color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
@@ -4682,13 +4685,13 @@ class _StationLayoutStep extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(item.icon, color: const Color(0xFF006D77), size: 26),
+          Icon(item.icon, color: EasySubwayAccessibleColors.primary, size: 26),
           const SizedBox(height: 8),
           Text(
             item.text,
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w900,
               height: 1.2,
             ),
@@ -4897,7 +4900,7 @@ class _StationFavoriteControl extends StatelessWidget {
                 child: Text(
                   state.message,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF102A2C),
+                    color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
@@ -4982,7 +4985,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
               Text(
                 result.summaryLabel,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
@@ -5036,7 +5039,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w800,
                   height: 1.3,
                 ),
@@ -5054,7 +5057,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.guidance,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF102A2C),
+                  color: EasySubwayAccessibleColors.text,
                   height: 1.35,
                 ),
               ),
@@ -5076,13 +5079,13 @@ class _StationDetailInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 22, color: const Color(0xFF006D77)),
+        Icon(icon, size: 22, color: EasySubwayAccessibleColors.primary),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF29484B),
+              color: EasySubwayAccessibleColors.secondaryText,
               fontWeight: FontWeight.w700,
               height: 1.3,
             ),
@@ -5178,7 +5181,7 @@ class _StationDetailSectionTitle extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: const Color(0xFF102A2C),
+          color: EasySubwayAccessibleColors.text,
           fontWeight: FontWeight.w900,
           height: 1.25,
         ),
@@ -5224,7 +5227,7 @@ class _StationExitCard extends StatelessWidget {
             elevation: 0,
             shape: const RoundedRectangleBorder(
               borderRadius: _stationDetailInfoCardRadius,
-              side: BorderSide(color: Color(0xFFD5E2E4)),
+              side: BorderSide(color: EasySubwayAccessibleColors.line),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -5234,7 +5237,7 @@ class _StationExitCard extends StatelessWidget {
                   Text(
                     exit.name,
                     style: textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF102A2C),
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w900,
                       height: 1.25,
                     ),
@@ -5297,7 +5300,7 @@ class _StationFacilityCard extends StatelessWidget {
         elevation: 0,
         shape: const RoundedRectangleBorder(
           borderRadius: _stationDetailFacilityCardRadius,
-          side: BorderSide(color: Color(0xFFD5E2E4)),
+          side: BorderSide(color: EasySubwayAccessibleColors.line),
         ),
         child: InkWell(
           key: Key('stationFacilityCard-${facility.id}'),
@@ -5311,7 +5314,7 @@ class _StationFacilityCard extends StatelessWidget {
                 Text(
                   facility.name,
                   style: textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF102A2C),
+                    color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
                   ),
@@ -5654,7 +5657,9 @@ class _StationDetailStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = positive ? const Color(0xFF006D77) : const Color(0xFF8A4B00);
+    final color = positive
+        ? EasySubwayAccessibleColors.primary
+        : const Color(0xFF8A4B00);
 
     return Row(
       children: [
@@ -5664,7 +5669,7 @@ class _StationDetailStatusPill extends StatelessWidget {
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF102A2C),
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w800,
               height: 1.3,
             ),
@@ -5693,7 +5698,7 @@ class _StationDetailTextPill extends StatelessWidget {
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: const Color(0xFF102A2C),
+            color: EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w800,
             height: 1.2,
           ),
