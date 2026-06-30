@@ -420,6 +420,7 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
 
   assert.match(workflow, /name: CD/);
   assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*CI[\s\S]*types:\s*\n\s*-\s*completed/);
+  assert.match(workflow, /workflow_run:[\s\S]*branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:[\s\S]*actions:\s*read[\s\S]*contents:\s*read/);
   assert.match(workflow, /group: cd-production-deploy/);
