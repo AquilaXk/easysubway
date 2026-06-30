@@ -35,6 +35,9 @@ const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
 const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
+const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
+const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
+const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1587,7 +1590,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      padding: _routeMobilitySheetHeaderPadding,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -1617,7 +1620,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                     Expanded(
                       child: ListView(
                         key: const Key('routeMobilityOptionsList'),
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        padding: _routeMobilitySheetListPadding,
                         children: [
                           for (final option in mobilityProfileOptions)
                             _RouteMobilityTypeOptionButton(
@@ -1637,7 +1640,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      padding: _routeMobilitySheetActionPadding,
                       child: FilledButton.icon(
                         key: const Key('routeMobilityApplyButton'),
                         onPressed: () =>
