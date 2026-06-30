@@ -34,6 +34,7 @@ const _routeSearchPagePadding = EdgeInsets.only(
 const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
 const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
+const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -3622,7 +3623,7 @@ class _RouteStatusChip extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFDEF5E7),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: _routeSearchPillRadius,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Wrap(
