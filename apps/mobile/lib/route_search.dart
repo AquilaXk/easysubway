@@ -50,6 +50,18 @@ const _routeGuidanceDarkColor = Color(0xFF073245);
 const _routeBlockedBorderColor = Color(0xFFEFCCCC);
 const _routeCardShadowColor = Color(0x0F071B2F);
 const _routeAccentShadowColor = Color(0x1A0D8A6D);
+const _routeResultBorderColor = Color(0xFF0D8A6D);
+const _routeStatusChipBackgroundColor = Color(0xFFDEF5E7);
+const _routeTimelineColor = Color(0xFF27A6D9);
+const _routeBlockedColor = Color(0xFFA93434);
+const _routeBlockedSoftColor = Color(0xFFFFE7E7);
+const _routeArrivalPanelColor = Color(0xFFE6F2F0);
+const _routeArrivalBorderColor = Color(0xFF9FCACE);
+const _routeArrivalTextColor = Color(0xFF004A50);
+const _routeNoticePanelColor = Color(0xFFFFF7E0);
+const _routeNoticeBorderColor = Color(0xFFE6C875);
+const _routeNoticeIconColor = Color(0xFF7A4F00);
+const _routeNoticeTextColor = Color(0xFF3C2F00);
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
 const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
 const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
@@ -3279,7 +3291,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.warning_amber, size: 64, color: Color(0xFFA93434)),
+        const Icon(Icons.warning_amber, size: 64, color: _routeBlockedColor),
         const SizedBox(height: 10),
         Text(
           '계단 없는 경로가 없습니다',
@@ -3375,7 +3387,7 @@ class _RouteResultListButton extends StatelessWidget {
             child: Ink(
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: const Color(0xFF0D8A6D), width: 2),
+                border: Border.all(color: _routeResultBorderColor, width: 2),
                 borderRadius: _routeSearchSmallRadius,
               ),
               child: Padding(
@@ -3638,7 +3650,7 @@ class _RouteStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFDEF5E7),
+        color: _routeStatusChipBackgroundColor,
         borderRadius: _routeSearchPillRadius,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -3677,7 +3689,7 @@ class _RouteLinePath extends StatelessWidget {
     return Row(
       children: [
         _RouteLineNode(),
-        Expanded(child: Container(height: 6, color: const Color(0xFF27A6D9))),
+        Expanded(child: Container(height: 6, color: _routeTimelineColor)),
         _RouteLineNode(),
       ],
     );
@@ -3691,10 +3703,12 @@ class _RouteLineNode extends StatelessWidget {
       width: 14,
       height: 14,
       decoration: BoxDecoration(
-        color: const Color(0xFF27A6D9),
+        color: _routeTimelineColor,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
-        boxShadow: const [BoxShadow(color: Color(0xFF27A6D9), spreadRadius: 2)],
+        boxShadow: const [
+          BoxShadow(color: _routeTimelineColor, spreadRadius: 2),
+        ],
       ),
     );
   }
@@ -3715,13 +3729,13 @@ class _RouteReasonBadge extends StatelessWidget {
           CircleAvatar(
             radius: 9,
             backgroundColor: blocked
-                ? const Color(0xFFFFE7E7)
+                ? _routeBlockedSoftColor
                 : EasySubwayAccessibleColors.mintSoft,
             child: Text(
               blocked ? '!' : '✓',
               style: TextStyle(
                 color: blocked
-                    ? const Color(0xFFA93434)
+                    ? _routeBlockedColor
                     : EasySubwayAccessibleColors.mintDark,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
@@ -3754,8 +3768,8 @@ class _RouteArrivalGuidance extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFE6F2F0),
-        border: Border.all(color: const Color(0xFF9FCACE)),
+        color: _routeArrivalPanelColor,
+        border: Border.all(color: _routeArrivalBorderColor),
         borderRadius: _routeSearchSmallRadius,
       ),
       child: Padding(
@@ -3763,7 +3777,11 @@ class _RouteArrivalGuidance extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.exit_to_app, color: Color(0xFF004A50), size: 30),
+            const Icon(
+              Icons.exit_to_app,
+              color: _routeArrivalTextColor,
+              size: 30,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -3772,7 +3790,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                   Text(
                     '도착 안내',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF004A50),
+                      color: _routeArrivalTextColor,
                       fontWeight: FontWeight.w900,
                       height: 1.25,
                     ),
@@ -3816,8 +3834,8 @@ class _RouteNotice extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF7E0),
-          border: Border.all(color: const Color(0xFFE6C875)),
+          color: _routeNoticePanelColor,
+          border: Border.all(color: _routeNoticeBorderColor),
           borderRadius: _routeSearchSmallRadius,
         ),
         child: Padding(
@@ -3825,7 +3843,7 @@ class _RouteNotice extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: const Color(0xFF7A4F00), size: 28),
+              Icon(icon, color: _routeNoticeIconColor, size: 28),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -3834,7 +3852,7 @@ class _RouteNotice extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF3C2F00),
+                        color: _routeNoticeTextColor,
                         fontWeight: FontWeight.w900,
                         height: 1.25,
                       ),
@@ -3843,7 +3861,7 @@ class _RouteNotice extends StatelessWidget {
                     Text(
                       text,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF3C2F00),
+                        color: _routeNoticeTextColor,
                         fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
@@ -3927,7 +3945,7 @@ class _RouteStepTile extends StatelessWidget {
                   Text(
                     step.userActionTitle,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: const Color(0xFF004A50),
+                      color: _routeArrivalTextColor,
                       fontWeight: FontWeight.w900,
                       height: 1.3,
                     ),
