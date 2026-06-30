@@ -5380,10 +5380,12 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.match(compose, /back-worker:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: \$\{EASYSUBWAY_PUSH_DELIVERY_ENABLED:-false\}/);
   assert.doesNotMatch(backWorkerBlock, /ports:/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /public-edge-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /docker-runtime-probe:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /loki:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
   assert.match(compose, /^volumes:\n  postgres-data:\n  object-storage-data:\n  prometheus-data:/m);
   assert.doesNotMatch(compose, /^  redis-data:/m);
 });
@@ -5569,31 +5571,31 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   const grafanaDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
-  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
+  assert.doesNotMatch(applicationYml, /include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
   assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
 
   assert.match(compose, /prometheus:\n/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: prom\/prometheus:v[0-9]+\.[0-9]+\.[0-9]+/);
   assert.match(compose, /\.\/prometheus\/prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
-  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
   assert.match(compose, /prometheus-data:\/prometheus/);
   assert.match(compose, /wget --spider -q http:\/\/localhost:9090\/-\/healthy/);
 
   assert.match(compose, /grafana:\n/);
   assert.match(compose, /grafana:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /image: grafana\/grafana:[0-9]+\.[0-9]+\.[0-9]+/);
-  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
+  assert.match(compose, /"\$\{EASYSUBWAY_GRAFANA_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_GRAFANA_PORT:-3000\}:3000"/);
   assert.match(compose, /GF_SECURITY_ADMIN_PASSWORD: \$\{EASYSUBWAY_GRAFANA_ADMIN_PASSWORD:-easysubway_local\}/);
   assert.match(compose, /grafana-data:\/var\/lib\/grafana/);
   assert.match(compose, /\.\/grafana\/provisioning:\/etc\/grafana\/provisioning:ro/);
   assert.match(compose, /depends_on:\s*\n\s*prometheus:\s*\n\s*condition: service_healthy[\s\S]*loki:\s*\n\s*condition: service_healthy/);
 
   assert.match(prometheusConfig, /job_name: "easysubway-backend"/);
-  assert.match(prometheusConfig, /metrics_path: "\/actuator\/prometheus"/);
-  assert.match(prometheusConfig, /targets: \["host\.docker\.internal:8080"\]/);
+  assert.match(prometheusConfig, /http:\/\/backend:8080\/actuator\/health\/readiness/);
   assert.match(prometheusConfig, /job_name: "back_worker"/);
-  assert.match(prometheusConfig, /targets: \["back-worker:8080"\]/);
+  assert.match(prometheusConfig, /http:\/\/back-worker:8080\/actuator\/health\/readiness/);
   assert.match(prometheusConfig, /job_name: "docker_runtime_probe"/);
   assert.match(prometheusConfig, /targets: \["docker-runtime-probe:8080"\]/);
   assert.match(prometheusConfig, /job_name: "public_edge_probe"/);
@@ -5601,6 +5603,8 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusConfig, /module: \[http_2xx\]/);
   assert.match(prometheusConfig, /https:\/\/easysubway-api\.aquilaxk\.site\/actuator\/health\/readiness/);
   assert.match(prometheusConfig, /replacement: public-edge-probe:9115/);
+  assert.doesNotMatch(prometheusConfig, /\/actuator\/prometheus/);
+  assert.doesNotMatch(prometheusConfig, /host\.docker\.internal:8080/);
 
   assert.match(grafanaDatasource, /name: easysubway-prometheus/);
   assert.match(grafanaDatasource, /type: prometheus/);
