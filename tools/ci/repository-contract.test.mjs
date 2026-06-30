@@ -5228,7 +5228,8 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(backupScript, /pg_dump --format=custom --no-owner --no-privileges -U "\$POSTGRES_USER" "\$POSTGRES_DB"/);
   assert.match(backupScript, /> "\$\{temp_file\}"/);
   assert.match(backupScript, /test -s "\$\{temp_file\}"/);
-  assert.match(backupScript, /docker compose "\$\{compose_args\[@\]\}" exec -T postgres sh -lc 'pg_restore --list - >\/dev\/null' < "\$\{temp_file\}"/);
+  assert.match(backupScript, /docker compose "\$\{compose_args\[@\]\}" exec -T postgres sh -lc 'pg_restore --list >\/dev\/null' < "\$\{temp_file\}"/);
+  assert.doesNotMatch(backupScript, /pg_restore --list -/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
   assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
   assert.match(backupScript, /trap - EXIT/);
