@@ -415,6 +415,18 @@ void main() {
     expect(result.semanticLabel, isNot(contains('안내할 수 있는 경로를 아직 찾지 못했어요.')));
   });
 
+  test('경로 검색 결과는 주의 안내를 쉬운 문구로 보여준다', () {
+    final safeResult = _sampleRouteSearchResult(warnings: const []);
+    final warningResult = _sampleRouteSearchResult(
+      warnings: const [
+        RouteSearchWarning(code: 'ROUTE_GRAPH_UNKNOWN', message: ''),
+      ],
+    );
+
+    expect(safeResult.attentionLabel, '주의 안내가 없어요');
+    expect(warningResult.attentionLabel, '주의 안내 보기');
+  });
+
   test('경로 warning은 code만으로 사용자 문구를 만들고 서버 원문을 읽지 않는다', () {
     final result = RouteSearchResult.fromJson({
       'routeSearchId': 'route-unknown-warning',
