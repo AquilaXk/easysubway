@@ -529,7 +529,6 @@ class _RegionMenuButton extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
