@@ -266,6 +266,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
       'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
+      'STALE_ACCESSIBILITY_DATA' => '오래된 안내라 계단 없는 경로로 안내하지 않아요.',
       'BLOCKED_UNVERIFIED_EDGE' => '검증되지 않은 경로는 안내하지 않아요.',
       'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
@@ -1346,12 +1347,8 @@ List<String> _strictRouteBlockerReasons({
   required bool evidenceHashValid,
   required bool isPlaceholderEvidence,
 }) {
-  // ponytail: legacy fixture rows predate provenance; production rows carry source_id.
-  if (sourceId.isEmpty &&
-      provenanceKind.toUpperCase() == 'UNKNOWN' &&
-      verificationStatus.toUpperCase() == 'UNKNOWN' &&
-      evidenceHash.isEmpty) {
-    return const [];
+  if (sourceId.isEmpty) {
+    return const ['BLOCKED_UNVERIFIED_EDGE'];
   }
   if (verificationStatus.toUpperCase() != 'VERIFIED') {
     return const ['BLOCKED_UNVERIFIED_EDGE'];

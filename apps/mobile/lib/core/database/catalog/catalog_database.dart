@@ -219,7 +219,19 @@ class CatalogDatabase extends _$CatalogDatabase {
             stairAccessState: const Value('STEP_FREE'),
             accessibilityStatus: const Value('AVAILABLE'),
             reliabilityScore: const Value(90),
+            sourceId: const Value('baseline-route-source-capital'),
+            sourceSnapshotId: const Value(
+              'baseline-route-source-capital-20260619',
+            ),
+            providerRecordHash: const Value(
+              '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+            ),
+            provenanceKind: const Value('OFFICIAL_SOURCE'),
+            verificationStatus: const Value('VERIFIED'),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+            evidenceHash: const Value(
+              'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            ),
           ),
           NetworkEdgesCompanion.insert(
             id: 'edge-sadang-sangnoksu-seoul-4',
@@ -231,7 +243,19 @@ class CatalogDatabase extends _$CatalogDatabase {
             stairAccessState: const Value('STEP_FREE'),
             accessibilityStatus: const Value('AVAILABLE'),
             reliabilityScore: const Value(90),
+            sourceId: const Value('baseline-route-source-capital'),
+            sourceSnapshotId: const Value(
+              'baseline-route-source-capital-20260619',
+            ),
+            providerRecordHash: const Value(
+              '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+            ),
+            provenanceKind: const Value('OFFICIAL_SOURCE'),
+            verificationStatus: const Value('VERIFIED'),
             lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+            evidenceHash: const Value(
+              'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            ),
           ),
           ..._baselineAccessEdges(),
         ]);
@@ -487,7 +511,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'exit-sangnoksu-seoul-4',
@@ -498,7 +532,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'entry-sadang-seoul-4',
@@ -509,7 +553,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
       NetworkEdgesCompanion.insert(
         id: 'exit-sadang-seoul-4',
@@ -520,7 +574,17 @@ class CatalogDatabase extends _$CatalogDatabase {
         stairAccessState: const Value('STEP_FREE'),
         accessibilityStatus: const Value('AVAILABLE'),
         reliabilityScore: const Value(90),
+        sourceId: const Value('baseline-route-source-capital'),
+        sourceSnapshotId: const Value('baseline-route-source-capital-20260619'),
+        providerRecordHash: const Value(
+          '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        ),
+        provenanceKind: const Value('OFFICIAL_SOURCE'),
+        verificationStatus: const Value('VERIFIED'),
         lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
+        evidenceHash: const Value(
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ),
       ),
     ];
   }
