@@ -303,7 +303,7 @@ class FavoriteFacility {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치 안내가 부족해요';
+    return '위치 안내를 준비 중이에요';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
