@@ -32,6 +32,7 @@ const _routeSearchPagePadding = EdgeInsets.only(
   bottom: 32,
 );
 const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
+const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
 
 String _mobilityLabelFor(String mobilityType) {
   for (final option in mobilityProfileOptions) {
@@ -1796,7 +1797,7 @@ class _RoutePointRow extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: _routeSearchMediumRadius,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Row(
@@ -1923,7 +1924,7 @@ class _RouteRecentDestinationListState
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xFFD5E2E4)),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: _routeSearchMediumRadius,
               ),
               child: Column(
                 children: [
@@ -2034,7 +2035,7 @@ class _RouteRecentDestinationRow extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onSelected,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: _routeSearchMediumRadius,
           child: ListTile(
             leading: const Icon(Icons.train_outlined, color: Color(0xFF006D77)),
             title: Text(
