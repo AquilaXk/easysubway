@@ -697,7 +697,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                 key: Key('favoriteFacilityReport-${favorite.facilityId}'),
                 onPressed: onReportTap,
                 icon: const Icon(Icons.report_outlined),
-                label: const Text('상태 제보'),
+                label: const Text('시설 알려주기'),
               ),
             ],
           ],
