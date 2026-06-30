@@ -5375,7 +5375,8 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   assert.doesNotMatch(compose, /EASYSUBWAY_REDIS_/);
   assert.match(compose, /back-worker:\n/);
   assert.match(compose, /back-worker:[\s\S]*image: easysubway-backend:\$\{EASYSUBWAY_BACKEND_IMAGE_TAG:-local\}/);
-  assert.match(compose, /back-worker:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: \$\{EASYSUBWAY_PUSH_DELIVERY_ENABLED:-false\}/);
+  assert.match(compose, /backend:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: "false"/);
+  assert.match(compose, /back-worker:[\s\S]*EASYSUBWAY_PUSH_DELIVERY_ENABLED: "true"/);
   assert.doesNotMatch(backWorkerBlock, /ports:/);
   assert.match(compose, /prometheus:[\s\S]*profiles:\s*\n\s*-\s*observability/);
   assert.match(compose, /"\$\{EASYSUBWAY_PROMETHEUS_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_PROMETHEUS_PORT:-9090\}:9090"/);
