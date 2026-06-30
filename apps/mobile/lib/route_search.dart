@@ -47,6 +47,7 @@ const _routeControlBorderColor = Color(0xFF9DB6BA);
 const _routeSoftPanelColor = Color(0xFFE9F5F6);
 const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
 const _routeGuidanceDarkColor = Color(0xFF073245);
+const _routeGuidanceSecondaryColor = Color(0xFFC7D8E3);
 const _routeBlockedBorderColor = Color(0xFFEFCCCC);
 const _routeCardShadowColor = Color(0x0F071B2F);
 const _routeAccentShadowColor = Color(0x1A0D8A6D);
@@ -3481,7 +3482,10 @@ class _RouteDarkSummaryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Color(0xFFC7D8E3))),
+            Text(
+              subtitle,
+              style: const TextStyle(color: _routeGuidanceSecondaryColor),
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 6,
