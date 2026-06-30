@@ -1328,9 +1328,12 @@ class _NetworkEdgeSnapshot {
     final isPlaceholderEvidence = _isPlaceholderEvidenceHash(evidenceHash);
     final blockerReasons = _strictRouteBlockerReasons(
       sourceId: sourceId,
+      sourceSnapshotId: sourceSnapshotId,
+      providerRecordHash: providerRecordHash,
       provenanceKind: provenanceKind,
       verificationStatus: verificationStatus,
       evidenceHash: evidenceHash,
+      lastVerifiedAt: verifiedAt,
       evidenceHashValid: evidenceHashValid,
       isPlaceholderEvidence: isPlaceholderEvidence,
     );
@@ -1354,13 +1357,16 @@ class _NetworkEdgeSnapshot {
 
 List<String> _strictRouteBlockerReasons({
   required String sourceId,
+  required String sourceSnapshotId,
+  required String providerRecordHash,
   required String provenanceKind,
   required String verificationStatus,
   required String evidenceHash,
+  required DateTime? lastVerifiedAt,
   required bool evidenceHashValid,
   required bool isPlaceholderEvidence,
 }) {
-  if (sourceId.isEmpty) {
+  if (sourceId.isEmpty || sourceSnapshotId.isEmpty || lastVerifiedAt == null) {
     return const ['BLOCKED_UNVERIFIED_EDGE'];
   }
   if (verificationStatus.toUpperCase() != 'VERIFIED') {
@@ -1369,7 +1375,7 @@ List<String> _strictRouteBlockerReasons({
   if (!_allowedStrictProvenanceKinds.contains(provenanceKind.toUpperCase())) {
     return const ['BLOCKED_UNSUPPORTED_SCOPE'];
   }
-  if (!evidenceHashValid) {
+  if (!evidenceHashValid || !_isValidEvidenceHash(providerRecordHash)) {
     return const ['BLOCKED_MISSING_EVIDENCE_HASH'];
   }
   if (isPlaceholderEvidence) {
