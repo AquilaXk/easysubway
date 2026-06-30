@@ -42,6 +42,12 @@ const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(8));
+const _highContrastTextColor = Color(0xFF000000);
+const _highContrastPrimaryColor = Color(0xFF003D40);
+const _highContrastSecondaryColor = Color(0xFF005E68);
+const _homeRouteDraftBorderColor = Color(0xFFB7DDF4);
+const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
+const _homeFacilityInfoBorderColor = Color(0xFFC8E6F8);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1067,15 +1073,14 @@ ThemeData _themeForPreferences(
     return baseTheme;
   }
 
-  const textColor = Color(0xFF000000);
   final colorScheme = baseTheme.colorScheme.copyWith(
-    primary: const Color(0xFF003D40),
+    primary: _highContrastPrimaryColor,
     onPrimary: Colors.white,
-    secondary: const Color(0xFF005E68),
+    secondary: _highContrastSecondaryColor,
     onSecondary: Colors.white,
     surface: Colors.white,
-    onSurface: textColor,
-    outline: textColor,
+    onSurface: _highContrastTextColor,
+    outline: _highContrastTextColor,
   );
 
   return baseTheme.copyWith(
@@ -1083,9 +1088,9 @@ ThemeData _themeForPreferences(
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: baseTheme.appBarTheme.copyWith(
       backgroundColor: Colors.white,
-      foregroundColor: textColor,
+      foregroundColor: _highContrastTextColor,
       titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
-        color: textColor,
+        color: _highContrastTextColor,
       ),
     ),
   );
@@ -2498,7 +2503,7 @@ class _HomeRouteDraftCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             child: _AppCard(
               backgroundColor: EasySubwayAccessibleColors.skySoft,
-              borderColor: const Color(0xFFB7DDF4),
+              borderColor: _homeRouteDraftBorderColor,
               borderRadius: 18,
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -2731,12 +2736,12 @@ _FacilitySeverityAccent _facilitySeverityAccent(
     ),
     FacilityStatusSeverity.caution => const _FacilitySeverityAccent(
       backgroundColor: EasySubwayAccessibleColors.amberSoft,
-      borderColor: Color(0xFFF1D49A),
+      borderColor: _homeFacilityCautionBorderColor,
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
       backgroundColor: EasySubwayAccessibleColors.skySoft,
-      borderColor: Color(0xFFC8E6F8),
+      borderColor: _homeFacilityInfoBorderColor,
       iconColor: EasySubwayAccessibleColors.brand,
     ),
     FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
