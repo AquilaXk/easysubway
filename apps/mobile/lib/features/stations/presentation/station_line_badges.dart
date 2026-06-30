@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../accessible_design.dart';
 import '../domain/station_line.dart';
 
 class StationLineBadges extends StatelessWidget {
@@ -113,15 +114,15 @@ class _StationLineOverflowBadge extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F0F1),
+        color: EasySubwayAccessibleColors.skySoft,
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFB8CACC)),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Text(
         '+$count',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: const Color(0xFF29484B),
+          color: EasySubwayAccessibleColors.mutedText,
           fontSize: 13 * (size / 32),
           fontWeight: FontWeight.w900,
           height: 1.0,
