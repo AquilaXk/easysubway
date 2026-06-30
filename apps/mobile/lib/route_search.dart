@@ -988,6 +988,10 @@ class RouteSearchStep {
 
   String get userReason => _routeStepReasonLabel(reason);
 
+  String get userTitle => _routeStepTitleLabel(title);
+
+  String get userActionTitle => _routeStepTitleLabel(actionTitle);
+
   String get userDescription => _routeStepDetailLabel(stepType: stepType);
 
   String get burdenLabel {
@@ -995,7 +999,7 @@ class RouteSearchStep {
       _routeDurationLabel(estimatedMinutes),
       _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
-      if (requiresAccessibilityCheck) '접근성 확인',
+      if (requiresAccessibilityCheck) '엘리베이터 안내 준비 중',
     ];
     return labels.join(' · ');
   }
@@ -1003,7 +1007,7 @@ class RouteSearchStep {
   String get semanticGuidanceLabel {
     final safeReason = _routeStepReasonLabel(reason);
     final labels = <String>[
-      '$sequence번 ${actionTitle.isEmpty ? title : actionTitle}',
+      '$sequence번 ${userActionTitle.isEmpty ? userTitle : userActionTitle}',
       _routeStepDetailLabel(stepType: stepType),
       if (safeReason.isNotEmpty) safeReason,
       burdenLabel,
@@ -1066,7 +1070,7 @@ String _routeDistanceLabel(int distanceMeters) {
 String _routeWarningLabel(String code) {
   return switch (code.trim()) {
     'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
-    'STALE_ACCESSIBILITY_DATA' => '시설 상태를 최근에 확인하지 못했어요.',
+    'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
     'GENERATED_CONNECTOR_UNVERIFIED' =>
@@ -1110,6 +1114,10 @@ String _routeStepReasonLabel(String reason) {
     return '';
   }
   return '선택한 길을 따라 안내합니다.';
+}
+
+String _routeStepTitleLabel(String title) {
+  return title.trim().replaceAll('접근성 정보', '엘리베이터와 통로 안내');
 }
 
 String _routeStepDetailLabel({required String stepType}) {
@@ -3889,9 +3897,9 @@ class _RouteStepTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (step.actionTitle.isNotEmpty) ...[
+                if (step.userActionTitle.isNotEmpty) ...[
                   Text(
-                    step.actionTitle,
+                    step.userActionTitle,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF004A50),
                       fontWeight: FontWeight.w900,
@@ -3901,7 +3909,7 @@ class _RouteStepTile extends StatelessWidget {
                   const SizedBox(height: 4),
                 ],
                 Text(
-                  step.title,
+                  step.userTitle,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: const Color(0xFF102A2C),
                     fontWeight: FontWeight.w900,
