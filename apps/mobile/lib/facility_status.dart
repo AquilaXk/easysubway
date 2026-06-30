@@ -40,10 +40,10 @@ const _cautionPresentation = FacilityStatusPresentation(
 
 const _needsInfoPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '정보 부족',
-  statusTitle: '상태 정보가 부족해요',
-  nextActionLabel: '시설 상세 보기',
-  nextActionDescription: '시설 상세를 살펴보고 이동 전 현장 안내를 봐 주세요.',
+  severityLabel: '확인 중',
+  statusTitle: '상태를 확인하고 있어요',
+  nextActionLabel: '자세히 보기',
+  nextActionDescription: '상태를 확인하고, 이동 전 현장 안내도 함께 봐 주세요.',
   priority: 30,
 );
 

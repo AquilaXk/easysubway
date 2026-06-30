@@ -246,7 +246,7 @@ void main() {
       result.warnings.map((warning) => warning.code),
       contains('STAIR_ONLY_ACCESS_UNKNOWN'),
     );
-    expect(rideStep.confidenceLabel, '정보가 부족해요');
+    expect(rideStep.confidenceLabel, '안내를 준비 중이에요');
   });
 
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {

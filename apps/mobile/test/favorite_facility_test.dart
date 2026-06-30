@@ -98,8 +98,8 @@ void main() {
     expect(unavailable.nextActionLabel, '대체 출구 보기');
     expect(reported.severityLabel, '가기 전 확인');
     expect(reported.nextActionLabel, '역무원 도움 요청');
-    expect(unknown.severityLabel, '정보 부족');
-    expect(unknown.nextActionLabel, '시설 상세 보기');
+    expect(unknown.severityLabel, '확인 중');
+    expect(unknown.nextActionLabel, '자세히 보기');
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
     expect(available.verificationStatusLabel, '최신 상태를 준비 중이에요');
