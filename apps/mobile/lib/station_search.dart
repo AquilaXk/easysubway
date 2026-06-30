@@ -55,8 +55,10 @@ const _stationCompactCardRadius = BorderRadius.all(Radius.circular(8));
 const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(8));
 const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(14));
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(8));
+const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(14));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
+const _stationDetailHeroCardRadius = BorderRadius.all(Radius.circular(18));
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -4715,8 +4717,8 @@ class _StationFacilityStatusSummary extends StatelessWidget {
           margin: EdgeInsets.zero,
           color: EasySubwayAccessibleColors.redSoft,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+          shape: const RoundedRectangleBorder(
+            borderRadius: _stationDetailFacilityCardRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -4764,8 +4766,8 @@ class _StationDetailHeader extends StatelessWidget {
           margin: EdgeInsets.zero,
           color: EasySubwayAccessibleColors.brandDark,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+          shape: const RoundedRectangleBorder(
+            borderRadius: _stationDetailHeroCardRadius,
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -5126,9 +5128,9 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
             margin: EdgeInsets.zero,
             elevation: 0,
             color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            shape: const RoundedRectangleBorder(
+              borderRadius: _stationDetailHelpCardRadius,
+              side: BorderSide(color: EasySubwayAccessibleColors.line),
             ),
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -5427,8 +5429,8 @@ class FacilityDetailScreen extends StatelessWidget {
               margin: EdgeInsets.zero,
               color: EasySubwayAccessibleColors.brandDark,
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+              shape: const RoundedRectangleBorder(
+                borderRadius: _stationDetailHeroCardRadius,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -5479,8 +5481,8 @@ class FacilityDetailScreen extends StatelessWidget {
               margin: EdgeInsets.zero,
               color: statusBackgroundColor,
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+              shape: const RoundedRectangleBorder(
+                borderRadius: _stationDetailFacilityCardRadius,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -5538,9 +5540,9 @@ class FacilityDetailScreen extends StatelessWidget {
               margin: EdgeInsets.zero,
               color: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: EasySubwayAccessibleColors.line),
+              shape: const RoundedRectangleBorder(
+                borderRadius: _stationDetailFacilityCardRadius,
+                side: BorderSide(color: EasySubwayAccessibleColors.line),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
