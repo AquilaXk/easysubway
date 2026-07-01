@@ -119,32 +119,74 @@ enum RouteFeedbackRating {
   final String serverValue;
 }
 
+enum RouteEtaOffsetBucket {
+  earlyOver3Minutes('EARLY_OVER_3_MINUTES'),
+  early1To3Minutes('EARLY_1_TO_3_MINUTES'),
+  onTime('ON_TIME'),
+  late1To3Minutes('LATE_1_TO_3_MINUTES'),
+  lateOver3Minutes('LATE_OVER_3_MINUTES'),
+  notProvided('NOT_PROVIDED');
+
+  const RouteEtaOffsetBucket(this.serverValue);
+
+  final String serverValue;
+}
+
 class RouteFeedbackRequest {
   const RouteFeedbackRequest({
     required this.routeSearchId,
     required this.rating,
     required this.comment,
+    this.itineraryId = '',
+    this.mobilityType = '',
+    this.constraintMode = '',
+    this.etaSource = '',
+    this.etaOffsetBucket = RouteEtaOffsetBucket.notProvided,
+    this.etaFeedbackOptedIn = false,
   });
 
   final String routeSearchId;
   final RouteFeedbackRating rating;
   final String comment;
+  final String itineraryId;
+  final String mobilityType;
+  final String constraintMode;
+  final String etaSource;
+  final RouteEtaOffsetBucket etaOffsetBucket;
+  final bool etaFeedbackOptedIn;
 
   RouteFeedbackRequest trimmed() {
     return RouteFeedbackRequest(
       routeSearchId: routeSearchId.trim(),
       rating: rating,
       comment: comment.trim(),
+      itineraryId: itineraryId.trim(),
+      mobilityType: mobilityType.trim(),
+      constraintMode: constraintMode.trim(),
+      etaSource: etaSource.trim(),
+      etaOffsetBucket: etaOffsetBucket,
+      etaFeedbackOptedIn: etaFeedbackOptedIn,
     );
   }
 
   Map<String, Object?> toJson({required String userId}) {
     final trimmedRequest = trimmed();
-    return {
+    final payload = <String, Object?>{
       'userId': userId.trim(),
       'rating': trimmedRequest.rating.serverValue,
       'comment': trimmedRequest.comment,
     };
+    if (trimmedRequest.etaFeedbackOptedIn) {
+      payload.addAll({
+        'itineraryId': trimmedRequest.itineraryId,
+        'mobilityType': trimmedRequest.mobilityType,
+        'constraintMode': trimmedRequest.constraintMode,
+        'etaSource': trimmedRequest.etaSource,
+        'etaOffsetBucket': trimmedRequest.etaOffsetBucket.serverValue,
+        'etaFeedbackOptedIn': true,
+      });
+    }
+    return payload;
   }
 }
 
@@ -5119,6 +5161,16 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
           routeSearchId: widget.result.routeSearchId,
           rating: rating,
           comment: comment,
+          itineraryId: '${widget.result.routeSearchId}-primary',
+          mobilityType: widget.result.mobilityType,
+          constraintMode: RouteSearchRequest._defaultConstraintMode(
+            widget.result.mobilityType,
+          ),
+          etaSource: widget.result.etaSource.isEmpty
+              ? 'PLANNED'
+              : widget.result.etaSource,
+          etaOffsetBucket: RouteEtaOffsetBucket.notProvided,
+          etaFeedbackOptedIn: true,
         ),
       );
       if (!mounted) {

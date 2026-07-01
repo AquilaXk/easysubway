@@ -222,7 +222,7 @@
       },
       {
         "dataType": "App activity",
-        "inventoryDataIds": ["search_queries", "favorite_stations_routes_facilities"],
+        "inventoryDataIds": ["search_queries", "favorite_stations_routes_facilities", "route_eta_feedback"],
         "containsCollectedData": true,
         "containsRequiredData": true,
         "containsOptionalData": true,

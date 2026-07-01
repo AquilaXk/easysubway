@@ -1345,6 +1345,12 @@ void main() {
         routeSearchId: 'route-1',
         rating: RouteFeedbackRating.helpful,
         comment: '추천이 도움이 됐어요',
+        itineraryId: 'route-1-primary',
+        mobilityType: 'SENIOR',
+        constraintMode: 'PREFER_STEP_FREE',
+        etaSource: 'PLANNED',
+        etaOffsetBucket: RouteEtaOffsetBucket.notProvided,
+        etaFeedbackOptedIn: true,
       ),
     );
 
@@ -1354,6 +1360,12 @@ void main() {
       'userId': 'anonymous-user-1',
       'rating': 'HELPFUL',
       'comment': '추천이 도움이 됐어요',
+      'itineraryId': 'route-1-primary',
+      'mobilityType': 'SENIOR',
+      'constraintMode': 'PREFER_STEP_FREE',
+      'etaSource': 'PLANNED',
+      'etaOffsetBucket': 'NOT_PROVIDED',
+      'etaFeedbackOptedIn': true,
     });
   });
 }
