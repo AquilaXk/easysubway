@@ -2674,8 +2674,18 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "route-result-v2-screenreader-label-audit",
     "route-result-v2-large-touch-target-and-contrast-regression",
   ]);
-  assert.equal(routeResultV2UiCopyGate.requiredEvidence.badgeScreenshotRequired, true);
-  assert.ok(routeResultV2UiCopyGate.forbiddenEvidence.includes("generated-placeholder-copy"));
+  assert.deepEqual(routeResultV2UiCopyGate.requiredEvidence, {
+    badgeScreenshotRequired: true,
+    accessibilityUiTreeRequired: true,
+    screenReaderCopyAuditRequired: true,
+    touchTargetAndContrastRegressionRequired: true,
+  });
+  assert.deepEqual(routeResultV2UiCopyGate.forbiddenEvidence, [
+    "old-route-result-v1-screenshot",
+    "generated-placeholder-copy",
+    "static-json-only-route-result",
+    "unverified-screenreader-summary",
+  ]);
   assert.deepEqual(
     gate.gates.find((item) => item.issue === 1230),
     {
