@@ -696,9 +696,7 @@ class _RouteCatalogSnapshot {
       }
       if (_isBaseStationLineNode(fromNode) && _isBaseStationLineNode(toNode)) {
         explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
-        if (routeEdgeType == graph.RouteEdgeType.inStationTransfer) {
-          explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
-        }
+        explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
       }
     }
 
