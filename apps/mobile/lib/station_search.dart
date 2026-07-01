@@ -36,7 +36,7 @@ const _locationQualityMockedMessage =
 const _locationPermissionRationaleTitle = '현재 위치 사용';
 const _locationPermissionRationalePurpose =
     '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
-const _locationPermissionRationaleFallback =
+const _locationPermissionRationaleDenialNotice =
     '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
 const _stationSearchFailureNextAction =
     '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
@@ -891,13 +891,13 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
 String _stringOrDefault(
   Map<String, Object?> json,
   String key,
-  String fallback,
+  String defaultValue,
 ) {
   final value = json[key];
   if (value is String && value.trim().isNotEmpty) {
     return value;
   }
-  return fallback;
+  return defaultValue;
 }
 
 bool _requiredBool(Map<String, Object?> json, String key) {
@@ -1806,6 +1806,8 @@ class StationSearchScreen extends StatefulWidget {
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
+    this.onOpenRouteSearch,
+    this.bottomNavigationBar,
     super.key,
   });
 
@@ -1820,6 +1822,8 @@ class StationSearchScreen extends StatefulWidget {
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
   final StationSearchEntryMode entryMode;
+  final Future<void> Function()? onOpenRouteSearch;
+  final Widget? bottomNavigationBar;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -1891,22 +1895,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
-  bool get _shouldShowNearbyFallbackSearch {
-    return widget.entryMode == StationSearchEntryMode.nearby &&
-        switch (_controller.state.status) {
-          StationSearchStatus.empty || StationSearchStatus.failure => true,
-          _ => false,
-        };
-  }
-
   @override
   Widget build(BuildContext context) {
     final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
-    final showSearchInput =
-        (!isRecentEntry && !isNearbyEntry) ||
-        _hasSearchQuery ||
-        _shouldShowNearbyFallbackSearch;
+    const showSearchInput = true;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     final searchInputSection = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1991,41 +1984,39 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     final actionButtonSection = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showSearchInput || showNearbyRetryButton) ...[
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              final isSearching =
-                  _controller.state.status == StationSearchStatus.loading;
-              final isNearbyDisabled = isSearching || _isNearbySearchRunning;
-              if (showNearbyRetryButton) {
-                return OutlinedButton.icon(
-                  key: const Key('nearbyStationSearchButton'),
-                  onPressed: isNearbyDisabled ? null : _searchNearby,
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('내 주변 역 다시 찾기'),
-                );
-              }
-              if (_hasSearchQuery) {
-                return FilledButton.icon(
-                  key: const Key('stationSearchSubmitButton'),
-                  onPressed: isSearching
-                      ? null
-                      : () => _submit(_queryController.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('검색'),
-                );
-              }
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final isSearching =
+                _controller.state.status == StationSearchStatus.loading;
+            final isNearbyDisabled = isSearching || _isNearbySearchRunning;
+            if (showNearbyRetryButton) {
               return OutlinedButton.icon(
                 key: const Key('nearbyStationSearchButton'),
                 onPressed: isNearbyDisabled ? null : _searchNearby,
                 icon: const Icon(Icons.my_location),
-                label: const Text('내 주변 역 찾기'),
+                label: const Text('내 주변 역 다시 찾기'),
               );
-            },
-          ),
-          const SizedBox(height: 20),
-        ],
+            }
+            if (_hasSearchQuery) {
+              return FilledButton.icon(
+                key: const Key('stationSearchSubmitButton'),
+                onPressed: isSearching
+                    ? null
+                    : () => _submit(_queryController.text),
+                icon: const Icon(Icons.search),
+                label: const Text('검색'),
+              );
+            }
+            return OutlinedButton.icon(
+              key: const Key('nearbyStationSearchButton'),
+              onPressed: isNearbyDisabled ? null : _searchNearby,
+              icon: const Icon(Icons.my_location),
+              label: const Text('내 주변 역 찾기'),
+            );
+          },
+        ),
+        const SizedBox(height: 20),
       ],
     );
     final resultSection = AnimatedBuilder(
@@ -2095,6 +2086,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             ),
         ],
       ),
+      bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -2159,6 +2151,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           searchHistoryRepository: widget.searchHistoryRepository,
           realtimeRepository: widget.realtimeRepository,
           routeDraftController: widget.routeDraftController,
+          onOpenRouteSearch: widget.onOpenRouteSearch,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
           internalRouteMobilityType: widget.internalRouteMobilityType,
@@ -2262,9 +2255,17 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _showRouteDraftSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: widget.onOpenRouteSearch == null
+            ? null
+            : SnackBarAction(
+                label: '길찾기 보기',
+                onPressed: () => unawaited(widget.onOpenRouteSearch!()),
+              ),
+      ),
+    );
   }
 
   Future<void> _searchNearby() async {
@@ -2314,7 +2315,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               children: [
                 Text(_locationPermissionRationalePurpose),
                 SizedBox(height: 8),
-                Text(_locationPermissionRationaleFallback),
+                Text(_locationPermissionRationaleDenialNotice),
               ],
             ),
             actions: [
@@ -3192,14 +3193,14 @@ class _StationSearchFailureMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowLocationSettings =
         message == _currentLocationDisabledMessage;
-    final shouldShowStationSearchFallback =
+    final shouldShowStationSearchNextAction =
         _shouldShowStationSearchFailureNextAction(message);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StationSearchMessage(message: message, liveRegion: true),
-        if (shouldShowStationSearchFallback) ...[
+        if (shouldShowStationSearchNextAction) ...[
           const SizedBox(height: 8),
           Semantics(
             key: const Key('stationSearchFailureNextAction'),
@@ -4136,7 +4137,7 @@ class _StationDetailContent extends StatelessWidget {
       if (mapMarkers.isNotEmpty) ...[
         const _StationDetailSectionTitle(title: '지도 위치 목록'),
         const SizedBox(height: 12),
-        _StationMapTextFallback(markers: mapMarkers),
+        _StationMapTextList(markers: mapMarkers),
         const SizedBox(height: 24),
       ],
       const _StationDetailSectionTitle(title: '출구'),
@@ -4296,8 +4297,8 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationMapTextFallback extends StatelessWidget {
-  const _StationMapTextFallback({required this.markers});
+class _StationMapTextList extends StatelessWidget {
+  const _StationMapTextList({required this.markers});
 
   final List<MapMarker> markers;
 
@@ -4308,22 +4309,10 @@ class _StationMapTextFallback extends StatelessWidget {
       children: [
         Semantics(
           container: true,
-          label: '지도 대체 위치 목록',
+          label: '지도 위치 목록',
           child: const SizedBox.shrink(),
         ),
-        Semantics(
-          container: true,
-          label: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
-          child: const ExcludeSemantics(
-            child: _StationDetailInfoRow(
-              icon: Icons.map_outlined,
-              text: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (final marker in markers)
-          _StationMapTextFallbackItem(marker: marker),
+        for (final marker in markers) _StationMapTextListItem(marker: marker),
       ],
     );
   }
@@ -4521,8 +4510,8 @@ class _StationPointButton extends StatelessWidget {
   }
 }
 
-class _StationMapTextFallbackItem extends StatelessWidget {
-  const _StationMapTextFallbackItem({required this.marker});
+class _StationMapTextListItem extends StatelessWidget {
+  const _StationMapTextListItem({required this.marker});
 
   final MapMarker marker;
 
@@ -4546,7 +4535,7 @@ class _StationMapTextFallbackItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   marker.title,
-                  key: Key('stationMapTextFallbackItem-${marker.id}'),
+                  key: Key('stationMapTextListItem-${marker.id}'),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w800,

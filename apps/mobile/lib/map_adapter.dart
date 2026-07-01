@@ -52,29 +52,21 @@ const mapCapabilityContracts = [
 ];
 
 enum MapProviderType {
-  naver,
   kakao;
 
   String get displayName {
     return switch (this) {
-      MapProviderType.naver => '네이버 지도',
       MapProviderType.kakao => '카카오 지도',
     };
   }
 }
 
 class MapProviderConfiguration {
-  const MapProviderConfiguration({
-    required this.primary,
-    required this.fallbacks,
-  });
+  const MapProviderConfiguration({required this.primary});
 
-  const MapProviderConfiguration.defaults()
-    : primary = MapProviderType.naver,
-      fallbacks = const [MapProviderType.kakao];
+  const MapProviderConfiguration.defaults() : primary = MapProviderType.kakao;
 
   final MapProviderType primary;
-  final List<MapProviderType> fallbacks;
 }
 
 enum MapMarkerType { station, exit, facility }
@@ -113,7 +105,7 @@ abstract interface class MapAdapter {
 }
 
 class EasySubwayMapAdapter implements MapAdapter {
-  const EasySubwayMapAdapter({this.providerType = MapProviderType.naver});
+  const EasySubwayMapAdapter({this.providerType = MapProviderType.kakao});
 
   @override
   final MapProviderType providerType;

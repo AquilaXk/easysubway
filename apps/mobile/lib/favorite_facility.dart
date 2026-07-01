@@ -749,13 +749,13 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
 String _stringOrDefault(
   Map<String, Object?> json,
   String key,
-  String fallback,
+  String defaultValue,
 ) {
   final value = json[key];
   if (value is String && value.trim().isNotEmpty) {
     return value;
   }
-  return fallback;
+  return defaultValue;
 }
 
 String _dataConfidenceLabel(String dataConfidence) {
