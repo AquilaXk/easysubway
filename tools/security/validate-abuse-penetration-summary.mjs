@@ -72,9 +72,24 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
   }
 }
 
-function assertCasePass(matrixId, caseId, item) {
+function expectedStatuses(matrixId, caseId, matrix) {
+  const statuses = required(matrix.expectedStatusByCase?.[caseId], `${matrixId}.expectedStatusByCase.${caseId}`);
+  if (!Array.isArray(statuses) || statuses.length === 0 || !statuses.every(Number.isInteger)) {
+    throw new Error(`${matrixId}.expectedStatusByCase.${caseId} must be non-empty integer status list`);
+  }
+  return statuses;
+}
+
+function assertCasePass(matrixId, caseId, item, matrix) {
   if (item.observedStatus !== item.expectedStatus) {
     throw new Error(`${matrixId}.cases.${caseId}.observedStatus must match expectedStatus`);
+  }
+  const statuses = expectedStatuses(matrixId, caseId, matrix);
+  if (!statuses.includes(item.expectedStatus)) {
+    throw new Error(`${matrixId}.cases.${caseId}.expectedStatus must match release gate`);
+  }
+  if (!statuses.includes(item.observedStatus)) {
+    throw new Error(`${matrixId}.cases.${caseId}.observedStatus must match release gate`);
   }
   for (const field of ["redactionResult", "auditRedactionResult", "cleanupResult", "deleteOrCleanupResult"]) {
     if (item[field] !== undefined && item[field] !== "PASS") {
@@ -101,7 +116,7 @@ function assertMatrix(matrixId, matrix, matrixSummary, gate, requirePass) {
     for (const field of matrix.summaryFields) {
       required(item[field], `${matrixId}.cases.${caseId}.${field}`);
     }
-    if (requirePass) assertCasePass(matrixId, caseId, item);
+    if (requirePass) assertCasePass(matrixId, caseId, item, matrix);
   }
 }
 
