@@ -1131,6 +1131,7 @@ class RouteSearchResult {
       (candidate) => candidate.status == 'FOUND',
       orElse: () => result.itineraries.first,
     );
+    final lineId = _routeV2SummaryLineId(itinerary.legs);
     return RouteSearchResult(
       routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
       originStationId: result.originStationId,
@@ -1139,8 +1140,8 @@ class RouteSearchResult {
       destinationStationName: result.destinationStationId,
       mobilityType: result.mobilityType,
       status: _routeV2Status(itinerary.status),
-      lineId: itinerary.legs.isEmpty ? '' : itinerary.legs.first.lineId,
-      lineName: itinerary.legs.isEmpty ? '' : itinerary.legs.first.lineId,
+      lineId: lineId,
+      lineName: lineId,
       score: _scoreFromRisk(itinerary.accessibilityRisk),
       burdenCost: itinerary.durationSeconds,
       estimatedDurationSeconds: itinerary.durationSeconds,
@@ -1566,6 +1567,36 @@ String _routeV2Status(String status) {
   return status == 'FOUND' ? 'FOUND' : 'BLOCKED';
 }
 
+String _routeV2SummaryLineId(List<RouteSearchV2Leg> legs) {
+  for (final leg in legs) {
+    if (leg.legType == 'RIDE' && leg.lineId.trim().isNotEmpty) {
+      return leg.lineId;
+    }
+  }
+  for (final leg in legs) {
+    if (leg.lineId.trim().isNotEmpty) {
+      return leg.lineId;
+    }
+  }
+  return '';
+}
+
+bool _routeV2RiskRequiresCheck(RouteSearchV2AccessibilityRisk risk) {
+  return risk.unknownAccessibilityCount > 0 ||
+      risk.staleDataCount > 0 ||
+      risk.lowConfidenceCount > 0;
+}
+
+String _routeV2StairAccessState(RouteSearchV2AccessibilityRisk risk) {
+  if (risk.stairCount > 0) {
+    return 'stairOnly';
+  }
+  if (_routeV2RiskRequiresCheck(risk)) {
+    return 'unknown';
+  }
+  return 'stepFree';
+}
+
 String _routeV2RiskMessage(String code) {
   return switch (code) {
     'STAIR_ONLY_ACCESS' => '계단 구간이 포함될 수 있어요.',
@@ -1672,13 +1703,10 @@ class RouteSearchStep {
       estimatedMinutes: minutes,
       distanceMeters: leg.distanceMeters,
       includesStairs: leg.accessibilityRisk.stairCount > 0,
-      stairAccessState: leg.accessibilityRisk.stairCount > 0
-          ? 'stairOnly'
-          : 'stepFree',
-      requiresAccessibilityCheck:
-          leg.accessibilityRisk.unknownAccessibilityCount > 0 ||
-          leg.accessibilityRisk.staleDataCount > 0 ||
-          leg.accessibilityRisk.lowConfidenceCount > 0,
+      stairAccessState: _routeV2StairAccessState(leg.accessibilityRisk),
+      requiresAccessibilityCheck: _routeV2RiskRequiresCheck(
+        leg.accessibilityRisk,
+      ),
       actionTitle: title,
       actionDetail: title,
       reason: leg.etaSource,
