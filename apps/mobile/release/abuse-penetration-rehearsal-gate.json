@@ -239,6 +239,7 @@
   "manualRehearsalPolicy": {
     "redactionRequired": true,
     "requestResponseSummaryOnly": true,
+    "validatorCommand": "node tools/security/validate-abuse-penetration-summary.mjs --summary <summary.json> --require-pass",
     "githubSummaryFields": [
       "scenarioId",
       "artifactIdentity",
