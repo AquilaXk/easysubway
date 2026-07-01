@@ -150,3 +150,33 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
     /artifactIdentity must match/,
   );
 });
+
+test("abuse penetration summary validator rejects case-level failed rehearsal evidence", async () => {
+  const statusMismatch = validSummary();
+  statusMismatch.matrices[0].cases[0].observedStatus = 200;
+  await assert.rejects(
+    withSummary(statusMismatch, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/security/validate-abuse-penetration-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /observedStatus must match expectedStatus/,
+  );
+
+  const redactionFailure = validSummary();
+  redactionFailure.matrices[0].cases[0].redactionResult = "FAIL";
+  await assert.rejects(
+    withSummary(redactionFailure, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/security/validate-abuse-penetration-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /redactionResult must be PASS/,
+  );
+});

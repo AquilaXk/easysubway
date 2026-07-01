@@ -72,7 +72,18 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
   }
 }
 
-function assertMatrix(matrixId, matrix, matrixSummary, gate) {
+function assertCasePass(matrixId, caseId, item) {
+  if (item.observedStatus !== item.expectedStatus) {
+    throw new Error(`${matrixId}.cases.${caseId}.observedStatus must match expectedStatus`);
+  }
+  for (const field of ["redactionResult", "auditRedactionResult", "cleanupResult", "deleteOrCleanupResult"]) {
+    if (item[field] !== undefined && item[field] !== "PASS") {
+      throw new Error(`${matrixId}.cases.${caseId}.${field} must be PASS`);
+    }
+  }
+}
+
+function assertMatrix(matrixId, matrix, matrixSummary, gate, requirePass) {
   required(matrixSummary, `matrices.${matrixId}`);
   if (matrixSummary.scenarioId !== matrix.scenarioId) {
     throw new Error(`${matrixId}.scenarioId must be ${matrix.scenarioId}`);
@@ -90,6 +101,7 @@ function assertMatrix(matrixId, matrix, matrixSummary, gate) {
     for (const field of matrix.summaryFields) {
       required(item[field], `${matrixId}.cases.${caseId}.${field}`);
     }
+    if (requirePass) assertCasePass(matrixId, caseId, item);
   }
 }
 
@@ -113,7 +125,7 @@ async function main() {
   const matrixSummaries = new Map(required(summary.matrices, "matrices").map((matrix) => [matrix.matrixId, matrix]));
   for (const [matrixId, matrix] of Object.entries(gate.rehearsalMatrices)) {
     const matrixSummary = matrixSummaries.get(matrixId);
-    assertMatrix(matrixId, matrix, matrixSummary, gate);
+    assertMatrix(matrixId, matrix, matrixSummary, gate, requirePass);
     assertIdentity(matrixSummary, gate, `${matrixId}.artifactIdentity`, artifactIdentity);
     assertFindingCounts(matrixSummary, requirePass, gate);
   }
