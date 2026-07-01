@@ -98,7 +98,10 @@ void main() {
       expect(result.originStationName, '상록수');
       expect(result.destinationStationName, '사당');
       expect(result.lineName, '수도권 4호선');
-      expect(result.steps.single.title, isNot(contains('station-')));
+      expect(result.steps, hasLength(2));
+      expect(result.steps.first.title, '상록수 승강장 접근');
+      expect(result.steps.first.actionDetail, '상록수 승강장 접근 동선을 확인합니다.');
+      expect(result.steps.last.title, isNot(contains('station-')));
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
 
@@ -3104,6 +3107,38 @@ Map<String, Object?> _routeV2Payload({
           'reasons': reasonCodes,
         },
         'legs': [
+          {
+            'legType': 'ACCESS',
+            'fromStationId': 'station-sangnoksu',
+            'toStationId': 'station-sangnoksu',
+            'fromNodeId': '',
+            'toNodeId': '',
+            'lineId': '',
+            'tripId': '',
+            'trainNo': '',
+            'plannedDepartureTime': '2026-07-01T09:00:00+09:00',
+            'realtimeDepartureTime': null,
+            'plannedArrivalTime': '2026-07-01T09:01:00+09:00',
+            'realtimeArrivalTime': null,
+            'waitTimeSeconds': 0,
+            'slackSeconds': 0,
+            'durationSeconds': 60,
+            'distanceMeters': 20,
+            'etaSource': 'PLANNED',
+            'confidence': 'HIGH',
+            'accessibilityRisk': {
+              'stairCount': 0,
+              'unknownAccessibilityCount': 0,
+              'generatedConnectorCount': 0,
+              'staleDataCount': 0,
+              'lowConfidenceCount': 0,
+              'unavailableFacilityCount': 0,
+              'riskLevel': 'LOW',
+              'reasonCodes': <Object?>[],
+              'level': 'LOW',
+              'reasons': <Object?>[],
+            },
+          },
           {
             'legType': 'RIDE',
             'fromStationId': 'station-sangnoksu',
