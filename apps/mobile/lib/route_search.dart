@@ -32,9 +32,9 @@ const _routeSearchPagePadding = EdgeInsets.only(
   right: 20,
   bottom: 32,
 );
-const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
-const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
-const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
+const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(12));
+const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(12));
+const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPickerRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 const _routePointRailWidth = 30.0;
