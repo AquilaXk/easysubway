@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'accessible_design.dart';
 
 const _mobilityProfilePagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
-const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(8));
+const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(16));
 
 class MobilityProfileOption {
   const MobilityProfileOption({

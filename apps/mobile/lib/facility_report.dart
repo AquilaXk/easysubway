@@ -43,65 +43,17 @@ const _facilityReportPagePadding = EdgeInsets.only(
   bottom: 32,
 );
 const _facilityReportCardRadius = BorderRadius.all(Radius.circular(8));
-const _reportStatusSkyBorderColor = Color(0xFFC0E0F5);
-const _reportStatusSkyTextColor = Color(0xFF17527C);
-const _reportStatusAmberBorderColor = Color(0xFFF1D49A);
-const _reportStatusRedBorderColor = Color(0xFFF3C7C2);
-const _reportStatusNeutralColor = Color(0xFFEEF2F4);
 
-/// 제보 상태(FacilityReportStatus)를 상태별 배지 색상·아이콘으로 매핑한다.
-class _ReportStatusPresentation {
-  const _ReportStatusPresentation({
-    required this.background,
-    required this.border,
-    required this.foreground,
-    required this.icon,
-  });
-
-  final Color background;
-  final Color border;
-  final Color foreground;
-  final IconData icon;
-}
-
-_ReportStatusPresentation _reportStatusPresentation(String status) {
+/// 제보 상태(FacilityReportStatus)를 상태색으로 매핑한다. 박스 대신 색 점·색
+/// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
+Color _reportStatusColor(String status) {
   return switch (status) {
-    'SUBMITTED' => const _ReportStatusPresentation(
-      background: EasySubwayAccessibleColors.skySoft,
-      border: _reportStatusSkyBorderColor,
-      foreground: _reportStatusSkyTextColor,
-      icon: Icons.inbox_outlined,
-    ),
-    'UNDER_REVIEW' => const _ReportStatusPresentation(
-      background: EasySubwayAccessibleColors.amberSoft,
-      border: _reportStatusAmberBorderColor,
-      foreground: EasySubwayAccessibleColors.amber,
-      icon: Icons.hourglass_bottom_outlined,
-    ),
-    'ACCEPTED' || 'RESOLVED' => const _ReportStatusPresentation(
-      background: EasySubwayAccessibleColors.mintSoft,
-      border: EasySubwayAccessibleColors.mintBorder,
-      foreground: EasySubwayAccessibleColors.mintDark,
-      icon: Icons.check_circle_outline,
-    ),
-    'REJECTED' => const _ReportStatusPresentation(
-      background: EasySubwayAccessibleColors.redSoft,
-      border: _reportStatusRedBorderColor,
-      foreground: EasySubwayAccessibleColors.red,
-      icon: Icons.cancel_outlined,
-    ),
-    'DUPLICATE' => const _ReportStatusPresentation(
-      background: _reportStatusNeutralColor,
-      border: EasySubwayAccessibleColors.line,
-      foreground: EasySubwayAccessibleColors.mutedText,
-      icon: Icons.content_copy_outlined,
-    ),
-    _ => const _ReportStatusPresentation(
-      background: _reportStatusNeutralColor,
-      border: EasySubwayAccessibleColors.line,
-      foreground: EasySubwayAccessibleColors.mutedText,
-      icon: Icons.info_outline,
-    ),
+    'SUBMITTED' => const Color(0xFF17527C),
+    'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
+    'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
+    'REJECTED' => EasySubwayAccessibleColors.red,
+    'DUPLICATE' => EasySubwayAccessibleColors.mutedText,
+    _ => EasySubwayAccessibleColors.mutedText,
   };
 }
 
@@ -1454,20 +1406,12 @@ class _MyReportEmpty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: EasySubwayAccessibleColors.mintSoft,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.receipt_long_outlined,
-                size: 32,
-                color: EasySubwayAccessibleColors.mintDark,
-              ),
+            const Icon(
+              Icons.receipt_long_outlined,
+              size: 40,
+              color: EasySubwayAccessibleColors.mutedText,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Text(
               '접수한 제보가 없습니다.',
               textAlign: TextAlign.center,
@@ -1584,7 +1528,7 @@ class _MyReportListItem extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      _MyReportStatusPill(
+                      _MyReportStatusLabel(
                         status: report.status,
                         label: report.statusLabel,
                       ),
@@ -1680,33 +1624,27 @@ class _MyReportDetailStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presentation = _reportStatusPresentation(status);
+    final color = _reportStatusColor(status);
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        decoration: BoxDecoration(
-          color: presentation.background,
-          borderRadius: _facilityReportCardRadius,
-          border: Border.all(color: presentation.border),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(presentation.icon, size: 20, color: presentation.foreground),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: presentation.foreground,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-            ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1745,39 +1683,33 @@ class _MyReportDetailRow extends StatelessWidget {
   }
 }
 
-class _MyReportStatusPill extends StatelessWidget {
-  const _MyReportStatusPill({required this.status, required this.label});
+class _MyReportStatusLabel extends StatelessWidget {
+  const _MyReportStatusLabel({required this.status, required this.label});
 
   final String status;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    final presentation = _reportStatusPresentation(status);
-    return Container(
-      decoration: BoxDecoration(
-        color: presentation.background,
-        borderRadius: _facilityReportCardRadius,
-        border: Border.all(color: presentation.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(presentation.icon, size: 15, color: presentation.foreground),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: presentation.foreground,
-                fontWeight: FontWeight.w900,
-                height: 1.2,
-              ),
-            ),
-          ],
+    final color = _reportStatusColor(status);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-      ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+      ],
     );
   }
 }
