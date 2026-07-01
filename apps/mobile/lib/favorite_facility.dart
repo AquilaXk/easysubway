@@ -618,6 +618,9 @@ class _FavoriteFacilityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final severityColor = _favoriteFacilitySeverityColor(
+      favorite.statusPresentation.severity,
+    );
 
     return Card(
       key: Key('favoriteFacilityTile-${favorite.facilityId}'),
@@ -646,9 +649,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                             width: 9,
                             height: 9,
                             decoration: BoxDecoration(
-                              color: _favoriteFacilitySeverityColor(
-                                favorite.statusPresentation.severity,
-                              ),
+                              color: severityColor,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -656,9 +657,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                           Text(
                             favorite.severityLabel,
                             style: textTheme.bodyMedium?.copyWith(
-                              color: _favoriteFacilitySeverityColor(
-                                favorite.statusPresentation.severity,
-                              ),
+                              color: severityColor,
                               fontWeight: FontWeight.w900,
                               height: 1.2,
                             ),

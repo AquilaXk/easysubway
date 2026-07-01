@@ -52,6 +52,7 @@ Color _reportStatusColor(String status) {
     'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
     'REJECTED' => EasySubwayAccessibleColors.red,
+    'DUPLICATE' => EasySubwayAccessibleColors.mutedText,
     _ => EasySubwayAccessibleColors.mutedText,
   };
 }
