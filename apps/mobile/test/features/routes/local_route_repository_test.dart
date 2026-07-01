@@ -1666,6 +1666,7 @@ void main() {
       operationalStatus: 'AVAILABLE',
       observedAtSeconds: nowSeconds - 60,
       expiresAtSeconds: nowSeconds + 1800,
+      confidence: 0,
     );
     final repository = LocalRouteRepository(catalogDatabase: database);
 
@@ -1679,6 +1680,10 @@ void main() {
 
     expect(result.status, 'FOUND');
     expect(result.blockedReasons, isEmpty);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('LOW_DATA_CONFIDENCE'),
+    );
     expect(
       result.steps.expand((step) => step.evidenceSources),
       containsAll([
@@ -1702,7 +1707,7 @@ void main() {
       status: 'BROKEN',
       operationalStatus: 'OUT_OF_SERVICE',
       observedAtSeconds: nowSeconds - 7200,
-      expiresAtSeconds: nowSeconds - 3600,
+      expiresAtSeconds: nowSeconds,
     );
     final repository = LocalRouteRepository(catalogDatabase: database);
 
@@ -3295,6 +3300,7 @@ Future<void> _addFacilityStatusSnapshot(
   required String operationalStatus,
   required int observedAtSeconds,
   required int expiresAtSeconds,
+  int confidence = 100,
 }) async {
   await database.customStatement(
     '''
@@ -3308,7 +3314,7 @@ Future<void> _addFacilityStatusSnapshot(
         ?, 'facility-a-elevator', ?, ?, ?,
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        'OFFICIAL_SOURCE', 'VERIFIED', ?, ?, 100, ?, ?
+        'OFFICIAL_SOURCE', 'VERIFIED', ?, ?, ?, ?, ?
       )
     ''',
     [
@@ -3318,6 +3324,7 @@ Future<void> _addFacilityStatusSnapshot(
       sourceSnapshotId,
       status,
       operationalStatus,
+      confidence,
       observedAtSeconds,
       expiresAtSeconds,
     ],
