@@ -295,6 +295,31 @@ void main() {
     expect(json, isNot(contains('photoDataBase64')));
   });
 
+  test('시설 신고 유형은 현장 접근성 보정 항목을 노출한다', () {
+    expect(
+      FacilityReportTypeOption.values.map((option) => option.reportType),
+      containsAll([
+        'ROUTE_BLOCKED',
+        'ELEVATOR_UNAVAILABLE',
+        'STAIRS_PRESENT',
+        'ETA_INACCURATE',
+        'TRANSFER_IMPOSSIBLE',
+      ]),
+    );
+    expect(
+      const FacilityReportResult(
+        id: 'report-route-blocked',
+        stationId: 'station-sangnoksu',
+        facilityId: 'facility-sangnoksu-elevator-1',
+        reportType: 'ROUTE_BLOCKED',
+        description: '경로가 막혀 있습니다.',
+        status: 'SUBMITTED',
+        createdAt: '2026-06-13T10:00:00',
+      ).reportTypeLabel,
+      '경로가 막혔어요',
+    );
+  });
+
   test('시설 신고 API 저장소는 사진 PUT 5xx를 한 번 재시도한 뒤 신고를 접수한다', () async {
     var uploadAttemptCount = 0;
     var reportRequestCount = 0;
