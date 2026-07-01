@@ -90,6 +90,12 @@ _ReportStatusPresentation _reportStatusPresentation(String status) {
       foreground: EasySubwayAccessibleColors.red,
       icon: Icons.cancel_outlined,
     ),
+    'DUPLICATE' => const _ReportStatusPresentation(
+      background: _reportStatusNeutralColor,
+      border: EasySubwayAccessibleColors.line,
+      foreground: EasySubwayAccessibleColors.mutedText,
+      icon: Icons.content_copy_outlined,
+    ),
     _ => const _ReportStatusPresentation(
       background: _reportStatusNeutralColor,
       border: EasySubwayAccessibleColors.line,
