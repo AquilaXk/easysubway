@@ -786,12 +786,40 @@ class RouteSearchV2Leg {
 
 class RouteSearchV2AccessibilityRisk {
   const RouteSearchV2AccessibilityRisk({
+    required this.stairCount,
+    required this.unknownAccessibilityCount,
+    required this.generatedConnectorCount,
+    required this.staleDataCount,
+    required this.lowConfidenceCount,
+    required this.unavailableFacilityCount,
+    required this.riskLevel,
+    required this.reasonCodes,
     required this.level,
     required this.reasons,
   });
 
   factory RouteSearchV2AccessibilityRisk.fromJson(Map<String, Object?> json) {
+    final reasonCodes = _routeStringList(
+      json['reasonCodes'] ?? json['reasons'],
+      'route v2 accessibility risk reason',
+    );
+    final riskLevel = _optionalRouteString(
+      json,
+      'riskLevel',
+      fallback: _optionalRouteString(json, 'level', fallback: 'UNKNOWN'),
+    );
     return RouteSearchV2AccessibilityRisk(
+      stairCount: _optionalRouteInt(json, 'stairCount') ?? 0,
+      unknownAccessibilityCount:
+          _optionalRouteInt(json, 'unknownAccessibilityCount') ?? 0,
+      generatedConnectorCount:
+          _optionalRouteInt(json, 'generatedConnectorCount') ?? 0,
+      staleDataCount: _optionalRouteInt(json, 'staleDataCount') ?? 0,
+      lowConfidenceCount: _optionalRouteInt(json, 'lowConfidenceCount') ?? 0,
+      unavailableFacilityCount:
+          _optionalRouteInt(json, 'unavailableFacilityCount') ?? 0,
+      riskLevel: riskLevel,
+      reasonCodes: reasonCodes,
       level: _requiredRouteString(json, 'level'),
       reasons: _routeStringList(
         json['reasons'],
@@ -800,6 +828,14 @@ class RouteSearchV2AccessibilityRisk {
     );
   }
 
+  final int stairCount;
+  final int unknownAccessibilityCount;
+  final int generatedConnectorCount;
+  final int staleDataCount;
+  final int lowConfidenceCount;
+  final int unavailableFacilityCount;
+  final String riskLevel;
+  final List<String> reasonCodes;
   final String level;
   final List<String> reasons;
 }

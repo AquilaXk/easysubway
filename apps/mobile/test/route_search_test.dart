@@ -575,6 +575,18 @@ void main() {
           'transferCount': 0,
           'walkingDistanceMeters': 180,
           'accessibilityRisk': {
+            'stairCount': 1,
+            'unknownAccessibilityCount': 1,
+            'generatedConnectorCount': 0,
+            'staleDataCount': 1,
+            'lowConfidenceCount': 1,
+            'unavailableFacilityCount': 0,
+            'riskLevel': 'HIGH',
+            'reasonCodes': [
+              'LOW_DATA_CONFIDENCE',
+              'STALE_ACCESSIBILITY_DATA',
+              'ACCESSIBILITY_CHECK_REQUIRED',
+            ],
             'level': 'REVIEW_REQUIRED',
             'reasons': ['ACCESSIBILITY_CHECK_REQUIRED'],
           },
@@ -599,6 +611,17 @@ void main() {
               'etaSource': 'STATIC_BACKEND_V1',
               'confidence': 'LOW',
               'accessibilityRisk': {
+                'stairCount': 1,
+                'unknownAccessibilityCount': 1,
+                'generatedConnectorCount': 0,
+                'staleDataCount': 0,
+                'lowConfidenceCount': 0,
+                'unavailableFacilityCount': 0,
+                'riskLevel': 'HIGH',
+                'reasonCodes': [
+                  'STAIR_ONLY_ACCESS',
+                  'ACCESSIBILITY_CHECK_REQUIRED',
+                ],
                 'level': 'REVIEW_REQUIRED',
                 'reasons': ['ACCESSIBILITY_CHECK_REQUIRED'],
               },
@@ -616,7 +639,18 @@ void main() {
           'durationSeconds': 420,
           'transferCount': 0,
           'walkingDistanceMeters': 180,
-          'accessibilityRisk': {'level': 'UNKNOWN', 'reasons': <Object?>[]},
+          'accessibilityRisk': {
+            'stairCount': 0,
+            'unknownAccessibilityCount': 0,
+            'generatedConnectorCount': 0,
+            'staleDataCount': 0,
+            'lowConfidenceCount': 0,
+            'unavailableFacilityCount': 0,
+            'riskLevel': 'UNKNOWN',
+            'reasonCodes': <Object?>[],
+            'level': 'UNKNOWN',
+            'reasons': <Object?>[],
+          },
           'legs': <Object?>[],
           'commercialEtaEligible': false,
         },
@@ -634,7 +668,23 @@ void main() {
     expect(result.itineraries.first.realtimeArrivalTime, isNull);
     expect(result.itineraries.first.commercialEtaEligible, isFalse);
     expect(result.itineraries.first.accessibilityRisk.level, 'REVIEW_REQUIRED');
+    expect(result.itineraries.first.accessibilityRisk.riskLevel, 'HIGH');
+    expect(result.itineraries.first.accessibilityRisk.stairCount, 1);
+    expect(
+      result.itineraries.first.accessibilityRisk.unknownAccessibilityCount,
+      1,
+    );
+    expect(result.itineraries.first.accessibilityRisk.staleDataCount, 1);
+    expect(result.itineraries.first.accessibilityRisk.lowConfidenceCount, 1);
+    expect(
+      result.itineraries.first.accessibilityRisk.reasonCodes,
+      contains('STALE_ACCESSIBILITY_DATA'),
+    );
     expect(result.itineraries.first.legs.single.legType, 'ACCESS');
+    expect(
+      result.itineraries.first.legs.single.accessibilityRisk.riskLevel,
+      'HIGH',
+    );
     expect(result.itineraries.first.legs.single.waitTimeSeconds, 0);
     expect(result.itineraries.first.legs.single.slackSeconds, 0);
     expect(result.itineraries.first.legs.single.etaSource, 'STATIC_BACKEND_V1');
