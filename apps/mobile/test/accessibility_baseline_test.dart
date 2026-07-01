@@ -25,7 +25,7 @@ void main() {
     );
   });
 
-  testWidgets('모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다', (tester) async {
+  testWidgets('모바일 접근성 QA 기준선은 시스템 접근성과 고대비 홈 화면을 검증한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(
@@ -43,7 +43,7 @@ void main() {
           locationProvider: _AccessibilityCurrentLocationProvider(),
           initialOnboardingState: _completedOnboardingState(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: true,
               simpleViewEnabled: false,
             ),
@@ -56,10 +56,7 @@ void main() {
       expect(MediaQuery.of(homeContext).highContrast, isTrue);
       expect(MediaQuery.boldTextOf(homeContext), isTrue);
       expect(MediaQuery.disableAnimationsOf(homeContext), isTrue);
-      expect(
-        MediaQuery.textScalerOf(homeContext).scale(20),
-        closeTo(23.6, 0.01),
-      );
+      expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
       expect(
         Theme.of(homeContext).colorScheme.primary,
         const Color(0xFF003D40),
@@ -78,20 +75,23 @@ void main() {
             ?.fontWeight,
         FontWeight.w900,
       );
-      expect(find.bySemanticsLabel('역 검색'), findsOneWidget);
-      expect(find.bySemanticsLabel('길찾기'), findsOneWidget);
+      expect(find.bySemanticsLabel('지하철역 검색'), findsOneWidget);
 
+      final menuSemantics = tester
+          .getSemantics(find.byKey(const Key('networkMapMenuButton')))
+          .getSemanticsData();
       final stationSearchSemantics = tester
           .getSemantics(find.byKey(const Key('stationSearchButton')))
           .getSemanticsData();
-      final routeSearchSemantics = tester
-          .getSemantics(find.byKey(const Key('routeSearchButton')))
+      final nearbyStationSemantics = tester
+          .getSemantics(find.byKey(const Key('nearbyStationButton')))
           .getSemanticsData();
 
-      expect(stationSearchSemantics.label, contains('역 검색'));
+      expect(menuSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(stationSearchSemantics.label, contains('지하철역 검색'));
       expect(stationSearchSemantics.hasAction(SemanticsAction.tap), isTrue);
-      expect(routeSearchSemantics.label, contains('길찾기'));
-      expect(routeSearchSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(nearbyStationSemantics.label, contains('현재 위치로 주변 역 찾기'));
+      expect(nearbyStationSemantics.hasAction(SemanticsAction.tap), isTrue);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));

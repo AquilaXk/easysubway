@@ -13,12 +13,31 @@ import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart'
 import 'features/network_map/infrastructure/route_map_renderer.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'mobile_error_reporter.dart';
+import 'station_search.dart';
 
-const _networkMapRadius = BorderRadius.all(Radius.circular(8));
-const _networkMapStationNodeStrokeColor = Color(0xFF2F3E42);
+const _supermoveHeaderHeight = 60.0;
+const _networkMapBottomAdHeight = 52.0;
+const _supermovePillRadius = BorderRadius.all(Radius.circular(28));
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
+}
+
+abstract interface class NetworkMapViewportRepository {
+  Future<Rect?> loadViewport(String region);
+
+  Future<void> saveViewport({required String region, required Rect viewport});
+}
+
+class _NetworkMapLoadResult {
+  const _NetworkMapLoadResult({
+    required this.data,
+    required this.initialViewport,
+  });
+
+  final NetworkMapData data;
+  final Rect? initialViewport;
 }
 
 class NetworkMapData {
@@ -273,6 +292,13 @@ class NetworkMapScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.onOpenRouteSearch,
     required this.onOpenStationSearch,
+    this.stationSearchRepository,
+    this.locationProvider,
+    this.viewportRepository,
+    this.onOpenSavedItems,
+    this.onOpenRecentSearch,
+    this.onOpenNearbyStations,
+    this.notificationAction,
     this.bottomNavigationBar,
     super.key,
   });
@@ -281,6 +307,13 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback onOpenStationSearch;
+  final StationSearchRepository? stationSearchRepository;
+  final CurrentLocationProvider? locationProvider;
+  final NetworkMapViewportRepository? viewportRepository;
+  final VoidCallback? onOpenSavedItems;
+  final VoidCallback? onOpenRecentSearch;
+  final VoidCallback? onOpenNearbyStations;
+  final Widget? notificationAction;
   final Widget? bottomNavigationBar;
 
   @override
@@ -289,15 +322,37 @@ class NetworkMapScreen extends StatefulWidget {
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
-  late Future<NetworkMapData> _future = _loadMap();
+  bool _expressView = false;
+  bool _nearbyPanelVisible = false;
+  _NetworkMapNearbyPanelData _nearbyPanelData =
+      const _NetworkMapNearbyPanelData.idle();
+  String? _nearbySelectedStationId;
+  String? _nearbyLookupMessage;
+  Timer? _nearbyLookupMessageTimer;
+  bool _initialNearbyFocusStarted = false;
+  late Future<_NetworkMapLoadResult> _future = _loadMap();
 
-  Future<NetworkMapData> _loadMap() {
-    return widget.repository.getNetworkMap(region: _selectedRegion);
+  @override
+  void dispose() {
+    _nearbyLookupMessageTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<_NetworkMapLoadResult> _loadMap() async {
+    final data = await widget.repository.getNetworkMap(region: _selectedRegion);
+    final viewport = await widget.viewportRepository?.loadViewport(
+      _displayRegionName(data.selectedRegion),
+    );
+    return _NetworkMapLoadResult(data: data, initialViewport: viewport);
   }
 
   void _reload({String? region}) {
     setState(() {
       _selectedRegion = region ?? _selectedRegion;
+      _nearbySelectedStationId = null;
+      _nearbyPanelVisible = false;
+      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+      _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
   }
@@ -306,105 +361,1501 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('networkMapScreen'),
-      appBar: AppBar(
-        title: const Text('노선도'),
-        actions: [
-          IconButton(
-            key: const Key('networkMapSearchButton'),
-            tooltip: '역 검색',
-            onPressed: widget.onOpenStationSearch,
-            icon: const Icon(Icons.search),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        child: FutureBuilder<NetworkMapData>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError || !snapshot.hasData) {
-              return _NetworkMapLoadFailure(
-                onRetry: () => _reload(),
-                onOpenStationSearch: widget.onOpenStationSearch,
-              );
-            }
-            final data = snapshot.data!;
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: _NetworkMapCanvas(
-                    data: data,
-                    onStationTap: _showStationSheet,
-                  ),
-                ),
-                Positioned(
-                  left: 14,
-                  top: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _RegionTabs(
-                        regions: data.regions,
-                        selectedRegion: data.selectedRegion,
-                        onSelected: (region) => _reload(region: region),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      backgroundColor: const Color(0xFFFFFAFD),
+      body: FutureBuilder<_NetworkMapLoadResult>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return _SupermoveNetworkMapChrome(
+              regions: const [NetworkMapRegion(name: '수도권')],
+              selectedRegion: _selectedRegion ?? '수도권',
+              expressView: _expressView,
+              showServicePatternToggle: true,
+              notificationAction: widget.notificationAction,
+              onMenuTap: _openMapMenu,
+              onSearchTap: widget.onOpenStationSearch,
+              onRegionSelected: (region) => _reload(region: region),
+              onExpressViewChanged: (value) {
+                setState(() => _expressView = value);
+              },
+              nearbyPanelVisible: _nearbyPanelVisible,
+              nearbyPanelData: _nearbyPanelData,
+              nearbyLookupMessage: _nearbyLookupMessage,
+              adjacentStations: const _NetworkMapAdjacentStations(),
+              onCurrentLocationTap: _showNearbyPanel,
+              onOpenNearbyStations: widget.onOpenNearbyStations,
+              onCloseNearbyPanel: _hideNearbyPanel,
+              child: const Center(child: CircularProgressIndicator()),
             );
-          },
-        ),
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return _SupermoveNetworkMapChrome(
+              regions: const [NetworkMapRegion(name: '수도권')],
+              selectedRegion: _selectedRegion ?? '수도권',
+              expressView: _expressView,
+              showServicePatternToggle: true,
+              notificationAction: widget.notificationAction,
+              onMenuTap: _openMapMenu,
+              onSearchTap: widget.onOpenStationSearch,
+              onRegionSelected: (region) => _reload(region: region),
+              onExpressViewChanged: (value) {
+                setState(() => _expressView = value);
+              },
+              nearbyPanelVisible: _nearbyPanelVisible,
+              nearbyPanelData: _nearbyPanelData,
+              nearbyLookupMessage: _nearbyLookupMessage,
+              adjacentStations: const _NetworkMapAdjacentStations(),
+              onCurrentLocationTap: _showNearbyPanel,
+              onOpenNearbyStations: widget.onOpenNearbyStations,
+              onCloseNearbyPanel: _hideNearbyPanel,
+              child: _NetworkMapLoadFailure(onRetry: () => _reload()),
+            );
+          }
+          final loadResult = snapshot.data!;
+          final data = loadResult.data;
+          final hasExpressLines = _expressLineIds(data).isNotEmpty;
+          final hasAssetRenderer =
+              _routeMapAssetForRegion(data.selectedRegion) != null;
+          final visibleData =
+              hasExpressLines && !hasAssetRenderer && _expressView
+              ? _expressOnlyMapData(data)
+              : data;
+          _startInitialNearbyFocus();
+          return _SupermoveNetworkMapChrome(
+            regions: data.regions,
+            selectedRegion: data.selectedRegion,
+            expressView: _expressView,
+            showServicePatternToggle: !hasAssetRenderer,
+            notificationAction: widget.notificationAction,
+            onMenuTap: _openMapMenu,
+            onSearchTap: widget.onOpenStationSearch,
+            onRegionSelected: (region) => _reload(region: region),
+            onExpressViewChanged: (value) {
+              setState(() => _expressView = value);
+            },
+            nearbyPanelVisible: _nearbyPanelVisible,
+            nearbyPanelData: _nearbyPanelData,
+            nearbyLookupMessage: _nearbyLookupMessage,
+            adjacentStations: _adjacentStationsFor(data),
+            onCurrentLocationTap: _showNearbyPanel,
+            onOpenNearbyStations: widget.onOpenNearbyStations,
+            onCloseNearbyPanel: _hideNearbyPanel,
+            child: _NetworkMapCanvas(
+              data: visibleData,
+              initialViewport: loadResult.initialViewport,
+              focusedStationId: _nearbySelectedStationId,
+              selectedStationId: _nearbyPanelVisible
+                  ? _nearbySelectedStationId
+                  : null,
+              onSetOrigin: _setOriginStation,
+              onSetDestination: _setDestinationStation,
+              onOpenRouteSearch: _openRouteSearchFromMap,
+              onViewportChanged: (viewport) {
+                _saveRecentViewport(data.selectedRegion, viewport);
+              },
+            ),
+          );
+        },
       ),
-      bottomNavigationBar: widget.bottomNavigationBar,
+      bottomNavigationBar: _nearbyPanelVisible
+          ? null
+          : const _NetworkMapBottomAdBanner(),
     );
   }
 
-  void _showStationSheet(
-    NetworkMapStation station,
-    List<NetworkMapLine> lines,
-  ) {
-    showModalBottomSheet<void>(
+  Future<void> _showNearbyPanel() async {
+    if (_nearbyPanelData.status == _NetworkMapNearbyPanelStatus.loading) {
+      return;
+    }
+    setState(() {
+      _nearbySelectedStationId = null;
+      _nearbyPanelVisible = false;
+      _nearbyPanelData = const _NetworkMapNearbyPanelData.loading();
+    });
+    final locationProvider = widget.locationProvider;
+    final stationRepository = widget.stationSearchRepository;
+    if (locationProvider == null || stationRepository == null) {
+      if (!mounted) {
+        return;
+      }
+      _showNearbyLookupMessage('현재 위치를 확인하지 못했어요.');
+      return;
+    }
+    try {
+      final location = await locationProvider.currentLocation();
+      final blockedMessage = location.nearbySearchBlockedMessage();
+      if (blockedMessage != null) {
+        if (!mounted) {
+          return;
+        }
+        _showNearbyLookupMessage(blockedMessage);
+        return;
+      }
+      final results = await stationRepository.searchNearbyStations(
+        location,
+        limit: 4,
+      );
+      if (!mounted) {
+        return;
+      }
+      if (results.isEmpty) {
+        _showNearbyLookupMessage('주변 역을 찾지 못했어요.');
+        return;
+      }
+      setState(() {
+        _nearbyPanelVisible = true;
+        _nearbySelectedStationId = results.first.id;
+        _nearbyPanelData = _NetworkMapNearbyPanelData.success(results);
+      });
+    } on CurrentLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showNearbyLookupMessage(error.message);
+    } on StationSearchException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showNearbyLookupMessage(error.message);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 주변 역 확인 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      _showNearbyLookupMessage('주변 역을 불러오지 못했어요.');
+    }
+  }
+
+  void _showNearbyLookupMessage(String message) {
+    _nearbyLookupMessageTimer?.cancel();
+    setState(() {
+      _nearbyPanelVisible = false;
+      _nearbySelectedStationId = null;
+      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+      _nearbyLookupMessage = message;
+    });
+    _nearbyLookupMessageTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _nearbyLookupMessage = null);
+    });
+  }
+
+  void _startInitialNearbyFocus() {
+    if (_initialNearbyFocusStarted ||
+        _nearbySelectedStationId != null ||
+        _nearbyPanelVisible) {
+      return;
+    }
+    if (widget.viewportRepository == null) {
+      return;
+    }
+    final locationProvider = widget.locationProvider;
+    final stationRepository = widget.stationSearchRepository;
+    if (locationProvider == null || stationRepository == null) {
+      return;
+    }
+    _initialNearbyFocusStarted = true;
+    unawaited(_focusInitialNearbyStation(locationProvider, stationRepository));
+  }
+
+  Future<void> _focusInitialNearbyStation(
+    CurrentLocationProvider locationProvider,
+    StationSearchRepository stationRepository,
+  ) async {
+    try {
+      if (await locationProvider.needsLocationPermissionRequest()) {
+        return;
+      }
+      final location = await locationProvider.currentLocation();
+      if (location.nearbySearchBlockedMessage() != null) {
+        return;
+      }
+      final results = await stationRepository.searchNearbyStations(
+        location,
+        limit: 1,
+      );
+      if (!mounted || results.isEmpty || _nearbyPanelVisible) {
+        return;
+      }
+      setState(() {
+        _nearbySelectedStationId = results.first.id;
+      });
+    } on CurrentLocationException {
+      return;
+    } on StationSearchException {
+      return;
+    }
+  }
+
+  void _saveRecentViewport(String region, Rect viewport) {
+    final repository = widget.viewportRepository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(
+      repository
+          .saveViewport(region: _displayRegionName(region), viewport: viewport)
+          .catchError((Object error, StackTrace stackTrace) {
+            reportMobileError(
+              error,
+              stackTrace,
+              context: '노선도 최근 화면 위치 저장 중 예외가 발생했습니다.',
+            );
+          }),
+    );
+  }
+
+  void _hideNearbyPanel() {
+    setState(() {
+      _nearbyPanelVisible = false;
+      _nearbySelectedStationId = null;
+      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+    });
+  }
+
+  Future<void> _openMapMenu() {
+    return showGeneralDialog<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return _StationSheet(
-          station: station,
-          lines: lines,
-          onSetOrigin: () {
-            widget.routeDraftController.setOrigin(
-              RouteDraftStation(id: station.id, nameKo: station.nameKo),
-            );
-            Navigator.of(context).pop();
-          },
-          onSetDestination: () {
-            widget.routeDraftController.setDestination(
-              RouteDraftStation(id: station.id, nameKo: station.nameKo),
-            );
-            Navigator.of(context).pop();
-          },
-          onOpenRouteSearch: () {
-            Navigator.of(context).pop();
-            widget.onOpenRouteSearch();
-          },
+      barrierDismissible: true,
+      barrierLabel: '메뉴 닫기',
+      barrierColor: const Color(0x99000000),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _SupermoveMapMenu(
+          onOpenStationSearch: widget.onOpenStationSearch,
+          onOpenRouteSearch: widget.onOpenRouteSearch,
+          onOpenSavedItems: widget.onOpenSavedItems,
+          onOpenNearbyStations: widget.onOpenNearbyStations,
+          onOpenRecentSearch: widget.onOpenRecentSearch,
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero)
+              .animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+          child: child,
         );
       },
     );
   }
+
+  void _setOriginStation(NetworkMapStation station) {
+    widget.routeDraftController.setOrigin(
+      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+    );
+  }
+
+  void _setDestinationStation(NetworkMapStation station) {
+    widget.routeDraftController.setDestination(
+      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+    );
+  }
+
+  void _openRouteSearchFromMap(NetworkMapStation station) {
+    widget.onOpenRouteSearch();
+  }
+
+  _NetworkMapAdjacentStations _adjacentStationsFor(NetworkMapData data) {
+    final selectedStationId = _nearbySelectedStationId;
+    if (selectedStationId == null) {
+      return const _NetworkMapAdjacentStations();
+    }
+    final primaryResult = _nearbyPanelData.results.isEmpty
+        ? null
+        : _nearbyPanelData.results.first;
+    final primaryLineId = primaryResult == null || primaryResult.lines.isEmpty
+        ? null
+        : primaryResult.lines.first.id;
+    final selectedStations = data.stations
+        .where((station) => station.id == selectedStationId)
+        .toList(growable: false);
+    if (selectedStations.isEmpty) {
+      return const _NetworkMapAdjacentStations();
+    }
+    final selectedStation = selectedStations.firstWhere(
+      (station) => station.lineId == primaryLineId,
+      orElse: () => selectedStations.first,
+    );
+    NetworkMapStation? left;
+    NetworkMapStation? right;
+    for (final edge in data.edges) {
+      if (edge.lineId != selectedStation.lineId) {
+        continue;
+      }
+      final from = networkMapStationForMapEdgeEndpoint(
+        endpoint: edge.fromStationId,
+        lineId: edge.lineId,
+        stations: data.stations,
+      );
+      final to = networkMapStationForMapEdgeEndpoint(
+        endpoint: edge.toStationId,
+        lineId: edge.lineId,
+        stations: data.stations,
+      );
+      NetworkMapStation? candidate;
+      if (_sameMapStation(from, selectedStation)) {
+        candidate = to;
+      } else if (_sameMapStation(to, selectedStation)) {
+        candidate = from;
+      }
+      if (candidate == null) {
+        continue;
+      }
+      if (candidate.sequence < selectedStation.sequence) {
+        if (left == null || candidate.sequence > left.sequence) {
+          left = candidate;
+        }
+      } else if (candidate.sequence > selectedStation.sequence) {
+        if (right == null || candidate.sequence < right.sequence) {
+          right = candidate;
+        }
+      }
+    }
+    return _NetworkMapAdjacentStations(
+      leftName: left?.nameKo,
+      rightName: right?.nameKo,
+    );
+  }
+}
+
+bool _sameMapStation(NetworkMapStation? a, NetworkMapStation b) {
+  return a != null && a.id == b.id && a.lineId == b.lineId;
+}
+
+class _SupermoveNetworkMapChrome extends StatelessWidget {
+  const _SupermoveNetworkMapChrome({
+    required this.regions,
+    required this.selectedRegion,
+    required this.expressView,
+    required this.showServicePatternToggle,
+    required this.notificationAction,
+    required this.onMenuTap,
+    required this.onSearchTap,
+    required this.onRegionSelected,
+    required this.onExpressViewChanged,
+    required this.nearbyPanelVisible,
+    required this.nearbyPanelData,
+    required this.nearbyLookupMessage,
+    required this.adjacentStations,
+    required this.onCurrentLocationTap,
+    required this.onOpenNearbyStations,
+    required this.onCloseNearbyPanel,
+    required this.child,
+  });
+
+  final List<NetworkMapRegion> regions;
+  final String selectedRegion;
+  final bool expressView;
+  final bool showServicePatternToggle;
+  final Widget? notificationAction;
+  final VoidCallback onMenuTap;
+  final VoidCallback onSearchTap;
+  final ValueChanged<String> onRegionSelected;
+  final ValueChanged<bool> onExpressViewChanged;
+  final bool nearbyPanelVisible;
+  final _NetworkMapNearbyPanelData nearbyPanelData;
+  final String? nearbyLookupMessage;
+  final _NetworkMapAdjacentStations adjacentStations;
+  final VoidCallback onCurrentLocationTap;
+  final VoidCallback? onOpenNearbyStations;
+  final VoidCallback onCloseNearbyPanel;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+    return Stack(
+      children: [
+        Positioned.fill(
+          top: topPadding + _supermoveHeaderHeight,
+          child: ClipRect(child: child),
+        ),
+        Positioned(
+          left: 0,
+          top: 0,
+          right: 0,
+          child: _SupermoveMapHeader(
+            regions: regions,
+            selectedRegion: selectedRegion,
+            notificationAction: notificationAction,
+            onMenuTap: onMenuTap,
+            onSearchTap: onSearchTap,
+            onRegionSelected: onRegionSelected,
+          ),
+        ),
+        if (showServicePatternToggle)
+          Positioned(
+            left: 16,
+            bottom: 26,
+            child: _SupermoveServicePatternToggle(
+              expressView: expressView,
+              onChanged: onExpressViewChanged,
+            ),
+          ),
+        if (nearbyPanelVisible)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _SupermoveNearbyStationPanel(
+              data: nearbyPanelData,
+              adjacentStations: adjacentStations,
+              onClose: onCloseNearbyPanel,
+              onRetry: onCurrentLocationTap,
+            ),
+          ),
+        if (nearbyLookupMessage != null)
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: nearbyPanelVisible ? 318 : 132,
+            child: _NetworkMapLookupToast(message: nearbyLookupMessage!),
+          ),
+        if (onOpenNearbyStations != null)
+          Positioned(
+            right: 16,
+            bottom: nearbyPanelVisible ? 280 : 26,
+            child: _SupermoveCurrentLocationButton(onTap: onCurrentLocationTap),
+          ),
+      ],
+    );
+  }
+}
+
+class _NetworkMapLookupToast extends StatelessWidget {
+  const _NetworkMapLookupToast({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.center,
+      child: Material(
+        key: const Key('networkMapNearbyLookupMessage'),
+        color: const Color(0xE62F3437),
+        elevation: 10,
+        shadowColor: const Color(0x33000000),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Text(
+            message,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveMapHeader extends StatelessWidget {
+  const _SupermoveMapHeader({
+    required this.regions,
+    required this.selectedRegion,
+    required this.notificationAction,
+    required this.onMenuTap,
+    required this.onSearchTap,
+    required this.onRegionSelected,
+  });
+
+  final List<NetworkMapRegion> regions;
+  final String selectedRegion;
+  final Widget? notificationAction;
+  final VoidCallback onMenuTap;
+  final VoidCallback onSearchTap;
+  final ValueChanged<String> onRegionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentRegion = _displayRegionName(selectedRegion);
+    final availableRegions = regions.isEmpty
+        ? const [NetworkMapRegion(name: '수도권')]
+        : regions;
+    return Material(
+      color: EasySubwayAccessibleColors.surface,
+      elevation: 4,
+      shadowColor: const Color(0x26000000),
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: _supermoveHeaderHeight,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            child: Row(
+              children: [
+                IconButton(
+                  key: const Key('networkMapMenuButton'),
+                  tooltip: '메뉴',
+                  onPressed: onMenuTap,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size.square(
+                      EasySubwayTouchTarget.general,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: EdgeInsets.zero,
+                  ),
+                  icon: const Icon(
+                    Icons.menu,
+                    size: 22,
+                    color: Color(0xFF4B4B4B),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _SupermoveSearchField(onSearchTap: onSearchTap),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  key: const Key('mapRegionTabs'),
+                  container: true,
+                  button: true,
+                  label: '지역: $currentRegion',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 84),
+                    child: SizedBox(
+                      height: EasySubwayTouchTarget.general,
+                      child: ExcludeSemantics(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: PopupMenuButton<String>(
+                            key: const Key('networkMapRegionDropdown'),
+                            tooltip: '지역 선택',
+                            initialValue: selectedRegion,
+                            onSelected: onRegionSelected,
+                            itemBuilder: (context) => [
+                              for (final region in availableRegions)
+                                PopupMenuItem<String>(
+                                  value: region.name,
+                                  child: Text(region.displayName),
+                                ),
+                            ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  currentRegion,
+                                  style: const TextStyle(
+                                    color: Color(0xFF606060),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Color(0xFF606060),
+                                  size: 18,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (notificationAction != null) ...[
+                  const SizedBox(width: 8),
+                  notificationAction!,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveSearchField extends StatelessWidget {
+  const _SupermoveSearchField({required this.onSearchTap});
+
+  final VoidCallback onSearchTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '지하철역 검색',
+      onTap: onSearchTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          key: const Key('stationSearchButton'),
+          onTap: onSearchTap,
+          borderRadius: _supermovePillRadius,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 72;
+              return SizedBox(
+                height: EasySubwayTouchTarget.general,
+                child: Center(
+                  child: Container(
+                    key: const Key('heroStationSearchButton'),
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: EasySubwayAccessibleColors.surface,
+                      border: Border.all(
+                        color: const Color(0xFFE8E8E8),
+                        width: 2,
+                      ),
+                      borderRadius: _supermovePillRadius,
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 14),
+                    child: compact
+                        ? const SizedBox.shrink()
+                        : const Row(
+                            children: [
+                              SizedBox(width: 17),
+                              Expanded(
+                                child: Text(
+                                  '지하철역 검색',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Color(0xFF666666),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveServicePatternToggle extends StatelessWidget {
+  const _SupermoveServicePatternToggle({
+    required this.expressView,
+    required this.onChanged,
+  });
+
+  final bool expressView;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('networkMapServicePatternToggle'),
+      color: Colors.white,
+      elevation: 16,
+      shadowColor: const Color(0x30000000),
+      borderRadius: _supermovePillRadius,
+      child: Container(
+        height: 58,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          borderRadius: _supermovePillRadius,
+          border: Border.all(color: const Color(0xFFE8E8E8)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SupermoveToggleSegment(
+              label: '일반',
+              selected: !expressView,
+              onTap: () => onChanged(false),
+            ),
+            _SupermoveToggleSegment(
+              label: '급행',
+              selected: expressView,
+              onTap: () => onChanged(true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveCurrentLocationButton extends StatelessWidget {
+  const _SupermoveCurrentLocationButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '현재 위치로 주변 역 찾기',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          key: const Key('nearbyStationButton'),
+          color: Colors.white,
+          elevation: 14,
+          shadowColor: const Color(0x26000000),
+          shape: const CircleBorder(
+            side: BorderSide(color: Color(0xFFD8D8D8), width: 1),
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: const SizedBox(
+              width: 56,
+              height: 56,
+              child: Icon(
+                Icons.my_location,
+                size: 27,
+                color: Color(0xFF565656),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _NetworkMapNearbyPanelStatus { idle, loading, success }
+
+class _NetworkMapNearbyPanelData {
+  const _NetworkMapNearbyPanelData._({
+    required this.status,
+    this.results = const [],
+  });
+
+  const _NetworkMapNearbyPanelData.idle()
+    : this._(status: _NetworkMapNearbyPanelStatus.idle);
+
+  const _NetworkMapNearbyPanelData.loading()
+    : this._(status: _NetworkMapNearbyPanelStatus.loading);
+
+  const _NetworkMapNearbyPanelData.success(List<StationSearchResult> results)
+    : this._(status: _NetworkMapNearbyPanelStatus.success, results: results);
+
+  final _NetworkMapNearbyPanelStatus status;
+  final List<StationSearchResult> results;
+}
+
+class _NetworkMapAdjacentStations {
+  const _NetworkMapAdjacentStations({this.leftName, this.rightName});
+
+  final String? leftName;
+  final String? rightName;
+}
+
+class _SupermoveNearbyStationPanel extends StatelessWidget {
+  const _SupermoveNearbyStationPanel({
+    required this.data,
+    required this.adjacentStations,
+    required this.onClose,
+    required this.onRetry,
+  });
+
+  final _NetworkMapNearbyPanelData data;
+  final _NetworkMapAdjacentStations adjacentStations;
+  final VoidCallback onClose;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = data.results.isEmpty ? null : data.results.first;
+    final primaryLine = primary == null || primary.lines.isEmpty
+        ? null
+        : primary.lines.first;
+    return Material(
+      key: const Key('networkMapNearbyStationPanel'),
+      color: Colors.white,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0xFFD8D8D8))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 44,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const SizedBox(width: 14),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 7),
+                      child: _SubwayLinePanelTab(line: primaryLine),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        height: 24,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFFFCACA)),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          '실시간',
+                          style: TextStyle(
+                            color: Color(0xFFFF7777),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: IconButton(
+                        tooltip: '다시 찾기',
+                        onPressed: onRetry,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 38,
+                          height: 38,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF5A5A5A),
+                          size: 27,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: IconButton(
+                        key: const Key('networkMapNearbyPanelCloseButton'),
+                        tooltip: '닫기',
+                        onPressed: onClose,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 38,
+                          height: 38,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.close,
+                          color: Color(0xFF454545),
+                          size: 27,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 22),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFD8D8D8)),
+              _SupermoveNearbyPanelBody(
+                data: data,
+                adjacentStations: adjacentStations,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveNearbyPanelBody extends StatelessWidget {
+  const _SupermoveNearbyPanelBody({
+    required this.data,
+    required this.adjacentStations,
+  });
+
+  final _NetworkMapNearbyPanelData data;
+  final _NetworkMapAdjacentStations adjacentStations;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (data.status) {
+      _NetworkMapNearbyPanelStatus.idle ||
+      _NetworkMapNearbyPanelStatus.loading => const SizedBox(
+        height: 132,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      _NetworkMapNearbyPanelStatus.success => _SupermoveNearbySuccessList(
+        results: data.results,
+        adjacentStations: adjacentStations,
+      ),
+    };
+  }
+}
+
+class _SupermoveNearbySuccessList extends StatelessWidget {
+  const _SupermoveNearbySuccessList({
+    required this.results,
+    required this.adjacentStations,
+  });
+
+  final List<StationSearchResult> results;
+  final _NetworkMapAdjacentStations adjacentStations;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = results.first;
+    final leftName = adjacentStations.leftName ?? '-';
+    final rightName = adjacentStations.rightName ?? '-';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(13, 18, 13, 0),
+          child: Container(
+            height: 26,
+            decoration: BoxDecoration(
+              color: const Color(0xFF13B8D6),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '< $leftName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 126),
+                  height: 34,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF13B8D6),
+                      width: 3,
+                    ),
+                  ),
+                  child: Text(
+                    primary.nameKo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF2C2C2C),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '$rightName >',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 17),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(42, 0, 42, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _SubwayArrivalColumn(
+                  arrivals: const [_SubwayArrivalPlaceholder()],
+                ),
+              ),
+              const SizedBox(
+                height: 46,
+                child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
+              ),
+              Expanded(
+                child: _SubwayArrivalColumn(
+                  arrivals: const [_SubwayArrivalPlaceholder()],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubwayLinePanelTab extends StatelessWidget {
+  const _SubwayLinePanelTab({required this.line});
+
+  final StationSearchLine? line;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = line?.badgeText ?? '';
+    return SizedBox(
+      width: 36,
+      height: 33,
+      child: Column(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: line?.badgeColor ?? const Color(0xFF8D8D8D),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Container(width: 30, height: 2, color: const Color(0xFF5A5A5A)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubwayArrivalPlaceholder {
+  const _SubwayArrivalPlaceholder();
+}
+
+class _SubwayArrivalColumn extends StatelessWidget {
+  const _SubwayArrivalColumn({required this.arrivals});
+
+  final List<_SubwayArrivalPlaceholder> arrivals;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: arrivals
+          .map((arrival) => const _SubwayArrivalRow())
+          .toList(growable: false),
+    );
+  }
+}
+
+class _SubwayArrivalRow extends StatelessWidget {
+  const _SubwayArrivalRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 2),
+      child: Center(
+        child: Text(
+          '-',
+          style: TextStyle(
+            color: Color(0xFF2F2F2F),
+            fontSize: 12,
+            height: 1.45,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveToggleSegment extends StatelessWidget {
+  const _SupermoveToggleSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: _supermovePillRadius,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 52,
+        width: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF006FD6) : Colors.transparent,
+          borderRadius: _supermovePillRadius,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF242424),
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkMapBottomAdBanner extends StatelessWidget {
+  const _NetworkMapBottomAdBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        key: const Key('networkMapBottomAdBanner'),
+        height: _networkMapBottomAdHeight,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+        ),
+        child: const Text(
+          '광고',
+          style: TextStyle(
+            color: Color(0xFF666666),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveMapMenu extends StatelessWidget {
+  const _SupermoveMapMenu({
+    required this.onOpenStationSearch,
+    required this.onOpenRouteSearch,
+    required this.onOpenSavedItems,
+    required this.onOpenNearbyStations,
+    required this.onOpenRecentSearch,
+  });
+
+  final VoidCallback onOpenStationSearch;
+  final Future<void> Function() onOpenRouteSearch;
+  final VoidCallback? onOpenSavedItems;
+  final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenRecentSearch;
+
+  void _runAction(BuildContext context, VoidCallback action) {
+    Navigator.of(context).pop();
+    action();
+  }
+
+  void _runFutureAction(BuildContext context, Future<void> Function() action) {
+    Navigator.of(context).pop();
+    unawaited(action());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width * 0.625;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        key: const Key('networkMapMenuPanel'),
+        color: Colors.white,
+        child: SizedBox(
+          width: width.clamp(280.0, 430.0).toDouble(),
+          height: double.infinity,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _SupermoveMenuHeader(),
+                const Divider(height: 1, color: Color(0xFFE4E4E4)),
+                _SupermoveMenuTile(
+                  key: const Key('networkMapMenuStationSearchButton'),
+                  icon: Icons.search,
+                  iconColor: Color(0xFF00BFA5),
+                  label: '역 검색',
+                  onTap: () => _runAction(context, onOpenStationSearch),
+                ),
+                _SupermoveMenuTile(
+                  key: const Key('networkMapMenuRouteSearchButton'),
+                  icon: Icons.route_outlined,
+                  iconColor: Color(0xFF00BFA5),
+                  label: '길찾기',
+                  onTap: () => _runFutureAction(context, onOpenRouteSearch),
+                ),
+                if (onOpenSavedItems != null)
+                  _SupermoveMenuTile(
+                    key: const Key('networkMapMenuSavedButton'),
+                    icon: Icons.star_border_rounded,
+                    iconColor: Color(0xFF00BFA5),
+                    label: '즐겨찾기',
+                    onTap: () => _runAction(context, onOpenSavedItems!),
+                  ),
+                if (onOpenNearbyStations != null)
+                  _SupermoveMenuTile(
+                    key: const Key('networkMapMenuNearbyButton'),
+                    icon: Icons.near_me_outlined,
+                    iconColor: Color(0xFFB7B7B7),
+                    label: '가까운 역',
+                    onTap: () => _runAction(context, onOpenNearbyStations!),
+                  ),
+                if (onOpenRecentSearch != null)
+                  _SupermoveMenuTile(
+                    key: const Key('networkMapMenuRecentButton'),
+                    icon: Icons.history,
+                    iconColor: Color(0xFFB7B7B7),
+                    label: '최근 검색',
+                    onTap: () => _runAction(context, onOpenRecentSearch!),
+                  ),
+                const SizedBox(height: 10),
+                const Divider(height: 1, color: Color(0xFFEDEDED)),
+                const _SupermoveMenuInfoBanner(),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 6, 24, 8),
+                  child: Text(
+                    '교통약자 이동을 더 쉽게',
+                    style: TextStyle(
+                      color: Color(0xFF9A9A9A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveMenuHeader extends StatelessWidget {
+  const _SupermoveMenuHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(24, 8, 20, 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: Color(0xFFE9E9E9),
+            child: Icon(
+              Icons.accessible_forward,
+              size: 26,
+              color: Color(0xFFB9B9B9),
+            ),
+          ),
+          SizedBox(width: 20),
+          Expanded(
+            child: Text(
+              '쉬운 지하철',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Color(0xFF7D7D7D),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupermoveMenuTile extends StatelessWidget {
+  const _SupermoveMenuTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 58,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Row(
+                children: [
+                  Icon(icon, size: 28, color: iconColor),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF333333),
+                        fontSize: 23,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupermoveMenuInfoBanner extends StatelessWidget {
+  const _SupermoveMenuInfoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      color: const Color(0xFF07345D),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: const Row(
+        children: [
+          Expanded(
+            child: Text(
+              '엘리베이터·출구 정보를 한 화면에서 확인하세요',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                height: 1.25,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Icon(Icons.train_outlined, color: Color(0xFFFFB020), size: 36),
+        ],
+      ),
+    );
+  }
+}
+
+Set<String> _expressLineIds(NetworkMapData data) {
+  return data.lines
+      .where(
+        (line) =>
+            line.name.contains('급행') ||
+            line.shortName.contains('급행') ||
+            line.id.toLowerCase().contains('express'),
+      )
+      .map((line) => line.id)
+      .toSet();
+}
+
+NetworkMapData _expressOnlyMapData(NetworkMapData data) {
+  final lineIds = _expressLineIds(data);
+  final stationIdsFromMemberships = data.stationLineMemberships
+      .where((membership) => lineIds.contains(membership.lineId))
+      .map((membership) => membership.stationId)
+      .toSet();
+  final stations = data.stations
+      .where(
+        (station) =>
+            lineIds.contains(station.lineId) ||
+            stationIdsFromMemberships.contains(station.id),
+      )
+      .toList(growable: false);
+  final stationsById = <String, List<NetworkMapStation>>{};
+  final stationByLineKey = <String, NetworkMapStation>{};
+  for (final station in stations) {
+    stationsById.putIfAbsent(station.id, () => []).add(station);
+    stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+        station;
+  }
+  bool hasFilteredEndpoint(NetworkMapEdge edge, String endpoint) {
+    return _stationForMapEdgeEndpoint(
+          endpoint,
+          edge.lineId,
+          stationByLineKey,
+          stationsById,
+        ) !=
+        null;
+  }
+
+  return NetworkMapData(
+    regions: data.regions,
+    selectedRegion: data.selectedRegion,
+    lines: data.lines
+        .where((line) => lineIds.contains(line.id))
+        .toList(growable: false),
+    stations: stations,
+    edges: data.edges
+        .where(
+          (edge) =>
+              lineIds.contains(edge.lineId) &&
+              hasFilteredEndpoint(edge, edge.fromStationId) &&
+              hasFilteredEndpoint(edge, edge.toStationId),
+        )
+        .toList(growable: false),
+    positionSources: data.positionSources,
+    stationLineMemberships: data.stationLineMemberships
+        .where((membership) => lineIds.contains(membership.lineId))
+        .toList(growable: false),
+  );
+}
+
+@visibleForTesting
+NetworkMapData networkMapExpressOnlyMapData(NetworkMapData data) {
+  return _expressOnlyMapData(data);
 }
 
 class _NetworkMapLoadFailure extends StatelessWidget {
-  const _NetworkMapLoadFailure({
-    required this.onRetry,
-    required this.onOpenStationSearch,
-  });
+  const _NetworkMapLoadFailure({required this.onRetry});
 
   final VoidCallback onRetry;
-  final VoidCallback onOpenStationSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -422,172 +1873,7 @@ class _NetworkMapLoadFailure extends StatelessWidget {
               icon: const Icon(Icons.refresh),
               label: const Text('다시 시도'),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              key: const Key('networkMapStationSearchFallbackButton'),
-              onPressed: onOpenStationSearch,
-              icon: const Icon(Icons.search),
-              label: const Text('역명으로 검색'),
-            ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RegionTabs extends StatelessWidget {
-  const _RegionTabs({
-    required this.regions,
-    required this.selectedRegion,
-    required this.onSelected,
-  });
-
-  final List<NetworkMapRegion> regions;
-  final String selectedRegion;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleRegions = regions.isEmpty
-        ? const [NetworkMapRegion(name: '수도권')]
-        : regions;
-    final selected =
-        visibleRegions.any((region) => region.name == selectedRegion)
-        ? selectedRegion
-        : visibleRegions.first.name;
-    return SizedBox(
-      key: const Key('mapRegionTabs'),
-      width: 108,
-      height: EasySubwayTouchTarget.general,
-      child: PopupMenuButton<String>(
-        padding: EdgeInsets.zero,
-        initialValue: selected,
-        onSelected: onSelected,
-        itemBuilder: (context) => [
-          for (final region in visibleRegions)
-            PopupMenuItem<String>(
-              value: region.name,
-              child: Text(region.displayName),
-            ),
-        ],
-        child: _RegionMenuButton(
-          label: _displayRegionName(selected),
-          semanticLabel: '지역: ${_displayRegionName(selected)}',
-        ),
-      ),
-    );
-  }
-}
-
-class _RegionMenuButton extends StatelessWidget {
-  const _RegionMenuButton({required this.label, required this.semanticLabel});
-
-  final String label;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: Container(
-          height: EasySubwayTouchTarget.general,
-          padding: const EdgeInsets.only(left: 10, right: 6),
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.surface,
-            borderRadius: _networkMapRadius,
-            border: Border.all(color: EasySubwayAccessibleColors.line),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: EasySubwayAccessibleColors.text,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.arrow_drop_down,
-                size: 22,
-                color: EasySubwayAccessibleColors.mutedText,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLineChip extends StatelessWidget {
-  const _StationLineChip({required this.line});
-
-  final NetworkMapLine line;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: line.shortName,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: EasySubwayAccessibleColors.mintSoft,
-          border: Border.all(color: EasySubwayAccessibleColors.line),
-          borderRadius: _networkMapRadius,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _LineCircleBadge(line: line, size: 34),
-            const SizedBox(width: 8),
-            Text(
-              line.shortName,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LineCircleBadge extends StatelessWidget {
-  const _LineCircleBadge({required this.line, required this.size});
-
-  final NetworkMapLine line;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _colorFromHex(line.color);
-    final foreground =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-        ? Colors.white
-        : EasySubwayAccessibleColors.text;
-    return ExcludeSemantics(
-      child: Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: Text(
-          line.badgeText,
-          maxLines: 2,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: foreground,
-            fontSize: RegExp(r'^\d+$').hasMatch(line.badgeText)
-                ? size * 0.55
-                : size * 0.32,
-            height: 1,
-            fontWeight: FontWeight.w900,
-          ),
         ),
       ),
     );
@@ -659,11 +1945,25 @@ _RouteMapAsset? _routeMapAssetForRegion(String region) {
 }
 
 class _NetworkMapCanvas extends StatefulWidget {
-  const _NetworkMapCanvas({required this.data, required this.onStationTap});
+  const _NetworkMapCanvas({
+    required this.data,
+    required this.initialViewport,
+    required this.focusedStationId,
+    required this.selectedStationId,
+    required this.onSetOrigin,
+    required this.onSetDestination,
+    required this.onOpenRouteSearch,
+    required this.onViewportChanged,
+  });
 
   final NetworkMapData data;
-  final void Function(NetworkMapStation station, List<NetworkMapLine> lines)
-  onStationTap;
+  final Rect? initialViewport;
+  final String? focusedStationId;
+  final String? selectedStationId;
+  final ValueChanged<NetworkMapStation> onSetOrigin;
+  final ValueChanged<NetworkMapStation> onSetDestination;
+  final ValueChanged<NetworkMapStation> onOpenRouteSearch;
+  final ValueChanged<Rect> onViewportChanged;
 
   @override
   State<_NetworkMapCanvas> createState() => _NetworkMapCanvasState();
@@ -671,9 +1971,9 @@ class _NetworkMapCanvas extends StatefulWidget {
 
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
-const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 700);
-const _routeMapGestureMaxTranslationDriftFraction = 0.85;
-const _routeMapGestureMaxScaleRatio = 2.4;
+const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 1100);
+const _routeMapGestureMaxTranslationDriftFraction = 1.35;
+const _routeMapGestureMaxScaleRatio = 3.4;
 const _routeMapGestureRendererOverscanFactor = 3.25;
 
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
@@ -685,17 +1985,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
   bool _routeMapRendererActive = false;
-  bool _routeMapFallbackActive = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
   bool _gestureActive = false;
+  String? _cameraFocusedStationId;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
   RouteMapRendererHealthMonitor? _rendererMonitor;
   RouteMapRendererController? _rendererController;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
+  NetworkMapStation? _selectedStation;
 
   @override
   void initState() {
@@ -781,15 +2082,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _requestedRendererCamera = null;
             _presentedRendererCamera = null;
             _requestedRendererCamerasByRevision.clear();
-            _routeMapFallbackActive = false;
             _routeMapRendererActive = mapAsset != null;
             _lastRendererCameraRequestAt = null;
             _gestureActive = false;
+            _cameraFocusedStationId = null;
             final initialCamera = _cameraForBounds(
-              geometry.initialBounds,
+              widget.initialViewport ?? geometry.initialBounds,
               constraints,
               sourceBounds: fullBounds,
-              contain: mapAsset != null,
+              contain: true,
               minScale: minScale,
             );
             final initialRendererCamera = networkMapOverscannedRendererCamera(
@@ -801,7 +2102,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               _presentedRendererCamera = initialRendererCamera;
             }
           }
-          final camera =
+          var camera =
               _camera ??
               _cameraForBounds(
                 geometry.initialBounds,
@@ -809,17 +2110,43 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 sourceBounds: fullBounds,
                 minScale: minScale,
               );
+          final selectedStation =
+              _stationByIdentity(widget.data.stations, _selectedStation) ??
+              _stationById(widget.data.stations, widget.selectedStationId);
+          final focusedStation = widget.focusedStationId == null
+              ? null
+              : _stationById(widget.data.stations, widget.focusedStationId);
+          if (!_gestureActive &&
+              focusedStation != null &&
+              _cameraFocusedStationId != focusedStation.id) {
+            final focusedCamera = _cameraForBounds(
+              _stationFocusBoundsFor(focusedStation, geometry),
+              constraints,
+              sourceBounds: fullBounds,
+              contain: true,
+              minScale: minScale,
+              revision: camera.revision + 1,
+            );
+            _cameraFocusedStationId = focusedStation.id;
+            _pendingCamera = null;
+            _camera = focusedCamera;
+            camera = focusedCamera;
+            widget.onViewportChanged(focusedCamera.visibleSourceRect);
+            if (_routeMapRendererActive) {
+              final rendererCamera = networkMapOverscannedRendererCamera(
+                focusedCamera,
+              );
+              _requestedRendererCamera = rendererCamera;
+              _presentedRendererCamera = rendererCamera;
+            }
+          } else if (focusedStation == null) {
+            _cameraFocusedStationId = null;
+          }
           return Stack(
             children: [
               Positioned.fill(
-                child: mapAsset == null
+                child: mapAsset == null || !_routeMapRendererActive
                     ? const _OriginalRouteMapUnavailable()
-                    : _routeMapFallbackActive
-                    ? _AndroidRouteMapFallbackLayer(
-                        data: widget.data,
-                        geometry: geometry,
-                        camera: camera,
-                      )
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
                         camera:
@@ -829,38 +2156,44 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                             _presentedRendererCamera ??
                             _requestedRendererCamera ??
                             networkMapOverscannedRendererCamera(camera),
+                        gestureActive: _gestureActive,
                         visualCamera: camera,
                         onControllerCreated: _attachRendererController,
                       ),
               ),
               Positioned.fill(
-                child: Listener(
-                  onPointerCancel: (_) => _endScaleGesture(),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onScaleStart: (details) {
-                      if (!_gestureActive) {
-                        setState(() {
-                          _gestureActive = true;
-                        });
-                      }
-                      _gestureStartCamera = camera;
-                      _gestureStartFocalPoint = details.localFocalPoint;
-                    },
-                    onScaleUpdate: (details) {
-                      _updateCameraForGesture(details);
-                    },
-                    onScaleEnd: (_) {
-                      _endScaleGesture();
-                    },
-                    onTapUp: (details) {
-                      _openNearestStation(
-                        details.localPosition,
-                        stationLinesById,
-                        geometry,
-                        camera,
-                      );
-                    },
+                child: Semantics(
+                  label: '노선도',
+                  hint: '역을 누르면 출발, 도착, 역 정보 action을 볼 수 있어요',
+                  child: Listener(
+                    onPointerCancel: (_) => _endScaleGesture(),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onScaleStart: (details) {
+                        if (!_gestureActive) {
+                          setState(() {
+                            _gestureActive = true;
+                            _selectedStation = null;
+                          });
+                        }
+                        _gestureStartCamera = camera;
+                        _gestureStartFocalPoint = details.localFocalPoint;
+                      },
+                      onScaleUpdate: (details) {
+                        _updateCameraForGesture(details);
+                      },
+                      onScaleEnd: (_) {
+                        _endScaleGesture();
+                      },
+                      onTapUp: (details) {
+                        _openNearestStation(
+                          details.localPosition,
+                          stationLinesById,
+                          geometry,
+                          camera,
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -884,59 +2217,29 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         'networkMapStation-${station.id.replaceFirst('station-', '')}-${station.lineId}',
                       ),
                       station: station,
-                      onTap: () => widget.onStationTap(
-                        station,
-                        stationLinesById[station.id] ?? const [],
-                      ),
+                      onTap: () => _selectStation(station),
                     ),
                   ),
-              Positioned(
-                right: 14,
-                top: 12,
-                child: _MapControls(
-                  onZoomIn: () => _scaleMap(1.25),
-                  onZoomOut: () => _scaleMap(0.8),
-                  onOverview: () {
-                    _setCamera(
-                      _cameraForBounds(
-                        fullBounds,
-                        constraints,
-                        sourceBounds: fullBounds,
-                        contain: true,
-                        minScale: minScale,
-                        revision: camera.revision + 1,
-                      ),
-                    );
+              if (!_gestureActive && selectedStation != null)
+                _NetworkMapStationActionOverlay(
+                  station: selectedStation,
+                  geometry: geometry,
+                  camera: camera,
+                  onSetOrigin: () {
+                    widget.onSetOrigin(selectedStation);
                   },
-                  onCenter: () {
-                    _setCamera(
-                      _cameraForBounds(
-                        _readableBoundsFor(geometry),
-                        constraints,
-                        sourceBounds: fullBounds,
-                        minScale: minScale,
-                        revision: camera.revision + 1,
-                      ),
-                    );
+                  onSetDestination: () {
+                    widget.onSetDestination(selectedStation);
                   },
+                  onOpenRouteSearch: () {
+                    widget.onOpenRouteSearch(selectedStation);
+                  },
+                  onClose: () => setState(() => _selectedStation = null),
                 ),
-              ),
             ],
           );
         },
       ),
-    );
-  }
-
-  void _scaleMap(double factor) {
-    final camera = _pendingCamera ?? _camera;
-    if (camera == null || camera.viewportSize == Size.zero) {
-      return;
-    }
-    _setCamera(
-      camera
-          .zoomBy(factor, focalPoint: camera.viewportSize.center(Offset.zero))
-          .clamped(viewportMargin: 220),
     );
   }
 
@@ -986,6 +2289,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _forceRendererCameraCommit = true;
     if (_pendingCamera == null && _camera != null) {
       _pendingCamera = _camera;
+    }
+    final pendingCamera = _pendingCamera;
+    if (pendingCamera != null) {
+      widget.onViewportChanged(pendingCamera.visibleSourceRect);
     }
     _scheduleCameraCommit();
     _gestureStartCamera = null;
@@ -1118,7 +2425,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     if (station == null) {
       return;
     }
-    widget.onStationTap(station, stationLinesById[station.id] ?? const []);
+    _selectStation(station);
+  }
+
+  void _selectStation(NetworkMapStation station) {
+    setState(() => _selectedStation = station);
   }
 
   void _attachRendererController(RouteMapRendererController controller) {
@@ -1152,7 +2463,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       _markRendererFramePresented(event.revision);
     }
     if (event is RouteMapRendererFailed) {
-      _activateRouteMapFallback();
+      _releaseRenderer(disposeRenderer: true);
+      if (mounted) {
+        setState(() {
+          _routeMapRendererActive = false;
+          _requestedRendererCamera = null;
+          _presentedRendererCamera = null;
+          _requestedRendererCamerasByRevision.clear();
+        });
+      }
     }
     if (!kDebugMode && !kProfileMode) {
       return;
@@ -1206,284 +2525,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     setState(() {
       _presentedRendererCamera = camera;
     });
-  }
-
-  void _activateRouteMapFallback() {
-    if (_routeMapFallbackActive) {
-      return;
-    }
-    _releaseRenderer(disposeRenderer: true);
-    if (!mounted) {
-      _routeMapFallbackActive = true;
-      _routeMapRendererActive = false;
-      _requestedRendererCamera = null;
-      _presentedRendererCamera = null;
-      _requestedRendererCamerasByRevision.clear();
-      return;
-    }
-    setState(() {
-      _routeMapFallbackActive = true;
-      _routeMapRendererActive = false;
-      _requestedRendererCamera = null;
-      _presentedRendererCamera = null;
-      _requestedRendererCamerasByRevision.clear();
-    });
-  }
-}
-
-class _MapControls extends StatelessWidget {
-  const _MapControls({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onOverview,
-    required this.onCenter,
-  });
-
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onOverview;
-  final VoidCallback onCenter;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _MapControlButton(
-          key: const Key('networkMapZoomInButton'),
-          tooltip: '확대',
-          icon: Icons.add,
-          onPressed: onZoomIn,
-        ),
-        const SizedBox(height: 8),
-        _MapControlButton(
-          key: const Key('networkMapZoomOutButton'),
-          tooltip: '축소',
-          icon: Icons.remove,
-          onPressed: onZoomOut,
-        ),
-        const SizedBox(height: 8),
-        _MapControlButton(
-          key: const Key('networkMapOverviewButton'),
-          tooltip: '지도 전체 보기',
-          icon: Icons.fit_screen,
-          onPressed: onOverview,
-        ),
-        const SizedBox(height: 8),
-        _MapControlButton(
-          key: const Key('networkMapLocateButton'),
-          tooltip: '처음 위치로',
-          icon: Icons.center_focus_strong,
-          onPressed: onCenter,
-        ),
-      ],
-    );
-  }
-}
-
-class _MapControlButton extends StatelessWidget {
-  const _MapControlButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-    super.key,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 2,
-      borderRadius: _networkMapRadius,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(icon),
-      ),
-    );
-  }
-}
-
-class _AndroidRouteMapFallbackLayer extends StatelessWidget {
-  const _AndroidRouteMapFallbackLayer({
-    required this.data,
-    required this.geometry,
-    required this.camera,
-  });
-
-  final NetworkMapData data;
-  final _MapGeometry geometry;
-  final MapCameraState camera;
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      key: const Key('routeMapViewportRenderer'),
-      child: CustomPaint(
-        painter: _AndroidRouteMapFallbackPainter(
-          data: data,
-          geometry: geometry,
-          camera: camera,
-          textScaler: MediaQuery.textScalerOf(context),
-        ),
-      ),
-    );
-  }
-}
-
-class _AndroidRouteMapFallbackPainter extends CustomPainter {
-  const _AndroidRouteMapFallbackPainter({
-    required this.data,
-    required this.geometry,
-    required this.camera,
-    required this.textScaler,
-  });
-
-  final NetworkMapData data;
-  final _MapGeometry geometry;
-  final MapCameraState camera;
-  final TextScaler textScaler;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final lineById = {for (final line in data.lines) line.id: line};
-    final stationsById = <String, List<NetworkMapStation>>{};
-    final stationByLineKey = <String, NetworkMapStation>{};
-    for (final station in data.stations) {
-      stationsById.putIfAbsent(station.id, () => []).add(station);
-      stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
-          station;
-    }
-    final visibleStations = _visibleCanonicalStations(
-      geometry: geometry,
-      camera: camera,
-    );
-    final visibleRect = camera.visibleSourceRect.inflate(180 / camera.scale);
-    final paintedSegments = <String>{};
-
-    canvas.save();
-    canvas.transform(camera.sourceToViewport.storage);
-
-    for (final edge in data.edges) {
-      final fromStation = _stationForMapEdgeEndpoint(
-        edge.fromStationId,
-        edge.lineId,
-        stationByLineKey,
-        stationsById,
-      );
-      final toStation = _stationForMapEdgeEndpoint(
-        edge.toStationId,
-        edge.lineId,
-        stationByLineKey,
-        stationsById,
-      );
-      if (fromStation == null || toStation == null) {
-        continue;
-      }
-      final from = Offset(geometry.x(fromStation), geometry.y(fromStation));
-      final to = Offset(geometry.x(toStation), geometry.y(toStation));
-      if (!Rect.fromPoints(from, to).inflate(24).overlaps(visibleRect)) {
-        continue;
-      }
-      final line = lineById[edge.lineId];
-      final paint = Paint()
-        ..color = line == null
-            ? EasySubwayAccessibleColors.line
-            : _colorFromHex(line.color)
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 7 / camera.scale;
-      canvas.drawLine(from, to, paint);
-    }
-
-    for (final station in data.stations) {
-      if (!_stationHitRect(station, geometry).overlaps(visibleRect)) {
-        continue;
-      }
-      final line = lineById[station.lineId];
-      final color = line == null
-          ? EasySubwayAccessibleColors.line
-          : _colorFromHex(line.color);
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 7 / camera.scale;
-      for (final pathData in [
-        station.position.upPath,
-        station.position.downPath,
-      ]) {
-        if (pathData.isEmpty ||
-            !paintedSegments.add('${station.lineId}:$pathData')) {
-          continue;
-        }
-        final cachedPath = _cachedRouteMapPath(pathData, geometry.origin);
-        if (cachedPath.bounds.overlaps(visibleRect)) {
-          canvas.drawPath(cachedPath.path, paint);
-        }
-      }
-    }
-
-    final nodeStroke = Paint()
-      ..color = _networkMapStationNodeStrokeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2 / camera.scale;
-    final nodeFill = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    for (final station in visibleStations) {
-      final center = Offset(geometry.x(station), geometry.y(station));
-      final nodeRadius = 5 / camera.scale;
-      canvas.drawCircle(center, nodeRadius, nodeFill);
-      canvas.drawCircle(center, nodeRadius, nodeStroke);
-    }
-    canvas.restore();
-
-    final labelStyle = const TextStyle(
-      color: EasySubwayAccessibleColors.text,
-      fontSize: 16,
-      fontWeight: FontWeight.w800,
-    );
-    final labelBackground = Paint()
-      ..color = Colors.white.withValues(alpha: 0.82)
-      ..style = PaintingStyle.fill;
-    final occupiedLabels = <Rect>[];
-    for (final station in visibleStations) {
-      final center = Offset(geometry.x(station), geometry.y(station));
-      final labelOffset = _labelOffsetFor(station);
-      final labelPainter = TextPainter(
-        text: TextSpan(text: station.nameKo, style: labelStyle),
-        textDirection: TextDirection.ltr,
-        textScaler: textScaler,
-        maxLines: 1,
-      )..layout();
-      final labelCenter = camera.sourceToViewportPoint(center + labelOffset);
-      final labelTopLeft = labelCenter - labelPainter.size.center(Offset.zero);
-      final labelRect = labelTopLeft & labelPainter.size;
-      final paddedRect = labelRect.inflate(3);
-      if (occupiedLabels.any((existing) => existing.overlaps(paddedRect))) {
-        continue;
-      }
-      occupiedLabels.add(paddedRect);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(paddedRect, const Radius.circular(3)),
-        labelBackground,
-      );
-      labelPainter.paint(canvas, labelTopLeft);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AndroidRouteMapFallbackPainter oldDelegate) {
-    return !_sameNetworkMapData(oldDelegate.data, data) ||
-        !_sameMapGeometry(oldDelegate.geometry, geometry) ||
-        !_sameMapCamera(oldDelegate.camera, camera) ||
-        oldDelegate.textScaler != textScaler;
   }
 }
 
@@ -1542,102 +2583,12 @@ _CachedRouteMapPath _cachedRouteMapPath(String pathData, Offset origin) {
   });
 }
 
-bool _sameMapCamera(MapCameraState a, MapCameraState b) {
-  return a.sourceBounds == b.sourceBounds &&
-      a.viewportSize == b.viewportSize &&
-      a.center == b.center &&
-      a.scale == b.scale &&
-      a.minScale == b.minScale &&
-      a.maxScale == b.maxScale &&
-      a.revision == b.revision;
-}
-
-bool _sameMapGeometry(_MapGeometry a, _MapGeometry b) {
-  return a.origin == b.origin &&
-      a.focus == b.focus &&
-      a.width == b.width &&
-      a.height == b.height &&
-      a.initialBounds == b.initialBounds &&
-      a.overlayStyleScale == b.overlayStyleScale;
-}
-
-bool _sameNetworkMapData(NetworkMapData a, NetworkMapData b) {
-  return a.selectedRegion == b.selectedRegion &&
-      _sameNetworkMapLines(a.lines, b.lines) &&
-      _sameNetworkMapStations(a.stations, b.stations) &&
-      _sameNetworkMapEdges(a.edges, b.edges);
-}
-
-bool _sameNetworkMapLines(List<NetworkMapLine> a, List<NetworkMapLine> b) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (var index = 0; index < a.length; index += 1) {
-    final left = a[index];
-    final right = b[index];
-    if (left.id != right.id ||
-        left.name != right.name ||
-        left.color != right.color ||
-        left.region != right.region) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool _sameNetworkMapStations(
-  List<NetworkMapStation> a,
-  List<NetworkMapStation> b,
-) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (var index = 0; index < a.length; index += 1) {
-    final left = a[index];
-    final right = b[index];
-    if (left.id != right.id ||
-        left.nameKo != right.nameKo ||
-        left.lineId != right.lineId ||
-        !_sameNetworkMapPosition(left.position, right.position)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool _sameNetworkMapPosition(NetworkMapPosition a, NetworkMapPosition b) {
-  return a.x == b.x &&
-      a.y == b.y &&
-      a.labelDx == b.labelDx &&
-      a.labelDy == b.labelDy &&
-      a.labelPolygon == b.labelPolygon &&
-      a.upPath == b.upPath &&
-      a.downPath == b.downPath &&
-      a.sourceId == b.sourceId;
-}
-
-bool _sameNetworkMapEdges(List<NetworkMapEdge> a, List<NetworkMapEdge> b) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (var index = 0; index < a.length; index += 1) {
-    final left = a[index];
-    final right = b[index];
-    if (left.id != right.id ||
-        left.lineId != right.lineId ||
-        left.fromStationId != right.fromStationId ||
-        left.toStationId != right.toStationId) {
-      return false;
-    }
-  }
-  return true;
-}
-
 class _RouteMapViewportRenderer extends StatelessWidget {
   const _RouteMapViewportRenderer({
     required this.asset,
     required this.camera,
     required this.presentedCamera,
+    required this.gestureActive,
     required this.visualCamera,
     required this.onControllerCreated,
   });
@@ -1645,6 +2596,7 @@ class _RouteMapViewportRenderer extends StatelessWidget {
   final _RouteMapAsset asset;
   final MapCameraState camera;
   final MapCameraState presentedCamera;
+  final bool gestureActive;
   final MapCameraState visualCamera;
   final ValueChanged<RouteMapRendererController> onControllerCreated;
 
@@ -1656,34 +2608,26 @@ class _RouteMapViewportRenderer extends StatelessWidget {
         color: Colors.white,
       );
     }
+    final rendererCamera = gestureActive ? camera : visualCamera;
     final renderer = switch (defaultTargetPlatform) {
       TargetPlatform.android => AndroidRouteMapViewportWebView(
         assetPath: asset.path,
         mimeType: asset.mimeType,
-        camera: camera,
+        camera: rendererCamera,
         onControllerCreated: onControllerCreated,
       ),
       TargetPlatform.iOS => IosRouteMapViewportWebView(
         assetPath: asset.path,
         mimeType: asset.mimeType,
-        camera: camera,
+        camera: rendererCamera,
         onControllerCreated: onControllerCreated,
       ),
       _ => const ColoredBox(color: Colors.white),
     };
     return ClipRect(
-      child: Transform(
-        transform: networkMapRendererFrameTransform(
-          rendererCamera: presentedCamera,
-          visualCamera: networkMapRendererTransformVisualCamera(
-            rendererCamera: presentedCamera,
-            visualCamera: visualCamera,
-          ),
-        ),
-        child: KeyedSubtree(
-          key: const Key('routeMapViewportRenderer'),
-          child: renderer,
-        ),
+      child: KeyedSubtree(
+        key: const Key('routeMapViewportRenderer'),
+        child: renderer,
       ),
     );
   }
@@ -1953,7 +2897,51 @@ Rect _readableBoundsFor(_MapGeometry geometry) {
 Rect networkMapInitialOriginalAssetBounds({
   required double sourceWidth,
   required double sourceHeight,
-}) => Rect.fromLTWH(0, 0, sourceWidth, sourceHeight);
+}) {
+  final width = sourceWidth * 0.58;
+  final height = sourceHeight * 0.58;
+  return _sourceCenteredBounds(
+    center: Offset(sourceWidth / 2, sourceHeight / 2),
+    width: width,
+    height: height,
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
+  );
+}
+
+Rect _stationFocusBoundsFor(NetworkMapStation station, _MapGeometry geometry) {
+  final width = math.min(
+    geometry.width,
+    math.max(860.0, geometry.width * 0.28),
+  );
+  final height = math.min(
+    geometry.height,
+    math.max(860.0, geometry.height * 0.28),
+  );
+  return _sourceCenteredBounds(
+    center: Offset(geometry.x(station), geometry.y(station)),
+    width: width,
+    height: height,
+    sourceWidth: geometry.width,
+    sourceHeight: geometry.height,
+  );
+}
+
+Rect _sourceCenteredBounds({
+  required Offset center,
+  required double width,
+  required double height,
+  required double sourceWidth,
+  required double sourceHeight,
+}) {
+  final clampedWidth = width.clamp(1.0, sourceWidth).toDouble();
+  final clampedHeight = height.clamp(1.0, sourceHeight).toDouble();
+  final maxLeft = math.max(0.0, sourceWidth - clampedWidth);
+  final maxTop = math.max(0.0, sourceHeight - clampedHeight);
+  final left = (center.dx - clampedWidth / 2).clamp(0.0, maxLeft).toDouble();
+  final top = (center.dy - clampedHeight / 2).clamp(0.0, maxTop).toDouble();
+  return Rect.fromLTWH(left, top, clampedWidth, clampedHeight);
+}
 
 class _MapGeometry {
   _MapGeometry({
@@ -2608,7 +3596,157 @@ class _StationHitTarget extends StatelessWidget {
       button: true,
       label: station.displayName,
       onTap: onTap,
-      child: const SizedBox.expand(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _NetworkMapStationActionOverlay extends StatelessWidget {
+  const _NetworkMapStationActionOverlay({
+    required this.station,
+    required this.geometry,
+    required this.camera,
+    required this.onSetOrigin,
+    required this.onSetDestination,
+    required this.onOpenRouteSearch,
+    required this.onClose,
+  });
+
+  final NetworkMapStation station;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+  final VoidCallback onSetOrigin;
+  final VoidCallback onSetDestination;
+  final VoidCallback onOpenRouteSearch;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final stationPoint = camera.sourceToViewportPoint(
+      Offset(geometry.x(station), geometry.y(station)),
+    );
+    const width = 200.0;
+    const height = 44.0;
+    final viewportWidth = camera.viewportSize.width;
+    final left = (stationPoint.dx - width / 2)
+        .clamp(12.0, math.max(12.0, viewportWidth - width - 12))
+        .toDouble();
+    final top = math.max(12.0, stationPoint.dy - height - 14);
+    final arrowLeft = (stationPoint.dx - left - 8).clamp(18.0, width - 34);
+    return Positioned(
+      key: const Key('networkMapStationSheet'),
+      left: left,
+      top: top,
+      width: width,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Material(
+            color: const Color(0xE8404445),
+            elevation: 10,
+            borderRadius: BorderRadius.circular(5),
+            child: SizedBox(
+              height: height,
+              child: Row(
+                children: [
+                  _NetworkMapStationActionTab(
+                    icon: Icons.north_east,
+                    label: '출발',
+                    onTap: onSetOrigin,
+                  ),
+                  _NetworkMapActionDivider(),
+                  _NetworkMapStationActionTab(
+                    icon: Icons.south_east,
+                    label: '도착',
+                    onTap: onSetDestination,
+                  ),
+                  _NetworkMapActionDivider(),
+                  _NetworkMapStationActionTab(
+                    icon: Icons.route_outlined,
+                    label: '길찾기',
+                    onTap: onOpenRouteSearch,
+                  ),
+                  _NetworkMapActionDivider(),
+                  _NetworkMapStationActionTab(
+                    icon: Icons.close,
+                    label: '닫기',
+                    onTap: onClose,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(left: arrowLeft),
+              child: const Icon(
+                Icons.arrow_drop_down,
+                size: 22,
+                color: Color(0xE8404445),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkMapActionDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 44,
+      child: VerticalDivider(width: 1, color: Color(0x665F6366)),
+    );
+  }
+}
+
+class _NetworkMapStationActionTab extends StatelessWidget {
+  const _NetworkMapStationActionTab({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(height: 1),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2638,6 +3776,37 @@ Map<String, List<NetworkMapLine>> _stationLinesById(NetworkMapData data) {
     }
   }
   return stationLinesById;
+}
+
+NetworkMapStation? _stationById(
+  List<NetworkMapStation> stations,
+  String? stationId,
+) {
+  if (stationId == null) {
+    return null;
+  }
+  for (final station in stations) {
+    if (station.id == stationId) {
+      return station;
+    }
+  }
+  return null;
+}
+
+NetworkMapStation? _stationByIdentity(
+  List<NetworkMapStation> stations,
+  NetworkMapStation? selectedStation,
+) {
+  if (selectedStation == null) {
+    return null;
+  }
+  for (final station in stations) {
+    if (station.id == selectedStation.id &&
+        station.lineId == selectedStation.lineId) {
+      return station;
+    }
+  }
+  return null;
 }
 
 Path _pathFromSvg(String data) {
@@ -2732,104 +3901,6 @@ Path _pathFromSvg(String data) {
     }
   }
   return path;
-}
-
-class _StationSheet extends StatelessWidget {
-  const _StationSheet({
-    required this.station,
-    required this.lines,
-    required this.onSetOrigin,
-    required this.onSetDestination,
-    required this.onOpenRouteSearch,
-  });
-
-  final NetworkMapStation station;
-  final List<NetworkMapLine> lines;
-  final VoidCallback onSetOrigin;
-  final VoidCallback onSetDestination;
-  final VoidCallback onOpenRouteSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      key: const Key('networkMapStationSheet'),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, top: 6, right: 20, bottom: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final line in lines) _StationLineChip(line: line),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              station.displayName,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '노선 순서에 맞춰 표시됩니다.',
-              style: TextStyle(
-                fontSize: 15,
-                color: EasySubwayAccessibleColors.mutedText,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onSetOrigin,
-                    child: const Text('출발로 설정'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onSetDestination,
-                    child: const Text('도착으로 설정'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.info_outline),
-                    label: const Text('역 상세'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: onOpenRouteSearch,
-                    icon: const Icon(Icons.route),
-                    label: const Text('길찾기'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Color _colorFromHex(String value) {
-  final normalized = value.replaceFirst('#', '');
-  if (normalized.length != 6) {
-    return EasySubwayAccessibleColors.mint;
-  }
-  return Color(int.parse('FF$normalized', radix: 16));
 }
 
 List<Map<String, Object?>> _objectList(Object? value) {

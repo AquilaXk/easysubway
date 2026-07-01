@@ -80,7 +80,7 @@ class OnboardingViewPreferences {
   });
 
   const OnboardingViewPreferences.defaults()
-    : largeTextEnabled = true,
+    : largeTextEnabled = false,
       highContrastEnabled = false,
       simpleViewEnabled = true;
 
@@ -877,31 +877,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
-                  Text(
-                    '보기 설정',
-                    style: textTheme.titleLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   _OnboardingPreferenceCard(
                     children: [
-                      _OnboardingViewPreferenceSwitch(
-                        key: const Key('onboardingPreference-largeText'),
-                        title: '큰 글자',
-                        subtitle: '글자를 더 크게 표시',
-                        value: _preferences.largeTextEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _preferences = _preferences.copyWith(
-                              largeTextEnabled: value,
-                            );
-                          });
-                        },
-                      ),
-                      const _OnboardingPreferenceDivider(),
                       _OnboardingViewPreferenceSwitch(
                         key: const Key('onboardingPreference-highContrast'),
                         title: '고대비',
