@@ -1704,7 +1704,10 @@ class RouteSearchStep {
   }
 
   factory RouteSearchStep.fromV2(int sequence, RouteSearchV2Leg leg) {
-    final minutes = (leg.durationSeconds / 60).ceil();
+    final waitOrSlackSeconds = leg.waitTimeSeconds > leg.slackSeconds
+        ? leg.waitTimeSeconds
+        : leg.slackSeconds;
+    final minutes = ((leg.durationSeconds + waitOrSlackSeconds) / 60).ceil();
     final title = _routeV2LegTitle(leg);
     return RouteSearchStep(
       sequence: sequence,
