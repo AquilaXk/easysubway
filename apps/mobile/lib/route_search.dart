@@ -1543,6 +1543,7 @@ int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
   final penalty =
       risk.stairCount * 30 +
       risk.unavailableFacilityCount * 30 +
+      risk.generatedConnectorCount * 15 +
       risk.unknownAccessibilityCount * 15 +
       risk.staleDataCount * 10 +
       risk.lowConfidenceCount * 10;
@@ -1597,6 +1598,16 @@ String _routeV2StairAccessState(RouteSearchV2AccessibilityRisk risk) {
     return 'unknown';
   }
   return 'stepFree';
+}
+
+String _routeV2StepType(String legType) {
+  return switch (legType) {
+    'ACCESS' => 'entry',
+    'EGRESS' => 'exit',
+    'TRANSFER' => 'transfer',
+    'RIDE' => 'ride',
+    _ => legType.toLowerCase(),
+  };
 }
 
 String _routeV2RiskMessage(String code) {
@@ -1695,7 +1706,7 @@ class RouteSearchStep {
     final title = _routeV2LegTitle(leg);
     return RouteSearchStep(
       sequence: sequence,
-      stepType: leg.legType.toLowerCase(),
+      stepType: _routeV2StepType(leg.legType),
       title: title,
       description: title,
       lineId: leg.lineId,
