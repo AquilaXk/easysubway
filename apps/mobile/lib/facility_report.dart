@@ -44,6 +44,18 @@ const _facilityReportPagePadding = EdgeInsets.only(
 );
 const _facilityReportCardRadius = BorderRadius.all(Radius.circular(8));
 
+/// 제보 상태(FacilityReportStatus)를 상태색으로 매핑한다. 박스 대신 색 점·색
+/// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
+Color _reportStatusColor(String status) {
+  return switch (status) {
+    'SUBMITTED' => const Color(0xFF17527C),
+    'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
+    'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
+    'REJECTED' => EasySubwayAccessibleColors.red,
+    _ => EasySubwayAccessibleColors.mutedText,
+  };
+}
+
 abstract class FacilityReportRepository {
   Future<FacilityReportResult> createReport(FacilityReportRequest request);
 
@@ -1390,14 +1402,34 @@ class _MyReportEmpty extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          '접수한 제보가 없습니다.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
-            height: 1.3,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.receipt_long_outlined,
+              size: 40,
+              color: EasySubwayAccessibleColors.mutedText,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '접수한 제보가 없습니다.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '시설 제보를 남기면 여기에서 진행 상황을 확인할 수 있어요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                height: 1.4,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1495,7 +1527,10 @@ class _MyReportListItem extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      _MyReportStatusPill(label: report.statusLabel),
+                      _MyReportStatusLabel(
+                        status: report.status,
+                        label: report.statusLabel,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1559,7 +1594,10 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _MyReportDetailStatus(label: report.statusLabel),
+              _MyReportDetailStatus(
+                status: report.status,
+                label: report.statusLabel,
+              ),
               const SizedBox(height: 24),
               _MyReportDetailRow(
                 label: '제보 번호',
@@ -1578,31 +1616,34 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
 }
 
 class _MyReportDetailStatus extends StatelessWidget {
-  const _MyReportDetailStatus({required this.label});
+  const _MyReportDetailStatus({required this.status, required this.label});
 
+  final String status;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final color = _reportStatusColor(status);
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        decoration: BoxDecoration(
-          color: EasySubwayAccessibleColors.mintSoft,
-          borderRadius: _facilityReportCardRadius,
-          border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Text(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
             label,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
+              color: color,
               fontWeight: FontWeight.w900,
               height: 1.2,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1641,30 +1682,33 @@ class _MyReportDetailRow extends StatelessWidget {
   }
 }
 
-class _MyReportStatusPill extends StatelessWidget {
-  const _MyReportStatusPill({required this.label});
+class _MyReportStatusLabel extends StatelessWidget {
+  const _MyReportStatusLabel({required this.status, required this.label});
 
+  final String status;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: _facilityReportCardRadius,
-        border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
+    final color = _reportStatusColor(status);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
+            color: color,
             fontWeight: FontWeight.w900,
             height: 1.2,
           ),
         ),
-      ),
+      ],
     );
   }
 }

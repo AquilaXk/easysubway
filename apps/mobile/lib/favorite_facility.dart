@@ -16,6 +16,17 @@ const _favoriteFacilityChangeErrorMessage = '즐겨찾기 시설을 바꾸지 �
 const _favoriteFacilityCardRadius = BorderRadius.all(Radius.circular(8));
 const _favoriteFacilityListPadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 
+/// 시설 상태 심각도를 상태색으로 매핑한다. 박스 대신 색 점·색 텍스트로 상태를
+/// 구분하기 위한 전경색만 돌려준다.
+Color _favoriteFacilitySeverityColor(FacilityStatusSeverity severity) {
+  return switch (severity) {
+    FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.red,
+    FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amber,
+    FacilityStatusSeverity.needsInfo => const Color(0xFF17527C),
+    FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mintDark,
+  };
+}
+
 abstract class FavoriteFacilityRepository {
   Future<List<FavoriteFacility>> listFavoriteFacilities();
 
@@ -629,6 +640,32 @@ class _FavoriteFacilityTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: _favoriteFacilitySeverityColor(
+                                favorite.statusPresentation.severity,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            favorite.severityLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: _favoriteFacilitySeverityColor(
+                                favorite.statusPresentation.severity,
+                              ),
+                              fontWeight: FontWeight.w900,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         favorite.name,
                         style: textTheme.titleLarge?.copyWith(
@@ -651,15 +688,6 @@ class _FavoriteFacilityTile extends StatelessWidget {
                         favorite.statusTitle,
                         style: textTheme.bodyMedium?.copyWith(
                           color: EasySubwayAccessibleColors.mutedText,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${favorite.severityLabel} · ${favorite.nextActionLabel}',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.mutedText,
-                          fontWeight: FontWeight.w700,
                           height: 1.3,
                         ),
                       ),
