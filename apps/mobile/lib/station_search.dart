@@ -36,7 +36,7 @@ const _locationQualityMockedMessage =
 const _locationPermissionRationaleTitle = '현재 위치 사용';
 const _locationPermissionRationalePurpose =
     '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
-const _locationPermissionRationaleFallback =
+const _locationPermissionRationaleDenialNotice =
     '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
 const _stationSearchFailureNextAction =
     '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
@@ -429,7 +429,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '저장한 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
   }
 }
 
@@ -891,13 +891,13 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
 String _stringOrDefault(
   Map<String, Object?> json,
   String key,
-  String fallback,
+  String defaultValue,
 ) {
   final value = json[key];
   if (value is String && value.trim().isNotEmpty) {
     return value;
   }
-  return fallback;
+  return defaultValue;
 }
 
 bool _requiredBool(Map<String, Object?> json, String key) {
@@ -2315,7 +2315,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               children: [
                 Text(_locationPermissionRationalePurpose),
                 SizedBox(height: 8),
-                Text(_locationPermissionRationaleFallback),
+                Text(_locationPermissionRationaleDenialNotice),
               ],
             ),
             actions: [
@@ -3193,14 +3193,14 @@ class _StationSearchFailureMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowLocationSettings =
         message == _currentLocationDisabledMessage;
-    final shouldShowStationSearchFallback =
+    final shouldShowStationSearchNextAction =
         _shouldShowStationSearchFailureNextAction(message);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StationSearchMessage(message: message, liveRegion: true),
-        if (shouldShowStationSearchFallback) ...[
+        if (shouldShowStationSearchNextAction) ...[
           const SizedBox(height: 8),
           Semantics(
             key: const Key('stationSearchFailureNextAction'),
@@ -4137,7 +4137,7 @@ class _StationDetailContent extends StatelessWidget {
       if (mapMarkers.isNotEmpty) ...[
         const _StationDetailSectionTitle(title: '지도 위치 목록'),
         const SizedBox(height: 12),
-        _StationMapTextFallback(markers: mapMarkers),
+        _StationMapTextList(markers: mapMarkers),
         const SizedBox(height: 24),
       ],
       const _StationDetailSectionTitle(title: '출구'),
@@ -4297,8 +4297,8 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationMapTextFallback extends StatelessWidget {
-  const _StationMapTextFallback({required this.markers});
+class _StationMapTextList extends StatelessWidget {
+  const _StationMapTextList({required this.markers});
 
   final List<MapMarker> markers;
 
@@ -4309,22 +4309,10 @@ class _StationMapTextFallback extends StatelessWidget {
       children: [
         Semantics(
           container: true,
-          label: '지도 대체 위치 목록',
+          label: '지도 위치 목록',
           child: const SizedBox.shrink(),
         ),
-        Semantics(
-          container: true,
-          label: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
-          child: const ExcludeSemantics(
-            child: _StationDetailInfoRow(
-              icon: Icons.map_outlined,
-              text: '지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.',
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (final marker in markers)
-          _StationMapTextFallbackItem(marker: marker),
+        for (final marker in markers) _StationMapTextListItem(marker: marker),
       ],
     );
   }
@@ -4522,8 +4510,8 @@ class _StationPointButton extends StatelessWidget {
   }
 }
 
-class _StationMapTextFallbackItem extends StatelessWidget {
-  const _StationMapTextFallbackItem({required this.marker});
+class _StationMapTextListItem extends StatelessWidget {
+  const _StationMapTextListItem({required this.marker});
 
   final MapMarker marker;
 
@@ -4547,7 +4535,7 @@ class _StationMapTextFallbackItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   marker.title,
-                  key: Key('stationMapTextFallbackItem-${marker.id}'),
+                  key: Key('stationMapTextListItem-${marker.id}'),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w800,
