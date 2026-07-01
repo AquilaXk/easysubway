@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -222,10 +223,10 @@ class RouteSearchController {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime) {
 			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime, result.mobilityType());
-			int durationSeconds = result.estimatedDurationSeconds() + legs.stream()
-				.mapToInt(LegDto::waitTimeSeconds)
-				.sum();
-			OffsetDateTime plannedArrivalTime = departureTime.plusSeconds(durationSeconds);
+			OffsetDateTime plannedArrivalTime = legs.isEmpty()
+				? departureTime
+				: OffsetDateTime.parse(legs.get(legs.size() - 1).plannedArrivalTime());
+			int durationSeconds = Math.toIntExact(Duration.between(departureTime, plannedArrivalTime).toSeconds());
 			return new ItineraryDto(
 				result.routeSearchId() + "-primary",
 				statusOf(result),
@@ -439,11 +440,12 @@ class RouteSearchController {
 			List<LegDto> legs = new ArrayList<>();
 			OffsetDateTime cursor = departureTime;
 			for (RouteStep step : steps) {
+				String legType = legTypeOf(step);
 				int durationSeconds = Math.max(0, step.estimatedMinutes()) * 60;
-				int slackSeconds = slackSeconds(step, mobilityType);
+				int slackSeconds = slackSeconds(legType, mobilityType);
 				OffsetDateTime plannedDepartureTime = cursor.plusSeconds(slackSeconds);
 				OffsetDateTime plannedArrivalTime = plannedDepartureTime.plusSeconds(durationSeconds);
-				legs.add(from(step, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds));
+				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds));
 				cursor = plannedArrivalTime;
 			}
 			return List.copyOf(legs);
@@ -451,13 +453,14 @@ class RouteSearchController {
 
 		private static LegDto from(
 			RouteStep step,
+			String legType,
 			OffsetDateTime departureTime,
 			OffsetDateTime plannedArrivalTime,
 			int durationSeconds,
 			int slackSeconds
 		) {
 			return new LegDto(
-				legTypeOf(step),
+				legType,
 				step.fromStationId(),
 				step.toStationId(),
 				"",
@@ -479,8 +482,8 @@ class RouteSearchController {
 			);
 		}
 
-		private static int slackSeconds(RouteStep step, MobilityType mobilityType) {
-			if (!"RIDE".equals(legTypeOf(step))) {
+		private static int slackSeconds(String legType, MobilityType mobilityType) {
+			if (!"RIDE".equals(legType)) {
 				return 0;
 			}
 			// ponytail: schedule candidate selection belongs with timetable schema; expose only mobility buffer for now.
