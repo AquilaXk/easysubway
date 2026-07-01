@@ -1,4 +1,40 @@
-enum RouteEdgeType { ride, transfer, entry, exit }
+enum RouteEdgeType {
+  ride,
+  inStationTransfer,
+  outOfStationTransfer,
+  entry,
+  exit,
+  walkway,
+  elevator,
+  ramp,
+  stair,
+  escalator,
+  facilityConnector,
+}
+
+RouteEdgeType? routeEdgeTypeFromCatalogValue(String value) {
+  return switch (value.trim().toUpperCase()) {
+    'RIDE' => RouteEdgeType.ride,
+    'TRANSFER' ||
+    'IN_STATION_TRANSFER' ||
+    'LEGACY_TRANSFER' => RouteEdgeType.inStationTransfer,
+    'OUT_OF_STATION_TRANSFER' => RouteEdgeType.outOfStationTransfer,
+    'ENTRY' => RouteEdgeType.entry,
+    'EXIT' => RouteEdgeType.exit,
+    'WALKWAY' => RouteEdgeType.walkway,
+    'ELEVATOR' => RouteEdgeType.elevator,
+    'RAMP' => RouteEdgeType.ramp,
+    'STAIR' => RouteEdgeType.stair,
+    'ESCALATOR' => RouteEdgeType.escalator,
+    'FACILITY_CONNECTOR' => RouteEdgeType.facilityConnector,
+    _ => null,
+  };
+}
+
+bool isRouteTransferEdgeType(RouteEdgeType type) {
+  return type == RouteEdgeType.inStationTransfer ||
+      type == RouteEdgeType.outOfStationTransfer;
+}
 
 enum RouteAccessibilityState { available, unavailable, unknown }
 
@@ -86,13 +122,13 @@ class RouteEdge {
   }) : durationSeconds = durationSeconds ?? baseCost,
        stairAccessState =
            stairAccessState ??
-           (includesStairs == true
+           (type == RouteEdgeType.stair || includesStairs == true
                ? RouteStairAccessState.stairOnly
                : type == RouteEdgeType.ride
                ? RouteStairAccessState.stepFree
                : RouteStairAccessState.unknown),
        includesStairs = stairAccessState == null
-           ? includesStairs ?? false
+           ? type == RouteEdgeType.stair || (includesStairs ?? false)
            : stairAccessState == RouteStairAccessState.stairOnly,
        accessibilityState = isAvailable == null
            ? accessibilityState

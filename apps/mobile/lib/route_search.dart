@@ -988,7 +988,9 @@ class RouteSearchResult {
     if (_transferCount != null) {
       return _transferCount;
     }
-    final typedTransfers = steps.where((step) => step.stepType == 'transfer');
+    final typedTransfers = steps.where(
+      (step) => _isRouteTransferStepType(step.stepType),
+    );
     if (typedTransfers.isNotEmpty) {
       return typedTransfers.length;
     }
@@ -1297,7 +1299,18 @@ class RouteSearchStep {
 
   bool get isWalkingStep {
     return switch (stepType) {
-      'entry' || 'exit' || 'transfer' || 'internal' => true,
+      'entry' ||
+      'exit' ||
+      'transfer' ||
+      'inStationTransfer' ||
+      'outOfStationTransfer' ||
+      'walkway' ||
+      'elevator' ||
+      'ramp' ||
+      'stair' ||
+      'escalator' ||
+      'facilityConnector' ||
+      'internal' => true,
       'ride' => false,
       _ => requiresAccessibilityCheck,
     };
@@ -1397,10 +1410,23 @@ String _routeStepDetailLabel({required String stepType}) {
   return switch (stepType) {
     'entry' => '계단 없는 승강장 접근 동선을 확인해 이동합니다.',
     'exit' => '도착역에서 계단 없는 출구 동선을 확인합니다.',
-    'transfer' => '다음 노선으로 갈아탈 준비를 합니다.',
+    'transfer' || 'inStationTransfer' => '다음 노선으로 갈아탈 준비를 합니다.',
+    'outOfStationTransfer' => '역 밖으로 이동해 다음 노선으로 갈아탑니다.',
+    'walkway' => '확인된 통로를 따라 이동합니다.',
+    'elevator' => '엘리베이터를 이용해 이동합니다.',
+    'ramp' => '경사로를 따라 이동합니다.',
+    'stair' => '계단 구간입니다. 계단 없는 조건에서는 안내하지 않습니다.',
+    'escalator' => '에스컬레이터를 이용해 이동합니다.',
+    'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
     'ride' => '열차를 이용해 이동합니다.',
     _ => '안내된 순서대로 이동합니다.',
   };
+}
+
+bool _isRouteTransferStepType(String stepType) {
+  return stepType == 'transfer' ||
+      stepType == 'inStationTransfer' ||
+      stepType == 'outOfStationTransfer';
 }
 
 class RouteSearchWarning {

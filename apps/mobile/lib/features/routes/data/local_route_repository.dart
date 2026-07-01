@@ -153,7 +153,9 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   int _transferCount(List<RouteSearchStep> steps) {
-    final typedTransfers = steps.where((step) => step.stepType == 'transfer');
+    final typedTransfers = steps.where(
+      (step) => _isRouteTransferStepType(step.stepType),
+    );
     if (typedTransfers.isNotEmpty) {
       return typedTransfers.length;
     }
@@ -205,9 +207,16 @@ class LocalRouteRepository implements RouteSearchRepository {
   ) {
     return switch (type) {
       'ride' => '$fromName에서 $toName까지 $lineName 이동',
-      'transfer' => '$fromName에서 환승',
+      'transfer' || 'inStationTransfer' => '$fromName에서 환승',
+      'outOfStationTransfer' => '역 밖으로 이동해 $toName에서 환승',
       'entry' => '$fromName역 승강장 접근',
       'exit' => '$toName역 출구 접근',
+      'walkway' => '$fromName에서 $toName까지 통로 이동',
+      'elevator' => '$fromName에서 $toName까지 엘리베이터 이동',
+      'ramp' => '$fromName에서 $toName까지 경사로 이동',
+      'stair' => '$fromName에서 $toName까지 계단 이동',
+      'escalator' => '$fromName에서 $toName까지 에스컬레이터 이동',
+      'facilityConnector' => '$fromName에서 $toName까지 시설 연결 통로 이동',
       _ => '$fromName에서 $toName까지 이동',
     };
   }
@@ -215,9 +224,16 @@ class LocalRouteRepository implements RouteSearchRepository {
   String _stepDescription(String type, String fromName, String toName) {
     return switch (type) {
       'ride' => '$fromName에서 $toName까지 열차를 이용합니다.',
-      'transfer' => '$fromName에서 다른 노선으로 갈아탑니다.',
+      'transfer' || 'inStationTransfer' => '$fromName에서 다른 노선으로 갈아탑니다.',
+      'outOfStationTransfer' => '역 밖으로 이동해 $toName에서 다른 노선으로 갈아탑니다.',
       'entry' => '계단 없는 동선을 우선해 승강장으로 이동합니다.',
       'exit' => '도착역에서 계단 없는 출구 동선을 확인합니다.',
+      'walkway' => '확인된 통로를 따라 이동합니다.',
+      'elevator' => '엘리베이터를 이용해 이동합니다.',
+      'ramp' => '경사로를 따라 이동합니다.',
+      'stair' => '계단 구간입니다. 계단 없는 조건에서는 안내하지 않습니다.',
+      'escalator' => '에스컬레이터를 이용해 이동합니다.',
+      'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -225,9 +241,16 @@ class LocalRouteRepository implements RouteSearchRepository {
   String _stepActionTitle(String type) {
     return switch (type) {
       'ride' => '열차 이동',
-      'transfer' => '환승',
+      'transfer' || 'inStationTransfer' => '환승',
+      'outOfStationTransfer' => '역외 환승',
       'entry' => '승강장 접근',
       'exit' => '출구 접근',
+      'walkway' => '통로 이동',
+      'elevator' => '엘리베이터 이동',
+      'ramp' => '경사로 이동',
+      'stair' => '계단 이동',
+      'escalator' => '에스컬레이터 이동',
+      'facilityConnector' => '시설 연결 이동',
       _ => '이동',
     };
   }
@@ -241,11 +264,24 @@ class LocalRouteRepository implements RouteSearchRepository {
     return switch (type) {
       'ride' =>
         '$fromName에서 $toName까지 ${lineName.isEmpty ? '열차' : lineName}를 이용합니다.',
-      'transfer' => '$fromName에서 다음 노선으로 갈아탈 준비를 합니다.',
+      'transfer' || 'inStationTransfer' => '$fromName에서 다음 노선으로 갈아탈 준비를 합니다.',
+      'outOfStationTransfer' => '역 밖으로 이동해 $toName에서 다음 노선으로 갈아탑니다.',
       'entry' => '$fromName역에서 계단 없는 승강장 접근 동선을 이용합니다.',
       'exit' => '$toName역에서 계단 없는 출구 동선을 확인합니다.',
+      'walkway' => '$fromName에서 $toName까지 통로를 따라 이동합니다.',
+      'elevator' => '$fromName에서 $toName까지 엘리베이터를 이용합니다.',
+      'ramp' => '$fromName에서 $toName까지 경사로를 이용합니다.',
+      'stair' => '$fromName에서 $toName까지 계단으로 이동하는 구간입니다.',
+      'escalator' => '$fromName에서 $toName까지 에스컬레이터를 이용합니다.',
+      'facilityConnector' => '$fromName에서 $toName까지 역 시설 연결 동선을 이용합니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
+  }
+
+  bool _isRouteTransferStepType(String stepType) {
+    return stepType == 'transfer' ||
+        stepType == 'inStationTransfer' ||
+        stepType == 'outOfStationTransfer';
   }
 
   String _stepReason() {
@@ -635,7 +671,9 @@ class _RouteCatalogSnapshot {
     }
 
     for (final networkEdge in networkEdges) {
-      if (networkEdge.routeEdgeType != graph.RouteEdgeType.transfer) {
+      final routeEdgeType = networkEdge.routeEdgeType;
+      if (routeEdgeType == null ||
+          !graph.isRouteTransferEdgeType(routeEdgeType)) {
         continue;
       }
       final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
@@ -668,7 +706,7 @@ class _RouteCatalogSnapshot {
       }
       if (routeEdgeType != graph.RouteEdgeType.entry &&
           routeEdgeType != graph.RouteEdgeType.exit &&
-          routeEdgeType != graph.RouteEdgeType.transfer) {
+          !graph.isRouteTransferEdgeType(routeEdgeType)) {
         continue;
       }
       for (final pair in _expandedExplicitEdgePairs(
@@ -680,7 +718,7 @@ class _RouteCatalogSnapshot {
           continue;
         }
         final pairKey = _edgePairKey(pair.fromNodeId, pair.toNodeId);
-        if (routeEdgeType == graph.RouteEdgeType.transfer &&
+        if (graph.isRouteTransferEdgeType(routeEdgeType) &&
             actualExplicitTransferPairs.contains(pairKey)) {
           continue;
         }
@@ -781,7 +819,7 @@ class _RouteCatalogSnapshot {
               id: 'transfer-$stationId-${from.transferEdgeSuffix}-${to.transferEdgeSuffix}',
               fromNodeId: from.nodeId,
               toNodeId: to.nodeId,
-              type: graph.RouteEdgeType.transfer,
+              type: graph.RouteEdgeType.inStationTransfer,
               baseCost: 140,
               transferStationId: stationId,
               stairAccessState: graph.RouteStairAccessState.unknown,
@@ -863,7 +901,7 @@ List<({String fromNodeId, String toNodeId})> _expandedExplicitEdgePairs(
         (fromNodeId: candidate.nodeId, toNodeId: networkEdge.toNodeId),
     ];
   }
-  if (routeEdgeType == graph.RouteEdgeType.transfer) {
+  if (routeEdgeType != null && graph.isRouteTransferEdgeType(routeEdgeType)) {
     final fromNode = _RouteNodeKey.tryParse(networkEdge.fromNodeId);
     final toNode = _RouteNodeKey.tryParse(networkEdge.toNodeId);
     if (fromNode == null || toNode == null) {
@@ -969,8 +1007,12 @@ graph.RouteEdge _toGraphRouteEdge(
         : networkEdge.durationSeconds,
     lineId: _lineIdForNode(effectiveFromNodeId),
     distanceMeters: networkEdge.distanceMeters,
-    includesStairs: networkEdge.includesStairs,
-    stairAccessState: networkEdge.routeStairAccessState,
+    includesStairs:
+        routeEdgeType == graph.RouteEdgeType.stair ||
+        networkEdge.includesStairs,
+    stairAccessState: routeEdgeType == graph.RouteEdgeType.stair
+        ? graph.RouteStairAccessState.stairOnly
+        : networkEdge.routeStairAccessState,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
@@ -1273,15 +1315,8 @@ class _NetworkEdgeSnapshot {
   final String verificationStatus;
   final String evidenceHash;
 
-  graph.RouteEdgeType? get routeEdgeType {
-    return switch (edgeType.toUpperCase()) {
-      'RIDE' => graph.RouteEdgeType.ride,
-      'TRANSFER' => graph.RouteEdgeType.transfer,
-      'ENTRY' => graph.RouteEdgeType.entry,
-      'EXIT' => graph.RouteEdgeType.exit,
-      _ => null,
-    };
-  }
+  graph.RouteEdgeType? get routeEdgeType =>
+      graph.routeEdgeTypeFromCatalogValue(edgeType);
 
   String get _accessibilityStatusUpper => accessibilityStatus.toUpperCase();
 

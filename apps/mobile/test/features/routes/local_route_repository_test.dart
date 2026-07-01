@@ -1,6 +1,8 @@
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/routes/application/network_graph.dart'
+    as graph;
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -436,6 +438,146 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
+  });
+
+  test('mobile catalog edge type mapping은 허용된 상용 edge 값을 모두 해석한다', () {
+    final cases = {
+      'RIDE': graph.RouteEdgeType.ride,
+      'TRANSFER': graph.RouteEdgeType.inStationTransfer,
+      'IN_STATION_TRANSFER': graph.RouteEdgeType.inStationTransfer,
+      'OUT_OF_STATION_TRANSFER': graph.RouteEdgeType.outOfStationTransfer,
+      'ENTRY': graph.RouteEdgeType.entry,
+      'EXIT': graph.RouteEdgeType.exit,
+      'WALKWAY': graph.RouteEdgeType.walkway,
+      'ELEVATOR': graph.RouteEdgeType.elevator,
+      'RAMP': graph.RouteEdgeType.ramp,
+      'STAIR': graph.RouteEdgeType.stair,
+      'ESCALATOR': graph.RouteEdgeType.escalator,
+      'FACILITY_CONNECTOR': graph.RouteEdgeType.facilityConnector,
+      'LEGACY_TRANSFER': graph.RouteEdgeType.inStationTransfer,
+      'transfer': graph.RouteEdgeType.inStationTransfer,
+    };
+
+    for (final entry in cases.entries) {
+      expect(
+        graph.routeEdgeTypeFromCatalogValue(entry.key),
+        entry.value,
+        reason: entry.key,
+      );
+    }
+    expect(graph.routeEdgeTypeFromCatalogValue('UNKNOWN'), isNull);
+  });
+
+  test('역외 환승 edge는 역 밖 환승 문구로 표시한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-b-a-line-test',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'out-transfer-a-c',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-alt',
+      edgeType: 'OUT_OF_STATION_TRANSFER',
+      durationSeconds: 300,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final transferStep = result.steps.singleWhere(
+      (step) => step.stepType == 'outOfStationTransfer',
+    );
+    expect(result.status, 'FOUND');
+    expect(result.transferCount, 1);
+    expect(transferStep.title, contains('역 밖으로 이동해'));
+    expect(transferStep.actionTitle, '역외 환승');
+  });
+
+  test('시설 connector edge는 generic transfer 문구로 렌더링하지 않는다', () async {
+    for (final fixture in const [
+      (edgeType: 'WALKWAY', stepType: 'walkway', actionTitle: '통로 이동'),
+      (edgeType: 'ELEVATOR', stepType: 'elevator', actionTitle: '엘리베이터 이동'),
+      (edgeType: 'RAMP', stepType: 'ramp', actionTitle: '경사로 이동'),
+      (
+        edgeType: 'FACILITY_CONNECTOR',
+        stepType: 'facilityConnector',
+        actionTitle: '시설 연결 이동',
+      ),
+    ]) {
+      final database = CatalogDatabase.memory();
+      try {
+        await _seedLineWithoutNetworkEdges(database);
+        await _insertVerifiedNetworkEdge(
+          database,
+          id: 'edge-a-c-${fixture.edgeType.toLowerCase()}',
+          fromNodeId: 'station-a:line-test',
+          toNodeId: 'station-c:line-test',
+          edgeType: fixture.edgeType,
+          durationSeconds: 180,
+        );
+        final repository = LocalRouteRepository(catalogDatabase: database);
+
+        final result = await repository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-c',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+        final step = result.steps.singleWhere(
+          (step) => step.stepType == fixture.stepType,
+        );
+        expect(result.status, 'FOUND', reason: fixture.edgeType);
+        expect(step.actionTitle, fixture.actionTitle);
+        expect(step.title, isNot(contains('환승')));
+      } finally {
+        await database.close();
+      }
+    }
+  });
+
+  test('STAIR edge는 stair_access_state가 잘못 들어와도 strict mode에서 차단한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-a-c-stair',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'STAIR',
+      durationSeconds: 180,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STROLLER',
+        constraintMode: 'STRICT_STEP_FREE',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('계단 없는 경로를 아직 찾지 못했어요.'));
   });
 
   test('사용 불가 접근성 edge는 이동 가능 경로로 안내하지 않는다', () async {
