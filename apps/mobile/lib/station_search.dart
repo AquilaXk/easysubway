@@ -429,7 +429,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+    return '저장한 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
   }
 }
 
@@ -1806,6 +1806,8 @@ class StationSearchScreen extends StatefulWidget {
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
+    this.onOpenRouteSearch,
+    this.bottomNavigationBar,
     super.key,
   });
 
@@ -1820,6 +1822,8 @@ class StationSearchScreen extends StatefulWidget {
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
   final StationSearchEntryMode entryMode;
+  final Future<void> Function()? onOpenRouteSearch;
+  final Widget? bottomNavigationBar;
 
   @override
   State<StationSearchScreen> createState() => _StationSearchScreenState();
@@ -1891,22 +1895,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
-  bool get _shouldShowNearbyFallbackSearch {
-    return widget.entryMode == StationSearchEntryMode.nearby &&
-        switch (_controller.state.status) {
-          StationSearchStatus.empty || StationSearchStatus.failure => true,
-          _ => false,
-        };
-  }
-
   @override
   Widget build(BuildContext context) {
     final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
-    final showSearchInput =
-        (!isRecentEntry && !isNearbyEntry) ||
-        _hasSearchQuery ||
-        _shouldShowNearbyFallbackSearch;
+    const showSearchInput = true;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     final searchInputSection = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2095,6 +2088,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             ),
         ],
       ),
+      bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -2159,6 +2153,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           searchHistoryRepository: widget.searchHistoryRepository,
           realtimeRepository: widget.realtimeRepository,
           routeDraftController: widget.routeDraftController,
+          onOpenRouteSearch: widget.onOpenRouteSearch,
           facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
           internalRouteRepository: widget.internalRouteRepository,
           internalRouteMobilityType: widget.internalRouteMobilityType,
@@ -2262,9 +2257,17 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _showRouteDraftSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: widget.onOpenRouteSearch == null
+            ? null
+            : SnackBarAction(
+                label: '길찾기 보기',
+                onPressed: () => unawaited(widget.onOpenRouteSearch!()),
+              ),
+      ),
+    );
   }
 
   Future<void> _searchNearby() async {

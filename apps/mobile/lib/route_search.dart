@@ -1728,10 +1728,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               onSwap: _swapStations,
             ),
             const SizedBox(height: 18),
-            _RouteRecentDestinationList(
-              repository: widget.favoriteRouteRepository,
-              onSelected: _updateDestinationStation,
-            ),
             if (_validationMessage.isNotEmpty) ...[
               _RouteSearchMessage(
                 message: _validationMessage,
@@ -1795,6 +1791,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                       : 'PREFER_STEP_FREE';
                 });
               },
+            ),
+            _RouteRecentDestinationList(
+              repository: widget.favoriteRouteRepository,
+              onSelected: _updateDestinationStation,
             ),
             AnimatedBuilder(
               animation: _controller,
