@@ -1782,6 +1782,12 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.ok(supportIncidentResponseGate.retentionDuplicateOverridePolicy.requiredEvidence.includes("override-rollback-sample"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("data-error-triage-dry-run"));
   assert.ok(supportIncidentResponseGate.dryRunRequiredEvidence.includes("local-emulator-help-screen-screenshot-or-ui-tree"));
+  assert.equal(
+    supportIncidentResponseGate.emergencyDatapackDrill.command,
+    "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+  );
+  assert.ok(supportIncidentResponseGate.emergencyDatapackDrill.requiredEvidence.includes("manifest-hashes"));
+  assert.ok(supportIncidentResponseGate.emergencyDatapackDrill.requiredEvidence.includes("route-regression-replay"));
   assert.deepEqual(supportIncidentResponseGate.supportEvidenceSummaryPolicy.githubSummaryFields, [
     "channelId",
     "redactedReceiptReference",
