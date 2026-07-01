@@ -140,6 +140,17 @@
     "incident-notice-copy-review",
     "local-emulator-help-screen-screenshot-or-ui-tree"
   ],
+  "emergencyDatapackDrill": {
+    "command": "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+    "requiredEvidence": [
+      "manifest-hashes",
+      "release-channel",
+      "rollback-time",
+      "emergency-patch-audit-id",
+      "route-regression-replay",
+      "verification-command-output"
+    ]
+  },
   "supportEvidenceSummaryPolicy": {
     "githubSummaryFields": [
       "channelId",
