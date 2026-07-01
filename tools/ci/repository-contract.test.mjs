@@ -5754,10 +5754,24 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusAlerts, /alert: AquilaPublicEdgeProbeScrapeDown/);
   assert.match(prometheusAlerts, /alert: AquilaDockerRuntimeProbeScrapeDown/);
   assert.match(prometheusAlerts, /alert: AquilaBackWorkerScrapeDown/);
+  assert.match(prometheusAlerts, /alert: AquilaPublicEdgeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "공개 접속 점검 실패"[\s\S]*impact_ko: "외부에서 API readiness를 확인하는 관측 신호가 멈췄습니다\."[\s\S]*action_ko: "public-edge-probe 컨테이너 상태와 외부 HTTPS readiness 응답을 확인하세요\."/);
+  assert.match(prometheusAlerts, /alert: AquilaDockerRuntimeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "Docker 런타임 점검 실패"[\s\S]*impact_ko: "컨테이너 상태 관측 신호가 멈춰 Docker 기반 장애 탐지가 늦어질 수 있습니다\."[\s\S]*action_ko: "docker-runtime-probe 컨테이너 상태와 Docker socket 접근 권한을 확인하세요\."/);
+  assert.match(prometheusAlerts, /alert: AquilaBackWorkerScrapeDown[\s\S]*severity: critical[\s\S]*title_ko: "백그라운드 작업자 상태 점검 실패"[\s\S]*impact_ko: "작업 큐와 DLQ 관련 알림 평가가 늦거나 멈출 수 있습니다\."[\s\S]*action_ko: "back-worker 컨테이너 상태와 \/actuator\/health\/readiness 응답을 확인하세요\."/);
   assert.match(alertmanagerConfig, /receiver: operations-null/);
   assert.match(alertmanagerConfig, /templates:\s*\n\s*-\s*\/etc\/alertmanager\/templates\/\*\.tmpl/);
   assert.match(alertmanagerTemplate, /define "easysubway\.email\.subject"/);
+  assert.match(alertmanagerTemplate, /define "easysubway\.status_ko"/);
+  assert.match(alertmanagerTemplate, /define "easysubway\.severity_ko"/);
+  assert.match(alertmanagerTemplate, /장애 발생/);
+  assert.match(alertmanagerTemplate, /복구/);
+  assert.match(alertmanagerTemplate, /주의/);
+  assert.match(alertmanagerTemplate, /긴급/);
+  assert.match(alertmanagerTemplate, /title_ko/);
+  assert.match(alertmanagerTemplate, /impact_ko/);
+  assert.match(alertmanagerTemplate, /action_ko/);
+  assert.match(alertmanagerTemplate, /Asia\/Seoul/);
   assert.doesNotMatch(alertmanagerTemplate, /\.GeneratorURL/);
+  assert.doesNotMatch(alertmanagerTemplate, /alertmanager:9093|prometheus:9090|backend:8080|back-worker:8080/);
 
   assert.match(grafanaDatasource, /name: easysubway-prometheus/);
   assert.match(grafanaDatasource, /type: prometheus/);
