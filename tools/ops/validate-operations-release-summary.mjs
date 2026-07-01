@@ -120,6 +120,10 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
   for (const step of gate.fixedReleaseProcedure.requiredSteps) {
     if (!fixedSteps.has(step)) throw new Error(`fixedReleaseSteps missing ${step}`);
   }
+  const dryRunEvidence = new Set(required(summary.postLaunchDryRunEvidence, "postLaunchDryRunEvidence"));
+  for (const evidenceId of gate.dryRunRequiredEvidence) {
+    if (!dryRunEvidence.has(evidenceId)) throw new Error(`postLaunchDryRunEvidence missing ${evidenceId}`);
+  }
 }
 
 function assertSupport(summary, gate, requirePass) {
