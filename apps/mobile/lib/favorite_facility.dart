@@ -312,7 +312,7 @@ class FavoriteFacility {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel =>
-      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
+      '저장한 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }

@@ -1251,9 +1251,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
-    _recentRoutesFuture = _loadRecentRoutes();
-    final facilitiesFuture = widget.favoriteFacilityRepository
-        ?.listFavoriteFacilities();
+    _recentRoutesFuture = widget.recentRoutesFuture;
+    final facilitiesFuture = _loadNotificationFacilities();
     _favoriteFacilitiesFuture = facilitiesFuture;
     _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
   }
@@ -1277,13 +1276,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (widget.favoriteFacilityRepository !=
         oldWidget.favoriteFacilityRepository) {
-      final facilitiesFuture = widget.favoriteFacilityRepository
-          ?.listFavoriteFacilities();
+      final facilitiesFuture = _loadNotificationFacilities();
       _favoriteFacilitiesFuture = facilitiesFuture;
       _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
     }
     if (widget.reportRepository != oldWidget.reportRepository ||
         widget.notificationRepository != oldWidget.notificationRepository) {
+      if (widget.notificationRepository != oldWidget.notificationRepository) {
+        _favoriteFacilitiesFuture = _loadNotificationFacilities();
+      }
       _hasNotificationItemsFuture = _loadHasNotificationItems(
         _favoriteFacilitiesFuture,
       );
@@ -1380,6 +1381,15 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
+    void openStationSearchTab() {
+      if (_selectedTabIndex == 1) {
+        return;
+      }
+      setState(() {
+        _selectedTabIndex = 1;
+      });
+    }
+
     void openRouteTab([String? mobilityType]) {
       final nextMobilityType = mobilityType ?? initialMobilityType;
       if (_selectedTabIndex == 2 && _routeTabMobilityType == nextMobilityType) {
@@ -1439,6 +1449,27 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    Future<void> openRouteSearch([String? mobilityType]) async {
+      final routeSearchMobilityType = mobilityType ?? initialMobilityType;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: repository,
+            routeFeedbackRepository: routeFeedbackRepository,
+            favoriteRouteRepository: favoriteRouteRepository,
+            initialMobilityType: routeSearchMobilityType,
+            initialDraft: _routeDraftController.draft,
+            simpleViewEnabled: simpleViewEnabled,
+          ),
+        ),
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await refreshHomeState();
+    }
+
     Future<void> openStationSearch([
       StationSearchEntryMode entryMode = StationSearchEntryMode.search,
     ]) async {
@@ -1456,27 +1487,10 @@ class _HomeScreenState extends State<HomeScreen> {
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             entryMode: entryMode,
-          ),
-        ),
-      );
-      if (!context.mounted) {
-        return;
-      }
-      await refreshHomeState();
-    }
-
-    Future<void> openRouteSearch([String? mobilityType]) async {
-      final routeSearchMobilityType = mobilityType ?? initialMobilityType;
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => RouteSearchScreen(
-            repository: routeRepository,
-            stationRepository: repository,
-            routeFeedbackRepository: routeFeedbackRepository,
-            favoriteRouteRepository: favoriteRouteRepository,
-            initialMobilityType: routeSearchMobilityType,
-            initialDraft: _routeDraftController.draft,
-            simpleViewEnabled: simpleViewEnabled,
+            onOpenRouteSearch: () async {
+              Navigator.of(context).pop();
+              openRouteTab();
+            },
           ),
         ),
       );
@@ -1519,15 +1533,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       unawaited(openFavorites());
-    }
-
-    void openNetworkMap() {
-      if (_selectedTabIndex == 1) {
-        return;
-      }
-      setState(() {
-        _selectedTabIndex = 1;
-      });
     }
 
     final heroSection = _HomeHero(
@@ -1573,7 +1578,7 @@ class _HomeScreenState extends State<HomeScreen> {
             openHomeTab();
             break;
           case 1:
-            openNetworkMap();
+            openStationSearchTab();
             break;
           case 2:
             openRouteTab();
@@ -1588,16 +1593,16 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       destinations: const [
         NavigationDestination(
-          key: Key('bottomNavHome'),
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: '홈',
+          key: Key('bottomNavMap'),
+          icon: Icon(Icons.map_outlined, key: Key('bottomNavHome')),
+          selectedIcon: Icon(Icons.map, key: Key('bottomNavHome')),
+          label: '노선도',
         ),
         NavigationDestination(
-          key: Key('bottomNavMap'),
-          icon: Icon(Icons.map_outlined),
-          selectedIcon: Icon(Icons.map),
-          label: '노선도',
+          key: Key('bottomNavStationSearch'),
+          icon: Icon(Icons.search),
+          selectedIcon: Icon(Icons.search),
+          label: '역 검색',
         ),
         NavigationDestination(
           key: Key('bottomNavRoute'),
@@ -1607,9 +1612,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         NavigationDestination(
           key: Key('bottomNavSaved'),
-          icon: Icon(Icons.star_border),
-          selectedIcon: Icon(Icons.star),
-          label: '즐겨찾기',
+          icon: Icon(Icons.bookmark_border),
+          selectedIcon: Icon(Icons.bookmark),
+          label: '저장',
         ),
         NavigationDestination(
           key: Key('bottomNavMore'),
@@ -1633,13 +1638,49 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_selectedTabIndex == 1) {
+    if (_selectedTabIndex == 0) {
       return rootTab(
         NetworkMapScreen(
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
-          onOpenRouteSearch: openRouteSearch,
+          onOpenRouteSearch: () async => openRouteTab(),
           onOpenStationSearch: () => unawaited(openStationSearch()),
+          onOpenSavedItems: openSavedTab,
+          onOpenRecentSearch: () =>
+              unawaited(openStationSearch(StationSearchEntryMode.recent)),
+          onOpenNearbyStations: () =>
+              unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          notificationAction: notificationRepository == null
+              ? null
+              : FutureBuilder<bool>(
+                  future: _hasNotificationItemsFuture,
+                  builder: (context, snapshot) {
+                    return _HomeNotificationButton(
+                      key: const Key('homeNotificationActionButton'),
+                      hasNotificationItems: snapshot.data ?? false,
+                      onPressed: openNotificationInbox,
+                    );
+                  },
+                ),
+          bottomNavigationBar: bottomNavigationBar,
+        ),
+      );
+    }
+
+    if (_selectedTabIndex == 1) {
+      return rootTab(
+        StationSearchScreen(
+          repository: repository,
+          reportRepository: reportRepository,
+          favoriteRepository: favoriteRepository,
+          searchHistoryRepository: searchHistoryRepository,
+          locationProvider: locationProvider,
+          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+          internalRouteRepository: internalRouteRepository,
+          internalRouteMobilityType: initialMobilityType,
+          realtimeRepository: realtimeRepository,
+          routeDraftController: _routeDraftController,
+          onOpenRouteSearch: () async => openRouteTab(),
           bottomNavigationBar: bottomNavigationBar,
         ),
       );
@@ -1751,8 +1792,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<List<FavoriteRoute>>? _loadRecentRoutes() {
-    return widget.recentRoutesFuture ??
-        widget.favoriteRouteRepository?.listFavoriteRoutes();
+    return widget.recentRoutesFuture;
+  }
+
+  Future<List<FavoriteFacility>>? _loadNotificationFacilities() {
+    if (widget.notificationRepository == null) {
+      return null;
+    }
+    return widget.favoriteFacilityRepository?.listFavoriteFacilities();
   }
 
   Future<bool> _loadHasNotificationItems(
@@ -3096,7 +3143,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
+          '저장한 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
@@ -3410,7 +3457,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       preferences: _viewPreferences,
       child: Scaffold(
         key: const Key('settingsScreen'),
-        appBar: AppBar(title: const Text('설정')),
+        appBar: AppBar(title: const Text('더보기')),
         bottomNavigationBar: widget.bottomNavigationBar,
         body: SafeArea(
           child: ListView(
@@ -3856,7 +3903,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('favoriteHomeScreen'),
-      appBar: AppBar(title: const Text('즐겨찾기')),
+      appBar: AppBar(title: const Text('저장')),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: FutureBuilder<_FavoriteHomeData>(
@@ -3886,12 +3933,12 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
-                  const _AppSectionTitle(title: '즐겨찾기한 항목'),
+                  const _AppSectionTitle(title: '저장한 항목'),
                   if (hasError)
                     _HomeStateCard(
                       key: const Key('favoriteHomeErrorState'),
                       icon: Icons.error_outline,
-                      title: '즐겨찾기를 불러오지 못했어요',
+                      title: '저장한 항목을 불러오지 못했어요',
                       subtitle: '잠시 후 다시 불러와 주세요.',
                       actionLabel: '다시 시도',
                       onAction: () {
@@ -3938,8 +3985,8 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                             icon: Icons.bookmark_border,
                             iconBackground: EasySubwayAccessibleColors.mintSoft,
                             iconColor: EasySubwayAccessibleColors.mintDark,
-                            title: '즐겨찾기한 항목이 없습니다',
-                            subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
+                            title: '저장한 항목이 없습니다',
+                            subtitle: '역, 시설, 경로에서 저장을 눌러 추가해 주세요.',
                           ),
                         ),
                       ),
@@ -3977,7 +4024,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '즐겨찾기한 경로',
+        title: '저장한 경로',
         child: FavoriteRouteListContent(
           repository: repository,
           onSearchAgain: widget.onOpenRouteSearch == null
@@ -4016,7 +4063,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '즐겨찾기한 역',
+        title: '저장한 역',
         child: FavoriteStationListContent(
           repository: repository,
           stationRepository: widget.stationRepository,
@@ -4039,7 +4086,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '즐겨찾기한 시설',
+        title: '저장한 시설',
         child: FavoriteFacilityListContent(
           repository: repository,
           reportRepository: widget.reportRepository,
@@ -4131,7 +4178,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeStationsButton'),
           icon: Icons.train_outlined,
-          label: '역',
+          label: '저장한 역',
           countLabel: _countLabel(stationCount),
           subtitle: '출발지·도착지 설정과 시설 상태를 확인해요',
           onTap: onStations,
@@ -4140,7 +4187,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeFacilitiesButton'),
           icon: Icons.elevator_outlined,
-          label: '시설',
+          label: '저장한 시설',
           countLabel: _countLabel(facilityCount),
           subtitle: '고장·공사 상태와 최근 확인 시각을 봐요',
           onTap: onFacilities,
@@ -4149,7 +4196,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeRoutesButton'),
           icon: Icons.route_outlined,
-          label: '경로',
+          label: '저장한 경로',
           countLabel: _countLabel(routeCount),
           subtitle: '이동 조건과 저장한 경로를 살펴봐요',
           onTap: onRoutes,

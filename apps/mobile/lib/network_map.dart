@@ -273,6 +273,10 @@ class NetworkMapScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.onOpenRouteSearch,
     required this.onOpenStationSearch,
+    this.onOpenSavedItems,
+    this.onOpenRecentSearch,
+    this.onOpenNearbyStations,
+    this.notificationAction,
     this.bottomNavigationBar,
     super.key,
   });
@@ -281,6 +285,10 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback onOpenStationSearch;
+  final VoidCallback? onOpenSavedItems;
+  final VoidCallback? onOpenRecentSearch;
+  final VoidCallback? onOpenNearbyStations;
+  final Widget? notificationAction;
   final Widget? bottomNavigationBar;
 
   @override
@@ -289,6 +297,7 @@ class NetworkMapScreen extends StatefulWidget {
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
+  bool _expressView = false;
   late Future<NetworkMapData> _future = _loadMap();
 
   Future<NetworkMapData> _loadMap() {
@@ -309,6 +318,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       appBar: AppBar(
         title: const Text('노선도'),
         actions: [
+          if (widget.notificationAction != null) widget.notificationAction!,
           IconButton(
             key: const Key('networkMapSearchButton'),
             tooltip: '역 검색',
@@ -323,7 +333,34 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return Stack(
+                children: [
+                  const Center(child: CircularProgressIndicator()),
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: _MapLoadingSearchPanel(
+                        onSearchTap: widget.onOpenStationSearch,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    bottom: 14,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: _NetworkMapQuickSheet(
+                        onOpenSavedItems: widget.onOpenSavedItems,
+                        onOpenRecentSearch: widget.onOpenRecentSearch,
+                        onOpenNearbyStations: widget.onOpenNearbyStations,
+                        onOpenRecentRoute: widget.onOpenRouteSearch,
+                      ),
+                    ),
+                  ),
+                ],
+              );
             }
             if (snapshot.hasError || !snapshot.hasData) {
               return _NetworkMapLoadFailure(
@@ -332,26 +369,47 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               );
             }
             final data = snapshot.data!;
+            final hasExpressLines = _expressLineIds(data).isNotEmpty;
+            final visibleData = hasExpressLines && _expressView
+                ? _expressOnlyMapData(data)
+                : data;
             return Stack(
               children: [
                 Positioned.fill(
                   child: _NetworkMapCanvas(
-                    data: data,
+                    data: visibleData,
                     onStationTap: _showStationSheet,
                   ),
                 ),
                 Positioned(
-                  left: 14,
+                  right: 12,
                   top: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _RegionTabs(
-                        regions: data.regions,
-                        selectedRegion: data.selectedRegion,
-                        onSelected: (region) => _reload(region: region),
-                      ),
-                    ],
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    child: _MapSearchOverlay(
+                      regions: data.regions,
+                      selectedRegion: data.selectedRegion,
+                      showServicePatternToggle: hasExpressLines,
+                      expressView: _expressView,
+                      onSearchTap: widget.onOpenStationSearch,
+                      onRegionSelected: (region) => _reload(region: region),
+                      onExpressViewChanged: (value) {
+                        setState(() => _expressView = value);
+                      },
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  bottom: 14,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    child: _NetworkMapQuickSheet(
+                      onOpenSavedItems: widget.onOpenSavedItems,
+                      onOpenRecentSearch: widget.onOpenRecentSearch,
+                      onOpenNearbyStations: widget.onOpenNearbyStations,
+                      onOpenRecentRoute: widget.onOpenRouteSearch,
+                    ),
                   ),
                 ),
               ],
@@ -395,6 +453,293 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       },
     );
   }
+}
+
+class _MapSearchOverlay extends StatelessWidget {
+  const _MapSearchOverlay({
+    required this.regions,
+    required this.selectedRegion,
+    required this.showServicePatternToggle,
+    required this.expressView,
+    required this.onSearchTap,
+    required this.onRegionSelected,
+    required this.onExpressViewChanged,
+  });
+
+  final List<NetworkMapRegion> regions;
+  final String selectedRegion;
+  final bool showServicePatternToggle;
+  final bool expressView;
+  final VoidCallback onSearchTap;
+  final ValueChanged<String> onRegionSelected;
+  final ValueChanged<bool> onExpressViewChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MapOverlayPanel(
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
+        borderRadius: _networkMapRadius,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            _MapStationSearchButton(onSearchTap: onSearchTap),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _RegionTabs(
+                  regions: regions,
+                  selectedRegion: selectedRegion,
+                  onSelected: onRegionSelected,
+                ),
+                if (showServicePatternToggle) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SegmentedButton<bool>(
+                      key: const Key('networkMapServicePatternToggle'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment<bool>(value: false, label: Text('일반')),
+                        ButtonSegment<bool>(value: true, label: Text('급행')),
+                      ],
+                      selected: {expressView},
+                      onSelectionChanged: (values) {
+                        onExpressViewChanged(values.first);
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapLoadingSearchPanel extends StatelessWidget {
+  const _MapLoadingSearchPanel({required this.onSearchTap});
+
+  final VoidCallback onSearchTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MapOverlayPanel(
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
+        borderRadius: _networkMapRadius,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: _MapStationSearchButton(onSearchTap: onSearchTap),
+      ),
+    );
+  }
+}
+
+class _MapStationSearchButton extends StatelessWidget {
+  const _MapStationSearchButton({required this.onSearchTap});
+
+  final VoidCallback onSearchTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '역 검색',
+      onTap: onSearchTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          key: const Key('stationSearchButton'),
+          onTap: onSearchTap,
+          borderRadius: _networkMapRadius,
+          child: const SizedBox(
+            key: Key('heroStationSearchButton'),
+            height: EasySubwayTouchTarget.general,
+            child: Row(
+              children: [
+                SizedBox(width: 10),
+                Icon(Icons.search),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '역 이름으로 찾기',
+                    style: TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkMapQuickSheet extends StatelessWidget {
+  const _NetworkMapQuickSheet({
+    required this.onOpenSavedItems,
+    required this.onOpenRecentSearch,
+    required this.onOpenNearbyStations,
+    required this.onOpenRecentRoute,
+  });
+
+  final VoidCallback? onOpenSavedItems;
+  final VoidCallback? onOpenRecentSearch;
+  final VoidCallback? onOpenNearbyStations;
+  final Future<void> Function()? onOpenRecentRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MapOverlayPanel(
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
+        borderRadius: _networkMapRadius,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '저장·최근',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (onOpenSavedItems != null)
+                  OutlinedButton.icon(
+                    key: const Key('networkMapSavedStationsButton'),
+                    onPressed: onOpenSavedItems,
+                    icon: const Icon(Icons.bookmark_border),
+                    label: const Text('저장'),
+                  ),
+                if (onOpenRecentSearch != null)
+                  OutlinedButton.icon(
+                    key: const Key('recentSearchButton'),
+                    onPressed: onOpenRecentSearch,
+                    icon: const Icon(Icons.history),
+                    label: const Text('최근 검색'),
+                  ),
+                if (onOpenNearbyStations != null)
+                  OutlinedButton.icon(
+                    key: const Key('nearbyStationButton'),
+                    onPressed: onOpenNearbyStations,
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('가까운 역'),
+                  ),
+                if (onOpenRecentRoute != null)
+                  OutlinedButton.icon(
+                    key: const Key('routeSearchButton'),
+                    onPressed: () => unawaited(onOpenRecentRoute!()),
+                    icon: const Icon(Icons.route_outlined),
+                    label: const Text('길찾기'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapOverlayPanel extends StatelessWidget {
+  const _MapOverlayPanel({required this.decoration, required this.child});
+
+  final Decoration decoration;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(child: DecoratedBox(decoration: decoration)),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+Set<String> _expressLineIds(NetworkMapData data) {
+  return data.lines
+      .where(
+        (line) =>
+            line.name.contains('급행') ||
+            line.shortName.contains('급행') ||
+            line.id.toLowerCase().contains('express'),
+      )
+      .map((line) => line.id)
+      .toSet();
+}
+
+NetworkMapData _expressOnlyMapData(NetworkMapData data) {
+  final lineIds = _expressLineIds(data);
+  final stationIdsFromMemberships = data.stationLineMemberships
+      .where((membership) => lineIds.contains(membership.lineId))
+      .map((membership) => membership.stationId)
+      .toSet();
+  final stations = data.stations
+      .where(
+        (station) =>
+            lineIds.contains(station.lineId) ||
+            stationIdsFromMemberships.contains(station.id),
+      )
+      .toList(growable: false);
+  final stationIds = stations.map((station) => station.id).toSet();
+  return NetworkMapData(
+    regions: data.regions,
+    selectedRegion: data.selectedRegion,
+    lines: data.lines
+        .where((line) => lineIds.contains(line.id))
+        .toList(growable: false),
+    stations: stations,
+    edges: data.edges
+        .where(
+          (edge) =>
+              lineIds.contains(edge.lineId) &&
+              stationIds.contains(edge.fromStationId) &&
+              stationIds.contains(edge.toStationId),
+        )
+        .toList(growable: false),
+    positionSources: data.positionSources,
+    stationLineMemberships: data.stationLineMemberships
+        .where((membership) => lineIds.contains(membership.lineId))
+        .toList(growable: false),
+  );
 }
 
 class _NetworkMapLoadFailure extends StatelessWidget {
@@ -834,33 +1179,37 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       ),
               ),
               Positioned.fill(
-                child: Listener(
-                  onPointerCancel: (_) => _endScaleGesture(),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onScaleStart: (details) {
-                      if (!_gestureActive) {
-                        setState(() {
-                          _gestureActive = true;
-                        });
-                      }
-                      _gestureStartCamera = camera;
-                      _gestureStartFocalPoint = details.localFocalPoint;
-                    },
-                    onScaleUpdate: (details) {
-                      _updateCameraForGesture(details);
-                    },
-                    onScaleEnd: (_) {
-                      _endScaleGesture();
-                    },
-                    onTapUp: (details) {
-                      _openNearestStation(
-                        details.localPosition,
-                        stationLinesById,
-                        geometry,
-                        camera,
-                      );
-                    },
+                child: Semantics(
+                  label: '노선도',
+                  hint: '역을 누르면 출발, 도착, 역 정보 action을 볼 수 있어요',
+                  child: Listener(
+                    onPointerCancel: (_) => _endScaleGesture(),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onScaleStart: (details) {
+                        if (!_gestureActive) {
+                          setState(() {
+                            _gestureActive = true;
+                          });
+                        }
+                        _gestureStartCamera = camera;
+                        _gestureStartFocalPoint = details.localFocalPoint;
+                      },
+                      onScaleUpdate: (details) {
+                        _updateCameraForGesture(details);
+                      },
+                      onScaleEnd: (_) {
+                        _endScaleGesture();
+                      },
+                      onTapUp: (details) {
+                        _openNearestStation(
+                          details.localPosition,
+                          stationLinesById,
+                          geometry,
+                          camera,
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -892,7 +1241,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   ),
               Positioned(
                 right: 14,
-                top: 12,
+                top: 148,
                 child: _MapControls(
                   onZoomIn: () => _scaleMap(1.25),
                   onZoomOut: () => _scaleMap(0.8),
@@ -2608,7 +2957,11 @@ class _StationHitTarget extends StatelessWidget {
       button: true,
       label: station.displayName,
       onTap: onTap,
-      child: const SizedBox.expand(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: onTap,
+        child: const SizedBox.expand(),
+      ),
     );
   }
 }
