@@ -56,6 +56,74 @@ void main() {
       expect(result.includesStairs, isFalse);
     });
 
+    test('access graph contract는 진입, 환승, 진출 시간을 분리한다', () {
+      final router = AccessGraphRouter(graph: _capitalFixtureGraph());
+
+      final result = router.findPath(
+        originNodeId: 'station-sangnoksu',
+        destinationNodeId: 'station-cityhall',
+        mobilityType: MobilityType.senior,
+        constraintMode: ConstraintMode.preferStepFree,
+      );
+      final path = result.path!;
+      final transfer = const TransferAccessResolver().resolve(
+        path: path,
+        alightAtSeconds: 600,
+        nextDepartureSeconds: 780,
+      );
+
+      expect(path.edgeIds, [
+        'entry-sangnoksu-step-free',
+        'ride-sangnoksu-sadang-line4',
+        'transfer-sadang-line4-line2',
+        'ride-sadang-cityhall-line2',
+        'exit-cityhall-step-free',
+      ]);
+      expect(path.entrySeconds, 90);
+      expect(path.transferSeconds, 140);
+      expect(path.egressSeconds, 90);
+      expect(
+        path.evidenceSources,
+        contains('edge:transfer-sadang-line4-line2'),
+      );
+      expect(transfer.transferReadyAtSeconds, 740);
+      expect(transfer.slackSeconds, 40);
+      expect(transfer.isFeasible, isTrue);
+    });
+
+    test('access graph no-path reason은 차단, 미확인, 데이터 없음으로 분리된다', () {
+      final blocked = AccessGraphRouter(graph: _stairOnlyFixtureGraph())
+          .findPath(
+            originNodeId: 'station-sangnoksu',
+            destinationNodeId: 'station-sadang',
+            mobilityType: MobilityType.wheelchair,
+            constraintMode: ConstraintMode.strictStepFree,
+          );
+      final unknown =
+          AccessGraphRouter(graph: _generatedConnectorFixtureGraph()).findPath(
+            originNodeId: 'station-a',
+            destinationNodeId: 'station-b',
+            mobilityType: MobilityType.stroller,
+            constraintMode: ConstraintMode.strictStepFree,
+          );
+      final noData =
+          AccessGraphRouter(
+            graph: NetworkGraph(nodes: const [], edges: const []),
+          ).findPath(
+            originNodeId: 'station-a',
+            destinationNodeId: 'station-b',
+            mobilityType: MobilityType.stroller,
+            constraintMode: ConstraintMode.strictStepFree,
+          );
+
+      expect(blocked.noPathReason, AccessNoPathReason.blocked);
+      expect(blocked.reasonCodes, ['STAIR_ONLY_ACCESS']);
+      expect(unknown.noPathReason, AccessNoPathReason.unknown);
+      expect(unknown.reasonCodes, ['GENERATED_CONNECTOR_UNVERIFIED']);
+      expect(noData.noPathReason, AccessNoPathReason.noData);
+      expect(noData.reasonCodes, ['NO_DATA']);
+    });
+
     test('2회 환승 경로는 catalog transfer edge에서 환승역 순서를 보존한다', () {
       final engine = LocalRouteEngine(graph: _twoTransferCatalogFixtureGraph());
 
