@@ -441,6 +441,8 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       score: snapshot['score'] is int ? snapshot['score'] as int : 0,
       routeCreatedAt: _string(snapshot['createdAt']),
       addedAt: addedAt,
+      etaSource: _string(snapshot['etaSource']),
+      fallbackReason: _string(snapshot['fallbackReason']),
     );
   }
 
@@ -551,6 +553,8 @@ FavoriteRoute _favoriteRouteFromResult({
     score: result.score,
     routeCreatedAt: result.createdAt,
     addedAt: addedAt,
+    etaSource: result.etaSource,
+    fallbackReason: result.fallbackReason,
   );
 }
 
@@ -593,6 +597,8 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'recommendationReasons': result.recommendationReasons,
     'blockedReasons': result.blockedReasons,
     'createdAt': result.createdAt,
+    'etaSource': result.etaSource,
+    'fallbackReason': result.fallbackReason,
   };
 }
 
@@ -609,7 +615,15 @@ Map<String, Object?> _routeStepToJson(RouteSearchStep step) {
     'estimatedMinutes': step.estimatedMinutes,
     'distanceMeters': step.distanceMeters,
     'includesStairs': step.includesStairs,
+    'stairAccessState': step.stairAccessState,
     'requiresAccessibilityCheck': step.requiresAccessibilityCheck,
+    'actionTitle': step.actionTitle,
+    'actionDetail': step.actionDetail,
+    'reason': step.reason,
+    'evidenceSources': step.evidenceSources,
+    'timeSource': step.timeSource,
+    'distanceSource': step.distanceSource,
+    'confidenceLabel': step.confidenceLabel,
   };
 }
 
