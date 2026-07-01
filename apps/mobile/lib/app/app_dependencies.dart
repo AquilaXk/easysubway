@@ -5,6 +5,7 @@ import '../core/network/api_client.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
 import '../features/favorites/data/drift_favorite_repositories.dart';
+import '../features/network_map/data/drift_network_map_viewport_repository.dart';
 import '../features/preferences/data/drift_notification_settings_repository.dart';
 import '../features/realtime/realtime_repository.dart';
 import '../features/search_history/data/drift_search_history_repository.dart';
@@ -36,6 +37,7 @@ class AppDependencies {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.networkMapViewportRepository,
     required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
@@ -54,6 +56,7 @@ class AppDependencies {
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NetworkMapRepository? networkMapRepository,
+    NetworkMapViewportRepository? networkMapViewportRepository,
     RealtimeRepository? realtimeRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
@@ -217,6 +220,11 @@ class AppDependencies {
                   ),
                 )),
       networkMapRepository: resolvedNetworkMapRepository,
+      networkMapViewportRepository:
+          networkMapViewportRepository ??
+          (userDatabase == null
+              ? null
+              : DriftNetworkMapViewportRepository(userDatabase: userDatabase)),
       realtimeRepository: resolvedRealtimeRepository,
       notificationRepository: resolvedNotificationRepository,
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
@@ -242,6 +250,7 @@ class AppDependencies {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final NetworkMapViewportRepository? networkMapViewportRepository;
   final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
