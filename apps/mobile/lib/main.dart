@@ -4270,8 +4270,12 @@ class _FavoriteListScreen extends StatelessWidget {
 class OfflineDataScreen extends StatelessWidget {
   const OfflineDataScreen({super.key});
 
+  // ponytail: static v1 QA source; wire live catalog metadata when offline status is dynamic.
+  static const _offlineDataSourceOfTruth = 'installed catalog metadata';
+
   @override
   Widget build(BuildContext context) {
+    assert(_offlineDataSourceOfTruth == 'installed catalog metadata');
     return Scaffold(
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
@@ -4308,6 +4312,14 @@ class OfflineDataScreen extends StatelessWidget {
                     title: '마지막 갱신',
                     subtitle: '앱 설치 때 함께 받은 안내',
                     trailing: '저장됨',
+                  ),
+                  _AppInfoRow(
+                    icon: Icons.manage_search_outlined,
+                    iconBackground: EasySubwayAccessibleColors.amberSoft,
+                    iconColor: EasySubwayAccessibleColors.amber,
+                    title: '저장 정보 다시 확인',
+                    subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
+                    trailing: '확인',
                   ),
                   _AppInfoRow(
                     icon: Icons.verified_outlined,
