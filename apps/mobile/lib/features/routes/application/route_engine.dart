@@ -357,6 +357,12 @@ class RouteAssembler {
         constraintMode: constraintMode,
       );
       totalCost += accessCost.cost;
+      if (edge.type == RouteEdgeType.outOfStationTransfer) {
+        warnings['FARE_EXIT_REENTRY_REQUIRED'] = const RouteWarning(
+          code: 'FARE_EXIT_REENTRY_REQUIRED',
+          message: '역 밖 환승은 요금구역을 나가 다시 들어갈 수 있어요.',
+        );
+      }
       for (final code in accessCost.warningCodes) {
         warnings[code] = RouteWarning(
           code: code,
