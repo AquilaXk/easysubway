@@ -748,6 +748,38 @@ void main() {
                 'reasons': <Object?>[],
               },
             },
+            {
+              'legType': 'IN_STATION_TRANSFER',
+              'fromStationId': 'station-transfer',
+              'toStationId': 'station-transfer',
+              'fromNodeId': '',
+              'toNodeId': '',
+              'lineId': '',
+              'tripId': '',
+              'trainNo': '',
+              'plannedDepartureTime': '2026-06-30T09:24:00+09:00',
+              'realtimeDepartureTime': null,
+              'plannedArrivalTime': '2026-06-30T09:25:00+09:00',
+              'realtimeArrivalTime': null,
+              'waitTimeSeconds': 0,
+              'slackSeconds': 45,
+              'durationSeconds': 60,
+              'distanceMeters': 40,
+              'etaSource': 'PLANNED',
+              'confidence': 'MEDIUM',
+              'accessibilityRisk': {
+                'stairCount': 0,
+                'unknownAccessibilityCount': 0,
+                'generatedConnectorCount': 0,
+                'staleDataCount': 0,
+                'lowConfidenceCount': 0,
+                'unavailableFacilityCount': 0,
+                'riskLevel': 'LOW',
+                'reasonCodes': <Object?>[],
+                'level': 'LOW',
+                'reasons': <Object?>[],
+              },
+            },
           ],
           'commercialEtaEligible': false,
         },
@@ -814,7 +846,7 @@ void main() {
     expect(displayResult.steps.first.metricSourceLabel, '서버 경로 안내 기준이에요');
     expect(displayResult.etaConfidence, 'LOW');
     expect(displayResult.accessibilityRiskLevel, 'HIGH');
-    expect(displayResult.transferSlackSeconds, 90);
+    expect(displayResult.transferSlackSeconds, 45);
     expect(displayResult.hasOutOfStationTransfer, isTrue);
     expect(displayResult.commercialEtaEligible, isFalse);
   });
@@ -928,6 +960,8 @@ void main() {
     expect(result.steps.last.estimatedMinutes, 26);
     expect(result.steps.first.stairAccessState, 'unknown');
     expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
+    expect(result.transferSlackSeconds, isNull);
+    expect(result.hasOutOfStationTransfer, isFalse);
   });
 
   test('경로 V2 blocked reasonCodes가 비어 있으면 status를 보존한다', () {

@@ -2073,6 +2073,8 @@ int? _routeV2TransferSlackSeconds(List<RouteSearchV2Leg> legs) {
       .where(
         (leg) =>
             leg.legType == 'TRANSFER' ||
+            leg.legType == 'IN_STATION_TRANSFER' ||
+            leg.legType == 'LEGACY_TRANSFER' ||
             leg.legType == 'OUT_OF_STATION_TRANSFER',
       )
       .map((leg) => leg.slackSeconds)
