@@ -5867,6 +5867,8 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusConfig, /job_name: "docker_runtime_probe"/);
   assert.match(prometheusConfig, /targets: \["docker-runtime-probe:8080"\]/);
   assert.match(prometheusConfig, /job_name: "public_edge_probe"/);
+  assert.match(compose, /public-edge-probe:[\s\S]*restart: unless-stopped/);
+  assert.match(compose, /docker-runtime-probe:[\s\S]*restart: unless-stopped/);
   assert.match(prometheusConfig, /metrics_path: "\/probe"/);
   assert.match(prometheusConfig, /module: \[http_2xx\]/);
   assert.match(prometheusConfig, /https:\/\/easysubway-api\.aquilaxk\.site\/actuator\/health\/readiness/);
