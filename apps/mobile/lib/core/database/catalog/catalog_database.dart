@@ -27,6 +27,7 @@ part 'catalog_database.g.dart';
     StationExits,
     Facilities,
     StationFacilityEvidence,
+    FacilityStatusSnapshots,
     StationAccessibilitySummaries,
     InternalRouteNodes,
     InternalRouteEdges,
@@ -52,7 +53,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -101,6 +102,10 @@ class CatalogDatabase extends _$CatalogDatabase {
           await migrator.createTable(stationPathwayEdges);
           await migrator.createTable(transferRules);
           await _createStationPathwayIndexes();
+        }
+        if (from < 11) {
+          await migrator.createTable(facilityStatusSnapshots);
+          await _createFacilityStatusSnapshotIndexes();
         }
       },
       beforeOpen: (_) async {
@@ -705,6 +710,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'ON facilities(station_id)',
     );
     await _createStationFacilityEvidenceIndexes();
+    await _createFacilityStatusSnapshotIndexes();
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_internal_route_edges_from '
       'ON internal_route_edges(from_node_id)',
@@ -780,6 +786,13 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_station_facility_evidence_station '
       'ON station_facility_evidence(station_id, line_id)',
+    );
+  }
+
+  Future<void> _createFacilityStatusSnapshotIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_facility_status_snapshots_facility '
+      'ON facility_status_snapshots(facility_id, expires_at, observed_at)',
     );
   }
 
