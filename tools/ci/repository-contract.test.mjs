@@ -1140,9 +1140,9 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
 
   assert.match(main, /selectedIndex:\s*_selectedTabIndex/);
   assert.doesNotMatch(main, /selectedIndex:\s*[0-9]/);
-  assert.match(widgetTest, /홈 노선도 탭은 같은 shell 안에서 선택 상태를 바꾼다/);
-  assert.match(widgetTest, /홈 하단 탭은 길찾기 즐겨찾기 더보기를 같은 shell에서 전환한다/);
-  assert.match(widgetTest, /홈 하단 루트 탭에서 시스템 뒤로가기는 홈으로 돌아온다/);
+  assert.match(widgetTest, /노선도 탭은 첫 shell 탭으로 선택 상태를 유지한다/);
+  assert.match(widgetTest, /홈 하단 탭은 길찾기 저장 더보기를 같은 shell에서 전환한다/);
+  assert.match(widgetTest, /홈 하단 루트 탭에서 시스템 뒤로가기는 노선도로 돌아온다/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도와 역 검색 대안을 보여준다/);
   assert.match(main, /homeFacilityAlertLoadingState/);
@@ -8818,7 +8818,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
-  assert.match(main, /label: '즐겨찾기'/);
+  assert.match(main, /label: '저장'/);
   assert.match(main, /FavoriteHomeScreen/);
   assert.match(main, /FavoriteRouteListContent/);
   assert.match(main, /FavoriteStationListContent/);
@@ -8987,7 +8987,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /enablePushNotifications: true/);
   assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
-  assert.match(widgetTest, /홈 화면은 핵심 행동과 보조 행동을 나누어 보여준다/);
+  assert.match(widgetTest, /노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
