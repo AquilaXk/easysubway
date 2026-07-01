@@ -8532,7 +8532,7 @@ void main() {
         find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
         findsOneWidget,
       );
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
+      expect(find.text("'휠체어 이용' 조건을 선택했어요. 아래에서 바꿀 수 있어요."), findsOneWidget);
       expect(find.bySemanticsLabel('선택 완료'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
@@ -8561,7 +8561,7 @@ void main() {
         find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
         findsOneWidget,
       );
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
+      expect(find.text("'휠체어 이용' 조건을 선택했어요. 아래에서 바꿀 수 있어요."), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }

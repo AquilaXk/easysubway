@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'accessible_design.dart';
 
 const _mobilityProfilePagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
-const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(8));
+const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(16));
 
 class MobilityProfileOption {
   const MobilityProfileOption({
@@ -170,8 +170,8 @@ class _MobilityProfileScreenState extends State<MobilityProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _SelectionStatus(option: _selectedOption),
-              if (_selectedOption != null) const SizedBox(height: 12),
+              _MobilityGuidanceCard(option: _selectedOption),
+              const SizedBox(height: 16),
               for (final option in mobilityProfileOptions)
                 _MobilityProfileCard(
                   option: option,
@@ -278,26 +278,63 @@ class _MobilityProfileCard extends StatelessWidget {
   }
 }
 
-class _SelectionStatus extends StatelessWidget {
-  const _SelectionStatus({required this.option});
+class _MobilityGuidanceCard extends StatelessWidget {
+  const _MobilityGuidanceCard({required this.option});
 
   final MobilityProfileOption? option;
 
   @override
   Widget build(BuildContext context) {
     final selectedOption = option;
-    if (selectedOption == null) {
-      return const SizedBox.shrink();
-    }
-
+    final isSelected = selectedOption != null;
+    final message = isSelected
+        ? '\'${selectedOption.title}\' 조건을 선택했어요. 아래에서 바꿀 수 있어요.'
+        : '경로를 찾을 때 적용할 이동 조건을 선택하세요.';
     return Semantics(
       liveRegion: true,
-      child: Text(
-        '${selectedOption.title} 조건을 선택했습니다',
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w800,
-          height: 1.35,
+      label: message,
+      child: ExcludeSemantics(
+        child: Container(
+          decoration: BoxDecoration(
+            color: EasySubwayAccessibleColors.mintSoft,
+            borderRadius: _mobilityProfileCardRadius,
+            border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: EasySubwayAccessibleColors.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSelected
+                        ? Icons.check_circle_outline
+                        : Icons.directions_walk,
+                    color: EasySubwayAccessibleColors.mintDark,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
