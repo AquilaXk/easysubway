@@ -886,6 +886,7 @@ void main() {
     expect(result.lineName, 'line-4');
     expect(result.score, 85);
     expect(result.steps.first.stepType, 'entry');
+    expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.userDescription, contains('승강장 접근'));
     expect(result.steps.first.stairAccessState, 'unknown');
     expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');

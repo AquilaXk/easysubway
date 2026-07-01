@@ -319,7 +319,9 @@ class RouteSearchOnlineException extends RouteSearchException {
        super(_routeSearchErrorMessage);
 
   factory RouteSearchOnlineException.http(int statusCode) {
-    final validationFailure = statusCode >= 400 && statusCode < 500;
+    final validationFailure =
+        statusCode == HttpStatus.badRequest ||
+        statusCode == HttpStatus.unprocessableEntity;
     return RouteSearchOnlineException._(
       statusCode: statusCode,
       fallbackAllowed: !validationFailure,
@@ -1720,7 +1722,7 @@ class RouteSearchStep {
       requiresAccessibilityCheck: _routeV2RiskRequiresCheck(
         leg.accessibilityRisk,
       ),
-      actionTitle: title,
+      actionTitle: '',
       actionDetail: title,
       reason: leg.etaSource,
       timeSource: leg.etaSource,
@@ -1769,7 +1771,7 @@ class RouteSearchStep {
       includesStairs: includesStairs,
       stairAccessState: stairAccessState,
       requiresAccessibilityCheck: requiresAccessibilityCheck,
-      actionTitle: title,
+      actionTitle: actionTitle,
       actionDetail: actionDetail,
       reason: reason,
       evidenceSources: evidenceSources,
