@@ -193,7 +193,7 @@
       "titleKo": "provider key와 object storage 노출 방지",
       "ownerKo": "보안/릴리즈 담당",
       "readyWhenKo": "모바일 릴리즈 산출물은 provider key, object storage credential, signed URL을 직접 포함하지 않고, 백엔드가 짧은 만료 signed upload URL만 발급하며 로그와 감사 기록에는 upload intent와 receipt token 원문을 남기지 않는다.",
-      "evidence": ["release-artifact-credential-search", "signed-upload-url-expiry-contract", "sensitive-log-redaction-review"],
+      "evidence": ["provider-security-boundary-regression-test", "release-artifact-credential-search", "signed-upload-url-expiry-contract", "sensitive-log-redaction-review"],
       "linkedArtifacts": [".github/workflows/release-artifacts.yml", "backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntentsTest.java", "backend/src/main/java/com/easysubway/report/adapter/out/storage/ObjectStorageFacilityReportPhotoStorage.java", "tools/ci/repository-contract.test.mjs"]
     },
     {

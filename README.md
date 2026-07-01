@@ -136,6 +136,7 @@ production data pack의 pack URL과 sourceInventory URL은 공개 HTTPS host만 
 - `mobile_anr_rate`
 - `mobile_app_start_failure_rate`
 - `route_search_found_blocked_unknown_distribution`
+- `route_quality_observability_dashboard`
 - `datapack_install_rollback_failure_rate`
 - `realtime_provider_success_stale_timeout_latency_eta_error`
 - `report_upload_failure_duplicate_orphan_cleanup_rate`
