@@ -116,4 +116,9 @@ class _UnusedRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
+  }
 }

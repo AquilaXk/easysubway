@@ -372,6 +372,50 @@ void main() {
     expect(notificationCount, 1);
   });
 
+  test('경로 검색 컨트롤러는 현재 결과 ETA refresh 상태를 유지해서 표시한다', () async {
+    final repository = FakeRouteSearchRepository();
+    final controller = RouteSearchController(repository: repository);
+
+    await controller.search(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'SENIOR',
+      ),
+    );
+    repository.refreshResult = RouteRefreshResult(
+      routeSearchId: 'route-1',
+      status: 'STALE_FALLBACK',
+      result: _sampleRouteSearchResult(
+        warnings: const [
+          RouteSearchWarning(
+            code: 'STALE_ACCESSIBILITY_DATA',
+            message: '시설 상태 안내가 오래됐을 수 있어요.',
+          ),
+        ],
+      ),
+      refreshedAt: '2026-07-01T15:30:00',
+      etaSource: 'FALLBACK',
+      etaConfidence: 'LOW',
+      sourceLabel: '최근 확인 시간이 오래되어 계획 시간으로 안내',
+      reasonCodes: const ['STALE_FALLBACK'],
+    );
+
+    await controller.refreshCurrentRoute();
+
+    expect(repository.refreshRouteSearchIds, ['route-1']);
+    expect(controller.state.status, RouteSearchViewStatus.success);
+    expect(controller.state.isRefreshing, isFalse);
+    expect(
+      controller.state.refreshMessage,
+      '실시간 정보가 늦어 계획 시간으로 안내해요. · 최근 확인 시간이 오래되어 계획 시간으로 안내 · 신뢰도 낮음',
+    );
+    expect(
+      controller.state.result!.warnings.map((warning) => warning.code),
+      contains('STALE_ACCESSIBILITY_DATA'),
+    );
+  });
+
   test('경로 검색 결과는 확인 필요 상태를 이동 가능으로 안내하지 않는다', () {
     final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
 
@@ -1108,7 +1152,9 @@ void main() {
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
   final requests = <RouteSearchRequest>[];
+  final refreshRouteSearchIds = <String>[];
   Object? error;
+  RouteRefreshResult? refreshResult;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
@@ -1119,6 +1165,21 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
     }
     return _sampleRouteSearchResult();
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    refreshRouteSearchIds.add(routeSearchId);
+    return refreshResult ??
+        RouteRefreshResult(
+          routeSearchId: routeSearchId,
+          status: 'UNCHANGED',
+          result: _sampleRouteSearchResult(),
+          refreshedAt: '2026-07-01T15:30:00',
+          etaSource: 'PLANNED',
+          etaConfidence: 'MEDIUM',
+          sourceLabel: '계획 시간 기준',
+        );
+  }
 }
 
 class PendingRouteSearchRepository implements RouteSearchRepository {
@@ -1127,6 +1188,11 @@ class PendingRouteSearchRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) =>
       _completer.future;
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
+  }
 
   void complete(RouteSearchResult result) {
     _completer.complete(result);

@@ -15,6 +15,7 @@ import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
+const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어요.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
@@ -88,6 +89,8 @@ String _routeDateLabel(String value) {
 
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
+
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId);
 }
 
 abstract class RouteFeedbackRepository {
@@ -176,6 +179,46 @@ class RouteSearchApiRepository implements RouteSearchRepository {
         context: '경로 검색 API 응답 처리 중 예외가 발생했습니다.',
       );
       throw const RouteSearchException(_routeSearchErrorMessage);
+    }
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    final trimmedRouteSearchId = routeSearchId.trim();
+    if (trimmedRouteSearchId.isEmpty) {
+      throw const RouteSearchException(_routeRefreshErrorMessage);
+    }
+
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v2/routes/${Uri.encodeComponent(trimmedRouteSearchId)}/refresh',
+        body: const <String, Object?>{},
+      );
+
+      if (!response.isOk) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+
+      final decoded = response.jsonBody;
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+
+      return RouteRefreshResult.fromJson(data);
+    } on RouteSearchException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 ETA refresh API 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const RouteSearchException(_routeRefreshErrorMessage);
     }
   }
 }
@@ -1205,6 +1248,68 @@ class RouteSearchResult {
   }
 }
 
+class RouteRefreshResult {
+  const RouteRefreshResult({
+    required this.routeSearchId,
+    required this.status,
+    required this.result,
+    required this.refreshedAt,
+    required this.etaSource,
+    required this.etaConfidence,
+    required this.sourceLabel,
+    this.reasonCodes = const [],
+  });
+
+  factory RouteRefreshResult.fromJson(Map<String, Object?> json) {
+    final route = json['route'];
+    if (route is! Map<String, Object?>) {
+      throw const FormatException('Invalid route refresh payload');
+    }
+    return RouteRefreshResult(
+      routeSearchId: _requiredRouteString(json, 'routeSearchId'),
+      status: _requiredRouteString(json, 'status'),
+      result: RouteSearchResult.fromJson(route),
+      refreshedAt: _requiredRouteString(json, 'refreshedAt'),
+      etaSource: _requiredRouteString(json, 'etaSource'),
+      etaConfidence: _requiredRouteString(json, 'etaConfidence'),
+      sourceLabel: _requiredRouteString(json, 'sourceLabel'),
+      reasonCodes: _routeStringList(
+        json['reasonCodes'],
+        'route refresh reason',
+      ),
+    );
+  }
+
+  final String routeSearchId;
+  final String status;
+  final RouteSearchResult result;
+  final String refreshedAt;
+  final String etaSource;
+  final String etaConfidence;
+  final String sourceLabel;
+  final List<String> reasonCodes;
+
+  String get userMessage {
+    final statusLabel = switch (status) {
+      'UPDATED_ETA' => '도착 시간을 새로 확인했어요.',
+      'UNCHANGED' => '도착 시간이 그대로예요.',
+      'STALE_FALLBACK' => '실시간 정보가 늦어 계획 시간으로 안내해요.',
+      'REROUTE_REQUIRED' => '경로를 다시 찾아야 해요.',
+      _ => '도착 시간을 확인했어요.',
+    };
+    final confidenceLabel = switch (etaConfidence) {
+      'HIGH' => '신뢰도 높음',
+      'MEDIUM' => '신뢰도 보통',
+      'LOW' => '신뢰도 낮음',
+      _ => '신뢰도 확인 중',
+    };
+    final source = sourceLabel.trim();
+    return source.isEmpty
+        ? '$statusLabel · $confidenceLabel'
+        : '$statusLabel · $source · $confidenceLabel';
+  }
+}
+
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
@@ -1488,16 +1593,38 @@ class RouteSearchState {
     required this.status,
     this.result,
     this.message = '',
+    this.isRefreshing = false,
+    this.refreshMessage = '',
   });
 
   const RouteSearchState.idle()
     : status = RouteSearchViewStatus.idle,
       result = null,
-      message = '';
+      message = '',
+      isRefreshing = false,
+      refreshMessage = '';
 
   final RouteSearchViewStatus status;
   final RouteSearchResult? result;
   final String message;
+  final bool isRefreshing;
+  final String refreshMessage;
+
+  RouteSearchState copyWith({
+    RouteSearchViewStatus? status,
+    RouteSearchResult? result,
+    String? message,
+    bool? isRefreshing,
+    String? refreshMessage,
+  }) {
+    return RouteSearchState(
+      status: status ?? this.status,
+      result: result ?? this.result,
+      message: message ?? this.message,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      refreshMessage: refreshMessage ?? this.refreshMessage,
+    );
+  }
 }
 
 class RouteSearchController extends ChangeNotifier {
@@ -1562,6 +1689,58 @@ class RouteSearchController extends ChangeNotifier {
         const RouteSearchState(
           status: RouteSearchViewStatus.failure,
           message: _routeSearchErrorMessage,
+        ),
+      );
+    }
+  }
+
+  Future<void> refreshCurrentRoute() async {
+    if (_disposed) {
+      return;
+    }
+    final currentResult = _state.result;
+    if (_state.status != RouteSearchViewStatus.success ||
+        currentResult == null ||
+        currentResult.isLocalResult ||
+        _state.isRefreshing) {
+      return;
+    }
+
+    _emitState(_state.copyWith(isRefreshing: true));
+    try {
+      final refreshed = await repository.refreshRoute(
+        currentResult.routeSearchId,
+      );
+      if (_disposed) {
+        return;
+      }
+      _emitState(
+        RouteSearchState(
+          status: RouteSearchViewStatus.success,
+          result: refreshed.result,
+          refreshMessage: refreshed.userMessage,
+        ),
+      );
+    } on RouteSearchException catch (error) {
+      if (_disposed) {
+        return;
+      }
+      _emitState(
+        _state.copyWith(isRefreshing: false, refreshMessage: error.message),
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 ETA refresh 처리 중 예외가 발생했습니다.',
+      );
+      if (_disposed) {
+        return;
+      }
+      _emitState(
+        _state.copyWith(
+          isRefreshing: false,
+          refreshMessage: _routeRefreshErrorMessage,
         ),
       );
     }
@@ -1634,7 +1813,8 @@ String _resolveInitialMobilityType(String? mobilityType) {
       : mobilityProfileOptions.first.mobilityType;
 }
 
-class _RouteSearchScreenState extends State<RouteSearchScreen> {
+class _RouteSearchScreenState extends State<RouteSearchScreen>
+    with WidgetsBindingObserver {
   late final RouteSearchController _controller;
   StationSearchResult? _originStation;
   StationSearchResult? _destinationStation;
@@ -1646,6 +1826,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = RouteSearchController(repository: widget.repository);
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
@@ -1657,8 +1838,16 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.refreshCurrentRoute();
+    }
   }
 
   @override
@@ -1708,104 +1897,109 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               children: [submitButton, widget.shellNavigationBar!],
             ),
       body: SafeArea(
-        child: ListView(
-          padding: _routeSearchPagePadding,
-          children: [
-            _RoutePointPickerCard(
-              key: const Key('routePointPickerCard'),
-              originStation: _originStation,
-              destinationStation: _destinationStation,
-              originPicker: _activeStationPicker == _RouteStationRole.origin
-                  ? _buildRouteStationPicker(_RouteStationRole.origin)
-                  : null,
-              destinationPicker:
-                  _activeStationPicker == _RouteStationRole.destination
-                  ? _buildRouteStationPicker(_RouteStationRole.destination)
-                  : null,
-              onOriginTap: () => _openStationPicker(_RouteStationRole.origin),
-              onDestinationTap: () =>
-                  _openStationPicker(_RouteStationRole.destination),
-              onSwap: _swapStations,
-            ),
-            const SizedBox(height: 18),
-            _RouteRecentDestinationList(
-              repository: widget.favoriteRouteRepository,
-              onSelected: _updateDestinationStation,
-            ),
-            if (_validationMessage.isNotEmpty) ...[
-              _RouteSearchMessage(
-                message: _validationMessage,
-                liveRegion: true,
+        child: RefreshIndicator(
+          key: const Key('routeResultRefreshIndicator'),
+          onRefresh: _controller.refreshCurrentRoute,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: _routeSearchPagePadding,
+            children: [
+              _RoutePointPickerCard(
+                key: const Key('routePointPickerCard'),
+                originStation: _originStation,
+                destinationStation: _destinationStation,
+                originPicker: _activeStationPicker == _RouteStationRole.origin
+                    ? _buildRouteStationPicker(_RouteStationRole.origin)
+                    : null,
+                destinationPicker:
+                    _activeStationPicker == _RouteStationRole.destination
+                    ? _buildRouteStationPicker(_RouteStationRole.destination)
+                    : null,
+                onOriginTap: () => _openStationPicker(_RouteStationRole.origin),
+                onDestinationTap: () =>
+                    _openStationPicker(_RouteStationRole.destination),
+                onSwap: _swapStations,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+              _RouteRecentDestinationList(
+                repository: widget.favoriteRouteRepository,
+                onSelected: _updateDestinationStation,
+              ),
+              if (_validationMessage.isNotEmpty) ...[
+                _RouteSearchMessage(
+                  message: _validationMessage,
+                  liveRegion: true,
+                ),
+                const SizedBox(height: 16),
+              ],
+              _RouteSectionHeader(
+                title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건',
+              ),
+              const SizedBox(height: 8),
+              // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
+              if (widget.simpleViewEnabled)
+                _RouteMobilityTypeSummary(
+                  mobilityType: _selectedMobilityType,
+                  onChangeRequested: _showMobilityTypePicker,
+                )
+              else
+                InputDecorator(
+                  key: const Key('routeMobilityTypeInput'),
+                  decoration: const InputDecoration(
+                    labelText: '이동 조건',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedMobilityType,
+                      isExpanded: true,
+                      items: [
+                        for (final option in mobilityProfileOptions)
+                          DropdownMenuItem<String>(
+                            value: option.mobilityType,
+                            child: Text(option.title),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() {
+                          _selectedMobilityType = value;
+                          _selectedConstraintMode =
+                              RouteSearchRequest._defaultConstraintMode(value);
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              SwitchListTile(
+                key: const Key('routeStrictStepFreeSwitch'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('계단 없는 길만'),
+                subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
+                value: _selectedConstraintMode == 'STRICT_STEP_FREE',
+                onChanged: (value) {
+                  setState(() {
+                    _selectedConstraintMode = value
+                        ? 'STRICT_STEP_FREE'
+                        : 'PREFER_STEP_FREE';
+                  });
+                },
+              ),
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) => _RouteSearchBody(
+                  state: _controller.state,
+                  routeFeedbackRepository: widget.routeFeedbackRepository,
+                  favoriteRouteRepository: widget.favoriteRouteRepository,
+                  onShellBackToHome: widget.onShellBackToHome,
+                ),
+              ),
             ],
-            _RouteSectionHeader(
-              title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건',
-            ),
-            const SizedBox(height: 8),
-            // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
-            if (widget.simpleViewEnabled)
-              _RouteMobilityTypeSummary(
-                mobilityType: _selectedMobilityType,
-                onChangeRequested: _showMobilityTypePicker,
-              )
-            else
-              InputDecorator(
-                key: const Key('routeMobilityTypeInput'),
-                decoration: const InputDecoration(
-                  labelText: '이동 조건',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedMobilityType,
-                    isExpanded: true,
-                    items: [
-                      for (final option in mobilityProfileOptions)
-                        DropdownMenuItem<String>(
-                          value: option.mobilityType,
-                          child: Text(option.title),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedMobilityType = value;
-                        _selectedConstraintMode =
-                            RouteSearchRequest._defaultConstraintMode(value);
-                      });
-                    },
-                  ),
-                ),
-              ),
-            SwitchListTile(
-              key: const Key('routeStrictStepFreeSwitch'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('계단 없는 길만'),
-              subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
-              value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-              onChanged: (value) {
-                setState(() {
-                  _selectedConstraintMode = value
-                      ? 'STRICT_STEP_FREE'
-                      : 'PREFER_STEP_FREE';
-                });
-              },
-            ),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => _RouteSearchBody(
-                state: _controller.state,
-                routeFeedbackRepository: widget.routeFeedbackRepository,
-                favoriteRouteRepository: widget.favoriteRouteRepository,
-                onShellBackToHome: widget.onShellBackToHome,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -2944,6 +3138,8 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
+        refreshMessage: state.refreshMessage,
+        isRefreshing: state.isRefreshing,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
         onShellBackToHome: onShellBackToHome,
@@ -3018,6 +3214,68 @@ class _RouteSearchMessage extends StatelessWidget {
   }
 }
 
+class _RouteRefreshStatusBanner extends StatelessWidget {
+  const _RouteRefreshStatusBanner({
+    required this.message,
+    required this.isRefreshing,
+  });
+
+  final String message;
+  final bool isRefreshing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isRefreshing && message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final text = isRefreshing ? '도착 시간을 확인하고 있어요.' : message;
+    return Semantics(
+      key: const Key('routeRefreshStatusBanner'),
+      container: true,
+      liveRegion: true,
+      label: text,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _routeArrivalPanelColor,
+          border: Border.all(color: _routeArrivalBorderColor),
+          borderRadius: _routeSearchSmallRadius,
+        ),
+        child: Row(
+          children: [
+            if (isRefreshing) ...[
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+              const SizedBox(width: 10),
+            ] else ...[
+              const Icon(
+                Icons.refresh,
+                color: _routeArrivalTextColor,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: _routeArrivalTextColor,
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 enum _RouteWorkflowView {
   list,
   detail,
@@ -3030,12 +3288,16 @@ enum _RouteWorkflowView {
 class _RouteSearchResultCard extends StatefulWidget {
   const _RouteSearchResultCard({
     required this.result,
+    required this.refreshMessage,
+    required this.isRefreshing,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
   });
 
   final RouteSearchResult result;
+  final String refreshMessage;
+  final bool isRefreshing;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final VoidCallback? onShellBackToHome;
@@ -3058,6 +3320,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
+    final refreshMessage = widget.refreshMessage;
     if (result.isBlocked) {
       final content = _RouteBlockedWorkflow(result: result);
       final onShellBackToHome = widget.onShellBackToHome;
@@ -3084,7 +3347,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     final canOpenFeedback =
         canUseApiActions && widget.routeFeedbackRepository != null;
 
-    final content = switch (_view) {
+    final workflowContent = switch (_view) {
       _RouteWorkflowView.list => _RouteResultsListView(
         result: result,
         onOpenDetail: () => setState(() => _view = _RouteWorkflowView.detail),
@@ -3128,6 +3391,16 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
         onBack: () => setState(() => _view = _RouteWorkflowView.detail),
       ),
     };
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RouteRefreshStatusBanner(
+          message: refreshMessage,
+          isRefreshing: widget.isRefreshing,
+        ),
+        workflowContent,
+      ],
+    );
     final onShellBackToHome = widget.onShellBackToHome;
     return PopScope(
       canPop: _view == _RouteWorkflowView.list && onShellBackToHome == null,

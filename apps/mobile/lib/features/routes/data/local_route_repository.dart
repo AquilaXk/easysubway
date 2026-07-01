@@ -40,6 +40,11 @@ class LocalRouteRepository implements RouteSearchRepository {
     return _toRouteSearchResult(request, result, catalog);
   }
 
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    throw const RouteSearchException('로컬 경로는 새로고침할 수 없어요.');
+  }
+
   RouteSearchResult _toRouteSearchResult(
     RouteSearchRequest request,
     local.LocalRouteResult result,
@@ -351,6 +356,11 @@ class LocalFirstRouteSearchRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     return localRepository.searchRoute(request);
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    return localRepository.refreshRoute(routeSearchId);
   }
 }
 
