@@ -53,25 +53,33 @@ function assertNoSensitiveSummary(summary, gate) {
   }
 }
 
-function assertIdentity(summary, gate) {
-  const identity = required(summary.artifactIdentity, "artifactIdentity");
+function stableFlatJson(value) {
+  return JSON.stringify(Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))));
+}
+
+function assertIdentity(summary, gate, path = "artifactIdentity", expectedIdentity) {
+  const identity = required(summary.artifactIdentity, path);
   for (const field of gate.buildIdentityPolicy.requiredIdentityFields) {
-    required(identity[field], `artifactIdentity.${field}`);
+    required(identity[field], `${path}.${field}`);
   }
   for (const fields of gate.buildIdentityPolicy.requiredIdentityAnyOf) {
     if (!fields.some((field) => identity[field])) {
-      throw new Error(`artifactIdentity must include one of: ${fields.join(", ")}`);
+      throw new Error(`${path} must include one of: ${fields.join(", ")}`);
     }
   }
+  if (expectedIdentity && stableFlatJson(identity) !== stableFlatJson(expectedIdentity)) {
+    throw new Error(`${path} must match artifactIdentity`);
+  }
+  return identity;
 }
 
 function assertFindingCounts(matrixSummary, requirePass, gate) {
   const counts = required(matrixSummary.findingCounts, `${matrixSummary.matrixId}.findingCounts`);
-  const critical = Number(counts.critical ?? 0);
-  const high = Number(counts.high ?? 0);
-  const medium = Number(counts.medium ?? 0);
-  if (!Number.isFinite(critical) || !Number.isFinite(high) || !Number.isFinite(medium)) {
-    throw new Error(`${matrixSummary.matrixId}.findingCounts must be numeric`);
+  const critical = counts.critical ?? 0;
+  const high = counts.high ?? 0;
+  const medium = counts.medium ?? 0;
+  if (![critical, high, medium].every((value) => Number.isInteger(value) && value >= 0)) {
+    throw new Error(`${matrixSummary.matrixId}.findingCounts must be non-negative integers`);
   }
   if (critical > gate.findingPolicy.criticalHighAllowed || high > gate.findingPolicy.criticalHighAllowed) {
     throw new Error(`${matrixSummary.matrixId} has critical/high findings`);
@@ -122,13 +130,14 @@ async function main() {
   if (!STATUS.has(summary.status)) throw new Error("status must be a release gate status");
   if (requirePass && summary.status !== "PASS") throw new Error("status must be PASS");
 
-  assertIdentity(summary, gate);
+  const artifactIdentity = assertIdentity(summary, gate);
   assertNoSensitiveSummary(summary, gate);
 
   const matrixSummaries = new Map(required(summary.matrices, "matrices").map((matrix) => [matrix.matrixId, matrix]));
   for (const [matrixId, matrix] of Object.entries(gate.rehearsalMatrices)) {
     const matrixSummary = matrixSummaries.get(matrixId);
     assertMatrix(matrixId, matrix, matrixSummary, gate);
+    assertIdentity(matrixSummary, gate, `${matrixId}.artifactIdentity`, artifactIdentity);
     assertFindingCounts(matrixSummary, requirePass, gate);
   }
 }

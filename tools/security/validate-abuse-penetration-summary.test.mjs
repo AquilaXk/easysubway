@@ -51,11 +51,11 @@ function validSummary() {
     releaseGate: gate.releaseGate,
     issue: gate.issue,
     status: "PASS",
-    artifactIdentity,
+    artifactIdentity: { ...artifactIdentity },
     matrices: Object.entries(gate.rehearsalMatrices).map(([matrixId, matrix]) => ({
       matrixId,
       scenarioId: matrix.scenarioId,
-      artifactIdentity,
+      artifactIdentity: { ...artifactIdentity },
       commandOrManualCheck: "redacted local rehearsal",
       findingCounts: { critical: 0, high: 0, medium: 0, low: 0 },
       result: "PASS",
@@ -126,5 +126,27 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
       ], { cwd: root }),
     ),
     /critical\/high findings/,
+  );
+
+  const stringCount = validSummary();
+  stringCount.matrices[0].findingCounts.critical = "0";
+  await assert.rejects(
+    withSummary(stringCount, (summaryPath) =>
+      execFileAsync(process.execPath, ["tools/security/validate-abuse-penetration-summary.mjs", "--summary", summaryPath], {
+        cwd: root,
+      }),
+    ),
+    /non-negative integers/,
+  );
+
+  const mixedIdentity = validSummary();
+  mixedIdentity.matrices[0].artifactIdentity.versionCode = 10002;
+  await assert.rejects(
+    withSummary(mixedIdentity, (summaryPath) =>
+      execFileAsync(process.execPath, ["tools/security/validate-abuse-penetration-summary.mjs", "--summary", summaryPath], {
+        cwd: root,
+      }),
+    ),
+    /artifactIdentity must match/,
   );
 });
