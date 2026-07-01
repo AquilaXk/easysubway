@@ -221,8 +221,11 @@ class RouteSearchController {
 	) {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime) {
-			OffsetDateTime plannedArrivalTime = departureTime.plusSeconds(result.estimatedDurationSeconds());
-			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime);
+			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime, result.mobilityType());
+			int durationSeconds = result.estimatedDurationSeconds() + legs.stream()
+				.mapToInt(LegDto::waitTimeSeconds)
+				.sum();
+			OffsetDateTime plannedArrivalTime = departureTime.plusSeconds(durationSeconds);
 			return new ItineraryDto(
 				result.routeSearchId() + "-primary",
 				statusOf(result),
@@ -230,7 +233,7 @@ class RouteSearchController {
 				null,
 				result.etaSource().name(),
 				etaConfidenceOf(result),
-				result.estimatedDurationSeconds(),
+				durationSeconds,
 				result.transferCount(),
 				result.walkingDistanceMeters(),
 				AccessibilityRiskDto.from(result),
@@ -428,13 +431,19 @@ class RouteSearchController {
 		AccessibilityRiskDto accessibilityRisk
 	) {
 
-		private static List<LegDto> fromSteps(List<RouteStep> steps, OffsetDateTime departureTime) {
+		private static List<LegDto> fromSteps(
+			List<RouteStep> steps,
+			OffsetDateTime departureTime,
+			MobilityType mobilityType
+		) {
 			List<LegDto> legs = new ArrayList<>();
 			OffsetDateTime cursor = departureTime;
 			for (RouteStep step : steps) {
 				int durationSeconds = Math.max(0, step.estimatedMinutes()) * 60;
-				OffsetDateTime plannedArrivalTime = cursor.plusSeconds(durationSeconds);
-				legs.add(from(step, cursor, plannedArrivalTime, durationSeconds));
+				int slackSeconds = slackSeconds(step, mobilityType);
+				OffsetDateTime plannedDepartureTime = cursor.plusSeconds(slackSeconds);
+				OffsetDateTime plannedArrivalTime = plannedDepartureTime.plusSeconds(durationSeconds);
+				legs.add(from(step, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds));
 				cursor = plannedArrivalTime;
 			}
 			return List.copyOf(legs);
@@ -444,7 +453,8 @@ class RouteSearchController {
 			RouteStep step,
 			OffsetDateTime departureTime,
 			OffsetDateTime plannedArrivalTime,
-			int durationSeconds
+			int durationSeconds,
+			int slackSeconds
 		) {
 			return new LegDto(
 				legTypeOf(step),
@@ -459,14 +469,25 @@ class RouteSearchController {
 				null,
 				formatOffset(plannedArrivalTime),
 				null,
-				0,
-				0,
+				slackSeconds,
+				slackSeconds,
 				durationSeconds,
 				Math.max(0, step.distanceMeters()),
 				etaSourceOf(step).name(),
 				etaConfidenceOf(step),
 				AccessibilityRiskDto.from(step)
 			);
+		}
+
+		private static int slackSeconds(RouteStep step, MobilityType mobilityType) {
+			if (!"RIDE".equals(legTypeOf(step))) {
+				return 0;
+			}
+			// ponytail: schedule candidate selection belongs with timetable schema; expose only mobility buffer for now.
+			if (mobilityType == MobilityType.WHEELCHAIR || mobilityType == MobilityType.TEMPORARY_INJURY) {
+				return 180;
+			}
+			return 120;
 		}
 
 		private static EtaSource etaSourceOf(RouteStep step) {
