@@ -1706,12 +1706,17 @@ class RouteSearchController extends ChangeNotifier {
       return;
     }
 
+    final refreshRequestId = _searchRequestId;
+    final refreshRouteSearchId = currentResult.routeSearchId;
+    bool staleRefresh() =>
+        _disposed ||
+        refreshRequestId != _searchRequestId ||
+        _state.result?.routeSearchId != refreshRouteSearchId;
+
     _emitState(_state.copyWith(isRefreshing: true));
     try {
-      final refreshed = await repository.refreshRoute(
-        currentResult.routeSearchId,
-      );
-      if (_disposed) {
+      final refreshed = await repository.refreshRoute(refreshRouteSearchId);
+      if (staleRefresh()) {
         return;
       }
       _emitState(
@@ -1722,7 +1727,7 @@ class RouteSearchController extends ChangeNotifier {
         ),
       );
     } on RouteSearchException catch (error) {
-      if (_disposed) {
+      if (staleRefresh()) {
         return;
       }
       _emitState(
@@ -1734,7 +1739,7 @@ class RouteSearchController extends ChangeNotifier {
         stackTrace,
         context: '경로 ETA refresh 처리 중 예외가 발생했습니다.',
       );
-      if (_disposed) {
+      if (staleRefresh()) {
         return;
       }
       _emitState(

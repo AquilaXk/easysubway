@@ -416,6 +416,50 @@ void main() {
     );
   });
 
+  test('경로 검색 컨트롤러는 오래된 ETA refresh 응답으로 새 검색 결과를 덮지 않는다', () async {
+    final repository = FakeRouteSearchRepository();
+    final controller = RouteSearchController(repository: repository);
+
+    await controller.search(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final pendingRefresh = Completer<RouteRefreshResult>();
+    repository.pendingRefresh = pendingRefresh;
+    final refreshFuture = controller.refreshCurrentRoute();
+
+    repository.searchResult = _sampleRouteSearchResult(
+      routeSearchId: 'route-2',
+    );
+    await controller.search(
+      const RouteSearchRequest(
+        originStationId: 'station-sadang',
+        destinationStationId: 'station-sangnoksu',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    pendingRefresh.complete(
+      RouteRefreshResult(
+        routeSearchId: 'route-1',
+        status: 'UPDATED_ETA',
+        result: _sampleRouteSearchResult(routeSearchId: 'route-1'),
+        refreshedAt: '2026-07-01T15:31:00',
+        etaSource: 'REALTIME',
+        etaConfidence: 'HIGH',
+        sourceLabel: '실시간 도착 정보 기준',
+      ),
+    );
+    await refreshFuture;
+
+    expect(controller.state.result!.routeSearchId, 'route-2');
+    expect(controller.state.refreshMessage, isEmpty);
+  });
+
   test('경로 검색 결과는 확인 필요 상태를 이동 가능으로 안내하지 않는다', () {
     final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
 
@@ -1154,6 +1198,8 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   final requests = <RouteSearchRequest>[];
   final refreshRouteSearchIds = <String>[];
   Object? error;
+  RouteSearchResult searchResult = _sampleRouteSearchResult();
+  Completer<RouteRefreshResult>? pendingRefresh;
   RouteRefreshResult? refreshResult;
 
   @override
@@ -1163,17 +1209,21 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
     if (currentError != null) {
       throw currentError;
     }
-    return _sampleRouteSearchResult();
+    return searchResult;
   }
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
     refreshRouteSearchIds.add(routeSearchId);
+    final pending = pendingRefresh;
+    if (pending != null) {
+      return pending.future;
+    }
     return refreshResult ??
         RouteRefreshResult(
           routeSearchId: routeSearchId,
           status: 'UNCHANGED',
-          result: _sampleRouteSearchResult(),
+          result: searchResult,
           refreshedAt: '2026-07-01T15:30:00',
           etaSource: 'PLANNED',
           etaConfidence: 'MEDIUM',
@@ -1200,6 +1250,7 @@ class PendingRouteSearchRepository implements RouteSearchRepository {
 }
 
 RouteSearchResult _sampleRouteSearchResult({
+  String routeSearchId = 'route-1',
   String status = 'FOUND',
   List<RouteSearchStep> steps = const [
     RouteSearchStep(
@@ -1230,7 +1281,7 @@ RouteSearchResult _sampleRouteSearchResult({
   List<String> blockedReasons = const [],
 }) {
   return RouteSearchResult(
-    routeSearchId: 'route-1',
+    routeSearchId: routeSearchId,
     originStationId: 'station-sangnoksu',
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
