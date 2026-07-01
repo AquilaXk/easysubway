@@ -69,10 +69,6 @@ class AppDependencies {
       'EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED',
       defaultValue: false,
     ),
-    bool enableRouteV2Fallback = const bool.fromEnvironment(
-      'EASYSUBWAY_ROUTE_V2_FALLBACK_ENABLED',
-      defaultValue: true,
-    ),
     RouteSearchOnlineFirstMetrics? routeSearchOnlineFirstMetrics,
     required bool enablePushNotifications,
   }) {
@@ -155,7 +151,6 @@ class AppDependencies {
                   baseUri: routeV2BaseUri,
                 ),
                 localRepository: localRouteRepository,
-                fallbackEnabled: enableRouteV2Fallback,
                 metrics: routeSearchOnlineFirstMetrics,
               );
             }

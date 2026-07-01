@@ -134,7 +134,7 @@ void main() {
   });
 
   test(
-    'online-first backend 5xx는 catalog가 있으면 STATIC_LOCAL fallback을 표시한다',
+    'online-first backend 5xx는 catalog가 있어도 local route로 대체하지 않는다',
     () async {
       final database = CatalogDatabase.memory();
       addTearDown(database.close);
@@ -144,91 +144,6 @@ void main() {
       server.listen((request) async {
         request.response
           ..statusCode = HttpStatus.serviceUnavailable
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode({'success': false}));
-        await request.response.close();
-      });
-      final metrics = RouteSearchOnlineFirstMetrics();
-
-      final dependencies = AppDependencies.resolve(
-        catalogDatabase: database,
-        reportRepository: const UnavailableFacilityReportRepository(),
-        apiBaseUri: () =>
-            Uri.parse('http://${server.address.host}:${server.port}'),
-        enablePushNotifications: false,
-        enableRouteV2OnlineFirst: true,
-        routeSearchOnlineFirstMetrics: metrics,
-      );
-
-      final result = await dependencies.routeRepository.searchRoute(
-        const RouteSearchRequest(
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityType: 'WHEELCHAIR',
-        ),
-      );
-
-      expect(result.isLocalResult, isTrue);
-      expect(result.etaSource, 'STATIC_LOCAL');
-      expect(result.fallbackReason, 'backend-5xx');
-      expect(result.sourceNotice, '실시간 미반영, 저장된 데이터 기준');
-      expect(result.semanticLabel, contains('실시간 미반영, 저장된 데이터 기준'));
-      expect(metrics.onlineSuccessCount, 0);
-      expect(metrics.fallbackSuccessCount, 1);
-      expect(metrics.fallbackReasonCounts, {'backend-5xx': 1});
-    },
-  );
-
-  test(
-    'online-first backend 404는 catalog가 있으면 STATIC_LOCAL fallback을 표시한다',
-    () async {
-      final database = CatalogDatabase.memory();
-      addTearDown(database.close);
-      await database.seedBaselineIfEmpty();
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(server.close);
-      server.listen((request) async {
-        request.response
-          ..statusCode = HttpStatus.notFound
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode({'success': false}));
-        await request.response.close();
-      });
-
-      final dependencies = AppDependencies.resolve(
-        catalogDatabase: database,
-        reportRepository: const UnavailableFacilityReportRepository(),
-        apiBaseUri: () =>
-            Uri.parse('http://${server.address.host}:${server.port}'),
-        enablePushNotifications: false,
-        enableRouteV2OnlineFirst: true,
-      );
-
-      final result = await dependencies.routeRepository.searchRoute(
-        const RouteSearchRequest(
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityType: 'WHEELCHAIR',
-        ),
-      );
-
-      expect(result.isLocalResult, isTrue);
-      expect(result.etaSource, 'STATIC_LOCAL');
-      expect(result.fallbackReason, 'backend-4xx');
-    },
-  );
-
-  test(
-    'online-first backend 4xx validation은 local fallback으로 숨기지 않는다',
-    () async {
-      final database = CatalogDatabase.memory();
-      addTearDown(database.close);
-      await database.seedBaselineIfEmpty();
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(server.close);
-      server.listen((request) async {
-        request.response
-          ..statusCode = HttpStatus.badRequest
           ..headers.contentType = ContentType.json
           ..write(jsonEncode({'success': false}));
         await request.response.close();
@@ -255,12 +170,97 @@ void main() {
         ),
         throwsA(isA<RouteSearchException>()),
       );
-      expect(metrics.fallbackUnavailableCount, 1);
-      expect(metrics.fallbackReasonCounts, {'backend-4xx': 1});
+
+      expect(metrics.onlineSuccessCount, 0);
+      expect(metrics.onlineFailureCount, 1);
+      expect(metrics.onlineFailureReasonCounts, {'backend-5xx': 1});
     },
   );
 
-  test('online-first 예상 밖 HTTP status는 local fallback으로 숨기지 않는다', () async {
+  test(
+    'online-first backend 404는 catalog가 있어도 local route로 대체하지 않는다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.notFound
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
+      });
+      final metrics = RouteSearchOnlineFirstMetrics();
+
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () =>
+            Uri.parse('http://${server.address.host}:${server.port}'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+        routeSearchOnlineFirstMetrics: metrics,
+      );
+
+      await expectLater(
+        dependencies.routeRepository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        ),
+        throwsA(isA<RouteSearchException>()),
+      );
+
+      expect(metrics.onlineSuccessCount, 0);
+      expect(metrics.onlineFailureCount, 1);
+      expect(metrics.onlineFailureReasonCounts, {'backend-4xx': 1});
+    },
+  );
+
+  test('online-first backend 4xx validation은 local route로 숨기지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) async {
+      request.response
+        ..statusCode = HttpStatus.badRequest
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'success': false}));
+      await request.response.close();
+    });
+    final metrics = RouteSearchOnlineFirstMetrics();
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: database,
+      reportRepository: const UnavailableFacilityReportRepository(),
+      apiBaseUri: () =>
+          Uri.parse('http://${server.address.host}:${server.port}'),
+      enablePushNotifications: false,
+      enableRouteV2OnlineFirst: true,
+      routeSearchOnlineFirstMetrics: metrics,
+    );
+
+    await expectLater(
+      dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      ),
+      throwsA(isA<RouteSearchException>()),
+    );
+    expect(metrics.onlineFailureCount, 1);
+    expect(metrics.onlineFailureReasonCounts, {'backend-4xx': 1});
+  });
+
+  test('online-first 예상 밖 HTTP status는 local route로 숨기지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
@@ -295,52 +295,9 @@ void main() {
       ),
       throwsA(isA<RouteSearchException>()),
     );
-    expect(metrics.fallbackUnavailableCount, 1);
-    expect(metrics.fallbackReasonCounts, {'backend-unexpected': 1});
+    expect(metrics.onlineFailureCount, 1);
+    expect(metrics.onlineFailureReasonCounts, {'backend-unexpected': 1});
   });
-
-  test(
-    'online-first fallback flag가 꺼져 있으면 5xx를 local fallback으로 숨기지 않는다',
-    () async {
-      final database = CatalogDatabase.memory();
-      addTearDown(database.close);
-      await database.seedBaselineIfEmpty();
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(server.close);
-      server.listen((request) async {
-        request.response
-          ..statusCode = HttpStatus.serviceUnavailable
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode({'success': false}));
-        await request.response.close();
-      });
-      final metrics = RouteSearchOnlineFirstMetrics();
-
-      final dependencies = AppDependencies.resolve(
-        catalogDatabase: database,
-        reportRepository: const UnavailableFacilityReportRepository(),
-        apiBaseUri: () =>
-            Uri.parse('http://${server.address.host}:${server.port}'),
-        enablePushNotifications: false,
-        enableRouteV2OnlineFirst: true,
-        enableRouteV2Fallback: false,
-        routeSearchOnlineFirstMetrics: metrics,
-      );
-
-      await expectLater(
-        dependencies.routeRepository.searchRoute(
-          const RouteSearchRequest(
-            originStationId: 'station-sangnoksu',
-            destinationStationId: 'station-sadang',
-            mobilityType: 'WHEELCHAIR',
-          ),
-        ),
-        throwsA(isA<RouteSearchException>()),
-      );
-      expect(metrics.fallbackUnavailableCount, 1);
-      expect(metrics.fallbackReasonCounts, {'backend-5xx': 1});
-    },
-  );
 
   test('로컬 경로 repository는 baseline catalog에서 상록수-사당 경로를 계산한다', () async {
     final database = CatalogDatabase.memory();

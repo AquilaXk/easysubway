@@ -368,13 +368,11 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
   const OnlineFirstRouteSearchRepository({
     required this.onlineRepository,
     required this.localRepository,
-    this.fallbackEnabled = true,
     this.metrics,
   });
 
   final RouteSearchRepository onlineRepository;
   final LocalRouteRepository? localRepository;
-  final bool fallbackEnabled;
   final RouteSearchOnlineFirstMetrics? metrics;
 
   @override
@@ -387,26 +385,9 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
       metrics?.recordOnlineSuccess();
       return result;
     } on RouteSearchOnlineException catch (error) {
-      if (!fallbackEnabled || !error.fallbackAllowed) {
-        metrics?.recordFallbackUnavailable(error.fallbackReason);
-        rethrow;
-      }
-      return _searchLocalFallback(request, error.fallbackReason);
+      metrics?.recordOnlineFailure(error.failureReason);
+      rethrow;
     }
-  }
-
-  Future<RouteSearchResult> _searchLocalFallback(
-    RouteSearchRequest request,
-    String reason,
-  ) async {
-    final local = localRepository;
-    if (local == null) {
-      metrics?.recordFallbackUnavailable(reason);
-      throw const RouteSearchException('저장된 경로 데이터가 없어 경로를 안내할 수 없어요.');
-    }
-    final result = await local.searchRoute(request);
-    metrics?.recordFallbackSuccess(reason);
-    return result.withSource(etaSource: 'STATIC_LOCAL', fallbackReason: reason);
   }
 
   @override
@@ -475,22 +456,17 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
 
 class RouteSearchOnlineFirstMetrics {
   int onlineSuccessCount = 0;
-  int fallbackSuccessCount = 0;
-  int fallbackUnavailableCount = 0;
-  final fallbackReasonCounts = <String, int>{};
+  int onlineFailureCount = 0;
+  final onlineFailureReasonCounts = <String, int>{};
 
   void recordOnlineSuccess() {
     onlineSuccessCount += 1;
   }
 
-  void recordFallbackSuccess(String reason) {
-    fallbackSuccessCount += 1;
-    fallbackReasonCounts[reason] = (fallbackReasonCounts[reason] ?? 0) + 1;
-  }
-
-  void recordFallbackUnavailable(String reason) {
-    fallbackUnavailableCount += 1;
-    fallbackReasonCounts[reason] = (fallbackReasonCounts[reason] ?? 0) + 1;
+  void recordOnlineFailure(String reason) {
+    onlineFailureCount += 1;
+    onlineFailureReasonCounts[reason] =
+        (onlineFailureReasonCounts[reason] ?? 0) + 1;
   }
 }
 
