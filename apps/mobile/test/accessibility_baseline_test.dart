@@ -176,6 +176,11 @@ class _AccessibilityRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
     throw UnimplementedError('접근성 기준선 테스트는 경로 검색 API를 호출하지 않는다.');
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError('접근성 기준선 테스트는 경로 refresh API를 호출하지 않는다.');
+  }
 }
 
 class _AccessibilityFacilityReportRepository
