@@ -1583,8 +1583,10 @@ String _routeV2SummaryLineId(List<RouteSearchV2Leg> legs) {
 
 bool _routeV2RiskRequiresCheck(RouteSearchV2AccessibilityRisk risk) {
   return risk.unknownAccessibilityCount > 0 ||
+      risk.generatedConnectorCount > 0 ||
       risk.staleDataCount > 0 ||
-      risk.lowConfidenceCount > 0;
+      risk.lowConfidenceCount > 0 ||
+      risk.unavailableFacilityCount > 0;
 }
 
 String _routeV2StairAccessState(RouteSearchV2AccessibilityRisk risk) {

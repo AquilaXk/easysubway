@@ -785,15 +785,15 @@ void main() {
   test('경로 V2 변환은 ride 노선과 불확실 접근성을 보수적으로 표시한다', () {
     const uncertainRisk = RouteSearchV2AccessibilityRisk(
       stairCount: 0,
-      unknownAccessibilityCount: 1,
-      generatedConnectorCount: 0,
+      unknownAccessibilityCount: 0,
+      generatedConnectorCount: 1,
       staleDataCount: 0,
       lowConfidenceCount: 0,
       unavailableFacilityCount: 0,
       riskLevel: 'UNKNOWN',
-      reasonCodes: ['ACCESSIBILITY_CHECK_REQUIRED'],
+      reasonCodes: ['GENERATED_CONNECTOR_UNVERIFIED'],
       level: 'REVIEW_REQUIRED',
-      reasons: ['ACCESSIBILITY_CHECK_REQUIRED'],
+      reasons: ['GENERATED_CONNECTOR_UNVERIFIED'],
     );
     const clearRisk = RouteSearchV2AccessibilityRisk(
       stairCount: 0,
