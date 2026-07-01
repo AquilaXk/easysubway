@@ -57,6 +57,7 @@ function validSummary() {
       redactionNotes: "summary only; no personal data",
       localEvidencePath: ".codex/evidence/release/post-launch-operations-review/rc/redacted-summary.json",
     })),
+    postLaunchDryRunEvidence: postLaunchGate.dryRunRequiredEvidence,
     supportChannels: supportGate.supportChannels.map((channel) => ({
       channelId: channel.id,
       redactedReceiptReference: "redacted-routing-check",
@@ -112,6 +113,22 @@ test("operations release summary validator compares artifact identity independen
       summaryPath,
       "--require-pass",
     ], { cwd: root }),
+  );
+});
+
+test("operations release summary validator rejects missing post-launch dry-run evidence", async () => {
+  const summary = validSummary();
+  delete summary.postLaunchDryRunEvidence;
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /postLaunchDryRunEvidence/,
   );
 });
 
