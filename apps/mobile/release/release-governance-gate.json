@@ -102,7 +102,6 @@
       "server-minimized-android-release-scope-fixed",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
-      "abuse-rehearsal-case-level-summary-gate-hardening",
       "operations-alert-and-mailbox-routing-summary"
     ],
     "remainingP0Blockers": [
@@ -291,7 +290,7 @@
       "status": "IN_PROGRESS",
       "owner": "mobile-ux",
       "nextAction": "Route result V2 badge와 accessibility copy evidence 수집",
-      "evidenceReference": "apps/mobile/release/route-commercialization-gate.json"
+      "evidenceReference": "apps/mobile/release/route-result-v2-ui-copy-gate.json"
     }
   ],
   "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230],

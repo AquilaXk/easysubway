@@ -2632,7 +2632,6 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "server-minimized-android-release-scope-fixed",
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
-    "abuse-rehearsal-case-level-summary-gate-hardening",
     "operations-alert-and-mailbox-routing-summary",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
@@ -2662,7 +2661,33 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
-  assert.ok(gate.gates.some((item) => item.issue === 1230 && item.id === "G12_ROUTE_RESULT_V2_UI_COPY"));
+  const routeResultV2UiCopyGatePath = "apps/mobile/release/route-result-v2-ui-copy-gate.json";
+  const routeResultV2UiCopyGate = readJson(routeResultV2UiCopyGatePath);
+  assert.equal(routeResultV2UiCopyGate.releaseGate, "route-result-v2-ui-copy");
+  assert.equal(routeResultV2UiCopyGate.issue, 1230);
+  assert.equal(routeResultV2UiCopyGate.status, "IN_PROGRESS");
+  assert.equal(routeResultV2UiCopyGate.currentDecision, "NO_GO");
+  assert.deepEqual(routeResultV2UiCopyGate.latestQaEvidenceStatus.resolvedEvidence, []);
+  assert.deepEqual(routeResultV2UiCopyGate.latestQaEvidenceStatus.remainingEvidence, [
+    "route-result-v2-badge-visible-screenshot",
+    "route-result-v2-accessibility-copy-ui-tree",
+    "route-result-v2-screenreader-label-audit",
+    "route-result-v2-large-touch-target-and-contrast-regression",
+  ]);
+  assert.equal(routeResultV2UiCopyGate.requiredEvidence.badgeScreenshotRequired, true);
+  assert.ok(routeResultV2UiCopyGate.forbiddenEvidence.includes("generated-placeholder-copy"));
+  assert.deepEqual(
+    gate.gates.find((item) => item.issue === 1230),
+    {
+      id: "G12_ROUTE_RESULT_V2_UI_COPY",
+      issue: 1230,
+      priority: "P0",
+      status: "IN_PROGRESS",
+      owner: "mobile-ux",
+      nextAction: "Route result V2 badge와 accessibility copy evidence 수집",
+      evidenceReference: routeResultV2UiCopyGatePath,
+    },
+  );
   assert.deepEqual(
     gate.gates.find((item) => item.issue === 1015),
     {
