@@ -9949,12 +9949,13 @@ class $FacilityStatusSnapshotsTable extends FacilityStatusSnapshots
     'observedAt',
   );
   @override
-  late final GeneratedColumn<DateTime> observedAt = GeneratedColumn<DateTime>(
+  late final GeneratedColumn<int> observedAt = GeneratedColumn<int>(
     'observed_at',
     aliasedName,
-    true,
-    type: DriftSqlType.dateTime,
+    false,
+    type: DriftSqlType.int,
     requiredDuringInsert: false,
+    defaultValue: const Constant(0),
   );
   static const VerificationMeta _expiresAtMeta = const VerificationMeta(
     'expiresAt',
@@ -10167,9 +10168,9 @@ class $FacilityStatusSnapshotsTable extends FacilityStatusSnapshots
         data['${effectivePrefix}confidence'],
       )!,
       observedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
+        DriftSqlType.int,
         data['${effectivePrefix}observed_at'],
-      ),
+      )!,
       expiresAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}expires_at'],
@@ -10197,7 +10198,7 @@ class FacilityStatusSnapshot extends DataClass
   final String status;
   final String operationalStatus;
   final int confidence;
-  final DateTime? observedAt;
+  final int observedAt;
   final DateTime? expiresAt;
   const FacilityStatusSnapshot({
     required this.id,
@@ -10212,7 +10213,7 @@ class FacilityStatusSnapshot extends DataClass
     required this.status,
     required this.operationalStatus,
     required this.confidence,
-    this.observedAt,
+    required this.observedAt,
     this.expiresAt,
   });
   @override
@@ -10230,9 +10231,7 @@ class FacilityStatusSnapshot extends DataClass
     map['status'] = Variable<String>(status);
     map['operational_status'] = Variable<String>(operationalStatus);
     map['confidence'] = Variable<int>(confidence);
-    if (!nullToAbsent || observedAt != null) {
-      map['observed_at'] = Variable<DateTime>(observedAt);
-    }
+    map['observed_at'] = Variable<int>(observedAt);
     if (!nullToAbsent || expiresAt != null) {
       map['expires_at'] = Variable<DateTime>(expiresAt);
     }
@@ -10253,9 +10252,7 @@ class FacilityStatusSnapshot extends DataClass
       status: Value(status),
       operationalStatus: Value(operationalStatus),
       confidence: Value(confidence),
-      observedAt: observedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(observedAt),
+      observedAt: Value(observedAt),
       expiresAt: expiresAt == null && nullToAbsent
           ? const Value.absent()
           : Value(expiresAt),
@@ -10284,7 +10281,7 @@ class FacilityStatusSnapshot extends DataClass
       status: serializer.fromJson<String>(json['status']),
       operationalStatus: serializer.fromJson<String>(json['operationalStatus']),
       confidence: serializer.fromJson<int>(json['confidence']),
-      observedAt: serializer.fromJson<DateTime?>(json['observedAt']),
+      observedAt: serializer.fromJson<int>(json['observedAt']),
       expiresAt: serializer.fromJson<DateTime?>(json['expiresAt']),
     );
   }
@@ -10304,7 +10301,7 @@ class FacilityStatusSnapshot extends DataClass
       'status': serializer.toJson<String>(status),
       'operationalStatus': serializer.toJson<String>(operationalStatus),
       'confidence': serializer.toJson<int>(confidence),
-      'observedAt': serializer.toJson<DateTime?>(observedAt),
+      'observedAt': serializer.toJson<int>(observedAt),
       'expiresAt': serializer.toJson<DateTime?>(expiresAt),
     };
   }
@@ -10322,7 +10319,7 @@ class FacilityStatusSnapshot extends DataClass
     String? status,
     String? operationalStatus,
     int? confidence,
-    Value<DateTime?> observedAt = const Value.absent(),
+    int? observedAt,
     Value<DateTime?> expiresAt = const Value.absent(),
   }) => FacilityStatusSnapshot(
     id: id ?? this.id,
@@ -10337,7 +10334,7 @@ class FacilityStatusSnapshot extends DataClass
     status: status ?? this.status,
     operationalStatus: operationalStatus ?? this.operationalStatus,
     confidence: confidence ?? this.confidence,
-    observedAt: observedAt.present ? observedAt.value : this.observedAt,
+    observedAt: observedAt ?? this.observedAt,
     expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
   );
   FacilityStatusSnapshot copyWithCompanion(
@@ -10453,7 +10450,7 @@ class FacilityStatusSnapshotsCompanion
   final Value<String> status;
   final Value<String> operationalStatus;
   final Value<int> confidence;
-  final Value<DateTime?> observedAt;
+  final Value<int> observedAt;
   final Value<DateTime?> expiresAt;
   final Value<int> rowid;
   const FacilityStatusSnapshotsCompanion({
@@ -10509,7 +10506,7 @@ class FacilityStatusSnapshotsCompanion
     Expression<String>? status,
     Expression<String>? operationalStatus,
     Expression<int>? confidence,
-    Expression<DateTime>? observedAt,
+    Expression<int>? observedAt,
     Expression<DateTime>? expiresAt,
     Expression<int>? rowid,
   }) {
@@ -10546,7 +10543,7 @@ class FacilityStatusSnapshotsCompanion
     Value<String>? status,
     Value<String>? operationalStatus,
     Value<int>? confidence,
-    Value<DateTime?>? observedAt,
+    Value<int>? observedAt,
     Value<DateTime?>? expiresAt,
     Value<int>? rowid,
   }) {
@@ -10609,7 +10606,7 @@ class FacilityStatusSnapshotsCompanion
       map['confidence'] = Variable<int>(confidence.value);
     }
     if (observedAt.present) {
-      map['observed_at'] = Variable<DateTime>(observedAt.value);
+      map['observed_at'] = Variable<int>(observedAt.value);
     }
     if (expiresAt.present) {
       map['expires_at'] = Variable<DateTime>(expiresAt.value);
@@ -20668,7 +20665,7 @@ typedef $$FacilityStatusSnapshotsTableCreateCompanionBuilder =
       Value<String> status,
       Value<String> operationalStatus,
       Value<int> confidence,
-      Value<DateTime?> observedAt,
+      Value<int> observedAt,
       Value<DateTime?> expiresAt,
       Value<int> rowid,
     });
@@ -20686,7 +20683,7 @@ typedef $$FacilityStatusSnapshotsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String> operationalStatus,
       Value<int> confidence,
-      Value<DateTime?> observedAt,
+      Value<int> observedAt,
       Value<DateTime?> expiresAt,
       Value<int> rowid,
     });
@@ -20760,7 +20757,7 @@ class $$FacilityStatusSnapshotsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get observedAt => $composableBuilder(
+  ColumnFilters<int> get observedAt => $composableBuilder(
     column: $table.observedAt,
     builder: (column) => ColumnFilters(column),
   );
@@ -20840,7 +20837,7 @@ class $$FacilityStatusSnapshotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get observedAt => $composableBuilder(
+  ColumnOrderings<int> get observedAt => $composableBuilder(
     column: $table.observedAt,
     builder: (column) => ColumnOrderings(column),
   );
@@ -20914,7 +20911,7 @@ class $$FacilityStatusSnapshotsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<DateTime> get observedAt => $composableBuilder(
+  GeneratedColumn<int> get observedAt => $composableBuilder(
     column: $table.observedAt,
     builder: (column) => column,
   );
@@ -20981,7 +20978,7 @@ class $$FacilityStatusSnapshotsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String> operationalStatus = const Value.absent(),
                 Value<int> confidence = const Value.absent(),
-                Value<DateTime?> observedAt = const Value.absent(),
+                Value<int> observedAt = const Value.absent(),
                 Value<DateTime?> expiresAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FacilityStatusSnapshotsCompanion(
@@ -21015,7 +21012,7 @@ class $$FacilityStatusSnapshotsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String> operationalStatus = const Value.absent(),
                 Value<int> confidence = const Value.absent(),
-                Value<DateTime?> observedAt = const Value.absent(),
+                Value<int> observedAt = const Value.absent(),
                 Value<DateTime?> expiresAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FacilityStatusSnapshotsCompanion.insert(

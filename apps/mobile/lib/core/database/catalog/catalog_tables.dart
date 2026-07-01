@@ -453,11 +453,17 @@ class FacilityStatusSnapshots extends Table {
       .withDefault(const Constant('UNKNOWN'))();
   IntColumn get confidence =>
       integer().named('confidence').withDefault(const Constant(0))();
-  DateTimeColumn get observedAt => dateTime().named('observed_at').nullable()();
+  IntColumn get observedAt =>
+      integer().named('observed_at').withDefault(const Constant(0))();
   DateTimeColumn get expiresAt => dateTime().named('expires_at').nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (facility_id) REFERENCES facilities(id)',
+  ];
 }
 
 class StationAccessibilitySummaries extends Table {

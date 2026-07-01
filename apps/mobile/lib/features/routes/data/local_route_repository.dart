@@ -1180,7 +1180,7 @@ class _FacilityStatusSnapshot {
 
   bool isExpiredAt(int nowSeconds) {
     final expiresAt = expiresAtSeconds;
-    return expiresAt != null && expiresAt > 0 && expiresAt < nowSeconds;
+    return expiresAt != null && expiresAt > 0 && expiresAt <= nowSeconds;
   }
 }
 
@@ -1393,10 +1393,12 @@ int _effectiveReliabilityScore(
 ) {
   var score = edgeReliabilityScore;
   final activeSnapshotConfidence = facility?.activeStatusSnapshot?.confidence;
-  if (activeSnapshotConfidence != null && activeSnapshotConfidence > 0) {
+  if (activeSnapshotConfidence != null) {
     score = score < activeSnapshotConfidence ? score : activeSnapshotConfidence;
   }
-  if (facility?.expiredStatusSnapshot != null && score > 60) {
+  if (facility?.activeStatusSnapshot == null &&
+      facility?.expiredStatusSnapshot != null &&
+      score > 60) {
     score = 60;
   }
   final facilityReliabilityScore = _facilityQualityScore(
