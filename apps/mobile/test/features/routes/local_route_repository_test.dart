@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/facility_report.dart';
@@ -8,34 +11,162 @@ import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('catalog DB가 있으면 기본 경로 repository는 API 주소 없이 로컬 결과를 반환한다', () async {
-    final database = CatalogDatabase.memory();
-    addTearDown(database.close);
-    await database.seedBaselineIfEmpty();
+  test(
+    'catalog DB가 있으면 offline/local fallback repository는 API 주소 없이 로컬 결과를 반환한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
 
-    final dependencies = AppDependencies.resolve(
-      catalogDatabase: database,
-      reportRepository: const UnavailableFacilityReportRepository(),
-      apiBaseUri: () {
-        throw StateError('Local route defaults must not read API base URL.');
-      },
-      enablePushNotifications: false,
-    );
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () {
+          throw StateError('Local route defaults must not read API base URL.');
+        },
+        enablePushNotifications: false,
+      );
 
-    final routeResult = await dependencies.routeRepository.searchRoute(
-      const RouteSearchRequest(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'WHEELCHAIR',
-      ),
-    );
-    final internalNodes = await dependencies.internalRouteRepository
-        .listRouteNodes('station-sangnoksu');
+      final routeResult = await dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
+      final internalNodes = await dependencies.internalRouteRepository
+          .listRouteNodes('station-sangnoksu');
 
-    expect(routeResult.status, 'FOUND');
-    expect(routeResult.isLocalResult, isTrue);
-    expect(internalNodes, isEmpty);
-  });
+      expect(routeResult.status, 'FOUND');
+      expect(routeResult.isLocalResult, isTrue);
+      expect(internalNodes, isEmpty);
+    },
+  );
+
+  test(
+    'online-first repository는 flag가 켜지면 V2 backend itinerary를 우선 사용한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      final requestedPaths = <String>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) async {
+        requestedPaths.add(request.uri.path);
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'success': true, 'data': _routeV2Payload()}));
+        await request.response.close();
+      });
+
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () =>
+            Uri.parse('http://${server.address.host}:${server.port}'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+      );
+
+      final result = await dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
+
+      expect(requestedPaths, ['/api/v2/routes/search']);
+      expect(result.routeSearchId, 'route-v2-primary');
+      expect(result.etaSource, 'REALTIME');
+      expect(result.isLocalResult, isFalse);
+    },
+  );
+
+  test(
+    'online-first backend 5xx는 catalog가 있으면 STATIC_LOCAL fallback을 표시한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.serviceUnavailable
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
+      });
+      final metrics = RouteSearchOnlineFirstMetrics();
+
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () =>
+            Uri.parse('http://${server.address.host}:${server.port}'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+        routeSearchOnlineFirstMetrics: metrics,
+      );
+
+      final result = await dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
+
+      expect(result.isLocalResult, isTrue);
+      expect(result.etaSource, 'STATIC_LOCAL');
+      expect(result.fallbackReason, 'backend-5xx');
+      expect(result.sourceNotice, '실시간 미반영, 저장된 데이터 기준');
+      expect(metrics.onlineSuccessCount, 0);
+      expect(metrics.fallbackSuccessCount, 1);
+      expect(metrics.fallbackReasonCounts, {'backend-5xx': 1});
+    },
+  );
+
+  test(
+    'online-first backend 4xx validation은 local fallback으로 숨기지 않는다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.badRequest
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
+      });
+
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () =>
+            Uri.parse('http://${server.address.host}:${server.port}'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+      );
+
+      await expectLater(
+        dependencies.routeRepository.searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        ),
+        throwsA(isA<RouteSearchException>()),
+      );
+    },
+  );
 
   test('로컬 경로 repository는 baseline catalog에서 상록수-사당 경로를 계산한다', () async {
     final database = CatalogDatabase.memory();
@@ -2888,6 +3019,81 @@ void main() {
       expect(result.steps, isEmpty);
     },
   );
+}
+
+Map<String, Object?> _routeV2Payload() {
+  return {
+    'contractVersion': 'ROUTE_SEARCH_V2',
+    'originStationId': 'station-sangnoksu',
+    'destinationStationId': 'station-sadang',
+    'departureTime': '2026-07-01T09:00:00+09:00',
+    'mobilityType': 'WHEELCHAIR',
+    'constraintMode': 'STRICT_STEP_FREE',
+    'useRealtime': true,
+    'maxTransfers': 3,
+    'alternativeCount': 1,
+    'statuses': ['FOUND'],
+    'itineraries': [
+      {
+        'itineraryId': 'route-v2-primary',
+        'status': 'FOUND',
+        'plannedArrivalTime': '2026-07-01T09:15:00+09:00',
+        'realtimeArrivalTime': '2026-07-01T09:13:00+09:00',
+        'etaSource': 'REALTIME',
+        'etaConfidence': 'HIGH',
+        'durationSeconds': 780,
+        'transferCount': 0,
+        'walkingDistanceMeters': 180,
+        'accessibilityRisk': {
+          'stairCount': 0,
+          'unknownAccessibilityCount': 0,
+          'generatedConnectorCount': 0,
+          'staleDataCount': 0,
+          'lowConfidenceCount': 0,
+          'unavailableFacilityCount': 0,
+          'riskLevel': 'LOW',
+          'reasonCodes': <Object?>[],
+          'level': 'LOW',
+          'reasons': <Object?>[],
+        },
+        'legs': [
+          {
+            'legType': 'RIDE',
+            'fromStationId': 'station-sangnoksu',
+            'toStationId': 'station-sadang',
+            'fromNodeId': '',
+            'toNodeId': '',
+            'lineId': 'seoul-4',
+            'tripId': 'trip-1',
+            'trainNo': '401',
+            'plannedDepartureTime': '2026-07-01T09:00:00+09:00',
+            'realtimeDepartureTime': '2026-07-01T09:00:30+09:00',
+            'plannedArrivalTime': '2026-07-01T09:15:00+09:00',
+            'realtimeArrivalTime': '2026-07-01T09:13:00+09:00',
+            'waitTimeSeconds': 30,
+            'slackSeconds': 60,
+            'durationSeconds': 780,
+            'distanceMeters': 180,
+            'etaSource': 'REALTIME',
+            'confidence': 'HIGH',
+            'accessibilityRisk': {
+              'stairCount': 0,
+              'unknownAccessibilityCount': 0,
+              'generatedConnectorCount': 0,
+              'staleDataCount': 0,
+              'lowConfidenceCount': 0,
+              'unavailableFacilityCount': 0,
+              'riskLevel': 'LOW',
+              'reasonCodes': <Object?>[],
+              'level': 'LOW',
+              'reasons': <Object?>[],
+            },
+          },
+        ],
+        'commercialEtaEligible': true,
+      },
+    ],
+  };
 }
 
 Future<void> _seedLineWithoutNetworkEdges(
