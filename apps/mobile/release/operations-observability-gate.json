@@ -93,6 +93,15 @@
       "linkedArtifacts": ["apps/mobile/test/route_search_test.dart", "README.md"]
     },
     {
+      "id": "route_quality_observability_dashboard",
+      "area": "mobile",
+      "ownerKo": "경로 품질 담당자",
+      "thresholdKo": "ETA P50/P90, wrong transfer, wrong line sequence, route not found rate 중 route commercialization gate 기준을 넘으면 배포 차단 또는 rollout 보류",
+      "firstResponseKo": "route accuracy report, route v2 contract report, provider coverage report를 같은 RC evidence 묶음으로 확인한다.",
+      "evidence": ["route-quality-dashboard-url-or-external-blocker", "route-accuracy-report", "route-v2-contract-report"],
+      "linkedArtifacts": ["apps/mobile/release/route-commercialization-gate.json", "tools/routes/check-route-commercialization-gate.mjs", "tools/routes/evaluate-eta-accuracy.mjs"]
+    },
+    {
       "id": "datapack_install_rollback_failure_rate",
       "area": "mobile",
       "ownerKo": "데이터팩 클라이언트 담당자",
