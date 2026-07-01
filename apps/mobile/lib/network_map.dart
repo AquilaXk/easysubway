@@ -896,91 +896,86 @@ class _SupermoveMapHeader extends StatelessWidget {
         bottom: false,
         child: SizedBox(
           height: _supermoveHeaderHeight,
-          child: MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(1)),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-              child: Row(
-                children: [
-                  IconButton(
-                    key: const Key('networkMapMenuButton'),
-                    tooltip: '메뉴',
-                    onPressed: onMenuTap,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size.square(
-                        EasySubwayTouchTarget.general,
-                      ),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            child: Row(
+              children: [
+                IconButton(
+                  key: const Key('networkMapMenuButton'),
+                  tooltip: '메뉴',
+                  onPressed: onMenuTap,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size.square(
+                      EasySubwayTouchTarget.general,
                     ),
-                    icon: const Icon(
-                      Icons.menu,
-                      size: 22,
-                      color: Color(0xFF4B4B4B),
-                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: EdgeInsets.zero,
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: _SupermoveSearchField(onSearchTap: onSearchTap),
+                  icon: const Icon(
+                    Icons.menu,
+                    size: 22,
+                    color: Color(0xFF4B4B4B),
                   ),
-                  const SizedBox(width: 8),
-                  Semantics(
-                    key: const Key('mapRegionTabs'),
-                    container: true,
-                    button: true,
-                    label: '지역: $currentRegion',
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 84),
-                      child: SizedBox(
-                        height: EasySubwayTouchTarget.general,
-                        child: ExcludeSemantics(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: PopupMenuButton<String>(
-                              key: const Key('networkMapRegionDropdown'),
-                              tooltip: '지역 선택',
-                              initialValue: selectedRegion,
-                              onSelected: onRegionSelected,
-                              itemBuilder: (context) => [
-                                for (final region in availableRegions)
-                                  PopupMenuItem<String>(
-                                    value: region.name,
-                                    child: Text(region.displayName),
-                                  ),
-                              ],
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    currentRegion,
-                                    style: const TextStyle(
-                                      color: Color(0xFF606060),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(
-                                    Icons.keyboard_arrow_down,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _SupermoveSearchField(onSearchTap: onSearchTap),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  key: const Key('mapRegionTabs'),
+                  container: true,
+                  button: true,
+                  label: '지역: $currentRegion',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 84),
+                    child: SizedBox(
+                      height: EasySubwayTouchTarget.general,
+                      child: ExcludeSemantics(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: PopupMenuButton<String>(
+                            key: const Key('networkMapRegionDropdown'),
+                            tooltip: '지역 선택',
+                            initialValue: selectedRegion,
+                            onSelected: onRegionSelected,
+                            itemBuilder: (context) => [
+                              for (final region in availableRegions)
+                                PopupMenuItem<String>(
+                                  value: region.name,
+                                  child: Text(region.displayName),
+                                ),
+                            ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  currentRegion,
+                                  style: const TextStyle(
                                     color: Color(0xFF606060),
-                                    size: 18,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Color(0xFF606060),
+                                  size: 18,
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  if (notificationAction != null) ...[
-                    const SizedBox(width: 8),
-                    notificationAction!,
-                  ],
+                ),
+                if (notificationAction != null) ...[
+                  const SizedBox(width: 8),
+                  notificationAction!,
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -1187,96 +1182,91 @@ class _SupermoveNearbyStationPanel extends StatelessWidget {
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
       elevation: 8,
-      child: MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: const TextScaler.linear(1)),
-        child: SafeArea(
-          top: false,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFD8D8D8))),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 44,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const SizedBox(width: 14),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 7),
-                        child: _SubwayLinePanelTab(line: primaryLine),
-                      ),
-                      const Spacer(),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Container(
-                          height: 24,
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFFFCACA)),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: const Text(
-                            '실시간',
-                            style: TextStyle(
-                              color: Color(0xFFFF7777),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
+      child: SafeArea(
+        top: false,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0xFFD8D8D8))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 44,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const SizedBox(width: 14),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 7),
+                      child: _SubwayLinePanelTab(line: primaryLine),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        height: 24,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFFFCACA)),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          '실시간',
+                          style: TextStyle(
+                            color: Color(0xFFFF7777),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: IconButton(
-                          tooltip: '다시 찾기',
-                          onPressed: onRetry,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 38,
-                            height: 38,
-                          ),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.refresh,
-                            color: Color(0xFF5A5A5A),
-                            size: 27,
-                          ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: IconButton(
+                        tooltip: '다시 찾기',
+                        onPressed: onRetry,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 38,
+                          height: 38,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF5A5A5A),
+                          size: 27,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: IconButton(
-                          key: const Key('networkMapNearbyPanelCloseButton'),
-                          tooltip: '닫기',
-                          onPressed: onClose,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 38,
-                            height: 38,
-                          ),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.close,
-                            color: Color(0xFF454545),
-                            size: 27,
-                          ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: IconButton(
+                        key: const Key('networkMapNearbyPanelCloseButton'),
+                        tooltip: '닫기',
+                        onPressed: onClose,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 38,
+                          height: 38,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.close,
+                          color: Color(0xFF454545),
+                          size: 27,
                         ),
                       ),
-                      const SizedBox(width: 22),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 22),
+                  ],
                 ),
-                const Divider(height: 1, color: Color(0xFFD8D8D8)),
-                _SupermoveNearbyPanelBody(
-                  data: data,
-                  adjacentStations: adjacentStations,
-                ),
-              ],
-            ),
+              ),
+              const Divider(height: 1, color: Color(0xFFD8D8D8)),
+              _SupermoveNearbyPanelBody(
+                data: data,
+                adjacentStations: adjacentStations,
+              ),
+            ],
           ),
         ),
       ),
@@ -1818,7 +1808,23 @@ NetworkMapData _expressOnlyMapData(NetworkMapData data) {
             stationIdsFromMemberships.contains(station.id),
       )
       .toList(growable: false);
-  final stationIds = stations.map((station) => station.id).toSet();
+  final stationsById = <String, List<NetworkMapStation>>{};
+  final stationByLineKey = <String, NetworkMapStation>{};
+  for (final station in stations) {
+    stationsById.putIfAbsent(station.id, () => []).add(station);
+    stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
+        station;
+  }
+  bool hasFilteredEndpoint(NetworkMapEdge edge, String endpoint) {
+    return _stationForMapEdgeEndpoint(
+          endpoint,
+          edge.lineId,
+          stationByLineKey,
+          stationsById,
+        ) !=
+        null;
+  }
+
   return NetworkMapData(
     regions: data.regions,
     selectedRegion: data.selectedRegion,
@@ -1830,8 +1836,8 @@ NetworkMapData _expressOnlyMapData(NetworkMapData data) {
         .where(
           (edge) =>
               lineIds.contains(edge.lineId) &&
-              stationIds.contains(edge.fromStationId) &&
-              stationIds.contains(edge.toStationId),
+              hasFilteredEndpoint(edge, edge.fromStationId) &&
+              hasFilteredEndpoint(edge, edge.toStationId),
         )
         .toList(growable: false),
     positionSources: data.positionSources,
@@ -1839,6 +1845,11 @@ NetworkMapData _expressOnlyMapData(NetworkMapData data) {
         .where((membership) => lineIds.contains(membership.lineId))
         .toList(growable: false),
   );
+}
+
+@visibleForTesting
+NetworkMapData networkMapExpressOnlyMapData(NetworkMapData data) {
+  return _expressOnlyMapData(data);
 }
 
 class _NetworkMapLoadFailure extends StatelessWidget {
@@ -2100,7 +2111,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 minScale: minScale,
               );
           final selectedStation =
-              _selectedStation ??
+              _stationByIdentity(widget.data.stations, _selectedStation) ??
               _stationById(widget.data.stations, widget.selectedStationId);
           final focusedStation = widget.focusedStationId == null
               ? null
@@ -3718,14 +3729,19 @@ class _NetworkMapStationActionTab extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 16),
             const SizedBox(height: 1),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ),
           ],
@@ -3771,6 +3787,22 @@ NetworkMapStation? _stationById(
   }
   for (final station in stations) {
     if (station.id == stationId) {
+      return station;
+    }
+  }
+  return null;
+}
+
+NetworkMapStation? _stationByIdentity(
+  List<NetworkMapStation> stations,
+  NetworkMapStation? selectedStation,
+) {
+  if (selectedStation == null) {
+    return null;
+  }
+  for (final station in stations) {
+    if (station.id == selectedStation.id &&
+        station.lineId == selectedStation.lineId) {
       return station;
     }
   }

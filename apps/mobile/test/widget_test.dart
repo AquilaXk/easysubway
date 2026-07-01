@@ -1635,6 +1635,54 @@ void main() {
     );
   });
 
+  test('급행 노선도 필터는 station-line endpoint edge를 유지한다', () {
+    final expressMap = networkMapExpressOnlyMapData(_expressFilterMapData());
+
+    expect(expressMap.lines.map((line) => line.id), ['line-express']);
+    expect(expressMap.stations.map((station) => station.lineId).toSet(), {
+      'line-express',
+    });
+    expect(expressMap.edges, hasLength(1));
+    expect(
+      expressMap.edges.single.fromStationId,
+      'station-express-a:line-express',
+    );
+    expect(
+      expressMap.edges.single.toStationId,
+      'station-express-b:line-express',
+    );
+  });
+
+  testWidgets('노선도 급행 전환은 필터 밖 선택 역 탭을 숨긴다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapData: _expressFilterMapData(),
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-local-a-line-local')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    await tester.tap(find.text('급행'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapStation-express-a-line-express')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     const map = NetworkMapData(
@@ -2962,6 +3010,56 @@ void main() {
     expect(find.textContaining('한대앞'), findsOneWidget);
     expect(find.text('-'), findsWidgets);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+  });
+
+  testWidgets('노선도 chrome은 시스템 글자 크기를 따른다', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      MediaQuery.textScalerOf(
+        tester.element(find.byKey(const Key('networkMapRegionDropdown'))),
+      ).scale(15),
+      closeTo(30, 0.01),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      MediaQuery.textScalerOf(
+        tester.element(find.byKey(const Key('networkMapNearbyStationPanel'))),
+      ).scale(12),
+      closeTo(24, 0.01),
+    );
   });
 
   testWidgets('노선도 현재위치 실패는 하단 패널 대신 임시 메시지만 보여준다', (tester) async {
@@ -11613,6 +11711,127 @@ FavoriteRoute _favoriteRoute({String mobilityType = 'SENIOR'}) {
     score: 92,
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',
+  );
+}
+
+NetworkMapData _expressFilterMapData() {
+  return const NetworkMapData(
+    regions: [NetworkMapRegion(name: '테스트권')],
+    selectedRegion: '테스트권',
+    lines: [
+      NetworkMapLine(
+        id: 'line-local',
+        name: '일반 노선',
+        color: '#444444',
+        region: '테스트권',
+      ),
+      NetworkMapLine(
+        id: 'line-express',
+        name: '급행 노선',
+        color: '#D71920',
+        region: '테스트권',
+      ),
+    ],
+    stations: [
+      NetworkMapStation(
+        id: 'station-local-a',
+        nameKo: '일반A',
+        nameEn: 'Local A',
+        region: '테스트권',
+        lineId: 'line-local',
+        stationCode: 'L01',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 100,
+          y: 100,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-express-filter',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-local-b',
+        nameKo: '일반B',
+        nameEn: 'Local B',
+        region: '테스트권',
+        lineId: 'line-local',
+        stationCode: 'L02',
+        sequence: 2,
+        position: NetworkMapPosition(
+          x: 180,
+          y: 100,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-express-filter',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-express-a',
+        nameKo: '급행A',
+        nameEn: 'Express A',
+        region: '테스트권',
+        lineId: 'line-express',
+        stationCode: 'E01',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 100,
+          y: 180,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-express-filter',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-express-b',
+        nameKo: '급행B',
+        nameEn: 'Express B',
+        region: '테스트권',
+        lineId: 'line-express',
+        stationCode: 'E02',
+        sequence: 2,
+        position: NetworkMapPosition(
+          x: 180,
+          y: 180,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-express-filter',
+        ),
+      ),
+    ],
+    edges: [
+      NetworkMapEdge(
+        id: 'edge-local',
+        lineId: 'line-local',
+        fromStationId: 'station-local-a:line-local',
+        toStationId: 'station-local-b:line-local',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+      NetworkMapEdge(
+        id: 'edge-express',
+        lineId: 'line-express',
+        fromStationId: 'station-express-a:line-express',
+        toStationId: 'station-express-b:line-express',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+    ],
+    positionSources: [
+      NetworkMapPositionSource(
+        id: 'fixture-express-filter',
+        name: '급행 필터 fixture',
+        licenseStatus: 'fixture-only',
+      ),
+    ],
+    stationLineMemberships: [],
   );
 }
 
