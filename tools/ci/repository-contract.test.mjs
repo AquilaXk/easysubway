@@ -8617,7 +8617,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(controller, /@PostMapping\("\/api\/v1\/routes\/search"\)/);
   assert.match(controller, /RouteSearchUseCase/);
   assert.match(controller, /ApiResponse<RouteSearchV1Response>/);
-  assert.match(controller, /"STATIC_BACKEND_V1"/);
+  assert.match(controller, /EtaSource/);
+  assert.match(controller, /result\.etaSource\(\)\.name\(\)/);
   assert.match(controller, /"LEGACY_STATIC"/);
   assert.match(controller, /false/);
   assert.doesNotMatch(controller, /@GetMapping|feedback|SubmitRouteFeedbackCommand/);
