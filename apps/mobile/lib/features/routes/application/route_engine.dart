@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 import '../domain/route_request.dart';
 import '../domain/route_result.dart';
 import '../domain/route_step.dart';
@@ -202,25 +204,34 @@ class AccessGraphRouter {
     RouteTraversalPolicy traversalPolicy,
     Set<String> blockedReasonCodes,
   ) {
-    final costs = <String, int>{originNodeId: 0};
+    final bestCostByNode = <String, int>{originNodeId: 0};
     final previousNode = <String, String>{};
     final previousEdge = <String, RouteEdge>{};
-    final visited = <String>{};
+    var sequence = 0;
+    final candidates =
+        PriorityQueue<_RouteCandidate>((a, b) {
+          final costComparison = a.cost.compareTo(b.cost);
+          if (costComparison != 0) {
+            return costComparison;
+          }
+          return a.sequence.compareTo(b.sequence);
+        })..add(
+          _RouteCandidate(nodeId: originNodeId, cost: 0, sequence: sequence++),
+        );
 
-    while (true) {
-      final current = _lowestUnvisitedNode(costs, visited);
-      if (current == null) {
-        return null;
+    while (candidates.isNotEmpty) {
+      final candidate = candidates.removeFirst();
+      if (candidate.cost != bestCostByNode[candidate.nodeId]) {
+        continue;
       }
-      if (current == destinationNodeId) {
+      if (candidate.nodeId == destinationNodeId) {
         break;
       }
-      visited.add(current);
 
-      for (final edge in graph.edgesFrom(current)) {
+      for (final edge in graph.edgesFrom(candidate.nodeId)) {
         if (!traversalPolicy.canTraverse(
           edge,
-          currentNodeId: current,
+          currentNodeId: candidate.nodeId,
           originNodeId: originNodeId,
           destinationNodeId: destinationNodeId,
         )) {
@@ -235,13 +246,24 @@ class AccessGraphRouter {
           blockedReasonCodes.addAll(edgeCost.warningCodes);
           continue;
         }
-        final nextCost = costs[current]! + edgeCost.cost;
-        if (nextCost < (costs[edge.toNodeId] ?? 1 << 62)) {
-          costs[edge.toNodeId] = nextCost;
-          previousNode[edge.toNodeId] = current;
+        final nextCost = candidate.cost + edgeCost.cost;
+        if (nextCost < (bestCostByNode[edge.toNodeId] ?? 1 << 62)) {
+          bestCostByNode[edge.toNodeId] = nextCost;
+          previousNode[edge.toNodeId] = candidate.nodeId;
           previousEdge[edge.toNodeId] = edge;
+          candidates.add(
+            _RouteCandidate(
+              nodeId: edge.toNodeId,
+              cost: nextCost,
+              sequence: sequence++,
+            ),
+          );
         }
       }
+    }
+
+    if (!bestCostByNode.containsKey(destinationNodeId)) {
+      return null;
     }
 
     final reversed = <RouteEdge>[];
@@ -258,21 +280,18 @@ class AccessGraphRouter {
 
     return reversed.reversed.toList(growable: false);
   }
+}
 
-  String? _lowestUnvisitedNode(Map<String, int> costs, Set<String> visited) {
-    String? selected;
-    var selectedCost = 1 << 62;
-    for (final entry in costs.entries) {
-      if (visited.contains(entry.key)) {
-        continue;
-      }
-      if (entry.value < selectedCost) {
-        selected = entry.key;
-        selectedCost = entry.value;
-      }
-    }
-    return selected;
-  }
+class _RouteCandidate {
+  const _RouteCandidate({
+    required this.nodeId,
+    required this.cost,
+    required this.sequence,
+  });
+
+  final String nodeId;
+  final int cost;
+  final int sequence;
 }
 
 class RouteTraversalPolicy {
