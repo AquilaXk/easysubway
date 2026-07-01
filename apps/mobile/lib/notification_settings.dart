@@ -16,7 +16,7 @@ const _deviceRegistrationErrorMessage = '알림을 켜지 못했어요.';
 const _notificationPermissionErrorMessage = '알림을 켤 수 있는지 확인하지 못했어요.';
 const _notificationRegistrationFailureNextAction =
     '휴대전화 알림 설정과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
-const _notificationSwitchTileRadius = BorderRadius.all(Radius.circular(8));
+const _notificationSwitchTileRadius = BorderRadius.all(Radius.circular(16));
 const _notificationSettingsContentPadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _notificationSettingsFailurePadding = EdgeInsets.fromLTRB(20, 32, 20, 32);
 
