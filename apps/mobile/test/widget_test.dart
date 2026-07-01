@@ -314,7 +314,7 @@ void main() {
     expect(find.text('내 제보'), findsOneWidget);
     expect(find.text('반영됨'), findsOneWidget);
     expect(find.text('중복 제보'), findsOneWidget);
-    expect(find.byIcon(Icons.content_copy_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.content_copy_outlined), findsNothing);
     expect(find.byIcon(Icons.info_outline), findsNothing);
     expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
     expect(
