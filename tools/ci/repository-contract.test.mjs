@@ -2027,6 +2027,15 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     for (const field of ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]) {
       assert.ok(matrix.summaryFields.includes(field), `${matrixId} must include PR summary field ${field}`);
     }
+    assert.equal(typeof matrix.expectedStatusByCase, "object", `${matrixId} must define expected statuses by case`);
+    for (const caseId of requiredCases) {
+      assert.ok(Array.isArray(matrix.expectedStatusByCase[caseId]), `${matrixId}.${caseId} must define expected statuses`);
+      assert.ok(matrix.expectedStatusByCase[caseId].length > 0, `${matrixId}.${caseId} expected statuses must not be empty`);
+      assert.ok(
+        matrix.expectedStatusByCase[caseId].every(Number.isInteger),
+        `${matrixId}.${caseId} expected statuses must be integer status codes`,
+      );
+    }
     assert.ok(Array.isArray(matrix.requiredEvidence), `${matrixId} must define evidence`);
     assert.ok(matrix.requiredEvidence.length > 0, `${matrixId} must require evidence`);
     assert.ok(Array.isArray(matrix.forbiddenSummaryValues), `${matrixId} must forbid sensitive summary values`);
