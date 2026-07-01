@@ -10132,10 +10132,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('facilityReportType-CLOSED')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('facilityReportDescriptionInput')),
-      );
-      await tester.pumpAndSettle();
+      await _showFacilityReportDescriptionInput(tester);
       await tester.enterText(
         find.byKey(const Key('facilityReportDescriptionInput')),
         '출입문이 막혀 있습니다.',
@@ -10219,16 +10216,12 @@ void main() {
         ),
       );
 
+      await _showFacilityReportDescriptionInput(tester);
       await tester.enterText(
         find.byKey(const Key('facilityReportDescriptionInput')),
         '출입문이 막혀 있습니다.',
       );
-      await tester.dragUntilVisible(
-        find.byKey(const Key('facilityReportSubmitButton')),
-        find.byType(Scrollable).first,
-        const Offset(0, -300),
-      );
-      await tester.pumpAndSettle();
+      await _showFacilityReportSubmitButton(tester);
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
 
@@ -10428,18 +10421,12 @@ void main() {
 
       expect(find.text('사진 1장 추가됨'), findsOneWidget);
 
-      await tester.ensureVisible(
-        find.byKey(const Key('facilityReportDescriptionInput')),
-      );
-      await tester.pumpAndSettle();
+      await _showFacilityReportDescriptionInput(tester);
       await tester.enterText(
         find.byKey(const Key('facilityReportDescriptionInput')),
         '문이 열리지 않습니다.',
       );
-      await tester.ensureVisible(
-        find.byKey(const Key('facilityReportSubmitButton')),
-      );
-      await tester.pumpAndSettle();
+      await _showFacilityReportSubmitButton(tester);
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('보내기'));
@@ -10498,18 +10485,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('사진 1장 추가됨'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '선택했던 사진입니다.',
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportSubmitButton')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportSubmitButton(tester);
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
@@ -10631,18 +10612,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('사진 1장 추가됨'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '앱 재시작 후 복구된 사진입니다.',
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportSubmitButton')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportSubmitButton(tester);
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('보내기'));
@@ -10815,18 +10790,12 @@ void main() {
     await tester.pumpAndSettle();
     await _continuePhotoUse(tester);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '문 앞에 안내문이 붙어 있습니다.',
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportSubmitButton')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportSubmitButton(tester);
 
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
@@ -10942,10 +10911,7 @@ void main() {
 
     expect(requestCount, 1);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '권한 요청 후 바로 확인된 위치입니다.',
@@ -11060,12 +11026,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.byKey(const Key('facilityReportSubmitButton')),
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportSubmitButton(tester);
 
     expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
@@ -11167,10 +11128,7 @@ void main() {
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
     expect(find.text('위치 확인됨'), findsNothing);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '위치가 다르게 표시됩니다.',
@@ -11417,10 +11375,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('시설 알려주기'), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.pumpAndSettle();
     expect(find.text('현재 위치 첨부됨'), findsNothing);
     expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
@@ -11473,10 +11428,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
 
     final loadingSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
@@ -11557,10 +11509,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('facilityReportDescriptionInput')),
-    );
-    await tester.pumpAndSettle();
+    await _showFacilityReportDescriptionInput(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치를 사용할 수 없어요.'), findsOneWidget);
@@ -11581,6 +11530,34 @@ void main() {
     await tester.pump();
     expect(reportRepository.requests, isEmpty);
   });
+}
+
+Future<void> _showFacilityReportDescriptionInput(WidgetTester tester) async {
+  final finder = find.byKey(const Key('facilityReportDescriptionInput'));
+  if (finder.evaluate().isNotEmpty) {
+    await tester.ensureVisible(finder);
+  } else {
+    await tester.dragUntilVisible(
+      finder,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+  }
+  await tester.pumpAndSettle();
+}
+
+Future<void> _showFacilityReportSubmitButton(WidgetTester tester) async {
+  final finder = find.byKey(const Key('facilityReportSubmitButton'));
+  if (finder.evaluate().isNotEmpty) {
+    await tester.ensureVisible(finder);
+  } else {
+    await tester.dragUntilVisible(
+      finder,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+  }
+  await tester.pumpAndSettle();
 }
 
 Future<void> _continuePhotoUse(
@@ -12125,6 +12102,19 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
     }
     return result;
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    return RouteRefreshResult(
+      routeSearchId: routeSearchId,
+      status: 'UNCHANGED',
+      result: result,
+      refreshedAt: '2026-07-01T15:30:00',
+      etaSource: 'PLANNED',
+      etaConfidence: 'MEDIUM',
+      sourceLabel: '계획 시간 기준',
+    );
+  }
 }
 
 class FakeRouteFeedbackRepository implements RouteFeedbackRepository {
@@ -12546,6 +12536,11 @@ class ControlledRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
     requests.add(request);
     return _completer.future;
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
   }
 
   void complete(RouteSearchResult result) {

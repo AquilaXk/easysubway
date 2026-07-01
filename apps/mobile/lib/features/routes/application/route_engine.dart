@@ -524,5 +524,9 @@ List<String> _routeEvidenceSources(RouteEdge edge) {
     'edge:${edge.id}',
     if (edge.isGeneratedConnector) 'GENERATED_CONNECTOR',
     if (edge.lineId.isNotEmpty) 'line:${edge.lineId}',
+    if (edge.safetyEvidence.sourceId.isNotEmpty)
+      'source:${edge.safetyEvidence.sourceId}',
+    if (edge.safetyEvidence.sourceSnapshotId.isNotEmpty)
+      'snapshot:${edge.safetyEvidence.sourceSnapshotId}',
   ];
 }

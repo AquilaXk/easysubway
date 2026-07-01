@@ -1609,6 +1609,124 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('active 시설 상태 snapshot이 사용 불가이면 strict 경로를 차단한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedAvailableFacilityRoute(database);
+    final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    await _addFacilityStatusSnapshot(
+      database,
+      id: 'snapshot-facility-a-live-unavailable',
+      providerId: 'live-provider',
+      sourceId: 'facility-live-source',
+      sourceSnapshotId: 'facility-live-source-20260701',
+      status: 'BROKEN',
+      operationalStatus: 'OUT_OF_SERVICE',
+      observedAtSeconds: nowSeconds,
+      expiresAtSeconds: nowSeconds + 3600,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.steps, isEmpty);
+    expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
+  });
+
+  test('operator override snapshot은 live snapshot보다 우선한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedAvailableFacilityRoute(database);
+    final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    await _addFacilityStatusSnapshot(
+      database,
+      id: 'snapshot-facility-a-live-unavailable',
+      providerId: 'live-provider',
+      sourceId: 'facility-live-source',
+      sourceSnapshotId: 'facility-live-source-20260701',
+      status: 'BROKEN',
+      operationalStatus: 'OUT_OF_SERVICE',
+      observedAtSeconds: nowSeconds,
+      expiresAtSeconds: nowSeconds + 3600,
+    );
+    await _addFacilityStatusSnapshot(
+      database,
+      id: 'snapshot-facility-a-operator-available',
+      providerId: 'operator-override',
+      sourceId: 'facility-operator-source',
+      sourceSnapshotId: 'facility-operator-source-20260701',
+      status: 'AVAILABLE',
+      operationalStatus: 'AVAILABLE',
+      observedAtSeconds: nowSeconds - 60,
+      expiresAtSeconds: nowSeconds + 1800,
+      confidence: 0,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('LOW_DATA_CONFIDENCE'),
+    );
+    expect(
+      result.steps.expand((step) => step.evidenceSources),
+      containsAll([
+        'source:facility-operator-source',
+        'snapshot:facility-operator-source-20260701',
+      ]),
+    );
+  });
+
+  test('expired 사용 불가 snapshot은 strict 경로를 차단하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedAvailableFacilityRoute(database);
+    final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    await _addFacilityStatusSnapshot(
+      database,
+      id: 'snapshot-facility-a-expired-unavailable',
+      providerId: 'operator-override',
+      sourceId: 'facility-expired-source',
+      sourceSnapshotId: 'facility-expired-source-20260701',
+      status: 'BROKEN',
+      operationalStatus: 'OUT_OF_SERVICE',
+      observedAtSeconds: nowSeconds - 7200,
+      expiresAtSeconds: nowSeconds,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(result.blockedReasons, isEmpty);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('LOW_DATA_CONFIDENCE'),
+    );
+  });
+
   test('eligible evidence가 없는 검수 완료 시설 edge는 strict 경로에서 제외한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -3114,6 +3232,102 @@ Future<void> _addEligibleStationFacilityEvidence(
         'FACILITY_EXISTS_AND_PROVENANCE_VERIFIED')
     ''',
     [stationId, lineId, facilityType],
+  );
+}
+
+Future<void> _seedAvailableFacilityRoute(CatalogDatabase database) async {
+  await _seedLineWithoutNetworkEdges(database);
+  await _addFacilityIdColumnIfMissing(database);
+  await database.customStatement('''
+      INSERT INTO facilities (
+        id, station_id, type, name, status, operational_status,
+        floor_from, floor_to, description
+      )
+      VALUES (
+        'facility-a-elevator',
+        'station-a',
+        'ELEVATOR',
+        '출발역 엘리베이터',
+        'ADMIN_VERIFIED',
+        'AVAILABLE',
+        'B1',
+        '1F',
+        '관리자 검수 완료'
+      )
+    ''');
+  await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, stair_access_state, accessibility_status,
+        reliability_score, facility_id
+      )
+      VALUES
+        (
+          'entry-a-line-test-elevator',
+          'station-a',
+          'station-a:line-test:LOCAL',
+          90,
+          'ENTRY',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          'facility-a-elevator'
+        ),
+        (
+          'edge-a-b-local',
+          'station-a:line-test:LOCAL',
+          'station-b:line-test:LOCAL',
+          120,
+          'RIDE',
+          'LOCAL',
+          'STEP_FREE',
+          'AVAILABLE',
+          95,
+          NULL
+        )
+    ''');
+  await _addEligibleStationFacilityEvidence(database);
+}
+
+Future<void> _addFacilityStatusSnapshot(
+  CatalogDatabase database, {
+  required String id,
+  required String providerId,
+  required String sourceId,
+  required String sourceSnapshotId,
+  required String status,
+  required String operationalStatus,
+  required int observedAtSeconds,
+  required int expiresAtSeconds,
+  int confidence = 100,
+}) async {
+  await database.customStatement(
+    '''
+      INSERT INTO facility_status_snapshots (
+        id, facility_id, provider_id, source_id, source_snapshot_id,
+        provider_record_hash, evidence_hash, provenance_kind,
+        verification_status, status, operational_status, confidence,
+        observed_at, expires_at
+      )
+      VALUES (
+        ?, 'facility-a-elevator', ?, ?, ?,
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        'OFFICIAL_SOURCE', 'VERIFIED', ?, ?, ?, ?, ?
+      )
+    ''',
+    [
+      id,
+      providerId,
+      sourceId,
+      sourceSnapshotId,
+      status,
+      operationalStatus,
+      confidence,
+      observedAtSeconds,
+      expiresAtSeconds,
+    ],
   );
 }
 

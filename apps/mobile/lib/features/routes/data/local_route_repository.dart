@@ -40,6 +40,11 @@ class LocalRouteRepository implements RouteSearchRepository {
     return _toRouteSearchResult(request, result, catalog);
   }
 
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    throw const RouteSearchException('로컬 경로는 새로고침할 수 없어요.');
+  }
+
   RouteSearchResult _toRouteSearchResult(
     RouteSearchRequest request,
     local.LocalRouteResult result,
@@ -352,6 +357,11 @@ class LocalFirstRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     return localRepository.searchRoute(request);
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    return localRepository.refreshRoute(routeSearchId);
+  }
 }
 
 class _RouteCatalogSnapshot {
@@ -527,6 +537,18 @@ class _RouteCatalogSnapshot {
           operationalStatus: row.readNullable<String>('operational_status'),
           qualityLevel: row.readNullable<String>('quality_level'),
           checkedAtSeconds: row.readNullable<int>('checked_at'),
+          activeStatusSnapshot: null,
+          expiredStatusSnapshot: null,
+        ),
+    };
+    final facilityStatusSnapshots = await _facilityStatusSnapshots(database);
+    final facilitiesWithStatusSnapshotsById = {
+      for (final entry in facilitiesById.entries)
+        entry.key: entry.value.copyWithStatusSnapshots(
+          activeStatusSnapshot:
+              facilityStatusSnapshots.activeByFacilityId[entry.key],
+          expiredStatusSnapshot:
+              facilityStatusSnapshots.expiredByFacilityId[entry.key],
         ),
     };
     final eligibleFacilityEvidence = await _eligibleFacilityEvidence(database);
@@ -553,7 +575,9 @@ class _RouteCatalogSnapshot {
     final networkEdges = networkEdgeRows
         .map((row) {
           final facility =
-              facilitiesById[row.readNullable<String>('facility_id')];
+              facilitiesWithStatusSnapshotsById[row.readNullable<String>(
+                'facility_id',
+              )];
           final facilityHasEligibleEvidence =
               facility == null ||
               eligibleFacilityEvidence.contains(
@@ -594,12 +618,24 @@ class _RouteCatalogSnapshot {
               lastVerifiedAtSeconds,
               facility,
             ),
-            sourceId: row.read<String>('source_id'),
-            sourceSnapshotId: row.read<String>('source_snapshot_id'),
-            providerRecordHash: row.read<String>('provider_record_hash'),
-            provenanceKind: row.read<String>('provenance_kind'),
-            verificationStatus: row.read<String>('verification_status'),
-            evidenceHash: row.read<String>('evidence_hash'),
+            sourceId:
+                facility?.activeStatusSnapshot?.sourceId ??
+                row.read<String>('source_id'),
+            sourceSnapshotId:
+                facility?.activeStatusSnapshot?.sourceSnapshotId ??
+                row.read<String>('source_snapshot_id'),
+            providerRecordHash:
+                facility?.activeStatusSnapshot?.providerRecordHash ??
+                row.read<String>('provider_record_hash'),
+            provenanceKind:
+                facility?.activeStatusSnapshot?.provenanceKind ??
+                row.read<String>('provenance_kind'),
+            verificationStatus:
+                facility?.activeStatusSnapshot?.verificationStatus ??
+                row.read<String>('verification_status'),
+            evidenceHash:
+                facility?.activeStatusSnapshot?.evidenceHash ??
+                row.read<String>('evidence_hash'),
           );
         })
         .toList(growable: false);
@@ -1084,6 +1120,8 @@ class _FacilitySnapshot {
     required this.operationalStatus,
     required this.qualityLevel,
     required this.checkedAtSeconds,
+    required this.activeStatusSnapshot,
+    required this.expiredStatusSnapshot,
   });
 
   final String id;
@@ -1093,6 +1131,81 @@ class _FacilitySnapshot {
   final String? operationalStatus;
   final String? qualityLevel;
   final int? checkedAtSeconds;
+  final _FacilityStatusSnapshot? activeStatusSnapshot;
+  final _FacilityStatusSnapshot? expiredStatusSnapshot;
+
+  _FacilitySnapshot copyWithStatusSnapshots({
+    required _FacilityStatusSnapshot? activeStatusSnapshot,
+    required _FacilityStatusSnapshot? expiredStatusSnapshot,
+  }) {
+    return _FacilitySnapshot(
+      id: id,
+      stationId: stationId,
+      type: type,
+      status: status,
+      operationalStatus: operationalStatus,
+      qualityLevel: qualityLevel,
+      checkedAtSeconds: checkedAtSeconds,
+      activeStatusSnapshot: activeStatusSnapshot,
+      expiredStatusSnapshot: expiredStatusSnapshot,
+    );
+  }
+}
+
+class _FacilityStatusSnapshot {
+  const _FacilityStatusSnapshot({
+    required this.facilityId,
+    required this.providerId,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.evidenceHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    required this.status,
+    required this.operationalStatus,
+    required this.confidence,
+    required this.observedAtSeconds,
+    required this.expiresAtSeconds,
+  });
+
+  final String facilityId;
+  final String providerId;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String evidenceHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String status;
+  final String operationalStatus;
+  final int confidence;
+  final int? observedAtSeconds;
+  final int? expiresAtSeconds;
+
+  bool get isOperatorOverride {
+    final normalized = providerId.toUpperCase().replaceAll('-', '_');
+    return normalized == 'OPERATOR_OVERRIDE' || normalized == 'MANUAL_OVERRIDE';
+  }
+
+  bool isExpiredAt(int nowSeconds) {
+    final expiresAt = expiresAtSeconds;
+    return expiresAt != null && expiresAt > 0 && expiresAt <= nowSeconds;
+  }
+}
+
+class _FacilityStatusSnapshotIndex {
+  const _FacilityStatusSnapshotIndex({
+    required this.activeByFacilityId,
+    required this.expiredByFacilityId,
+  });
+
+  const _FacilityStatusSnapshotIndex.empty()
+    : activeByFacilityId = const {},
+      expiredByFacilityId = const {};
+
+  final Map<String, _FacilityStatusSnapshot> activeByFacilityId;
+  final Map<String, _FacilityStatusSnapshot> expiredByFacilityId;
 }
 
 String _effectiveAccessibilityStatus(
@@ -1104,35 +1217,71 @@ String _effectiveAccessibilityStatus(
   if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
     return edgeStatus;
   }
-  final operationalStatus = facility.operationalStatus?.toUpperCase();
-  if (operationalStatus == 'UNAVAILABLE' ||
-      operationalStatus == 'OUT_OF_SERVICE') {
-    return 'UNAVAILABLE';
+  final activeStatusSnapshot = facility.activeStatusSnapshot;
+  if (activeStatusSnapshot != null) {
+    final activeSnapshotStatus = _effectiveFacilityStatus(
+      status: activeStatusSnapshot.status,
+      operationalStatus: activeStatusSnapshot.operationalStatus,
+    );
+    if (activeSnapshotStatus == 'UNAVAILABLE') {
+      return activeSnapshotStatus;
+    }
+    if (activeSnapshotStatus == 'UNKNOWN') {
+      return activeSnapshotStatus;
+    }
+    if (activeSnapshotStatus == 'AVAILABLE') {
+      if (!facilityHasEligibleEvidence) {
+        return 'UNKNOWN';
+      }
+      return edgeStatus;
+    }
   }
-  final status = facility.status.toUpperCase();
-  if (status == 'BROKEN' ||
-      status == 'UNDER_CONSTRUCTION' ||
-      status == 'CLOSED' ||
-      status == 'UNAVAILABLE' ||
-      status == 'OUT_OF_SERVICE') {
-    return 'UNAVAILABLE';
+  final staticFacilityStatus = _effectiveFacilityStatus(
+    status: facility.status,
+    operationalStatus: facility.operationalStatus,
+    fallbackForAvailable: edgeStatus,
+  );
+  if (staticFacilityStatus == 'UNAVAILABLE') {
+    return staticFacilityStatus;
   }
   if (!facilityHasEligibleEvidence) {
     return 'UNKNOWN';
   }
-  if (operationalStatus == 'UNKNOWN' || operationalStatus == 'CHECK_REQUIRED') {
+  return staticFacilityStatus;
+}
+
+String _effectiveFacilityStatus({
+  required String? status,
+  required String? operationalStatus,
+  String fallbackForAvailable = 'AVAILABLE',
+}) {
+  final operationalStatusUpper = operationalStatus?.toUpperCase();
+  if (operationalStatusUpper == 'UNAVAILABLE' ||
+      operationalStatusUpper == 'OUT_OF_SERVICE') {
+    return 'UNAVAILABLE';
+  }
+  final statusUpper = status?.toUpperCase();
+  if (statusUpper == 'BROKEN' ||
+      statusUpper == 'UNDER_CONSTRUCTION' ||
+      statusUpper == 'CLOSED' ||
+      statusUpper == 'UNAVAILABLE' ||
+      statusUpper == 'OUT_OF_SERVICE') {
+    return 'UNAVAILABLE';
+  }
+  if (operationalStatusUpper == 'UNKNOWN' ||
+      operationalStatusUpper == 'CHECK_REQUIRED' ||
+      statusUpper == 'UNKNOWN' ||
+      statusUpper == 'CHECK_REQUIRED' ||
+      statusUpper == null) {
     return 'UNKNOWN';
   }
-  if (status == 'NORMAL' ||
-      status == 'AVAILABLE' ||
-      status == 'IN_SERVICE' ||
-      status == 'OPERATING' ||
-      status == 'OPEN' ||
-      status == 'ADMIN_VERIFIED') {
-    return edgeStatus;
-  }
-  if (status == 'UNKNOWN' || status == 'CHECK_REQUIRED') {
-    return 'UNKNOWN';
+  if (statusUpper == 'NORMAL' ||
+      statusUpper == 'AVAILABLE' ||
+      statusUpper == 'IN_SERVICE' ||
+      statusUpper == 'OPERATING' ||
+      statusUpper == 'OPEN' ||
+      statusUpper == 'ADMIN_VERIFIED') {
+    return fallbackForAvailable;
   }
   return 'UNAVAILABLE';
 }
@@ -1155,6 +1304,71 @@ Future<Set<String>> _eligibleFacilityEvidence(CatalogDatabase database) async {
         facilityType: row.read<String>('facility_type'),
       ),
   };
+}
+
+Future<_FacilityStatusSnapshotIndex> _facilityStatusSnapshots(
+  CatalogDatabase database,
+) async {
+  if (!await _tableExists(database, 'facility_status_snapshots')) {
+    return const _FacilityStatusSnapshotIndex.empty();
+  }
+  final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+  final rows = await database.customSelect('''
+        SELECT facility_id, provider_id, source_id, source_snapshot_id,
+               provider_record_hash, evidence_hash, provenance_kind,
+               verification_status, status, operational_status, confidence,
+               observed_at, expires_at
+        FROM facility_status_snapshots
+        ORDER BY facility_id
+        ''').get();
+  final activeByFacilityId = <String, _FacilityStatusSnapshot>{};
+  final expiredByFacilityId = <String, _FacilityStatusSnapshot>{};
+  for (final row in rows) {
+    final snapshot = _FacilityStatusSnapshot(
+      facilityId: row.read<String>('facility_id'),
+      providerId: row.read<String>('provider_id'),
+      sourceId: row.read<String>('source_id'),
+      sourceSnapshotId: row.read<String>('source_snapshot_id'),
+      providerRecordHash: row.read<String>('provider_record_hash'),
+      evidenceHash: row.read<String>('evidence_hash'),
+      provenanceKind: row.read<String>('provenance_kind'),
+      verificationStatus: row.read<String>('verification_status'),
+      status: row.read<String>('status'),
+      operationalStatus: row.read<String>('operational_status'),
+      confidence: row.read<int>('confidence'),
+      observedAtSeconds: row.readNullable<int>('observed_at'),
+      expiresAtSeconds: row.readNullable<int>('expires_at'),
+    );
+    final targetMap = snapshot.isExpiredAt(nowSeconds)
+        ? expiredByFacilityId
+        : activeByFacilityId;
+    final current = targetMap[snapshot.facilityId];
+    if (current == null ||
+        _compareFacilityStatusSnapshot(snapshot, current) > 0) {
+      targetMap[snapshot.facilityId] = snapshot;
+    }
+  }
+  return _FacilityStatusSnapshotIndex(
+    activeByFacilityId: activeByFacilityId,
+    expiredByFacilityId: expiredByFacilityId,
+  );
+}
+
+int _compareFacilityStatusSnapshot(
+  _FacilityStatusSnapshot left,
+  _FacilityStatusSnapshot right,
+) {
+  final leftOverride = left.isOperatorOverride ? 1 : 0;
+  final rightOverride = right.isOperatorOverride ? 1 : 0;
+  if (leftOverride != rightOverride) {
+    return leftOverride.compareTo(rightOverride);
+  }
+  final leftObservedAt = left.observedAtSeconds ?? 0;
+  final rightObservedAt = right.observedAtSeconds ?? 0;
+  if (leftObservedAt != rightObservedAt) {
+    return leftObservedAt.compareTo(rightObservedAt);
+  }
+  return left.confidence.compareTo(right.confidence);
 }
 
 String _stationFacilityEvidenceKey({
@@ -1187,31 +1401,46 @@ int _effectiveReliabilityScore(
   int edgeReliabilityScore,
   _FacilitySnapshot? facility,
 ) {
+  var score = edgeReliabilityScore;
+  final activeSnapshotConfidence = facility?.activeStatusSnapshot?.confidence;
+  if (activeSnapshotConfidence != null) {
+    score = score < activeSnapshotConfidence ? score : activeSnapshotConfidence;
+  }
+  if (facility?.activeStatusSnapshot == null &&
+      facility?.expiredStatusSnapshot != null &&
+      score > 60) {
+    score = 60;
+  }
   final facilityReliabilityScore = _facilityQualityScore(
     facility?.qualityLevel,
   );
-  if (facilityReliabilityScore == null) {
-    return edgeReliabilityScore;
+  if (facilityReliabilityScore != null && facilityReliabilityScore < score) {
+    score = facilityReliabilityScore;
   }
-  return edgeReliabilityScore < facilityReliabilityScore
-      ? edgeReliabilityScore
-      : facilityReliabilityScore;
+  return score;
 }
 
 int? _effectiveLastVerifiedAtSeconds(
   int? edgeLastVerifiedAtSeconds,
   _FacilitySnapshot? facility,
 ) {
+  final activeSnapshotObservedAt =
+      facility?.activeStatusSnapshot?.observedAtSeconds;
+  if (activeSnapshotObservedAt != null && activeSnapshotObservedAt > 0) {
+    return _olderSecond(edgeLastVerifiedAtSeconds, activeSnapshotObservedAt);
+  }
   final facilityCheckedAtSeconds = facility?.checkedAtSeconds;
   if (facilityCheckedAtSeconds == null) {
     return edgeLastVerifiedAtSeconds;
   }
-  if (edgeLastVerifiedAtSeconds == null) {
-    return facilityCheckedAtSeconds;
+  return _olderSecond(edgeLastVerifiedAtSeconds, facilityCheckedAtSeconds);
+}
+
+int _olderSecond(int? left, int right) {
+  if (left == null) {
+    return right;
   }
-  return edgeLastVerifiedAtSeconds < facilityCheckedAtSeconds
-      ? edgeLastVerifiedAtSeconds
-      : facilityCheckedAtSeconds;
+  return left < right ? left : right;
 }
 
 int? _facilityQualityScore(String? qualityLevel) {

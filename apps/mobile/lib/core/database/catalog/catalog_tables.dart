@@ -431,6 +431,41 @@ class StationFacilityEvidence extends Table {
   Set<Column> get primaryKey => {stationId, lineId, facilityType};
 }
 
+class FacilityStatusSnapshots extends Table {
+  @override
+  String get tableName => 'facility_status_snapshots';
+
+  TextColumn get id => text()();
+  TextColumn get facilityId => text().named('facility_id')();
+  TextColumn get providerId => text().named('provider_id')();
+  TextColumn get sourceId => text().named('source_id')();
+  TextColumn get sourceSnapshotId => text().named('source_snapshot_id')();
+  TextColumn get providerRecordHash => text().named('provider_record_hash')();
+  TextColumn get evidenceHash => text().named('evidence_hash')();
+  TextColumn get provenanceKind =>
+      text().named('provenance_kind').withDefault(const Constant('UNKNOWN'))();
+  TextColumn get verificationStatus => text()
+      .named('verification_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  TextColumn get status => text().withDefault(const Constant('UNKNOWN'))();
+  TextColumn get operationalStatus => text()
+      .named('operational_status')
+      .withDefault(const Constant('UNKNOWN'))();
+  IntColumn get confidence =>
+      integer().named('confidence').withDefault(const Constant(0))();
+  IntColumn get observedAt =>
+      integer().named('observed_at').withDefault(const Constant(0))();
+  DateTimeColumn get expiresAt => dateTime().named('expires_at').nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (facility_id) REFERENCES facilities(id)',
+  ];
+}
+
 class StationAccessibilitySummaries extends Table {
   @override
   String get tableName => 'station_accessibility_summaries';
@@ -596,9 +631,8 @@ class TransferRules extends Table {
   TextColumn get toLineId => text().named('to_line_id')();
   TextColumn get transferType =>
       text().named('transfer_type').withDefault(const Constant('IN_STATION'))();
-  IntColumn get minTransferSeconds => integer()
-      .named('min_transfer_seconds')
-      .withDefault(const Constant(0))();
+  IntColumn get minTransferSeconds =>
+      integer().named('min_transfer_seconds').withDefault(const Constant(0))();
   TextColumn get pathwayEdgeId => text().named('pathway_edge_id').nullable()();
   TextColumn get strictStepFreePathwayEdgeId =>
       text().named('strict_step_free_pathway_edge_id').nullable()();
