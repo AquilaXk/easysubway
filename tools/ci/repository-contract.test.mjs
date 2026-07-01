@@ -221,6 +221,22 @@ function assertMobileCatchPolicy(file, source) {
   }
 }
 
+function catchBlocks(source) {
+  const blocks = [];
+  const catchPattern = /catch\s*\([^)]*\)\s*\{/g;
+  for (const match of source.matchAll(catchPattern)) {
+    let depth = 1;
+    let cursor = match.index + match[0].length;
+    while (cursor < source.length && depth > 0) {
+      const char = source[cursor++];
+      if (char === "{") depth++;
+      if (char === "}") depth--;
+    }
+    blocks.push(source.slice(match.index, cursor));
+  }
+  return blocks;
+}
+
 function collectStatusValues(value, values = []) {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -1008,6 +1024,24 @@ test("모바일 generic catch는 원본 예외와 스택을 버리지 않는다"
   assert.ok(mobileFiles.length > 0, "mobile Dart files not found");
   for (const file of mobileFiles) {
     assertMobileCatchPolicy(file, read(file));
+  }
+});
+
+test("모바일 async 실패는 빈 목록으로 조용히 숨기지 않는다", () => {
+  const audit = readJson("apps/mobile/release/issue-1075-async-state-audit.json");
+
+  assert.equal(audit.issue, 1075);
+  assert.deepEqual(audit.silentEmptyListCatchReturns, []);
+  assert.match(audit.command, /node --test/);
+
+  for (const file of mobileProductionDartFiles()) {
+    for (const block of catchBlocks(read(file))) {
+      assert.doesNotMatch(
+        block,
+        /return const (?:<[^>]+>)?\[\];/,
+        `${file} hides an async catch failure as an empty list`,
+      );
+    }
   }
 });
 
