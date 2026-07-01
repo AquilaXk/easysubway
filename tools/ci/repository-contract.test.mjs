@@ -484,6 +484,8 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
+  assert.match(workflow, /Repository CI \/ Run security tool tests/);
+  assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
   assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
   assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
   assert.doesNotMatch(releaseGateJob, /--test-name-pattern/);
@@ -2042,6 +2044,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "storage lifecycle rehearsal must require retention/delete evidence",
   );
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
+  assert.equal(
+    abusePenetrationRehearsalGate.manualRehearsalPolicy.validatorCommand,
+    "node tools/security/validate-abuse-penetration-summary.mjs --summary <summary.json> --require-pass",
+  );
+  assert.equal(existsSync(path.join(root, "tools/security/validate-abuse-penetration-summary.mjs")), true);
   assert.deepEqual(abusePenetrationRehearsalGate.manualRehearsalPolicy.githubSummaryFields, [
     "scenarioId",
     "artifactIdentity",
@@ -10611,6 +10618,13 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(realtimeTool.android, "false");
   assert.equal(realtimeTool.ios, "false");
   assert.equal(realtimeTool.deploy, "false");
+
+  const securityTool = await classifyChangedFiles(["tools/security/validate-abuse-penetration-summary.mjs"]);
+  assert.equal(securityTool.repository, "true");
+  assert.equal(securityTool.mobile, "false");
+  assert.equal(securityTool.android, "false");
+  assert.equal(securityTool.ios, "false");
+  assert.equal(securityTool.deploy, "false");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
