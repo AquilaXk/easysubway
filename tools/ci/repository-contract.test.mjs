@@ -2620,7 +2620,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "support-incident-response-dry-run-evidence",
   ]);
   assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-02");
-  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "8df06ae4be931f78ee1b908e286beec1e6bb4954");
+  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "da34e5215daf64ae4c1c31a7682d4fa774588074");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
   assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230]);
@@ -2633,6 +2633,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
+    "operations-post-launch-dry-run-required-evidence-contract",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
     "play-installed-build-provenance",
