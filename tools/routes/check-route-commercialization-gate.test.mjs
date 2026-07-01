@@ -21,6 +21,7 @@ test("route commercialization gate passes with production-ready reports", async 
         manualObservation: 120,
         staleRealtime: 0,
       },
+      productionSampleSize: 120,
       metrics: {
         singleRide: { sampleSize: 60, p50ErrorSeconds: 45, p90ErrorSeconds: 100 },
         transfer: { sampleSize: 60, p50ErrorSeconds: 90, p90ErrorSeconds: 240 },
@@ -70,6 +71,7 @@ test("route commercialization gate fails closed for fixture-only or unsafe route
         manualObservation: 0,
         staleRealtime: 0,
       },
+      productionSampleSize: 0,
       metrics: {
         singleRide: { sampleSize: 50, p50ErrorSeconds: 45, p90ErrorSeconds: 100 },
         transfer: { sampleSize: 50, p50ErrorSeconds: 90, p90ErrorSeconds: 240 },
