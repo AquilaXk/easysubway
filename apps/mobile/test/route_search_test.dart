@@ -893,6 +893,55 @@ void main() {
     expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
   });
 
+  test('경로 V2 blocked reasonCodes가 비어 있으면 status를 보존한다', () {
+    const clearRisk = RouteSearchV2AccessibilityRisk(
+      stairCount: 0,
+      unknownAccessibilityCount: 0,
+      generatedConnectorCount: 0,
+      staleDataCount: 0,
+      lowConfidenceCount: 0,
+      unavailableFacilityCount: 0,
+      riskLevel: 'UNKNOWN',
+      reasonCodes: [],
+      level: 'UNKNOWN',
+      reasons: [],
+    );
+
+    final result = RouteSearchResult.fromV2(
+      const RouteSearchV2Result(
+        contractVersion: 'ROUTE_SEARCH_V2',
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        departureTime: '2026-06-30T09:15:00+09:00',
+        mobilityType: 'WHEELCHAIR',
+        constraintMode: 'STRICT_STEP_FREE',
+        useRealtime: true,
+        maxTransfers: 3,
+        alternativeCount: 3,
+        statuses: ['ROUTE_GRAPH_UNKNOWN'],
+        itineraries: [
+          RouteSearchV2Itinerary(
+            itineraryId: 'route-unknown-primary',
+            status: 'ROUTE_GRAPH_UNKNOWN',
+            plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+            realtimeArrivalTime: null,
+            etaSource: 'PLANNED',
+            etaConfidence: 'UNKNOWN',
+            durationSeconds: 0,
+            transferCount: 0,
+            walkingDistanceMeters: 0,
+            accessibilityRisk: clearRisk,
+            legs: [],
+            commercialEtaEligible: false,
+          ),
+        ],
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.blockedReasons, ['ROUTE_GRAPH_UNKNOWN']);
+  });
+
   test('경로 contract는 accessibilityScore만으로 이동 비용을 대체하지 않는다', () {
     expect(
       () => RouteSearchResult.fromJson({

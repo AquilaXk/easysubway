@@ -388,6 +388,7 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
       return result;
     } on RouteSearchOnlineException catch (error) {
       if (!fallbackEnabled || !error.fallbackAllowed) {
+        metrics?.recordFallbackUnavailable(error.fallbackReason);
         rethrow;
       }
       return _searchLocalFallback(request, error.fallbackReason);
