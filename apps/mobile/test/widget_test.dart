@@ -1683,6 +1683,24 @@ void main() {
     );
   });
 
+  testWidgets('공식 노선도 asset 지역은 급행 전환을 숨긴다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapData: _assetBackedExpressMapData(),
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
+    expect(find.text('급행'), findsNothing);
+  });
+
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     const map = NetworkMapData(
@@ -11832,6 +11850,19 @@ NetworkMapData _expressFilterMapData() {
       ),
     ],
     stationLineMemberships: [],
+  );
+}
+
+NetworkMapData _assetBackedExpressMapData() {
+  final data = _expressFilterMapData();
+  return NetworkMapData(
+    regions: const [NetworkMapRegion(name: '수도권')],
+    selectedRegion: '수도권',
+    lines: data.lines,
+    stations: data.stations,
+    edges: data.edges,
+    positionSources: data.positionSources,
+    stationLineMemberships: data.stationLineMemberships,
   );
 }
 
