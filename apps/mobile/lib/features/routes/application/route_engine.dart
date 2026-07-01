@@ -296,6 +296,10 @@ class RouteTraversalPolicy {
     if (edge.type == RouteEdgeType.exit) {
       return edge.toNodeId == destinationNodeId;
     }
+    if (edge.type == RouteEdgeType.outOfStationTransfer) {
+      return searchMode ==
+          RouteSearchMode.stationToStationWithOutOfStationTransfers;
+    }
     return true;
   }
 }

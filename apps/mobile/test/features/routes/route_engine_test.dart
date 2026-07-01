@@ -199,6 +199,20 @@ void main() {
       ]);
     });
 
+    test('기본 역간 탐색은 역외 환승 edge를 쓰지 않는다', () {
+      final result =
+          LocalRouteEngine(graph: _outOfStationTransferFixtureGraph()).search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-d',
+              mobilityType: MobilityType.senior,
+            ),
+          );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+    });
+
     test('역외 환승 모드도 임의 중간 exit와 entry 우회는 거부한다', () {
       final result = LocalRouteEngine(graph: _midRouteExitEntryFixtureGraph())
           .search(
