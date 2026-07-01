@@ -77,3 +77,70 @@ class AccessibleShortcutButton extends StatelessWidget {
     );
   }
 }
+
+class AccessibleStateCard extends StatelessWidget {
+  const AccessibleStateCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actions = const [],
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title, $subtitle',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: EasySubwayAccessibleColors.mintSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: colorScheme.primary, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (actions.isNotEmpty) ...[const SizedBox(height: 12), ...actions],
+        ],
+      ),
+    );
+  }
+}
