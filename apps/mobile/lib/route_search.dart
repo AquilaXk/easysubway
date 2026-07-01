@@ -322,10 +322,17 @@ class RouteSearchOnlineException extends RouteSearchException {
     final validationFailure =
         statusCode == HttpStatus.badRequest ||
         statusCode == HttpStatus.unprocessableEntity;
+    final backend4xxFailure = statusCode >= 400 && statusCode < 500;
+    final backend5xxFailure = statusCode >= 500;
     return RouteSearchOnlineException._(
       statusCode: statusCode,
-      fallbackAllowed: !validationFailure,
-      fallbackReason: statusCode >= 500 ? 'backend-5xx' : 'backend-4xx',
+      fallbackAllowed:
+          backend5xxFailure || (backend4xxFailure && !validationFailure),
+      fallbackReason: backend5xxFailure
+          ? 'backend-5xx'
+          : backend4xxFailure
+          ? 'backend-4xx'
+          : 'backend-unexpected',
     );
   }
 
@@ -1171,6 +1178,8 @@ class RouteSearchResult {
           : const ['상용 ETA 품질 확인 전 경로입니다.'],
       blockedReasons: itinerary.status == 'FOUND'
           ? const []
+          : itinerary.accessibilityRisk.reasonCodes.isEmpty
+          ? [itinerary.status]
           : itinerary.accessibilityRisk.reasonCodes,
       createdAt: result.departureTime,
       etaSource: itinerary.etaSource,
@@ -1429,6 +1438,9 @@ class RouteSearchResult {
       parts.add(
         '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
       );
+    }
+    if (sourceNotice.isNotEmpty) {
+      parts.add(sourceNotice);
     }
     final stepsForGuidance = movementSteps;
     if (stepsForGuidance.isNotEmpty) {
