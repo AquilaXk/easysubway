@@ -2965,32 +2965,20 @@ class _HomeStateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actionLabel = this.actionLabel;
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      label: '$title, $subtitle',
-      child: _AppCard(
-        showBorder: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _AppInfoRow(
-              icon: icon,
-              iconBackground: EasySubwayAccessibleColors.mintSoft,
-              iconColor: EasySubwayAccessibleColors.mintDark,
-              title: title,
-              subtitle: subtitle,
+    return _AppCard(
+      showBorder: true,
+      child: AccessibleStateCard(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        actions: [
+          if (actionLabel != null && onAction != null)
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh),
+              label: Text(actionLabel),
             ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: onAction,
-                icon: const Icon(Icons.refresh),
-                label: Text(actionLabel),
-              ),
-            ],
-          ],
-        ),
+        ],
       ),
     );
   }
