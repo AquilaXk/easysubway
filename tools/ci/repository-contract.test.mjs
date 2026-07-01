@@ -2983,6 +2983,8 @@ test("경로 source contract 불변식은 접근성 안전과 metric fallback �
   const accessibilityCostCalculator = read(
     "apps/mobile/lib/features/routes/application/accessibility_cost_calculator.dart",
   );
+  const routeEngine = read("apps/mobile/lib/features/routes/application/route_engine.dart");
+  const mobilePubspec = read("apps/mobile/pubspec.yaml");
   const localRouteRepository = read("apps/mobile/lib/features/routes/data/local_route_repository.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
 
@@ -2992,6 +2994,12 @@ test("경로 source contract 불변식은 접근성 안전과 metric fallback �
   assert.match(accessibilityCostCalculator, /route contract: unknown accessibility data/);
   assert.match(accessibilityCostCalculator, /route contract: stair-only block/);
   assert.match(accessibilityCostCalculator, /route contract: generated connector strict block/);
+  assert.match(mobilePubspec, /^\s{2}collection:\s*\^/m);
+  assert.match(routeEngine, /PriorityQueue<_RouteCandidate>/);
+  assert.match(routeEngine, /class _RouteCandidate/);
+  assert.match(routeEngine, /sequence/);
+  assert.match(routeEngine, /candidate\.cost != bestCostByNode\[candidate\.nodeId\]/);
+  assert.doesNotMatch(routeEngine, /_lowestUnvisitedNode/);
   assert.match(localRouteRepository, /route contract: synthetic connector edge/);
   assert.match(localRouteRepository, /isGeneratedConnector: true/);
   assert.match(localRouteRepository, /route contract: local metric fallback/);

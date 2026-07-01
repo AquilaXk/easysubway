@@ -438,6 +438,33 @@ void main() {
       expect(result.edgeIds.length, 9999);
     });
 
+    test('개선된 후보가 있는 경로는 반복 실행해도 같은 최저 비용 경로를 반환한다', () {
+      final engine = LocalRouteEngine(graph: _improvedCandidateFixtureGraph());
+
+      final results = List.generate(
+        5,
+        (_) => engine.search(
+          const RouteRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-d',
+            mobilityType: MobilityType.senior,
+          ),
+        ),
+      );
+
+      for (final result in results) {
+        expect(result.status, RouteStatus.found);
+        expect(result.edgeIds, [
+          'entry-a-line-1',
+          'ride-a-b-line-1',
+          'ride-b-d-line-1',
+          'exit-d-line-1',
+        ]);
+        expect(result.totalCost, 398);
+        expect(result.blockedReasonCodes, isEmpty);
+      }
+    });
+
     test('generated connector edge 비율을 일반 접근성 edge와 별도로 계산한다', () {
       final graph = NetworkGraph(
         nodes: const [
@@ -572,6 +599,70 @@ void main() {
       ]);
     });
   });
+}
+
+NetworkGraph _improvedCandidateFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-d:line-1',
+        stationId: 'station-d',
+        lineId: 'line-1',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-d-expensive-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-d:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 500,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'ride-b-d-line-1',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-d:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-1',
+        fromNodeId: 'station-d:line-1',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
 }
 
 NetworkGraph _generatedConnectorFixtureGraph() {
