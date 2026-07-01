@@ -662,7 +662,7 @@ void main() {
           'etaSource': 'STATIC_BACKEND_V1',
           'etaConfidence': 'LOW',
           'durationSeconds': 420,
-          'transferCount': 0,
+          'transferCount': 1,
           'walkingDistanceMeters': 180,
           'accessibilityRisk': {
             'stairCount': 1,
@@ -714,6 +714,70 @@ void main() {
                 ],
                 'level': 'REVIEW_REQUIRED',
                 'reasons': ['ACCESSIBILITY_CHECK_REQUIRED'],
+              },
+            },
+            {
+              'legType': 'OUT_OF_STATION_TRANSFER',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-transfer',
+              'fromNodeId': '',
+              'toNodeId': '',
+              'lineId': '',
+              'tripId': '',
+              'trainNo': '',
+              'plannedDepartureTime': '2026-06-30T09:22:00+09:00',
+              'realtimeDepartureTime': null,
+              'plannedArrivalTime': '2026-06-30T09:24:00+09:00',
+              'realtimeArrivalTime': null,
+              'waitTimeSeconds': 0,
+              'slackSeconds': 90,
+              'durationSeconds': 120,
+              'distanceMeters': 80,
+              'etaSource': 'PLANNED',
+              'confidence': 'MEDIUM',
+              'accessibilityRisk': {
+                'stairCount': 0,
+                'unknownAccessibilityCount': 0,
+                'generatedConnectorCount': 0,
+                'staleDataCount': 0,
+                'lowConfidenceCount': 0,
+                'unavailableFacilityCount': 0,
+                'riskLevel': 'LOW',
+                'reasonCodes': <Object?>[],
+                'level': 'LOW',
+                'reasons': <Object?>[],
+              },
+            },
+            {
+              'legType': 'IN_STATION_TRANSFER',
+              'fromStationId': 'station-transfer',
+              'toStationId': 'station-transfer',
+              'fromNodeId': '',
+              'toNodeId': '',
+              'lineId': '',
+              'tripId': '',
+              'trainNo': '',
+              'plannedDepartureTime': '2026-06-30T09:24:00+09:00',
+              'realtimeDepartureTime': null,
+              'plannedArrivalTime': '2026-06-30T09:25:00+09:00',
+              'realtimeArrivalTime': null,
+              'waitTimeSeconds': 0,
+              'slackSeconds': 45,
+              'durationSeconds': 60,
+              'distanceMeters': 40,
+              'etaSource': 'PLANNED',
+              'confidence': 'MEDIUM',
+              'accessibilityRisk': {
+                'stairCount': 0,
+                'unknownAccessibilityCount': 0,
+                'generatedConnectorCount': 0,
+                'staleDataCount': 0,
+                'lowConfidenceCount': 0,
+                'unavailableFacilityCount': 0,
+                'riskLevel': 'LOW',
+                'reasonCodes': <Object?>[],
+                'level': 'LOW',
+                'reasons': <Object?>[],
               },
             },
           ],
@@ -770,18 +834,21 @@ void main() {
       result.itineraries.first.accessibilityRisk.reasonCodes,
       contains('STALE_ACCESSIBILITY_DATA'),
     );
-    expect(result.itineraries.first.legs.single.legType, 'ACCESS');
+    expect(result.itineraries.first.legs.first.legType, 'ACCESS');
     expect(
-      result.itineraries.first.legs.single.accessibilityRisk.riskLevel,
+      result.itineraries.first.legs.first.accessibilityRisk.riskLevel,
       'HIGH',
     );
-    expect(result.itineraries.first.legs.single.waitTimeSeconds, 0);
-    expect(result.itineraries.first.legs.single.slackSeconds, 0);
-    expect(result.itineraries.first.legs.single.etaSource, 'STATIC_BACKEND_V1');
-    expect(
-      RouteSearchResult.fromV2(result).steps.single.metricSourceLabel,
-      '서버 경로 안내 기준이에요',
-    );
+    expect(result.itineraries.first.legs.first.waitTimeSeconds, 0);
+    expect(result.itineraries.first.legs.first.slackSeconds, 0);
+    expect(result.itineraries.first.legs.first.etaSource, 'STATIC_BACKEND_V1');
+    final displayResult = RouteSearchResult.fromV2(result);
+    expect(displayResult.steps.first.metricSourceLabel, '서버 경로 안내 기준이에요');
+    expect(displayResult.etaConfidence, 'LOW');
+    expect(displayResult.accessibilityRiskLevel, 'HIGH');
+    expect(displayResult.transferSlackSeconds, 45);
+    expect(displayResult.hasOutOfStationTransfer, isTrue);
+    expect(displayResult.commercialEtaEligible, isFalse);
   });
 
   test('경로 V2 변환은 ride 노선과 불확실 접근성을 보수적으로 표시한다', () {
@@ -893,6 +960,8 @@ void main() {
     expect(result.steps.last.estimatedMinutes, 26);
     expect(result.steps.first.stairAccessState, 'unknown');
     expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
+    expect(result.transferSlackSeconds, isNull);
+    expect(result.hasOutOfStationTransfer, isFalse);
   });
 
   test('경로 V2 blocked reasonCodes가 비어 있으면 status를 보존한다', () {

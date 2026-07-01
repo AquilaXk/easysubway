@@ -89,11 +89,11 @@
     ]
   },
   "latestGoNoGoStatus": {
-    "qaEvidenceDateKst": "2026-06-29",
-    "reviewedMainMergeSha": "a1a6da80b3433c26ae2f5a45b02de86c8f37ce82",
+    "qaEvidenceDateKst": "2026-07-02",
+    "reviewedMainMergeSha": "da34e5215daf64ae4c1c31a7682d4fa774588074",
     "currentDecision": "NO_GO",
     "decisionOwner": "release-owner",
-    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022],
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230],
     "recentlyResolvedEvidence": [
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
@@ -102,7 +102,8 @@
       "server-minimized-android-release-scope-fixed",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
-      "operations-alert-and-mailbox-routing-summary"
+      "operations-alert-and-mailbox-routing-summary",
+      "operations-post-launch-dry-run-required-evidence-contract"
     ],
     "remainingP0Blockers": [
       "play-installed-build-provenance",
@@ -113,7 +114,8 @@
       "post-launch-review-window-evidence-after-public-release",
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
-      "play-installed-server-minimized-final-acceptance-evidence"
+      "play-installed-server-minimized-final-acceptance-evidence",
+      "route-result-v2-ui-badge-accessibility-copy-evidence"
     ],
     "remainingApprovalPrerequisites": [
       "release-owner-final-go-approval"
@@ -281,9 +283,18 @@
       "owner": "release-owner",
       "nextAction": "final RC evidence manifest identity와 waiver 판정 동결",
       "evidenceReference": "apps/mobile/release/rc-evidence-manifest-contract.json"
+    },
+    {
+      "id": "G12_ROUTE_RESULT_V2_UI_COPY",
+      "issue": 1230,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "mobile-ux",
+      "nextAction": "Route result V2 badge와 accessibility copy evidence 수집",
+      "evidenceReference": "apps/mobile/release/route-result-v2-ui-copy-gate.json"
     }
   ],
-  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],
+  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230],
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/android-release-100/",
     "githubEvidencePolicy": "summary_or_public_link",

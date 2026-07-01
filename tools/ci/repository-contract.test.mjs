@@ -45,7 +45,23 @@ test("route ETA accuracy evaluator report contract is machine-readable", async (
   const report = JSON.parse(readFileSync(output, "utf8"));
   assert.equal(report.schemaVersion, 1);
   assert.equal(report.sampleSize, 100);
+  assert.deepEqual(report.referenceSourceCounts, {
+    PROVIDER_LIVE_ARRIVAL: 0,
+    STATIC_TIMETABLE_REFERENCE: 0,
+    MANUAL_OBSERVATION: 0,
+    COMPETING_APP_COMPARISON: 0,
+    FIXTURE_EXPECTED: 100,
+  });
+  assert.equal(report.productionSampleSize, 0);
+  assert.equal(report.nonProductionSampleSize, 100);
   assert.equal(report.metrics.sampleSize, 100);
+  assert.equal(report.metrics.routeNotFoundRate, 0);
+  assert.equal(report.metrics.wrongTransferCountRate, 0);
+  assert.equal(report.metrics.wrongLineSequenceRate, 0);
+  assert.equal(report.metrics.strictStepFreeFalsePositiveCount, 0);
+  assert.equal(report.metrics.etaSourceMismatchCount, 0);
+  assert.equal(report.metrics.realtimeFallbackMismatchCount, 0);
+  assert.equal(report.metrics.providerStaleMisuseCount, 0);
   assert.equal(report.coverage.singleRide, true);
   assert.equal(report.coverage.oneTransfer, true);
   assert.equal(report.coverage.twoTransfer, true);
@@ -484,6 +500,10 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
+  assert.match(workflow, /Repository CI \/ Run security tool tests/);
+  assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
+  assert.match(workflow, /Repository CI \/ Run ops tool tests/);
+  assert.match(workflow, /node --test tools\/ops\/\*\.test\.mjs/);
   assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
   assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
   assert.doesNotMatch(releaseGateJob, /--test-name-pattern/);
@@ -2007,6 +2027,15 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     for (const field of ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]) {
       assert.ok(matrix.summaryFields.includes(field), `${matrixId} must include PR summary field ${field}`);
     }
+    assert.equal(typeof matrix.expectedStatusByCase, "object", `${matrixId} must define expected statuses by case`);
+    for (const caseId of requiredCases) {
+      assert.ok(Array.isArray(matrix.expectedStatusByCase[caseId]), `${matrixId}.${caseId} must define expected statuses`);
+      assert.ok(matrix.expectedStatusByCase[caseId].length > 0, `${matrixId}.${caseId} expected statuses must not be empty`);
+      assert.ok(
+        matrix.expectedStatusByCase[caseId].every(Number.isInteger),
+        `${matrixId}.${caseId} expected statuses must be integer status codes`,
+      );
+    }
     assert.ok(Array.isArray(matrix.requiredEvidence), `${matrixId} must define evidence`);
     assert.ok(matrix.requiredEvidence.length > 0, `${matrixId} must require evidence`);
     assert.ok(Array.isArray(matrix.forbiddenSummaryValues), `${matrixId} must forbid sensitive summary values`);
@@ -2042,6 +2071,11 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "storage lifecycle rehearsal must require retention/delete evidence",
   );
   assert.equal(abusePenetrationRehearsalGate.manualRehearsalPolicy.localAndroidEmulatorRequiredForMobileEvidence, true);
+  assert.equal(
+    abusePenetrationRehearsalGate.manualRehearsalPolicy.validatorCommand,
+    "node tools/security/validate-abuse-penetration-summary.mjs --summary <summary.json> --require-pass",
+  );
+  assert.equal(existsSync(path.join(root, "tools/security/validate-abuse-penetration-summary.mjs")), true);
   assert.deepEqual(abusePenetrationRehearsalGate.manualRehearsalPolicy.githubSummaryFields, [
     "scenarioId",
     "artifactIdentity",
@@ -2585,11 +2619,11 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "post-launch-review-window-evidence-after-public-release",
     "support-incident-response-dry-run-evidence",
   ]);
-  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-06-29");
-  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "a1a6da80b3433c26ae2f5a45b02de86c8f37ce82");
+  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-02");
+  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "da34e5215daf64ae4c1c31a7682d4fa774588074");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -2599,6 +2633,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
+    "operations-post-launch-dry-run-required-evidence-contract",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
     "play-installed-build-provenance",
@@ -2610,6 +2645,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "play-installed-android-quality-performance-recovery-evidence",
     "production-like-abuse-rehearsal-evidence",
     "play-installed-server-minimized-final-acceptance-evidence",
+    "route-result-v2-ui-badge-accessibility-copy-evidence",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingApprovalPrerequisites, [
     "release-owner-final-go-approval",
@@ -2626,6 +2662,43 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
+  const routeResultV2UiCopyGatePath = "apps/mobile/release/route-result-v2-ui-copy-gate.json";
+  const routeResultV2UiCopyGate = readJson(routeResultV2UiCopyGatePath);
+  assert.equal(routeResultV2UiCopyGate.releaseGate, "route-result-v2-ui-copy");
+  assert.equal(routeResultV2UiCopyGate.issue, 1230);
+  assert.equal(routeResultV2UiCopyGate.status, "IN_PROGRESS");
+  assert.equal(routeResultV2UiCopyGate.currentDecision, "NO_GO");
+  assert.deepEqual(routeResultV2UiCopyGate.latestQaEvidenceStatus.resolvedEvidence, []);
+  assert.deepEqual(routeResultV2UiCopyGate.latestQaEvidenceStatus.remainingEvidence, [
+    "route-result-v2-badge-visible-screenshot",
+    "route-result-v2-accessibility-copy-ui-tree",
+    "route-result-v2-screenreader-label-audit",
+    "route-result-v2-large-touch-target-and-contrast-regression",
+  ]);
+  assert.deepEqual(routeResultV2UiCopyGate.requiredEvidence, {
+    badgeScreenshotRequired: true,
+    accessibilityUiTreeRequired: true,
+    screenReaderCopyAuditRequired: true,
+    touchTargetAndContrastRegressionRequired: true,
+  });
+  assert.deepEqual(routeResultV2UiCopyGate.forbiddenEvidence, [
+    "old-route-result-v1-screenshot",
+    "generated-placeholder-copy",
+    "static-json-only-route-result",
+    "unverified-screenreader-summary",
+  ]);
+  assert.deepEqual(
+    gate.gates.find((item) => item.issue === 1230),
+    {
+      id: "G12_ROUTE_RESULT_V2_UI_COPY",
+      issue: 1230,
+      priority: "P0",
+      status: "IN_PROGRESS",
+      owner: "mobile-ux",
+      nextAction: "Route result V2 badge와 accessibility copy evidence 수집",
+      evidenceReference: routeResultV2UiCopyGatePath,
+    },
+  );
   assert.deepEqual(
     gate.gates.find((item) => item.issue === 1015),
     {
@@ -2644,7 +2717,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.deepEqual(
     gate.childIssueLinks,
-    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230],
   );
   for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
     assert.ok(item.owner, `${item.id} must define owner`);
@@ -3370,6 +3443,12 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("alert-route"));
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("runbook"));
   assert.ok(operationsEvidence.observability.allowedFallbackKinds.includes("external-blocker-record"));
+  assert.equal(
+    operationsEvidence.releaseEvidenceSummaryValidator.command,
+    "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --require-pass",
+  );
+  assert.match(operationsEvidence.releaseEvidenceSummaryValidator.passPolicyKo, /external-blocker-record/);
+  assert.equal(existsSync(path.join(root, "tools/ops/validate-operations-release-summary.mjs")), true);
   assert.equal(backupRestoreGate.rcEvidenceManifest, operationsEvidencePath);
 
   assert.match(applicationProd, /management:[\s\S]*health:[\s\S]*readiness:[\s\S]*productionReadiness/);
@@ -10611,6 +10690,27 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(realtimeTool.android, "false");
   assert.equal(realtimeTool.ios, "false");
   assert.equal(realtimeTool.deploy, "false");
+
+  const securityTool = await classifyChangedFiles(["tools/security/validate-abuse-penetration-summary.mjs"]);
+  assert.equal(securityTool.repository, "true");
+  assert.equal(securityTool.mobile, "false");
+  assert.equal(securityTool.android, "false");
+  assert.equal(securityTool.ios, "false");
+  assert.equal(securityTool.deploy, "false");
+
+  const opsTool = await classifyChangedFiles(["tools/ops/validate-operations-release-summary.mjs"]);
+  assert.equal(opsTool.repository, "true");
+  assert.equal(opsTool.mobile, "false");
+  assert.equal(opsTool.android, "false");
+  assert.equal(opsTool.ios, "false");
+  assert.equal(opsTool.deploy, "false");
+
+  const releaseTool = await classifyChangedFiles(["tools/release/summary-validation-utils.mjs"]);
+  assert.equal(releaseTool.repository, "true");
+  assert.equal(releaseTool.mobile, "false");
+  assert.equal(releaseTool.android, "false");
+  assert.equal(releaseTool.ios, "false");
+  assert.equal(releaseTool.deploy, "false");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
