@@ -484,10 +484,12 @@ class RouteSearchController {
 				return 0;
 			}
 			// ponytail: schedule candidate selection belongs with timetable schema; expose only mobility buffer for now.
-			if (mobilityType == MobilityType.WHEELCHAIR || mobilityType == MobilityType.TEMPORARY_INJURY) {
-				return 180;
-			}
-			return 120;
+			return switch (mobilityType) {
+				case LUGGAGE -> 60;
+				case SENIOR, PREGNANT -> 90;
+				case STROLLER, TEMPORARY_INJURY -> 120;
+				case WHEELCHAIR -> 180;
+			};
 		}
 
 		private static EtaSource etaSourceOf(RouteStep step) {

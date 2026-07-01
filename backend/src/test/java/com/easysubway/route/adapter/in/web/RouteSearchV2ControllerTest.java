@@ -212,6 +212,36 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
+	@DisplayName("V2 큰 짐 이동은 탑승 준비시간 60초를 적용한다")
+	void routeSearchV2AppliesLuggageBoardingSlack() throws Exception {
+		when(routeSearchUseCase.searchRoute(argThat(command ->
+			command != null && command.mobilityType() == MobilityType.LUGGAGE
+		))).thenReturn(boardingTransferRouteSearch(MobilityType.LUGGAGE));
+
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-boarding-origin",
+					  "destinationStationId": "station-boarding-destination",
+					  "departureTime": "2026-06-30T09:15:00+09:00",
+					  "mobilityType": "LUGGAGE",
+					  "constraintMode": "PREFER_STEP_FREE",
+					  "useRealtime": true,
+					  "maxTransfers": 1,
+					  "alternativeCount": 1
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].plannedArrivalTime").value("2026-06-30T09:31:00+09:00"))
+			.andExpect(jsonPath("$.data.itineraries[0].durationSeconds").value(960))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].waitTimeSeconds").value(60))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].slackSeconds").value(60))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[3].waitTimeSeconds").value(60))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[3].slackSeconds").value(60));
+	}
+
+	@Test
 	@DisplayName("모바일 V2 계약의 blocked reasonCodes는 사용자 문장 대신 안정적인 코드만 반환한다")
 	void routeSearchV2BlockedRiskReasonCodesAreStableCodes() throws Exception {
 		when(routeSearchUseCase.searchRoute(argThat(command ->
@@ -518,13 +548,17 @@ class RouteSearchV2ControllerTest {
 	}
 
 	private RouteSearchResult boardingTransferRouteSearch() {
+		return boardingTransferRouteSearch(MobilityType.STROLLER);
+	}
+
+	private RouteSearchResult boardingTransferRouteSearch(MobilityType mobilityType) {
 		return new RouteSearchResult(
 			"route-search-boarding-transfer",
 			"station-boarding-origin",
 			"탑승 출발역",
 			"station-boarding-destination",
 			"탑승 도착역",
-			MobilityType.STROLLER,
+			mobilityType,
 			RouteSearchStatus.FOUND,
 			"line-boarding",
 			"탑승 노선",
