@@ -408,55 +408,28 @@ class _NetworkMapLoadFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      label: '노선도를 불러오지 못했어요. 다시 시도하거나 역명으로 검색할 수 있어요.',
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '노선도를 불러오지 못했어요',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '네트워크 상태를 확인한 뒤 다시 시도하거나 역명으로 검색해 주세요.',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(height: 1.35),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                key: const Key('networkMapRetryButton'),
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 시도'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('networkMapStationSearchFallbackButton'),
-                onPressed: onOpenStationSearch,
-                icon: const Icon(Icons.search),
-                label: const Text('역명으로 검색'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: AccessibleStateCard(
+          icon: Icons.map_outlined,
+          title: '노선도를 불러오지 못했어요',
+          subtitle: '네트워크 상태를 확인한 뒤 다시 시도하거나 역명으로 검색해 주세요.',
+          actions: [
+            FilledButton.icon(
+              key: const Key('networkMapRetryButton'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('다시 시도'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('networkMapStationSearchFallbackButton'),
+              onPressed: onOpenStationSearch,
+              icon: const Icon(Icons.search),
+              label: const Text('역명으로 검색'),
+            ),
+          ],
         ),
       ),
     );
