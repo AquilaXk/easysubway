@@ -12307,6 +12307,19 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
     }
     return result;
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    return RouteRefreshResult(
+      routeSearchId: routeSearchId,
+      status: 'UNCHANGED',
+      result: result,
+      refreshedAt: '2026-07-01T15:30:00',
+      etaSource: 'PLANNED',
+      etaConfidence: 'MEDIUM',
+      sourceLabel: '계획 시간 기준',
+    );
+  }
 }
 
 class FakeRouteFeedbackRepository implements RouteFeedbackRepository {
@@ -12728,6 +12741,11 @@ class ControlledRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
     requests.add(request);
     return _completer.future;
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
   }
 
   void complete(RouteSearchResult result) {

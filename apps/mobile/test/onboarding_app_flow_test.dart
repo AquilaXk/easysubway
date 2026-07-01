@@ -287,6 +287,11 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
+  }
 }
 
 class FakeFavoriteStationRepository implements FavoriteStationRepository {
