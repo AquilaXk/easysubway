@@ -1984,41 +1984,39 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     final actionButtonSection = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showSearchInput || showNearbyRetryButton) ...[
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              final isSearching =
-                  _controller.state.status == StationSearchStatus.loading;
-              final isNearbyDisabled = isSearching || _isNearbySearchRunning;
-              if (showNearbyRetryButton) {
-                return OutlinedButton.icon(
-                  key: const Key('nearbyStationSearchButton'),
-                  onPressed: isNearbyDisabled ? null : _searchNearby,
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('내 주변 역 다시 찾기'),
-                );
-              }
-              if (_hasSearchQuery) {
-                return FilledButton.icon(
-                  key: const Key('stationSearchSubmitButton'),
-                  onPressed: isSearching
-                      ? null
-                      : () => _submit(_queryController.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('검색'),
-                );
-              }
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final isSearching =
+                _controller.state.status == StationSearchStatus.loading;
+            final isNearbyDisabled = isSearching || _isNearbySearchRunning;
+            if (showNearbyRetryButton) {
               return OutlinedButton.icon(
                 key: const Key('nearbyStationSearchButton'),
                 onPressed: isNearbyDisabled ? null : _searchNearby,
                 icon: const Icon(Icons.my_location),
-                label: const Text('내 주변 역 찾기'),
+                label: const Text('내 주변 역 다시 찾기'),
               );
-            },
-          ),
-          const SizedBox(height: 20),
-        ],
+            }
+            if (_hasSearchQuery) {
+              return FilledButton.icon(
+                key: const Key('stationSearchSubmitButton'),
+                onPressed: isSearching
+                    ? null
+                    : () => _submit(_queryController.text),
+                icon: const Icon(Icons.search),
+                label: const Text('검색'),
+              );
+            }
+            return OutlinedButton.icon(
+              key: const Key('nearbyStationSearchButton'),
+              onPressed: isNearbyDisabled ? null : _searchNearby,
+              icon: const Icon(Icons.my_location),
+              label: const Text('내 주변 역 찾기'),
+            );
+          },
+        ),
+        const SizedBox(height: 20),
       ],
     );
     final resultSection = AnimatedBuilder(
