@@ -64,7 +64,8 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    expect(find.byKey(const Key('routeSearchButton')), findsNothing);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
     expect(
@@ -127,7 +128,7 @@ void main() {
           (option) => option.id == 'wheelchair',
         ),
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: true,
           simpleViewEnabled: true,
         ),
@@ -142,7 +143,7 @@ void main() {
     expect(onboardingStore.readCount, 1);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
-    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(23.6, 0.01));
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
     expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
   });
 

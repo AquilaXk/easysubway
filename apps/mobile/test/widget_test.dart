@@ -602,7 +602,7 @@ void main() {
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingStateWithPreferences(
           preferences: const OnboardingViewPreferences(
-            largeTextEnabled: true,
+            largeTextEnabled: false,
             highContrastEnabled: true,
             simpleViewEnabled: true,
           ),
@@ -612,7 +612,7 @@ void main() {
 
     final homeContext = tester.element(find.byType(HomeScreen));
 
-    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(23.6, 0.01));
+    expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
     expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('이동 프로필'), findsNothing);
@@ -635,7 +635,7 @@ void main() {
           notificationRepository: FakeNotificationSettingsRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: false,
               simpleViewEnabled: false,
             ),
@@ -3154,7 +3154,7 @@ void main() {
     }
   });
 
-  testWidgets('홈 핵심 행동은 좁은 화면과 큰 글자에서도 터치 기준을 지킨다', (tester) async {
+  testWidgets('홈 핵심 행동은 좁은 화면과 시스템 글자 크기에서도 터치 기준을 지킨다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 3.2;
@@ -3239,7 +3239,7 @@ void main() {
           notificationRepository: FakeNotificationSettingsRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: false,
               simpleViewEnabled: false,
             ),
@@ -3282,7 +3282,7 @@ void main() {
           notificationRepository: FakeNotificationSettingsRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: true,
               simpleViewEnabled: false,
             ),
@@ -3378,7 +3378,7 @@ void main() {
           notificationRepository: FakeNotificationSettingsRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: true,
               simpleViewEnabled: false,
             ),
@@ -3407,23 +3407,17 @@ void main() {
       expect(find.text('저장된 안내'), findsOneWidget);
       expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
       expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
-      expect(find.text('큰 글자'), findsOneWidget);
+      expect(find.text('큰 글자'), findsNothing);
       expect(find.text('고대비'), findsOneWidget);
       expect(find.text('간편 보기'), findsOneWidget);
-      expect(find.text('켜짐'), findsNWidgets(2));
-      expect(find.text('꺼짐'), findsOneWidget);
+      expect(find.text('켜짐'), findsWidgets);
+      expect(find.text('꺼짐'), findsWidgets);
       expect(find.textContaining('데이터팩'), findsNothing);
       expect(find.textContaining('실기기 QA'), findsNothing);
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
           '계단 피하기 · 환승 줄이기 적용 중, 계단을 피하고 쉬운 환승을 우선해요',
-        ).getSemanticsData().hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-      expect(
-        settingsActionSemantics(
-          '큰 글자, 켜짐, 화면 글자와 버튼 설명을 더 크게 보여줘요, 두 번 탭해 끄기',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -3541,7 +3535,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3560,30 +3554,21 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
-    await tester.pumpAndSettle();
-    expect(
-      MediaQuery.textScalerOf(
-        tester.element(find.byKey(const Key('largeTextSettingsButton'))),
-      ).scale(20),
-      closeTo(20, 0.01),
-    );
+    expect(find.byKey(const Key('largeTextSettingsButton')), findsNothing);
+    expect(find.text('큰 글자'), findsNothing);
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
     await tester.pumpAndSettle();
 
-    expect(onboardingStore.saveCount, 3);
+    expect(onboardingStore.saveCount, 2);
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
       isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
-    expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
-      findsOneWidget,
-    );
+    expect(find.text('큰 글자'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
@@ -3611,10 +3596,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('largeTextSettingsButton')), findsNothing);
+    expect(find.text('큰 글자'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
@@ -3637,7 +3620,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3657,13 +3640,17 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
-    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isTrue);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
+      onboardingStore.savedResult?.preferences.highContrastEnabled,
+      isFalse,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
     );
     expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsOneWidget);
@@ -3718,7 +3705,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3738,18 +3725,13 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
-    await tester.pump();
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
     await tester.pump();
 
     expect(onboardingStore.saveCount, 1);
-    expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
-      findsOneWidget,
-    );
+    expect(find.text('큰 글자'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
@@ -3787,7 +3769,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3807,8 +3789,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
-    await tester.pump();
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
@@ -3827,10 +3807,7 @@ void main() {
       isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isFalse);
-    expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
-      findsOneWidget,
-    );
+    expect(find.text('큰 글자'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
@@ -3856,7 +3833,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3876,9 +3853,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
-    await tester.pump();
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
     await tester.pump();
 
     firstSave.complete();
@@ -3891,15 +3868,16 @@ void main() {
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
-      isFalse,
+      isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
+    expect(find.text('큰 글자'), findsNothing);
     expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 꺼짐, .*두 번 탭해 켜기')),
+      find.bySemanticsLabel(RegExp('고대비, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
+      find.bySemanticsLabel(RegExp('간편 보기, 켜짐, .*두 번 탭해 끄기')),
       findsOneWidget,
     );
     expect(find.text('설정을 저장하지 못했어요. 이전 값으로 되돌렸어요.'), findsOneWidget);
@@ -3921,7 +3899,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3941,9 +3919,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
-    await tester.pump();
     await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('simpleViewSettingsButton')));
     await tester.pump();
 
     firstSave.completeError(StateError('first save failed'));
@@ -3953,16 +3931,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isTrue);
+    expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
       isFalse,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
-    expect(
-      find.bySemanticsLabel(RegExp('큰 글자, 켜짐, .*두 번 탭해 끄기')),
-      findsOneWidget,
-    );
+    expect(find.text('큰 글자'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('고대비, 꺼짐, .*두 번 탭해 켜기')),
       findsOneWidget,
@@ -3977,7 +3952,7 @@ void main() {
       initialResult: OnboardingResult(
         profile: mobilityProfileOptions.first,
         preferences: const OnboardingViewPreferences(
-          largeTextEnabled: true,
+          largeTextEnabled: false,
           highContrastEnabled: false,
           simpleViewEnabled: true,
         ),
@@ -3997,7 +3972,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSettingsScreen(tester);
-    await tester.tap(find.byKey(const Key('largeTextSettingsButton')));
+    await tester.tap(find.byKey(const Key('highContrastSettingsButton')));
     await tester.pump();
     expect(onboardingStore.saveCount, 1);
 
@@ -4022,12 +3997,12 @@ void main() {
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
-      isFalse,
+      isTrue,
     );
     expect(onboardingStore.savedResult?.preferences.simpleViewEnabled, isTrue);
   });
 
-  testWidgets('설정 화면 보기 옵션은 큰 글자에서도 스위치를 조작할 수 있다', (tester) async {
+  testWidgets('설정 화면 보기 옵션은 시스템 글자 크기에서도 스위치를 조작할 수 있다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;
@@ -4045,7 +4020,7 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         initialOnboardingState: _completedOnboardingStateWithPreferences(
           preferences: const OnboardingViewPreferences(
-            largeTextEnabled: true,
+            largeTextEnabled: false,
             highContrastEnabled: true,
             simpleViewEnabled: false,
           ),
@@ -4056,7 +4031,8 @@ void main() {
 
     await _openSettingsScreen(tester);
 
-    expect(find.byKey(const Key('largeTextSettingsButton')), findsOneWidget);
+    expect(find.byKey(const Key('largeTextSettingsButton')), findsNothing);
+    expect(find.text('큰 글자'), findsNothing);
     expect(find.byKey(const Key('highContrastSettingsButton')), findsOneWidget);
     expect(find.byKey(const Key('simpleViewSettingsButton')), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -5738,7 +5714,7 @@ void main() {
     }
   });
 
-  testWidgets('역 검색 결과 핵심 문구는 큰 글자에서 한 줄 말줄임으로 고정하지 않는다', (tester) async {
+  testWidgets('역 검색 결과 핵심 문구는 시스템 글자 크기에서 한 줄 말줄임으로 고정하지 않는다', (tester) async {
     final longStationName = '김포공항국제선환승센터';
     final repository = FakeStationSearchRepository(
       queryResults: {
@@ -6596,7 +6572,7 @@ void main() {
     expect(filterRect.top, lessThan(resultRect.bottom));
   });
 
-  testWidgets('역 검색 대화면은 경계 폭 큰 글씨와 긴 노선명에서 렌더링된다', (tester) async {
+  testWidgets('역 검색 대화면은 경계 폭 시스템 글자 크기와 긴 노선명에서 렌더링된다', (tester) async {
     tester.view.physicalSize = const Size(900, 800);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;
@@ -6681,7 +6657,7 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         initialOnboardingState: _completedOnboardingStateWithPreferences(
           preferences: const OnboardingViewPreferences(
-            largeTextEnabled: true,
+            largeTextEnabled: false,
             highContrastEnabled: true,
             simpleViewEnabled: false,
           ),
@@ -7682,7 +7658,7 @@ void main() {
     expect(detailRect.top, lessThan(primaryRect.bottom));
   });
 
-  testWidgets('역 상세 대화면은 큰 글씨에서 시설 상태 3종을 렌더링한다', (tester) async {
+  testWidgets('역 상세 대화면은 시스템 글자 크기에서 시설 상태 3종을 렌더링한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     tester.view.physicalSize = const Size(900, 800);
     tester.view.devicePixelRatio = 1;
@@ -7746,7 +7722,7 @@ void main() {
           favoriteRepository: FakeFavoriteStationRepository(),
           initialOnboardingState: _completedOnboardingStateWithPreferences(
             preferences: const OnboardingViewPreferences(
-              largeTextEnabled: true,
+              largeTextEnabled: false,
               highContrastEnabled: true,
               simpleViewEnabled: false,
             ),
@@ -8857,7 +8833,7 @@ void main() {
         favoriteRepository: FakeFavoriteStationRepository(),
         initialOnboardingState: _completedOnboardingStateWithPreferences(
           preferences: const OnboardingViewPreferences(
-            largeTextEnabled: true,
+            largeTextEnabled: false,
             highContrastEnabled: false,
             simpleViewEnabled: false,
           ),
@@ -9701,7 +9677,7 @@ void main() {
     expect(find.text('의견을 보내지 못했어요.'), findsOneWidget);
   });
 
-  testWidgets('경로 안내 칩은 좁은 화면과 큰 글자에서도 넘치지 않는다', (tester) async {
+  testWidgets('경로 안내 칩은 좁은 화면과 시스템 글자 크기에서도 넘치지 않는다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;

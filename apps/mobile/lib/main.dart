@@ -1062,15 +1062,11 @@ class _OnboardingPreferenceScope extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final textScaler = preferences.largeTextEnabled
-        ? mediaQuery.textScaler.clamp(minScaleFactor: 1.18)
-        : mediaQuery.textScaler;
 
     return MediaQuery(
       data: mediaQuery.copyWith(
         highContrast:
             preferences.highContrastEnabled || mediaQuery.highContrast,
-        textScaler: textScaler,
       ),
       child: Theme(
         data: _themeForPlatformAccessibility(
@@ -3429,18 +3425,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 title: '화면 및 접근성',
                 children: [
                   _AppSettingsPreferenceTile(
-                    key: const Key('largeTextSettingsButton'),
-                    icon: Icons.text_fields,
-                    title: '큰 글자',
-                    subtitle: '화면 글자와 버튼 설명을 더 크게 보여줘요',
-                    enabled: _viewPreferences.largeTextEnabled,
-                    onChanged: (value) {
-                      _updateViewPreferences(
-                        _viewPreferences.copyWith(largeTextEnabled: value),
-                      );
-                    },
-                  ),
-                  _AppSettingsPreferenceTile(
                     key: const Key('simpleViewSettingsButton'),
                     icon: Icons.visibility_outlined,
                     title: '간편 보기',
@@ -4074,8 +4058,7 @@ bool _isSameViewPreferences(
   OnboardingViewPreferences left,
   OnboardingViewPreferences right,
 ) {
-  return left.largeTextEnabled == right.largeTextEnabled &&
-      left.highContrastEnabled == right.highContrastEnabled &&
+  return left.highContrastEnabled == right.highContrastEnabled &&
       left.simpleViewEnabled == right.simpleViewEnabled;
 }
 
