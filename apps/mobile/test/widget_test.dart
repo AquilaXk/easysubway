@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/adaptive_layout.dart';
@@ -27,6 +26,7 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
@@ -3435,6 +3435,51 @@ void main() {
     }
   });
 
+  testWidgets('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다', (tester) async {
+    final screenshotKey = GlobalKey();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: screenshotKey,
+        child: EasySubwayApp(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingStateWithPreferences(
+            preferences: const OnboardingViewPreferences(
+              largeTextEnabled: true,
+              highContrastEnabled: true,
+              simpleViewEnabled: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('routeSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('heroStationSearchButton')), findsOneWidget);
+
+    final boundary =
+        screenshotKey.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 1);
+    addTearDown(image.dispose);
+    expect(image.width, 390);
+    expect(image.height, 844);
+  });
+
   testWidgets('홈은 저장한 경로를 최근 경로로 보여주되 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
@@ -3657,6 +3702,8 @@ void main() {
     expect(find.text('수도권 역과 노선'), findsOneWidget);
     expect(find.text('마지막 갱신'), findsOneWidget);
     expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
+    expect(find.text('저장 정보 다시 확인'), findsOneWidget);
+    expect(find.text('저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요'), findsOneWidget);
     expect(find.text('안내 범위'), findsOneWidget);
     expect(find.text('주요 역·노선 안내를 먼저 보여줘요'), findsOneWidget);
     expect(find.text('제한 사항'), findsOneWidget);

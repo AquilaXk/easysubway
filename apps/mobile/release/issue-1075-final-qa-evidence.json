@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "issue": 1075,
+  "titleKo": "모바일 접근성 QA 최종 증거",
+  "remainingChecklistClosed": [
+    "offline_metadata_missing_state",
+    "manual_accessibility_qa_scenarios",
+    "text_scale_200_screenshot_evidence",
+    "text_scale_200_screenshot_test"
+  ],
+  "offlineStatusSourceOfTruth": "installed catalog metadata",
+  "metadataMissingStateKo": "저장 정보 다시 확인",
+  "textScale200Evidence": {
+    "type": "widget-screenshot-smoke",
+    "command": "flutter test test/widget_test.dart --plain-name \"홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다\" --reporter expanded",
+    "viewport": "390x844",
+    "textScaleFactor": 2,
+    "checks": [
+      "routeSearchButton visible",
+      "heroStationSearchButton visible",
+      "RepaintBoundary.toImage creates 390x844 image",
+      "no Flutter exception"
+    ]
+  },
+  "environmentProbe": {
+    "android": {
+      "adbDevices": "no connected devices",
+      "flutterEmulators": ["easysubway_ps16k_api36", "maum_on_api36"],
+      "sdkAvds": ["easysubway_ps16k_api36", "maum_on_api36"],
+      "flutterDevices": ["macOS", "Chrome"],
+      "manualRunStatus": "available_avd_not_booted_in_this_session"
+    },
+    "ios": {
+      "xcodebuildmcpSimulators": [
+        {
+          "name": "Maum iPhone 17",
+          "runtime": "iOS 26.5",
+          "state": "Shutdown"
+        }
+      ],
+      "manualRunStatus": "no_booted_simulator_in_this_session"
+    }
+  },
+  "manualQaScenarios": [
+    {
+      "id": "android_font_scale_200_high_contrast_small_screen",
+      "platform": "android",
+      "flowKo": "Android emulator에서 200% 글자와 고대비 기준 홈, 설정, 오프라인 안내를 확인한다.",
+      "evidence": ["uiautomator", "screenshot", "logcat-summary"]
+    },
+    {
+      "id": "android_screen_reader_primary_flow",
+      "platform": "android",
+      "flowKo": "TalkBack 기준 홈에서 역 검색과 길찾기 CTA, 오프라인 안내 상태를 순서대로 확인한다.",
+      "evidence": ["uiautomator", "accessibility-notes"]
+    },
+    {
+      "id": "ios_voiceover_dynamic_type_primary_flow",
+      "platform": "ios",
+      "flowKo": "iOS Simulator에서 VoiceOver 또는 Dynamic Type 기준 홈, 설정, 오프라인 안내를 확인한다.",
+      "evidence": ["xcodebuildmcp", "screenshot", "accessibility-notes"]
+    }
+  ]
+}
