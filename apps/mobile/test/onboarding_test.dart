@@ -12,7 +12,7 @@ void main() {
   test('온보딩 보기 설정은 쉬운 기본값으로 시작한다', () {
     const preferences = OnboardingViewPreferences.defaults();
 
-    expect(preferences.largeTextEnabled, isTrue);
+    expect(preferences.largeTextEnabled, isFalse);
     expect(preferences.highContrastEnabled, isFalse);
     expect(preferences.simpleViewEnabled, isTrue);
   });
@@ -116,9 +116,8 @@ void main() {
       expect(find.text('계단 피하기'), findsOneWidget);
       expect(find.text('엘리베이터 이용'), findsOneWidget);
       expect(find.text('켜짐'), findsWidgets);
-      expect(find.text('보기 설정'), findsOneWidget);
       expect(find.text('큰 글씨'), findsNothing);
-      expect(find.text('큰 글자'), findsOneWidget);
+      expect(find.text('큰 글자'), findsNothing);
       expect(find.text('단순 보기'), findsNothing);
       expect(find.text('간편 보기'), findsOneWidget);
       expect(
@@ -160,7 +159,7 @@ void main() {
 
       expect(completedResult?.profile.id, 'wheelchair');
       expect(completedResult?.profile.mobilityType, 'WHEELCHAIR');
-      expect(completedResult?.preferences.largeTextEnabled, isTrue);
+      expect(completedResult?.preferences.largeTextEnabled, isFalse);
       expect(completedResult?.preferences.highContrastEnabled, isTrue);
       expect(completedResult?.preferences.simpleViewEnabled, isTrue);
 
@@ -362,7 +361,7 @@ void main() {
     expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
   });
 
-  testWidgets('온보딩 조건 배지는 큰 글씨에서도 잘리지 않는다', (tester) async {
+  testWidgets('온보딩 조건 배지는 시스템 글자 크기에서도 잘리지 않는다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
@@ -427,7 +426,7 @@ void main() {
         (option) => option.id == 'wheelchair',
       ),
       preferences: const OnboardingViewPreferences(
-        largeTextEnabled: true,
+        largeTextEnabled: false,
         highContrastEnabled: true,
         simpleViewEnabled: false,
       ),
@@ -437,7 +436,7 @@ void main() {
 
     expect(decoded.profile.id, 'wheelchair');
     expect(decoded.profile.mobilityType, 'WHEELCHAIR');
-    expect(decoded.preferences.largeTextEnabled, isTrue);
+    expect(decoded.preferences.largeTextEnabled, isFalse);
     expect(decoded.preferences.highContrastEnabled, isTrue);
     expect(decoded.preferences.simpleViewEnabled, isFalse);
   });

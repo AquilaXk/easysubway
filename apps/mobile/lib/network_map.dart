@@ -16,7 +16,7 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
-const _supermoveHeaderHeight = 52.0;
+const _supermoveHeaderHeight = 60.0;
 const _networkMapBottomAdHeight = 52.0;
 const _supermovePillRadius = BorderRadius.all(Radius.circular(28));
 
@@ -909,7 +909,9 @@ class _SupermoveMapHeader extends StatelessWidget {
                     tooltip: '메뉴',
                     onPressed: onMenuTap,
                     style: IconButton.styleFrom(
-                      minimumSize: const Size.square(40),
+                      minimumSize: const Size.square(
+                        EasySubwayTouchTarget.general,
+                      ),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       padding: EdgeInsets.zero,
                     ),
@@ -1006,34 +1008,42 @@ class _SupermoveSearchField extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 72;
-              return Container(
-                key: const Key('heroStationSearchButton'),
-                height: 38,
-                decoration: BoxDecoration(
-                  color: EasySubwayAccessibleColors.surface,
-                  border: Border.all(color: const Color(0xFFE8E8E8), width: 2),
-                  borderRadius: _supermovePillRadius,
-                ),
-                padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 14),
-                child: compact
-                    ? const SizedBox.shrink()
-                    : const Row(
-                        children: [
-                          SizedBox(width: 17),
-                          Expanded(
-                            child: Text(
-                              '지하철역 검색',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Color(0xFF8A8A8A),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
+              return SizedBox(
+                height: EasySubwayTouchTarget.general,
+                child: Center(
+                  child: Container(
+                    key: const Key('heroStationSearchButton'),
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: EasySubwayAccessibleColors.surface,
+                      border: Border.all(
+                        color: const Color(0xFFE8E8E8),
+                        width: 2,
                       ),
+                      borderRadius: _supermovePillRadius,
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 14),
+                    child: compact
+                        ? const SizedBox.shrink()
+                        : const Row(
+                            children: [
+                              SizedBox(width: 17),
+                              Expanded(
+                                child: Text(
+                                  '지하철역 검색',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Color(0xFF666666),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
               );
             },
           ),
@@ -1061,7 +1071,7 @@ class _SupermoveServicePatternToggle extends StatelessWidget {
       shadowColor: const Color(0x30000000),
       borderRadius: _supermovePillRadius,
       child: Container(
-        height: 48,
+        height: 58,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           borderRadius: _supermovePillRadius,
@@ -1509,11 +1519,11 @@ class _SupermoveToggleSegment extends StatelessWidget {
       borderRadius: _supermovePillRadius,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        height: 42,
+        height: 52,
         width: 50,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF3F86F7) : Colors.transparent,
+          color: selected ? const Color(0xFF006FD6) : Colors.transparent,
           borderRadius: _supermovePillRadius,
         ),
         child: Text(
@@ -1547,7 +1557,7 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
         child: const Text(
           '광고',
           style: TextStyle(
-            color: Color(0xFF9A9A9A),
+            color: Color(0xFF666666),
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),

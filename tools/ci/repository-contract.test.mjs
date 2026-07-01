@@ -1157,14 +1157,14 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(main, /homeRecentRouteEmptyState/);
 });
 
-test("모바일 역 검색 결과 큰 글자 문구 회귀 테스트는 유지된다", () => {
+test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const resultTileMatch = stationSearch.match(
     /class _StationSearchResultTile[\s\S]*?class _StationRoleActionBar/,
   );
   const largeTextTestMatch = widgetTest.match(
-    /testWidgets\('역 검색 결과 핵심 문구는 큰 글자에서 한 줄 말줄임으로 고정하지 않는다'[\s\S]*?\n  testWidgets\('/,
+    /testWidgets\('역 검색 결과 핵심 문구는 시스템 글자 크기에서 한 줄 말줄임으로 고정하지 않는다'[\s\S]*?\n  testWidgets\('/,
   );
 
   assert.ok(resultTileMatch, "_StationSearchResultTile block not found");
@@ -8820,7 +8820,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /_OnboardingPreferenceScope/);
-  assert.match(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
+  assert.doesNotMatch(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
   assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
   assert.match(main, /mediaQuery\.boldText/);
   assert.match(main, /_themeForPlatformAccessibility/);
@@ -8842,8 +8842,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /class OnboardingState/);
   assert.match(onboarding, /class OnboardingScreen extends StatefulWidget/);
   assert.match(onboarding, /먼저 이동 조건을 골라 주세요/);
-  assert.match(onboarding, /보기 설정/);
-  assert.match(onboarding, /큰 글자/);
+  assert.doesNotMatch(onboarding, /큰 글자/);
   assert.match(onboarding, /고대비/);
   assert.match(onboarding, /간편 보기/);
   assert.match(onboarding, /onTap: \(\) => onChanged\(!value\)/);
@@ -8858,7 +8857,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
   assert.match(widgetTest, /MediaQuery\.textScalerOf/);
-  assert.match(accessibilityBaselineTest, /모바일 접근성 QA 기준선은 큰 글씨와 고대비 홈 화면을 검증한다/);
+  assert.match(accessibilityBaselineTest, /모바일 접근성 QA 기준선은 시스템 접근성과 고대비 홈 화면을 검증한다/);
   assert.match(accessibilityBaselineTest, /tester\.ensureSemantics\(\)/);
   assert.match(accessibilityBaselineTest, /FakeAccessibilityFeatures\([\s\S]*boldText: true[\s\S]*disableAnimations: true[\s\S]*reduceMotion: true/);
   assert.match(accessibilityBaselineTest, /MediaQuery\.boldTextOf/);
@@ -8932,11 +8931,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 호스트가 없는 API 주소를 거부한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /개발 빌드는 Android 에뮬레이터 로컬 API 주소를 유지한다/);
   assert.match(mapAdapter, /enum MapProviderType/);
-  assert.match(mapAdapter, /MapProviderType\.naver => '네이버 지도'/);
   assert.match(mapAdapter, /MapProviderType\.kakao => '카카오 지도'/);
   assert.match(mapAdapter, /const MapProviderConfiguration\.defaults\(\)/);
-  assert.match(mapAdapter, /primary = MapProviderType\.naver/);
-  assert.match(mapAdapter, /fallbacks = const \[MapProviderType\.kakao\]/);
+  assert.match(mapAdapter, /primary = MapProviderType\.kakao/);
+  assert.doesNotMatch(mapAdapter, /fallbacks/);
   assert.match(mapAdapter, /abstract interface class MapAdapter/);
   assert.match(mapAdapter, /class EasySubwayMapAdapter implements MapAdapter/);
   assert.match(mapAdapter, /markersForStationDetail/);
@@ -8946,7 +8944,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.match(stationSearch, /지도 위치 목록/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
-  assert.match(mapAdapterTest, /지도 제공자는 네이버를 기본값으로 두고 카카오를 대체 후보로 둔다/);
+  assert.match(mapAdapterTest, /지도 제공자는 승인된 기본 제공자만 사용한다/);
   assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
   assert.match(widgetTest, /지도 위치 목록/);
   assert.match(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\.'\), findsNothing/);

@@ -26,12 +26,10 @@ void main() {
     expect(nearbyGeographicMapContract.listEquivalentLabel, '주변 역과 시설 목록');
   });
 
-  test('지도 제공자는 네이버를 기본값으로 두고 카카오를 대체 후보로 둔다', () {
+  test('지도 제공자는 승인된 기본 제공자만 사용한다', () {
     const configuration = MapProviderConfiguration.defaults();
 
-    expect(configuration.primary, MapProviderType.naver);
-    expect(configuration.fallbacks, [MapProviderType.kakao]);
-    expect(MapProviderType.naver.displayName, '네이버 지도');
+    expect(configuration.primary, MapProviderType.kakao);
     expect(MapProviderType.kakao.displayName, '카카오 지도');
   });
 
