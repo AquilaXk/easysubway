@@ -50,7 +50,6 @@ const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 const _stationSearchInputRadius = BorderRadius.all(Radius.circular(12));
-const _stationResultCardRadius = BorderRadius.all(Radius.circular(18));
 const _stationCompactCardRadius = BorderRadius.all(Radius.circular(12));
 const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(12));
 const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(12));
@@ -3092,7 +3091,7 @@ class _NearbyStationOverview extends StatelessWidget {
       color: EasySubwayAccessibleColors.skySoft,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: _stationResultCardRadius,
+        borderRadius: _stationDetailFacilityCardRadius,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Column(
@@ -3105,7 +3104,7 @@ class _NearbyStationOverview extends StatelessWidget {
             child: ExcludeSemantics(
               child: InkWell(
                 key: const Key('nearbyStationPrimaryCard'),
-                borderRadius: _stationResultCardRadius,
+                borderRadius: _stationDetailFacilityCardRadius,
                 onTap: onTap,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -3296,13 +3295,13 @@ class _StationSearchResultTile extends StatelessWidget {
     final semanticLabel = _stationResultSemanticLabel(result);
     final hasRoleActions = onSetOrigin != null || onSetDestination != null;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: _stationResultCardRadius,
-        side: const BorderSide(color: EasySubwayAccessibleColors.line),
+    // 항목마다 테두리 박스를 두지 않고 하단 구분선만 둔 깔끔한 리스트 행으로 표시한다.
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
       ),
       child: Column(
         children: [
@@ -3314,7 +3313,6 @@ class _StationSearchResultTile extends StatelessWidget {
               child: ExcludeSemantics(
                 child: InkWell(
                   key: Key('stationSearchResult-${result.id}'),
-                  borderRadius: _stationCompactCardRadius,
                   onTap: onTap,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 78),
