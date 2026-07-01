@@ -1804,6 +1804,12 @@ class RouteSearchStep {
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리를 확인하고 있어요';
     }
+    if (timeSource == 'REALTIME') {
+      return '실시간 도착 정보 기준이에요';
+    }
+    if (timeSource == 'PLANNED' || distanceSource == 'BACKEND_V2') {
+      return '서버 경로 안내 기준이에요';
+    }
     return '앱에 저장된 길 안내예요';
   }
 }

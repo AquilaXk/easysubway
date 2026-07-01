@@ -131,7 +131,6 @@ class AppDependencies {
     final localRouteRepository = catalogDatabase == null
         ? null
         : LocalRouteRepository(catalogDatabase: catalogDatabase);
-    final routeV2BaseUri = enableRouteV2OnlineFirst ? optionalBaseUri() : null;
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -143,20 +142,27 @@ class AppDependencies {
           ),
       routeRepository:
           routeRepository ??
-          (enableRouteV2OnlineFirst && routeV2BaseUri != null
-              ? OnlineFirstRouteSearchRepository(
-                  onlineRepository: RouteSearchV2ApiRepository(
-                    baseUri: routeV2BaseUri,
-                  ),
-                  localRepository: localRouteRepository,
-                  fallbackEnabled: enableRouteV2Fallback,
-                  metrics: routeSearchOnlineFirstMetrics,
-                )
-              : localRouteRepository == null
-              ? RouteSearchApiRepository(baseUri: requireBaseUri())
-              : LocalFirstRouteSearchRepository(
-                  localRepository: localRouteRepository,
-                )),
+          (() {
+            final routeV2BaseUri = enableRouteV2OnlineFirst
+                ? optionalBaseUri()
+                : null;
+            if (routeV2BaseUri != null) {
+              return OnlineFirstRouteSearchRepository(
+                onlineRepository: RouteSearchV2ApiRepository(
+                  baseUri: routeV2BaseUri,
+                ),
+                localRepository: localRouteRepository,
+                fallbackEnabled: enableRouteV2Fallback,
+                metrics: routeSearchOnlineFirstMetrics,
+              );
+            }
+            if (localRouteRepository == null) {
+              return RouteSearchApiRepository(baseUri: requireBaseUri());
+            }
+            return LocalFirstRouteSearchRepository(
+              localRepository: localRouteRepository,
+            );
+          })(),
       routeFeedbackRepository:
           routeFeedbackRepository ??
           _defaultRouteFeedbackRepository(
