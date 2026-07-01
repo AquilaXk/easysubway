@@ -21,6 +21,7 @@ function assertNoSensitiveSummary(summary, gate) {
     ...gate.manualRehearsalPolicy.forbiddenInEvidence,
     ...Object.values(gate.rehearsalMatrices).flatMap((matrix) => matrix.forbiddenSummaryValues),
     ...gate.latestQaEvidenceStatus.redactionPolicy.forbiddenInGitHubEvidence,
+    ...gate.productionLikeEvidencePolicy.forbiddenClosureEvidence,
   ].map((value) => value.toLowerCase()));
   for (const [path, value] of collectStrings(summary)) {
     const normalized = value.toLowerCase();

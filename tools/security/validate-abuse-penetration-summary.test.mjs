@@ -111,6 +111,22 @@ test("abuse penetration summary validator rejects pass without production-like c
   );
 });
 
+test("abuse penetration summary validator rejects forbidden closure evidence markers", async () => {
+  const forbiddenClosureEvidence = validSummary();
+  forbiddenClosureEvidence.productionLikeEvidence[0].source = "preflight env check only";
+  await assert.rejects(
+    withSummary(forbiddenClosureEvidence, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/security/validate-abuse-penetration-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /forbidden sensitive evidence marker/,
+  );
+});
+
 test("abuse penetration summary validator rejects missing cases, raw sensitive markers, and high findings", async () => {
   const missingCase = validSummary();
   missingCase.matrices[0].cases.pop();
