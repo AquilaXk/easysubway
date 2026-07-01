@@ -256,6 +256,7 @@ void main() {
       ),
       throwsA(isA<RouteSearchException>()),
     );
+    expect(metrics.onlineSuccessCount, 0);
     expect(metrics.onlineFailureCount, 1);
     expect(metrics.onlineFailureReasonCounts, {'backend-4xx': 1});
   });
@@ -295,6 +296,7 @@ void main() {
       ),
       throwsA(isA<RouteSearchException>()),
     );
+    expect(metrics.onlineSuccessCount, 0);
     expect(metrics.onlineFailureCount, 1);
     expect(metrics.onlineFailureReasonCounts, {'backend-unexpected': 1});
   });
