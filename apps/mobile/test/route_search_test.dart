@@ -782,6 +782,112 @@ void main() {
     );
   });
 
+  test('경로 V2 변환은 ride 노선과 불확실 접근성을 보수적으로 표시한다', () {
+    const uncertainRisk = RouteSearchV2AccessibilityRisk(
+      stairCount: 0,
+      unknownAccessibilityCount: 1,
+      generatedConnectorCount: 0,
+      staleDataCount: 0,
+      lowConfidenceCount: 0,
+      unavailableFacilityCount: 0,
+      riskLevel: 'UNKNOWN',
+      reasonCodes: ['ACCESSIBILITY_CHECK_REQUIRED'],
+      level: 'REVIEW_REQUIRED',
+      reasons: ['ACCESSIBILITY_CHECK_REQUIRED'],
+    );
+    const clearRisk = RouteSearchV2AccessibilityRisk(
+      stairCount: 0,
+      unknownAccessibilityCount: 0,
+      generatedConnectorCount: 0,
+      staleDataCount: 0,
+      lowConfidenceCount: 0,
+      unavailableFacilityCount: 0,
+      riskLevel: 'LOW',
+      reasonCodes: [],
+      level: 'LOW',
+      reasons: [],
+    );
+
+    final result = RouteSearchResult.fromV2(
+      const RouteSearchV2Result(
+        contractVersion: 'ROUTE_SEARCH_V2',
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        departureTime: '2026-06-30T09:15:00+09:00',
+        mobilityType: 'WHEELCHAIR',
+        constraintMode: 'STRICT_STEP_FREE',
+        useRealtime: true,
+        maxTransfers: 3,
+        alternativeCount: 3,
+        statuses: ['FOUND'],
+        itineraries: [
+          RouteSearchV2Itinerary(
+            itineraryId: 'route-ride-line-primary',
+            status: 'FOUND',
+            plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+            realtimeArrivalTime: null,
+            etaSource: 'PLANNED',
+            etaConfidence: 'MEDIUM',
+            durationSeconds: 1620,
+            transferCount: 0,
+            walkingDistanceMeters: 80,
+            accessibilityRisk: uncertainRisk,
+            commercialEtaEligible: false,
+            legs: [
+              RouteSearchV2Leg(
+                legType: 'ACCESS',
+                fromStationId: 'station-sangnoksu',
+                toStationId: 'station-sangnoksu',
+                fromNodeId: '',
+                toNodeId: '',
+                lineId: '',
+                tripId: '',
+                trainNo: '',
+                plannedDepartureTime: '2026-06-30T09:15:00+09:00',
+                realtimeDepartureTime: null,
+                plannedArrivalTime: '2026-06-30T09:17:00+09:00',
+                realtimeArrivalTime: null,
+                waitTimeSeconds: 0,
+                slackSeconds: 0,
+                durationSeconds: 120,
+                distanceMeters: 80,
+                etaSource: 'PLANNED',
+                confidence: 'LOW',
+                accessibilityRisk: uncertainRisk,
+              ),
+              RouteSearchV2Leg(
+                legType: 'RIDE',
+                fromStationId: 'station-sangnoksu',
+                toStationId: 'station-sadang',
+                fromNodeId: '',
+                toNodeId: '',
+                lineId: 'line-4',
+                tripId: 'trip-1',
+                trainNo: '4001',
+                plannedDepartureTime: '2026-06-30T09:17:00+09:00',
+                realtimeDepartureTime: null,
+                plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+                realtimeArrivalTime: null,
+                waitTimeSeconds: 60,
+                slackSeconds: 0,
+                durationSeconds: 1500,
+                distanceMeters: 12000,
+                etaSource: 'PLANNED',
+                confidence: 'MEDIUM',
+                accessibilityRisk: clearRisk,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    expect(result.lineId, 'line-4');
+    expect(result.lineName, 'line-4');
+    expect(result.steps.first.stairAccessState, 'unknown');
+    expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
+  });
+
   test('경로 contract는 accessibilityScore만으로 이동 비용을 대체하지 않는다', () {
     expect(
       () => RouteSearchResult.fromJson({
