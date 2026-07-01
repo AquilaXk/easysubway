@@ -1561,7 +1561,7 @@ int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
       risk.unknownAccessibilityCount * 15 +
       risk.staleDataCount * 10 +
       risk.lowConfidenceCount * 10;
-  return (100 - penalty).clamp(0, 100);
+  return (100 - penalty).clamp(0, 100).toInt();
 }
 
 String _routeV2DepartureTimeNow() {
