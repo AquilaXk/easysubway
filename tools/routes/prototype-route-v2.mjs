@@ -285,7 +285,7 @@ function realtimeMatchLevel(trip) {
 }
 
 function normalizeServicePattern(pattern) {
-  return String(pattern ?? "LOCAL").toUpperCase();
+  return String(pattern ?? "").toUpperCase() === "EXPRESS" ? "EXPRESS" : "LOCAL";
 }
 
 function serviceDay(fixtures, query) {
