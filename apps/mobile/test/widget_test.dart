@@ -284,6 +284,16 @@ void main() {
           status: 'ACCEPTED',
           createdAt: '2026-06-15T09:00:00',
         ),
+        const FacilityReportResult(
+          id: 'report-3',
+          publicReceiptCode: 'ES-1003',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-2',
+          reportType: 'BROKEN',
+          description: '이미 접수된 제보입니다.',
+          status: 'DUPLICATE',
+          createdAt: '2026-06-15T10:00:00',
+        ),
       ],
     );
 
@@ -303,6 +313,9 @@ void main() {
 
     expect(find.text('내 제보'), findsOneWidget);
     expect(find.text('반영됨'), findsOneWidget);
+    expect(find.text('중복 제보'), findsOneWidget);
+    expect(find.byIcon(Icons.content_copy_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsNothing);
     expect(find.text('출입문이 막혀 있습니다.'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
