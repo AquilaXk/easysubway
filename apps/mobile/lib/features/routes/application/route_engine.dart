@@ -26,6 +26,7 @@ class LocalRouteEngine {
       destinationNodeId: request.destinationStationId,
       mobilityType: request.mobilityType,
       constraintMode: request.effectiveConstraintMode,
+      searchMode: request.searchMode,
     );
     final path = pathResult.path;
     if (path == null) {
@@ -126,6 +127,7 @@ class AccessGraphRouter {
     required String destinationNodeId,
     required MobilityType mobilityType,
     required ConstraintMode constraintMode,
+    RouteSearchMode searchMode = RouteSearchMode.stationToStation,
   }) {
     if (graph.nodes.isEmpty || graph.edges.isEmpty) {
       return AccessPathResult.noPath(
@@ -140,6 +142,7 @@ class AccessGraphRouter {
       destinationNodeId,
       mobilityType,
       constraintMode,
+      RouteTraversalPolicy(searchMode),
       blockedReasonCodes,
     );
     if (edges != null) {
@@ -196,6 +199,7 @@ class AccessGraphRouter {
     String destinationNodeId,
     MobilityType mobilityType,
     ConstraintMode constraintMode,
+    RouteTraversalPolicy traversalPolicy,
     Set<String> blockedReasonCodes,
   ) {
     final costs = <String, int>{originNodeId: 0};
@@ -214,11 +218,12 @@ class AccessGraphRouter {
       visited.add(current);
 
       for (final edge in graph.edgesFrom(current)) {
-        if (edge.type == RouteEdgeType.entry && current != originNodeId) {
-          continue;
-        }
-        if (edge.type == RouteEdgeType.exit &&
-            edge.toNodeId != destinationNodeId) {
+        if (!traversalPolicy.canTraverse(
+          edge,
+          currentNodeId: current,
+          originNodeId: originNodeId,
+          destinationNodeId: destinationNodeId,
+        )) {
           continue;
         }
         final edgeCost = costCalculator.costFor(
@@ -270,6 +275,31 @@ class AccessGraphRouter {
   }
 }
 
+class RouteTraversalPolicy {
+  const RouteTraversalPolicy(this.searchMode);
+
+  final RouteSearchMode searchMode;
+
+  bool canTraverse(
+    RouteEdge edge, {
+    required String currentNodeId,
+    required String originNodeId,
+    required String destinationNodeId,
+  }) {
+    if (searchMode == RouteSearchMode.debugAllEdges ||
+        searchMode == RouteSearchMode.stationInternal) {
+      return true;
+    }
+    if (edge.type == RouteEdgeType.entry) {
+      return currentNodeId == originNodeId;
+    }
+    if (edge.type == RouteEdgeType.exit) {
+      return edge.toNodeId == destinationNodeId;
+    }
+    return true;
+  }
+}
+
 class StationPathwayRouter {
   const StationPathwayRouter({required this.accessGraphRouter});
 
@@ -287,6 +317,7 @@ class StationPathwayRouter {
       destinationNodeId: toNodeId,
       mobilityType: mobilityType,
       constraintMode: constraintMode,
+      searchMode: RouteSearchMode.stationInternal,
     );
   }
 }
