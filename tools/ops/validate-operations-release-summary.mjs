@@ -38,6 +38,13 @@ function assertNoSensitiveSummary(summary, gates) {
           throw new Error(`${path} contains forbidden sensitive evidence marker: ${forbidden}`);
         }
       }
+    } else {
+      for (const forbidden of forbiddenValues) {
+        const rawMarker = forbidden.startsWith("raw ") ? forbidden : `raw ${forbidden}`;
+        if (normalized.includes(rawMarker)) {
+          throw new Error(`${path} contains forbidden sensitive evidence marker: ${rawMarker}`);
+        }
+      }
     }
     for (const pattern of RAW_SECRET_PATTERNS) {
       if (pattern.test(value)) {

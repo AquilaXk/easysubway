@@ -151,4 +151,15 @@ test("operations release summary validator rejects missing signals, fallback pas
     ),
     /raw secret, token, cookie, signed URL, or personal data/,
   );
+
+  const rawReceiptMarker = validSummary();
+  rawReceiptMarker.supportChannels[0].redactionNotes = "raw report receipt token: abc123";
+  await assert.rejects(
+    withSummary(rawReceiptMarker, (summaryPath) =>
+      execFileAsync(process.execPath, ["tools/ops/validate-operations-release-summary.mjs", "--summary", summaryPath], {
+        cwd: root,
+      }),
+    ),
+    /forbidden sensitive evidence marker/,
+  );
 });
