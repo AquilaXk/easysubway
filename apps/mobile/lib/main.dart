@@ -4095,36 +4095,56 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _FavoriteHomeQuickCard(
-          key: const Key('favoriteHomeStationsButton'),
-          icon: Icons.train_outlined,
-          label: '역',
-          countLabel: _countLabel(stationCount),
-          subtitle: '출발지·도착지 설정과 시설 상태를 확인해요',
-          onTap: onStations,
-        ),
-        const SizedBox(height: 10),
-        _FavoriteHomeQuickCard(
-          key: const Key('favoriteHomeFacilitiesButton'),
-          icon: Icons.elevator_outlined,
-          label: '시설',
-          countLabel: _countLabel(facilityCount),
-          subtitle: '고장·공사 상태와 최근 확인 시각을 봐요',
-          onTap: onFacilities,
-        ),
-        const SizedBox(height: 10),
-        _FavoriteHomeQuickCard(
-          key: const Key('favoriteHomeRoutesButton'),
-          icon: Icons.route_outlined,
-          label: '경로',
-          countLabel: _countLabel(routeCount),
-          subtitle: '이동 조건과 즐겨찾기한 경로를 살펴봐요',
-          onTap: onRoutes,
-        ),
-      ],
+    // 역/시설/경로를 각각 박스로 두지 않고 하나의 카드에 구분선으로 묶는다.
+    return _AppCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 16,
+      showBorder: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _FavoriteHomeQuickCard(
+            key: const Key('favoriteHomeStationsButton'),
+            icon: Icons.train_outlined,
+            label: '역',
+            countLabel: _countLabel(stationCount),
+            subtitle: '출발지·도착지 설정과 시설 상태를 확인해요',
+            onTap: onStations,
+          ),
+          const _FavoriteHomeQuickDivider(),
+          _FavoriteHomeQuickCard(
+            key: const Key('favoriteHomeFacilitiesButton'),
+            icon: Icons.elevator_outlined,
+            label: '시설',
+            countLabel: _countLabel(facilityCount),
+            subtitle: '고장·공사 상태와 최근 확인 시각을 봐요',
+            onTap: onFacilities,
+          ),
+          const _FavoriteHomeQuickDivider(),
+          _FavoriteHomeQuickCard(
+            key: const Key('favoriteHomeRoutesButton'),
+            icon: Icons.route_outlined,
+            label: '경로',
+            countLabel: _countLabel(routeCount),
+            subtitle: '이동 조건과 즐겨찾기한 경로를 살펴봐요',
+            onTap: onRoutes,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoriteHomeQuickDivider extends StatelessWidget {
+  const _FavoriteHomeQuickDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: 1,
+      indent: 16,
+      endIndent: 16,
+      color: EasySubwayAccessibleColors.line,
     );
   }
 }
@@ -4156,11 +4176,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: _mainThemeControlRadius,
-          child: _AppCard(
-            backgroundColor: Colors.white,
-            borderRadius: 8,
-            showBorder: true,
+          child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
