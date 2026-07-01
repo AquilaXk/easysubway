@@ -72,6 +72,19 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
   }
 }
 
+function assertProductionLikeEvidence(summary, gate, requirePass) {
+  if (!requirePass) return;
+
+  const evidenceById = new Map(
+    required(summary.productionLikeEvidence, "productionLikeEvidence").map((item) => [item.evidenceId, item]),
+  );
+  for (const evidenceId of gate.productionLikeEvidencePolicy.requiredForClosing) {
+    const evidence = required(evidenceById.get(evidenceId), `productionLikeEvidence missing ${evidenceId}`);
+    if (evidence.result !== "PASS") throw new Error(`productionLikeEvidence.${evidenceId}.result must be PASS`);
+    required(evidence.localEvidencePath, `productionLikeEvidence.${evidenceId}.localEvidencePath`);
+  }
+}
+
 function expectedStatuses(matrixId, caseId, matrix) {
   const statuses = required(matrix.expectedStatusByCase?.[caseId], `${matrixId}.expectedStatusByCase.${caseId}`);
   if (!Array.isArray(statuses) || statuses.length === 0 || !statuses.every(Number.isInteger)) {
@@ -136,6 +149,7 @@ async function main() {
 
   const artifactIdentity = assertIdentity(summary, gate);
   assertNoSensitiveSummary(summary, gate);
+  assertProductionLikeEvidence(summary, gate, requirePass);
 
   const matrixSummaries = new Map(required(summary.matrices, "matrices").map((matrix) => [matrix.matrixId, matrix]));
   for (const [matrixId, matrix] of Object.entries(gate.rehearsalMatrices)) {
