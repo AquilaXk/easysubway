@@ -19,6 +19,14 @@ import 'station_search.dart';
 const _supermoveHeaderHeight = 60.0;
 const _networkMapBottomAdHeight = 52.0;
 const _supermovePillRadius = BorderRadius.all(Radius.circular(28));
+const _supermoveSearchFieldRadius = BorderRadius.all(Radius.circular(12));
+const _supermoveSearchFieldBorderColor = Color(0xFFDBE3E9);
+const _supermoveSearchFieldHintColor = Color(0xFF466467);
+const _supermoveSearchFieldIconColor = Color(0xFF8A9AA0);
+const _supermoveMenuIconColor = Color(0xFF466467);
+const _supermoveMenuLabelColor = Color(0xFF1E3234);
+const _supermoveMenuSectionColor = Color(0xFF7C949A);
+const _supermoveMenuChevronColor = Color(0xFFB0BEC5);
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -999,7 +1007,7 @@ class _SupermoveSearchField extends StatelessWidget {
         child: InkWell(
           key: const Key('stationSearchButton'),
           onTap: onSearchTap,
-          borderRadius: _supermovePillRadius,
+          borderRadius: _supermoveSearchFieldRadius,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 72;
@@ -1012,24 +1020,29 @@ class _SupermoveSearchField extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: EasySubwayAccessibleColors.surface,
                       border: Border.all(
-                        color: const Color(0xFFE8E8E8),
-                        width: 2,
+                        color: _supermoveSearchFieldBorderColor,
+                        width: 1.5,
                       ),
-                      borderRadius: _supermovePillRadius,
+                      borderRadius: _supermoveSearchFieldRadius,
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 14),
+                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
                     child: compact
                         ? const SizedBox.shrink()
                         : const Row(
                             children: [
-                              SizedBox(width: 17),
+                              Icon(
+                                Icons.search,
+                                size: 18,
+                                color: _supermoveSearchFieldIconColor,
+                              ),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '지하철역 검색',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Color(0xFF666666),
+                                    color: _supermoveSearchFieldHintColor,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1600,33 +1613,23 @@ class _SupermoveMapMenu extends StatelessWidget {
               children: [
                 const _SupermoveMenuHeader(),
                 const Divider(height: 1, color: Color(0xFFE4E4E4)),
+                const _SupermoveMenuSectionLabel('탐색'),
                 _SupermoveMenuTile(
                   key: const Key('networkMapMenuStationSearchButton'),
                   icon: Icons.search,
-                  iconColor: Color(0xFF00BFA5),
                   label: '역 검색',
                   onTap: () => _runAction(context, onOpenStationSearch),
                 ),
                 _SupermoveMenuTile(
                   key: const Key('networkMapMenuRouteSearchButton'),
                   icon: Icons.route_outlined,
-                  iconColor: Color(0xFF00BFA5),
                   label: '길찾기',
                   onTap: () => _runFutureAction(context, onOpenRouteSearch),
                 ),
-                if (onOpenSavedItems != null)
-                  _SupermoveMenuTile(
-                    key: const Key('networkMapMenuSavedButton'),
-                    icon: Icons.star_border_rounded,
-                    iconColor: Color(0xFF00BFA5),
-                    label: '즐겨찾기',
-                    onTap: () => _runAction(context, onOpenSavedItems!),
-                  ),
                 if (onOpenNearbyStations != null)
                   _SupermoveMenuTile(
                     key: const Key('networkMapMenuNearbyButton'),
                     icon: Icons.near_me_outlined,
-                    iconColor: Color(0xFFB7B7B7),
                     label: '가까운 역',
                     onTap: () => _runAction(context, onOpenNearbyStations!),
                   ),
@@ -1634,10 +1637,18 @@ class _SupermoveMapMenu extends StatelessWidget {
                   _SupermoveMenuTile(
                     key: const Key('networkMapMenuRecentButton'),
                     icon: Icons.history,
-                    iconColor: Color(0xFFB7B7B7),
                     label: '최근 검색',
                     onTap: () => _runAction(context, onOpenRecentSearch!),
                   ),
+                if (onOpenSavedItems != null) ...[
+                  const _SupermoveMenuSectionLabel('내 정보'),
+                  _SupermoveMenuTile(
+                    key: const Key('networkMapMenuSavedButton'),
+                    icon: Icons.star_border_rounded,
+                    label: '즐겨찾기',
+                    onTap: () => _runAction(context, onOpenSavedItems!),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 const Divider(height: 1, color: Color(0xFFEDEDED)),
                 const _SupermoveMenuInfoBanner(),
@@ -1667,29 +1678,30 @@ class _SupermoveMenuHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(24, 8, 20, 8),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(24, 14, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Color(0xFFE9E9E9),
-            child: Icon(
-              Icons.accessible_forward,
-              size: 26,
-              color: Color(0xFFB9B9B9),
+          Text(
+            '쉬운 지하철',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: _supermoveMenuLabelColor,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
             ),
           ),
-          SizedBox(width: 20),
-          Expanded(
-            child: Text(
-              '쉬운 지하철',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Color(0xFF7D7D7D),
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
+          SizedBox(height: 3),
+          Text(
+            '교통약자 지하철 길찾기',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: _supermoveMenuSectionColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1698,17 +1710,39 @@ class _SupermoveMenuHeader extends StatelessWidget {
   }
 }
 
+class _SupermoveMenuSectionLabel extends StatelessWidget {
+  const _SupermoveMenuSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 6),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: _supermoveMenuSectionColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
 class _SupermoveMenuTile extends StatelessWidget {
   const _SupermoveMenuTile({
     required this.icon,
-    required this.iconColor,
     required this.label,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
-  final Color iconColor;
   final String label;
   final VoidCallback onTap;
 
@@ -1721,25 +1755,32 @@ class _SupermoveMenuTile extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
+          highlightColor: const Color(0x14006D77),
+          splashColor: const Color(0x14006D77),
           child: SizedBox(
-            height: 58,
+            height: 52,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  Icon(icon, size: 28, color: iconColor),
-                  const SizedBox(width: 24),
+                  Icon(icon, size: 22, color: _supermoveMenuIconColor),
+                  const SizedBox(width: 18),
                   Expanded(
                     child: Text(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF333333),
-                        fontSize: 23,
-                        fontWeight: FontWeight.w500,
+                        color: _supermoveMenuLabelColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: _supermoveMenuChevronColor,
                   ),
                 ],
               ),
