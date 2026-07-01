@@ -16,18 +16,27 @@ enum MobilityType {
 
 enum ConstraintMode { strictStepFree, preferStepFree, allowWithWarnings }
 
+enum RouteSearchMode {
+  stationToStation,
+  stationToStationWithOutOfStationTransfers,
+  stationInternal,
+  debugAllEdges,
+}
+
 class RouteRequest {
   const RouteRequest({
     required this.originStationId,
     required this.destinationStationId,
     required this.mobilityType,
     this.constraintMode,
+    this.searchMode = RouteSearchMode.stationToStation,
   });
 
   final String originStationId;
   final String destinationStationId;
   final MobilityType mobilityType;
   final ConstraintMode? constraintMode;
+  final RouteSearchMode searchMode;
 
   ConstraintMode get effectiveConstraintMode =>
       constraintMode ?? mobilityType.defaultConstraintMode;

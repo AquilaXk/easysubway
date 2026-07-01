@@ -177,6 +177,77 @@ void main() {
       expect(crossStationResult.transferStationIds, isEmpty);
     });
 
+    test('역외 환승 모드는 검증된 역외 환승 edge를 허용한다', () {
+      final result =
+          LocalRouteEngine(graph: _outOfStationTransferFixtureGraph()).search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-d',
+              mobilityType: MobilityType.senior,
+              searchMode:
+                  RouteSearchMode.stationToStationWithOutOfStationTransfers,
+            ),
+          );
+
+      expect(result.status, RouteStatus.found);
+      expect(result.edgeIds, [
+        'entry-a-line-1',
+        'ride-a-b-line-1',
+        'out-transfer-b-c',
+        'ride-c-d-line-2',
+        'exit-d-line-2',
+      ]);
+    });
+
+    test('기본 역간 탐색은 역외 환승 edge를 쓰지 않는다', () {
+      final result =
+          LocalRouteEngine(graph: _outOfStationTransferFixtureGraph()).search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-d',
+              mobilityType: MobilityType.senior,
+            ),
+          );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+    });
+
+    test('역외 환승 모드도 임의 중간 exit와 entry 우회는 거부한다', () {
+      final result = LocalRouteEngine(graph: _midRouteExitEntryFixtureGraph())
+          .search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-d',
+              mobilityType: MobilityType.senior,
+              searchMode:
+                  RouteSearchMode.stationToStationWithOutOfStationTransfers,
+            ),
+          );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+    });
+
+    test('strict 역외 환승 모드는 generated 역외 환승 connector를 검증된 edge로 쓰지 않는다', () {
+      final result =
+          LocalRouteEngine(
+            graph: _generatedOutOfStationTransferFixtureGraph(),
+          ).search(
+            const RouteRequest(
+              originStationId: 'station-a',
+              destinationStationId: 'station-d',
+              mobilityType: MobilityType.wheelchair,
+              searchMode:
+                  RouteSearchMode.stationToStationWithOutOfStationTransfers,
+            ),
+          );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+      expect(result.blockedReasonCodes, ['GENERATED_CONNECTOR_UNVERIFIED']);
+    });
+
     test('휠체어 조건은 계단만 있는 경로를 비용 증가가 아니라 차단으로 처리한다', () {
       final engine = LocalRouteEngine(graph: _stairOnlyFixtureGraph());
 
@@ -730,6 +801,159 @@ NetworkGraph _crossStationTransferCatalogFixtureGraph() {
         id: 'exit-c-line-2',
         fromNodeId: 'station-c:line-2',
         toNodeId: 'station-c',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _outOfStationTransferFixtureGraph({
+  bool generatedOutOfStationTransfer = false,
+}) {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-c:line-2',
+        stationId: 'station-c',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-d:line-2',
+        stationId: 'station-d',
+        lineId: 'line-2',
+      ),
+    ],
+    edges: [
+      const RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      const RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'out-transfer-b-c',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-c:line-2',
+        type: RouteEdgeType.outOfStationTransfer,
+        baseCost: 240,
+        stairAccessState: RouteStairAccessState.stepFree,
+        isGeneratedConnector: generatedOutOfStationTransfer,
+      ),
+      const RouteEdge(
+        id: 'ride-c-d-line-2',
+        fromNodeId: 'station-c:line-2',
+        toNodeId: 'station-d:line-2',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-2',
+      ),
+      const RouteEdge(
+        id: 'exit-d-line-2',
+        fromNodeId: 'station-d:line-2',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _generatedOutOfStationTransferFixtureGraph() {
+  return _outOfStationTransferFixtureGraph(generatedOutOfStationTransfer: true);
+}
+
+NetworkGraph _midRouteExitEntryFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-2',
+        stationId: 'station-b',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-d:line-2',
+        stationId: 'station-d',
+        lineId: 'line-2',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'exit-b-line-1',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-b',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'entry-b-line-2',
+        fromNodeId: 'station-b',
+        toNodeId: 'station-b:line-2',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-b-d-line-2',
+        fromNodeId: 'station-b:line-2',
+        toNodeId: 'station-d:line-2',
+        type: RouteEdgeType.ride,
+        baseCost: 180,
+        lineId: 'line-2',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-2',
+        fromNodeId: 'station-d:line-2',
+        toNodeId: 'station-d',
         type: RouteEdgeType.exit,
         baseCost: 90,
         stairAccessState: RouteStairAccessState.stepFree,
