@@ -2718,8 +2718,8 @@ class _RoutePointPickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 카카오/슈퍼무브식 출발(○)-도착(●) 노드는 각 역 행 안쪽에 두어 역명이
-    // 노드 뒤로 들여써지도록 한다. 입력 피커가 열리면 해당 행의 노드는 접힌다.
+    // 출발(○)-도착(●) 노드는 각 역 행 안쪽에 두어 역명이 노드 뒤로
+    // 들여써지도록 한다. 입력 피커가 열리면 해당 행의 노드는 접힌다.
     final originChild =
         originPicker ??
         _RoutePointRow(
