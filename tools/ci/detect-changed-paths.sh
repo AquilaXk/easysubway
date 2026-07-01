@@ -64,6 +64,12 @@ while IFS= read -r file; do
     tools/security/**)
       repository=true
       ;;
+    tools/ops/**)
+      repository=true
+      ;;
+    tools/release/**)
+      repository=true
+      ;;
     apps/mobile/release/**)
       mobile=true
       android=true

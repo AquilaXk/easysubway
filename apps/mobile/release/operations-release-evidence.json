@@ -257,6 +257,10 @@
     ],
     "blockedWhenKo": "각 operations signal에 dashboard, alert route, runbook 또는 외부 blocker 기록이 없으면 운영 관측성 gate를 닫지 않는다."
   },
+  "releaseEvidenceSummaryValidator": {
+    "command": "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --require-pass",
+    "passPolicyKo": "external-blocker-record는 남은 외부 blocker를 기록하는 용도이며 최종 PASS를 대체할 수 없다."
+  },
   "sensitiveEvidencePolicy": {
     "localOnly": true,
     "forbiddenInPullRequest": [
