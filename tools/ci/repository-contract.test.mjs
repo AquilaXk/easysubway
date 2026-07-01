@@ -2619,11 +2619,11 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "post-launch-review-window-evidence-after-public-release",
     "support-incident-response-dry-run-evidence",
   ]);
-  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-06-29");
-  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "a1a6da80b3433c26ae2f5a45b02de86c8f37ce82");
+  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-02");
+  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "8df06ae4be931f78ee1b908e286beec1e6bb4954");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -2632,6 +2632,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "server-minimized-android-release-scope-fixed",
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
+    "abuse-rehearsal-case-level-summary-gate-hardening",
     "operations-alert-and-mailbox-routing-summary",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
@@ -2644,6 +2645,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "play-installed-android-quality-performance-recovery-evidence",
     "production-like-abuse-rehearsal-evidence",
     "play-installed-server-minimized-final-acceptance-evidence",
+    "route-result-v2-ui-badge-accessibility-copy-evidence",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingApprovalPrerequisites, [
     "release-owner-final-go-approval",
@@ -2660,6 +2662,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
+  assert.ok(gate.gates.some((item) => item.issue === 1230 && item.id === "G12_ROUTE_RESULT_V2_UI_COPY"));
   assert.deepEqual(
     gate.gates.find((item) => item.issue === 1015),
     {
@@ -2678,7 +2681,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.deepEqual(
     gate.childIssueLinks,
-    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022],
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230],
   );
   for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
     assert.ok(item.owner, `${item.id} must define owner`);
