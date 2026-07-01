@@ -16,17 +16,17 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
-const _supermoveHeaderHeight = 60.0;
+const _networkMapTopBarHeight = 60.0;
 const _networkMapBottomAdHeight = 52.0;
-const _supermovePillRadius = BorderRadius.all(Radius.circular(28));
-const _supermoveSearchFieldRadius = BorderRadius.all(Radius.circular(12));
-const _supermoveSearchFieldBorderColor = Color(0xFFDBE3E9);
-const _supermoveSearchFieldHintColor = Color(0xFF466467);
-const _supermoveSearchFieldIconColor = Color(0xFF8A9AA0);
-const _supermoveMenuIconColor = Color(0xFF466467);
-const _supermoveMenuLabelColor = Color(0xFF1E3234);
-const _supermoveMenuSectionColor = Color(0xFF7C949A);
-const _supermoveMenuChevronColor = Color(0xFFB0BEC5);
+const _networkMapPillRadius = BorderRadius.all(Radius.circular(28));
+const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(12));
+const _networkMapSearchFieldBorderColor = Color(0xFFDBE3E9);
+const _networkMapSearchFieldHintColor = Color(0xFF466467);
+const _networkMapSearchFieldIconColor = Color(0xFF8A9AA0);
+const _networkMapMenuIconColor = Color(0xFF466467);
+const _networkMapMenuLabelColor = Color(0xFF1E3234);
+const _networkMapMenuSectionColor = Color(0xFF7C949A);
+const _networkMapMenuChevronColor = Color(0xFFB0BEC5);
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -374,7 +374,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return _SupermoveNetworkMapChrome(
+            return _NetworkMapChrome(
               regions: const [NetworkMapRegion(name: '수도권')],
               selectedRegion: _selectedRegion ?? '수도권',
               expressView: _expressView,
@@ -397,7 +397,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             );
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return _SupermoveNetworkMapChrome(
+            return _NetworkMapChrome(
               regions: const [NetworkMapRegion(name: '수도권')],
               selectedRegion: _selectedRegion ?? '수도권',
               expressView: _expressView,
@@ -429,7 +429,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               ? _expressOnlyMapData(data)
               : data;
           _startInitialNearbyFocus();
-          return _SupermoveNetworkMapChrome(
+          return _NetworkMapChrome(
             regions: data.regions,
             selectedRegion: data.selectedRegion,
             expressView: _expressView,
@@ -635,7 +635,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       barrierColor: const Color(0x99000000),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, animation, secondaryAnimation) {
-        return _SupermoveMapMenu(
+        return _NetworkMapMenuPanel(
           onOpenStationSearch: widget.onOpenStationSearch,
           onOpenRouteSearch: widget.onOpenRouteSearch,
           onOpenSavedItems: widget.onOpenSavedItems,
@@ -738,8 +738,8 @@ bool _sameMapStation(NetworkMapStation? a, NetworkMapStation b) {
   return a != null && a.id == b.id && a.lineId == b.lineId;
 }
 
-class _SupermoveNetworkMapChrome extends StatelessWidget {
-  const _SupermoveNetworkMapChrome({
+class _NetworkMapChrome extends StatelessWidget {
+  const _NetworkMapChrome({
     required this.regions,
     required this.selectedRegion,
     required this.expressView,
@@ -783,14 +783,14 @@ class _SupermoveNetworkMapChrome extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          top: topPadding + _supermoveHeaderHeight,
+          top: topPadding + _networkMapTopBarHeight,
           child: ClipRect(child: child),
         ),
         Positioned(
           left: 0,
           top: 0,
           right: 0,
-          child: _SupermoveMapHeader(
+          child: _NetworkMapTopBar(
             regions: regions,
             selectedRegion: selectedRegion,
             notificationAction: notificationAction,
@@ -803,7 +803,7 @@ class _SupermoveNetworkMapChrome extends StatelessWidget {
           Positioned(
             left: 16,
             bottom: 26,
-            child: _SupermoveServicePatternToggle(
+            child: _NetworkMapServicePatternToggle(
               expressView: expressView,
               onChanged: onExpressViewChanged,
             ),
@@ -813,7 +813,7 @@ class _SupermoveNetworkMapChrome extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _SupermoveNearbyStationPanel(
+            child: _NetworkMapNearbyStationPanel(
               data: nearbyPanelData,
               adjacentStations: adjacentStations,
               onClose: onCloseNearbyPanel,
@@ -831,7 +831,9 @@ class _SupermoveNetworkMapChrome extends StatelessWidget {
           Positioned(
             right: 16,
             bottom: nearbyPanelVisible ? 280 : 26,
-            child: _SupermoveCurrentLocationButton(onTap: onCurrentLocationTap),
+            child: _NetworkMapCurrentLocationButton(
+              onTap: onCurrentLocationTap,
+            ),
           ),
       ],
     );
@@ -873,8 +875,8 @@ class _NetworkMapLookupToast extends StatelessWidget {
   }
 }
 
-class _SupermoveMapHeader extends StatelessWidget {
-  const _SupermoveMapHeader({
+class _NetworkMapTopBar extends StatelessWidget {
+  const _NetworkMapTopBar({
     required this.regions,
     required this.selectedRegion,
     required this.notificationAction,
@@ -903,7 +905,7 @@ class _SupermoveMapHeader extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: _supermoveHeaderHeight,
+          height: _networkMapTopBarHeight,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
             child: Row(
@@ -927,7 +929,7 @@ class _SupermoveMapHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: _SupermoveSearchField(onSearchTap: onSearchTap),
+                  child: _NetworkMapSearchField(onSearchTap: onSearchTap),
                 ),
                 const SizedBox(width: 8),
                 Semantics(
@@ -992,8 +994,8 @@ class _SupermoveMapHeader extends StatelessWidget {
   }
 }
 
-class _SupermoveSearchField extends StatelessWidget {
-  const _SupermoveSearchField({required this.onSearchTap});
+class _NetworkMapSearchField extends StatelessWidget {
+  const _NetworkMapSearchField({required this.onSearchTap});
 
   final VoidCallback onSearchTap;
 
@@ -1007,7 +1009,7 @@ class _SupermoveSearchField extends StatelessWidget {
         child: InkWell(
           key: const Key('stationSearchButton'),
           onTap: onSearchTap,
-          borderRadius: _supermoveSearchFieldRadius,
+          borderRadius: _networkMapSearchFieldRadius,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 72;
@@ -1020,10 +1022,10 @@ class _SupermoveSearchField extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: EasySubwayAccessibleColors.surface,
                       border: Border.all(
-                        color: _supermoveSearchFieldBorderColor,
+                        color: _networkMapSearchFieldBorderColor,
                         width: 1.5,
                       ),
-                      borderRadius: _supermoveSearchFieldRadius,
+                      borderRadius: _networkMapSearchFieldRadius,
                     ),
                     padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
                     child: compact
@@ -1033,7 +1035,7 @@ class _SupermoveSearchField extends StatelessWidget {
                               Icon(
                                 Icons.search,
                                 size: 18,
-                                color: _supermoveSearchFieldIconColor,
+                                color: _networkMapSearchFieldIconColor,
                               ),
                               SizedBox(width: 8),
                               Expanded(
@@ -1042,7 +1044,7 @@ class _SupermoveSearchField extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: _supermoveSearchFieldHintColor,
+                                    color: _networkMapSearchFieldHintColor,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1061,8 +1063,8 @@ class _SupermoveSearchField extends StatelessWidget {
   }
 }
 
-class _SupermoveServicePatternToggle extends StatelessWidget {
-  const _SupermoveServicePatternToggle({
+class _NetworkMapServicePatternToggle extends StatelessWidget {
+  const _NetworkMapServicePatternToggle({
     required this.expressView,
     required this.onChanged,
   });
@@ -1077,23 +1079,23 @@ class _SupermoveServicePatternToggle extends StatelessWidget {
       color: Colors.white,
       elevation: 16,
       shadowColor: const Color(0x30000000),
-      borderRadius: _supermovePillRadius,
+      borderRadius: _networkMapPillRadius,
       child: Container(
         height: 58,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          borderRadius: _supermovePillRadius,
+          borderRadius: _networkMapPillRadius,
           border: Border.all(color: const Color(0xFFE8E8E8)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SupermoveToggleSegment(
+            _NetworkMapToggleSegment(
               label: '일반',
               selected: !expressView,
               onTap: () => onChanged(false),
             ),
-            _SupermoveToggleSegment(
+            _NetworkMapToggleSegment(
               label: '급행',
               selected: expressView,
               onTap: () => onChanged(true),
@@ -1105,8 +1107,8 @@ class _SupermoveServicePatternToggle extends StatelessWidget {
   }
 }
 
-class _SupermoveCurrentLocationButton extends StatelessWidget {
-  const _SupermoveCurrentLocationButton({required this.onTap});
+class _NetworkMapCurrentLocationButton extends StatelessWidget {
+  const _NetworkMapCurrentLocationButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -1172,8 +1174,8 @@ class _NetworkMapAdjacentStations {
   final String? rightName;
 }
 
-class _SupermoveNearbyStationPanel extends StatelessWidget {
-  const _SupermoveNearbyStationPanel({
+class _NetworkMapNearbyStationPanel extends StatelessWidget {
+  const _NetworkMapNearbyStationPanel({
     required this.data,
     required this.adjacentStations,
     required this.onClose,
@@ -1275,7 +1277,7 @@ class _SupermoveNearbyStationPanel extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1, color: Color(0xFFD8D8D8)),
-              _SupermoveNearbyPanelBody(
+              _NetworkMapNearbyPanelBody(
                 data: data,
                 adjacentStations: adjacentStations,
               ),
@@ -1287,8 +1289,8 @@ class _SupermoveNearbyStationPanel extends StatelessWidget {
   }
 }
 
-class _SupermoveNearbyPanelBody extends StatelessWidget {
-  const _SupermoveNearbyPanelBody({
+class _NetworkMapNearbyPanelBody extends StatelessWidget {
+  const _NetworkMapNearbyPanelBody({
     required this.data,
     required this.adjacentStations,
   });
@@ -1304,7 +1306,7 @@ class _SupermoveNearbyPanelBody extends StatelessWidget {
         height: 132,
         child: Center(child: CircularProgressIndicator()),
       ),
-      _NetworkMapNearbyPanelStatus.success => _SupermoveNearbySuccessList(
+      _NetworkMapNearbyPanelStatus.success => _NetworkMapNearbySuccessList(
         results: data.results,
         adjacentStations: adjacentStations,
       ),
@@ -1312,8 +1314,8 @@ class _SupermoveNearbyPanelBody extends StatelessWidget {
   }
 }
 
-class _SupermoveNearbySuccessList extends StatelessWidget {
-  const _SupermoveNearbySuccessList({
+class _NetworkMapNearbySuccessList extends StatelessWidget {
+  const _NetworkMapNearbySuccessList({
     required this.results,
     required this.adjacentStations,
   });
@@ -1504,8 +1506,8 @@ class _SubwayArrivalRow extends StatelessWidget {
   }
 }
 
-class _SupermoveToggleSegment extends StatelessWidget {
-  const _SupermoveToggleSegment({
+class _NetworkMapToggleSegment extends StatelessWidget {
+  const _NetworkMapToggleSegment({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -1519,7 +1521,7 @@ class _SupermoveToggleSegment extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: _supermovePillRadius,
+      borderRadius: _networkMapPillRadius,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         height: 52,
@@ -1527,7 +1529,7 @@ class _SupermoveToggleSegment extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected ? const Color(0xFF006FD6) : Colors.transparent,
-          borderRadius: _supermovePillRadius,
+          borderRadius: _networkMapPillRadius,
         ),
         child: Text(
           label,
@@ -1570,8 +1572,8 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
   }
 }
 
-class _SupermoveMapMenu extends StatelessWidget {
-  const _SupermoveMapMenu({
+class _NetworkMapMenuPanel extends StatelessWidget {
+  const _NetworkMapMenuPanel({
     required this.onOpenStationSearch,
     required this.onOpenRouteSearch,
     required this.onOpenSavedItems,
@@ -1611,38 +1613,38 @@ class _SupermoveMapMenu extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _SupermoveMenuHeader(),
+                const _NetworkMapMenuHeader(),
                 const Divider(height: 1, color: Color(0xFFE4E4E4)),
-                const _SupermoveMenuSectionLabel('탐색'),
-                _SupermoveMenuTile(
+                const _NetworkMapMenuSectionLabel('탐색'),
+                _NetworkMapMenuTile(
                   key: const Key('networkMapMenuStationSearchButton'),
                   icon: Icons.search,
                   label: '역 검색',
                   onTap: () => _runAction(context, onOpenStationSearch),
                 ),
-                _SupermoveMenuTile(
+                _NetworkMapMenuTile(
                   key: const Key('networkMapMenuRouteSearchButton'),
                   icon: Icons.route_outlined,
                   label: '길찾기',
                   onTap: () => _runFutureAction(context, onOpenRouteSearch),
                 ),
                 if (onOpenNearbyStations != null)
-                  _SupermoveMenuTile(
+                  _NetworkMapMenuTile(
                     key: const Key('networkMapMenuNearbyButton'),
                     icon: Icons.near_me_outlined,
                     label: '가까운 역',
                     onTap: () => _runAction(context, onOpenNearbyStations!),
                   ),
                 if (onOpenRecentSearch != null)
-                  _SupermoveMenuTile(
+                  _NetworkMapMenuTile(
                     key: const Key('networkMapMenuRecentButton'),
                     icon: Icons.history,
                     label: '최근 검색',
                     onTap: () => _runAction(context, onOpenRecentSearch!),
                   ),
                 if (onOpenSavedItems != null) ...[
-                  const _SupermoveMenuSectionLabel('내 정보'),
-                  _SupermoveMenuTile(
+                  const _NetworkMapMenuSectionLabel('내 정보'),
+                  _NetworkMapMenuTile(
                     key: const Key('networkMapMenuSavedButton'),
                     icon: Icons.star_border_rounded,
                     label: '즐겨찾기',
@@ -1651,7 +1653,7 @@ class _SupermoveMapMenu extends StatelessWidget {
                 ],
                 const SizedBox(height: 10),
                 const Divider(height: 1, color: Color(0xFFEDEDED)),
-                const _SupermoveMenuInfoBanner(),
+                const _NetworkMapMenuInfoBanner(),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(24, 6, 24, 8),
                   child: Text(
@@ -1672,8 +1674,8 @@ class _SupermoveMapMenu extends StatelessWidget {
   }
 }
 
-class _SupermoveMenuHeader extends StatelessWidget {
-  const _SupermoveMenuHeader();
+class _NetworkMapMenuHeader extends StatelessWidget {
+  const _NetworkMapMenuHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -1687,7 +1689,7 @@ class _SupermoveMenuHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: _supermoveMenuLabelColor,
+              color: _networkMapMenuLabelColor,
               fontSize: 21,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
@@ -1699,7 +1701,7 @@ class _SupermoveMenuHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: _supermoveMenuSectionColor,
+              color: _networkMapMenuSectionColor,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -1710,8 +1712,8 @@ class _SupermoveMenuHeader extends StatelessWidget {
   }
 }
 
-class _SupermoveMenuSectionLabel extends StatelessWidget {
-  const _SupermoveMenuSectionLabel(this.label);
+class _NetworkMapMenuSectionLabel extends StatelessWidget {
+  const _NetworkMapMenuSectionLabel(this.label);
 
   final String label;
 
@@ -1724,7 +1726,7 @@ class _SupermoveMenuSectionLabel extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: _supermoveMenuSectionColor,
+          color: _networkMapMenuSectionColor,
           fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
@@ -1734,8 +1736,8 @@ class _SupermoveMenuSectionLabel extends StatelessWidget {
   }
 }
 
-class _SupermoveMenuTile extends StatelessWidget {
-  const _SupermoveMenuTile({
+class _NetworkMapMenuTile extends StatelessWidget {
+  const _NetworkMapMenuTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1763,7 +1765,7 @@ class _SupermoveMenuTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  Icon(icon, size: 22, color: _supermoveMenuIconColor),
+                  Icon(icon, size: 22, color: _networkMapMenuIconColor),
                   const SizedBox(width: 18),
                   Expanded(
                     child: Text(
@@ -1771,7 +1773,7 @@ class _SupermoveMenuTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: _supermoveMenuLabelColor,
+                        color: _networkMapMenuLabelColor,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1780,7 +1782,7 @@ class _SupermoveMenuTile extends StatelessWidget {
                   const Icon(
                     Icons.chevron_right,
                     size: 20,
-                    color: _supermoveMenuChevronColor,
+                    color: _networkMapMenuChevronColor,
                   ),
                 ],
               ),
@@ -1792,32 +1794,33 @@ class _SupermoveMenuTile extends StatelessWidget {
   }
 }
 
-class _SupermoveMenuInfoBanner extends StatelessWidget {
-  const _SupermoveMenuInfoBanner();
+class _NetworkMapMenuInfoBanner extends StatelessWidget {
+  const _NetworkMapMenuInfoBanner();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      color: const Color(0xFF07345D),
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      child: const Row(
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(
+            Icons.elevator_outlined,
+            size: 18,
+            color: _networkMapMenuSectionColor,
+          ),
+          SizedBox(width: 8),
           Expanded(
             child: Text(
-              '엘리베이터·출구 정보를 한 화면에서 확인하세요',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              '엘리베이터·출구 정보를 한 화면에서 확인할 수 있어요',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                height: 1.25,
-                fontWeight: FontWeight.w900,
+                color: _networkMapMenuSectionColor,
+                fontSize: 13,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          SizedBox(width: 12),
-          Icon(Icons.train_outlined, color: Color(0xFFFFB020), size: 36),
         ],
       ),
     );
