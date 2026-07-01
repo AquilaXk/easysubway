@@ -314,13 +314,34 @@ public class RouteSearchService implements RouteSearchUseCase {
 	) {
 		return findDirectLine(originStationId, destinationStationId)
 			.map(RoutePlan::direct)
-			.or(() -> maxTransfers >= 1
-				? findOneTransferRoute(originStationId, destinationStationId, profileWeight).map(RoutePlan::transfer)
-				: Optional.empty())
-			.or(() -> maxTransfers >= 2
-				? findMultiTransferRoute(originStationId, destinationStationId, maxTransfers).map(RoutePlan::multiTransfer)
-				: Optional.empty())
+			.or(() -> findTransferRoutePlan(originStationId, destinationStationId, profileWeight, maxTransfers))
 			.orElseThrow(RouteNotFoundException::new);
+	}
+
+	private Optional<RoutePlan> findTransferRoutePlan(
+		String originStationId,
+		String destinationStationId,
+		RouteProfileWeight profileWeight,
+		int maxTransfers
+	) {
+		List<RoutePlan> candidates = new ArrayList<>();
+		if (maxTransfers >= 1) {
+			findOneTransferRoute(originStationId, destinationStationId, profileWeight)
+				.map(RoutePlan::transfer)
+				.ifPresent(candidates::add);
+		}
+		if (maxTransfers >= 2) {
+			findMultiTransferRoute(originStationId, destinationStationId, profileWeight, maxTransfers)
+				.map(RoutePlan::multiTransfer)
+				.ifPresent(candidates::add);
+		}
+		return candidates.stream()
+			.min(Comparator.comparingInt((RoutePlan routePlan) ->
+					routeAccessibilityRank(routePlan, originStationId, destinationStationId, profileWeight))
+				.thenComparingInt(routePlan ->
+					routeCandidateCost(routePlan, originStationId, destinationStationId, profileWeight))
+				.thenComparingInt(RoutePlan::transferCount)
+				.thenComparing(RoutePlan::lineName));
 	}
 
 	private Optional<DirectLine> findDirectLine(String originStationId, String destinationStationId) {
@@ -376,6 +397,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 	private Optional<MultiTransferRoute> findMultiTransferRoute(
 		String originStationId,
 		String destinationStationId,
+		RouteProfileWeight profileWeight,
 		int maxTransfers
 	) {
 		Map<String, SubwayLine> activeLinesById = loadTransitMasterPort.loadLines()
@@ -439,7 +461,14 @@ public class RouteSearchService implements RouteSearchUseCase {
 		}
 		return routes.stream()
 			.filter(route -> route.transferCount() <= maxTransfers)
-			.min(Comparator.comparingInt(MultiTransferRoute::stopCount)
+			.min(Comparator.comparingInt((MultiTransferRoute route) ->
+					accessibilityRank(route.accessibilityStationIds(originStationId, destinationStationId), profileWeight))
+				.thenComparingInt(route -> accessibilityAwareCost(
+					route.stopCount(),
+					route.transferCount(),
+					route.accessibilityStationIds(originStationId, destinationStationId),
+					profileWeight
+				))
 				.thenComparingInt(MultiTransferRoute::transferCount)
 				.thenComparing(MultiTransferRoute::lineName));
 	}
@@ -465,6 +494,51 @@ public class RouteSearchService implements RouteSearchUseCase {
 		return List.copyOf(warnings);
 	}
 
+	private int routeAccessibilityRank(
+		RoutePlan routePlan,
+		String originStationId,
+		String destinationStationId,
+		RouteProfileWeight profileWeight
+	) {
+		return accessibilityRank(routePlan.accessibilityStationIds(originStationId, destinationStationId), profileWeight);
+	}
+
+	private int accessibilityRank(List<String> stationIds, RouteProfileWeight profileWeight) {
+		if (profileWeight.blocksStairOnlyAccess() && hasStairOnlyAccess(stationIds)) {
+			return 1;
+		}
+		return 0;
+	}
+
+	private int routeCandidateCost(
+		RoutePlan routePlan,
+		String originStationId,
+		String destinationStationId,
+		RouteProfileWeight profileWeight
+	) {
+		return accessibilityAwareCost(
+			routePlan.stopCount(),
+			routePlan.transferCount(),
+			routePlan.accessibilityStationIds(originStationId, destinationStationId),
+			profileWeight
+		);
+	}
+
+	private int accessibilityAwareCost(
+		int stopCount,
+		int transferCount,
+		List<String> accessibilityStationIds,
+		RouteProfileWeight profileWeight
+	) {
+		int stairOnlyPenalty = hasStairOnlyAccess(accessibilityStationIds)
+			? profileWeight.stairOnlyAccessPenalty()
+			: 0;
+		int lowDataPenalty = hasLowAccessibilityData(accessibilityStationIds)
+			? profileWeight.lowDataConfidencePenalty()
+			: 0;
+		return stopCount * 3 + transferCount * profileWeight.transferPenalty() + stairOnlyPenalty + lowDataPenalty;
+	}
+
 	private boolean hasLowAccessibilityData(String stationId) {
 		List<StationExit> exits = stationExits(stationId);
 		if (exits.isEmpty()) {
@@ -476,6 +550,10 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.filter(this::isStepFreeFacility)
 			.anyMatch(facility -> facility.dataConfidence() != DataConfidenceLevel.HIGH);
 		return hasLowConfidenceExit || hasLowConfidenceStepFreeFacility;
+	}
+
+	private boolean hasLowAccessibilityData(List<String> stationIds) {
+		return stationIds.stream().anyMatch(this::hasLowAccessibilityData);
 	}
 
 	private boolean hasStaleAccessibilityData(String stationId) {

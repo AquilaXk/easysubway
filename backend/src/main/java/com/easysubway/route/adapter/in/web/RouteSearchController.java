@@ -140,9 +140,10 @@ class RouteSearchController {
 		String constraintMode,
 		@NotNull(message = "실시간 반영 여부를 선택해야 합니다.")
 		Boolean useRealtime,
+		@NotNull(message = "최대 환승 수를 선택해야 합니다.")
 		@Min(value = 0, message = "최대 환승 수는 0 이상이어야 합니다.")
 		@Max(value = 3, message = "최대 환승 수는 3 이하여야 합니다.")
-		int maxTransfers,
+		Integer maxTransfers,
 		@Min(value = 1, message = "대안 경로 수는 1 이상이어야 합니다.")
 		int alternativeCount
 	) {
