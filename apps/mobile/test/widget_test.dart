@@ -949,7 +949,7 @@ void main() {
     expect(homeNavigationBar.selectedIndex, 0);
   });
 
-  testWidgets('홈 하단 탭은 길찾기 즐겨찾기 더보기를 같은 shell에서 전환한다', (tester) async {
+  testWidgets('홈 하단 탭은 길찾기 저장 더보기를 같은 shell에서 전환한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
