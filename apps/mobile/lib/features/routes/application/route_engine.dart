@@ -183,9 +183,16 @@ class LocalRouteEngine {
   RouteStepType _stepType(RouteEdgeType edgeType) {
     return switch (edgeType) {
       RouteEdgeType.ride => RouteStepType.ride,
-      RouteEdgeType.transfer => RouteStepType.transfer,
+      RouteEdgeType.inStationTransfer => RouteStepType.inStationTransfer,
+      RouteEdgeType.outOfStationTransfer => RouteStepType.outOfStationTransfer,
       RouteEdgeType.entry => RouteStepType.entry,
       RouteEdgeType.exit => RouteStepType.exit,
+      RouteEdgeType.walkway => RouteStepType.walkway,
+      RouteEdgeType.elevator => RouteStepType.elevator,
+      RouteEdgeType.ramp => RouteStepType.ramp,
+      RouteEdgeType.stair => RouteStepType.stair,
+      RouteEdgeType.escalator => RouteStepType.escalator,
+      RouteEdgeType.facilityConnector => RouteStepType.facilityConnector,
     };
   }
 
@@ -193,7 +200,7 @@ class LocalRouteEngine {
     if (edge.transferStationId.isNotEmpty) {
       return edge.transferStationId;
     }
-    if (edge.type != RouteEdgeType.transfer) {
+    if (!isRouteTransferEdgeType(edge.type)) {
       return '';
     }
     if (edge.fromNodeId == edge.toNodeId) {
