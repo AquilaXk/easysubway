@@ -504,8 +504,46 @@ void main() {
     );
     expect(result.status, 'FOUND');
     expect(result.transferCount, 1);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('FARE_EXIT_REENTRY_REQUIRED'),
+    );
     expect(transferStep.title, contains('역 밖으로 이동해'));
     expect(transferStep.actionTitle, '역외 환승');
+  });
+
+  test('역외 환승 edge는 역방향을 자동으로 열지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'out-transfer-a-c-one-way',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-alt',
+      edgeType: 'OUT_OF_STATION_TRANSFER',
+      durationSeconds: 300,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-c',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, isNot('FOUND'));
   });
 
   test('시설 connector edge는 generic transfer 문구로 렌더링하지 않는다', () async {

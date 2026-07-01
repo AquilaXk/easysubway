@@ -691,7 +691,9 @@ class _RouteCatalogSnapshot {
         explicitTransferPairs.add(_edgePairKey(pair.fromNodeId, pair.toNodeId));
       }
       explicitTransferPairs.add(_edgePairKey(fromNode.nodeId, toNode.nodeId));
-      explicitTransferPairs.add(_edgePairKey(toNode.nodeId, fromNode.nodeId));
+      if (routeEdgeType == graph.RouteEdgeType.inStationTransfer) {
+        explicitTransferPairs.add(_edgePairKey(toNode.nodeId, fromNode.nodeId));
+      }
       if (_isBaseStationLineNode(fromNode) && _isBaseStationLineNode(toNode)) {
         explicitTransferLinePairs.add(_lineTransferPairKey(fromNode, toNode));
         explicitTransferLinePairs.add(_lineTransferPairKey(toNode, fromNode));
@@ -912,10 +914,11 @@ List<({String fromNodeId, String toNodeId})> _expandedExplicitEdgePairs(
         for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
           if (from.nodeId != to.nodeId)
             (fromNodeId: from.nodeId, toNodeId: to.nodeId),
-      for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
-        for (final from in _matchingNodeKeys(fromNode, nodeKeysByStation))
-          if (from.nodeId != to.nodeId)
-            (fromNodeId: to.nodeId, toNodeId: from.nodeId),
+      if (routeEdgeType == graph.RouteEdgeType.inStationTransfer)
+        for (final to in _matchingNodeKeys(toNode, nodeKeysByStation))
+          for (final from in _matchingNodeKeys(fromNode, nodeKeysByStation))
+            if (from.nodeId != to.nodeId)
+              (fromNodeId: to.nodeId, toNodeId: from.nodeId),
     ];
   }
   return const [];
