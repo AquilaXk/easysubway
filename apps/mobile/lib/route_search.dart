@@ -1113,6 +1113,11 @@ class RouteSearchResult {
     required this.blockedReasons,
     required this.createdAt,
     this.etaSource = '',
+    this.etaConfidence = '',
+    this.accessibilityRiskLevel = '',
+    this.transferSlackSeconds,
+    this.hasOutOfStationTransfer = false,
+    this.commercialEtaEligible = false,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1208,6 +1213,16 @@ class RouteSearchResult {
           .toList(growable: false),
       createdAt: _requiredRouteString(json, 'createdAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
+      etaConfidence: _optionalRouteString(json, 'etaConfidence'),
+      accessibilityRiskLevel: _optionalRouteString(
+        json,
+        'accessibilityRiskLevel',
+      ),
+      transferSlackSeconds: _optionalRouteInt(json, 'transferSlackSeconds'),
+      hasOutOfStationTransfer:
+          _optionalRouteBool(json, 'hasOutOfStationTransfer') ?? false,
+      commercialEtaEligible:
+          _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
     );
   }
 
@@ -1260,6 +1275,13 @@ class RouteSearchResult {
           : itinerary.accessibilityRisk.reasonCodes,
       createdAt: result.departureTime,
       etaSource: itinerary.etaSource,
+      etaConfidence: itinerary.etaConfidence,
+      accessibilityRiskLevel: itinerary.accessibilityRisk.riskLevel,
+      transferSlackSeconds: _routeV2TransferSlackSeconds(itinerary.legs),
+      hasOutOfStationTransfer: itinerary.legs.any(
+        (leg) => leg.legType == 'OUT_OF_STATION_TRANSFER',
+      ),
+      commercialEtaEligible: itinerary.commercialEtaEligible,
     );
   }
 
@@ -1286,6 +1308,11 @@ class RouteSearchResult {
   final List<String> blockedReasons;
   final String createdAt;
   final String etaSource;
+  final String etaConfidence;
+  final String accessibilityRiskLevel;
+  final int? transferSlackSeconds;
+  final bool hasOutOfStationTransfer;
+  final bool commercialEtaEligible;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1411,6 +1438,11 @@ class RouteSearchResult {
       blockedReasons: blockedReasons,
       createdAt: createdAt,
       etaSource: etaSource ?? this.etaSource,
+      etaConfidence: etaConfidence,
+      accessibilityRiskLevel: accessibilityRiskLevel,
+      transferSlackSeconds: transferSlackSeconds,
+      hasOutOfStationTransfer: hasOutOfStationTransfer,
+      commercialEtaEligible: commercialEtaEligible,
     );
   }
 
@@ -2034,6 +2066,22 @@ bool _isRouteTransferStepType(String stepType) {
   return stepType == 'transfer' ||
       stepType == 'inStationTransfer' ||
       stepType == 'outOfStationTransfer';
+}
+
+int? _routeV2TransferSlackSeconds(List<RouteSearchV2Leg> legs) {
+  final transferSlacks = legs
+      .where(
+        (leg) =>
+            leg.legType == 'TRANSFER' ||
+            leg.legType == 'OUT_OF_STATION_TRANSFER',
+      )
+      .map((leg) => leg.slackSeconds)
+      .toList(growable: false);
+  if (transferSlacks.isEmpty) {
+    return null;
+  }
+  transferSlacks.sort();
+  return transferSlacks.first;
 }
 
 class RouteSearchWarning {
@@ -6025,4 +6073,12 @@ bool _requiredRouteBool(Map<String, Object?> json, String key) {
     return value;
   }
   throw FormatException('Missing required route field: $key');
+}
+
+bool? _optionalRouteBool(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is bool) {
+    return value;
+  }
+  return null;
 }
