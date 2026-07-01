@@ -76,7 +76,7 @@ void main() {
     expect(favorites.single.verificationStatusLabel, '최신 상태를 준비 중이에요');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 시설 알려주기',
+      '저장한 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 시설 알려주기',
     );
     expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(favorites.single.semanticLabel, isNot(contains('출처')));
