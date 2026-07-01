@@ -255,6 +255,83 @@ void main() {
     );
   });
 
+  test('V2 경로 즐겨찾기는 ETA 출처와 step metadata를 snapshot에 보존한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    final result = RouteSearchResult(
+      routeSearchId: 'route-v2',
+      originStationId: 'station-sangnoksu',
+      originStationName: '상록수',
+      destinationStationId: 'station-sadang',
+      destinationStationName: '사당',
+      mobilityType: 'WHEELCHAIR',
+      status: 'FOUND',
+      lineId: 'seoul-4',
+      lineName: '수도권 4호선',
+      score: 88,
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 이동',
+          description: '4호선 이동',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 26,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          timeSource: 'STATIC_BACKEND_V1',
+          distanceSource: 'BACKEND_V2',
+          confidenceLabel: 'LOW',
+        ),
+      ],
+      warnings: const [],
+      blockedReasons: const [],
+      createdAt: '2026-07-01T09:00:00+09:00',
+      etaSource: 'STATIC_BACKEND_V1',
+    );
+
+    final saved = await repository.saveFavoriteRoute(
+      result.routeSearchId,
+      result: result,
+    );
+    final favorites = await repository.listFavoriteRoutes();
+    final snapshotRows = await userDatabase
+        .customSelect(
+          'SELECT value FROM app_preferences WHERE key = ?',
+          variables: [
+            Variable.withString(
+              'favorite_route_snapshot:${saved.favoriteRouteId}',
+            ),
+          ],
+          readsFrom: {userDatabase.appPreferences},
+        )
+        .get();
+    final snapshot =
+        jsonDecode(snapshotRows.single.read<String>('value'))
+            as Map<String, Object?>;
+    final steps = snapshot['steps'] as List<Object?>;
+    final firstStep = steps.single as Map<String, Object?>;
+
+    expect(favorites.single.routeSearchId, 'route-v2');
+    expect(favorites.single.scoreBasisText, contains('시간표 기준'));
+    expect(favorites.single.semanticLabel, contains('시간표 기준'));
+    expect(snapshot['etaSource'], 'STATIC_BACKEND_V1');
+    expect(firstStep['timeSource'], 'STATIC_BACKEND_V1');
+    expect(firstStep['distanceSource'], 'BACKEND_V2');
+    expect(firstStep['confidenceLabel'], 'LOW');
+  });
+
   test('로컬 알림 설정과 최근 검색은 app_preferences와 search_history에 보관한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);

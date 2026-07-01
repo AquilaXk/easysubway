@@ -87,6 +87,18 @@ String _routeDateLabel(String value) {
   return '최근 확인일을 아직 알 수 없어요';
 }
 
+String _routeEtaSourceLabel(String value) {
+  return switch (value.trim()) {
+    'REALTIME' => '실시간 반영',
+    'PLANNED' => '시간표 기준',
+    'STATIC_BACKEND_V1' => '시간표 기준',
+    'MIXED' => '일부 실시간 반영',
+    'FALLBACK' => '실시간 미지원',
+    'STATIC_LOCAL' => '저장된 데이터 기준',
+    _ => '',
+  };
+}
+
 abstract class RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request);
 
@@ -627,6 +639,8 @@ class FavoriteRoute {
     required this.score,
     required this.routeCreatedAt,
     required this.addedAt,
+    this.etaSource = '',
+    this.fallbackReason = '',
   });
 
   factory FavoriteRoute.fromJson(Map<String, Object?> json) {
@@ -648,6 +662,8 @@ class FavoriteRoute {
       score: _requiredRouteInt(json, 'score'),
       routeCreatedAt: _requiredRouteString(json, 'routeCreatedAt'),
       addedAt: _requiredRouteString(json, 'addedAt'),
+      etaSource: _optionalRouteString(json, 'etaSource'),
+      fallbackReason: _optionalRouteString(json, 'fallbackReason'),
     );
   }
 
@@ -665,6 +681,8 @@ class FavoriteRoute {
   final int score;
   final String routeCreatedAt;
   final String addedAt;
+  final String etaSource;
+  final String fallbackReason;
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
@@ -674,11 +692,25 @@ class FavoriteRoute {
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
-  String get scoreBasisText =>
-      '$mobilityLabel 조건 · $lineLabel · ${_routeDateLabel(routeCreatedAt)}';
+  String get etaSourceLabel => _routeEtaSourceLabel(etaSource);
 
-  String get scoreBasisSemanticLabel =>
-      '$mobilityLabel 조건, $lineLabel, ${_routeDateLabel(routeCreatedAt)}';
+  String get scoreBasisText {
+    return [
+      '$mobilityLabel 조건',
+      lineLabel,
+      _routeDateLabel(routeCreatedAt),
+      if (etaSourceLabel.isNotEmpty) etaSourceLabel,
+    ].join(' · ');
+  }
+
+  String get scoreBasisSemanticLabel {
+    return [
+      '$mobilityLabel 조건',
+      lineLabel,
+      _routeDateLabel(routeCreatedAt),
+      if (etaSourceLabel.isNotEmpty) etaSourceLabel,
+    ].join(', ');
+  }
 
   String get movementMetricLabel =>
       '예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요';
