@@ -3,14 +3,12 @@ package com.easysubway.easysubway_mobile
 import android.content.Context
 import android.graphics.Color
 import android.os.Build
-import android.view.Gravity
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import android.widget.TextView
 import io.flutter.FlutterInjector
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
@@ -124,7 +122,9 @@ private class RouteMapViewportPlatformView(
                 ): Boolean {
                     if (webView === view) {
                         channel.invokeMethod("processGone", mapOf("didCrash" to detail.didCrash()))
-                        showFallback(view)
+                        container.removeView(view)
+                        view.destroy()
+                        webView = null
                     }
                     return true
                 }
@@ -205,23 +205,6 @@ private class RouteMapViewportPlatformView(
             return viewBox
         }
         return listOf(0.0, 0.0, sourceWidth.coerceAtLeast(1.0), sourceHeight.coerceAtLeast(1.0))
-    }
-
-    private fun showFallback(view: WebView) {
-        container.removeView(view)
-        view.destroy()
-        webView = null
-        container.addView(
-            TextView(container.context).apply {
-                text = "노선도를 다시 불러오지 못했습니다."
-                gravity = Gravity.CENTER
-                setTextColor(Color.BLACK)
-            },
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
     }
 
     override fun getView(): View = container
