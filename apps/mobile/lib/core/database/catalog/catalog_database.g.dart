@@ -9805,6 +9805,844 @@ class StationFacilityEvidenceCompanion
   }
 }
 
+class $FacilityStatusSnapshotsTable extends FacilityStatusSnapshots
+    with TableInfo<$FacilityStatusSnapshotsTable, FacilityStatusSnapshot> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FacilityStatusSnapshotsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _facilityIdMeta = const VerificationMeta(
+    'facilityId',
+  );
+  @override
+  late final GeneratedColumn<String> facilityId = GeneratedColumn<String>(
+    'facility_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerIdMeta = const VerificationMeta(
+    'providerId',
+  );
+  @override
+  late final GeneratedColumn<String> providerId = GeneratedColumn<String>(
+    'provider_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _operationalStatusMeta = const VerificationMeta(
+    'operationalStatus',
+  );
+  @override
+  late final GeneratedColumn<String> operationalStatus =
+      GeneratedColumn<String>(
+        'operational_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _confidenceMeta = const VerificationMeta(
+    'confidence',
+  );
+  @override
+  late final GeneratedColumn<int> confidence = GeneratedColumn<int>(
+    'confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _observedAtMeta = const VerificationMeta(
+    'observedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> observedAt = GeneratedColumn<DateTime>(
+    'observed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _expiresAtMeta = const VerificationMeta(
+    'expiresAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiresAt = GeneratedColumn<DateTime>(
+    'expires_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    facilityId,
+    providerId,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    evidenceHash,
+    provenanceKind,
+    verificationStatus,
+    status,
+    operationalStatus,
+    confidence,
+    observedAt,
+    expiresAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'facility_status_snapshots';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FacilityStatusSnapshot> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('facility_id')) {
+      context.handle(
+        _facilityIdMeta,
+        facilityId.isAcceptableOrUnknown(data['facility_id']!, _facilityIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_facilityIdMeta);
+    }
+    if (data.containsKey('provider_id')) {
+      context.handle(
+        _providerIdMeta,
+        providerId.isAcceptableOrUnknown(data['provider_id']!, _providerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerIdMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceSnapshotIdMeta);
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerRecordHashMeta);
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_evidenceHashMeta);
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('operational_status')) {
+      context.handle(
+        _operationalStatusMeta,
+        operationalStatus.isAcceptableOrUnknown(
+          data['operational_status']!,
+          _operationalStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('confidence')) {
+      context.handle(
+        _confidenceMeta,
+        confidence.isAcceptableOrUnknown(data['confidence']!, _confidenceMeta),
+      );
+    }
+    if (data.containsKey('observed_at')) {
+      context.handle(
+        _observedAtMeta,
+        observedAt.isAcceptableOrUnknown(data['observed_at']!, _observedAtMeta),
+      );
+    }
+    if (data.containsKey('expires_at')) {
+      context.handle(
+        _expiresAtMeta,
+        expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FacilityStatusSnapshot map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FacilityStatusSnapshot(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      facilityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}facility_id'],
+      )!,
+      providerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      operationalStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operational_status'],
+      )!,
+      confidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}confidence'],
+      )!,
+      observedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}observed_at'],
+      ),
+      expiresAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expires_at'],
+      ),
+    );
+  }
+
+  @override
+  $FacilityStatusSnapshotsTable createAlias(String alias) {
+    return $FacilityStatusSnapshotsTable(attachedDatabase, alias);
+  }
+}
+
+class FacilityStatusSnapshot extends DataClass
+    implements Insertable<FacilityStatusSnapshot> {
+  final String id;
+  final String facilityId;
+  final String providerId;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String evidenceHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final String status;
+  final String operationalStatus;
+  final int confidence;
+  final DateTime? observedAt;
+  final DateTime? expiresAt;
+  const FacilityStatusSnapshot({
+    required this.id,
+    required this.facilityId,
+    required this.providerId,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.evidenceHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    required this.status,
+    required this.operationalStatus,
+    required this.confidence,
+    this.observedAt,
+    this.expiresAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['facility_id'] = Variable<String>(facilityId);
+    map['provider_id'] = Variable<String>(providerId);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
+    map['evidence_hash'] = Variable<String>(evidenceHash);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['verification_status'] = Variable<String>(verificationStatus);
+    map['status'] = Variable<String>(status);
+    map['operational_status'] = Variable<String>(operationalStatus);
+    map['confidence'] = Variable<int>(confidence);
+    if (!nullToAbsent || observedAt != null) {
+      map['observed_at'] = Variable<DateTime>(observedAt);
+    }
+    if (!nullToAbsent || expiresAt != null) {
+      map['expires_at'] = Variable<DateTime>(expiresAt);
+    }
+    return map;
+  }
+
+  FacilityStatusSnapshotsCompanion toCompanion(bool nullToAbsent) {
+    return FacilityStatusSnapshotsCompanion(
+      id: Value(id),
+      facilityId: Value(facilityId),
+      providerId: Value(providerId),
+      sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
+      evidenceHash: Value(evidenceHash),
+      provenanceKind: Value(provenanceKind),
+      verificationStatus: Value(verificationStatus),
+      status: Value(status),
+      operationalStatus: Value(operationalStatus),
+      confidence: Value(confidence),
+      observedAt: observedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(observedAt),
+      expiresAt: expiresAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expiresAt),
+    );
+  }
+
+  factory FacilityStatusSnapshot.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FacilityStatusSnapshot(
+      id: serializer.fromJson<String>(json['id']),
+      facilityId: serializer.fromJson<String>(json['facilityId']),
+      providerId: serializer.fromJson<String>(json['providerId']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
+      status: serializer.fromJson<String>(json['status']),
+      operationalStatus: serializer.fromJson<String>(json['operationalStatus']),
+      confidence: serializer.fromJson<int>(json['confidence']),
+      observedAt: serializer.fromJson<DateTime?>(json['observedAt']),
+      expiresAt: serializer.fromJson<DateTime?>(json['expiresAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'facilityId': serializer.toJson<String>(facilityId),
+      'providerId': serializer.toJson<String>(providerId),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
+      'status': serializer.toJson<String>(status),
+      'operationalStatus': serializer.toJson<String>(operationalStatus),
+      'confidence': serializer.toJson<int>(confidence),
+      'observedAt': serializer.toJson<DateTime?>(observedAt),
+      'expiresAt': serializer.toJson<DateTime?>(expiresAt),
+    };
+  }
+
+  FacilityStatusSnapshot copyWith({
+    String? id,
+    String? facilityId,
+    String? providerId,
+    String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
+    String? evidenceHash,
+    String? provenanceKind,
+    String? verificationStatus,
+    String? status,
+    String? operationalStatus,
+    int? confidence,
+    Value<DateTime?> observedAt = const Value.absent(),
+    Value<DateTime?> expiresAt = const Value.absent(),
+  }) => FacilityStatusSnapshot(
+    id: id ?? this.id,
+    facilityId: facilityId ?? this.facilityId,
+    providerId: providerId ?? this.providerId,
+    sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
+    status: status ?? this.status,
+    operationalStatus: operationalStatus ?? this.operationalStatus,
+    confidence: confidence ?? this.confidence,
+    observedAt: observedAt.present ? observedAt.value : this.observedAt,
+    expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
+  );
+  FacilityStatusSnapshot copyWithCompanion(
+    FacilityStatusSnapshotsCompanion data,
+  ) {
+    return FacilityStatusSnapshot(
+      id: data.id.present ? data.id.value : this.id,
+      facilityId: data.facilityId.present
+          ? data.facilityId.value
+          : this.facilityId,
+      providerId: data.providerId.present
+          ? data.providerId.value
+          : this.providerId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
+      status: data.status.present ? data.status.value : this.status,
+      operationalStatus: data.operationalStatus.present
+          ? data.operationalStatus.value
+          : this.operationalStatus,
+      confidence: data.confidence.present
+          ? data.confidence.value
+          : this.confidence,
+      observedAt: data.observedAt.present
+          ? data.observedAt.value
+          : this.observedAt,
+      expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FacilityStatusSnapshot(')
+          ..write('id: $id, ')
+          ..write('facilityId: $facilityId, ')
+          ..write('providerId: $providerId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('status: $status, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('confidence: $confidence, ')
+          ..write('observedAt: $observedAt, ')
+          ..write('expiresAt: $expiresAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    facilityId,
+    providerId,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    evidenceHash,
+    provenanceKind,
+    verificationStatus,
+    status,
+    operationalStatus,
+    confidence,
+    observedAt,
+    expiresAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FacilityStatusSnapshot &&
+          other.id == this.id &&
+          other.facilityId == this.facilityId &&
+          other.providerId == this.providerId &&
+          other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
+          other.evidenceHash == this.evidenceHash &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verificationStatus == this.verificationStatus &&
+          other.status == this.status &&
+          other.operationalStatus == this.operationalStatus &&
+          other.confidence == this.confidence &&
+          other.observedAt == this.observedAt &&
+          other.expiresAt == this.expiresAt);
+}
+
+class FacilityStatusSnapshotsCompanion
+    extends UpdateCompanion<FacilityStatusSnapshot> {
+  final Value<String> id;
+  final Value<String> facilityId;
+  final Value<String> providerId;
+  final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
+  final Value<String> evidenceHash;
+  final Value<String> provenanceKind;
+  final Value<String> verificationStatus;
+  final Value<String> status;
+  final Value<String> operationalStatus;
+  final Value<int> confidence;
+  final Value<DateTime?> observedAt;
+  final Value<DateTime?> expiresAt;
+  final Value<int> rowid;
+  const FacilityStatusSnapshotsCompanion({
+    this.id = const Value.absent(),
+    this.facilityId = const Value.absent(),
+    this.providerId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.status = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.observedAt = const Value.absent(),
+    this.expiresAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FacilityStatusSnapshotsCompanion.insert({
+    required String id,
+    required String facilityId,
+    required String providerId,
+    required String sourceId,
+    required String sourceSnapshotId,
+    required String providerRecordHash,
+    required String evidenceHash,
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.status = const Value.absent(),
+    this.operationalStatus = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.observedAt = const Value.absent(),
+    this.expiresAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       facilityId = Value(facilityId),
+       providerId = Value(providerId),
+       sourceId = Value(sourceId),
+       sourceSnapshotId = Value(sourceSnapshotId),
+       providerRecordHash = Value(providerRecordHash),
+       evidenceHash = Value(evidenceHash);
+  static Insertable<FacilityStatusSnapshot> custom({
+    Expression<String>? id,
+    Expression<String>? facilityId,
+    Expression<String>? providerId,
+    Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
+    Expression<String>? evidenceHash,
+    Expression<String>? provenanceKind,
+    Expression<String>? verificationStatus,
+    Expression<String>? status,
+    Expression<String>? operationalStatus,
+    Expression<int>? confidence,
+    Expression<DateTime>? observedAt,
+    Expression<DateTime>? expiresAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (facilityId != null) 'facility_id': facilityId,
+      if (providerId != null) 'provider_id': providerId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (status != null) 'status': status,
+      if (operationalStatus != null) 'operational_status': operationalStatus,
+      if (confidence != null) 'confidence': confidence,
+      if (observedAt != null) 'observed_at': observedAt,
+      if (expiresAt != null) 'expires_at': expiresAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FacilityStatusSnapshotsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? facilityId,
+    Value<String>? providerId,
+    Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
+    Value<String>? evidenceHash,
+    Value<String>? provenanceKind,
+    Value<String>? verificationStatus,
+    Value<String>? status,
+    Value<String>? operationalStatus,
+    Value<int>? confidence,
+    Value<DateTime?>? observedAt,
+    Value<DateTime?>? expiresAt,
+    Value<int>? rowid,
+  }) {
+    return FacilityStatusSnapshotsCompanion(
+      id: id ?? this.id,
+      facilityId: facilityId ?? this.facilityId,
+      providerId: providerId ?? this.providerId,
+      sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      status: status ?? this.status,
+      operationalStatus: operationalStatus ?? this.operationalStatus,
+      confidence: confidence ?? this.confidence,
+      observedAt: observedAt ?? this.observedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (facilityId.present) {
+      map['facility_id'] = Variable<String>(facilityId.value);
+    }
+    if (providerId.present) {
+      map['provider_id'] = Variable<String>(providerId.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (operationalStatus.present) {
+      map['operational_status'] = Variable<String>(operationalStatus.value);
+    }
+    if (confidence.present) {
+      map['confidence'] = Variable<int>(confidence.value);
+    }
+    if (observedAt.present) {
+      map['observed_at'] = Variable<DateTime>(observedAt.value);
+    }
+    if (expiresAt.present) {
+      map['expires_at'] = Variable<DateTime>(expiresAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FacilityStatusSnapshotsCompanion(')
+          ..write('id: $id, ')
+          ..write('facilityId: $facilityId, ')
+          ..write('providerId: $providerId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('status: $status, ')
+          ..write('operationalStatus: $operationalStatus, ')
+          ..write('confidence: $confidence, ')
+          ..write('observedAt: $observedAt, ')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StationAccessibilitySummariesTable extends StationAccessibilitySummaries
     with
         TableInfo<
@@ -14768,6 +15606,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $FacilitiesTable facilities = $FacilitiesTable(this);
   late final $StationFacilityEvidenceTable stationFacilityEvidence =
       $StationFacilityEvidenceTable(this);
+  late final $FacilityStatusSnapshotsTable facilityStatusSnapshots =
+      $FacilityStatusSnapshotsTable(this);
   late final $StationAccessibilitySummariesTable stationAccessibilitySummaries =
       $StationAccessibilitySummariesTable(this);
   late final $InternalRouteNodesTable internalRouteNodes =
@@ -14804,6 +15644,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     stationExits,
     facilities,
     stationFacilityEvidence,
+    facilityStatusSnapshots,
     stationAccessibilitySummaries,
     internalRouteNodes,
     internalRouteEdges,
@@ -19813,6 +20654,416 @@ typedef $$StationFacilityEvidenceTableProcessedTableManager =
       StationFacilityEvidenceData,
       PrefetchHooks Function()
     >;
+typedef $$FacilityStatusSnapshotsTableCreateCompanionBuilder =
+    FacilityStatusSnapshotsCompanion Function({
+      required String id,
+      required String facilityId,
+      required String providerId,
+      required String sourceId,
+      required String sourceSnapshotId,
+      required String providerRecordHash,
+      required String evidenceHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<String> status,
+      Value<String> operationalStatus,
+      Value<int> confidence,
+      Value<DateTime?> observedAt,
+      Value<DateTime?> expiresAt,
+      Value<int> rowid,
+    });
+typedef $$FacilityStatusSnapshotsTableUpdateCompanionBuilder =
+    FacilityStatusSnapshotsCompanion Function({
+      Value<String> id,
+      Value<String> facilityId,
+      Value<String> providerId,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> evidenceHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<String> status,
+      Value<String> operationalStatus,
+      Value<int> confidence,
+      Value<DateTime?> observedAt,
+      Value<DateTime?> expiresAt,
+      Value<int> rowid,
+    });
+
+class $$FacilityStatusSnapshotsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $FacilityStatusSnapshotsTable> {
+  $$FacilityStatusSnapshotsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get observedAt => $composableBuilder(
+    column: $table.observedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FacilityStatusSnapshotsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $FacilityStatusSnapshotsTable> {
+  $$FacilityStatusSnapshotsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get observedAt => $composableBuilder(
+    column: $table.observedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FacilityStatusSnapshotsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $FacilityStatusSnapshotsTable> {
+  $$FacilityStatusSnapshotsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get facilityId => $composableBuilder(
+    column: $table.facilityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get operationalStatus => $composableBuilder(
+    column: $table.operationalStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get observedAt => $composableBuilder(
+    column: $table.observedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get expiresAt =>
+      $composableBuilder(column: $table.expiresAt, builder: (column) => column);
+}
+
+class $$FacilityStatusSnapshotsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $FacilityStatusSnapshotsTable,
+          FacilityStatusSnapshot,
+          $$FacilityStatusSnapshotsTableFilterComposer,
+          $$FacilityStatusSnapshotsTableOrderingComposer,
+          $$FacilityStatusSnapshotsTableAnnotationComposer,
+          $$FacilityStatusSnapshotsTableCreateCompanionBuilder,
+          $$FacilityStatusSnapshotsTableUpdateCompanionBuilder,
+          (
+            FacilityStatusSnapshot,
+            BaseReferences<
+              _$CatalogDatabase,
+              $FacilityStatusSnapshotsTable,
+              FacilityStatusSnapshot
+            >,
+          ),
+          FacilityStatusSnapshot,
+          PrefetchHooks Function()
+        > {
+  $$FacilityStatusSnapshotsTableTableManager(
+    _$CatalogDatabase db,
+    $FacilityStatusSnapshotsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FacilityStatusSnapshotsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$FacilityStatusSnapshotsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$FacilityStatusSnapshotsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> facilityId = const Value.absent(),
+                Value<String> providerId = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
+                Value<DateTime?> observedAt = const Value.absent(),
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FacilityStatusSnapshotsCompanion(
+                id: id,
+                facilityId: facilityId,
+                providerId: providerId,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                evidenceHash: evidenceHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                status: status,
+                operationalStatus: operationalStatus,
+                confidence: confidence,
+                observedAt: observedAt,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String facilityId,
+                required String providerId,
+                required String sourceId,
+                required String sourceSnapshotId,
+                required String providerRecordHash,
+                required String evidenceHash,
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> operationalStatus = const Value.absent(),
+                Value<int> confidence = const Value.absent(),
+                Value<DateTime?> observedAt = const Value.absent(),
+                Value<DateTime?> expiresAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FacilityStatusSnapshotsCompanion.insert(
+                id: id,
+                facilityId: facilityId,
+                providerId: providerId,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                evidenceHash: evidenceHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                status: status,
+                operationalStatus: operationalStatus,
+                confidence: confidence,
+                observedAt: observedAt,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FacilityStatusSnapshotsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $FacilityStatusSnapshotsTable,
+      FacilityStatusSnapshot,
+      $$FacilityStatusSnapshotsTableFilterComposer,
+      $$FacilityStatusSnapshotsTableOrderingComposer,
+      $$FacilityStatusSnapshotsTableAnnotationComposer,
+      $$FacilityStatusSnapshotsTableCreateCompanionBuilder,
+      $$FacilityStatusSnapshotsTableUpdateCompanionBuilder,
+      (
+        FacilityStatusSnapshot,
+        BaseReferences<
+          _$CatalogDatabase,
+          $FacilityStatusSnapshotsTable,
+          FacilityStatusSnapshot
+        >,
+      ),
+      FacilityStatusSnapshot,
+      PrefetchHooks Function()
+    >;
 typedef $$StationAccessibilitySummariesTableCreateCompanionBuilder =
     StationAccessibilitySummariesCompanion Function({
       required String stationId,
@@ -22297,6 +23548,11 @@ class $CatalogDatabaseManager {
       $$StationFacilityEvidenceTableTableManager(
         _db,
         _db.stationFacilityEvidence,
+      );
+  $$FacilityStatusSnapshotsTableTableManager get facilityStatusSnapshots =>
+      $$FacilityStatusSnapshotsTableTableManager(
+        _db,
+        _db.facilityStatusSnapshots,
       );
   $$StationAccessibilitySummariesTableTableManager
   get stationAccessibilitySummaries =>
