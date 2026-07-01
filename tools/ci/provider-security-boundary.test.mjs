@@ -49,7 +49,7 @@ test("provider credential과 release artifact security boundary regression을 �
   for (const [file, content] of mobileTrackedSource) {
     assert.doesNotMatch(content, /swopenapi\.seoul\.go\.kr/i, `${file} must not call TOPIS directly`);
     assert.doesNotMatch(content, /EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY/i, `${file} must not reference backend TOPIS key`);
-    assert.doesNotMatch(content, /(?:serviceKey|apiKey|providerUrl|provider_url)=/i, `${file} must not carry provider credential query`);
+    assert.doesNotMatch(content, /["']?(?:serviceKey|apiKey|providerUrl|provider_url)["']?\s*(?:=|:)/i, `${file} must not carry provider credential fields`);
   }
 });
 
