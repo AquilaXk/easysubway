@@ -138,6 +138,45 @@
       }
     },
     {
+      "id": "route_eta_feedback",
+      "displayNameKo": "경로 ETA 피드백",
+      "purposeKo": "경로 안내의 탑승·환승 여유 시간 기본값을 개선하기 위한 opt-in 보정 집계",
+      "implementationStatus": "collected",
+      "introducedInVersion": "1.0.2",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 경로 피드백 화면에서 도움됨 또는 맞지 않음 버튼을 눌러 명시적으로 제출할 때만 저장",
+      "backendTableOrService": ["route_feedbacks.itinerary_id", "route_feedbacks.mobility_type", "route_feedbacks.constraint_mode", "route_feedbacks.eta_source", "route_feedbacks.eta_offset_bucket"],
+      "storageLocations": ["backend-database"],
+      "retentionKo": "운영 품질 분석과 board/transfer slack 기본값 검토 기간 동안 bucket 집계로만 사용",
+      "deletionKo": "데이터 삭제 요청 시 사용자 식별자와 자유 입력 코멘트를 익명화하고, bucket 집계용 값은 개인 식별 없이 유지",
+      "deletionImplementation": "AnonymizeUserRouteFeedbackPort가 route_feedbacks.user_id와 comment를 익명화하고 ETA offset은 bucket enum 값만 보존한다.",
+      "evidence": [
+        "apps/mobile/lib/route_search.dart",
+        "backend/src/main/java/com/easysubway/route/domain/RouteFeedback.java",
+        "backend/src/main/resources/db/migration/postgresql/V33__route_eta_feedback_calibration.sql"
+      ],
+      "lastVerifiedAt": "2026-06-19",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "continuousLocationTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "collected": true,
+        "collectionType": "user-triggered",
+        "purpose": "App functionality",
+        "linkedToUser": true,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": true
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+        "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
       "id": "mobility_profile",
       "displayNameKo": "이동 조건",
       "purposeKo": "계단 회피, 엘리베이터 우선 등 사용자 상황에 맞는 경로 안내",

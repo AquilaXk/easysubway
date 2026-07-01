@@ -119,32 +119,74 @@ enum RouteFeedbackRating {
   final String serverValue;
 }
 
+enum RouteEtaOffsetBucket {
+  earlyOver3Minutes('EARLY_OVER_3_MINUTES'),
+  early1To3Minutes('EARLY_1_TO_3_MINUTES'),
+  onTime('ON_TIME'),
+  late1To3Minutes('LATE_1_TO_3_MINUTES'),
+  lateOver3Minutes('LATE_OVER_3_MINUTES'),
+  notProvided('NOT_PROVIDED');
+
+  const RouteEtaOffsetBucket(this.serverValue);
+
+  final String serverValue;
+}
+
 class RouteFeedbackRequest {
   const RouteFeedbackRequest({
     required this.routeSearchId,
     required this.rating,
     required this.comment,
+    this.itineraryId = '',
+    this.mobilityType = '',
+    this.constraintMode = '',
+    this.etaSource = '',
+    this.etaOffsetBucket = RouteEtaOffsetBucket.notProvided,
+    this.etaFeedbackOptedIn = false,
   });
 
   final String routeSearchId;
   final RouteFeedbackRating rating;
   final String comment;
+  final String itineraryId;
+  final String mobilityType;
+  final String constraintMode;
+  final String etaSource;
+  final RouteEtaOffsetBucket etaOffsetBucket;
+  final bool etaFeedbackOptedIn;
 
   RouteFeedbackRequest trimmed() {
     return RouteFeedbackRequest(
       routeSearchId: routeSearchId.trim(),
       rating: rating,
       comment: comment.trim(),
+      itineraryId: itineraryId.trim(),
+      mobilityType: mobilityType.trim(),
+      constraintMode: constraintMode.trim(),
+      etaSource: etaSource.trim(),
+      etaOffsetBucket: etaOffsetBucket,
+      etaFeedbackOptedIn: etaFeedbackOptedIn,
     );
   }
 
   Map<String, Object?> toJson({required String userId}) {
     final trimmedRequest = trimmed();
-    return {
+    final payload = <String, Object?>{
       'userId': userId.trim(),
       'rating': trimmedRequest.rating.serverValue,
       'comment': trimmedRequest.comment,
     };
+    if (trimmedRequest.etaFeedbackOptedIn) {
+      payload.addAll({
+        'itineraryId': trimmedRequest.itineraryId,
+        'mobilityType': trimmedRequest.mobilityType,
+        'constraintMode': trimmedRequest.constraintMode,
+        'etaSource': trimmedRequest.etaSource,
+        'etaOffsetBucket': trimmedRequest.etaOffsetBucket.serverValue,
+        'etaFeedbackOptedIn': true,
+      });
+    }
+    return payload;
   }
 }
 
@@ -181,7 +223,10 @@ class RouteSearchApiRepository implements RouteSearchRepository {
         throw const RouteSearchException(_routeSearchErrorMessage);
       }
 
-      return RouteSearchResult.fromJson(data);
+      return RouteSearchResult.fromJson(
+        data,
+        constraintMode: routeRequest.effectiveConstraintMode,
+      );
     } on RouteSearchException {
       rethrow;
     } catch (error, stackTrace) {
@@ -1046,6 +1091,7 @@ class RouteSearchResult {
     required this.destinationStationId,
     required this.destinationStationName,
     required this.mobilityType,
+    this.constraintMode = '',
     required this.status,
     required this.lineId,
     required this.lineName,
@@ -1074,7 +1120,10 @@ class RouteSearchResult {
        // ignore: prefer_initializing_formals
        _transferCount = transferCount;
 
-  factory RouteSearchResult.fromJson(Map<String, Object?> json) {
+  factory RouteSearchResult.fromJson(
+    Map<String, Object?> json, {
+    String? constraintMode,
+  }) {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
     final rawRecommendationReasons = json['recommendationReasons'];
@@ -1105,6 +1154,9 @@ class RouteSearchResult {
         'destinationStationName',
       ),
       mobilityType: _requiredRouteString(json, 'mobilityType'),
+      constraintMode: constraintMode?.trim().isNotEmpty == true
+          ? constraintMode!.trim()
+          : _optionalRouteString(json, 'constraintMode'),
       status: _requiredRouteString(json, 'status'),
       lineId: _optionalRouteString(json, 'lineId'),
       lineName: _optionalRouteString(json, 'lineName'),
@@ -1167,6 +1219,7 @@ class RouteSearchResult {
       destinationStationId: result.destinationStationId,
       destinationStationName: result.destinationStationId,
       mobilityType: result.mobilityType,
+      constraintMode: result.constraintMode,
       status: _routeV2Status(itinerary.status),
       lineId: lineId,
       lineName: lineId,
@@ -1211,6 +1264,7 @@ class RouteSearchResult {
   final String destinationStationId;
   final String destinationStationName;
   final String mobilityType;
+  final String constraintMode;
   final String status;
   final String lineId;
   final String lineName;
@@ -1335,6 +1389,7 @@ class RouteSearchResult {
       destinationStationName:
           destinationStationName ?? this.destinationStationName,
       mobilityType: mobilityType,
+      constraintMode: constraintMode,
       status: status,
       lineId: lineId,
       lineName: lineName ?? this.lineName,
@@ -5119,6 +5174,14 @@ class _RouteFeedbackButtonsState extends State<_RouteFeedbackButtons> {
           routeSearchId: widget.result.routeSearchId,
           rating: rating,
           comment: comment,
+          itineraryId: '${widget.result.routeSearchId}-primary',
+          mobilityType: widget.result.mobilityType,
+          constraintMode: widget.result.constraintMode,
+          etaSource: widget.result.etaSource.isEmpty
+              ? 'PLANNED'
+              : widget.result.etaSource,
+          etaOffsetBucket: RouteEtaOffsetBucket.notProvided,
+          etaFeedbackOptedIn: true,
         ),
       );
       if (!mounted) {
