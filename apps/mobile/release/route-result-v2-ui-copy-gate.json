@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "route-result-v2-ui-copy",
+  "issue": 1230,
+  "releaseBlockerPolicy": true,
+  "status": "IN_PROGRESS",
+  "currentDecision": "NO_GO",
+  "evidenceRoot": ".codex/evidence/release/android-route-result-v2-ui-copy/<run>/",
+  "latestQaEvidenceStatus": {
+    "qaEvidenceDateKst": "2026-07-02",
+    "resolvedEvidence": [],
+    "remainingEvidence": [
+      "route-result-v2-badge-visible-screenshot",
+      "route-result-v2-accessibility-copy-ui-tree",
+      "route-result-v2-screenreader-label-audit",
+      "route-result-v2-large-touch-target-and-contrast-regression"
+    ],
+    "notClosingReasonKo": "#1230은 Route result V2 badge와 accessibility copy 구현/검증 증거가 아직 동결되지 않아 Android v1 GO 판정 전에 open 유지한다."
+  },
+  "requiredEvidence": {
+    "badgeScreenshotRequired": true,
+    "accessibilityUiTreeRequired": true,
+    "screenReaderCopyAuditRequired": true,
+    "touchTargetAndContrastRegressionRequired": true
+  },
+  "forbiddenEvidence": [
+    "old-route-result-v1-screenshot",
+    "generated-placeholder-copy",
+    "static-json-only-route-result",
+    "unverified-screenreader-summary"
+  ]
+}
