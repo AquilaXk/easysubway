@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "issue": 1075,
+  "titleKo": "모바일 async 실패 상태 감사",
+  "scope": "apps/mobile/lib/**/*.dart",
+  "command": "node --test --test-name-pattern \"모바일 async 실패\" tools/ci/repository-contract.test.mjs",
+  "silentEmptyListCatchReturns": [],
+  "checkedStates": [
+    "homeFacilityAlert",
+    "homeRecentRoute",
+    "favoriteHome",
+    "favoriteStationList",
+    "favoriteFacilityList",
+    "favoriteRouteList",
+    "networkMap",
+    "routeSearch",
+    "stationSearch",
+    "facilityReport"
+  ]
+}
