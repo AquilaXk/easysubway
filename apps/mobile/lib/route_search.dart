@@ -35,7 +35,12 @@ const _routeSearchPagePadding = EdgeInsets.only(
 const _routeSearchSmallRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(14));
 const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(20));
+const _routeSearchPickerRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
+const _routePointRailWidth = 30.0;
+const _routePointOriginNodeColor = Color(0xFF27A6D9);
+const _routePointDestinationNodeColor = Color(0xFF006D77);
+const _routePointConnectorColor = Color(0xFFBFD6DA);
 const _routeTextPrimaryColor = Color(0xFF102A2C);
 const _routeTextSecondaryColor = Color(0xFF29484B);
 const _routeTextMutedColor = Color(0xFF405A5D);
@@ -2658,11 +2663,42 @@ class _RoutePointPickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 카카오/슈퍼무브식 출발(○)-도착(●) 노드는 각 역 행 안쪽에 두어 역명이
+    // 노드 뒤로 들여써지도록 한다. 입력 피커가 열리면 해당 행의 노드는 접힌다.
+    final originChild =
+        originPicker ??
+        _RoutePointRow(
+          key: const Key('routeOriginPointButton'),
+          isOrigin: true,
+          station: originStation,
+          fallback: '출발역 선택',
+          onTap: onOriginTap,
+        );
+    final destinationChild =
+        destinationPicker ??
+        _RoutePointRow(
+          key: const Key('routeDestinationPointButton'),
+          isOrigin: false,
+          station: destinationStation,
+          fallback: '도착역 선택',
+          onTap: onDestinationTap,
+        );
+    final rows = Column(
+      children: [
+        originChild,
+        const Divider(
+          height: 1,
+          indent: _routePointRailWidth,
+          color: _routeDividerColor,
+        ),
+        destinationChild,
+      ],
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _routeCardBorderColor),
-        borderRadius: _routeSearchLargeRadius,
+        borderRadius: _routeSearchPickerRadius,
         boxShadow: const [
           BoxShadow(
             color: _routeCardShadowColor,
@@ -2674,30 +2710,7 @@ class _RoutePointPickerCard extends StatelessWidget {
       child: Stack(
         alignment: Alignment.centerRight,
         children: [
-          Padding(
-            padding: _routePointSelectorPadding,
-            child: Column(
-              children: [
-                originPicker ??
-                    _RoutePointRow(
-                      key: const Key('routeOriginPointButton'),
-                      label: '출발',
-                      station: originStation,
-                      fallback: '출발역 선택',
-                      onTap: onOriginTap,
-                    ),
-                const Divider(height: 1, color: _routeDividerColor),
-                destinationPicker ??
-                    _RoutePointRow(
-                      key: const Key('routeDestinationPointButton'),
-                      label: '도착',
-                      station: destinationStation,
-                      fallback: '도착역 선택',
-                      onTap: onDestinationTap,
-                    ),
-              ],
-            ),
-          ),
+          Padding(padding: _routePointSelectorPadding, child: rows),
           Padding(
             padding: const EdgeInsets.only(right: 9),
             child: Semantics(
@@ -2724,22 +2737,68 @@ class _RoutePointPickerCard extends StatelessWidget {
   }
 }
 
+class _RoutePointNodeColumn extends StatelessWidget {
+  const _RoutePointNodeColumn({required this.isOrigin});
+
+  final bool isOrigin;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget connector() =>
+        Center(child: Container(width: 2, color: _routePointConnectorColor));
+    // 출발 노드는 아래로, 도착 노드는 위로 연결선을 뻗어 두 행 사이에서 만난다.
+    return SizedBox(
+      width: _routePointRailWidth,
+      child: Column(
+        children: [
+          Expanded(child: isOrigin ? const SizedBox.shrink() : connector()),
+          _RoutePointNode(filled: !isOrigin),
+          Expanded(child: isOrigin ? connector() : const SizedBox.shrink()),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoutePointNode extends StatelessWidget {
+  const _RoutePointNode({required this.filled});
+
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = filled
+        ? _routePointDestinationNodeColor
+        : _routePointOriginNodeColor;
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: filled ? color : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 3),
+      ),
+    );
+  }
+}
+
 class _RoutePointRow extends StatelessWidget {
   const _RoutePointRow({
-    required this.label,
+    required this.isOrigin,
     required this.station,
     required this.fallback,
     required this.onTap,
     super.key,
   });
 
-  final String label;
+  final bool isOrigin;
   final StationSearchResult? station;
   final String fallback;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final label = isOrigin ? '출발' : '도착';
     final stationName = station == null
         ? fallback
         : _routeStationDisplayName(station!);
@@ -2754,21 +2813,30 @@ class _RoutePointRow extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: _routeSearchMediumRadius,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          child: IntrinsicHeight(
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _RoutePointNodeColumn(isOrigin: isOrigin),
                 Expanded(
-                  child: Text(
-                    stationName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: _routeTextPrimaryColor,
-                      fontSize: 22,
-                      height: 1.2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Text(
+                      stationName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: station == null
+                            ? _routeTextSubtleColor
+                            : _routeTextPrimaryColor,
+                        fontSize: 22,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                 ),
-                const Icon(Icons.map_outlined, color: _routeTextSubtleColor),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Icon(Icons.map_outlined, color: _routeTextSubtleColor),
+                ),
               ],
             ),
           ),
@@ -4734,20 +4802,22 @@ class _RouteReasonBadge extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 9,
-            backgroundColor: blocked
-                ? _routeBlockedSoftColor
-                : EasySubwayAccessibleColors.mintSoft,
-            child: Text(
-              blocked ? '!' : '✓',
-              style: TextStyle(
-                color: blocked
-                    ? _routeBlockedColor
-                    : EasySubwayAccessibleColors.mintDark,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
+          Container(
+            width: 18,
+            height: 18,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: blocked
+                  ? _routeBlockedSoftColor
+                  : EasySubwayAccessibleColors.mintSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              blocked ? Icons.priority_high_rounded : Icons.check_rounded,
+              size: 12,
+              color: blocked
+                  ? _routeBlockedColor
+                  : EasySubwayAccessibleColors.mintDark,
             ),
           ),
           const SizedBox(width: 7),
