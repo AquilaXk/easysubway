@@ -91,6 +91,7 @@ String _routeEtaSourceLabel(String value) {
   return switch (value.trim()) {
     'REALTIME' => '실시간 반영',
     'PLANNED' => '시간표 기준',
+    'STATIC_BACKEND_V1' => '시간표 기준',
     'MIXED' => '일부 실시간 반영',
     'FALLBACK' => '실시간 미지원',
     'STATIC_LOCAL' => '저장된 데이터 기준',

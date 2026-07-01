@@ -290,7 +290,7 @@ void main() {
           distanceMeters: 0,
           includesStairs: false,
           requiresAccessibilityCheck: false,
-          timeSource: 'PLANNED',
+          timeSource: 'STATIC_BACKEND_V1',
           distanceSource: 'BACKEND_V2',
           confidenceLabel: 'LOW',
         ),
@@ -298,7 +298,7 @@ void main() {
       warnings: const [],
       blockedReasons: const [],
       createdAt: '2026-07-01T09:00:00+09:00',
-      etaSource: 'PLANNED',
+      etaSource: 'STATIC_BACKEND_V1',
     );
 
     final saved = await repository.saveFavoriteRoute(
@@ -326,8 +326,8 @@ void main() {
     expect(favorites.single.routeSearchId, 'route-v2');
     expect(favorites.single.scoreBasisText, contains('시간표 기준'));
     expect(favorites.single.semanticLabel, contains('시간표 기준'));
-    expect(snapshot['etaSource'], 'PLANNED');
-    expect(firstStep['timeSource'], 'PLANNED');
+    expect(snapshot['etaSource'], 'STATIC_BACKEND_V1');
+    expect(firstStep['timeSource'], 'STATIC_BACKEND_V1');
     expect(firstStep['distanceSource'], 'BACKEND_V2');
     expect(firstStep['confidenceLabel'], 'LOW');
   });
