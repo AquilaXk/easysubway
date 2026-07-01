@@ -9,76 +9,151 @@ class LocalRouteEngine {
   LocalRouteEngine({
     required this.graph,
     this.costCalculator = const AccessibilityCostCalculator(),
+  }) : accessGraphRouter = AccessGraphRouter(
+         graph: graph,
+         costCalculator: costCalculator,
+       ),
+       routeAssembler = RouteAssembler(costCalculator: costCalculator);
+
+  final NetworkGraph graph;
+  final AccessibilityCostCalculator costCalculator;
+  final AccessGraphRouter accessGraphRouter;
+  final RouteAssembler routeAssembler;
+
+  LocalRouteResult search(RouteRequest request) {
+    final pathResult = accessGraphRouter.findPath(
+      originNodeId: request.originStationId,
+      destinationNodeId: request.destinationStationId,
+      mobilityType: request.mobilityType,
+      constraintMode: request.effectiveConstraintMode,
+    );
+    final path = pathResult.path;
+    if (path == null) {
+      if (pathResult.noPathReason != AccessNoPathReason.blocked) {
+        return LocalRouteResult.unknown(pathResult.reasonCodes);
+      }
+      return LocalRouteResult.blocked(pathResult.reasonCodes);
+    }
+
+    final weight = RouteWeight.from(request.mobilityType);
+    final assembled = routeAssembler.assemble(
+      path,
+      request.mobilityType,
+      constraintMode: request.effectiveConstraintMode,
+    );
+
+    return LocalRouteResult(
+      status: RouteStatus.found,
+      totalCost: weight.baseAccessCost + assembled.totalCost,
+      steps: assembled.steps,
+      warnings: assembled.warnings,
+      blockedReasonCodes: const [],
+    );
+  }
+}
+
+enum AccessNoPathReason { blocked, unknown, unsupported, noData }
+
+class AccessPathResult {
+  const AccessPathResult._({
+    required this.path,
+    required this.noPathReason,
+    required this.reasonCodes,
+  });
+
+  factory AccessPathResult.found(AccessPath path) {
+    return AccessPathResult._(
+      path: path,
+      noPathReason: null,
+      reasonCodes: const [],
+    );
+  }
+
+  factory AccessPathResult.noPath({
+    required AccessNoPathReason reason,
+    required List<String> reasonCodes,
+  }) {
+    return AccessPathResult._(
+      path: null,
+      noPathReason: reason,
+      reasonCodes: List.unmodifiable(reasonCodes),
+    );
+  }
+
+  final AccessPath? path;
+  final AccessNoPathReason? noPathReason;
+  final List<String> reasonCodes;
+}
+
+class AccessPath {
+  const AccessPath({required this.edges});
+
+  final List<RouteEdge> edges;
+
+  int get entrySeconds => _secondsForTypes({RouteEdgeType.entry});
+
+  int get transferSeconds => _secondsForTypes({
+    RouteEdgeType.inStationTransfer,
+    RouteEdgeType.outOfStationTransfer,
+  });
+
+  int get egressSeconds => _secondsForTypes({RouteEdgeType.exit});
+
+  List<String> get edgeIds =>
+      edges.map((edge) => edge.id).toList(growable: false);
+
+  List<String> get evidenceSources =>
+      edges.expand(_routeEvidenceSources).toSet().toList(growable: false);
+
+  int _secondsForTypes(Set<RouteEdgeType> types) {
+    return edges
+        .where((edge) => types.contains(edge.type))
+        .fold(0, (total, edge) => total + edge.durationSeconds);
+  }
+}
+
+class AccessGraphRouter {
+  const AccessGraphRouter({
+    required this.graph,
+    this.costCalculator = const AccessibilityCostCalculator(),
   });
 
   final NetworkGraph graph;
   final AccessibilityCostCalculator costCalculator;
 
-  LocalRouteResult search(RouteRequest request) {
+  AccessPathResult findPath({
+    required String originNodeId,
+    required String destinationNodeId,
+    required MobilityType mobilityType,
+    required ConstraintMode constraintMode,
+  }) {
+    if (graph.nodes.isEmpty || graph.edges.isEmpty) {
+      return AccessPathResult.noPath(
+        reason: AccessNoPathReason.noData,
+        reasonCodes: const ['NO_DATA'],
+      );
+    }
+
     final blockedReasonCodes = <String>{};
-    final path = _findLowestCostPath(
-      request.originStationId,
-      request.destinationStationId,
-      request.mobilityType,
-      request.effectiveConstraintMode,
+    final edges = _findLowestCostPath(
+      originNodeId,
+      destinationNodeId,
+      mobilityType,
+      constraintMode,
       blockedReasonCodes,
     );
-    if (path == null) {
-      final reasonCodes = blockedReasonCodes.isEmpty
-          ? const ['ROUTE_GRAPH_UNKNOWN']
-          : blockedReasonCodes.toList(growable: false);
-      if (_hasUnknownRouteReason(reasonCodes)) {
-        return LocalRouteResult.unknown(reasonCodes);
-      }
-      return LocalRouteResult.blocked(reasonCodes);
-    }
-
-    final weight = RouteWeight.from(request.mobilityType);
-    final warnings = <String, RouteWarning>{};
-    var totalCost = weight.baseAccessCost;
-    final steps = <RouteStep>[];
-
-    for (final edge in path) {
-      final accessCost = costCalculator.costFor(
-        edge,
-        request.mobilityType,
-        constraintMode: request.effectiveConstraintMode,
-      );
-      totalCost += accessCost.cost;
-      for (final code in accessCost.warningCodes) {
-        warnings[code] = RouteWarning(
-          code: code,
-          message: _warningMessage(code),
-        );
-      }
-      steps.add(
-        RouteStep(
-          sequence: steps.length + 1,
-          edgeId: edge.id,
-          fromNodeId: edge.fromNodeId,
-          toNodeId: edge.toNodeId,
-          type: _stepType(edge.type),
-          cost: accessCost.cost,
-          durationSeconds: edge.durationSeconds,
-          distanceMeters: edge.distanceMeters,
-          lineId: edge.lineId,
-          transferStationId: _transferStationId(edge),
-          includesStairs: edge.includesStairs,
-          stairAccessState: edge.stairAccessState.name,
-          evidenceSources: _evidenceSources(edge),
-          timeSource: edge.durationSeconds > 0 ? 'STATIC_ESTIMATE' : 'UNKNOWN',
-          distanceSource: edge.distanceMeters > 0 ? 'MEASURED' : 'UNKNOWN',
-          confidenceLabel: _confidenceLabel(edge),
-        ),
+    if (edges != null) {
+      return AccessPathResult.found(
+        AccessPath(edges: List.unmodifiable(edges)),
       );
     }
 
-    return LocalRouteResult(
-      status: RouteStatus.found,
-      totalCost: totalCost,
-      steps: List.unmodifiable(steps),
-      warnings: List.unmodifiable(warnings.values),
-      blockedReasonCodes: const [],
+    final reasonCodes = blockedReasonCodes.isEmpty
+        ? const ['ROUTE_GRAPH_UNKNOWN']
+        : blockedReasonCodes.toList(growable: false);
+    return AccessPathResult.noPath(
+      reason: _noPathReason(reasonCodes),
+      reasonCodes: reasonCodes,
     );
   }
 
@@ -100,6 +175,20 @@ class LocalRouteEngine {
     };
     return reasonCodes.isNotEmpty &&
         reasonCodes.any((code) => unknownCodes.contains(code));
+  }
+
+  AccessNoPathReason _noPathReason(List<String> reasonCodes) {
+    if (reasonCodes.contains('NO_DATA')) {
+      return AccessNoPathReason.noData;
+    }
+    if (reasonCodes.contains('BLOCKED_UNSUPPORTED_SCOPE') ||
+        reasonCodes.contains('STRICT_EVIDENCE_UNSUPPORTED')) {
+      return AccessNoPathReason.unsupported;
+    }
+    if (_hasUnknownRouteReason(reasonCodes)) {
+      return AccessNoPathReason.unknown;
+    }
+    return AccessNoPathReason.blocked;
   }
 
   List<RouteEdge>? _findLowestCostPath(
@@ -179,6 +268,129 @@ class LocalRouteEngine {
     }
     return selected;
   }
+}
+
+class StationPathwayRouter {
+  const StationPathwayRouter({required this.accessGraphRouter});
+
+  final AccessGraphRouter accessGraphRouter;
+
+  AccessPathResult findPathway({
+    required String stationId,
+    required String fromNodeId,
+    required String toNodeId,
+    required MobilityType mobilityType,
+    required ConstraintMode constraintMode,
+  }) {
+    return accessGraphRouter.findPath(
+      originNodeId: fromNodeId,
+      destinationNodeId: toNodeId,
+      mobilityType: mobilityType,
+      constraintMode: constraintMode,
+    );
+  }
+}
+
+class TransferAccess {
+  const TransferAccess({
+    required this.path,
+    required this.transferReadyAtSeconds,
+    required this.slackSeconds,
+    required this.isFeasible,
+  });
+
+  final AccessPath path;
+  final int transferReadyAtSeconds;
+  final int slackSeconds;
+  final bool isFeasible;
+}
+
+class TransferAccessResolver {
+  const TransferAccessResolver();
+
+  TransferAccess resolve({
+    required AccessPath path,
+    required int alightAtSeconds,
+    required int nextDepartureSeconds,
+  }) {
+    final transferReadyAtSeconds = alightAtSeconds + path.transferSeconds;
+    return TransferAccess(
+      path: path,
+      transferReadyAtSeconds: transferReadyAtSeconds,
+      slackSeconds: nextDepartureSeconds - transferReadyAtSeconds,
+      isFeasible: nextDepartureSeconds >= transferReadyAtSeconds,
+    );
+  }
+}
+
+class AssembledRoute {
+  const AssembledRoute({
+    required this.totalCost,
+    required this.steps,
+    required this.warnings,
+  });
+
+  final int totalCost;
+  final List<RouteStep> steps;
+  final List<RouteWarning> warnings;
+}
+
+class RouteAssembler {
+  const RouteAssembler({
+    this.costCalculator = const AccessibilityCostCalculator(),
+  });
+
+  final AccessibilityCostCalculator costCalculator;
+
+  AssembledRoute assemble(
+    AccessPath path,
+    MobilityType mobilityType, {
+    required ConstraintMode constraintMode,
+  }) {
+    final warnings = <String, RouteWarning>{};
+    var totalCost = 0;
+    final steps = <RouteStep>[];
+    for (final edge in path.edges) {
+      final accessCost = costCalculator.costFor(
+        edge,
+        mobilityType,
+        constraintMode: constraintMode,
+      );
+      totalCost += accessCost.cost;
+      for (final code in accessCost.warningCodes) {
+        warnings[code] = RouteWarning(
+          code: code,
+          message: _warningMessage(code),
+        );
+      }
+      steps.add(
+        RouteStep(
+          sequence: steps.length + 1,
+          edgeId: edge.id,
+          fromNodeId: edge.fromNodeId,
+          toNodeId: edge.toNodeId,
+          type: _stepType(edge.type),
+          cost: accessCost.cost,
+          durationSeconds: edge.durationSeconds,
+          distanceMeters: edge.distanceMeters,
+          lineId: edge.lineId,
+          transferStationId: _transferStationId(edge),
+          includesStairs: edge.includesStairs,
+          stairAccessState: edge.stairAccessState.name,
+          evidenceSources: _routeEvidenceSources(edge),
+          timeSource: edge.durationSeconds > 0 ? 'STATIC_ESTIMATE' : 'UNKNOWN',
+          distanceSource: edge.distanceMeters > 0 ? 'MEASURED' : 'UNKNOWN',
+          confidenceLabel: _confidenceLabel(edge),
+        ),
+      );
+    }
+
+    return AssembledRoute(
+      totalCost: totalCost,
+      steps: List.unmodifiable(steps),
+      warnings: List.unmodifiable(warnings.values),
+    );
+  }
 
   RouteStepType _stepType(RouteEdgeType edgeType) {
     return switch (edgeType) {
@@ -228,14 +440,6 @@ class LocalRouteEngine {
     return parts.length >= 2 ? parts[1] : '';
   }
 
-  List<String> _evidenceSources(RouteEdge edge) {
-    return [
-      'edge:${edge.id}',
-      if (edge.isGeneratedConnector) 'GENERATED_CONNECTOR',
-      if (edge.lineId.isNotEmpty) 'line:${edge.lineId}',
-    ];
-  }
-
   String _confidenceLabel(RouteEdge edge) {
     if (edge.isGeneratedConnector ||
         edge.durationSeconds <= 0 ||
@@ -272,4 +476,12 @@ class LocalRouteEngine {
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };
   }
+}
+
+List<String> _routeEvidenceSources(RouteEdge edge) {
+  return [
+    'edge:${edge.id}',
+    if (edge.isGeneratedConnector) 'GENERATED_CONNECTOR',
+    if (edge.lineId.isNotEmpty) 'line:${edge.lineId}',
+  ];
 }
