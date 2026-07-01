@@ -776,6 +776,10 @@ void main() {
     expect(result.itineraries.first.legs.single.waitTimeSeconds, 0);
     expect(result.itineraries.first.legs.single.slackSeconds, 0);
     expect(result.itineraries.first.legs.single.etaSource, 'STATIC_BACKEND_V1');
+    expect(
+      RouteSearchResult.fromV2(result).steps.single.metricSourceLabel,
+      '서버 경로 안내 기준이에요',
+    );
   });
 
   test('경로 contract는 accessibilityScore만으로 이동 비용을 대체하지 않는다', () {

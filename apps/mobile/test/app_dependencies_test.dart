@@ -85,6 +85,34 @@ void main() {
     expect(dependencies.repository, isA<DriftStationRepository>());
   });
 
+  test('주입 routeRepository는 online-first flag가 켜져도 API 주소를 읽지 않는다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    final injectedRouteRepository = _InjectedRouteSearchRepository();
+    var apiBaseReads = 0;
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      reportRepository: const UnavailableFacilityReportRepository(),
+      routeRepository: injectedRouteRepository,
+      apiBaseUri: () {
+        apiBaseReads++;
+        throw StateError(
+          'Injected route repository must not read API base URL.',
+        );
+      },
+      enablePushNotifications: false,
+      enableRouteV2OnlineFirst: true,
+    );
+
+    expect(apiBaseReads, 0);
+    expect(dependencies.routeRepository, same(injectedRouteRepository));
+  });
+
   test('로컬 데이터베이스와 API 주소가 있으면 실시간은 API를 호출한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
@@ -173,4 +201,16 @@ void main() {
       ),
     );
   });
+}
+
+class _InjectedRouteSearchRepository implements RouteSearchRepository {
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
+  }
 }
