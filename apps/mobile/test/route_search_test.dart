@@ -181,6 +181,7 @@ void main() {
               'destinationStationId': 'station-sadang',
               'destinationStationName': '사당',
               'mobilityType': 'WHEELCHAIR',
+              'constraintMode': 'STRICT_STEP_FREE',
               'status': 'FOUND',
               'lineId': 'seoul-4',
               'lineName': '수도권 4호선',
@@ -267,6 +268,7 @@ void main() {
       'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
+    expect(result.constraintMode, 'STRICT_STEP_FREE');
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
     expect(result.statusLabel, '경로를 찾았습니다');
@@ -1428,6 +1430,7 @@ class PendingRouteSearchRepository implements RouteSearchRepository {
 RouteSearchResult _sampleRouteSearchResult({
   String routeSearchId = 'route-1',
   String status = 'FOUND',
+  String constraintMode = 'PREFER_STEP_FREE',
   List<RouteSearchStep> steps = const [
     RouteSearchStep(
       sequence: 1,
@@ -1463,6 +1466,7 @@ RouteSearchResult _sampleRouteSearchResult({
     destinationStationId: 'station-sadang',
     destinationStationName: '사당',
     mobilityType: 'SENIOR',
+    constraintMode: constraintMode,
     status: status,
     lineId: 'seoul-4',
     lineName: '수도권 4호선',
