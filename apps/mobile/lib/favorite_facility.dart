@@ -312,7 +312,7 @@ class FavoriteFacility {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel =>
-      '저장한 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
+      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }
@@ -749,13 +749,13 @@ String _stringOrEmpty(Map<String, Object?> json, String key) {
 String _stringOrDefault(
   Map<String, Object?> json,
   String key,
-  String fallback,
+  String defaultValue,
 ) {
   final value = json[key];
   if (value is String && value.trim().isNotEmpty) {
     return value;
   }
-  return fallback;
+  return defaultValue;
 }
 
 String _dataConfidenceLabel(String dataConfidence) {

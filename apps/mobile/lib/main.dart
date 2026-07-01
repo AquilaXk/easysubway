@@ -259,6 +259,7 @@ class EasySubwayApp extends StatelessWidget {
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
     NetworkMapRepository? networkMapRepository,
+    NetworkMapViewportRepository? networkMapViewportRepository,
     RealtimeRepository? realtimeRepository,
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
@@ -290,6 +291,7 @@ class EasySubwayApp extends StatelessWidget {
                searchHistoryRepository: searchHistoryRepository,
                internalRouteRepository: internalRouteRepository,
                networkMapRepository: networkMapRepository,
+               networkMapViewportRepository: networkMapViewportRepository,
                realtimeRepository: realtimeRepository,
                notificationRepository: notificationRepository,
                notificationPermissionProvider: notificationPermissionProvider,
@@ -335,6 +337,7 @@ class EasySubwayApp extends StatelessWidget {
        searchHistoryRepository = dependencies.searchHistoryRepository,
        internalRouteRepository = dependencies.internalRouteRepository,
        networkMapRepository = dependencies.networkMapRepository,
+       networkMapViewportRepository = dependencies.networkMapViewportRepository,
        realtimeRepository = dependencies.realtimeRepository,
        notificationRepository = dependencies.notificationRepository,
        notificationPermissionProvider =
@@ -352,6 +355,7 @@ class EasySubwayApp extends StatelessWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final NetworkMapViewportRepository? networkMapViewportRepository;
   final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
@@ -427,6 +431,7 @@ class EasySubwayApp extends StatelessWidget {
         searchHistoryRepository: searchHistoryRepository,
         internalRouteRepository: internalRouteRepository,
         networkMapRepository: networkMapRepository,
+        networkMapViewportRepository: networkMapViewportRepository,
         realtimeRepository: realtimeRepository,
         notificationRepository: notificationRepository,
         notificationPermissionProvider: notificationPermissionProvider,
@@ -546,6 +551,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.networkMapViewportRepository,
     required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
@@ -571,6 +577,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final NetworkMapViewportRepository? networkMapViewportRepository;
   final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
@@ -691,6 +698,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         searchHistoryRepository: widget.searchHistoryRepository,
         internalRouteRepository: widget.internalRouteRepository,
         networkMapRepository: widget.networkMapRepository,
+        networkMapViewportRepository: widget.networkMapViewportRepository,
         realtimeRepository: widget.realtimeRepository,
         notificationRepository: widget.notificationRepository,
         notificationPermissionProvider: widget.notificationPermissionProvider,
@@ -1186,6 +1194,7 @@ class HomeScreen extends StatefulWidget {
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
+    required this.networkMapViewportRepository,
     required this.realtimeRepository,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
@@ -1215,6 +1224,7 @@ class HomeScreen extends StatefulWidget {
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
+  final NetworkMapViewportRepository? networkMapViewportRepository;
   final RealtimeRepository realtimeRepository;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
@@ -1378,15 +1388,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       setState(() {
         _selectedTabIndex = 0;
-      });
-    }
-
-    void openStationSearchTab() {
-      if (_selectedTabIndex == 1) {
-        return;
-      }
-      setState(() {
-        _selectedTabIndex = 1;
       });
     }
 
@@ -1567,63 +1568,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: openRouteSearch,
       onRetry: () => unawaited(refreshHomeState()),
     );
-    final bottomNavigationBar = NavigationBar(
-      key: const Key('homeBottomNavigationBar'),
-      selectedIndex: _selectedTabIndex,
-      height: 72,
-      onDestinationSelected: (index) {
-        switch (index) {
-          case 0:
-            openHomeTab();
-            break;
-          case 1:
-            openStationSearchTab();
-            break;
-          case 2:
-            openRouteTab();
-            break;
-          case 3:
-            openSavedTab();
-            break;
-          case 4:
-            openMoreTab();
-            break;
-        }
-      },
-      destinations: const [
-        NavigationDestination(
-          key: Key('bottomNavMap'),
-          icon: Icon(Icons.map_outlined, key: Key('bottomNavHome')),
-          selectedIcon: Icon(Icons.map, key: Key('bottomNavHome')),
-          label: '노선도',
-        ),
-        NavigationDestination(
-          key: Key('bottomNavStationSearch'),
-          icon: Icon(Icons.search),
-          selectedIcon: Icon(Icons.search),
-          label: '역 검색',
-        ),
-        NavigationDestination(
-          key: Key('bottomNavRoute'),
-          icon: Icon(Icons.route_outlined),
-          selectedIcon: Icon(Icons.route),
-          label: '길찾기',
-        ),
-        NavigationDestination(
-          key: Key('bottomNavSaved'),
-          icon: Icon(Icons.bookmark_border),
-          selectedIcon: Icon(Icons.bookmark),
-          label: '저장',
-        ),
-        NavigationDestination(
-          key: Key('bottomNavMore'),
-          icon: Icon(Icons.more_horiz),
-          selectedIcon: Icon(Icons.more),
-          label: '더보기',
-        ),
-      ],
-    );
-
     Widget rootTab(Widget child) {
       return PopScope(
         canPop: false,
@@ -1644,6 +1588,9 @@ class _HomeScreenState extends State<HomeScreen> {
           routeDraftController: _routeDraftController,
           onOpenRouteSearch: () async => openRouteTab(),
           onOpenStationSearch: () => unawaited(openStationSearch()),
+          stationSearchRepository: repository,
+          locationProvider: locationProvider,
+          viewportRepository: widget.networkMapViewportRepository,
           onOpenSavedItems: openSavedTab,
           onOpenRecentSearch: () =>
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
@@ -1661,7 +1608,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   },
                 ),
-          bottomNavigationBar: bottomNavigationBar,
         ),
       );
     }
@@ -1680,7 +1626,6 @@ class _HomeScreenState extends State<HomeScreen> {
           realtimeRepository: realtimeRepository,
           routeDraftController: _routeDraftController,
           onOpenRouteSearch: () async => openRouteTab(),
-          bottomNavigationBar: bottomNavigationBar,
         ),
       );
     }
@@ -1694,7 +1639,6 @@ class _HomeScreenState extends State<HomeScreen> {
         initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
         simpleViewEnabled: simpleViewEnabled,
-        shellNavigationBar: bottomNavigationBar,
         onShellBackToHome: openHomeTab,
       );
     }
@@ -1715,7 +1659,6 @@ class _HomeScreenState extends State<HomeScreen> {
           initialMobilityType: initialMobilityType,
           onOpenRouteSearch: ([mobilityType]) async =>
               openRouteTab(mobilityType),
-          bottomNavigationBar: bottomNavigationBar,
         ),
       );
     }
@@ -1731,7 +1674,6 @@ class _HomeScreenState extends State<HomeScreen> {
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
           onOpenMyReports: openMyReports,
-          bottomNavigationBar: bottomNavigationBar,
         ),
       );
     }
@@ -1786,7 +1728,6 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
-      bottomNavigationBar: bottomNavigationBar,
     );
   }
 
@@ -2677,7 +2618,7 @@ class _HomeFacilityAlertSection extends StatelessWidget {
             child: _HomeStateCard(
               key: Key('homeFacilityAlertLoadingState'),
               icon: Icons.hourglass_empty,
-              title: '저장한 시설 상태를 확인하고 있어요',
+              title: '즐겨찾기한 시설 상태를 확인하고 있어요',
               subtitle: '잠시 후 고장·공사 알림을 보여드릴게요.',
             ),
           );
@@ -2705,7 +2646,7 @@ class _HomeFacilityAlertSection extends StatelessWidget {
               key: Key('homeFacilityAlertEmptyState'),
               icon: Icons.check_circle_outline,
               title: '확인할 시설 알림이 없어요',
-              subtitle: '저장한 시설에 고장·공사 알림이 생기면 여기에서 알려드려요.',
+              subtitle: '즐겨찾기한 시설에 고장·공사 알림이 생기면 여기에서 알려드려요.',
             ),
           );
         }
@@ -2849,7 +2790,7 @@ class _HomeFacilityNoticeMessage extends StatelessWidget {
               key: const Key('homeFacilityActionButton'),
               onPressed: onOpenFacilities,
               icon: const Icon(Icons.open_in_new),
-              label: const Text('저장한 시설 보기'),
+              label: const Text('즐겨찾기 시설 보기'),
             ),
             const SizedBox(height: 8),
             Text(
@@ -3142,7 +3083,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '저장한 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
+          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(
@@ -3902,7 +3843,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('favoriteHomeScreen'),
-      appBar: AppBar(title: const Text('저장')),
+      appBar: AppBar(title: const Text('즐겨찾기')),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: FutureBuilder<_FavoriteHomeData>(
@@ -3932,12 +3873,12 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                 children: [
                   if (snapshot.connectionState != ConnectionState.done)
                     const LinearProgressIndicator(minHeight: 3),
-                  const _AppSectionTitle(title: '저장한 항목'),
+                  const _AppSectionTitle(title: '즐겨찾기한 항목'),
                   if (hasError)
                     _HomeStateCard(
                       key: const Key('favoriteHomeErrorState'),
                       icon: Icons.error_outline,
-                      title: '저장한 항목을 불러오지 못했어요',
+                      title: '즐겨찾기를 불러오지 못했어요',
                       subtitle: '잠시 후 다시 불러와 주세요.',
                       actionLabel: '다시 시도',
                       onAction: () {
@@ -3984,8 +3925,8 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                             icon: Icons.bookmark_border,
                             iconBackground: EasySubwayAccessibleColors.mintSoft,
                             iconColor: EasySubwayAccessibleColors.mintDark,
-                            title: '저장한 항목이 없습니다',
-                            subtitle: '역, 시설, 경로에서 저장을 눌러 추가해 주세요.',
+                            title: '즐겨찾기한 항목이 없습니다',
+                            subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
                           ),
                         ),
                       ),
@@ -4023,7 +3964,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '저장한 경로',
+        title: '즐겨찾기한 경로',
         child: FavoriteRouteListContent(
           repository: repository,
           onSearchAgain: widget.onOpenRouteSearch == null
@@ -4062,7 +4003,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '저장한 역',
+        title: '즐겨찾기한 역',
         child: FavoriteStationListContent(
           repository: repository,
           stationRepository: widget.stationRepository,
@@ -4085,7 +4026,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     }
     unawaited(
       _openFavoriteListScreen(
-        title: '저장한 시설',
+        title: '즐겨찾기한 시설',
         child: FavoriteFacilityListContent(
           repository: repository,
           reportRepository: widget.reportRepository,
@@ -4177,7 +4118,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeStationsButton'),
           icon: Icons.train_outlined,
-          label: '저장한 역',
+          label: '역',
           countLabel: _countLabel(stationCount),
           subtitle: '출발지·도착지 설정과 시설 상태를 확인해요',
           onTap: onStations,
@@ -4186,7 +4127,7 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeFacilitiesButton'),
           icon: Icons.elevator_outlined,
-          label: '저장한 시설',
+          label: '시설',
           countLabel: _countLabel(facilityCount),
           subtitle: '고장·공사 상태와 최근 확인 시각을 봐요',
           onTap: onFacilities,
@@ -4195,9 +4136,9 @@ class _FavoriteHomeQuickGrid extends StatelessWidget {
         _FavoriteHomeQuickCard(
           key: const Key('favoriteHomeRoutesButton'),
           icon: Icons.route_outlined,
-          label: '저장한 경로',
+          label: '경로',
           countLabel: _countLabel(routeCount),
-          subtitle: '이동 조건과 저장한 경로를 살펴봐요',
+          subtitle: '이동 조건과 즐겨찾기한 경로를 살펴봐요',
           onTap: onRoutes,
         ),
       ],
@@ -5508,14 +5449,14 @@ class _SupportAccessItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final targetUri = uri;
-    final fallbackTarget = value.trim();
+    final targetText = value.trim();
     final displayValue = targetUri == null
         ? '아직 준비 중이에요'
-        : this.displayValue ?? fallbackTarget;
+        : this.displayValue ?? targetText;
     final secondaryText = helperText;
     final semanticLabelParts = [title, displayValue];
-    if (targetUri != null && displayValue != fallbackTarget) {
-      semanticLabelParts.add(fallbackTarget);
+    if (targetUri != null && displayValue != targetText) {
+      semanticLabelParts.add(targetText);
     }
     if (secondaryText != null) {
       semanticLabelParts.add(secondaryText);
@@ -5526,13 +5467,12 @@ class _SupportAccessItem extends StatelessWidget {
       label: semanticLabelParts.join(', '),
       onTap: targetUri == null
           ? null
-          : () => unawaited(_openTarget(context, targetUri, fallbackTarget)),
+          : () => unawaited(_openTarget(context, targetUri, targetText)),
       child: ExcludeSemantics(
         child: OutlinedButton.icon(
           onPressed: targetUri == null
               ? null
-              : () =>
-                    unawaited(_openTarget(context, targetUri, fallbackTarget)),
+              : () => unawaited(_openTarget(context, targetUri, targetText)),
           icon: Icon(icon),
           label: Align(
             alignment: Alignment.centerLeft,
@@ -5574,7 +5514,7 @@ class _SupportAccessItem extends StatelessWidget {
   Future<void> _openTarget(
     BuildContext context,
     Uri uri,
-    String fallbackTarget,
+    String targetText,
   ) async {
     bool opened = false;
     try {
@@ -5592,7 +5532,7 @@ class _SupportAccessItem extends StatelessWidget {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('연결할 수 없습니다. 직접 확인해 주세요: $fallbackTarget')),
+      SnackBar(content: Text('연결할 수 없습니다. 직접 확인해 주세요: $targetText')),
     );
   }
 }
