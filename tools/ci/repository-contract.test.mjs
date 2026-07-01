@@ -45,7 +45,23 @@ test("route ETA accuracy evaluator report contract is machine-readable", async (
   const report = JSON.parse(readFileSync(output, "utf8"));
   assert.equal(report.schemaVersion, 1);
   assert.equal(report.sampleSize, 100);
+  assert.deepEqual(report.referenceSourceCounts, {
+    PROVIDER_LIVE_ARRIVAL: 0,
+    STATIC_TIMETABLE_REFERENCE: 0,
+    MANUAL_OBSERVATION: 0,
+    COMPETING_APP_COMPARISON: 0,
+    FIXTURE_EXPECTED: 100,
+  });
+  assert.equal(report.productionSampleSize, 0);
+  assert.equal(report.nonProductionSampleSize, 100);
   assert.equal(report.metrics.sampleSize, 100);
+  assert.equal(report.metrics.routeNotFoundRate, 0);
+  assert.equal(report.metrics.wrongTransferCountRate, 0);
+  assert.equal(report.metrics.wrongLineSequenceRate, 0);
+  assert.equal(report.metrics.strictStepFreeFalsePositiveCount, 0);
+  assert.equal(report.metrics.etaSourceMismatchCount, 0);
+  assert.equal(report.metrics.realtimeFallbackMismatchCount, 0);
+  assert.equal(report.metrics.providerStaleMisuseCount, 0);
   assert.equal(report.coverage.singleRide, true);
   assert.equal(report.coverage.oneTransfer, true);
   assert.equal(report.coverage.twoTransfer, true);
