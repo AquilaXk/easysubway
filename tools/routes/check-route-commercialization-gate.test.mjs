@@ -117,6 +117,60 @@ test("route commercialization gate fails closed for fixture-only or unsafe route
   );
 });
 
+test("route commercialization gate keeps legacy production sample fallback", async () => {
+  const fixture = await writeFixtureSet({
+    accuracy: {
+      schemaVersion: 1,
+      sampleSize: 120,
+      sampleSourceCounts: {
+        fixture: 0,
+        staticTimetable: 0,
+        realtimeProvider: 120,
+        manualObservation: 100,
+        staleRealtime: 20,
+      },
+      metrics: {
+        singleRide: { sampleSize: 60, p50ErrorSeconds: 45, p90ErrorSeconds: 100 },
+        transfer: { sampleSize: 60, p50ErrorSeconds: 90, p90ErrorSeconds: 240 },
+      },
+      failures: [],
+    },
+    accessibility: {
+      schemaVersion: 1,
+      strictStepFreeKnownStairFalsePositiveCount: 0,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      unknownAccessibilityLabeled: true,
+    },
+    coverage: {
+      schemaVersion: 1,
+      supportedStationLinePairs: 150,
+      providerFreshnessSecondsMaxObserved: 80,
+      staleFallbackRequired: true,
+    },
+    contract: {
+      schemaVersion: 1,
+      multiTransferSupported: true,
+      outOfStationTransferSupported: true,
+      alternativeItinerariesMinObserved: 2,
+      wrongTransferCount: 0,
+      wrongLineSequence: 0,
+      routeNotFoundRate: 0.01,
+      releaseBlockersSatisfied: ["D-2", "D-3", "H-1"],
+    },
+  });
+
+  await assert.rejects(
+    execChecker(fixture),
+    (error) => {
+      const report = JSON.parse(error.stdout);
+      assert.equal(report.status, "FAIL");
+      assert.ok(report.failures.includes("routeEtaAccuracy production sampleSize is below 100"));
+      assert.ok(report.failures.includes("routeEtaAccuracy stale realtime samples cannot count as fresh provider samples"));
+      return true;
+    },
+  );
+});
+
 async function writeFixtureSet(reports) {
   const dir = await mkdtemp(path.join(tmpdir(), "route-commercialization-gate-"));
   const files = {

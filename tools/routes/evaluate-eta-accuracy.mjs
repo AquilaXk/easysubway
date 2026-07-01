@@ -134,13 +134,13 @@ function buildReport(rows) {
     providerStaleMisuse: 0,
   };
   for (const row of rows) {
+    collectQualityFailures(row, failures, quality);
     const observed = requiredNumber(row.observed_eta_error_seconds, row, "observed_eta_error_seconds", failures);
     const max = requiredNumber(row.max_eta_error_seconds, row, "max_eta_error_seconds", failures);
     if (observed === null || max === null) continue;
     if (observed > max) {
       addFailure(failures, row, "ETA_ERROR", "observed ETA error exceeds max", { maxEtaErrorSeconds: max }, { observedEtaErrorSeconds: observed });
     }
-    collectQualityFailures(row, failures, quality);
     errors.push(observed);
     if (Number(row.expected_transfer_count) === 0) {
       singleRideErrors.push(observed);
