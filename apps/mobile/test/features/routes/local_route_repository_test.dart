@@ -50,14 +50,25 @@ void main() {
       addTearDown(database.close);
       await database.seedBaselineIfEmpty();
       final requestedPaths = <String>[];
+      final requestedBodies = <Map<String, Object?>>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
         requestedPaths.add(request.uri.path);
+        final requestBody = await utf8.decoder.bind(request).join();
+        requestedBodies.add(jsonDecode(requestBody) as Map<String, Object?>);
         request.response
           ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode({'success': true, 'data': _routeV2Payload()}));
+          ..headers.contentType = ContentType.json;
+        if (request.uri.path.endsWith('/refresh')) {
+          request.response.write(
+            jsonEncode({'success': true, 'data': _routeRefreshPayload()}),
+          );
+        } else {
+          request.response.write(
+            jsonEncode({'success': true, 'data': _routeV2Payload()}),
+          );
+        }
         await request.response.close();
       });
 
@@ -79,11 +90,44 @@ void main() {
       );
 
       expect(requestedPaths, ['/api/v2/routes/search']);
-      expect(result.routeSearchId, 'route-v2-primary');
+      expect(requestedBodies.single, containsPair('useRealtime', true));
+      expect(requestedBodies.single, containsPair('maxTransfers', 3));
+      expect(requestedBodies.single, containsPair('alternativeCount', 3));
+      expect(requestedBodies.single['departureTime'], isA<String>());
+      expect(result.routeSearchId, 'route-v2');
+      expect(result.originStationName, '상록수');
+      expect(result.destinationStationName, '사당');
+      expect(result.lineName, '수도권 4호선');
+      expect(result.steps.single.title, isNot(contains('station-')));
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
+
+      final refresh = await dependencies.routeRepository.refreshRoute(
+        result.routeSearchId,
+      );
+
+      expect(requestedPaths, [
+        '/api/v2/routes/search',
+        '/api/v2/routes/route-v2/refresh',
+      ]);
+      expect(refresh.routeSearchId, 'route-v2');
     },
   );
+
+  test('V2 blocked itinerary는 기존 blocked UI 상태로 정규화된다', () {
+    final result = RouteSearchResult.fromV2(
+      RouteSearchV2Result.fromJson(
+        _routeV2Payload(
+          status: 'BLOCKED_ACCESSIBILITY',
+          reasonCodes: const ['BLOCKED_ACCESSIBILITY'],
+        ),
+      ),
+    );
+
+    expect(result.status, 'BLOCKED');
+    expect(result.isBlocked, isTrue);
+    expect(result.blockedReasons, ['BLOCKED_ACCESSIBILITY']);
+  });
 
   test(
     'online-first backend 5xx는 catalog가 있으면 STATIC_LOCAL fallback을 표시한다',
@@ -3021,7 +3065,10 @@ void main() {
   );
 }
 
-Map<String, Object?> _routeV2Payload() {
+Map<String, Object?> _routeV2Payload({
+  String status = 'FOUND',
+  List<Object?> reasonCodes = const <Object?>[],
+}) {
   return {
     'contractVersion': 'ROUTE_SEARCH_V2',
     'originStationId': 'station-sangnoksu',
@@ -3032,11 +3079,11 @@ Map<String, Object?> _routeV2Payload() {
     'useRealtime': true,
     'maxTransfers': 3,
     'alternativeCount': 1,
-    'statuses': ['FOUND'],
+    'statuses': [status],
     'itineraries': [
       {
         'itineraryId': 'route-v2-primary',
-        'status': 'FOUND',
+        'status': status,
         'plannedArrivalTime': '2026-07-01T09:15:00+09:00',
         'realtimeArrivalTime': '2026-07-01T09:13:00+09:00',
         'etaSource': 'REALTIME',
@@ -3052,9 +3099,9 @@ Map<String, Object?> _routeV2Payload() {
           'lowConfidenceCount': 0,
           'unavailableFacilityCount': 0,
           'riskLevel': 'LOW',
-          'reasonCodes': <Object?>[],
+          'reasonCodes': reasonCodes,
           'level': 'LOW',
-          'reasons': <Object?>[],
+          'reasons': reasonCodes,
         },
         'legs': [
           {
@@ -3090,9 +3137,44 @@ Map<String, Object?> _routeV2Payload() {
             },
           },
         ],
-        'commercialEtaEligible': true,
+        'commercialEtaEligible': status == 'FOUND',
       },
     ],
+  };
+}
+
+Map<String, Object?> _routeRefreshPayload() {
+  return {
+    'routeSearchId': 'route-v2',
+    'status': 'UPDATED_ETA',
+    'route': {
+      'routeSearchId': 'route-v2',
+      'originStationId': 'station-sangnoksu',
+      'originStationName': '상록수',
+      'destinationStationId': 'station-sadang',
+      'destinationStationName': '사당',
+      'mobilityType': 'WHEELCHAIR',
+      'status': 'FOUND',
+      'lineId': 'seoul-4',
+      'lineName': '수도권 4호선',
+      'score': 96,
+      'burdenCost': 780,
+      'estimatedDurationSeconds': 780,
+      'walkingDistanceMeters': 180,
+      'transferCount': 0,
+      'evidenceSummary': ['ETA_REALTIME'],
+      'steps': <Object?>[],
+      'warnings': <Object?>[],
+      'recommendationReasons': ['실시간 도착 정보를 반영했어요.'],
+      'blockedReasons': <Object?>[],
+      'createdAt': '2026-07-01T09:00:00+09:00',
+      'etaSource': 'REALTIME',
+    },
+    'refreshedAt': '2026-07-01T09:01:00',
+    'etaSource': 'REALTIME',
+    'etaConfidence': 'HIGH',
+    'sourceLabel': '실시간 도착 정보 기준',
+    'reasonCodes': <Object?>[],
   };
 }
 

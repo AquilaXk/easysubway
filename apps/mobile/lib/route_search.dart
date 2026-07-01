@@ -239,7 +239,7 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
     try {
       final response = await _apiClient.postJson(
         '/api/v2/routes/search',
-        body: routeRequest.toJson(),
+        body: routeRequest.toV2Json(),
       );
       if (!response.isSuccess) {
         throw RouteSearchOnlineException.http(response.statusCode);
@@ -276,7 +276,38 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
-    throw const RouteSearchException(_routeRefreshErrorMessage);
+    final trimmedRouteSearchId = routeSearchId.trim();
+    if (trimmedRouteSearchId.isEmpty) {
+      throw const RouteSearchException(_routeRefreshErrorMessage);
+    }
+
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v2/routes/${Uri.encodeComponent(trimmedRouteSearchId)}/refresh',
+        body: const <String, Object?>{},
+      );
+      if (!response.isSuccess) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      final decoded = response.jsonBody;
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      return RouteRefreshResult.fromJson(data);
+    } on RouteSearchException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 V2 ETA refresh API 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const RouteSearchException(_routeRefreshErrorMessage);
+    }
   }
 }
 
@@ -707,6 +738,16 @@ class RouteSearchRequest {
     };
   }
 
+  Map<String, Object?> toV2Json() {
+    return {
+      ...toJson(),
+      'departureTime': _routeV2DepartureTimeNow(),
+      'useRealtime': true,
+      'maxTransfers': 3,
+      'alternativeCount': 3,
+    };
+  }
+
   static String _defaultConstraintMode(String mobilityType) =>
       mobilityType == 'WHEELCHAIR' ? 'STRICT_STEP_FREE' : 'PREFER_STEP_FREE';
 }
@@ -1091,13 +1132,13 @@ class RouteSearchResult {
       orElse: () => result.itineraries.first,
     );
     return RouteSearchResult(
-      routeSearchId: itinerary.itineraryId,
+      routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
       originStationId: result.originStationId,
       originStationName: result.originStationId,
       destinationStationId: result.destinationStationId,
       destinationStationName: result.destinationStationId,
       mobilityType: result.mobilityType,
-      status: itinerary.status == 'FOUND' ? 'FOUND' : itinerary.status,
+      status: _routeV2Status(itinerary.status),
       lineId: itinerary.legs.isEmpty ? '' : itinerary.legs.first.lineId,
       lineName: itinerary.legs.isEmpty ? '' : itinerary.legs.first.lineId,
       score: _scoreFromRisk(itinerary.accessibilityRisk),
@@ -1253,16 +1294,31 @@ class RouteSearchResult {
     required String etaSource,
     String fallbackReason = '',
   }) {
+    return withDisplayLabels(
+      etaSource: etaSource,
+      fallbackReason: fallbackReason,
+    );
+  }
+
+  RouteSearchResult withDisplayLabels({
+    String? originStationName,
+    String? destinationStationName,
+    String? lineName,
+    List<RouteSearchStep>? steps,
+    String? etaSource,
+    String? fallbackReason,
+  }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
       originStationId: originStationId,
-      originStationName: originStationName,
+      originStationName: originStationName ?? this.originStationName,
       destinationStationId: destinationStationId,
-      destinationStationName: destinationStationName,
+      destinationStationName:
+          destinationStationName ?? this.destinationStationName,
       mobilityType: mobilityType,
       status: status,
       lineId: lineId,
-      lineName: lineName,
+      lineName: lineName ?? this.lineName,
       score: score,
       accessibilityScore: _accessibilityScore,
       burdenCost: _burdenCost,
@@ -1270,13 +1326,13 @@ class RouteSearchResult {
       walkingDistanceMeters: _walkingDistanceMeters,
       transferCount: _transferCount,
       evidenceSummary: evidenceSummary,
-      steps: steps,
+      steps: steps ?? this.steps,
       warnings: warnings,
       recommendationReasons: recommendationReasons,
       blockedReasons: blockedReasons,
       createdAt: createdAt,
-      etaSource: etaSource,
-      fallbackReason: fallbackReason,
+      etaSource: etaSource ?? this.etaSource,
+      fallbackReason: fallbackReason ?? this.fallbackReason,
     );
   }
 
@@ -1492,6 +1548,24 @@ int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
   return (100 - penalty).clamp(0, 100);
 }
 
+String _routeV2DepartureTimeNow() {
+  final timestamp = DateTime.now().toUtc().toIso8601String();
+  return '${timestamp.split('.').first}Z';
+}
+
+String _routeV2RouteSearchId(String itineraryId) {
+  for (final suffix in const ['-primary', '-review']) {
+    if (itineraryId.endsWith(suffix)) {
+      return itineraryId.substring(0, itineraryId.length - suffix.length);
+    }
+  }
+  return itineraryId;
+}
+
+String _routeV2Status(String status) {
+  return status == 'FOUND' ? 'FOUND' : 'BLOCKED';
+}
+
 String _routeV2RiskMessage(String code) {
   return switch (code) {
     'STAIR_ONLY_ACCESS' => '계단 구간이 포함될 수 있어요.',
@@ -1634,6 +1708,35 @@ class RouteSearchStep {
   final String timeSource;
   final String distanceSource;
   final String confidenceLabel;
+
+  RouteSearchStep withDisplayLabels({
+    required String title,
+    required String lineName,
+    required String actionDetail,
+  }) {
+    return RouteSearchStep(
+      sequence: sequence,
+      stepType: stepType,
+      title: title,
+      description: title,
+      lineId: lineId,
+      lineName: lineName,
+      fromStationId: fromStationId,
+      toStationId: toStationId,
+      estimatedMinutes: estimatedMinutes,
+      distanceMeters: distanceMeters,
+      includesStairs: includesStairs,
+      stairAccessState: stairAccessState,
+      requiresAccessibilityCheck: requiresAccessibilityCheck,
+      actionTitle: title,
+      actionDetail: actionDetail,
+      reason: reason,
+      evidenceSources: evidenceSources,
+      timeSource: timeSource,
+      distanceSource: distanceSource,
+      confidenceLabel: confidenceLabel,
+    );
+  }
 
   String get userReason => _routeStepReasonLabel(reason);
 
