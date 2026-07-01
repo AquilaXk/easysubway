@@ -100,6 +100,7 @@ void main() {
       expect(result.lineName, '수도권 4호선');
       expect(result.steps, hasLength(2));
       expect(result.steps.first.title, '상록수 승강장 접근');
+      expect(result.steps.first.actionTitle, isEmpty);
       expect(result.steps.first.actionDetail, '상록수 승강장 접근 동선을 확인합니다.');
       expect(result.steps.last.title, isNot(contains('station-')));
       expect(result.etaSource, 'REALTIME');
@@ -174,6 +175,45 @@ void main() {
       expect(metrics.onlineSuccessCount, 0);
       expect(metrics.fallbackSuccessCount, 1);
       expect(metrics.fallbackReasonCounts, {'backend-5xx': 1});
+    },
+  );
+
+  test(
+    'online-first backend 404는 catalog가 있으면 STATIC_LOCAL fallback을 표시한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.notFound
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'success': false}));
+        await request.response.close();
+      });
+
+      final dependencies = AppDependencies.resolve(
+        catalogDatabase: database,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () =>
+            Uri.parse('http://${server.address.host}:${server.port}'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+      );
+
+      final result = await dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
+
+      expect(result.isLocalResult, isTrue);
+      expect(result.etaSource, 'STATIC_LOCAL');
+      expect(result.fallbackReason, 'backend-4xx');
     },
   );
 
