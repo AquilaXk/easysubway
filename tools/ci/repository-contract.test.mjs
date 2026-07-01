@@ -486,6 +486,8 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
   assert.match(workflow, /Repository CI \/ Run security tool tests/);
   assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
+  assert.match(workflow, /Repository CI \/ Run ops tool tests/);
+  assert.match(workflow, /node --test tools\/ops\/\*\.test\.mjs/);
   assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
   assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
   assert.doesNotMatch(releaseGateJob, /--test-name-pattern/);
@@ -3377,6 +3379,12 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("alert-route"));
   assert.ok(operationsEvidence.observability.requiredResolutionKinds.includes("runbook"));
   assert.ok(operationsEvidence.observability.allowedFallbackKinds.includes("external-blocker-record"));
+  assert.equal(
+    operationsEvidence.releaseEvidenceSummaryValidator.command,
+    "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --require-pass",
+  );
+  assert.match(operationsEvidence.releaseEvidenceSummaryValidator.passPolicyKo, /external-blocker-record/);
+  assert.equal(existsSync(path.join(root, "tools/ops/validate-operations-release-summary.mjs")), true);
   assert.equal(backupRestoreGate.rcEvidenceManifest, operationsEvidencePath);
 
   assert.match(applicationProd, /management:[\s\S]*health:[\s\S]*readiness:[\s\S]*productionReadiness/);
@@ -10625,6 +10633,20 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(securityTool.android, "false");
   assert.equal(securityTool.ios, "false");
   assert.equal(securityTool.deploy, "false");
+
+  const opsTool = await classifyChangedFiles(["tools/ops/validate-operations-release-summary.mjs"]);
+  assert.equal(opsTool.repository, "true");
+  assert.equal(opsTool.mobile, "false");
+  assert.equal(opsTool.android, "false");
+  assert.equal(opsTool.ios, "false");
+  assert.equal(opsTool.deploy, "false");
+
+  const releaseTool = await classifyChangedFiles(["tools/release/summary-validation-utils.mjs"]);
+  assert.equal(releaseTool.repository, "true");
+  assert.equal(releaseTool.mobile, "false");
+  assert.equal(releaseTool.android, "false");
+  assert.equal(releaseTool.ios, "false");
+  assert.equal(releaseTool.deploy, "false");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
