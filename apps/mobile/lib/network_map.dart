@@ -425,7 +425,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             regions: data.regions,
             selectedRegion: data.selectedRegion,
             expressView: _expressView,
-            showServicePatternToggle: true,
+            showServicePatternToggle: hasExpressLines && !hasAssetRenderer,
             notificationAction: widget.notificationAction,
             onMenuTap: _openMapMenu,
             onSearchTap: widget.onOpenStationSearch,
