@@ -31,6 +31,9 @@ class LocalRouteRepository implements RouteSearchRepository {
               destinationStationId: request.destinationStationId,
               mobilityType: mobilityType,
               constraintMode: constraintMode,
+              searchMode: local
+                  .RouteSearchMode
+                  .stationToStationWithOutOfStationTransfers,
             ),
           );
 
