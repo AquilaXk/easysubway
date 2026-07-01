@@ -19,7 +19,11 @@ import '../station_search.dart';
 import '../user_data_deletion.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
 import '../features/routes/data/local_route_repository.dart'
-    show LocalFirstRouteSearchRepository, LocalRouteRepository;
+    show
+        LocalFirstRouteSearchRepository,
+        LocalRouteRepository,
+        OnlineFirstRouteSearchRepository,
+        RouteSearchOnlineFirstMetrics;
 
 class AppDependencies {
   const AppDependencies({
@@ -61,6 +65,15 @@ class AppDependencies {
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
     Uri? Function() apiBaseUri = defaultOptionalStationApiBaseUri,
+    bool enableRouteV2OnlineFirst = const bool.fromEnvironment(
+      'EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED',
+      defaultValue: false,
+    ),
+    bool enableRouteV2Fallback = const bool.fromEnvironment(
+      'EASYSUBWAY_ROUTE_V2_FALLBACK_ENABLED',
+      defaultValue: true,
+    ),
+    RouteSearchOnlineFirstMetrics? routeSearchOnlineFirstMetrics,
     required bool enablePushNotifications,
   }) {
     Uri? cachedBaseUri;
@@ -118,6 +131,9 @@ class AppDependencies {
     final resolvedRealtimeRepository =
         realtimeRepository ??
         _defaultRealtimeRepository(baseUri: optionalBaseUri);
+    final localRouteRepository = catalogDatabase == null
+        ? null
+        : LocalRouteRepository(catalogDatabase: catalogDatabase);
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -129,13 +145,27 @@ class AppDependencies {
           ),
       routeRepository:
           routeRepository ??
-          (catalogDatabase == null
-              ? RouteSearchApiRepository(baseUri: requireBaseUri())
-              : LocalFirstRouteSearchRepository(
-                  localRepository: LocalRouteRepository(
-                    catalogDatabase: catalogDatabase,
-                  ),
-                )),
+          (() {
+            final routeV2BaseUri = enableRouteV2OnlineFirst
+                ? optionalBaseUri()
+                : null;
+            if (routeV2BaseUri != null) {
+              return OnlineFirstRouteSearchRepository(
+                onlineRepository: RouteSearchV2ApiRepository(
+                  baseUri: routeV2BaseUri,
+                ),
+                localRepository: localRouteRepository,
+                fallbackEnabled: enableRouteV2Fallback,
+                metrics: routeSearchOnlineFirstMetrics,
+              );
+            }
+            if (localRouteRepository == null) {
+              return RouteSearchApiRepository(baseUri: requireBaseUri());
+            }
+            return LocalFirstRouteSearchRepository(
+              localRepository: localRouteRepository,
+            );
+          })(),
       routeFeedbackRepository:
           routeFeedbackRepository ??
           _defaultRouteFeedbackRepository(

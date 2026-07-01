@@ -364,6 +364,136 @@ class LocalFirstRouteSearchRepository implements RouteSearchRepository {
   }
 }
 
+class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
+  const OnlineFirstRouteSearchRepository({
+    required this.onlineRepository,
+    required this.localRepository,
+    this.fallbackEnabled = true,
+    this.metrics,
+  });
+
+  final RouteSearchRepository onlineRepository;
+  final LocalRouteRepository? localRepository;
+  final bool fallbackEnabled;
+  final RouteSearchOnlineFirstMetrics? metrics;
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
+    try {
+      final onlineResult = await onlineRepository.searchRoute(request);
+      final result = localRepository == null
+          ? onlineResult
+          : await localRepository!.resolveDisplayLabels(onlineResult);
+      metrics?.recordOnlineSuccess();
+      return result;
+    } on RouteSearchOnlineException catch (error) {
+      if (!fallbackEnabled || !error.fallbackAllowed) {
+        metrics?.recordFallbackUnavailable(error.fallbackReason);
+        rethrow;
+      }
+      return _searchLocalFallback(request, error.fallbackReason);
+    }
+  }
+
+  Future<RouteSearchResult> _searchLocalFallback(
+    RouteSearchRequest request,
+    String reason,
+  ) async {
+    final local = localRepository;
+    if (local == null) {
+      metrics?.recordFallbackUnavailable(reason);
+      throw const RouteSearchException('저장된 경로 데이터가 없어 경로를 안내할 수 없어요.');
+    }
+    final result = await local.searchRoute(request);
+    metrics?.recordFallbackSuccess(reason);
+    return result.withSource(etaSource: 'STATIC_LOCAL', fallbackReason: reason);
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    return onlineRepository.refreshRoute(routeSearchId);
+  }
+}
+
+extension _OnlineRouteDisplayLabels on LocalRouteRepository {
+  Future<RouteSearchResult> resolveDisplayLabels(
+    RouteSearchResult result,
+  ) async {
+    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final steps = result.steps
+        .map((step) {
+          final fromName = catalog.stationName(step.fromStationId);
+          final toName = catalog.stationName(step.toStationId);
+          final lineName = catalog.lineName(step.lineId);
+          final title = _onlineStepTitle(step.stepType, fromName, toName);
+          return step.withDisplayLabels(
+            title: title,
+            lineName: lineName,
+            actionDetail: _onlineStepActionDetail(
+              step.stepType,
+              fromName,
+              toName,
+              lineName,
+            ),
+          );
+        })
+        .toList(growable: false);
+    return result.withDisplayLabels(
+      originStationName: catalog.stationName(result.originStationId),
+      destinationStationName: catalog.stationName(result.destinationStationId),
+      lineName: catalog.lineName(result.lineId),
+      steps: steps,
+    );
+  }
+
+  String _onlineStepTitle(String type, String fromName, String toName) {
+    return switch (type) {
+      'ride' => '$fromName에서 $toName까지 이동',
+      'transfer' => '$fromName에서 환승',
+      'entry' || 'access' => '$fromName 승강장 접근',
+      'exit' || 'egress' => '$toName 출구 접근',
+      _ => '$fromName에서 $toName까지 이동',
+    };
+  }
+
+  String _onlineStepActionDetail(
+    String type,
+    String fromName,
+    String toName,
+    String lineName,
+  ) {
+    return switch (type) {
+      'ride' =>
+        '$fromName에서 $toName까지 ${lineName.isEmpty ? '열차' : lineName}를 이용합니다.',
+      'transfer' => '$fromName에서 다음 노선으로 갈아탈 준비를 합니다.',
+      'entry' || 'access' => '$fromName 승강장 접근 동선을 확인합니다.',
+      'exit' || 'egress' => '$toName 출구 접근 동선을 확인합니다.',
+      _ => '$fromName에서 $toName까지 이동합니다.',
+    };
+  }
+}
+
+class RouteSearchOnlineFirstMetrics {
+  int onlineSuccessCount = 0;
+  int fallbackSuccessCount = 0;
+  int fallbackUnavailableCount = 0;
+  final fallbackReasonCounts = <String, int>{};
+
+  void recordOnlineSuccess() {
+    onlineSuccessCount += 1;
+  }
+
+  void recordFallbackSuccess(String reason) {
+    fallbackSuccessCount += 1;
+    fallbackReasonCounts[reason] = (fallbackReasonCounts[reason] ?? 0) + 1;
+  }
+
+  void recordFallbackUnavailable(String reason) {
+    fallbackUnavailableCount += 1;
+    fallbackReasonCounts[reason] = (fallbackReasonCounts[reason] ?? 0) + 1;
+  }
+}
+
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,

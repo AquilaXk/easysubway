@@ -223,6 +223,130 @@ class RouteSearchApiRepository implements RouteSearchRepository {
   }
 }
 
+class RouteSearchV2ApiRepository implements RouteSearchRepository {
+  RouteSearchV2ApiRepository({
+    required this.baseUri,
+    ApiClient? apiClient,
+    HttpClient? httpClient,
+  }) : _apiClient =
+           apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
+
+  final Uri baseUri;
+  final ApiClient _apiClient;
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest routeRequest) async {
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v2/routes/search',
+        body: routeRequest.toV2Json(),
+      );
+      if (!response.isSuccess) {
+        throw RouteSearchOnlineException.http(response.statusCode);
+      }
+      final decoded = response.jsonBody;
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const RouteSearchOnlineException.unavailable();
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const RouteSearchOnlineException.unavailable();
+      }
+      return RouteSearchResult.fromV2(RouteSearchV2Result.fromJson(data));
+    } on RouteSearchOnlineException {
+      rethrow;
+    } on ApiException catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 V2 API 요청 처리 중 예외가 발생했습니다.',
+      );
+      throw const RouteSearchOnlineException.unavailable(
+        fallbackReason: 'network-unavailable',
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 V2 API 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const RouteSearchOnlineException.unavailable();
+    }
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
+    final trimmedRouteSearchId = routeSearchId.trim();
+    if (trimmedRouteSearchId.isEmpty) {
+      throw const RouteSearchException(_routeRefreshErrorMessage);
+    }
+
+    try {
+      final response = await _apiClient.postJson(
+        '/api/v2/routes/${Uri.encodeComponent(trimmedRouteSearchId)}/refresh',
+        body: const <String, Object?>{},
+      );
+      if (!response.isSuccess) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      final decoded = response.jsonBody;
+      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, Object?>) {
+        throw const RouteSearchException(_routeRefreshErrorMessage);
+      }
+      return RouteRefreshResult.fromJson(data);
+    } on RouteSearchException {
+      rethrow;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '경로 V2 ETA refresh API 응답 처리 중 예외가 발생했습니다.',
+      );
+      throw const RouteSearchException(_routeRefreshErrorMessage);
+    }
+  }
+}
+
+class RouteSearchOnlineException extends RouteSearchException {
+  const RouteSearchOnlineException.unavailable({
+    this.statusCode,
+    this.fallbackReason = 'online-unavailable',
+  }) : fallbackAllowed = true,
+       super(_routeSearchErrorMessage);
+
+  factory RouteSearchOnlineException.http(int statusCode) {
+    final validationFailure =
+        statusCode == HttpStatus.badRequest ||
+        statusCode == HttpStatus.unprocessableEntity;
+    final backend4xxFailure = statusCode >= 400 && statusCode < 500;
+    final backend5xxFailure = statusCode >= 500;
+    return RouteSearchOnlineException._(
+      statusCode: statusCode,
+      fallbackAllowed:
+          backend5xxFailure || (backend4xxFailure && !validationFailure),
+      fallbackReason: backend5xxFailure
+          ? 'backend-5xx'
+          : backend4xxFailure
+          ? 'backend-4xx'
+          : 'backend-unexpected',
+    );
+  }
+
+  const RouteSearchOnlineException._({
+    required this.statusCode,
+    required this.fallbackAllowed,
+    required this.fallbackReason,
+  }) : super(_routeSearchErrorMessage);
+
+  final int? statusCode;
+  final bool fallbackAllowed;
+  final String fallbackReason;
+}
+
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
   RouteFeedbackApiRepository({
     required this.baseUri,
@@ -623,6 +747,16 @@ class RouteSearchRequest {
     };
   }
 
+  Map<String, Object?> toV2Json() {
+    return {
+      ...toJson(),
+      'departureTime': _routeV2DepartureTimeNow(),
+      'useRealtime': true,
+      'maxTransfers': 3,
+      'alternativeCount': 3,
+    };
+  }
+
   static String _defaultConstraintMode(String mobilityType) =>
       mobilityType == 'WHEELCHAIR' ? 'STRICT_STEP_FREE' : 'PREFER_STEP_FREE';
 }
@@ -906,6 +1040,8 @@ class RouteSearchResult {
     this.recommendationReasons = const [],
     required this.blockedReasons,
     required this.createdAt,
+    this.etaSource = '',
+    this.fallbackReason = '',
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 fallback용 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -994,6 +1130,59 @@ class RouteSearchResult {
           })
           .toList(growable: false),
       createdAt: _requiredRouteString(json, 'createdAt'),
+      etaSource: _optionalRouteString(json, 'etaSource'),
+      fallbackReason: _optionalRouteString(json, 'fallbackReason'),
+    );
+  }
+
+  factory RouteSearchResult.fromV2(RouteSearchV2Result result) {
+    final itinerary = result.itineraries.firstWhere(
+      (candidate) => candidate.status == 'FOUND',
+      orElse: () => result.itineraries.first,
+    );
+    final lineId = _routeV2SummaryLineId(itinerary.legs);
+    return RouteSearchResult(
+      routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
+      originStationId: result.originStationId,
+      originStationName: result.originStationId,
+      destinationStationId: result.destinationStationId,
+      destinationStationName: result.destinationStationId,
+      mobilityType: result.mobilityType,
+      status: _routeV2Status(itinerary.status),
+      lineId: lineId,
+      lineName: lineId,
+      score: _scoreFromRisk(itinerary.accessibilityRisk),
+      burdenCost: itinerary.durationSeconds,
+      estimatedDurationSeconds: itinerary.durationSeconds,
+      walkingDistanceMeters: itinerary.walkingDistanceMeters,
+      transferCount: itinerary.transferCount,
+      evidenceSummary: [
+        'ETA_${itinerary.etaSource}',
+        'CONFIDENCE_${itinerary.etaConfidence}',
+      ],
+      steps: itinerary.legs
+          .asMap()
+          .entries
+          .map((entry) => RouteSearchStep.fromV2(entry.key + 1, entry.value))
+          .toList(growable: false),
+      warnings: itinerary.accessibilityRisk.reasonCodes
+          .map(
+            (code) => RouteSearchWarning(
+              code: code,
+              message: _routeV2RiskMessage(code),
+            ),
+          )
+          .toList(growable: false),
+      recommendationReasons: itinerary.commercialEtaEligible
+          ? const ['실시간 도착 정보를 반영했어요.']
+          : const ['상용 ETA 품질 확인 전 경로입니다.'],
+      blockedReasons: itinerary.status == 'FOUND'
+          ? const []
+          : itinerary.accessibilityRisk.reasonCodes.isEmpty
+          ? [itinerary.status]
+          : itinerary.accessibilityRisk.reasonCodes,
+      createdAt: result.departureTime,
+      etaSource: itinerary.etaSource,
     );
   }
 
@@ -1018,6 +1207,8 @@ class RouteSearchResult {
   final List<String> recommendationReasons;
   final List<String> blockedReasons;
   final String createdAt;
+  final String etaSource;
+  final String fallbackReason;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1107,6 +1298,55 @@ class RouteSearchResult {
   bool get needsConfirmation => !isBlocked && status != 'FOUND';
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
+
+  String get sourceNotice =>
+      etaSource == 'STATIC_LOCAL' ? '실시간 미반영, 저장된 데이터 기준' : '';
+
+  RouteSearchResult withSource({
+    required String etaSource,
+    String fallbackReason = '',
+  }) {
+    return withDisplayLabels(
+      etaSource: etaSource,
+      fallbackReason: fallbackReason,
+    );
+  }
+
+  RouteSearchResult withDisplayLabels({
+    String? originStationName,
+    String? destinationStationName,
+    String? lineName,
+    List<RouteSearchStep>? steps,
+    String? etaSource,
+    String? fallbackReason,
+  }) {
+    return RouteSearchResult(
+      routeSearchId: routeSearchId,
+      originStationId: originStationId,
+      originStationName: originStationName ?? this.originStationName,
+      destinationStationId: destinationStationId,
+      destinationStationName:
+          destinationStationName ?? this.destinationStationName,
+      mobilityType: mobilityType,
+      status: status,
+      lineId: lineId,
+      lineName: lineName ?? this.lineName,
+      score: score,
+      accessibilityScore: _accessibilityScore,
+      burdenCost: _burdenCost,
+      estimatedDurationSeconds: _estimatedDurationSeconds,
+      walkingDistanceMeters: _walkingDistanceMeters,
+      transferCount: _transferCount,
+      evidenceSummary: evidenceSummary,
+      steps: steps ?? this.steps,
+      warnings: warnings,
+      recommendationReasons: recommendationReasons,
+      blockedReasons: blockedReasons,
+      createdAt: createdAt,
+      etaSource: etaSource ?? this.etaSource,
+      fallbackReason: fallbackReason ?? this.fallbackReason,
+    );
+  }
 
   RouteSearchStep? get arrivalGuidanceStep {
     for (final step in steps.reversed) {
@@ -1198,6 +1438,9 @@ class RouteSearchResult {
       parts.add(
         '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
       );
+    }
+    if (sourceNotice.isNotEmpty) {
+      parts.add(sourceNotice);
     }
     final stepsForGuidance = movementSteps;
     if (stepsForGuidance.isNotEmpty) {
@@ -1310,6 +1553,97 @@ class RouteRefreshResult {
   }
 }
 
+int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
+  final penalty =
+      risk.stairCount * 30 +
+      risk.unavailableFacilityCount * 30 +
+      risk.generatedConnectorCount * 15 +
+      risk.unknownAccessibilityCount * 15 +
+      risk.staleDataCount * 10 +
+      risk.lowConfidenceCount * 10;
+  return (100 - penalty).clamp(0, 100).toInt();
+}
+
+String _routeV2DepartureTimeNow() {
+  final timestamp = DateTime.now().toUtc().toIso8601String();
+  return '${timestamp.split('.').first}Z';
+}
+
+String _routeV2RouteSearchId(String itineraryId) {
+  for (final suffix in const ['-primary', '-review']) {
+    if (itineraryId.endsWith(suffix)) {
+      return itineraryId.substring(0, itineraryId.length - suffix.length);
+    }
+  }
+  return itineraryId;
+}
+
+String _routeV2Status(String status) {
+  return status == 'FOUND' ? 'FOUND' : 'BLOCKED';
+}
+
+String _routeV2SummaryLineId(List<RouteSearchV2Leg> legs) {
+  for (final leg in legs) {
+    if (leg.legType == 'RIDE' && leg.lineId.trim().isNotEmpty) {
+      return leg.lineId;
+    }
+  }
+  for (final leg in legs) {
+    if (leg.lineId.trim().isNotEmpty) {
+      return leg.lineId;
+    }
+  }
+  return '';
+}
+
+bool _routeV2RiskRequiresCheck(RouteSearchV2AccessibilityRisk risk) {
+  return risk.unknownAccessibilityCount > 0 ||
+      risk.generatedConnectorCount > 0 ||
+      risk.staleDataCount > 0 ||
+      risk.lowConfidenceCount > 0 ||
+      risk.unavailableFacilityCount > 0;
+}
+
+String _routeV2StairAccessState(RouteSearchV2AccessibilityRisk risk) {
+  if (risk.stairCount > 0) {
+    return 'stairOnly';
+  }
+  if (_routeV2RiskRequiresCheck(risk)) {
+    return 'unknown';
+  }
+  return 'stepFree';
+}
+
+String _routeV2StepType(String legType) {
+  return switch (legType) {
+    'ACCESS' => 'entry',
+    'EGRESS' => 'exit',
+    'TRANSFER' => 'transfer',
+    'RIDE' => 'ride',
+    _ => legType.toLowerCase(),
+  };
+}
+
+String _routeV2RiskMessage(String code) {
+  return switch (code) {
+    'STAIR_ONLY_ACCESS' => '계단 구간이 포함될 수 있어요.',
+    'ACCESSIBILITY_CHECK_REQUIRED' => '현장 접근성 확인이 필요해요.',
+    'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
+    'LOW_DATA_CONFIDENCE' => '경로 신뢰도가 낮아 현장 확인이 필요해요.',
+    _ => '경로 상태를 현장에서 확인해 주세요.',
+  };
+}
+
+String _routeV2LegTitle(RouteSearchV2Leg leg) {
+  return switch (leg.legType) {
+    'RIDE' => '${leg.fromStationId}에서 ${leg.toStationId}까지 이동',
+    'TRANSFER' => '${leg.fromStationId}에서 환승',
+    'ACCESS' => '${leg.fromStationId} 승강장 접근',
+    'EGRESS' => '${leg.toStationId} 출구 접근',
+    _ => '${leg.fromStationId}에서 ${leg.toStationId}까지 이동',
+  };
+}
+
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
@@ -1381,6 +1715,37 @@ class RouteSearchStep {
     );
   }
 
+  factory RouteSearchStep.fromV2(int sequence, RouteSearchV2Leg leg) {
+    final waitOrSlackSeconds = leg.waitTimeSeconds > leg.slackSeconds
+        ? leg.waitTimeSeconds
+        : leg.slackSeconds;
+    final minutes = ((leg.durationSeconds + waitOrSlackSeconds) / 60).ceil();
+    final title = _routeV2LegTitle(leg);
+    return RouteSearchStep(
+      sequence: sequence,
+      stepType: _routeV2StepType(leg.legType),
+      title: title,
+      description: title,
+      lineId: leg.lineId,
+      lineName: leg.lineId,
+      fromStationId: leg.fromStationId,
+      toStationId: leg.toStationId,
+      estimatedMinutes: minutes,
+      distanceMeters: leg.distanceMeters,
+      includesStairs: leg.accessibilityRisk.stairCount > 0,
+      stairAccessState: _routeV2StairAccessState(leg.accessibilityRisk),
+      requiresAccessibilityCheck: _routeV2RiskRequiresCheck(
+        leg.accessibilityRisk,
+      ),
+      actionTitle: '',
+      actionDetail: title,
+      reason: leg.etaSource,
+      timeSource: leg.etaSource,
+      distanceSource: 'BACKEND_V2',
+      confidenceLabel: leg.confidence,
+    );
+  }
+
   final int sequence;
   final String stepType;
   final String title;
@@ -1401,6 +1766,35 @@ class RouteSearchStep {
   final String timeSource;
   final String distanceSource;
   final String confidenceLabel;
+
+  RouteSearchStep withDisplayLabels({
+    required String title,
+    required String lineName,
+    required String actionDetail,
+  }) {
+    return RouteSearchStep(
+      sequence: sequence,
+      stepType: stepType,
+      title: title,
+      description: title,
+      lineId: lineId,
+      lineName: lineName,
+      fromStationId: fromStationId,
+      toStationId: toStationId,
+      estimatedMinutes: estimatedMinutes,
+      distanceMeters: distanceMeters,
+      includesStairs: includesStairs,
+      stairAccessState: stairAccessState,
+      requiresAccessibilityCheck: requiresAccessibilityCheck,
+      actionTitle: actionTitle,
+      actionDetail: actionDetail,
+      reason: reason,
+      evidenceSources: evidenceSources,
+      timeSource: timeSource,
+      distanceSource: distanceSource,
+      confidenceLabel: confidenceLabel,
+    );
+  }
 
   String get userReason => _routeStepReasonLabel(reason);
 
@@ -1467,6 +1861,12 @@ class RouteSearchStep {
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리를 확인하고 있어요';
+    }
+    if (timeSource == 'REALTIME') {
+      return '실시간 도착 정보 기준이에요';
+    }
+    if (timeSource == 'PLANNED' || distanceSource == 'BACKEND_V2') {
+      return '서버 경로 안내 기준이에요';
     }
     return '앱에 저장된 길 안내예요';
   }
@@ -3459,6 +3859,10 @@ class _RouteResultsListView extends StatelessWidget {
             ),
           ),
         ),
+        if (result.sourceNotice.isNotEmpty) ...[
+          _RouteSearchMessage(message: result.sourceNotice),
+          const SizedBox(height: 8),
+        ],
         _RouteResultListButton(result: result, onPressed: onOpenDetail),
       ],
     );
