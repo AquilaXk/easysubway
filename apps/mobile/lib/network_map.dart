@@ -337,25 +337,33 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 children: [
                   const Center(child: CircularProgressIndicator()),
                   Positioned(
+                    left: 12,
                     right: 12,
                     top: 12,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: _MapLoadingSearchPanel(
-                        onSearchTap: widget.onOpenStationSearch,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: _MapLoadingSearchPanel(
+                          onSearchTap: widget.onOpenStationSearch,
+                        ),
                       ),
                     ),
                   ),
                   Positioned(
                     left: 12,
+                    right: 12,
                     bottom: 14,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: _NetworkMapQuickSheet(
-                        onOpenSavedItems: widget.onOpenSavedItems,
-                        onOpenRecentSearch: widget.onOpenRecentSearch,
-                        onOpenNearbyStations: widget.onOpenNearbyStations,
-                        onOpenRecentRoute: widget.onOpenRouteSearch,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: _NetworkMapQuickSheet(
+                          onOpenSavedItems: widget.onOpenSavedItems,
+                          onOpenRecentSearch: widget.onOpenRecentSearch,
+                          onOpenNearbyStations: widget.onOpenNearbyStations,
+                          onOpenRecentRoute: widget.onOpenRouteSearch,
+                        ),
                       ),
                     ),
                   ),
@@ -370,7 +378,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             }
             final data = snapshot.data!;
             final hasExpressLines = _expressLineIds(data).isNotEmpty;
-            final visibleData = hasExpressLines && _expressView
+            final hasAssetRenderer =
+                _routeMapAssetForRegion(data.selectedRegion) != null;
+            final showExpressToggle = hasExpressLines && !hasAssetRenderer;
+            final visibleData = showExpressToggle && _expressView
                 ? _expressOnlyMapData(data)
                 : data;
             return Stack(
@@ -382,33 +393,41 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                   ),
                 ),
                 Positioned(
+                  left: 12,
                   right: 12,
                   top: 12,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: _MapSearchOverlay(
-                      regions: data.regions,
-                      selectedRegion: data.selectedRegion,
-                      showServicePatternToggle: hasExpressLines,
-                      expressView: _expressView,
-                      onSearchTap: widget.onOpenStationSearch,
-                      onRegionSelected: (region) => _reload(region: region),
-                      onExpressViewChanged: (value) {
-                        setState(() => _expressView = value);
-                      },
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: _MapSearchOverlay(
+                        regions: data.regions,
+                        selectedRegion: data.selectedRegion,
+                        showServicePatternToggle: showExpressToggle,
+                        expressView: _expressView,
+                        onSearchTap: widget.onOpenStationSearch,
+                        onRegionSelected: (region) => _reload(region: region),
+                        onExpressViewChanged: (value) {
+                          setState(() => _expressView = value);
+                        },
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
                   left: 12,
+                  right: 12,
                   bottom: 14,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: _NetworkMapQuickSheet(
-                      onOpenSavedItems: widget.onOpenSavedItems,
-                      onOpenRecentSearch: widget.onOpenRecentSearch,
-                      onOpenNearbyStations: widget.onOpenNearbyStations,
-                      onOpenRecentRoute: widget.onOpenRouteSearch,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: _NetworkMapQuickSheet(
+                        onOpenSavedItems: widget.onOpenSavedItems,
+                        onOpenRecentSearch: widget.onOpenRecentSearch,
+                        onOpenNearbyStations: widget.onOpenNearbyStations,
+                        onOpenRecentRoute: widget.onOpenRouteSearch,
+                      ),
                     ),
                   ),
                 ),
@@ -2959,6 +2978,7 @@ class _StationHitTarget extends StatelessWidget {
       onTap: onTap,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        excludeFromSemantics: true,
         onTap: onTap,
         child: const SizedBox.expand(),
       ),

@@ -1426,8 +1426,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     Future<void> refreshHomeState() async {
-      final facilitiesFuture = widget.favoriteFacilityRepository
-          ?.listFavoriteFacilities();
+      final facilitiesFuture = _loadNotificationFacilities();
       final routesFuture = _loadRecentRoutes();
       final hasNotificationItemsFuture = _loadHasNotificationItems(
         facilitiesFuture,
