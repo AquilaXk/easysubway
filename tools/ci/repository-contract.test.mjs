@@ -1045,6 +1045,16 @@ test("모바일 async 실패는 빈 목록으로 조용히 숨기지 않는다",
   }
 });
 
+test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용된다", () => {
+  const accessibleDesign = read("apps/mobile/lib/accessible_design.dart");
+  const main = read("apps/mobile/lib/main.dart");
+  const networkMap = read("apps/mobile/lib/network_map.dart");
+
+  assert.match(accessibleDesign, /class AccessibleStateCard extends StatelessWidget/);
+  assert.match(main, /class _HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
+  assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
