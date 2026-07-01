@@ -42,7 +42,7 @@ const _facilityReportPagePadding = EdgeInsets.only(
   right: 20,
   bottom: 32,
 );
-const _facilityReportCardRadius = BorderRadius.all(Radius.circular(8));
+const _facilityReportCardRadius = BorderRadius.all(Radius.circular(16));
 
 /// 제보 상태(FacilityReportStatus)를 상태색으로 매핑한다. 박스 대신 색 점·색
 /// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
