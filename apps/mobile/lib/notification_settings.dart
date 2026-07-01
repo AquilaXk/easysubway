@@ -816,33 +816,39 @@ class _NotificationSettingsContent extends StatelessWidget {
           _NotificationSettingsMessage(message: state.message),
           const SizedBox(height: 12),
         ],
-        _NotificationSwitchTile(
-          key: const Key('notificationSwitch-favoriteStationFacilityAlerts'),
-          title: '역 시설 알림',
-          value: settings.favoriteStationFacilityAlerts,
-          enabled: !isSaving,
-          onChanged: onFavoriteStationFacilityAlertsChanged,
-        ),
-        _NotificationSwitchTile(
-          key: const Key('notificationSwitch-favoriteRouteFacilityAlerts'),
-          title: '경로 시설 알림',
-          value: settings.favoriteRouteFacilityAlerts,
-          enabled: !isSaving,
-          onChanged: onFavoriteRouteFacilityAlertsChanged,
-        ),
-        _NotificationSwitchTile(
-          key: const Key('notificationSwitch-reportStatusAlerts'),
-          title: '제보 진행 알림',
-          value: settings.reportStatusAlerts,
-          enabled: !isSaving,
-          onChanged: onReportStatusAlertsChanged,
-        ),
-        _NotificationSwitchTile(
-          key: const Key('notificationSwitch-dataQualityAlerts'),
-          title: '최신 안내 알림',
-          value: settings.dataQualityAlerts,
-          enabled: !isSaving,
-          onChanged: onDataQualityAlertsChanged,
+        _NotificationSwitchGroup(
+          tiles: [
+            _NotificationSwitchTile(
+              key: const Key(
+                'notificationSwitch-favoriteStationFacilityAlerts',
+              ),
+              title: '역 시설 알림',
+              value: settings.favoriteStationFacilityAlerts,
+              enabled: !isSaving,
+              onChanged: onFavoriteStationFacilityAlertsChanged,
+            ),
+            _NotificationSwitchTile(
+              key: const Key('notificationSwitch-favoriteRouteFacilityAlerts'),
+              title: '경로 시설 알림',
+              value: settings.favoriteRouteFacilityAlerts,
+              enabled: !isSaving,
+              onChanged: onFavoriteRouteFacilityAlertsChanged,
+            ),
+            _NotificationSwitchTile(
+              key: const Key('notificationSwitch-reportStatusAlerts'),
+              title: '제보 진행 알림',
+              value: settings.reportStatusAlerts,
+              enabled: !isSaving,
+              onChanged: onReportStatusAlertsChanged,
+            ),
+            _NotificationSwitchTile(
+              key: const Key('notificationSwitch-dataQualityAlerts'),
+              title: '최신 안내 알림',
+              value: settings.dataQualityAlerts,
+              enabled: !isSaving,
+              onChanged: onDataQualityAlertsChanged,
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Semantics(
@@ -939,38 +945,62 @@ class _NotificationSwitchTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    return Semantics(
+      container: true,
+      excludeSemantics: true,
+      label: '$title ${value ? '켜짐' : '꺼짐'}',
+      toggled: value,
+      enabled: enabled,
+      onTap: enabled ? () => onChanged(!value) : null,
+      child: SwitchListTile.adaptive(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        activeThumbColor: colorScheme.primary,
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w800,
+            height: 1.35,
+          ),
+        ),
+        value: value,
+        onChanged: enabled ? onChanged : null,
+      ),
+    );
+  }
+}
+
+/// 알림 스위치들을 개별 박스 대신 하나의 카드에 묶고 구분선으로 나눈다.
+class _NotificationSwitchGroup extends StatelessWidget {
+  const _NotificationSwitchGroup({required this.tiles});
+
+  final List<Widget> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
       color: Colors.white,
-      elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: _notificationSwitchTileRadius,
         side: BorderSide(color: EasySubwayAccessibleColors.line),
       ),
-      child: Semantics(
-        container: true,
-        excludeSemantics: true,
-        label: '$title ${value ? '켜짐' : '꺼짐'}',
-        toggled: value,
-        enabled: enabled,
-        onTap: enabled ? () => onChanged(!value) : null,
-        child: SwitchListTile.adaptive(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          activeThumbColor: colorScheme.primary,
-          title: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-            ),
-          ),
-          value: value,
-          onChanged: enabled ? onChanged : null,
-        ),
+      child: Column(
+        children: [
+          for (var i = 0; i < tiles.length; i++) ...[
+            if (i > 0)
+              const Divider(
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+                color: EasySubwayAccessibleColors.line,
+              ),
+            tiles[i],
+          ],
+        ],
       ),
     );
   }
