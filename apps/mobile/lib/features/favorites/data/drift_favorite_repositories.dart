@@ -321,15 +321,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         continue;
       }
 
-      favorites.add(
-        await _fallbackFavoriteRoute(
-          routeId: routeId,
-          originStationId: row.read<String>('origin_station_id'),
-          destinationStationId: row.read<String>('destination_station_id'),
-          mobilityType: row.read<String>('mobility_profile'),
-          addedAt: _isoFromEpoch(row.read<int?>('added_at_value')),
-        ),
-      );
+      throw const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
     }
     return favorites;
   }
@@ -442,46 +434,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       routeCreatedAt: _string(snapshot['createdAt']),
       addedAt: addedAt,
       etaSource: _string(snapshot['etaSource']),
-      fallbackReason: _string(snapshot['fallbackReason']),
     );
-  }
-
-  Future<FavoriteRoute> _fallbackFavoriteRoute({
-    required String routeId,
-    required String originStationId,
-    required String destinationStationId,
-    required String mobilityType,
-    required String addedAt,
-  }) async {
-    final originName = await _stationName(originStationId);
-    final destinationName = await _stationName(destinationStationId);
-    return FavoriteRoute(
-      userId: _localUserId,
-      favoriteRouteId: routeId,
-      routeSearchId: routeId,
-      originStationId: originStationId,
-      originStationName: originName,
-      destinationStationId: destinationStationId,
-      destinationStationName: destinationName,
-      mobilityType: mobilityType,
-      status: 'FOUND',
-      lineId: '',
-      lineName: '',
-      score: 0,
-      routeCreatedAt: addedAt,
-      addedAt: addedAt,
-    );
-  }
-
-  Future<String> _stationName(String stationId) async {
-    final row = await catalogDatabase
-        .customSelect(
-          'SELECT name_ko FROM stations WHERE id = ?',
-          variables: [Variable.withString(stationId)],
-          readsFrom: {catalogDatabase.stations},
-        )
-        .getSingleOrNull();
-    return row?.read<String>('name_ko') ?? stationId;
   }
 
   Future<String> _catalogVersion() async {
@@ -554,7 +507,6 @@ FavoriteRoute _favoriteRouteFromResult({
     routeCreatedAt: result.createdAt,
     addedAt: addedAt,
     etaSource: result.etaSource,
-    fallbackReason: result.fallbackReason,
   );
 }
 
@@ -598,7 +550,6 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'blockedReasons': result.blockedReasons,
     'createdAt': result.createdAt,
     'etaSource': result.etaSource,
-    'fallbackReason': result.fallbackReason,
   };
 }
 

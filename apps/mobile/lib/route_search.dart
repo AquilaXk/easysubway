@@ -274,7 +274,7 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
         context: '경로 V2 API 요청 처리 중 예외가 발생했습니다.',
       );
       throw const RouteSearchOnlineException.unavailable(
-        fallbackReason: 'network-unavailable',
+        failureReason: 'network-unavailable',
       );
     } catch (error, stackTrace) {
       reportMobileError(
@@ -326,21 +326,15 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
 class RouteSearchOnlineException extends RouteSearchException {
   const RouteSearchOnlineException.unavailable({
     this.statusCode,
-    this.fallbackReason = 'online-unavailable',
-  }) : fallbackAllowed = true,
-       super(_routeSearchErrorMessage);
+    this.failureReason = 'online-unavailable',
+  }) : super(_routeSearchErrorMessage);
 
   factory RouteSearchOnlineException.http(int statusCode) {
-    final validationFailure =
-        statusCode == HttpStatus.badRequest ||
-        statusCode == HttpStatus.unprocessableEntity;
     final backend4xxFailure = statusCode >= 400 && statusCode < 500;
     final backend5xxFailure = statusCode >= 500;
     return RouteSearchOnlineException._(
       statusCode: statusCode,
-      fallbackAllowed:
-          backend5xxFailure || (backend4xxFailure && !validationFailure),
-      fallbackReason: backend5xxFailure
+      failureReason: backend5xxFailure
           ? 'backend-5xx'
           : backend4xxFailure
           ? 'backend-4xx'
@@ -350,13 +344,11 @@ class RouteSearchOnlineException extends RouteSearchException {
 
   const RouteSearchOnlineException._({
     required this.statusCode,
-    required this.fallbackAllowed,
-    required this.fallbackReason,
+    required this.failureReason,
   }) : super(_routeSearchErrorMessage);
 
   final int? statusCode;
-  final bool fallbackAllowed;
-  final String fallbackReason;
+  final String failureReason;
 }
 
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
@@ -640,7 +632,6 @@ class FavoriteRoute {
     required this.routeCreatedAt,
     required this.addedAt,
     this.etaSource = '',
-    this.fallbackReason = '',
   });
 
   factory FavoriteRoute.fromJson(Map<String, Object?> json) {
@@ -663,7 +654,6 @@ class FavoriteRoute {
       routeCreatedAt: _requiredRouteString(json, 'routeCreatedAt'),
       addedAt: _requiredRouteString(json, 'addedAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
-      fallbackReason: _optionalRouteString(json, 'fallbackReason'),
     );
   }
 
@@ -682,7 +672,6 @@ class FavoriteRoute {
   final String routeCreatedAt;
   final String addedAt;
   final String etaSource;
-  final String fallbackReason;
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
@@ -1073,8 +1062,7 @@ class RouteSearchResult {
     required this.blockedReasons,
     required this.createdAt,
     this.etaSource = '',
-    this.fallbackReason = '',
-  }) : // `burdenCost`는 API contract 이름이고 저장 필드는 fallback용 private 값이다.
+  }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
        // ignore: prefer_initializing_formals
@@ -1163,7 +1151,6 @@ class RouteSearchResult {
           .toList(growable: false),
       createdAt: _requiredRouteString(json, 'createdAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
-      fallbackReason: _optionalRouteString(json, 'fallbackReason'),
     );
   }
 
@@ -1240,7 +1227,6 @@ class RouteSearchResult {
   final List<String> blockedReasons;
   final String createdAt;
   final String etaSource;
-  final String fallbackReason;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1334,23 +1320,12 @@ class RouteSearchResult {
   String get sourceNotice =>
       etaSource == 'STATIC_LOCAL' ? '실시간 미반영, 저장된 데이터 기준' : '';
 
-  RouteSearchResult withSource({
-    required String etaSource,
-    String fallbackReason = '',
-  }) {
-    return withDisplayLabels(
-      etaSource: etaSource,
-      fallbackReason: fallbackReason,
-    );
-  }
-
   RouteSearchResult withDisplayLabels({
     String? originStationName,
     String? destinationStationName,
     String? lineName,
     List<RouteSearchStep>? steps,
     String? etaSource,
-    String? fallbackReason,
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
@@ -1376,7 +1351,6 @@ class RouteSearchResult {
       blockedReasons: blockedReasons,
       createdAt: createdAt,
       etaSource: etaSource ?? this.etaSource,
-      fallbackReason: fallbackReason ?? this.fallbackReason,
     );
   }
 
