@@ -449,8 +449,8 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
     return switch (type) {
       'ride' => '$fromName에서 $toName까지 이동',
       'transfer' => '$fromName에서 환승',
-      'access' => '$fromName 승강장 접근',
-      'egress' => '$toName 출구 접근',
+      'entry' || 'access' => '$fromName 승강장 접근',
+      'exit' || 'egress' => '$toName 출구 접근',
       _ => '$fromName에서 $toName까지 이동',
     };
   }
@@ -465,8 +465,8 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
       'ride' =>
         '$fromName에서 $toName까지 ${lineName.isEmpty ? '열차' : lineName}를 이용합니다.',
       'transfer' => '$fromName에서 다음 노선으로 갈아탈 준비를 합니다.',
-      'access' => '$fromName 승강장 접근 동선을 확인합니다.',
-      'egress' => '$toName 출구 접근 동선을 확인합니다.',
+      'entry' || 'access' => '$fromName 승강장 접근 동선을 확인합니다.',
+      'exit' || 'egress' => '$toName 출구 접근 동선을 확인합니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
