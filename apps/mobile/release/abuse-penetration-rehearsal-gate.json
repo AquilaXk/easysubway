@@ -56,6 +56,26 @@
       ]
     }
   },
+  "productionLikeEvidencePolicy": {
+    "requiredForClosing": [
+      "play-installed-or-play-generated-artifact-identity",
+      "network-trace-from-play-installed-or-generated-build",
+      "deployed-public-https-backend-base-url",
+      "deployed-admin-security-negative-test",
+      "deployed-signed-url-boundary-run",
+      "deployed-object-storage-lifecycle-run",
+      "distributed-or-waived-rate-limit-rehearsal"
+    ],
+    "forbiddenClosureEvidence": [
+      "static gate JSON",
+      "fixture output only",
+      "preflight env check only",
+      "local selected tests only",
+      "stale evidence from previous RC"
+    ],
+    "missingEvidenceDisposition": "KEEP_OPEN_NO_GO",
+    "policyKo": "#1022는 Play-generated/Play-installed artifact와 deployed production-like backend/object-storage rehearsal 증거가 없으면 preflight, local selected test, static contract만으로 완료 처리하지 않는다."
+  },
   "buildIdentityPolicy": {
     "requiredIssueLinks": ["#1015", "#1016", "#1020"],
     "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],

@@ -42,6 +42,17 @@ test("provider credential과 release artifact security boundary regression을 �
   assert.ok(providerExposureMatrix.forbiddenSummaryValues.includes("object storage credential"));
   assert.ok(providerExposureMatrix.forbiddenSummaryValues.includes("local or internal endpoint"));
 
+  assert.equal(abuseGate.productionLikeEvidencePolicy.missingEvidenceDisposition, "KEEP_OPEN_NO_GO");
+  assert.ok(
+    abuseGate.productionLikeEvidencePolicy.requiredForClosing.includes("play-installed-or-play-generated-artifact-identity"),
+  );
+  assert.ok(
+    abuseGate.productionLikeEvidencePolicy.requiredForClosing.includes("deployed-public-https-backend-base-url"),
+  );
+  assert.ok(abuseGate.productionLikeEvidencePolicy.forbiddenClosureEvidence.includes("preflight env check only"));
+  assert.ok(abuseGate.productionLikeEvidencePolicy.forbiddenClosureEvidence.includes("local selected tests only"));
+  assert.ok(abuseGate.productionLikeEvidencePolicy.forbiddenClosureEvidence.includes("stale evidence from previous RC"));
+
   assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_OBJECT_STORAGE_(?:ACCESS_KEY|SECRET_KEY|ENDPOINT|REGION)/);
   assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_[A-Z0-9_]*(?:PROVIDER|REALTIME)[A-Z0-9_]*KEY/);
   assert.doesNotMatch(androidBuildGradle, /EASYSUBWAY_OBJECT_STORAGE|PROVIDER_API_KEY|REALTIME_PROVIDER_KEY/);
