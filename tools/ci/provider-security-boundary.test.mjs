@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -19,6 +20,7 @@ test("provider credential과 release artifact security boundary regression을 �
   const abuseGate = readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const mobileTrackedSource = trackedFiles("apps/mobile").map((file) => [file, read(file)]);
 
   const providerStorageExposureGuard = releaseSecurityGate.items.find(
     (item) => item.id === "repository_provider_storage_exposure_guard",
@@ -43,4 +45,17 @@ test("provider credential과 release artifact security boundary regression을 �
   assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_OBJECT_STORAGE_(?:ACCESS_KEY|SECRET_KEY|ENDPOINT|REGION)/);
   assert.doesNotMatch(releaseArtifactsWorkflow, /EASYSUBWAY_[A-Z0-9_]*(?:PROVIDER|REALTIME)[A-Z0-9_]*KEY/);
   assert.doesNotMatch(androidBuildGradle, /EASYSUBWAY_OBJECT_STORAGE|PROVIDER_API_KEY|REALTIME_PROVIDER_KEY/);
+
+  for (const [file, content] of mobileTrackedSource) {
+    assert.doesNotMatch(content, /swopenapi\.seoul\.go\.kr/i, `${file} must not call TOPIS directly`);
+    assert.doesNotMatch(content, /EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY/i, `${file} must not reference backend TOPIS key`);
+    assert.doesNotMatch(content, /["']?(?:serviceKey|apiKey|providerUrl|provider_url)["']?\s*(?:=|:)/i, `${file} must not carry provider credential fields`);
+  }
 });
+
+function trackedFiles(prefix) {
+  return execFileSync("git", ["ls-files", prefix], { cwd: root, encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean)
+    .filter((file) => /\.(dart|gradle|kts|xml|json|ya?ml|properties|plist|swift|kt)$/.test(file));
+}
