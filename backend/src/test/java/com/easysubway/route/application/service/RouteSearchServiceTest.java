@@ -827,7 +827,7 @@ class RouteSearchServiceTest {
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.first()
 			.satisfies(step -> {
-				assertThat(step.reasonCodes()).isEmpty();
+				assertThat(step.reasonCodes()).containsExactly("MATCHED_REALTIME");
 				assertThat(step.providerSnapshotId()).isEqualTo("test-realtime-snapshot");
 				assertThat(step.providerObservedAt()).isEqualTo("2026-07-01T00:05:00Z");
 				assertThat(step.gatewayReceivedAt()).isEqualTo("2026-07-01T00:05:00Z");
