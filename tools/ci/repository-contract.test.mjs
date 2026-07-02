@@ -737,21 +737,31 @@ test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함�
   assert.match(template, /## Version impact/);
   assert.match(template, /mobile patch/);
   assert.match(template, /backend identity/);
+  assert.match(template, /PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다/);
   assert.match(template, /CodeRabbit 리뷰를 확인했다/);
-  assert.match(template, /Codex CLI code review 결과를 확인했다/);
+  assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
+  assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
+  assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
   assert.match(template, /CD 상태를 확인했다/);
 });
 
 test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
   const templates = [
     read(".github/ISSUE_TEMPLATE/bug_report.yml"),
+    read(".github/ISSUE_TEMPLATE/docs_request.yml"),
     read(".github/ISSUE_TEMPLATE/feature_request.yml"),
+    read(".github/ISSUE_TEMPLATE/refactor_request.yml"),
+    read(".github/ISSUE_TEMPLATE/style_request.yml"),
     read(".github/ISSUE_TEMPLATE/task_request.yml"),
+    read(".github/ISSUE_TEMPLATE/test_request.yml"),
   ].join("\n");
 
   assert.match(templates, /실제 개발자가 바로 판단할 수 있게/);
   assert.match(templates, /사용자 또는 운영 영향/);
   assert.match(templates, /실행할 검증/);
+  assert.match(templates, /상위 이슈는 하위 이슈와 완료 조건을 함께 적고/);
+  assert.match(templates, /하위 이슈 완료 전에는 닫지 않습니다/);
+  assert.match(templates, /PR 본문 양식과 GitHub PR Review 증거 확인/);
   assert.doesNotMatch(templates, /AI 에이전트|자동 생성|제가 작업/);
 });
 
