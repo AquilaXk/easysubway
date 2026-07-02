@@ -1388,9 +1388,9 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   ].join("[\\s\\S]*"));
   const facilityNoLocationPattern = new RegExp([
     "testWidgets\\('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다'",
-    "facilityReportSubmitWithoutLocationButton",
-    "위치 없이 제보합니다",
-    "현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요",
+    "requestCount, 0",
+    "facilityReportSubmitButton",
+    "onPressed, isNotNull",
     "latitude, isNull",
     "longitude, isNull",
   ].join("[\\s\\S]*"));
@@ -1399,10 +1399,11 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   assert.match(main, /_viewPreferences\s*=\s*previous/);
   assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
   assert.match(widgetTest, settingsFailurePattern);
-  assert.match(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
-  assert.match(facilityReport, /facilityReportRetryLocationButton/);
-  assert.match(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
+  assert.doesNotMatch(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.doesNotMatch(facilityReport, /facilityReportRetryLocationButton/);
+  assert.doesNotMatch(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
   assert.match(widgetTest, facilityNoLocationPattern);
   assert.match(widgetTest, /시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다/);
 });
