@@ -60,7 +60,6 @@ const _highContrastSecondaryColor =
     EasySubwayAccessibleColors.highContrastSecondary;
 const _homeInfoBorderColor = Color(0xFFB7DDF4);
 const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
-const _homeFacilityInfoBorderColor = Color(0xFFC8E6F8);
 const _settingsSwitchActiveTrackColor =
     EasySubwayAccessibleColors.switchActiveTrack;
 const _settingsSwitchInactiveTrackColor =
@@ -2834,9 +2833,9 @@ _FacilitySeverityAccent _facilitySeverityAccent(
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
-      backgroundColor: EasySubwayAccessibleColors.skySoft,
-      borderColor: _homeFacilityInfoBorderColor,
-      iconColor: EasySubwayAccessibleColors.brand,
+      backgroundColor: Colors.white,
+      borderColor: EasySubwayAccessibleColors.needsInfo,
+      iconColor: EasySubwayAccessibleColors.needsInfo,
     ),
     FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
       backgroundColor: Colors.white,
