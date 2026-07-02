@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -117,12 +118,39 @@ function validateSample({ candidate, candidateId, sample }) {
   for (const [index, hash] of sample.providerRecordHashes.entries()) {
     assertSha256(hash, `providerRecordHashes.${index}`);
   }
+  if (!Number.isInteger(sample.rowCount) || sample.rowCount !== sample.providerRecordHashes.length) {
+    throw new Error("rowCount must match providerRecordHashes length");
+  }
+
+  const expectedSchemaFingerprint = sha256(JSON.stringify([...sample.fields].sort()));
+  if (sample.schemaFingerprint !== expectedSchemaFingerprint) {
+    throw new Error("schemaFingerprint does not match fields");
+  }
+
+  const expectedEvidenceHash = sha256(JSON.stringify({
+    candidateId: sample.candidateId,
+    endpoint: sample.endpoint,
+    format: sample.format,
+    fields: sample.fields,
+    rowCount: sample.rowCount,
+    rawSha256: sample.rawSha256,
+    schemaFingerprint: sample.schemaFingerprint,
+    credentialRedacted: sample.credentialRedacted,
+    providerRecordHashes: sample.providerRecordHashes,
+  }));
+  if (sample.evidenceHash !== expectedEvidenceHash) {
+    throw new Error("evidenceHash does not match sample evidence");
+  }
 }
 
 function assertSha256(value, label) {
   if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
     throw new Error(`${label} must be a sha256 hex string`);
   }
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 async function main() {

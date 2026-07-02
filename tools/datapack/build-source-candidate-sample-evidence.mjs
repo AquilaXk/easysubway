@@ -71,6 +71,10 @@ function bestJsonRow(value, best = { row: null, count: 0 }) {
 
 function itemRows(value) {
   if (Array.isArray(value)) {
+    const objectRows = value.filter((item) => item && typeof item === "object" && !Array.isArray(item));
+    if (objectRows.some((item) => scalarFieldCount(item) > 0)) {
+      return objectRows;
+    }
     return value.flatMap(itemRows);
   }
   if (!value || typeof value !== "object") {
