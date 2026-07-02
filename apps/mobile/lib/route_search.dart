@@ -39,28 +39,27 @@ const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPickerRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 const _routePointRailWidth = 30.0;
-const _routePointOriginNodeColor = Color(0xFF27A6D9);
+const _routePointOriginNodeColor = EasySubwayAccessibleColors.primary;
 const _routePointDestinationNodeColor = Color(0xFF006D77);
 const _routePointConnectorColor = Color(0xFFBFD6DA);
-const _routeTextPrimaryColor = Color(0xFF102A2C);
-const _routeTextSecondaryColor = Color(0xFF29484B);
-const _routeTextMutedColor = Color(0xFF405A5D);
-const _routeTextSubtleColor = Color(0xFF50656F);
-const _routeNextActionTextColor = Color(0xFF506B6F);
-const _routeAccentColor = Color(0xFF006D77);
+const _routeTextPrimaryColor = EasySubwayAccessibleColors.text;
+const _routeTextSecondaryColor = EasySubwayAccessibleColors.secondaryText;
+const _routeTextMutedColor = EasySubwayAccessibleColors.secondaryText;
+const _routeTextSubtleColor = EasySubwayAccessibleColors.mutedText;
+const _routeNextActionTextColor = EasySubwayAccessibleColors.mutedText;
+const _routeAccentColor = EasySubwayAccessibleColors.primary;
 const _routeCardBorderColor = Color(0xFFD5E2E4);
-const _routeDividerColor = Color(0xFFE0E7EC);
+const _routeDividerColor = EasySubwayAccessibleColors.line;
 const _routeControlBorderColor = Color(0xFF9DB6BA);
 const _routeSoftPanelColor = Color(0xFFE9F5F6);
 const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
 const _routeGuidanceDarkColor = Color(0xFF073245);
 const _routeGuidanceSecondaryColor = Color(0xFFC7D8E3);
 const _routeBlockedBorderColor = Color(0xFFEFCCCC);
-const _routeCardShadowColor = Color(0x0F071B2F);
-const _routeAccentShadowColor = Color(0x1A0D8A6D);
-const _routeResultBorderColor = Color(0xFF0D8A6D);
-const _routeStatusChipBackgroundColor = Color(0xFFDEF5E7);
-const _routeTimelineColor = Color(0xFF27A6D9);
+const _routeCardShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _routeAccentShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _routeResultBorderColor = EasySubwayAccessibleColors.primary;
+const _routeTimelineColor = EasySubwayAccessibleColors.primary;
 const _routeBlockedColor = Color(0xFFA93434);
 const _routeBlockedSoftColor = Color(0xFFFFE7E7);
 const _routeArrivalPanelColor = Color(0xFFE6F2F0);
@@ -2688,7 +2687,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
                                   color: _routeTextPrimaryColor,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.25,
                                 ),
                           ),
@@ -2997,7 +2996,7 @@ class _RouteSectionHeader extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: _routeTextPrimaryColor,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.25,
             ),
           ),
@@ -3188,7 +3187,7 @@ class _RouteRecentDestinationRow extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: _routeTextPrimaryColor,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
             subtitle: Padding(
@@ -3258,7 +3257,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
           option.title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -3664,7 +3663,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                             result.nameKo,
                             style: textTheme.titleMedium?.copyWith(
                               color: _routeTextPrimaryColor,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               height: 1.25,
                             ),
                           ),
@@ -4202,7 +4201,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 '${result.originStationName} → ${result.destinationStationName}',
                                 style: textTheme.titleMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.25,
                                 ),
                               ),
@@ -4227,7 +4226,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                       '${result.originStationName} → ${result.destinationStationName}',
                                       style: textTheme.titleMedium?.copyWith(
                                         color: EasySubwayAccessibleColors.text,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w800,
                                         height: 1.25,
                                       ),
                                     ),
@@ -4294,7 +4293,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 _routeWorkflowSummaryTitle(result),
                                 style: textTheme.headlineSmall?.copyWith(
                                   color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.1,
                                 ),
                               ),
@@ -4310,7 +4309,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 result.comfortLabel,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.mintDark,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ],
@@ -4327,7 +4326,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                       _routeWorkflowSummaryTitle(result),
                                       style: textTheme.headlineSmall?.copyWith(
                                         color: EasySubwayAccessibleColors.text,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w800,
                                         height: 1.1,
                                       ),
                                     ),
@@ -4351,7 +4350,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                     style: textTheme.bodyMedium?.copyWith(
                                       color:
                                           EasySubwayAccessibleColors.mintDark,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ],
@@ -4500,7 +4499,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 12),
@@ -4547,7 +4546,7 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
           '방금 안내가\n실제 이동에 도움이 됐나요?',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -4605,7 +4604,7 @@ class _RouteResultListButton extends StatelessWidget {
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   color: _routeTextPrimaryColor,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                           ),
                         ),
@@ -4679,7 +4678,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
               title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.white,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 4),
@@ -4827,7 +4826,7 @@ class _RouteResultSection extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.2,
             ),
           ),
@@ -4853,10 +4852,12 @@ class _RouteStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 환승·걷기·이동조건 등 비상태 정보는 민트 틴트 대신 중립 아이콘+텍스트로.
     return Container(
       decoration: BoxDecoration(
-        color: _routeStatusChipBackgroundColor,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _routeSearchPillRadius,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Wrap(
@@ -4864,13 +4865,13 @@ class _RouteStatusChip extends StatelessWidget {
         runSpacing: 3,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
+          Icon(icon, size: 13, color: EasySubwayAccessibleColors.secondaryText),
           Text(
             label,
             style: const TextStyle(
-              color: EasySubwayAccessibleColors.mintDark,
+              color: EasySubwayAccessibleColors.secondaryText,
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -4998,7 +4999,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                     '도착 안내',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: _routeArrivalTextColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
@@ -5060,7 +5061,7 @@ class _RouteNotice extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: _routeNoticeTextColor,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         height: 1.25,
                       ),
                     ),
@@ -5107,7 +5108,7 @@ class _RouteStepSection extends StatelessWidget {
           '이동 순서',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -5139,7 +5140,7 @@ class _RouteStepTile extends StatelessWidget {
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -5153,7 +5154,7 @@ class _RouteStepTile extends StatelessWidget {
                     step.userActionTitle,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: _routeArrivalTextColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
                   ),
@@ -5163,7 +5164,7 @@ class _RouteStepTile extends StatelessWidget {
                   step.userTitle,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: _routeTextPrimaryColor,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
                 ),
