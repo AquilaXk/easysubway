@@ -4298,8 +4298,8 @@ class OfflineDataScreen extends StatelessWidget {
                     icon: Icons.public,
                     iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
-                    title: '지역',
-                    subtitle: '수도권 역과 노선',
+                    title: '검증 구간',
+                    subtitle: ProductionScopeCopy.supportedClaimKo,
                     trailing: '저장됨',
                   ),
                   _AppInfoRow(

@@ -5,7 +5,7 @@ class ProductionScopeCopy {
   static const unsupportedRegionStatus = 'UNSUPPORTED_REGION';
   static const unsupportedRegionActionKo = '다시 확인';
   static const routeSearchNotice =
-      '$supportedClaimKo 범위의 경로만 안내하고, 벗어난 경로는 $unsupportedRegionActionKo 상태로 보여줘요.';
+      '$supportedClaimKo 범위의 경로만 안내하고, 범위 밖 경로는 현장 안내를 $unsupportedRegionActionKo해 주세요.';
   static const stationSearchNotice =
       '$supportedClaimKo 범위의 역 정보를 먼저 보여주고, 벗어난 지역은 $unsupportedRegionActionKo해 주세요.';
   static const helpNotice =
