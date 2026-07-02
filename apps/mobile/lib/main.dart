@@ -22,6 +22,7 @@ import 'mobility_profile.dart';
 import 'network_map.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
+import 'production_scope.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 import 'mobile_error_reporter.dart';
@@ -2297,6 +2298,16 @@ class _HomeHero extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: _HomeProfilePill(profile: profile, onTap: onProfileTap),
               ),
+              const SizedBox(height: 12),
+              const Text(
+                ProductionScopeCopy.helpNotice,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
               const SizedBox(height: 18),
               Semantics(
                 key: const Key('routeSearchButton'),
@@ -3456,8 +3467,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 children: [
                   const _AppSettingsInfoTile(
                     icon: Icons.public,
-                    title: '수도권 우선',
-                    subtitle: '인터넷이 불안정해도 주요 역 정보를 먼저 보여줘요',
+                    title: '지원 범위',
+                    subtitle: ProductionScopeCopy.supportedClaimKo,
                   ),
                   _AppSettingsActionTile(
                     key: const Key('offlineDataSettingsButton'),
@@ -4312,7 +4323,7 @@ class OfflineDataScreen extends StatelessWidget {
                     iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '안내 범위',
-                    subtitle: '주요 역·노선 안내를 먼저 보여줘요',
+                    subtitle: ProductionScopeCopy.supportedClaimKo,
                     trailing: '일부',
                   ),
                   _AppInfoRow(
@@ -4446,6 +4457,16 @@ class SupportAccessScreen extends StatelessWidget {
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '이동 전 살펴보기'),
             const _SafetyDataNotice(),
+            const SizedBox(height: 12),
+            const _AppCard(
+              child: _AppInfoRow(
+                icon: Icons.verified_outlined,
+                iconBackground: EasySubwayAccessibleColors.skySoft,
+                iconColor: EasySubwayAccessibleColors.brand,
+                title: '지원 범위',
+                subtitle: ProductionScopeCopy.helpNotice,
+              ),
+            ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
             _SupportAccessItem(

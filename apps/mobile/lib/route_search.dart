@@ -11,6 +11,7 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
+import 'production_scope.dart';
 import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
@@ -2410,116 +2411,135 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
     final scaffold = Scaffold(
       key: const Key('routeSearchScreen'),
-      appBar: AppBar(title: const Text('길찾기')),
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('길찾기'),
+            Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: widget.shellNavigationBar == null
           ? submitButton
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [submitButton, widget.shellNavigationBar!],
             ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          key: const Key('routeResultRefreshIndicator'),
-          onRefresh: _controller.refreshCurrentRoute,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: _routeSearchPagePadding,
-            children: [
-              _RoutePointPickerCard(
-                key: const Key('routePointPickerCard'),
-                originStation: _originStation,
-                destinationStation: _destinationStation,
-                originPicker: _activeStationPicker == _RouteStationRole.origin
-                    ? _buildRouteStationPicker(_RouteStationRole.origin)
-                    : null,
-                destinationPicker:
-                    _activeStationPicker == _RouteStationRole.destination
-                    ? _buildRouteStationPicker(_RouteStationRole.destination)
-                    : null,
-                onOriginTap: () => _openStationPicker(_RouteStationRole.origin),
-                onDestinationTap: () =>
-                    _openStationPicker(_RouteStationRole.destination),
-                onSwap: _swapStations,
-              ),
-              const SizedBox(height: 18),
-              if (_validationMessage.isNotEmpty) ...[
-                _RouteSearchMessage(
-                  message: _validationMessage,
-                  liveRegion: true,
+      body: Semantics(
+        container: true,
+        label: ProductionScopeCopy.routeSearchNotice,
+        child: SafeArea(
+          child: RefreshIndicator(
+            key: const Key('routeResultRefreshIndicator'),
+            onRefresh: _controller.refreshCurrentRoute,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: _routeSearchPagePadding,
+              children: [
+                _RoutePointPickerCard(
+                  key: const Key('routePointPickerCard'),
+                  originStation: _originStation,
+                  destinationStation: _destinationStation,
+                  originPicker: _activeStationPicker == _RouteStationRole.origin
+                      ? _buildRouteStationPicker(_RouteStationRole.origin)
+                      : null,
+                  destinationPicker:
+                      _activeStationPicker == _RouteStationRole.destination
+                      ? _buildRouteStationPicker(_RouteStationRole.destination)
+                      : null,
+                  onOriginTap: () =>
+                      _openStationPicker(_RouteStationRole.origin),
+                  onDestinationTap: () =>
+                      _openStationPicker(_RouteStationRole.destination),
+                  onSwap: _swapStations,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                if (_validationMessage.isNotEmpty) ...[
+                  _RouteSearchMessage(
+                    message: _validationMessage,
+                    liveRegion: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                _RouteSectionHeader(
+                  title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건',
+                ),
+                const SizedBox(height: 8),
+                // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
+                if (widget.simpleViewEnabled)
+                  _RouteMobilityTypeSummary(
+                    mobilityType: _selectedMobilityType,
+                    onChangeRequested: _showMobilityTypePicker,
+                  )
+                else
+                  InputDecorator(
+                    key: const Key('routeMobilityTypeInput'),
+                    decoration: const InputDecoration(
+                      labelText: '이동 조건',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedMobilityType,
+                        isExpanded: true,
+                        items: [
+                          for (final option in mobilityProfileOptions)
+                            DropdownMenuItem<String>(
+                              value: option.mobilityType,
+                              child: Text(option.title),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          setState(() {
+                            _selectedMobilityType = value;
+                            _selectedConstraintMode =
+                                RouteSearchRequest._defaultConstraintMode(
+                                  value,
+                                );
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                SwitchListTile(
+                  key: const Key('routeStrictStepFreeSwitch'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('계단 없는 길만'),
+                  subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
+                  value: _selectedConstraintMode == 'STRICT_STEP_FREE',
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedConstraintMode = value
+                          ? 'STRICT_STEP_FREE'
+                          : 'PREFER_STEP_FREE';
+                    });
+                  },
+                ),
+                _RouteRecentDestinationList(
+                  repository: widget.favoriteRouteRepository,
+                  onSelected: _updateDestinationStation,
+                ),
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) => _RouteSearchBody(
+                    state: _controller.state,
+                    routeFeedbackRepository: widget.routeFeedbackRepository,
+                    favoriteRouteRepository: widget.favoriteRouteRepository,
+                    onShellBackToHome: widget.onShellBackToHome,
+                  ),
+                ),
               ],
-              _RouteSectionHeader(
-                title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건',
-              ),
-              const SizedBox(height: 8),
-              // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
-              if (widget.simpleViewEnabled)
-                _RouteMobilityTypeSummary(
-                  mobilityType: _selectedMobilityType,
-                  onChangeRequested: _showMobilityTypePicker,
-                )
-              else
-                InputDecorator(
-                  key: const Key('routeMobilityTypeInput'),
-                  decoration: const InputDecoration(
-                    labelText: '이동 조건',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(8)),
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedMobilityType,
-                      isExpanded: true,
-                      items: [
-                        for (final option in mobilityProfileOptions)
-                          DropdownMenuItem<String>(
-                            value: option.mobilityType,
-                            child: Text(option.title),
-                          ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setState(() {
-                          _selectedMobilityType = value;
-                          _selectedConstraintMode =
-                              RouteSearchRequest._defaultConstraintMode(value);
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              SwitchListTile(
-                key: const Key('routeStrictStepFreeSwitch'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('계단 없는 길만'),
-                subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
-                value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-                onChanged: (value) {
-                  setState(() {
-                    _selectedConstraintMode = value
-                        ? 'STRICT_STEP_FREE'
-                        : 'PREFER_STEP_FREE';
-                  });
-                },
-              ),
-              _RouteRecentDestinationList(
-                repository: widget.favoriteRouteRepository,
-                onSelected: _updateDestinationStation,
-              ),
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) => _RouteSearchBody(
-                  state: _controller.state,
-                  routeFeedbackRepository: widget.routeFeedbackRepository,
-                  favoriteRouteRepository: widget.favoriteRouteRepository,
-                  onShellBackToHome: widget.onShellBackToHome,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
