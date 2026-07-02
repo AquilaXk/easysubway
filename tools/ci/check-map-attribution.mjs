@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
-const manifestPath = process.argv[2] ?? "apps/mobile/assets/datapacks/metro_map_pack/manifest.json";
+const root = process.cwd();
+const manifestArg = process.argv[2] ?? "apps/mobile/assets/datapacks/metro_map_pack/manifest.json";
+const manifestPath = path.resolve(root, manifestArg);
+if (!manifestPath.startsWith(`${root}${path.sep}`) || path.extname(manifestPath) !== ".json") {
+  console.error("manifest path must be a JSON file inside the repository");
+  process.exit(1);
+}
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const maps = Array.isArray(manifest.maps) ? manifest.maps : [];
 const requiredLicenseFields = [
