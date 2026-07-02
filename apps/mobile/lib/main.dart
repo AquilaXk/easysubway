@@ -1616,6 +1616,7 @@ class _HomeScreenState extends State<HomeScreen> {
           stationSearchRepository: repository,
           locationProvider: locationProvider,
           viewportRepository: widget.networkMapViewportRepository,
+          realtimeRepository: widget.realtimeRepository,
           onOpenSavedItems: openSavedTab,
           onOpenRecentSearch: () =>
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
