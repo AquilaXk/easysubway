@@ -865,7 +865,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("estimatedMinutes")
-			.containsExactly(6, 6);
+			.containsExactly(4, 4);
 	}
 
 	@Test
@@ -907,7 +907,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("estimatedMinutes")
-			.containsExactly(4, 6);
+			.containsExactly(4, 4);
 	}
 
 	@Test
