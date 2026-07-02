@@ -48,7 +48,7 @@ const _facilityReportCardRadius = BorderRadius.all(Radius.circular(16));
 /// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
 Color _reportStatusColor(String status) {
   return switch (status) {
-    'SUBMITTED' => const Color(0xFF17527C),
+    'SUBMITTED' => EasySubwayAccessibleColors.needsInfo,
     'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
     'REJECTED' => EasySubwayAccessibleColors.red,
@@ -1417,7 +1417,7 @@ class _MyReportEmpty extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 height: 1.3,
               ),
             ),
@@ -1455,7 +1455,7 @@ class _MyReportError extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 height: 1.3,
               ),
             ),
@@ -1522,7 +1522,7 @@ class _MyReportListItem extends StatelessWidget {
                           report.reportTypeLabel,
                           style: textTheme.titleMedium?.copyWith(
                             color: EasySubwayAccessibleColors.text,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                             height: 1.25,
                           ),
                         ),
@@ -1590,7 +1590,7 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
                 report.reportTypeLabel,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
@@ -1640,7 +1640,7 @@ class _MyReportDetailStatus extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: color,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.2,
             ),
           ),
@@ -1665,7 +1665,7 @@ class _MyReportDetailRow extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: EasySubwayAccessibleColors.mutedText,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.2,
           ),
         ),
@@ -1705,7 +1705,7 @@ class _MyReportStatusLabel extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: color,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.2,
           ),
         ),
@@ -2440,7 +2440,7 @@ class _FacilityReportStatusRow extends StatelessWidget {
           value,
           style: textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -2470,7 +2470,7 @@ class _FacilityReportHeader extends StatelessWidget {
               '${target.stationName}역',
               style: textTheme.headlineSmall?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 height: 1.2,
               ),
             ),
@@ -2512,7 +2512,7 @@ class _FacilityReportSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.25,
         ),
       ),
@@ -2574,7 +2574,7 @@ class _FacilityReportTypeCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: textColor,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               height: 1.25,
                             ),
                       ),
@@ -2599,7 +2599,7 @@ class _FacilityReportMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFailure = state.status == FacilityReportViewStatus.failure;
     final color = isFailure
-        ? EasySubwayAccessibleColors.amber
+        ? EasySubwayAccessibleColors.red
         : EasySubwayAccessibleColors.primary;
     final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
     final shouldShowNextAction = _shouldShowFacilityReportFailureNextAction(
@@ -2672,7 +2672,7 @@ class _FacilityReportLocationMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isFailure
-        ? EasySubwayAccessibleColors.amber
+        ? EasySubwayAccessibleColors.red
         : EasySubwayAccessibleColors.primary;
     final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
 

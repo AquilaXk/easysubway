@@ -81,6 +81,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   const readme = read("README.md");
   const prTemplate = read(".github/pull_request_template.md");
   const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
+  const routeGraphCoverageBuilder = "tools/routes/build-route-graph-coverage-report.mjs";
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -117,11 +118,13 @@ test("route commercialization release gate blocks unsupported commercial route c
     accuracy: "artifacts/route-accuracy-report.json",
     accessibility: "artifacts/route-accessibility-regression-report.json",
     coverage: "artifacts/realtime-provider-coverage-report.json",
+    routeGraphCoverage: "artifacts/route-graph-coverage-report.json",
     contract: "artifacts/route-v2-contract-report.json",
   });
   assert.deepEqual(gate.outOfStationTransferReleaseBlockers, ["D-2", "D-3", "H-1"]);
 
   assert.equal(existsSync(path.join(root, contractReportBuilder)), true, "route v2 contract report builder must exist");
+  assert.equal(existsSync(path.join(root, routeGraphCoverageBuilder)), true, "route graph coverage report builder must exist");
   assert.match(readme, /Route commercialization gate/);
   assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
   assert.match(readme, /tools\/routes\/build-route-v2-contract-report\.mjs/);
@@ -1412,7 +1415,7 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
     "offlineDataSettingsButton",
     "저장된 안내 상태",
     "검증 구간",
-    "상록수·사당 검증 pilot",
+    "지금은 상록수역·사당역 구간을 안내해요",
     "findsNWidgets\\(2\\)",
     "마지막 갱신",
     "앱 설치 때 함께 받은 안내",
@@ -3046,7 +3049,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3070,7 +3073,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     },
   );
   const rcGithubEnvOutput = readFileSync(rcGithubEnv, "utf8");
-  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/datapack\.aquilaxk\.site\/datapacks\/$/m);
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/objectstorage\.ap-seoul-1\.oraclecloud\.com\/n\/axvym6vk8g7i\/b\/easysubway-datapacks\/o$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_CHANNEL=production$/m);
   assert.match(
@@ -3125,7 +3128,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3151,7 +3154,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",

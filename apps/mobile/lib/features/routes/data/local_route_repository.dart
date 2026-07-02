@@ -89,6 +89,9 @@ class LocalRouteRepository implements RouteSearchRepository {
           .map(_blockedReasonMessage)
           .toList(growable: false),
       createdAt: DateTime.now().toIso8601String(),
+      etaSource: 'STATIC_LOCAL',
+      etaConfidence: 'STATIC',
+      sourceUpdatedAt: catalog.sourceUpdatedAt,
     );
   }
 
@@ -478,6 +481,7 @@ class _RouteCatalogSnapshot {
     required this.stationLines,
     required this.networkEdges,
     required this.strictEvidenceSupported,
+    required this.sourceUpdatedAt,
   });
 
   final Map<String, String> stationsById;
@@ -485,8 +489,13 @@ class _RouteCatalogSnapshot {
   final List<_StationLineSnapshot> stationLines;
   final List<_NetworkEdgeSnapshot> networkEdges;
   final bool strictEvidenceSupported;
+  final String sourceUpdatedAt;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
+    final sourceUpdatedAtRow = await database.customSelect('''
+          SELECT MAX(CAST(updated_at AS INTEGER)) AS source_updated_at
+          FROM catalog_metadata
+          ''').getSingleOrNull();
     final stationRows = await database
         .customSelect('SELECT id, name_ko FROM stations')
         .get();
@@ -775,6 +784,9 @@ class _RouteCatalogSnapshot {
           .toList(growable: false),
       networkEdges: networkEdges,
       strictEvidenceSupported: strictEvidenceSupported,
+      sourceUpdatedAt: _metadataUpdatedAtIso(
+        sourceUpdatedAtRow?.readNullable<int>('source_updated_at'),
+      ),
     );
   }
 
@@ -1018,6 +1030,19 @@ class _RouteCatalogSnapshot {
     }
     return nodeId.split(':').first;
   }
+}
+
+String _metadataUpdatedAtIso(int? updatedAtMillis) {
+  if (updatedAtMillis == null || updatedAtMillis <= 0) {
+    return '';
+  }
+  final normalizedMillis = updatedAtMillis < 100000000000
+      ? updatedAtMillis * 1000
+      : updatedAtMillis;
+  return DateTime.fromMillisecondsSinceEpoch(
+    normalizedMillis,
+    isUtc: true,
+  ).toIso8601String();
 }
 
 String _edgePairKey(String fromNodeId, String toNodeId) {
