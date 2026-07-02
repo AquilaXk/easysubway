@@ -4437,6 +4437,33 @@ test("데이터팩 headway report는 stop_times와 frequencies에서 대기시�
   assert.deepEqual(sangnoksu.departures, [29100, 90300]);
   assert.equal(sangnoksu.minHeadwaySeconds, 61200);
 
+  const defaultLocalFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  delete defaultLocalFixture.packs[0].transitTrips.find(
+    (row) => row.id === "trip-seoul-4-local-2505",
+  ).servicePattern;
+  const defaultLocalFixturePath = path.join(outputDir, "default-local-fixture.json");
+  const defaultLocalReportPath = path.join(outputDir, "artifacts/datapack-headways-default-local.json");
+  await writeFile(defaultLocalFixturePath, `${JSON.stringify(defaultLocalFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      defaultLocalFixturePath,
+      "--output",
+      defaultLocalReportPath,
+    ],
+    { cwd: root },
+  );
+  const defaultLocalReport = JSON.parse(await readFile(defaultLocalReportPath, "utf8"));
+  const defaultLocalSangnoksu = defaultLocalReport.packs[0].observedHeadways.find(
+    (row) =>
+      row.stationId === "station-sangnoksu" &&
+      row.stationLineId === "seoul-4" &&
+      row.servicePattern === "LOCAL",
+  );
+  assert.deepEqual(defaultLocalSangnoksu.departures, [29100, 90300]);
+
   const frequencyTemplateFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   frequencyTemplateFixture.packs[0].transitTrips.push({
     id: "trip-seoul-2-local-0830",

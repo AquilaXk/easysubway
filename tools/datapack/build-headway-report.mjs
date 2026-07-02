@@ -51,11 +51,12 @@ function headwaysForPack(pack) {
     if (!trip || !route) {
       continue;
     }
+    const servicePattern = trip.servicePattern ?? "LOCAL";
     const key = [
       route.lineId,
       trip.serviceId,
       trip.directionId,
-      trip.servicePattern,
+      servicePattern,
       stopTime.stationId,
       stopTime.lineId,
     ].join("|");
@@ -64,7 +65,7 @@ function headwaysForPack(pack) {
         lineId: route.lineId,
         serviceId: trip.serviceId,
         directionId: trip.directionId,
-        servicePattern: trip.servicePattern,
+        servicePattern,
         stationId: stopTime.stationId,
         stationLineId: stopTime.lineId,
         departures: [],
