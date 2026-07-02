@@ -1117,6 +1117,7 @@ class RouteSearchResult {
     this.transferSlackSeconds,
     this.hasOutOfStationTransfer = false,
     this.commercialEtaEligible = false,
+    this.sourceUpdatedAt = '',
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1222,6 +1223,7 @@ class RouteSearchResult {
           _optionalRouteBool(json, 'hasOutOfStationTransfer') ?? false,
       commercialEtaEligible:
           _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
+      sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
     );
   }
 
@@ -1281,6 +1283,7 @@ class RouteSearchResult {
         (leg) => leg.legType == 'OUT_OF_STATION_TRANSFER',
       ),
       commercialEtaEligible: itinerary.commercialEtaEligible,
+      sourceUpdatedAt: result.departureTime,
     );
   }
 
@@ -1312,6 +1315,7 @@ class RouteSearchResult {
   final int? transferSlackSeconds;
   final bool hasOutOfStationTransfer;
   final bool commercialEtaEligible;
+  final String sourceUpdatedAt;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1402,7 +1406,16 @@ class RouteSearchResult {
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
-  String get sourceNotice => '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
+  String get sourceNotice {
+    if (isLocalResult && etaSource == 'STATIC_LOCAL') {
+      final updatedAt = sourceUpdatedAt.trim();
+      final freshness = updatedAt.isEmpty
+          ? ''
+          : ' · ${_routeDateLabel(updatedAt)}';
+      return '예상 소요시간: 저장된 데이터 기준$freshness';
+    }
+    return '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
+  }
 
   RouteSearchResult withDisplayLabels({
     String? originStationName,
@@ -1441,6 +1454,7 @@ class RouteSearchResult {
       transferSlackSeconds: transferSlackSeconds,
       hasOutOfStationTransfer: hasOutOfStationTransfer,
       commercialEtaEligible: commercialEtaEligible,
+      sourceUpdatedAt: sourceUpdatedAt,
     );
   }
 
