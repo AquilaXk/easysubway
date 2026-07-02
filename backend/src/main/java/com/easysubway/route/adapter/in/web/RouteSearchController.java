@@ -238,7 +238,9 @@ class RouteSearchController {
 				Boolean.TRUE.equals(request.useRealtime()),
 				request.maxTransfers(),
 				request.alternativeCount(),
-				plan.statuses(),
+				plan.statuses().stream()
+					.map(Enum::name)
+					.toList(),
 				plan.itineraries().stream()
 					.map(result -> ItineraryDto.from(result, departureTime))
 					.toList()

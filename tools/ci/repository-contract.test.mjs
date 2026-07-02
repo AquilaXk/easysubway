@@ -9251,6 +9251,11 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(useCase, /boolean useRealtime/);
   assert.match(useCase, /int maxTransfers/);
   assert.match(useCase, /int alternativeCount/);
+  assert.match(useCase, /SearchRouteV2Command \{/);
+  assert.match(useCase, /maxTransfers < 0/);
+  assert.match(useCase, /alternativeCount < 1/);
+  assert.match(useCase, /enum RouteV2Status/);
+  assert.match(useCase, /List<RouteV2Status> statuses/);
   assert.match(planner, /route-algorithm-v2-adr\.json|Range RAPTOR/);
 });
 
