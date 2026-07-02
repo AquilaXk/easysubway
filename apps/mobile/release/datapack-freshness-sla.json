@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "datapack-freshness-sla",
+  "issue": 1418,
+  "status": "IN_PROGRESS",
+  "currentDecision": "NO_GO",
+  "policyOwner": "QA",
+  "sourceClasses": [
+    {
+      "id": "static_accessibility_facility",
+      "examples": ["KRIC elevator", "KRIC escalator", "KRIC wheelchair lift"],
+      "reverificationCadence": "P90D",
+      "eventTriggers": ["operator construction notice", "facility outage notice", "field verification override"],
+      "changePublishSla": "P3D",
+      "freshnessMetric": "freshnessValidRatio"
+    },
+    {
+      "id": "planned_timetable",
+      "examples": ["service calendar", "trips", "stop_times", "headway"],
+      "reverificationCadence": "event-based",
+      "eventTriggers": ["operator timetable revision", "service calendar expiry", "line extension opening"],
+      "changePublishSla": "before-effective-date",
+      "freshnessMetric": "plannedEtaCoverageRatio"
+    },
+    {
+      "id": "route_map_asset",
+      "examples": ["official cyber-station SVG", "route map label polygons"],
+      "reverificationCadence": "P1Y",
+      "eventTriggers": ["new station opening", "line extension opening", "official map revision"],
+      "changePublishSla": "P14D",
+      "freshnessMetric": "routeMapPositionFreshnessRatio"
+    },
+    {
+      "id": "realtime_overlay",
+      "examples": ["Seoul TOPIS arrival", "provider train position"],
+      "reverificationCadence": "PT90S",
+      "eventTriggers": ["provider stale", "mapping failure spike", "quota or terms change"],
+      "changePublishSla": "online-overlay-only",
+      "freshnessMetric": "providerFreshnessSecondsMax"
+    }
+  ],
+  "monitoring": {
+    "manualCheckCadence": "P1D",
+    "channels": ["operator notices", "public data portal update metadata", "GitHub Actions schedule"],
+    "alertBeforePackExpiry": "PT6H",
+    "alertWhenFreshnessInvalid": true,
+    "productionChannelAllowsExpiredPack": false
+  },
+  "scheduledPipeline": {
+    "cadence": "P1D",
+    "requiredStages": [
+      "source-snapshot",
+      "build",
+      "validate",
+      "publish",
+      "post-publish-artifact-validation"
+    ],
+    "releaseSequenceManagedByPipeline": true,
+    "expiresAtManagedByPipeline": true,
+    "reusesProductionValidationIssue": 1393
+  },
+  "staleExposurePolicy": {
+    "expiredManifestAppBehavior": "continue-with-visible-stale-label",
+    "expiredManifestEtaSource": "STALE",
+    "visibleLabelKo": "저장된 데이터 기준 · 갱신 필요",
+    "strictProfileCanUseStaleAsFound": false,
+    "supportClaimDowngradeRequired": true,
+    "linkedUiIssues": [1396, 1398]
+  },
+  "rollback": {
+    "runbookCommand": "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+    "rehearsalEvidenceRequired": true,
+    "requiredEvidence": ["manifest-hashes", "rollback-time-seconds", "route-regression-replay"]
+  },
+  "requiredEvidence": [
+    "freshness-policy-json",
+    "scheduled-pipeline-log-one-cycle",
+    "expiry-alert-evidence",
+    "rollback-rehearsal-evidence",
+    "stale-label-android-ui-tree-or-screenshot"
+  ]
+}

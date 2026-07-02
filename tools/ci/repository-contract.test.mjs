@@ -175,6 +175,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
     coverageGapReport: "artifacts/datapack-coverage-gaps.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
+    freshnessSlaPolicy: "apps/mobile/release/datapack-freshness-sla.json",
     androidOfflineRouteEvidence: ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md",
   });
   assert.ok(
@@ -3852,6 +3853,8 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   const releaseEvidenceBundleSchema = readJson("tools/datapack/schema/release-evidence-bundle.schema.json");
 
   assert.match(workflow, /mode:[\s\S]*options:[\s\S]*- exploratory[\s\S]*- release-candidate[\s\S]*- production-publish/);
+  assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
+  assert.match(workflow, /apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.match(workflow, /buildSpecPath:[\s\S]*required: true/);
   assert.match(workflow, /allowGaps:[\s\S]*default: false/);
   assert.match(workflow, /targetChannel:[\s\S]*options:[\s\S]*- dev[\s\S]*- staging[\s\S]*- production/);
@@ -4755,6 +4758,44 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.evidencePolicy.githubSummaryOnly, true);
   assert.ok(scope.linkedReleaseBlockers.includes(571));
   assert.ok(scope.linkedReleaseBlockers.includes(1020));
+});
+
+test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정책을 고정한다", () => {
+  const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
+  const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
+
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.issue, 1418);
+  assert.equal(policy.currentDecision, "NO_GO");
+  assert.equal(classes.get("static_accessibility_facility").reverificationCadence, "P90D");
+  assert.equal(classes.get("static_accessibility_facility").changePublishSla, "P3D");
+  assert.equal(classes.get("planned_timetable").changePublishSla, "before-effective-date");
+  assert.equal(classes.get("route_map_asset").reverificationCadence, "P1Y");
+  assert.equal(classes.get("realtime_overlay").reverificationCadence, "PT90S");
+  assert.equal(policy.monitoring.manualCheckCadence, "P1D");
+  assert.equal(policy.monitoring.alertBeforePackExpiry, "PT6H");
+  assert.equal(policy.monitoring.productionChannelAllowsExpiredPack, false);
+  assert.deepEqual(policy.scheduledPipeline.requiredStages, [
+    "source-snapshot",
+    "build",
+    "validate",
+    "publish",
+    "post-publish-artifact-validation",
+  ]);
+  assert.equal(policy.scheduledPipeline.releaseSequenceManagedByPipeline, true);
+  assert.equal(policy.scheduledPipeline.expiresAtManagedByPipeline, true);
+  assert.equal(policy.scheduledPipeline.reusesProductionValidationIssue, 1393);
+  assert.equal(policy.staleExposurePolicy.expiredManifestEtaSource, "STALE");
+  assert.equal(policy.staleExposurePolicy.visibleLabelKo, "저장된 데이터 기준 · 갱신 필요");
+  assert.equal(policy.staleExposurePolicy.strictProfileCanUseStaleAsFound, false);
+  assert.deepEqual(policy.staleExposurePolicy.linkedUiIssues, [1396, 1398]);
+  assert.equal(
+    policy.rollback.runbookCommand,
+    "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+  );
+  assert.ok(policy.requiredEvidence.includes("scheduled-pipeline-log-one-cycle"));
+  assert.ok(policy.requiredEvidence.includes("rollback-rehearsal-evidence"));
+  assert.ok(policy.requiredEvidence.includes("stale-label-android-ui-tree-or-screenshot"));
 });
 
 test("official source importer는 production placeholder evidence hash를 거부한다", async () => {
