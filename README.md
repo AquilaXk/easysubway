@@ -6,7 +6,8 @@
 
 ## Scope
 
-- 전국 도시철도, 광역철도, 공항철도, GTX, 경전철을 서비스 범위에 포함합니다.
+- 장기 서비스 분모는 전국 도시철도, 광역철도, 공항철도, GTX, 경전철을 포함합니다.
+- Android v1의 현재 공개 지원 claim은 `상록수·사당 검증 pilot`로 제한합니다. 전국/수도권 전체/실시간 ETA/교통약자 경로 보장 claim은 `tools/datapack/nationwide-coverage-targets.json`의 단계별 source admission roadmap과 release gate 증거가 모두 닫힐 때까지 NO-GO입니다.
 - 지역별 데이터 품질은 Level 1-4로 구분하고, 신뢰도와 마지막 갱신일을 숨기지 않습니다.
 - 초기 현장 검증 지역은 상록수역입니다.
 
