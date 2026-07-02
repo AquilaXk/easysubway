@@ -1008,7 +1008,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                   button: true,
                   label: '지역: $currentRegion',
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 84),
+                    constraints: const BoxConstraints(maxWidth: 148),
                     child: SizedBox(
                       height: EasySubwayTouchTarget.general,
                       child: ExcludeSemantics(
@@ -1016,27 +1016,28 @@ class _NetworkMapTopBar extends StatelessWidget {
                           key: const Key('networkMapRegionDropdown'),
                           onTap: () =>
                               _showRegionSheet(context, availableRegions),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
                                   currentRegion,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Color(0xFF606060),
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(width: 2),
-                                const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: Color(0xFF606060),
-                                  size: 18,
-                                ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Color(0xFF606060),
+                                size: 18,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1496,8 +1497,8 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = results.first;
-    final leftName = adjacentStations.leftName ?? '-';
-    final rightName = adjacentStations.rightName ?? '-';
+    final leftName = adjacentStations.leftName;
+    final rightName = adjacentStations.rightName;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1513,7 +1514,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '< $leftName',
+                    leftName == null ? '' : '< $leftName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -1550,7 +1551,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    '$rightName >',
+                    rightName == null ? '' : '$rightName >',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,

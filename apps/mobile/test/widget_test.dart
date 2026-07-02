@@ -990,7 +990,8 @@ void main() {
         matching: find.text('수도권'),
       ),
     );
-    expect(regionText.overflow, isNot(TextOverflow.ellipsis));
+    // 지역명은 FittedBox 축소 대신 말줄임으로 가독성을 유지한다(#1487).
+    expect(regionText.overflow, TextOverflow.ellipsis);
     expect(find.text('전국'), findsNothing);
     expect(
       tester.getSize(find.byKey(const Key('mapRegionTabs'))).height,
