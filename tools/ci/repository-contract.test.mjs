@@ -623,6 +623,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /pull_request:[\s\S]*types:[\s\S]*- edited/);
   assert.match(workflow, /name: Changes/);
   assert.match(workflow, /name: PR Title/);
   assert.match(workflow, /PR Title \/ Validate bracket prefix/);
