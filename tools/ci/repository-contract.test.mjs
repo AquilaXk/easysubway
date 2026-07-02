@@ -100,9 +100,9 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.accessibility.strictStepFreeKnownStairFalsePositiveAllowed, 0);
   assert.equal(gate.accessibility.generatedConnectorAsVerifiedAllowed, false);
   assert.equal(gate.accessibility.unknownAccessibilityMustBeLabeled, true);
-  assert.equal(gate.routing.multiTransferSupported, true);
-  assert.equal(gate.routing.outOfStationTransferSupported, true);
-  assert.equal(gate.routing.alternativeItinerariesMin, 2);
+  assert.equal(gate.routing.multiTransferSupported, false);
+  assert.equal(gate.routing.outOfStationTransferSupported, false);
+  assert.equal(gate.routing.alternativeItinerariesMin, 1);
   assert.equal(gate.etaSourceIntegrity.realtimeEtaWithoutFreshProviderAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staleRealtimeUsedAsFreshAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staticLocalMustBeLabeled, true);
@@ -4620,6 +4620,17 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     productionInput.supportedV1Scope.facilityCoverageDenominator,
     scope.supportScope.facilityCoverageDenominator,
   );
+  assert.deepEqual(productionInput.routeRegressionScope, {
+    mode: "DIRECT_ONLY",
+    excludedPatterns: ["TRANSFER", "MULTI_TRANSFER", "LOOP_BRANCH", "EXPRESS_LOCAL"],
+    claim: productionInput.routeRegressionScope.claim,
+  });
+  assert.match(productionInput.routeRegressionScope.claim, /direct ride only/);
+  assert.deepEqual(productionInput.representativeRouteRegressions.map((route) => route.pattern), ["DIRECT"]);
+  for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
+    const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
+    assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
+  }
   assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
     "UNSUPPORTED_REGION",
     "다시 확인",
