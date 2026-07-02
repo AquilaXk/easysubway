@@ -1876,7 +1876,7 @@ class _HomeNotificationButton extends StatelessWidget {
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(48),
                 backgroundColor: Colors.white,
-                foregroundColor: EasySubwayAccessibleColors.mintDark,
+                foregroundColor: EasySubwayAccessibleColors.secondaryText,
                 side: const BorderSide(
                   color: EasySubwayAccessibleColors.line,
                   width: 1.5,
@@ -2670,7 +2670,7 @@ class _AppSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.2,
         ),
       ),
@@ -3186,13 +3186,10 @@ class _HomeSavedRouteCard extends StatelessWidget {
             showBorder: true,
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 21,
-                  backgroundColor: EasySubwayAccessibleColors.mintSoft,
-                  child: const Icon(
-                    Icons.route_outlined,
-                    color: EasySubwayAccessibleColors.mintDark,
-                  ),
+                const Icon(
+                  Icons.route_outlined,
+                  color: EasySubwayAccessibleColors.primary,
+                  size: 30,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -3204,7 +3201,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
                       ),
@@ -3272,13 +3269,13 @@ class _HomeMiniBadge extends StatelessWidget {
     return Chip(
       label: Text(label),
       visualDensity: VisualDensity.compact,
-      backgroundColor: EasySubwayAccessibleColors.mintSoft,
-      side: BorderSide.none,
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      side: const BorderSide(color: EasySubwayAccessibleColors.line),
       shape: const StadiumBorder(),
       labelStyle: const TextStyle(
-        color: EasySubwayAccessibleColors.mintDark,
+        color: EasySubwayAccessibleColors.secondaryText,
         fontSize: 11,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         height: 1.2,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -3293,7 +3290,7 @@ class _AppCard extends StatelessWidget {
     this.borderColor = EasySubwayAccessibleColors.line,
     this.borderRadius = 20,
     this.padding = const EdgeInsets.all(16),
-    this.showBorder = false,
+    this.showBorder = true,
   });
 
   final Widget child;
@@ -3305,10 +3302,11 @@ class _AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 최소 그림자 원칙: 그림자 대신 얇은 보더로 카드를 구분한다.
     return Card(
       margin: EdgeInsets.zero,
       color: backgroundColor,
-      elevation: 2,
+      elevation: 0,
       shadowColor: _appCardShadowColor,
       shape: RoundedRectangleBorder(
         side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
@@ -3683,7 +3681,7 @@ class _AppSettingsSection extends StatelessWidget {
               title,
               style: textTheme.titleMedium?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 height: 1.25,
               ),
             ),
@@ -3999,7 +3997,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                         child: _AppCard(
                           child: _AppInfoRow(
                             icon: Icons.bookmark_border,
-                            iconColor: EasySubwayAccessibleColors.mintDark,
+                            iconColor: EasySubwayAccessibleColors.mutedText,
                             title: '즐겨찾기한 항목이 없습니다',
                             subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
                           ),
@@ -4272,18 +4270,13 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: EasySubwayAccessibleColors.mintSoft,
-                    borderRadius: _mainThemeControlRadius,
-                  ),
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      icon,
-                      color: EasySubwayAccessibleColors.mintDark,
-                    ),
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    icon,
+                    color: EasySubwayAccessibleColors.primary,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -4296,7 +4289,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 18,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
                       ),
