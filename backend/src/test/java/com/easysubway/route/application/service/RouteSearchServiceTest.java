@@ -51,6 +51,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -851,6 +852,12 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(resolver.callCount()).isEqualTo(2);
+		assertThat(resolver.queries())
+			.extracting(RealtimeArrivalResolver.Query::readyAt)
+			.containsExactly(
+				Instant.parse("2026-07-01T00:04:00Z"),
+				Instant.parse("2026-07-01T00:16:00Z")
+			);
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("timeSource")
@@ -1641,11 +1648,13 @@ class RouteSearchServiceTest {
 	private static class CountingRealtimeArrivalResolver implements RealtimeArrivalResolver {
 
 		private final AtomicInteger callCount = new AtomicInteger();
+		private final List<Query> queries = new ArrayList<>();
 		private Query lastQuery;
 
 		@Override
 		public Resolution resolve(Query query) {
 			callCount.incrementAndGet();
+			queries.add(query);
 			lastQuery = query;
 			Instant expectedArrivalAt = query.readyAt().plusSeconds(120);
 			return new Resolution(
@@ -1673,6 +1682,10 @@ class RouteSearchServiceTest {
 
 		Query lastQuery() {
 			return lastQuery;
+		}
+
+		List<Query> queries() {
+			return List.copyOf(queries);
 		}
 	}
 

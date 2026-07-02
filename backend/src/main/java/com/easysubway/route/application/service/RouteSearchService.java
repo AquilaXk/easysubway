@@ -1155,7 +1155,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			);
 			RouteStep realtimeStep = withEtaOverlay(step, overlay);
 			realtimeSteps.set(index, realtimeStep);
-			elapsedMinutes += Math.max(0, realtimeStep.estimatedMinutes());
+			elapsedMinutes += Math.max(0, realtimeStep.estimatedMinutes()) + Math.max(0, step.estimatedMinutes());
 		}
 		return List.copyOf(realtimeSteps);
 	}
