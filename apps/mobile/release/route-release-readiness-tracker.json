@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "route-release-readiness-tracker",
+  "issue": 1414,
+  "parentGate": "apps/mobile/release/route-commercialization-gate.json",
+  "releaseBlockerPolicy": true,
+  "storeReadyStatus": "blocked_route_release_tracker_incomplete",
+  "releaseClaimPolicy": {
+    "commercialRealtimeRouteClaimAllowed": false,
+    "accessibleRouteReleaseReadyClaimAllowed": false,
+    "untilAllCompletionCriteriaPass": true
+  },
+  "northStar": {
+    "realtimeEtaRequiresFreshProviderEvidence": true,
+    "realtimeEtaWithoutProviderObservedAtAllowed": false,
+    "etaErrorBudgetGate": "apps/mobile/release/route-commercialization-gate.json",
+    "unclassifiedEtaDeviationAllowed": 0
+  },
+  "childIssueBlocksRelease": true,
+  "requiredChildIssues": [
+    { "number": 1210, "area": "contract-gate", "releaseBlocker": true },
+    { "number": 1230, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1392, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1393, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1394, "area": "data-accessibility-coverage", "releaseBlocker": true },
+    { "number": 1395, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1396, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1397, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1398, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1399, "area": "data-accessibility-coverage", "releaseBlocker": true },
+    { "number": 1400, "area": "data-accessibility-coverage", "releaseBlocker": true },
+    { "number": 1401, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1402, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1403, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1404, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1405, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1406, "area": "data-accessibility-coverage", "releaseBlocker": true },
+    { "number": 1407, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1408, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1409, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1410, "area": "mobile-user-claim", "releaseBlocker": true },
+    { "number": 1411, "area": "data-accessibility-coverage", "releaseBlocker": true },
+    { "number": 1412, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1413, "area": "backend-planner", "releaseBlocker": true }
+  ],
+  "completionCriteria": {
+    "allRequiredChildIssuesClosed": true,
+    "anchorWithoutRealtimeClaimAllowed": 0,
+    "unclassifiedEtaDeviationAllowed": 0,
+    "requiredProductionEvidenceReports": [
+      "artifacts/route-accuracy-report.json",
+      "artifacts/route-accessibility-regression-report.json",
+      "artifacts/realtime-provider-coverage-report.json",
+      "artifacts/route-v2-contract-report.json"
+    ],
+    "androidRouteResultUiEvidenceRequired": true,
+    "storeAndHelpCopyMustAvoidOverclaim": true
+  },
+  "evidencePolicy": {
+    "fixtureOnlyEvidenceAllowedForGo": false,
+    "productionOrManualRealtimeEvidenceRequired": true,
+    "localOnlyEvidenceRoot": ".codex/evidence/release/route-readiness/<rc-or-run>/"
+  }
+}
