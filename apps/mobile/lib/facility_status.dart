@@ -47,6 +47,15 @@ const _needsInfoPresentation = FacilityStatusPresentation(
   priority: 30,
 );
 
+const _unknownPresentation = FacilityStatusPresentation(
+  severity: FacilityStatusSeverity.needsInfo,
+  severityLabel: '확인 중',
+  statusTitle: '설치 확인 · 운행상태 미확인',
+  nextActionLabel: '자세히 보기',
+  nextActionDescription: '설치 여부는 확인됐어요. 운행 상태는 현장 안내도 함께 봐 주세요.',
+  priority: 30,
+);
+
 const _normalPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.normal,
   severityLabel: '정상',
@@ -65,7 +74,7 @@ FacilityStatusPresentation facilityStatusPresentation(String status) {
     'UNDER_CONSTRUCTION' ||
     'CONSTRUCTION' ||
     'USER_REPORTED' => _cautionPresentation,
-    'UNKNOWN' ||
+    'UNKNOWN' => _unknownPresentation,
     'NEEDS_REPORT' ||
     'NEEDS_CHECK' ||
     'CHECK_REQUIRED' => _needsInfoPresentation,
@@ -136,6 +145,7 @@ Map<FacilityStatusPresentation, int> _attentionCounts(
       _blockedPresentation,
       _cautionPresentation,
       _needsInfoPresentation,
+      _unknownPresentation,
     ])
       if (counts[presentation] != null) presentation: counts[presentation]!,
   };
