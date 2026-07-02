@@ -188,11 +188,7 @@ class StartScreen extends StatelessWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0D8A6D), Color(0xFF17527C)],
-          ),
+          color: EasySubwayAccessibleColors.primary,
         ),
         child: SafeArea(
           child: LayoutBuilder(
@@ -343,12 +339,8 @@ class _IntroVisual extends StatelessWidget {
       height: 230,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFE4F7F0), Color(0xFFEAF5FF)],
-          ),
-          border: Border.all(color: const Color(0xFFC8D3DC)),
+          color: EasySubwayAccessibleColors.surface,
+          border: Border.all(color: EasySubwayAccessibleColors.line),
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Stack(
@@ -358,7 +350,7 @@ class _IntroVisual extends StatelessWidget {
               top: 38,
               child: _IntroIcon(
                 icon: Icons.accessible_forward,
-                color: Color(0xFF0A705A),
+                color: EasySubwayAccessibleColors.mint,
               ),
             ),
             Positioned(
@@ -366,7 +358,7 @@ class _IntroVisual extends StatelessWidget {
               top: 80,
               child: _IntroIcon(
                 icon: Icons.elevator_outlined,
-                color: Color(0xFF17527C),
+                color: EasySubwayAccessibleColors.primary,
               ),
             ),
             Positioned(
@@ -375,7 +367,7 @@ class _IntroVisual extends StatelessWidget {
               child: _IntroIcon(
                 icon: Icons.route,
                 color: Colors.white,
-                backgroundColor: Color(0xFF071B2F),
+                backgroundColor: EasySubwayAccessibleColors.primary,
                 size: 94,
                 iconSize: 44,
                 radius: 29,
