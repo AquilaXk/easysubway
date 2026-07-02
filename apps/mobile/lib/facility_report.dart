@@ -1744,7 +1744,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _locationMessage = '';
   bool _isLoadingLocation = false;
   bool _isLocationFailure = false;
-  bool _submitWithoutLocation = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
   bool _isConfirmingPhotoUse = false;
@@ -1992,9 +1991,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
-    if (_photoAttachment != null ||
-        _attachedLocation != null ||
-        _submitWithoutLocation) {
+    if (_photoAttachment != null || _attachedLocation != null) {
       final confirmed = await _confirmReportUpload();
       if (!confirmed) {
         return;
@@ -2022,10 +2019,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(_facilityReportUploadDisclosurePurpose),
-            if (_submitWithoutLocation) ...[
-              const SizedBox(height: 8),
-              const Text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
-            ],
             const SizedBox(height: 8),
             const Text(_facilityReportUploadDisclosureScope),
           ],
@@ -2084,7 +2077,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (mounted) {
         setState(() {
           _attachedLocation = null;
-          _submitWithoutLocation = false;
           _locationMessage = '';
           _isLocationFailure = false;
         });
@@ -2319,7 +2311,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _isLoadingLocation = true;
       _locationMessage = '';
       _isLocationFailure = false;
-      _submitWithoutLocation = false;
     });
 
     try {
@@ -2331,7 +2322,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = location;
         _locationMessage = '';
         _isLocationFailure = false;
-        _submitWithoutLocation = false;
       });
     } on FacilityReportLocationException catch (error) {
       if (!mounted) {
@@ -2343,7 +2333,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
           error.message,
         );
         _isLocationFailure = true;
-        _submitWithoutLocation = false;
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2358,7 +2347,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = null;
         _locationMessage = '현재 위치를 확인하지 못했어요.';
         _isLocationFailure = true;
-        _submitWithoutLocation = false;
       });
     } finally {
       if (mounted) {
