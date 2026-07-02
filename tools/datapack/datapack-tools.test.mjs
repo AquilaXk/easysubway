@@ -4405,6 +4405,39 @@ test("데이터팩 quality metric report는 denominator 기반 metric과 freshne
   assert.equal(report.packs[0].metrics.freshnessValidRatio, 0);
 });
 
+test("데이터팩 headway report는 stop_times와 frequencies에서 대기시간 근거를 산출한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-headway-report-${Date.now()}`);
+  const reportPath = path.join(outputDir, "artifacts/datapack-headways.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      reportPath,
+    ],
+    { cwd: root },
+  );
+
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  assert.equal(report.artifactKind, "datapack-headway-report");
+  assert.equal(report.summary.packCount, 1);
+  assert.equal(report.summary.declaredFrequencyCount, 1);
+  assert.equal(report.packs[0].declaredFrequencies[0].headwaySeconds, 600);
+  const sangnoksu = report.packs[0].observedHeadways.find(
+    (row) =>
+      row.stationId === "station-sangnoksu" &&
+      row.stationLineId === "seoul-4" &&
+      row.servicePattern === "LOCAL",
+  );
+  assert.deepEqual(sangnoksu.departures, [29100, 90300]);
+  assert.equal(sangnoksu.minHeadwaySeconds, 61200);
+});
+
 test("데이터팩 quality metric report는 freshness metric 누락 manifest를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-quality-report-invalid-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });
