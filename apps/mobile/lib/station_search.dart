@@ -58,11 +58,9 @@ const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
-const _stationDetailHeroCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationTextMutedColor = Color(0xFF405A5D);
 const _stationTextSubtleColor = Color(0xFF506B6F);
 const _stationDetailTextColor = Color(0xFF2C5558);
-const _stationFacilityDividerColor = Color(0xFFC8D9E2);
 const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
 const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
 const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
@@ -71,7 +69,6 @@ const _stationDetailNoticeColor = Color(0xFFE6F2F0);
 const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
 const _stationLineFilterSelectedColor = Color(0xFF007A80);
 const _stationLineFilterBorderColor = Color(0xFF93C7C2);
-const _stationDetailHeroSecondaryColor = Color(0xFFAFC6D4);
 const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
@@ -4733,64 +4730,56 @@ class _StationDetailHeader extends StatelessWidget {
       label: detail.semanticLabel,
       header: true,
       child: ExcludeSemantics(
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: EasySubwayAccessibleColors.brandDark,
-          elevation: 0,
-          shape: const RoundedRectangleBorder(
-            borderRadius: _stationDetailHeroCardRadius,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StationLineBadges(lines: detail.lines, size: 34),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${detail.nameKo}역',
-                        style: textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              StationLineBadges(lines: detail.lines, size: 34),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${detail.nameKo}역',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        detail.lineLabel,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.secondaryText,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        detail.dataQualityLabel,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      detail.dataQualityLabel,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '마지막 확인 ${detail.lastVerifiedAt}',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '마지막 확인 ${detail.lastVerifiedAt}',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -5381,9 +5370,6 @@ class FacilityDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusBackgroundColor = _facilityStatusNoticeBackgroundColor(
-      facility.statusPresentation.severity,
-    );
     final statusIconColor = _facilityStatusNoticeIconColor(
       facility.statusPresentation.severity,
     );
@@ -5396,108 +5382,115 @@ class FacilityDetailScreen extends StatelessWidget {
         child: ListView(
           padding: _stationSearchPagePadding,
           children: [
-            Card(
-              margin: EdgeInsets.zero,
-              color: EasySubwayAccessibleColors.brandDark,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(
-                borderRadius: _stationDetailHeroCardRadius,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 27,
-                      backgroundColor: EasySubwayAccessibleColors.mintSoft,
-                      child: Icon(
-                        facility.layoutSummaryIcon,
-                        color: EasySubwayAccessibleColors.mint,
-                        size: 28,
-                      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    facility.layoutSummaryIcon,
+                    color: EasySubwayAccessibleColors.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${station.nameKo}역',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          facility.name,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.text,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${station.nameKo}역',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: _stationDetailHeroSecondaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            facility.name,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.2,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Card(
+            const SizedBox(height: 16),
+            Container(
               key: Key('facilityDetailStatusNotice-${facility.id}'),
-              margin: EdgeInsets.zero,
-              color: statusBackgroundColor,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(
+              decoration: BoxDecoration(
+                color: EasySubwayAccessibleColors.surface,
                 borderRadius: _stationDetailFacilityCardRadius,
+                border: Border.all(color: EasySubwayAccessibleColors.line),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+              clipBehavior: Clip.antiAlias,
+              child: IntrinsicHeight(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(statusIcon, color: statusIconColor, size: 28),
-                    const SizedBox(width: 10),
+                    Container(width: 4, color: statusIconColor),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _facilityStatusTitle(facility),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: statusIconColor,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.25,
-                                ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            facilityStatusDisplayLabel(
-                              statusLabel: facility.statusLabel,
-                              severityLabel: facility.severityLabel,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(statusIcon, color: statusIconColor, size: 28),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _facilityStatusTitle(facility),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: statusIconColor,
+                                          fontWeight: FontWeight.w800,
+                                          height: 1.25,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    facilityStatusDisplayLabel(
+                                      statusLabel: facility.statusLabel,
+                                      severityLabel: facility.severityLabel,
+                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    _facilityDetailStatusDescription(facility),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.3,
-                                ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            _facilityDetailStatusDescription(facility),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.3,
-                                ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -5583,15 +5576,6 @@ String _facilityDetailStatusDescription(StationFacilityInfo facility) {
 
 String _facilityStatusTitle(StationFacilityInfo facility) {
   return facility.statusTitle;
-}
-
-Color _facilityStatusNoticeBackgroundColor(FacilityStatusSeverity severity) {
-  return switch (severity) {
-    FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.redSoft,
-    FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amberSoft,
-    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.skySoft,
-    FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mintSoft,
-  };
 }
 
 Color _facilityStatusNoticeIconColor(FacilityStatusSeverity severity) {
