@@ -168,7 +168,19 @@ void main() {
             mobilityType: 'WHEELCHAIR',
           ),
         ),
-        throwsA(isA<RouteSearchException>()),
+        throwsA(
+          isA<RouteSearchOnlineException>()
+              .having(
+                (error) => error.message,
+                'message',
+                '실시간/서버 경로를 확인하지 못했어요.',
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                isNot(contains('저장된 데이터')),
+              ),
+        ),
       );
 
       expect(metrics.onlineSuccessCount, 0);
@@ -212,7 +224,19 @@ void main() {
             mobilityType: 'WHEELCHAIR',
           ),
         ),
-        throwsA(isA<RouteSearchException>()),
+        throwsA(
+          isA<RouteSearchOnlineException>()
+              .having(
+                (error) => error.message,
+                'message',
+                '실시간/서버 경로를 확인하지 못했어요.',
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                isNot(contains('저장된 데이터')),
+              ),
+        ),
       );
 
       expect(metrics.onlineSuccessCount, 0);
@@ -254,7 +278,19 @@ void main() {
           mobilityType: 'WHEELCHAIR',
         ),
       ),
-      throwsA(isA<RouteSearchException>()),
+      throwsA(
+        isA<RouteSearchOnlineException>()
+            .having(
+              (error) => error.message,
+              'message',
+              '실시간/서버 경로를 확인하지 못했어요.',
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              isNot(contains('저장된 데이터')),
+            ),
+      ),
     );
     expect(metrics.onlineSuccessCount, 0);
     expect(metrics.onlineFailureCount, 1);
