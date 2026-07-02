@@ -73,7 +73,9 @@ public class RouteV2Planner {
 				destinationStationId,
 				mobilityType,
 				constraintMode,
-				maxTransfers
+				maxTransfers,
+				departureTime,
+				useRealtime
 			);
 		}
 	}

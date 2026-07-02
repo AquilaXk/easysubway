@@ -9,7 +9,11 @@ import com.easysubway.route.adapter.out.persistence.InMemoryRouteSearchRepositor
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
+import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
+import com.easysubway.route.domain.ArrivalCandidate;
+import com.easysubway.route.domain.ArrivalFreshness;
 import com.easysubway.route.domain.ConstraintMode;
+import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.InvalidRouteFeedbackException;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.RouteNotFoundException;
@@ -43,9 +47,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -675,6 +681,71 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 useRealtime=true는 provider ETA를 첫 승차 단계에 반영한다")
+	void routeV2PlannerAppliesRealtimeEtaWhenRequested() {
+		var repository = new InMemoryRouteSearchRepository();
+		var resolver = new CountingRealtimeArrivalResolver();
+		var routeSearchService = new RouteSearchService(
+			repository,
+			repository,
+			new RampAccessibleTransitMasterPort(),
+			CLOCK,
+			resolver
+		);
+		var planner = new RouteV2Planner(routeSearchService);
+
+		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			true,
+			1,
+			1
+		));
+
+		assertThat(resolver.callCount()).isEqualTo(1);
+		assertThat(resolver.lastQuery().stationId()).isEqualTo("station-a");
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.MIXED);
+		assertThat(plan.itineraries().getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("timeSource")
+			.containsExactly(EtaSource.REALTIME.name());
+		assertThat(plan.statuses()).containsExactly("FOUND");
+	}
+
+	@Test
+	@DisplayName("V2 useRealtime=false는 provider를 호출하지 않고 계획 ETA를 유지한다")
+	void routeV2PlannerSkipsRealtimeProviderWhenDisabled() {
+		var repository = new InMemoryRouteSearchRepository();
+		var resolver = new CountingRealtimeArrivalResolver();
+		var routeSearchService = new RouteSearchService(
+			repository,
+			repository,
+			new RampAccessibleTransitMasterPort(),
+			CLOCK,
+			resolver
+		);
+		var planner = new RouteV2Planner(routeSearchService);
+
+		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			1
+		));
+
+		assertThat(resolver.callCount()).isZero();
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+		assertThat(plan.statuses()).containsExactly("FOUND");
+	}
+
+	@Test
 	@DisplayName("휠체어 이동 유형은 우회 거리가 길어도 무단차 환승역을 우선한다")
 	void wheelchairRoutePrefersStepFreeTransferStationEvenWhenDetourIsLong() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -1297,6 +1368,44 @@ class RouteSearchServiceTest {
 			.steps()
 			.getFirst()
 			.description();
+	}
+
+	private static class CountingRealtimeArrivalResolver implements RealtimeArrivalResolver {
+
+		private final AtomicInteger callCount = new AtomicInteger();
+		private Query lastQuery;
+
+		@Override
+		public Resolution resolve(Query query) {
+			callCount.incrementAndGet();
+			lastQuery = query;
+			Instant expectedArrivalAt = query.readyAt().plusSeconds(120);
+			return new Resolution(
+				ArrivalFreshness.FRESH_REALTIME,
+				null,
+				"test-realtime-snapshot",
+				query.readyAt().minusSeconds(30),
+				List.of(new ArrivalCandidate(
+					"train-test",
+					query.lineId(),
+					query.direction(),
+					"도착역",
+					120,
+					expectedArrivalAt,
+					query.readyAt().minusSeconds(30),
+					ArrivalFreshness.FRESH_REALTIME,
+					EtaConfidence.HIGH
+				))
+			);
+		}
+
+		int callCount() {
+			return callCount.get();
+		}
+
+		Query lastQuery() {
+			return lastQuery;
+		}
 	}
 
 	private static class StairOnlyTransitMasterPort implements LoadTransitMasterPort {
