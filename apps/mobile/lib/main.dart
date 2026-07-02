@@ -5690,9 +5690,25 @@ class _AttributionCard extends StatelessWidget {
     return text.isEmpty ? fallback : text;
   }
 
-  static String _yesNo(Object? value) => value == true ? '예' : '아니오';
+  static String _yesNo(Object? value) {
+    if (value == true) {
+      return '예';
+    }
+    if (value == false) {
+      return '아니오';
+    }
+    return '미확정';
+  }
 
-  static String _allowed(Object? value) => value == true ? '가능' : '미확정';
+  static String _allowed(Object? value) {
+    if (value == true) {
+      return '가능';
+    }
+    if (value == false) {
+      return '불가';
+    }
+    return '미확정';
+  }
 }
 
 class _AttributionRow extends StatelessWidget {

@@ -22,6 +22,7 @@ const requiredLicenseFields = [
   "changes",
   "attributionRequired",
   "commercialUseAllowed",
+  "derivativeWorkAllowed",
   "redistributionAllowed",
   "reviewStatus",
 ];
@@ -42,7 +43,7 @@ for (const map of maps) {
   if (!Array.isArray(map.license.authors) || map.license.authors.length === 0) {
     failures.push(`${id}: license.authors must be a non-empty array`);
   }
-  for (const field of ["attributionRequired", "commercialUseAllowed", "redistributionAllowed"]) {
+  for (const field of ["attributionRequired", "commercialUseAllowed", "derivativeWorkAllowed", "redistributionAllowed"]) {
     if (typeof map.license[field] !== "boolean") {
       failures.push(`${id}: license.${field} must be boolean`);
     }

@@ -90,11 +90,11 @@
         "date": "210712",
         "authors": ["kiwitree", "grafiker"],
         "attributionRequired": true,
-        "commercialUseAllowed": true,
-        "derivativeWorkAllowed": true,
-        "redistributionAllowed": true,
+        "commercialUseAllowed": false,
+        "derivativeWorkAllowed": false,
+        "redistributionAllowed": false,
         "reviewStatus": "legal-review-required",
-        "changes": "File stored unchanged as a bundled offline route-map asset."
+        "changes": "File stored unchanged as a bundled offline route-map asset. Derivative-work license chain is pending legal review; commercial use and redistribution remain blocked until confirmed."
       }
     },
     {

@@ -1521,6 +1521,7 @@ void main() {
       expect(license['changes'], isA<String>());
       expect(license['attributionRequired'], isA<bool>());
       expect(license['commercialUseAllowed'], isA<bool>());
+      expect(license['derivativeWorkAllowed'], isA<bool>());
       expect(license['redistributionAllowed'], isA<bool>());
       expect(license['reviewStatus'], isA<String>());
     }

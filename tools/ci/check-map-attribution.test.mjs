@@ -17,6 +17,16 @@ test("지도 asset license 누락은 실패한다", async () => {
   );
 });
 
+test("지도 asset license boolean 타입 오류는 실패한다", async () => {
+  await assert.rejects(
+    execFile(process.execPath, [
+      "tools/ci/check-map-attribution.mjs",
+      "tools/ci/fixtures/map-attribution-invalid-boolean.json",
+    ], { cwd: root }),
+    /busan: license.attributionRequired must be boolean/,
+  );
+});
+
 test("번들 지도 manifest license는 완비되어 있다", async () => {
   await execFile(process.execPath, [
     "tools/ci/check-map-attribution.mjs",
