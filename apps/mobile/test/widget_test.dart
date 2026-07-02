@@ -5444,7 +5444,8 @@ void main() {
       expect(find.text('즐겨찾기한 역'), findsOneWidget);
       expect(find.text('상록수'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
+      // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
+      expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
@@ -5912,7 +5913,8 @@ void main() {
       );
       expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
       expect(find.text('수도권'), findsNothing);
-      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
+      // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
+      expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 확인 필요'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
       expect(
@@ -6025,7 +6027,6 @@ void main() {
     for (final text in [
       '$longStationName역',
       '현재 위치에서 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용',
-      '일부 정보는 확인 중이에요',
     ]) {
       final widget = tester.widget<Text>(find.text(text));
       expect(widget.maxLines, isNot(1));
@@ -7645,7 +7646,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
       await tester.pumpAndSettle();
-      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
+      // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
+      expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(
         find.bySemanticsLabel('상록수역, 수도권 2호선, 수도권, 일부 정보는 확인 중이에요'),
