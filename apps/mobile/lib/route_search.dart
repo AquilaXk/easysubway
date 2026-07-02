@@ -734,18 +734,20 @@ class FavoriteRoute {
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
-  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
+  /// 노선명(모르면 빈 문자열 — 호출부에서 줄 자체를 숨긴다).
+  String get lineLabel => lineName;
 
-  String get scoreLabel => '다시 찾으면 자세히 볼 수 있어요';
+  bool get hasLine => lineName.isNotEmpty;
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get etaSourceLabel => routeEtaSourceLabel(etaSource);
 
+  /// 확정 정보만: 이동 조건 · 노선(있을 때) · 최근 확인일 · 출처.
   String get scoreBasisText {
     return [
       '$mobilityLabel 조건',
-      lineLabel,
+      if (hasLine) lineLabel,
       _routeDateLabel(routeCreatedAt),
       if (etaSourceLabel.isNotEmpty) etaSourceLabel,
     ].join(' · ');
@@ -754,31 +756,19 @@ class FavoriteRoute {
   String get scoreBasisSemanticLabel {
     return [
       '$mobilityLabel 조건',
-      lineLabel,
+      if (hasLine) lineLabel,
       _routeDateLabel(routeCreatedAt),
       if (etaSourceLabel.isNotEmpty) etaSourceLabel,
     ].join(', ');
   }
 
-  String get movementMetricLabel =>
-      '예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요';
-
-  String get accessibilityMetricLabel =>
-      '계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요';
-
   String get semanticLabel {
     return [
       '즐겨찾기 경로',
       summaryTitle,
-      lineLabel,
+      if (hasLine) lineLabel,
       mobilityLabel,
-      scoreLabel,
       scoreBasisSemanticLabel,
-      '예상 시간을 확인하고 있어요',
-      '환승 안내를 확인하고 있어요',
-      '걷는 거리를 확인하고 있어요',
-      '계단 여부를 아직 알 수 없어요',
-      '엘리베이터 연결을 아직 알 수 없어요',
     ].join(', ');
   }
 }
@@ -3144,6 +3134,13 @@ StationSearchLine _routeRecentLine(String name) {
 
 String _routeLineColor(String name) => fallbackLineColorHex(lineName: name);
 
+/// 기본 레벨(LEVEL_1)·미확정 품질 필러는 목록에서 감춘다(#1477과 동일 규칙).
+bool _showsRouteDataQualityLabel(String dataQualityLevel) {
+  return dataQualityLevel == 'LEVEL_2' ||
+      dataQualityLevel == 'LEVEL_3' ||
+      dataQualityLevel == 'LEVEL_4';
+}
+
 class _RouteRecentDestinationRow extends StatelessWidget {
   const _RouteRecentDestinationRow({
     required this.route,
@@ -3667,14 +3664,18 @@ class _RouteStationOptionTile extends StatelessWidget {
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            result.dataQualityLabel,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: _routeTextMutedColor,
-                              height: 1.3,
+                          if (_showsRouteDataQualityLabel(
+                            result.dataQualityLevel,
+                          )) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              result.dataQualityLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: _routeTextMutedColor,
+                                height: 1.3,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -5801,11 +5802,6 @@ class _FavoriteRouteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final menuButtonKey =
-        GlobalKey<PopupMenuButtonState<_FavoriteRouteMenuAction>>();
-    final moreSemanticLabel =
-        '${favorite.summaryTitle} 더 보기${isRemoving ? ', 삭제 중' : ''}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -5842,35 +5838,20 @@ class _FavoriteRouteTile extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             Semantics(
-              key: Key('favoriteRouteMore-${favorite.favoriteRouteId}'),
-              container: true,
-              label: moreSemanticLabel,
+              label: '${favorite.summaryTitle} 삭제',
               button: true,
               enabled: !isRemoving,
               onTap: isRemoving
                   ? null
-                  : () => menuButtonKey.currentState?.showButtonMenu(),
+                  : () => unawaited(_confirmRemove(context)),
               child: ExcludeSemantics(
-                child: PopupMenuButton<_FavoriteRouteMenuAction>(
-                  key: menuButtonKey,
-                  enabled: !isRemoving,
-                  tooltip: '경로 더 보기',
-                  onSelected: (action) {
-                    switch (action) {
-                      case _FavoriteRouteMenuAction.remove:
-                        unawaited(_confirmRemove(context));
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<_FavoriteRouteMenuAction>(
-                      key: Key(
-                        'favoriteRouteRemove-${favorite.favoriteRouteId}',
-                      ),
-                      value: _FavoriteRouteMenuAction.remove,
-                      child: const Text('삭제'),
-                    ),
-                  ],
-                  icon: const Icon(Icons.more_vert),
+                child: IconButton(
+                  key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
+                  tooltip: '삭제',
+                  onPressed: isRemoving
+                      ? null
+                      : () => unawaited(_confirmRemove(context)),
+                  icon: const Icon(Icons.delete_outline),
                 ),
               ),
             ),
@@ -5910,8 +5891,6 @@ class _FavoriteRouteTile extends StatelessWidget {
   }
 }
 
-enum _FavoriteRouteMenuAction { remove }
-
 class _FavoriteRouteSummaryCard extends StatelessWidget {
   const _FavoriteRouteSummaryCard({required this.favorite});
 
@@ -5942,59 +5921,27 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                     favorite.summaryTitle,
                     style: textTheme.titleLarge?.copyWith(
                       color: _routeTextPrimaryColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    favorite.lineLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
+                  if (favorite.hasLine) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      favorite.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: _routeTextSecondaryColor,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.mobilityLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.scoreLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     favorite.scoreBasisText,
                     style: textTheme.bodyMedium?.copyWith(
                       color: _routeTextMutedColor,
                       fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.movementMetricLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _routeTextMutedColor,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.accessibilityMetricLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _routeTextMutedColor,
                       height: 1.3,
                     ),
                   ),
