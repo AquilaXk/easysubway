@@ -519,7 +519,8 @@ for _ in $(seq 1 12); do
 done
 
 if [[ "${observability_ready}" -ne 1 ]]; then
-	diagnostic="${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-observability-$(date -u +%Y%m%dT%H%M%SZ).log"
+	diagnostic="$(mktemp "${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-observability-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")"
+	chmod 600 "${diagnostic}"
 	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability ps > "${diagnostic}" 2>&1 || true
 	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability logs --no-color --tail=200 "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}" >> "${diagnostic}" 2>&1 || true
 	chmod 600 "${diagnostic}"
@@ -537,7 +538,8 @@ for _ in $(seq 1 60); do
 done
 
 if [[ "${ready}" -ne 1 ]]; then
-	diagnostic="${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-$(date -u +%Y%m%dT%H%M%SZ).log"
+	diagnostic="$(mktemp "${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")"
+	chmod 600 "${diagnostic}"
 	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" logs --no-color --tail=200 "${RUNTIME_SERVICES[@]}" > "${diagnostic}" 2>&1 || true
 	chmod 600 "${diagnostic}"
 	fail_backend_deployment "readiness_failed"
