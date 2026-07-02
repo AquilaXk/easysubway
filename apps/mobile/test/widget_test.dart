@@ -1155,8 +1155,8 @@ void main() {
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
     await tester.pump();
     await tester.pump();
-    await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
-    expect(find.text('지도 표시용 asset'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('지도 표시용 파일'), 240);
+    expect(find.text('지도 표시용 파일'), findsOneWidget);
     expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
   });
 

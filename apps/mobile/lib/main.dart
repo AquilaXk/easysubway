@@ -4359,11 +4359,10 @@ class OfflineDataScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: const [
             _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.mintSoft,
-              borderColor: EasySubwayAccessibleColors.mintBorder,
+              showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
-                iconColor: EasySubwayAccessibleColors.mintDark,
+                iconColor: EasySubwayAccessibleColors.primary,
                 title: '인터넷 없이도 이용할 수 있어요',
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
@@ -5234,11 +5233,10 @@ class UserDataDeletionResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.skySoft,
-              borderColor: _homeInfoBorderColor,
+              showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.map_outlined,
-                iconColor: EasySubwayAccessibleColors.brand,
+                iconColor: EasySubwayAccessibleColors.primary,
                 title: '노선도와 역 정보는 계속 이용할 수 있어요',
               ),
             ),
@@ -5273,7 +5271,7 @@ class _DataDeletionResultRow extends StatelessWidget {
           title,
           style: textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 4),
@@ -5286,6 +5284,7 @@ class _DataDeletionResultRow extends StatelessWidget {
         ),
       ],
     );
+    // 삭제 완료는 복구/완료 상태 의미가 있어 민트 뱃지를 유지한다.
     final statusBadge = Container(
       key: Key('dataDeletionResultStatus-$id'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -5297,8 +5296,8 @@ class _DataDeletionResultRow extends StatelessWidget {
       child: const Text(
         '완료',
         style: TextStyle(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          color: EasySubwayAccessibleColors.mintDark,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -5752,9 +5751,9 @@ class _DataSourceAttributionScreenState
                         subtitle: ProductionScopeCopy.supportedClaimKo,
                       ),
                     ),
-                    const _AppSectionTitle(title: '지도 표시용 asset'),
+                    const _AppSectionTitle(title: '지도 표시용 파일'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
-                    const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
+                    const _AppSectionTitle(title: '경로·시설 판단용 데이터'),
                     for (final source in sources)
                       _AttributionCard.source(source),
                   ],
@@ -5781,24 +5780,21 @@ class _AttributionCard extends StatelessWidget {
     final offline = (map['offline'] as Map<String, Object?>?) ?? const {};
     return _AttributionCard._(
       title: _text(map['name_ko']),
-      subtitle: 'provider/owner: ${_text(map['operator'])}',
+      subtitle: '제공·소유: ${_text(map['operator'])}',
       rows: [
-        ('source name', _text(license['source'], _text(map['name_ko']))),
+        ('출처명', _text(license['source'], _text(map['name_ko']))),
+        ('라이선스', '${_text(license['name'])} (${_text(license['spdx'])})'),
+        ('라이선스 링크', _text(license['url'])),
+        ('출처 표기 필요', _yesNo(license['attributionRequired'])),
+        ('가져온 날짜', _text(license['date'])),
+        ('확인한 날짜', _text(manifest['generated_at_utc'])),
         (
-          'license type',
-          '${_text(license['name'])} (${_text(license['spdx'])})',
-        ),
-        ('license URL', _text(license['url'])),
-        ('attribution required', _yesNo(license['attributionRequired'])),
-        ('last retrieved', _text(license['date'])),
-        ('last verified', _text(manifest['generated_at_utc'])),
-        (
-          'commercial use / redistribution',
+          '상업적 이용 / 재배포',
           '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
         ),
-        ('review status', _text(license['reviewStatus'])),
-        ('changes', _text(license['changes'])),
-        ('asset path', _text(offline['path'])),
+        ('검토 상태', _text(license['reviewStatus'])),
+        ('변경 사항', _text(license['changes'])),
+        ('파일 경로', _text(offline['path'])),
       ],
     );
   }
@@ -5808,26 +5804,23 @@ class _AttributionCard extends StatelessWidget {
     return _AttributionCard._(
       title: _text(source['displayName']),
       subtitle:
-          'provider/owner: ${_text(source['provider'])} / ${_text(source['owner'])}',
+          '제공·소유: ${_text(source['provider'])} / ${_text(source['owner'])}',
       rows: [
-        ('source name', _text(source['displayName'])),
+        ('출처명', _text(source['displayName'])),
+        ('라이선스', '${_text(license['name'])} (${_text(license['type'])})'),
+        ('라이선스 링크', _text(license['evidenceUrl'])),
+        ('출처 표기 필요', _text(license['attribution'])),
+        ('가져온 날짜', _text(source['retrievedAt'])),
+        ('확인한 날짜', _text(source['observedDataUpdatedAt'])),
         (
-          'license type',
-          '${_text(license['name'])} (${_text(license['type'])})',
-        ),
-        ('license URL', _text(license['evidenceUrl'])),
-        ('attribution required', _text(license['attribution'])),
-        ('last retrieved', _text(source['retrievedAt'])),
-        ('last verified', _text(source['observedDataUpdatedAt'])),
-        (
-          'commercial use / redistribution',
+          '상업적 이용 / 재배포',
           '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
         ),
         (
-          'changes',
+          '변경 사항',
           source.containsKey('changes')
               ? _text(source['changes'])
-              : 'inventory에 별도 변경 고지 없음',
+              : '자료 목록에 별도 변경 고지 없음',
         ),
       ],
     );
@@ -5856,7 +5849,7 @@ class _AttributionCard extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
@@ -5929,7 +5922,7 @@ class _AttributionRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.25,
             ),
           ),
