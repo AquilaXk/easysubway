@@ -69,8 +69,8 @@ const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
 const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
 const _stationDetailNoticeColor = Color(0xFFE6F2F0);
 const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
-const _stationLineFilterSelectedColor = Color(0xFF007A80);
-const _stationLineFilterBorderColor = Color(0xFF93C7C2);
+const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
+const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailHeroSecondaryColor = Color(0xFFAFC6D4);
 const _stationDetailCautionColor = Color(0xFF8A4B00);
 
@@ -2745,6 +2745,16 @@ class _StationLineFilterSection extends StatelessWidget {
     BuildContext context,
     List<SubwayLineOption> lines,
   ) async {
+    final seenRegions = <String>{};
+    final orderedRegions = <String>[
+      for (final line in lines)
+        if (seenRegions.add(line.region)) line.region,
+    ]..sort(_compareStationLineRegions);
+    final linesByRegion = <String, List<SubwayLineOption>>{};
+    for (final line in lines) {
+      (linesByRegion[line.region] ??= <SubwayLineOption>[]).add(line);
+    }
+
     final selected = await showModalBottomSheet<Object?>(
       context: context,
       showDragHandle: true,
@@ -2758,29 +2768,39 @@ class _StationLineFilterSection extends StatelessWidget {
                 '전체 노선 보기',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
-              const SizedBox(height: 12),
-              _StationLineFilterButton(
+              const SizedBox(height: 8),
+              _StationLineSheetRow(
                 key: const Key('stationLineFilter-all'),
                 label: '전체 노선',
                 semanticLabel: '전체 노선',
                 selected: selectedLine == null,
                 onPressed: () => Navigator.of(context).pop(false),
               ),
-              const SizedBox(height: 8),
-              for (final line in lines) ...[
-                _StationLineFilterButton(
-                  key: Key('stationLineFilter-${line.id}'),
-                  label: line.name,
-                  semanticLabel: line.semanticLabel,
-                  selected: selectedLine?.id == line.id,
-                  badgeLine: line.badgeLine,
-                  onPressed: () => Navigator.of(context).pop(line),
+              for (final region in orderedRegions) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 2),
+                  child: Text(
+                    region,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                for (final line in linesByRegion[region]!)
+                  _StationLineSheetRow(
+                    key: Key('stationLineFilter-${line.id}'),
+                    label: line.name,
+                    semanticLabel: line.semanticLabel,
+                    selected: selectedLine?.id == line.id,
+                    badgeLine: line.badgeLine,
+                    onPressed: () => Navigator.of(context).pop(line),
+                  ),
               ],
             ],
           ),
@@ -2869,11 +2889,9 @@ class _StationLineFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = selected
-        ? _stationLineFilterSelectedColor
-        : Colors.white;
+    const backgroundColor = Colors.white;
     final foregroundColor = selected
-        ? Colors.white
+        ? _stationLineFilterSelectedColor
         : EasySubwayAccessibleColors.text;
     final borderColor = selected
         ? _stationLineFilterSelectedColor
@@ -2912,6 +2930,73 @@ class _StationLineFilterButton extends StatelessWidget {
               ],
               Text(label),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationLineSheetRow extends StatelessWidget {
+  const _StationLineSheetRow({
+    required this.label,
+    required this.semanticLabel,
+    required this.selected,
+    required this.onPressed,
+    this.badgeLine,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final bool selected;
+  final VoidCallback onPressed;
+  final StationSearchLine? badgeLine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
+      button: true,
+      selected: selected,
+      onTap: onPressed,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onPressed,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+              ),
+            ),
+            child: Row(
+              children: [
+                if (badgeLine != null) ...[
+                  StationLineBadge(line: badgeLine!, size: 26),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: selected
+                          ? _stationLineFilterSelectedColor
+                          : EasySubwayAccessibleColors.text,
+                      fontSize: 16,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Icon(
+                    Icons.check,
+                    size: 22,
+                    color: _stationLineFilterSelectedColor,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
