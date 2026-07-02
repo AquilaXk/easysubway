@@ -7650,30 +7650,22 @@ void main() {
       expect(find.text('마지막 확인'), findsOneWidget);
       expect(find.text('2026-06-13'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('안전 안내, 이동 전 현장 안내와 역무원 안내를 확인해 주세요.'),
-        findsOneWidget,
-      );
+      // 상시 안전 안내는 제거됐다(#1497).
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsNothing);
       expect(
         find.bySemanticsLabel(
           '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
-      expect(
-        find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'),
-        findsOneWidget,
+      // 역 안 이동 안내·순서는 "역 안 이동" 한 섹션으로 통합됐다(#1497).
+      await tester.scrollUntilVisible(
+        find.text('역 안 이동'),
+        120,
+        scrollable: find.byType(Scrollable).last,
       );
-      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'));
       await tester.pumpAndSettle();
-      expect(find.text('안내 확인 방법'), findsOneWidget);
-      expect(find.text('공식 안내'), findsOneWidget);
-      expectNoForbiddenUserCopy(tester);
-      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 접기'));
-      await tester.pumpAndSettle();
-      expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.text('역 안 이동 안내'), findsOneWidget);
+      expect(find.text('역 안 이동'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('승강장'),
         120,
@@ -7688,56 +7680,11 @@ void main() {
         find.bySemanticsLabel('역 안 이동 안내, 1번 출구, 엘리베이터, 승강장'),
         findsOneWidget,
       );
-      await tester.scrollUntilVisible(
-        find.text('지도 위치 목록'),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('지도 위치 목록'), findsOneWidget);
-      expect(find.text('지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.'), findsNothing);
-      expect(find.text('상록수역'), findsWidgets);
-      expect(find.text('1번 출구'), findsWidgets);
-      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('2번 출구'), findsNothing);
-      expect(find.bySemanticsLabel('지도 위치 목록'), findsWidgets);
-      await tester.scrollUntilVisible(
+      // 중복 "지도 위치 목록" 섹션은 제거됐다(#1497).
+      expect(find.text('지도 위치 목록'), findsNothing);
+      expect(
         find.byKey(const Key('stationMapTextListItem-station-sangnoksu')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
-        ),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('stationMapTextListItem-exit-sangnoksu-1')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태가 확인됐어요, 지도 위치',
-        ),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(
-          const Key('stationMapTextListItem-facility-sangnoksu-elevator-1'),
-        ),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 시설 알려주기, 지도 위치',
-        ),
-        findsOneWidget,
+        findsNothing,
       );
       await tester.scrollUntilVisible(
         find.text('출구'),
@@ -8301,7 +8248,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.requests, hasLength(1));
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
@@ -8366,9 +8313,9 @@ void main() {
       'node-sangnoksu-faregate',
     );
     expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
-    await tester.scrollUntilVisible(find.text('역 안 이동 순서'), 500);
+    await tester.scrollUntilVisible(find.text('역 안 이동'), 500);
     await tester.pumpAndSettle();
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
   });
@@ -8396,7 +8343,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 길 안내에 필요한 정보를 찾지 못했어요.'), findsOneWidget);
     expect(find.textContaining('기준점'), findsNothing);
   });
