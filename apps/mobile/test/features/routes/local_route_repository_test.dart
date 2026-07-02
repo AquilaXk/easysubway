@@ -413,6 +413,25 @@ void main() {
     expect(capability.outOfStationTransferAllowed, isFalse);
   });
 
+  test('로컬 capability는 같은 provider의 양끝 mapping이 있을 때 realtime을 지원한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedRealtimeMapping(database);
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(capability.stationExists, isTrue);
+    expect(capability.realtimeSupported, isTrue);
+  });
+
   test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -3883,6 +3902,34 @@ Future<void> _seedAvailableFacilityRoute(CatalogDatabase database) async {
         )
     ''');
   await _addEligibleStationFacilityEvidence(database);
+}
+
+Future<void> _seedRealtimeMapping(CatalogDatabase database) async {
+  await database.customStatement('''
+      INSERT INTO realtime_provider_line_mappings (
+        provider_id, provider_line_id, line_id, source_id,
+        supports_arrivals, mapping_confidence
+      )
+      VALUES (
+        'seoul-topis', '4', 'seoul-4', 'test-realtime-source',
+        1, 'OFFICIAL'
+      )
+    ''');
+  await database.customStatement('''
+      INSERT INTO realtime_provider_station_mappings (
+        provider_id, provider_line_id, provider_station_id, station_id,
+        line_id, source_id, query_name, supports_arrivals, mapping_confidence
+      )
+      VALUES
+        (
+          'seoul-topis', '4', 'topis-sangnoksu', 'station-sangnoksu',
+          'seoul-4', 'test-realtime-source', '상록수', 1, 'OFFICIAL'
+        ),
+        (
+          'seoul-topis', '4', 'topis-sadang', 'station-sadang',
+          'seoul-4', 'test-realtime-source', '사당', 1, 'OFFICIAL'
+        )
+    ''');
 }
 
 Future<void> _addFacilityStatusSnapshot(
