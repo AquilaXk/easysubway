@@ -2411,7 +2411,19 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
     final scaffold = Scaffold(
       key: const Key('routeSearchScreen'),
-      appBar: AppBar(title: const Text('길찾기')),
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('길찾기'),
+            Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: widget.shellNavigationBar == null
           ? submitButton
           : Column(

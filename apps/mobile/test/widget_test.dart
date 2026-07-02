@@ -5748,6 +5748,13 @@ void main() {
       await tester.tap(find.byKey(const Key('stationSearchButton')));
       await tester.pumpAndSettle();
 
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('상록수·사당 검증 pilot'),
+        ),
+        findsOneWidget,
+      );
       final searchInput = tester.widget<TextField>(
         find.byKey(const Key('stationSearchInput')),
       );
@@ -6027,6 +6034,13 @@ void main() {
 
       expect(
         find.descendant(of: find.byType(AppBar), matching: find.text('길찾기')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('상록수·사당 검증 pilot'),
+        ),
         findsOneWidget,
       );
       expect(find.text('출발·도착 입력'), findsNothing);
@@ -7764,6 +7778,13 @@ void main() {
     expect(find.byKey(const Key('stationDetailDetailColumn')), findsOneWidget);
     expect(find.text('상록수역'), findsOneWidget);
     expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('상록수·사당 검증 pilot'),
+      ),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(
         const Key('stationFacilityCard-facility-sangnoksu-elevator-1'),
       ),
@@ -8238,6 +8259,8 @@ void main() {
       'node-sangnoksu-faregate',
     );
     expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
+    await tester.scrollUntilVisible(find.text('역 안 이동 순서'), 500);
+    await tester.pumpAndSettle();
     expect(find.text('역 안 이동 순서'), findsOneWidget);
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
