@@ -80,6 +80,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   const gate = readJson(gatePath);
   const readme = read("README.md");
   const prTemplate = read(".github/pull_request_template.md");
+  const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -120,8 +121,10 @@ test("route commercialization release gate blocks unsupported commercial route c
   });
   assert.deepEqual(gate.outOfStationTransferReleaseBlockers, ["D-2", "D-3", "H-1"]);
 
+  assert.equal(existsSync(path.join(root, contractReportBuilder)), true, "route v2 contract report builder must exist");
   assert.match(readme, /Route commercialization gate/);
   assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
+  assert.match(readme, /tools\/routes\/build-route-v2-contract-report\.mjs/);
   assert.match(prTemplate, /Route commercialization gate impact/);
   assert.match(prTemplate, /route-commercialization-gate\.json/);
 });
@@ -4355,6 +4358,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const pubspec = read("apps/mobile/pubspec.yaml");
   const mobileMain = read("apps/mobile/lib/main.dart");
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
+  const sourceCandidates = readJson("tools/datapack/source-candidates.json");
   const gapReporter = read("tools/datapack/report-coverage-gaps.mjs");
 
   assert.deepEqual(appInventory, inventory);
@@ -4443,6 +4447,30 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.ok(targets.expansionRoadmap.slice(1).every((stage) => stage.status === "NO_GO"));
   assert.ok(targets.expansionRoadmap.every((stage) => stage.conditionAxesRef === "roadmapConditionAxes"));
   assert.ok(targets.expansionRoadmap.every((stage) => stage.verificationCommandIds.length > 0));
+  assert.equal(targets.roadmapEvidenceLedger.issue, 1399);
+  assert.equal(targets.roadmapEvidenceLedger.goNoGoSummaryIssue, 1020);
+  assert.match(targets.roadmapEvidenceLedger.goNoGoSummaryReferencePolicyKo, /#1020/);
+  assert.equal(targets.roadmapEvidenceLedger.targetComparison.nationwideTargets.requiredSourceDomainCount, 6);
+  assert.equal(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.requiredSourceDomainCount, 2);
+  assert.deepEqual(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.deferredSourceDomains, [
+    "route_graph_topology",
+    "realtime_arrivals",
+    "route_map_positions",
+    "demand_reference",
+  ]);
+  const p0SourceCandidates = sourceCandidates.candidates.filter((candidate) => candidate.priority === "P0");
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.p0CandidateCount, p0SourceCandidates.length);
+  assert.ok(
+    p0SourceCandidates.every(
+      (candidate) =>
+        candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentSharedAdmissionStatus,
+    ),
+  );
+  assert.equal(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentSharedAdmissionStatus,
+    "evidence_recorded_admin_review_required",
+  );
+  assert.match(targets.roadmapEvidenceLedger.gapEscalationRuleKo, /P0 release blocker/);
   assert.match(gapReporter, /nationwide coverage gaps remain/);
   assert.match(gapReporter, /coverageScope/);
   assert.match(gapReporter, /coverageComplete/);
