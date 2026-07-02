@@ -3343,6 +3343,34 @@ void main() {
     expect(locationProvider.requestCount, 0);
   });
 
+  testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('networkMapMenuSettingsButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapMenuSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppSettingsScreen), findsOneWidget);
+  });
+
   testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       error: const CurrentLocationException('현재 위치를 확인하지 못했어요.'),

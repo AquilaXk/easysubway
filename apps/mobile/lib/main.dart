@@ -1622,6 +1622,7 @@ class _HomeScreenState extends State<HomeScreen> {
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
           onOpenNearbyStations: () =>
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenSettings: openMoreTab,
           onOpenDataSources: openDataSources,
           notificationAction: notificationRepository == null
               ? null
