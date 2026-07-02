@@ -1534,6 +1534,14 @@ class _HomeScreenState extends State<HomeScreen> {
       unawaited(openFavorites());
     }
 
+    void openDataSources() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const DataSourceAttributionScreen(),
+        ),
+      );
+    }
+
     final heroSection = _HomeHero(
       profile: currentProfile,
       onRouteSearch: openRouteTab,
@@ -1595,6 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> {
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
           onOpenNearbyStations: () =>
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenDataSources: openDataSources,
           notificationAction: notificationRepository == null
               ? null
               : FutureBuilder<bool>(
@@ -5459,12 +5468,24 @@ class _PrivacyDataUseLine extends StatelessWidget {
   }
 }
 
-class DataSourceAttributionScreen extends StatelessWidget {
+class DataSourceAttributionScreen extends StatefulWidget {
   const DataSourceAttributionScreen({super.key});
 
+  @override
+  State<DataSourceAttributionScreen> createState() =>
+      _DataSourceAttributionScreenState();
+}
+
+class _DataSourceAttributionScreenState
+    extends State<DataSourceAttributionScreen> {
   static const _mapManifestAsset =
       'assets/datapacks/metro_map_pack/manifest.json';
   static const _sourceInventoryAsset = 'assets/datapacks/source-inventory.json';
+
+  late final Future<
+    ({Map<String, Object?> manifest, Map<String, Object?> inventory})
+  >
+  _future = _load();
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
@@ -5488,7 +5509,7 @@ class DataSourceAttributionScreen extends StatelessWidget {
             FutureBuilder<
               ({Map<String, Object?> manifest, Map<String, Object?> inventory})
             >(
-              future: _load(),
+              future: _future,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return ListView(
