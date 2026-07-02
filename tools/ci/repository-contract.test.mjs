@@ -203,6 +203,58 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.match(readme, /오프라인 데이터팩과 온라인 실시간 overlay를 분리/);
 });
 
+test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
+  const trackerPath = "apps/mobile/release/route-release-readiness-tracker.json";
+  assert.equal(existsSync(path.join(root, trackerPath)), true, "route release readiness tracker must exist");
+
+  const tracker = readJson(trackerPath);
+  const readme = read("README.md");
+  const prTemplate = read(".github/pull_request_template.md");
+  const issueNumbers = tracker.requiredChildIssues.map((issue) => issue.number);
+
+  assert.equal(tracker.schemaVersion, 1);
+  assert.equal(tracker.applicationId, "easysubway");
+  assert.equal(tracker.androidApplicationId, "com.easysubway.app");
+  assert.equal(tracker.releaseGate, "route-release-readiness-tracker");
+  assert.equal(tracker.issue, 1414);
+  assert.equal(tracker.parentGate, "apps/mobile/release/route-commercialization-gate.json");
+  assert.equal(tracker.releaseBlockerPolicy, true);
+  assert.equal(tracker.storeReadyStatus, "blocked_route_release_tracker_incomplete");
+  assert.equal(tracker.releaseClaimPolicy.commercialRealtimeRouteClaimAllowed, false);
+  assert.equal(tracker.releaseClaimPolicy.accessibleRouteReleaseReadyClaimAllowed, false);
+  assert.equal(tracker.releaseClaimPolicy.untilAllCompletionCriteriaPass, true);
+  assert.equal(tracker.northStar.realtimeEtaRequiresFreshProviderEvidence, true);
+  assert.equal(tracker.northStar.realtimeEtaWithoutProviderObservedAtAllowed, false);
+  assert.equal(tracker.northStar.etaErrorBudgetGate, "apps/mobile/release/route-commercialization-gate.json");
+  assert.equal(tracker.northStar.unclassifiedEtaDeviationAllowed, 0);
+  assert.equal(tracker.childIssueBlocksRelease, true);
+  assert.equal(new Set(issueNumbers).size, issueNumbers.length);
+  assert.deepEqual(issueNumbers.toSorted((left, right) => left - right), [
+    1210, 1230, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401,
+    1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413,
+  ]);
+  assert.ok(tracker.requiredChildIssues.every((issue) => issue.releaseBlocker === true));
+  assert.equal(tracker.completionCriteria.allRequiredChildIssuesClosed, true);
+  assert.equal(tracker.completionCriteria.anchorWithoutRealtimeClaimAllowed, 0);
+  assert.equal(tracker.completionCriteria.unclassifiedEtaDeviationAllowed, 0);
+  assert.deepEqual(tracker.completionCriteria.requiredProductionEvidenceReports, [
+    "artifacts/route-accuracy-report.json",
+    "artifacts/route-accessibility-regression-report.json",
+    "artifacts/realtime-provider-coverage-report.json",
+    "artifacts/route-v2-contract-report.json",
+  ]);
+  assert.equal(tracker.completionCriteria.androidRouteResultUiEvidenceRequired, true);
+  assert.equal(tracker.completionCriteria.storeAndHelpCopyMustAvoidOverclaim, true);
+  assert.equal(tracker.evidencePolicy.fixtureOnlyEvidenceAllowedForGo, false);
+  assert.equal(tracker.evidencePolicy.productionOrManualRealtimeEvidenceRequired, true);
+  assert.equal(tracker.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/route-readiness/<rc-or-run>/");
+
+  assert.match(readme, /Route release readiness tracker/);
+  assert.match(readme, /apps\/mobile\/release\/route-release-readiness-tracker\.json/);
+  assert.match(prTemplate, /Route release readiness tracker impact/);
+  assert.match(prTemplate, /route-release-readiness-tracker\.json/);
+});
+
 function currentMobileVersionCode() {
   const match = read("apps/mobile/pubspec.yaml").match(/^version:\s*[^+\s]+[+](\d+)\s*$/m);
   assert.ok(match, "mobile pubspec must contain versionName+versionCode");
