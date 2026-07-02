@@ -3491,21 +3491,25 @@ class _FavoriteListScreen extends StatelessWidget {
 }
 
 class OfflineDataScreen extends StatelessWidget {
-  const OfflineDataScreen({super.key});
+  const OfflineDataScreen({super.key, this.expiresAt, this.now});
 
   // ponytail: static v1 QA source; wire live catalog metadata when offline status is dynamic.
   static const _offlineDataSourceOfTruth = 'installed catalog metadata';
 
+  final DateTime? expiresAt;
+  final DateTime Function()? now;
+
   @override
   Widget build(BuildContext context) {
     assert(_offlineDataSourceOfTruth == 'installed catalog metadata');
+    final storedDataStatus = _storedDataStatus(expiresAt: expiresAt, now: now);
     return Scaffold(
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
         child: ListView(
           padding: _mainPagePadding,
-          children: const [
-            _AppCard(
+          children: [
+            const _AppCard(
               showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
@@ -3514,11 +3518,11 @@ class OfflineDataScreen extends StatelessWidget {
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
             ),
-            _AppSectionTitle(title: '저장된 안내 상태'),
+            const _AppSectionTitle(title: '저장된 안내 상태'),
             _AppCard(
               child: Column(
                 children: [
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.public,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '검증 구간',
@@ -3529,24 +3533,24 @@ class OfflineDataScreen extends StatelessWidget {
                     icon: Icons.update,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
-                    subtitle: '앱 설치 때 함께 받은 안내',
-                    trailing: '저장됨',
+                    subtitle: storedDataStatus.subtitle,
+                    trailing: storedDataStatus.trailing,
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.manage_search_outlined,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '저장 정보 다시 확인',
                     subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
                     trailing: '확인',
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.verified_outlined,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '안내 범위',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
                     trailing: '일부',
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.info_outline,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '제한 사항',
@@ -3556,8 +3560,8 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _AppSectionTitle(title: '이용 가능'),
-            _AppCard(
+            const _AppSectionTitle(title: '이용 가능'),
+            const _AppCard(
               child: Column(
                 children: [
                   _AppInfoRow(
@@ -3584,8 +3588,8 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _AppSectionTitle(title: '인터넷 연결 필요'),
-            _AppCard(
+            const _AppSectionTitle(title: '인터넷 연결 필요'),
+            const _AppCard(
               child: Column(
                 children: [
                   _AppInfoRow(
@@ -3610,6 +3614,18 @@ class OfflineDataScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+({String subtitle, String trailing}) _storedDataStatus({
+  DateTime? expiresAt,
+  DateTime Function()? now,
+}) {
+  final expiry = expiresAt;
+  final current = (now ?? DateTime.now)().toUtc();
+  if (expiry != null && !current.isBefore(expiry.toUtc())) {
+    return (subtitle: '저장된 데이터 기준 · 갱신 필요', trailing: '갱신 필요');
+  }
+  return (subtitle: '앱 설치 때 함께 받은 안내', trailing: '저장됨');
 }
 
 class SupportAccessScreen extends StatelessWidget {
