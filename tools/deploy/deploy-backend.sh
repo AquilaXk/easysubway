@@ -481,7 +481,7 @@ fail_backend_deployment() {
 		ln -sfn "$(readlink "${SHARED_DIR}/previous-env")" "${SHARED_DIR}/current-env.next"
 		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
 		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build "${RUNTIME_SERVICES[@]}" || true
-		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" --profile observability up -d --no-build --force-recreate "${OBSERVABILITY_SERVICES[@]}" || true
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" --profile observability up -d --no-build "${OBSERVABILITY_SERVICES[@]}" || true
 		write_result "failed" "${detail}_rollback_attempted"
 	else
 		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" rm -f -s "${RUNTIME_SERVICES[@]}" || true
@@ -504,7 +504,7 @@ if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/
 	fail_backend_deployment "backend_start_failed"
 	exit 1
 fi
-if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability up -d --no-build --force-recreate "${OBSERVABILITY_SERVICES[@]}"; then
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability up -d --no-build "${OBSERVABILITY_SERVICES[@]}"; then
 	fail_backend_deployment "observability_start_failed"
 	exit 1
 fi

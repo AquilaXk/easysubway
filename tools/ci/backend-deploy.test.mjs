@@ -214,7 +214,8 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /same_sha_same_env_services_ready/);
   assert.doesNotMatch(deploy, /same_sha_same_env_ready/);
   assert.match(deploy, /up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
+  assert.match(deploy, /--profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
+  assert.doesNotMatch(deploy, /--force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /fail_backend_deployment\(\)/);
   assert.match(deploy, /fail_backend_deployment "backend_start_failed"/);
   assert.match(deploy, /fail_backend_deployment "observability_start_failed"/);
@@ -226,7 +227,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /fail_backend_deployment "observability_readiness_failed"/);
   assert.match(deploy, /"\$\{detail\}_rollback_attempted"/);
   assert.match(deploy, /"\$\{detail\}_rollback_unavailable"/);
-  assert.match(deploy, /"\$\{current_sha\}" --profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| true/);
+  assert.match(deploy, /"\$\{current_sha\}" --profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| true/);
   assert.match(deploy, /rm -f -s "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
