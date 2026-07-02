@@ -22,7 +22,7 @@ Color _favoriteFacilitySeverityColor(FacilityStatusSeverity severity) {
   return switch (severity) {
     FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.red,
     FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amber,
-    FacilityStatusSeverity.needsInfo => const Color(0xFF17527C),
+    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.needsInfo,
     FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mintDark,
   };
 }
@@ -658,7 +658,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                             favorite.severityLabel,
                             style: textTheme.bodyMedium?.copyWith(
                               color: severityColor,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               height: 1.2,
                             ),
                           ),
@@ -669,7 +669,7 @@ class _FavoriteFacilityTile extends StatelessWidget {
                         favorite.name,
                         style: textTheme.titleLarge?.copyWith(
                           color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
                       ),

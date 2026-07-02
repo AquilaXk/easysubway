@@ -212,6 +212,8 @@ class StartScreen extends StatelessWidget {
                                 children: [
                                   TextSpan(text: '빠른 길보다,\n'),
                                   TextSpan(
+                                    // 스타트 화면(브랜드 스플래시) 한정 강조색.
+                                    // 팔레트 액센트(primary) 배경 위 대비를 위한 예외.
                                     text: '갈 수 있는 길',
                                     style: TextStyle(color: Color(0xFFB8F4DF)),
                                   ),
@@ -350,7 +352,7 @@ class _IntroVisual extends StatelessWidget {
               top: 38,
               child: _IntroIcon(
                 icon: Icons.accessible_forward,
-                color: EasySubwayAccessibleColors.mint,
+                color: EasySubwayAccessibleColors.primary,
               ),
             ),
             Positioned(
@@ -405,9 +407,9 @@ class _IntroIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x16071B2F),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            color: EasySubwayAccessibleColors.cardShadow,
+            blurRadius: 8,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -484,15 +486,13 @@ class _IntroInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFFDFF7EF),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: SizedBox(
-            width: 43,
-            height: 43,
-            child: Icon(icon, color: const Color(0xFF0A705A), size: 22),
+        SizedBox(
+          width: 43,
+          height: 43,
+          child: Icon(
+            icon,
+            color: EasySubwayAccessibleColors.primary,
+            size: 26,
           ),
         ),
         const SizedBox(width: 12),
@@ -504,14 +504,14 @@ class _IntroInfoRow extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF647686),
+                  color: EasySubwayAccessibleColors.mutedText,
                   fontWeight: FontWeight.w700,
                   height: 1.35,
                 ),
@@ -531,7 +531,7 @@ class _IntroDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 13),
-      child: Divider(height: 1, color: Color(0xFFE0E7EC)),
+      child: Divider(height: 1, color: EasySubwayAccessibleColors.line),
     );
   }
 }
@@ -557,8 +557,8 @@ class _OnboardingStepIndicator extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: step <= currentStep
-                        ? const Color(0xFF0D8A6D)
-                        : const Color(0xFFDBE3E9),
+                        ? EasySubwayAccessibleColors.primary
+                        : EasySubwayAccessibleColors.line,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const SizedBox(height: 5),
@@ -573,7 +573,7 @@ class _OnboardingStepIndicator extends StatelessWidget {
           '$currentStep / $totalSteps',
           textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF647686),
+            color: EasySubwayAccessibleColors.mutedText,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -604,7 +604,6 @@ class _PermissionInfoCard extends StatelessWidget {
             icon: Icons.location_on_outlined,
             title: '현재 위치',
             subtitle: '가까운 역 찾기',
-            mint: true,
             value: locationSelected,
             onChanged: onLocationChanged,
           ),
@@ -629,7 +628,6 @@ class _PermissionInfoRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
-    this.mint = false,
   });
 
   final IconData icon;
@@ -637,26 +635,18 @@ class _PermissionInfoRow extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
-  final bool mint;
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = mint ? const Color(0xFF0A705A) : const Color(0xFF17527C);
-    final iconBackground = mint
-        ? const Color(0xFFDFF7EF)
-        : const Color(0xFFEEF3F6);
-
     return Row(
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: SizedBox(
-            width: 43,
-            height: 43,
-            child: Icon(icon, color: iconColor, size: 22),
+        SizedBox(
+          width: 43,
+          height: 43,
+          child: Icon(
+            icon,
+            color: EasySubwayAccessibleColors.primary,
+            size: 26,
           ),
         ),
         const SizedBox(width: 12),
@@ -668,14 +658,14 @@ class _PermissionInfoRow extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF647686),
+                  color: EasySubwayAccessibleColors.mutedText,
                   fontWeight: FontWeight.w700,
                   height: 1.35,
                 ),
@@ -936,7 +926,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Text(
                         _onboardingNotificationFailureNextAction,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF506B6F),
+                          color: EasySubwayAccessibleColors.mutedText,
                           fontWeight: FontWeight.w700,
                           height: 1.35,
                         ),
@@ -1085,9 +1075,11 @@ class _OnboardingProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF0D8A6D);
-    final borderColor = selected ? primaryColor : const Color(0xFFDBE3E9);
-    final backgroundColor = selected ? const Color(0xFFEAF8F3) : Colors.white;
+    const primaryColor = EasySubwayAccessibleColors.primary;
+    final borderColor = selected
+        ? primaryColor
+        : EasySubwayAccessibleColors.line;
+    const backgroundColor = Colors.white;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
@@ -1116,23 +1108,13 @@ class _OnboardingProfileCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xFFDFF7EF)
-                              : const Color(0xFFEEF3F6),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: SizedBox(
-                          width: 46,
-                          height: 46,
-                          child: Icon(
-                            profile.icon,
-                            color: selected
-                                ? primaryColor
-                                : const Color(0xFF17527C),
-                            size: 23,
-                          ),
+                      SizedBox(
+                        width: 46,
+                        height: 46,
+                        child: Icon(
+                          profile.icon,
+                          color: EasySubwayAccessibleColors.primary,
+                          size: 27,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1146,7 +1128,7 @@ class _OnboardingProfileCard extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w800,
                                     height: 1.25,
                                   ),
                             ),
@@ -1155,7 +1137,7 @@ class _OnboardingProfileCard extends StatelessWidget {
                               _profileDisplaySummary(profile),
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
-                                    color: const Color(0xFF647686),
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -1203,7 +1185,9 @@ class _ProfileRadio extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? const Color(0xFF0D8A6D) : const Color(0xFFC8D3DC),
+          color: selected
+              ? EasySubwayAccessibleColors.primary
+              : EasySubwayAccessibleColors.line,
           width: 2,
         ),
       ),
@@ -1214,7 +1198,7 @@ class _ProfileRadio extends StatelessWidget {
             ? const Center(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Color(0xFF0D8A6D),
+                    color: EasySubwayAccessibleColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: SizedBox(width: 10, height: 10),
@@ -1236,7 +1220,7 @@ class _OnboardingPreferenceCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFDBE3E9)),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(
@@ -1280,14 +1264,14 @@ class _OnboardingConditionRow extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF647686),
+                        color: EasySubwayAccessibleColors.mutedText,
                         fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
@@ -1295,37 +1279,34 @@ class _OnboardingConditionRow extends StatelessWidget {
                   ],
                 ),
               ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: enabled
-                      ? const Color(0xFFDFF7EF)
-                      : const Color(0xFFEEF3F6),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minWidth: 72,
-                    minHeight: 36,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    child: Center(
-                      child: Text(
-                        state,
-                        style: TextStyle(
-                          color: enabled
-                              ? const Color(0xFF0D8A6D)
-                              : const Color(0xFF647686),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                        ),
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: enabled
+                            ? EasySubwayAccessibleColors.primary
+                            : EasySubwayAccessibleColors.line,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Text(
+                      state,
+                      style: TextStyle(
+                        color: enabled
+                            ? EasySubwayAccessibleColors.primary
+                            : EasySubwayAccessibleColors.mutedText,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1371,14 +1352,14 @@ class _OnboardingViewPreferenceSwitch extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF647686),
+                        color: EasySubwayAccessibleColors.mutedText,
                         fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
@@ -1409,6 +1390,6 @@ class _OnboardingPreferenceDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(height: 1, color: Color(0xFFDBE3E9));
+    return const Divider(height: 1, color: EasySubwayAccessibleColors.line);
   }
 }

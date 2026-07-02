@@ -68,6 +68,9 @@ class EasySubwayAccessibleColors {
   /// 고장·오류 상태 배경 틴트.
   static const redSoft = Color(0xFFFFE8E6);
 
+  /// 확인 중·제보됨(needsInfo) 상태색. 브랜드 액센트 1계열로 통일한다.
+  static const needsInfo = primary;
+
   /// 정보 틴트(레거시). 장식용이므로 화면 정비 시 여백·구분선으로 대체한다.
   static const skySoft = Color(0xFFE6F5FF);
 
