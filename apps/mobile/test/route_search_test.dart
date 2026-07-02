@@ -639,6 +639,7 @@ void main() {
       'REALTIME',
       'MIXED',
       'PLANNED',
+      'STATIC_BACKEND_ESTIMATE',
       'STATIC_BACKEND_V1',
       'STATIC_LOCAL',
       'STATIC_ESTIMATE',
@@ -648,6 +649,7 @@ void main() {
     });
     expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보 준비 중');
     expect(routeEtaSourceLabel('MIXED'), '일부 도착정보를 확인하고 있어요');
+    expect(routeEtaSourceLabel('STATIC_BACKEND_ESTIMATE'), '시간표 기준');
     expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
     expect(routeEtaSourceLabel('UNSUPPORTED'), '실시간 미지원');
     expect(routeEtaSourceLabel('STALE'), '저장된 데이터 기준 · 갱신 필요');
