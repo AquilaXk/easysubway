@@ -1370,10 +1370,11 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 
   assert.match(widgetTest, routeBackTestPattern);
   assert.match(routeSearch, /return PopScope\(/);
-  assert.match(routeSearch, /_RouteWorkflowView\.detail\s*=>\s*_RouteWorkflowView\.list/);
-  assert.match(routeSearch, /_RouteWorkflowView\.guidance\s*=>\s*_RouteWorkflowView\.detail/);
-  assert.match(routeSearch, /_RouteWorkflowView\.internalRoute\s*=>\s*_RouteWorkflowView\.guidance/);
-  assert.match(routeSearch, /_RouteWorkflowView\.feedback\s*=>\s*_RouteWorkflowView\.detail/);
+  assert.match(routeSearch, /Navigator\.of\(context\)\.push\(\s*MaterialPageRoute<void>/);
+  assert.match(routeSearch, /builder:\s*\(_\)\s*=>\s*_RouteStageScaffold\(child:\s*child\)/);
+  assert.match(routeSearch, /class _RouteStageScaffold extends StatelessWidget/);
+  assert.match(routeSearch, /onBack:\s*\(\)\s*=>\s*Navigator\.of\(context\)\.pop\(\)/);
+  assert.doesNotMatch(routeSearch, /enum _RouteWorkflowView/);
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {

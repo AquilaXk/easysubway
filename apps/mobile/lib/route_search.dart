@@ -3881,15 +3881,6 @@ class _RouteRefreshStatusBanner extends StatelessWidget {
   }
 }
 
-enum _RouteWorkflowView {
-  list,
-  detail,
-  guidance,
-  internalRoute,
-  blocked,
-  feedback,
-}
-
 class _RouteSearchResultCard extends StatefulWidget {
   const _RouteSearchResultCard({
     required this.result,
@@ -3912,122 +3903,134 @@ class _RouteSearchResultCard extends StatefulWidget {
 }
 
 class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
-  _RouteWorkflowView _view = _RouteWorkflowView.list;
-
-  @override
-  void didUpdateWidget(_RouteSearchResultCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.result.routeSearchId != widget.result.routeSearchId) {
-      _view = _RouteWorkflowView.list;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
-    final refreshMessage = widget.refreshMessage;
     if (result.isBlocked) {
-      final content = _RouteBlockedWorkflow(result: result);
-      final onShellBackToHome = widget.onShellBackToHome;
-      if (onShellBackToHome == null) {
-        return content;
-      }
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            onShellBackToHome();
-          }
-        },
-        child: content,
-      );
+      return _wrapShellBack(_RouteBlockedWorkflow(result: result));
     }
 
-    final canUseRouteActions = _isRecommendedRoute(result);
-    final canUseApiActions = !result.isLocalResult;
-    final canSaveRoute =
-        canUseApiActions &&
-        widget.favoriteRouteRepository != null &&
-        canUseRouteActions;
-    final canOpenFeedback =
-        canUseApiActions && widget.routeFeedbackRepository != null;
-
-    final workflowContent = switch (_view) {
-      _RouteWorkflowView.list => _RouteResultsListView(
-        result: result,
-        onOpenDetail: () => setState(() => _view = _RouteWorkflowView.detail),
+    // 결과 목록만 이 화면에 남기고, 상세·안내·역 안 이동·피드백은 표준
+    // 내비게이션 스택에 별도 화면으로 push한다(뒤로가기는 시스템 back에 위임).
+    return _wrapShellBack(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _RouteRefreshStatusBanner(
+            message: widget.refreshMessage,
+            isRefreshing: widget.isRefreshing,
+          ),
+          _RouteResultsListView(
+            result: result,
+            onOpenDetail: () => _openDetail(result),
+          ),
+        ],
       ),
-      _RouteWorkflowView.detail => _RouteDetailWorkflowView(
+    );
+  }
+
+  bool get _canUseRouteActions => _isRecommendedRoute(widget.result);
+  bool get _canUseApiActions => !widget.result.isLocalResult;
+  bool get _canSaveRoute =>
+      _canUseApiActions &&
+      widget.favoriteRouteRepository != null &&
+      _canUseRouteActions;
+  bool get _canOpenFeedback =>
+      _canUseApiActions && widget.routeFeedbackRepository != null;
+
+  // 목록 화면에서 시스템 back은 탭 셸 홈으로(탭 셸이 아닐 땐 화면 pop).
+  Widget _wrapShellBack(Widget content) {
+    final onShellBackToHome = widget.onShellBackToHome;
+    if (onShellBackToHome == null) {
+      return content;
+    }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          onShellBackToHome();
+        }
+      },
+      child: content,
+    );
+  }
+
+  void _pushStage(Widget child) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _RouteStageScaffold(child: child),
+      ),
+    );
+  }
+
+  void _openDetail(RouteSearchResult result) {
+    _pushStage(
+      _RouteDetailWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.list),
-        onStartGuidance: !canUseRouteActions
+        onBack: () => Navigator.of(context).pop(),
+        onStartGuidance: !_canUseRouteActions
             ? null
-            : () => setState(() => _view = _RouteWorkflowView.guidance),
-        onOpenFeedback: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
-        favoriteSaveButton: canSaveRoute
+            : () => _openGuidance(result),
+        onOpenFeedback: !_canOpenFeedback ? null : () => _openFeedback(result),
+        favoriteSaveButton: _canSaveRoute
             ? _RouteFavoriteSaveButton(
                 result: result,
                 repository: widget.favoriteRouteRepository!,
               )
             : null,
       ),
-      _RouteWorkflowView.guidance => _RouteGuidanceWorkflowView(
+    );
+  }
+
+  void _openGuidance(RouteSearchResult result) {
+    _pushStage(
+      _RouteGuidanceWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.detail),
-        onOpenInternalRoute: () =>
-            setState(() => _view = _RouteWorkflowView.internalRoute),
-        onOpenBlocked: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
-        onOpenFeedback: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
+        onBack: () => Navigator.of(context).pop(),
+        onOpenInternalRoute: () => _openInternal(result),
+        onOpenBlocked: !_canOpenFeedback ? null : () => _openFeedback(result),
+        onOpenFeedback: !_canOpenFeedback ? null : () => _openFeedback(result),
       ),
-      _RouteWorkflowView.internalRoute => _RouteInternalWorkflowView(
+    );
+  }
+
+  void _openInternal(RouteSearchResult result) {
+    _pushStage(
+      _RouteInternalWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.guidance),
+        onBack: () => Navigator.of(context).pop(),
       ),
-      _RouteWorkflowView.blocked => _RouteBlockedWorkflow(result: result),
-      _RouteWorkflowView.feedback => _RouteFeedbackWorkflowView(
+    );
+  }
+
+  void _openFeedback(RouteSearchResult result) {
+    _pushStage(
+      _RouteFeedbackWorkflowView(
         result: result,
         repository: widget.routeFeedbackRepository,
-        onBack: () => setState(() => _view = _RouteWorkflowView.detail),
+        onBack: () => Navigator.of(context).pop(),
       ),
-    };
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _RouteRefreshStatusBanner(
-          message: refreshMessage,
-          isRefreshing: widget.isRefreshing,
-        ),
-        workflowContent,
-      ],
     );
-    final onShellBackToHome = widget.onShellBackToHome;
-    return PopScope(
-      canPop: _view == _RouteWorkflowView.list && onShellBackToHome == null,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        if (_view == _RouteWorkflowView.list) {
-          onShellBackToHome?.call();
-          return;
-        }
-        setState(() {
-          _view = switch (_view) {
-            _RouteWorkflowView.detail => _RouteWorkflowView.list,
-            _RouteWorkflowView.guidance => _RouteWorkflowView.detail,
-            _RouteWorkflowView.internalRoute => _RouteWorkflowView.guidance,
-            _RouteWorkflowView.feedback => _RouteWorkflowView.detail,
-            _ => _RouteWorkflowView.list,
-          };
-        });
-      },
-      child: content,
+  }
+}
+
+/// push된 길찾기 단계(상세·안내·역 안 이동·피드백) 화면 껍데기.
+/// 시스템 back과 각 뷰의 상단 back 버튼이 이 라우트를 pop한다.
+class _RouteStageScaffold extends StatelessWidget {
+  const _RouteStageScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -4396,7 +4399,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
         if (nextStep != null)
           _RouteNotice(
             title: '다음',
-            text: nextStep.title,
+            text: nextStep.userTitle,
             icon: Icons.near_me_outlined,
           ),
         if (onOpenBlocked case final openBlocked?)

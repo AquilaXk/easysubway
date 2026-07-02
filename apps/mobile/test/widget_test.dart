@@ -9028,7 +9028,11 @@ void main() {
       await tester.pumpAndSettle();
       await _tapFirstRouteResultListItem(tester);
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, 600));
+      // 상세는 이제 별도 화면(SingleChildScrollView)으로 push된다.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, 600),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('경로 목록'), findsOneWidget);
