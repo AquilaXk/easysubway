@@ -1193,8 +1193,17 @@ public class RouteSearchService implements RouteSearchUseCase {
 			step.requiresAccessibilityCheck(),
 			overlay.etaSource().name(),
 			step.distanceSource(),
-			overlay.confidence().name()
+			overlay.confidence().name(),
+			overlay.warningCodes(),
+			overlay.providerSnapshotId(),
+			formatInstant(overlay.providerObservedAt()),
+			formatInstant(overlay.gatewayReceivedAt()),
+			formatInstant(Instant.now(clock))
 		);
+	}
+
+	private String formatInstant(Instant instant) {
+		return instant == null ? null : instant.toString();
 	}
 
 	private int durationSeconds(RouteStep step) {
