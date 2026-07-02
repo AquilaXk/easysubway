@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "releaseGate": "mobile-release-claim-scan",
+  "issue": 1392,
+  "scopeSource": "apps/mobile/release/production-datapack-scope.json",
+  "scanTargets": [
+    {
+      "path": "apps/mobile/lib",
+      "extensions": [".dart"]
+    },
+    {
+      "path": "apps/mobile/release/play-store-submission-content.json",
+      "jsonPointers": [
+        "/koreanListing",
+        "/requiredScreenshotSet",
+        "/largeScreenScreenshotTargets",
+        "/appContentDeclarations/reviewerAccessNotesKo"
+      ]
+    }
+  ],
+  "forbiddenClaimsKo": [
+    "전국 완전 지원",
+    "전국 지하철 완전 지원",
+    "모든 역",
+    "100% 안전",
+    "휠체어 경로 보장",
+    "실시간 보장",
+    "항상 정확",
+    "실시간 길찾기 정확 보장"
+  ]
+}
