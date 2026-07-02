@@ -1534,6 +1534,14 @@ class _HomeScreenState extends State<HomeScreen> {
       unawaited(openFavorites());
     }
 
+    void openDataSources() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const DataSourceAttributionScreen(),
+        ),
+      );
+    }
+
     final heroSection = _HomeHero(
       profile: currentProfile,
       onRouteSearch: openRouteTab,
@@ -1595,6 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> {
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
           onOpenNearbyStations: () =>
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenDataSources: openDataSources,
           notificationAction: notificationRepository == null
               ? null
               : FutureBuilder<bool>(
@@ -2768,7 +2777,6 @@ class _HomeFacilityAlertCard extends StatelessWidget {
           children: [
             _AppInfoRow(
               icon: _facilityIcon(facility.type),
-              iconBackground: Colors.white,
               iconColor: accent.iconColor,
               title: '${facility.stationLabel} $facilityName',
               subtitle:
@@ -3319,18 +3327,16 @@ class _AppCard extends StatelessWidget {
 class _AppInfoRow extends StatelessWidget {
   const _AppInfoRow({
     required this.icon,
-    required this.iconBackground,
     required this.iconColor,
     required this.title,
     this.subtitle,
     this.subtitleColor = EasySubwayAccessibleColors.mutedText,
-    this.iconBoxSize = 43,
+    this.iconBoxSize = 32,
     this.iconSize = 22,
     this.trailing,
   });
 
   final IconData icon;
-  final Color iconBackground;
   final Color iconColor;
   final String title;
   final String? subtitle;
@@ -3342,14 +3348,12 @@ class _AppInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = this.subtitle;
-    final leading = Container(
+    final leading = SizedBox(
       width: iconBoxSize,
       height: iconBoxSize,
-      decoration: BoxDecoration(
-        color: iconBackground,
-        borderRadius: _mainIconControlRadius,
+      child: Center(
+        child: Icon(icon, color: iconColor, size: iconSize),
       ),
-      child: Icon(icon, color: iconColor, size: iconSize),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3359,7 +3363,7 @@ class _AppInfoRow extends StatelessWidget {
           style: const TextStyle(
             color: EasySubwayAccessibleColors.text,
             fontSize: 15,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             height: 1.25,
           ),
         ),
@@ -3370,7 +3374,7 @@ class _AppInfoRow extends StatelessWidget {
             style: TextStyle(
               color: subtitleColor,
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w500,
               height: 1.4,
             ),
           ),
@@ -3397,7 +3401,7 @@ class _AppInfoRow extends StatelessWidget {
                 style: const TextStyle(
                   color: EasySubwayAccessibleColors.text,
                   fontSize: 12,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -3416,7 +3420,7 @@ class _AppInfoRow extends StatelessWidget {
             style: const TextStyle(
               color: EasySubwayAccessibleColors.text,
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -3999,7 +4003,6 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                         child: _AppCard(
                           child: _AppInfoRow(
                             icon: Icons.bookmark_border,
-                            iconBackground: EasySubwayAccessibleColors.mintSoft,
                             iconColor: EasySubwayAccessibleColors.mintDark,
                             title: '즐겨찾기한 항목이 없습니다',
                             subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
@@ -4365,7 +4368,6 @@ class OfflineDataScreen extends StatelessWidget {
               borderColor: EasySubwayAccessibleColors.mintBorder,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
-                iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.mintDark,
                 title: '인터넷 없이도 이용할 수 있어요',
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
@@ -4377,7 +4379,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.public,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '검증 구간',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
@@ -4385,7 +4386,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.update,
-                    iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
                     subtitle: '앱 설치 때 함께 받은 안내',
@@ -4393,7 +4393,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.manage_search_outlined,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '저장 정보 다시 확인',
                     subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
@@ -4401,7 +4400,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.verified_outlined,
-                    iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '안내 범위',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
@@ -4409,7 +4407,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.info_outline,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '제한 사항',
                     subtitle: '실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요',
@@ -4424,7 +4421,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.map_outlined,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '노선도',
                     subtitle: '지역·노선·역 보기',
@@ -4432,7 +4428,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.train_outlined,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '역·시설 정보',
                     subtitle: '출구와 엘리베이터 보기',
@@ -4440,7 +4435,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.bookmark_border,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '즐겨찾기한 항목',
                     subtitle: '역·시설·경로 보기',
@@ -4455,7 +4449,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.report_outlined,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '시설 제보',
                     subtitle: '사진과 제보 보내기',
@@ -4463,7 +4456,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.refresh,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '시설 상태 새로 확인',
                     subtitle: '최신 고장·복구 확인',
@@ -4542,7 +4534,6 @@ class SupportAccessScreen extends StatelessWidget {
             const _AppCard(
               child: _AppInfoRow(
                 icon: Icons.verified_outlined,
-                iconBackground: EasySubwayAccessibleColors.skySoft,
                 iconColor: EasySubwayAccessibleColors.brand,
                 title: '지원 범위',
                 subtitle: ProductionScopeCopy.helpNotice,
@@ -5112,7 +5103,6 @@ class UserDataDeletionResultScreen extends StatelessWidget {
               borderColor: _homeInfoBorderColor,
               child: _AppInfoRow(
                 icon: Icons.map_outlined,
-                iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.brand,
                 title: '노선도와 역 정보는 계속 이용할 수 있어요',
               ),
@@ -5546,12 +5536,24 @@ class _PrivacyDataUseLine extends StatelessWidget {
   }
 }
 
-class DataSourceAttributionScreen extends StatelessWidget {
+class DataSourceAttributionScreen extends StatefulWidget {
   const DataSourceAttributionScreen({super.key});
 
+  @override
+  State<DataSourceAttributionScreen> createState() =>
+      _DataSourceAttributionScreenState();
+}
+
+class _DataSourceAttributionScreenState
+    extends State<DataSourceAttributionScreen> {
   static const _mapManifestAsset =
       'assets/datapacks/metro_map_pack/manifest.json';
   static const _sourceInventoryAsset = 'assets/datapacks/source-inventory.json';
+
+  late final Future<
+    ({Map<String, Object?> manifest, Map<String, Object?> inventory})
+  >
+  _future = _load();
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
@@ -5575,7 +5577,7 @@ class DataSourceAttributionScreen extends StatelessWidget {
             FutureBuilder<
               ({Map<String, Object?> manifest, Map<String, Object?> inventory})
             >(
-              future: _load(),
+              future: _future,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return ListView(
@@ -5584,7 +5586,6 @@ class DataSourceAttributionScreen extends StatelessWidget {
                       _AppCard(
                         child: _AppInfoRow(
                           icon: Icons.error_outline,
-                          iconBackground: EasySubwayAccessibleColors.amberSoft,
                           iconColor: EasySubwayAccessibleColors.amber,
                           title: '자료 제공 정보를 불러오지 못했어요',
                           subtitle: '앱을 다시 열고, 계속 보이지 않으면 고객지원에 알려 주세요.',
@@ -5611,7 +5612,6 @@ class DataSourceAttributionScreen extends StatelessWidget {
                       borderColor: EasySubwayAccessibleColors.mintBorder,
                       child: _AppInfoRow(
                         icon: Icons.info_outline,
-                        iconBackground: Colors.white,
                         iconColor: EasySubwayAccessibleColors.mintDark,
                         title: '지원 범위',
                         subtitle: ProductionScopeCopy.supportedClaimKo,
