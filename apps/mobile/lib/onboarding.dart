@@ -772,8 +772,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       bottomNavigationBar: _currentStep == 2
           ? null
-          : SafeArea(
-              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          : Padding(
+              padding: easySubwayBottomActionInsets(context, top: 8),
               child: FilledButton(
                 key: const Key('onboardingDoneButton'),
                 onPressed: onNext,

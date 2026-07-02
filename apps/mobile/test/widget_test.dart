@@ -7641,8 +7641,11 @@ void main() {
       expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('수도권 2호선'), findsOneWidget);
-      expect(find.text('일부 정보는 확인 중이에요'), findsOneWidget);
-      expect(find.text('마지막 확인 2026-06-13'), findsOneWidget);
+      // 상세 헤더는 데이터 품질 문구를 노출하지 않는다(간결화, 시맨틱 라벨에는 유지).
+      expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
+      // '마지막 확인'은 역명 우측에 라벨/날짜 두 줄로 표시된다.
+      expect(find.text('마지막 확인'), findsOneWidget);
+      expect(find.text('2026-06-13'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
       expect(
