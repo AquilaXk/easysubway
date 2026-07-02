@@ -42,6 +42,37 @@ test("builds route v2 contract report from runtime responses", () => {
   assert.deepEqual(report.releaseBlockersSatisfied, ["D-2", "D-3", "H-1"]);
 });
 
+test("reads line sequence from route v2 legType runtime response", () => {
+  const report = buildContractReport({
+    schemaVersion: 1,
+    samples: [
+      {
+        id: "controller-runtime",
+        response: {
+          data: {
+            itineraries: [
+              {
+                status: "FOUND",
+                transferCount: 1,
+                legs: [
+                  { legType: "RIDE", lineId: "line-a" },
+                  { legType: "TRANSFER" },
+                  { legType: "RIDE", lineId: "line-b" },
+                ],
+              },
+            ],
+          },
+        },
+        expected: {
+          lineSequences: [["line-a", "line-b"]],
+        },
+      },
+    ],
+  });
+
+  assert.equal(report.wrongLineSequence, 0);
+});
+
 test("writes route v2 contract report json", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "route-v2-contract-"));
   const inputPath = path.join(dir, "responses.json");

@@ -112,9 +112,13 @@ function wrongLineSequence(samples) {
 function lineSequenceOf(itinerary) {
   const steps = itinerary?.legs ?? itinerary?.steps ?? [];
   return steps
-    .filter((step) => (step.type ?? step.stepType) === "RIDE" || (step.type ?? step.stepType) === "ride")
+    .filter((step) => isRideStep(step))
     .map((step) => step.lineId)
     .filter(Boolean);
+}
+
+function isRideStep(step) {
+  return ["RIDE", "ride"].includes(step.legType ?? step.type ?? step.stepType);
 }
 
 function number(value) {
