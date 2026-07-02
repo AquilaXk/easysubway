@@ -33,6 +33,7 @@
   "routing": {
     "multiTransferSupported": false,
     "outOfStationTransferSupported": false,
+    "outOfStationTransferAllowlistSource": "catalog_metadata:route.outOfStationTransfer.allowlist",
     "alternativeItinerariesMin": 2
   },
   "etaSourceIntegrity": {

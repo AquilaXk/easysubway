@@ -742,6 +742,10 @@ void main() {
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
     await _addSecondLineForTransferFixture(database);
+    await _allowOutOfStationTransfer(
+      database,
+      'station-a:line-test->station-c:line-alt',
+    );
     await _insertVerifiedNetworkEdge(
       database,
       id: 'edge-b-a-line-test',
@@ -781,11 +785,100 @@ void main() {
     expect(transferStep.actionTitle, '역외 환승');
   });
 
+  test('역외 환승 edge는 allowlist 없으면 후보에서 제외한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-b-a-line-test',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'out-transfer-a-c',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-alt',
+      edgeType: 'OUT_OF_STATION_TRANSFER',
+      durationSeconds: 300,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(result.status, isNot('FOUND'));
+    expect(
+      result.steps.where((step) => step.stepType == 'outOfStationTransfer'),
+      isEmpty,
+    );
+  });
+
+  test('역외 환승 runtime kill switch off는 다음 검색부터 후보에서 제외한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _addSecondLineForTransferFixture(database);
+    await _allowOutOfStationTransfer(
+      database,
+      'station-a:line-test->station-c:line-alt',
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'edge-b-a-line-test',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'out-transfer-a-c',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-alt',
+      edgeType: 'OUT_OF_STATION_TRANSFER',
+      durationSeconds: 300,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final enabledResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+    await _setOutOfStationTransferRuntimeEnabled(database, false);
+    final disabledResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(enabledResult.status, 'FOUND');
+    expect(disabledResult.status, isNot('FOUND'));
+  });
+
   test('역외 환승 edge는 역방향을 자동으로 열지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
     await _addSecondLineForTransferFixture(database);
+    await _allowOutOfStationTransfer(
+      database,
+      'station-a:line-test->station-c:line-alt',
+    );
     await _insertVerifiedNetworkEdge(
       database,
       id: 'edge-a-b-line-test',
@@ -3352,6 +3445,36 @@ Future<void> _seedLineWithoutNetworkEdges(
   if (fillInsertedNetworkEdgeEvidence) {
     await _fillInsertedNetworkEdgeEvidence(database);
   }
+}
+
+Future<void> _allowOutOfStationTransfer(
+  CatalogDatabase database,
+  String pairId,
+) async {
+  await database.customStatement(
+    '''
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES
+        ('route.outOfStationTransfer.enabled', 'true', 1781827200),
+        ('route.outOfStationTransfer.allowlist', ?, 1781827200)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    ''',
+    [pairId],
+  );
+}
+
+Future<void> _setOutOfStationTransferRuntimeEnabled(
+  CatalogDatabase database,
+  bool enabled,
+) async {
+  await database.customStatement(
+    '''
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES ('route.outOfStationTransfer.runtimeEnabled', ?, 1781827200)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    ''',
+    [enabled ? 'true' : 'false'],
+  );
 }
 
 Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
