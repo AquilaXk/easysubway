@@ -8989,6 +8989,30 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(operatorRouteFeedbackReportTemplate, /<form|_csrf|routeSearchId|userId|comment|\/admin\/reports/);
 });
 
+test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 전달한다", () => {
+  const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
+
+  assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
+
+  const planner = read(plannerPath);
+  const v2Endpoint = controller.match(
+    /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
+  )?.[0] ?? "";
+
+  assert.match(v2Endpoint, /routeV2Planner\.search/);
+  assert.doesNotMatch(v2Endpoint, /routeSearchUseCase\.searchRoute/);
+  assert.match(controller, /toV2Command\(departureTime\)/);
+  assert.match(controller, /RouteSearchV2Response\.from\(plan, request, departureTime\)/);
+  assert.match(planner, /class RouteV2Planner/);
+  assert.match(planner, /record SearchRouteV2Command/);
+  assert.match(planner, /OffsetDateTime departureTime/);
+  assert.match(planner, /boolean useRealtime/);
+  assert.match(planner, /int maxTransfers/);
+  assert.match(planner, /int alternativeCount/);
+  assert.match(planner, /route-algorithm-v2-adr\.json|Range RAPTOR/);
+});
+
 test("모바일 async lint 기준선은 Future 처리 누락을 analyzer에서 잡는다", () => {
   const analysisOptions = read("apps/mobile/analysis_options.yaml");
   const asyncLintBaseline = readJson("apps/mobile/analysis/async-lint-baseline.json");
