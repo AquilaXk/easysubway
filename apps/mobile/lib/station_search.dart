@@ -17,6 +17,7 @@ import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
+import 'production_scope.dart';
 
 export 'features/stations/domain/station_line.dart';
 
@@ -2086,29 +2087,33 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         ],
       ),
       bottomNavigationBar: widget.bottomNavigationBar,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
-              constraints,
-              textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
-            );
-            return ListView(
-              padding: isLargeScreen
-                  ? _stationSearchLargePagePadding
-                  : _stationSearchPagePadding,
-              children: [
-                _StationSearchAdaptiveContent(
-                  isLargeScreen: isLargeScreen,
-                  searchInputSection: searchInputSection,
-                  recentSearchSection: recentSearchSection,
-                  actionButtonSection: actionButtonSection,
-                  resultSection: resultSection,
-                  lineFilterSection: lineFilterSection,
-                ),
-              ],
-            );
-          },
+      body: Semantics(
+        container: true,
+        label: ProductionScopeCopy.stationSearchNotice,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
+                constraints,
+                textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
+              );
+              return ListView(
+                padding: isLargeScreen
+                    ? _stationSearchLargePagePadding
+                    : _stationSearchPagePadding,
+                children: [
+                  _StationSearchAdaptiveContent(
+                    isLargeScreen: isLargeScreen,
+                    searchInputSection: searchInputSection,
+                    recentSearchSection: recentSearchSection,
+                    actionButtonSection: actionButtonSection,
+                    resultSection: resultSection,
+                    lineFilterSection: lineFilterSection,
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -3975,21 +3980,28 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('역 상세')),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_controller, ?_internalRouteController]),
-          builder: (context, _) {
-            return _StationDetailBody(
-              state: _controller.state,
-              internalRouteState: _internalRouteController?.state,
-              reportRepository: widget.reportRepository,
-              favoriteController: _favoriteController,
-              routeDraftController: widget.routeDraftController,
-              locationProvider: widget.locationProvider,
-              facilityReportDraftTargetStore:
-                  widget.facilityReportDraftTargetStore,
-            );
-          },
+      body: Semantics(
+        container: true,
+        label: ProductionScopeCopy.stationSearchNotice,
+        child: SafeArea(
+          child: AnimatedBuilder(
+            animation: Listenable.merge([
+              _controller,
+              ?_internalRouteController,
+            ]),
+            builder: (context, _) {
+              return _StationDetailBody(
+                state: _controller.state,
+                internalRouteState: _internalRouteController?.state,
+                reportRepository: widget.reportRepository,
+                favoriteController: _favoriteController,
+                routeDraftController: widget.routeDraftController,
+                locationProvider: widget.locationProvider,
+                facilityReportDraftTargetStore:
+                    widget.facilityReportDraftTargetStore,
+              );
+            },
+          ),
         ),
       ),
     );

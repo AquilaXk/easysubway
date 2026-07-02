@@ -3654,7 +3654,7 @@ void main() {
     expect(find.text('저장 정보 다시 확인'), findsOneWidget);
     expect(find.text('저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요'), findsOneWidget);
     expect(find.text('안내 범위'), findsOneWidget);
-    expect(find.text('주요 역·노선 안내를 먼저 보여줘요'), findsOneWidget);
+    expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
     expect(find.text('제한 사항'), findsOneWidget);
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
   });
