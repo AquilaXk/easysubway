@@ -30,9 +30,9 @@
     "unknownAccessibilityMustBeLabeled": true
   },
   "routing": {
-    "multiTransferSupported": true,
-    "outOfStationTransferSupported": true,
-    "alternativeItinerariesMin": 2
+    "multiTransferSupported": false,
+    "outOfStationTransferSupported": false,
+    "alternativeItinerariesMin": 1
   },
   "etaSourceIntegrity": {
     "realtimeEtaWithoutFreshProviderAllowed": false,
