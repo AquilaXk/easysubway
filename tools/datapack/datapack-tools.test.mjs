@@ -4437,6 +4437,51 @@ test("데이터팩 headway report는 stop_times와 frequencies에서 대기시�
   assert.deepEqual(sangnoksu.departures, [29100, 90300]);
   assert.equal(sangnoksu.minHeadwaySeconds, 61200);
 
+  const frequencyTemplateFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  frequencyTemplateFixture.packs[0].transitTrips.push({
+    id: "trip-seoul-2-local-0830",
+    routeId: "route-seoul-2-inner",
+    serviceId: "weekday-2026",
+    tripHeadsign: "내선순환",
+    directionId: "inner",
+    servicePattern: "LOCAL",
+    serviceDayStartSeconds: 0,
+  });
+  frequencyTemplateFixture.packs[0].transitStopTimes.push({
+    tripId: "trip-seoul-2-local-0830",
+    stopSequence: 1,
+    stationId: "station-sadang",
+    lineId: "seoul-2",
+    arrivalSeconds: 30600,
+    departureSeconds: 30600,
+  });
+  frequencyTemplateFixture.packs[0].transitFrequencies.push({
+    tripId: "trip-seoul-2-local-0830",
+    startTimeSeconds: 30600,
+    endTimeSeconds: 33600,
+    headwaySeconds: 600,
+    exactTimes: false,
+  });
+  const frequencyTemplateFixturePath = path.join(outputDir, "frequency-template-fixture.json");
+  const frequencyTemplateReportPath = path.join(outputDir, "artifacts/datapack-headways-frequency-template.json");
+  await writeFile(frequencyTemplateFixturePath, `${JSON.stringify(frequencyTemplateFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      frequencyTemplateFixturePath,
+      "--output",
+      frequencyTemplateReportPath,
+    ],
+    { cwd: root },
+  );
+  const frequencyTemplateReport = JSON.parse(await readFile(frequencyTemplateReportPath, "utf8"));
+  assert.equal(
+    frequencyTemplateReport.packs[0].observedHeadways.some((row) => row.lineId === "seoul-2"),
+    false,
+  );
+
   const noPickupFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   noPickupFixture.packs[0].transitStopTimes.find(
     (row) => row.tripId === "trip-seoul-4-local-2505" && row.stationId === "station-sangnoksu",

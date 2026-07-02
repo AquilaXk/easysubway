@@ -39,10 +39,11 @@ try {
 function headwaysForPack(pack) {
   const routesById = new Map((pack.transitRoutes ?? []).map((route) => [route.id, route]));
   const tripsById = new Map((pack.transitTrips ?? []).map((trip) => [trip.id, trip]));
+  const frequencyTripIds = new Set((pack.transitFrequencies ?? []).map((frequency) => frequency.tripId));
   const departuresByGroup = new Map();
 
   for (const stopTime of pack.transitStopTimes ?? []) {
-    if (stopTime.pickupType === 1) {
+    if (stopTime.pickupType === 1 || frequencyTripIds.has(stopTime.tripId)) {
       continue;
     }
     const trip = tripsById.get(stopTime.tripId);
