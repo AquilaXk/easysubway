@@ -7989,6 +7989,44 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       },
     ],
   );
+  for (const testCase of [
+    {
+      name: "string-label-dx",
+      mutate(position) {
+        position.labelDx = "0";
+      },
+      expected: /routeMapPositions\.labelDx must be an integer/,
+    },
+    {
+      name: "number-up-path",
+      mutate(position) {
+        position.upPath = 1;
+      },
+      expected: /routeMapPositions\.upPath must be a string/,
+    },
+  ]) {
+    const invalidRouteMapPositionInput = JSON.parse(JSON.stringify(adjacencySafeInput));
+    testCase.mutate(invalidRouteMapPositionInput.routeMapPositions[0]);
+    const invalidRouteMapPositionInputPath = path.join(outputDir, `${testCase.name}-input.json`);
+    const invalidRouteMapPositionOutputPath = path.join(outputDir, `${testCase.name}-fixture.json`);
+    await writeFile(invalidRouteMapPositionInputPath, `${JSON.stringify(invalidRouteMapPositionInput, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          invalidRouteMapPositionInputPath,
+          "--output",
+          invalidRouteMapPositionOutputPath,
+        ],
+        { cwd: root },
+      ),
+      testCase.expected,
+    );
+  }
 
   const validatorBypassFixture = JSON.parse(JSON.stringify(importedFixture));
   validatorBypassFixture.packs[0].networkEdges = validatorBypassFixture.packs[0].networkEdges.map((edge) =>
