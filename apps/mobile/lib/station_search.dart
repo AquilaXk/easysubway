@@ -58,13 +58,11 @@ const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationTextMutedColor = EasySubwayAccessibleColors.secondaryText;
 const _stationTextSubtleColor = EasySubwayAccessibleColors.mutedText;
-const _stationDetailTextColor = Color(0xFF2C5558);
-const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
-const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
-const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
-const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
-const _stationDetailNoticeColor = Color(0xFFE6F2F0);
-const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
+const _stationDetailTextColor = EasySubwayAccessibleColors.secondaryText;
+const _stationDetailSoftPanelColor = EasySubwayAccessibleColors.surface;
+const _stationDetailSoftPanelBorderColor = EasySubwayAccessibleColors.line;
+const _stationDetailMintPanelColor = EasySubwayAccessibleColors.surface;
+const _stationDetailMintPanelBorderColor = EasySubwayAccessibleColors.line;
 const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
 const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailCautionColor = Color(0xFF8A4B00);
@@ -4553,9 +4551,8 @@ class _StationDetailRouteActions extends StatelessWidget {
         Expanded(
           child: _StationPointButton(
             key: const Key('stationDetailSetOriginButton'),
-            symbol: '출',
+            icon: Icons.trip_origin,
             label: '출발로 설정',
-            selectedColor: EasySubwayAccessibleColors.mint,
             onPressed: () {
               controller.setOrigin(station);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4568,9 +4565,8 @@ class _StationDetailRouteActions extends StatelessWidget {
         Expanded(
           child: _StationPointButton(
             key: const Key('stationDetailSetDestinationButton'),
-            symbol: '도',
+            icon: Icons.flag_outlined,
             label: '도착으로 설정',
-            selectedColor: EasySubwayAccessibleColors.brand,
             onPressed: () {
               controller.setDestination(station);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4586,44 +4582,33 @@ class _StationDetailRouteActions extends StatelessWidget {
 
 class _StationPointButton extends StatelessWidget {
   const _StationPointButton({
-    required this.symbol,
+    required this.icon,
     required this.label,
-    required this.selectedColor,
     required this.onPressed,
     super.key,
   });
 
-  final String symbol;
+  final IconData icon;
   final String label;
-  final Color selectedColor;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    // 같은 성격 행동은 화면이 달라도 같은 패턴: 검색 결과의 _StationRoleButton과
+    // 동일하게 아웃라인 아이콘 + 라벨, 단일 primary 계열.
     return OutlinedButton.icon(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(62),
+        minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
         backgroundColor: Colors.white,
-        foregroundColor: EasySubwayAccessibleColors.text,
+        foregroundColor: EasySubwayAccessibleColors.primary,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         shape: const RoundedRectangleBorder(
           borderRadius: _stationDetailActionButtonRadius,
         ),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
-      icon: CircleAvatar(
-        radius: 16,
-        backgroundColor: selectedColor,
-        child: Text(
-          symbol,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      icon: Icon(icon, size: 22),
       label: Text(label),
     );
   }
@@ -4698,7 +4683,7 @@ class _StationLayoutStep extends StatelessWidget {
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.2,
             ),
           ),
@@ -5135,7 +5120,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                     '안내 확인 방법',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -5173,7 +5158,7 @@ class _StationDetailSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.25,
         ),
       ),
@@ -5229,7 +5214,7 @@ class _StationExitCard extends StatelessWidget {
                     exit.name,
                     style: textTheme.titleMedium?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
@@ -5673,19 +5658,20 @@ class _StationDetailTextPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 유형·품질 라벨은 상태 의미가 없으므로 틴트 필 대신 중립 아웃라인으로.
     return Container(
       decoration: BoxDecoration(
-        color: _stationDetailNoticeColor,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: _stationDetailNoticeBorderColor),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
+            color: EasySubwayAccessibleColors.secondaryText,
+            fontWeight: FontWeight.w700,
             height: 1.2,
           ),
         ),
