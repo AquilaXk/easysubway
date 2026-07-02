@@ -76,6 +76,7 @@ async function main() {
     "coverageSummarySha256",
     "routeMapPositionCoverageSha256",
     "routeGraphTopologySha256",
+    "headwayReportSha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
   ]) {
@@ -86,6 +87,7 @@ async function main() {
     "coverageStatus",
     "routeMapPositionCoverageStatus",
     "routeGraphTopologyStatus",
+    "headwayReportStatus",
     "strictRouteRegressionStatus",
     "manifestSignatureStatus",
     "androidEvidenceStatus",
