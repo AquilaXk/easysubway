@@ -391,6 +391,28 @@ void main() {
     expect(result.blockedReasons, isEmpty);
   });
 
+  test('로컬 capability는 station 존재와 realtime 지원을 분리한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(capability.stationExists, isTrue);
+    expect(capability.routeGraphConnected, isTrue);
+    expect(capability.strictEvidenceSupported, isTrue);
+    expect(capability.realtimeSupported, isFalse);
+    expect(capability.plannedTimetableSupported, isTrue);
+    expect(capability.outOfStationTransferAllowed, isFalse);
+  });
+
   test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

@@ -10,6 +10,32 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   final CatalogDatabase catalogDatabase;
 
+  Future<RouteCapabilityMetadata> routeCapability(
+    RouteSearchRequest request,
+  ) async {
+    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final stationExists =
+        catalog.hasStation(request.originStationId) &&
+        catalog.hasStation(request.destinationStationId);
+    final routeGraphConnected =
+        stationExists &&
+        catalog.routeGraphConnected(
+          request.originStationId,
+          request.destinationStationId,
+        );
+    return RouteCapabilityMetadata(
+      stationExists: stationExists,
+      routeGraphConnected: routeGraphConnected,
+      strictEvidenceSupported: catalog.strictEvidenceSupported,
+      realtimeSupported: catalog.realtimeSupported(
+        request.originStationId,
+        request.destinationStationId,
+      ),
+      plannedTimetableSupported: routeGraphConnected,
+      outOfStationTransferAllowed: false,
+    );
+  }
+
   Future<bool> canSearchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
     return catalog.hasStation(request.originStationId) &&
@@ -352,6 +378,24 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 }
 
+class RouteCapabilityMetadata {
+  const RouteCapabilityMetadata({
+    required this.stationExists,
+    required this.routeGraphConnected,
+    required this.strictEvidenceSupported,
+    required this.realtimeSupported,
+    required this.plannedTimetableSupported,
+    required this.outOfStationTransferAllowed,
+  });
+
+  final bool stationExists;
+  final bool routeGraphConnected;
+  final bool strictEvidenceSupported;
+  final bool realtimeSupported;
+  final bool plannedTimetableSupported;
+  final bool outOfStationTransferAllowed;
+}
+
 class LocalFirstRouteSearchRepository implements RouteSearchRepository {
   const LocalFirstRouteSearchRepository({required this.localRepository});
 
@@ -482,6 +526,7 @@ class _RouteCatalogSnapshot {
     required this.networkEdges,
     required this.strictEvidenceSupported,
     required this.sourceUpdatedAt,
+    required this.realtimeStationLineKeysByProvider,
   });
 
   final Map<String, String> stationsById;
@@ -490,6 +535,7 @@ class _RouteCatalogSnapshot {
   final List<_NetworkEdgeSnapshot> networkEdges;
   final bool strictEvidenceSupported;
   final String sourceUpdatedAt;
+  final Map<String, Set<String>> realtimeStationLineKeysByProvider;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final sourceUpdatedAtRow = await database.customSelect('''
@@ -510,6 +556,10 @@ class _RouteCatalogSnapshot {
     final outOfStationTransferPolicy = await _OutOfStationTransferPolicy.load(
       database,
     );
+    final realtimeRows = await database.customSelect('''
+          SELECT provider_id, station_id, line_id
+          FROM realtime_provider_station_mappings
+          ''').get();
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -795,6 +845,35 @@ class _RouteCatalogSnapshot {
       sourceUpdatedAt: _metadataUpdatedAtIso(
         sourceUpdatedAtRow?.readNullable<int>('source_updated_at'),
       ),
+      realtimeStationLineKeysByProvider: _realtimeStationLineKeysByProvider(
+        realtimeRows,
+      ),
+    );
+  }
+
+  bool routeGraphConnected(
+    String originStationId,
+    String destinationStationId,
+  ) {
+    final result = LocalRouteEngine(graph: toGraph()).search(
+      local.RouteRequest(
+        originStationId: originStationId,
+        destinationStationId: destinationStationId,
+        mobilityType: local.MobilityType.luggage,
+        constraintMode: local.ConstraintMode.allowWithWarnings,
+        searchMode:
+            local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+      ),
+    );
+    return result.status == local.RouteStatus.found;
+  }
+
+  bool realtimeSupported(String originStationId, String destinationStationId) {
+    final originKeys = _stationLineKeysFor(originStationId);
+    final destinationKeys = _stationLineKeysFor(destinationStationId);
+    return realtimeStationLineKeysByProvider.values.any(
+      (keys) =>
+          originKeys.any(keys.contains) && destinationKeys.any(keys.contains),
     );
   }
 
@@ -1025,6 +1104,13 @@ class _RouteCatalogSnapshot {
     return stationsById.containsKey(stationId);
   }
 
+  List<String> _stationLineKeysFor(String stationId) {
+    return stationLines
+        .where((stationLine) => stationLine.stationId == stationId)
+        .map((stationLine) => _stationLineKey(stationId, stationLine.lineId))
+        .toList(growable: false);
+  }
+
   String lineName(String lineId) {
     if (lineId.isEmpty) {
       return '';
@@ -1215,6 +1301,23 @@ String _lineTransferPairKey(_RouteNodeKey from, _RouteNodeKey to) {
 
 String _stationLineKey(String stationId, String lineId) {
   return '$stationId:$lineId';
+}
+
+Map<String, Set<String>> _realtimeStationLineKeysByProvider(
+  List<dynamic> rows,
+) {
+  final keysByProvider = <String, Set<String>>{};
+  for (final row in rows) {
+    keysByProvider
+        .putIfAbsent(row.read<String>('provider_id'), () => <String>{})
+        .add(
+          _stationLineKey(
+            row.read<String>('station_id'),
+            row.read<String>('line_id'),
+          ),
+        );
+  }
+  return keysByProvider;
 }
 
 graph.RouteEdge _toGraphRouteEdge(
