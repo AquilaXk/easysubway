@@ -17,6 +17,7 @@ import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
+import 'production_scope.dart';
 
 export 'features/stations/domain/station_line.dart';
 
@@ -2070,11 +2071,21 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (widget.entryMode) {
-          StationSearchEntryMode.recent => '최근 검색',
-          StationSearchEntryMode.nearby => '가까운 역',
-          StationSearchEntryMode.search => '역 검색',
-        }),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(switch (widget.entryMode) {
+              StationSearchEntryMode.recent => '최근 검색',
+              StationSearchEntryMode.nearby => '가까운 역',
+              StationSearchEntryMode.search => '역 검색',
+            }),
+            const Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
         actions: [
           if (!isRecentEntry && !isNearbyEntry)
             TextButton.icon(
@@ -2086,29 +2097,33 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         ],
       ),
       bottomNavigationBar: widget.bottomNavigationBar,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
-              constraints,
-              textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
-            );
-            return ListView(
-              padding: isLargeScreen
-                  ? _stationSearchLargePagePadding
-                  : _stationSearchPagePadding,
-              children: [
-                _StationSearchAdaptiveContent(
-                  isLargeScreen: isLargeScreen,
-                  searchInputSection: searchInputSection,
-                  recentSearchSection: recentSearchSection,
-                  actionButtonSection: actionButtonSection,
-                  resultSection: resultSection,
-                  lineFilterSection: lineFilterSection,
-                ),
-              ],
-            );
-          },
+      body: Semantics(
+        container: true,
+        label: ProductionScopeCopy.stationSearchNotice,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isLargeScreen = EasySubwayAdaptiveLayout.isLargeScreen(
+                constraints,
+                textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
+              );
+              return ListView(
+                padding: isLargeScreen
+                    ? _stationSearchLargePagePadding
+                    : _stationSearchPagePadding,
+                children: [
+                  _StationSearchAdaptiveContent(
+                    isLargeScreen: isLargeScreen,
+                    searchInputSection: searchInputSection,
+                    recentSearchSection: recentSearchSection,
+                    actionButtonSection: actionButtonSection,
+                    resultSection: resultSection,
+                    lineFilterSection: lineFilterSection,
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -3974,22 +3989,41 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('역 상세')),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_controller, ?_internalRouteController]),
-          builder: (context, _) {
-            return _StationDetailBody(
-              state: _controller.state,
-              internalRouteState: _internalRouteController?.state,
-              reportRepository: widget.reportRepository,
-              favoriteController: _favoriteController,
-              routeDraftController: widget.routeDraftController,
-              locationProvider: widget.locationProvider,
-              facilityReportDraftTargetStore:
-                  widget.facilityReportDraftTargetStore,
-            );
-          },
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('역 상세'),
+            Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+      body: Semantics(
+        container: true,
+        label: ProductionScopeCopy.stationSearchNotice,
+        child: SafeArea(
+          child: AnimatedBuilder(
+            animation: Listenable.merge([
+              _controller,
+              ?_internalRouteController,
+            ]),
+            builder: (context, _) {
+              return _StationDetailBody(
+                state: _controller.state,
+                internalRouteState: _internalRouteController?.state,
+                reportRepository: widget.reportRepository,
+                favoriteController: _favoriteController,
+                routeDraftController: widget.routeDraftController,
+                locationProvider: widget.locationProvider,
+                facilityReportDraftTargetStore:
+                    widget.facilityReportDraftTargetStore,
+              );
+            },
+          ),
         ),
       ),
     );

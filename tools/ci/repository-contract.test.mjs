@@ -1403,6 +1403,7 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
     "저장 정보 다시 확인",
     "저장 정보 기록을 확인할 수 없으면",
     "안내 범위",
+    "상록수·사당 검증 pilot",
     "실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요",
   ].join("[\\s\\S]*"));
 
@@ -1416,7 +1417,7 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   assert.match(offlineScreen, /지역[\s\S]*수도권 역과 노선/);
   assert.match(offlineScreen, /저장 정보 다시 확인[\s\S]*저장 정보 기록을 확인할 수 없으면/);
   assert.match(offlineScreen, /마지막 갱신[\s\S]*앱 설치 때 함께 받은 안내/);
-  assert.match(offlineScreen, /안내 범위[\s\S]*주요 역·노선 안내를 먼저 보여줘요/);
+  assert.match(offlineScreen, /안내 범위[\s\S]*ProductionScopeCopy\.supportedClaimKo/);
   assert.match(offlineScreen, /인터넷 연결 필요[\s\S]*시설 제보[\s\S]*연결 필요/);
   assert.match(widgetTest, offlineWidgetTestPattern);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
@@ -4475,6 +4476,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
 test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
   const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
@@ -4510,6 +4512,49 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "UNSUPPORTED_REGION",
     "다시 확인",
   ]);
+  assert.equal(
+    playStoreContent.koreanListing.supportRegionKo,
+    scope.supportScope.supportedClaimKo,
+    "Play listing support region must use the production scope artifact claim",
+  );
+  assert.match(
+    playStoreContent.koreanListing.fullDescriptionKo,
+    new RegExp(scope.supportScope.supportedClaimKo),
+    "Play listing full description must expose the approved Android v1 support scope",
+  );
+  assert.deepEqual(playStoreContent.prohibitedClaims.toSorted(), [
+    "100% 안전",
+    "모든 역",
+    "전국 완전 지원",
+    "휠체어 경로 보장",
+    "실시간 보장",
+    "항상 정확",
+  ].toSorted());
+  assert.match(
+    read("apps/mobile/lib/main.dart"),
+    /ProductionScopeCopy\.supportedClaimKo/,
+    "home/help/settings/offline copy must use the production scope constant",
+  );
+  assert.match(
+    read("apps/mobile/lib/station_search.dart"),
+    /ProductionScopeCopy\.stationSearchNotice/,
+    "station search and detail copy must use the production scope constant",
+  );
+  assert.match(
+    read("apps/mobile/lib/station_search.dart"),
+    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.stationSearchNotice/,
+    "station search and detail must render visible production scope claims",
+  );
+  assert.match(
+    read("apps/mobile/lib/route_search.dart"),
+    /ProductionScopeCopy\.routeSearchNotice/,
+    "route result copy must use the production scope constant",
+  );
+  assert.match(
+    read("apps/mobile/lib/route_search.dart"),
+    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.routeSearchNotice/,
+    "route search must render a visible production scope claim",
+  );
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
     "kric-station-elevator",
