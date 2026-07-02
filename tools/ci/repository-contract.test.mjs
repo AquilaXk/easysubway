@@ -4371,6 +4371,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.ok(Array.isArray(inventory.sources));
   assert.ok(inventory.sources.length >= 6);
   assert.equal(targets.artifactKind, "nationwide-datapack-coverage-targets");
+  assert.equal(targets.targetVersion, "2026-07-02");
   assert.deepEqual(
     targets.requiredSourceDomains.map((domain) => domain.id),
     [
@@ -4384,6 +4385,64 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   );
   assert.ok(targets.regions.some((region) => region.id === "capital"));
   assert.ok(targets.regions.some((region) => region.id !== "capital"));
+  const capitalTarget = targets.regions.find((region) => region.id === "capital");
+  assert.ok(capitalTarget.operatorIds.includes("airport-railroad"));
+  assert.ok(capitalTarget.operatorIds.includes("gtx-a"));
+  assert.ok(capitalTarget.operatorIds.includes("shinbundang"));
+  assert.ok(capitalTarget.operatorIds.includes("gimpo-goldline"));
+  assert.ok(capitalTarget.operatorIds.includes("ui-sinseol-light-rail"));
+  assert.deepEqual(targets.roadmapConditionAxes, [
+    "station-line membership",
+    "adjacent ride edges",
+    "facility evidence",
+    "entry/exit",
+    "transfer/pathway",
+    "schedule/realtime",
+    "route map positions",
+    "source/license evidence",
+  ]);
+  const roadmapGateCommands = new Map(targets.roadmapGateCommands.map((entry) => [entry.id, entry.command]));
+  assert.deepEqual([...roadmapGateCommands.keys()].sort(), [
+    "coverage_gap_report",
+    "production_datapack_validation",
+    "route_commercialization_gate",
+    "source_inventory_validation",
+  ]);
+  for (const command of roadmapGateCommands.values()) {
+    assert.doesNotMatch(command, /\.\.\./);
+  }
+  assert.match(roadmapGateCommands.get("coverage_gap_report"), /report-coverage-gaps\.mjs/);
+  assert.match(roadmapGateCommands.get("source_inventory_validation"), /validate-source-inventory\.mjs/);
+  assert.match(roadmapGateCommands.get("production_datapack_validation"), /validate-datapack\.mjs --manifest .+ --root .+ --require-production/);
+  assert.match(
+    roadmapGateCommands.get("route_commercialization_gate"),
+    /check-route-commercialization-gate\.mjs --gate .+ --accuracy .+ --accessibility .+ --coverage .+ --contract .+/,
+  );
+  assert.ok(
+    targets.claimLedger.some(
+      (claim) =>
+        claim.claimId === "android_v1_public_support_scope" &&
+        claim.status === "SCOPE_LOCKED_NO_GO_UNTIL_EVIDENCE_CLOSED",
+    ),
+  );
+  assert.ok(
+    targets.claimLedger.some(
+      (claim) => claim.claimId === "nationwide_subway_support" && claim.status === "NO_GO",
+    ),
+  );
+  assert.ok(
+    targets.claimLedger.some((claim) => claim.claimId === "realtime_eta_accuracy" && claim.status === "NO_GO"),
+  );
+  assert.deepEqual(
+    targets.expansionRoadmap.map((stage) => stage.stage),
+    [0, 1, 2, 3, 4, 5],
+  );
+  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("airport-railroad"));
+  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("gtx-c"));
+  assert.equal(targets.expansionRoadmap[0].status, "CURRENT_NO_GO_UNTIL_PILOT_EVIDENCE_CLOSED");
+  assert.ok(targets.expansionRoadmap.slice(1).every((stage) => stage.status === "NO_GO"));
+  assert.ok(targets.expansionRoadmap.every((stage) => stage.conditionAxesRef === "roadmapConditionAxes"));
+  assert.ok(targets.expansionRoadmap.every((stage) => stage.verificationCommandIds.length > 0));
   assert.match(gapReporter, /nationwide coverage gaps remain/);
   assert.match(gapReporter, /coverageScope/);
   assert.match(gapReporter, /coverageComplete/);
