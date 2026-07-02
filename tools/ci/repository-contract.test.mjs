@@ -103,7 +103,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.accessibility.unknownAccessibilityMustBeLabeled, true);
   assert.equal(gate.routing.multiTransferSupported, false);
   assert.equal(gate.routing.outOfStationTransferSupported, false);
-  assert.equal(gate.routing.alternativeItinerariesMin, 1);
+  assert.equal(gate.routing.alternativeItinerariesMin, 2);
   assert.equal(gate.etaSourceIntegrity.realtimeEtaWithoutFreshProviderAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staleRealtimeUsedAsFreshAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staticLocalMustBeLabeled, true);
