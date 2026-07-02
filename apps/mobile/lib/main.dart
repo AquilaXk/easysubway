@@ -4497,90 +4497,90 @@ class SupportAccessScreen extends StatelessWidget {
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _PrivacyDataUseSummary(deletionScope: deletionScope),
             const SizedBox(height: 12),
-            _SupportAccessItem(
-              key: const Key('privacyPolicyAccessItem'),
-              icon: Icons.privacy_tip_outlined,
-              title: '개인정보처리방침',
-              value: accessInfo.privacyPolicyUrl,
-              displayValue: '웹에서 확인',
-              uri: _httpsUri(accessInfo.privacyPolicyUrl),
-              launcher: launcher,
-            ),
-            const SizedBox(height: 12),
-            if (userDataDeletionRepository == null)
-              _SupportAccessItem(
-                key: const Key('dataDeletionAccessItem'),
-                icon: Icons.delete_outline,
-                title: '내 정보 삭제 요청',
-                value: accessInfo.dataDeletionEmail,
-                displayValue: '이메일 보내기',
-                helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
-                uri: _mailtoUri(
-                  accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 내 정보 삭제 요청',
+            _SupportGroupCard(
+              children: [
+                _SupportAccessItem(
+                  key: const Key('privacyPolicyAccessItem'),
+                  icon: Icons.privacy_tip_outlined,
+                  title: '개인정보처리방침',
+                  value: accessInfo.privacyPolicyUrl,
+                  displayValue: '웹에서 확인',
+                  uri: _httpsUri(accessInfo.privacyPolicyUrl),
+                  launcher: launcher,
                 ),
-                launcher: launcher,
-              )
-            else
-              _UserDataDeletionAccessItem(
-                repository: userDataDeletionRepository!,
-                deletionScope: deletionScope,
-                onDeleted: onUserDataDeleted,
-              ),
+                if (userDataDeletionRepository == null)
+                  _SupportAccessItem(
+                    key: const Key('dataDeletionAccessItem'),
+                    icon: Icons.delete_outline,
+                    title: '내 정보 삭제 요청',
+                    value: accessInfo.dataDeletionEmail,
+                    displayValue: '이메일 보내기',
+                    helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
+                    uri: _mailtoUri(
+                      accessInfo.dataDeletionEmail,
+                      '쉬운 지하철 내 정보 삭제 요청',
+                    ),
+                    launcher: launcher,
+                  )
+                else
+                  _UserDataDeletionAccessItem(
+                    repository: userDataDeletionRepository!,
+                    deletionScope: deletionScope,
+                    onDeleted: onUserDataDeleted,
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '이동 전 살펴보기'),
             const _SafetyDataNotice(),
             const SizedBox(height: 12),
-            const _AppCard(
-              child: _AppInfoRow(
-                icon: Icons.verified_outlined,
-                iconColor: EasySubwayAccessibleColors.brand,
-                title: '지원 범위',
-                subtitle: ProductionScopeCopy.helpNotice,
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: const Key('supportDataSourceAttributionButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DataSourceAttributionScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.source_outlined),
-              label: const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('데이터 및 지도 출처'),
+            _SupportGroupCard(
+              children: [
+                const _SupportStaticRow(
+                  icon: Icons.verified_outlined,
+                  title: '지원 범위',
+                  subtitle: ProductionScopeCopy.helpNotice,
                 ),
-              ),
+                _SupportNavRow(
+                  key: const Key('supportDataSourceAttributionButton'),
+                  icon: Icons.source_outlined,
+                  title: '데이터 및 지도 출처',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DataSourceAttributionScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
-            _SupportAccessItem(
-              key: const Key('supportAccessItem'),
-              icon: Icons.support_agent,
-              title: '고객지원',
-              value: accessInfo.supportEmail,
-              displayValue: '이메일 보내기',
-              uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
-              launcher: launcher,
+            _SupportGroupCard(
+              children: [
+                _SupportAccessItem(
+                  key: const Key('supportAccessItem'),
+                  icon: Icons.support_agent,
+                  title: '고객지원',
+                  value: accessInfo.supportEmail,
+                  displayValue: '이메일 보내기',
+                  uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
+                  launcher: launcher,
+                ),
+                _SupportAccessItem(
+                  key: const Key('securityContactAccessItem'),
+                  icon: Icons.security_outlined,
+                  title: '보안 문의',
+                  value: accessInfo.securityEmail,
+                  displayValue: '보안 문제 알리기',
+                  uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
+                  launcher: launcher,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             const _SecurityContactNotice(),
-            const SizedBox(height: 12),
-            _SupportAccessItem(
-              key: const Key('securityContactAccessItem'),
-              icon: Icons.security_outlined,
-              title: '보안 문의',
-              value: accessInfo.securityEmail,
-              displayValue: '보안 문제 알리기',
-              uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
-              launcher: launcher,
-            ),
           ],
         ),
       ),
@@ -4601,10 +4601,156 @@ class _SupportSectionTitle extends StatelessWidget {
         header: true,
         child: Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportGroupCard extends StatelessWidget {
+  const _SupportGroupCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      rows.add(children[i]);
+      if (i != children.length - 1) {
+        rows.add(
+          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
+        );
+      }
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows,
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportStaticRow extends StatelessWidget {
+  const _SupportStaticRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              icon,
+              size: 24,
+              color: EasySubwayAccessibleColors.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportNavRow extends StatelessWidget {
+  const _SupportNavRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: title,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 24, color: EasySubwayAccessibleColors.primary),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.mutedText,
+                  size: 22,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -4644,59 +4790,53 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
       label: '${copy.title}, ${copy.helperText}',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
-        child: Material(
-          color: EasySubwayAccessibleColors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: _mainThemeControlRadius,
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: InkWell(
-            borderRadius: _mainThemeControlRadius,
-            onTap: openDeletionScreen,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(
+        child: InkWell(
+          onTap: openDeletionScreen,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 1),
+                  child: Icon(
                     Icons.delete_outline,
                     color: EasySubwayAccessibleColors.red,
-                    size: 28,
+                    size: 24,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          copy.title,
-                          style: const TextStyle(
-                            color: EasySubwayAccessibleColors.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            height: 1.25,
-                          ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        copy.title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          copy.helperText,
-                          style: const TextStyle(
-                            color: EasySubwayAccessibleColors.mutedText,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3,
-                          ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        copy.helperText,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.mutedText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: EasySubwayAccessibleColors.mutedText,
-                  ),
-                ],
-              ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.mutedText,
+                ),
+              ],
             ),
           ),
         ),
@@ -5238,13 +5378,13 @@ class _SecurityContactNotice extends StatelessWidget {
       label: '$_title, $_contactNotice $_scopeNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.skySoft,
-            border: Border.all(color: EasySubwayAccessibleColors.line),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5334,13 +5474,13 @@ class _SafetyDataNotice extends StatelessWidget {
       label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.amberSoft,
-            border: Border.all(color: EasySubwayAccessibleColors.amber),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5467,13 +5607,13 @@ class _PrivacyDataUseSummary extends StatelessWidget {
           '$_title, $_locationPurpose $_appDataPurpose $deletionScopeText $sentReportNoticeText $_retentionNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.mintSoft,
-            border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5856,41 +5996,73 @@ class _SupportAccessItem extends StatelessWidget {
           ? null
           : () => unawaited(_openTarget(context, targetUri, targetText)),
       child: ExcludeSemantics(
-        child: OutlinedButton.icon(
-          onPressed: targetUri == null
+        child: InkWell(
+          onTap: targetUri == null
               ? null
               : () => unawaited(_openTarget(context, targetUri, targetText)),
-          icon: Icon(icon),
-          label: Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(title),
-                  const SizedBox(height: 4),
-                  Text(
-                    displayValue,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.secondaryText,
-                      height: 1.25,
-                    ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: targetUri == null
+                        ? EasySubwayAccessibleColors.mutedText
+                        : EasySubwayAccessibleColors.primary,
                   ),
-                  if (secondaryText != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      secondaryText,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        displayValue,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.secondaryText,
+                          height: 1.3,
+                        ),
+                      ),
+                      if (secondaryText != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          secondaryText,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                              ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (targetUri != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: EasySubwayAccessibleColors.mutedText,
+                    size: 22,
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
