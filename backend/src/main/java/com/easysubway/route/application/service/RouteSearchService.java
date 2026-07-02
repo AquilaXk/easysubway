@@ -9,6 +9,7 @@ import com.easysubway.route.application.port.out.LoadRouteSearchPort;
 import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
 import com.easysubway.route.application.port.out.SaveRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SaveRouteSearchPort;
+import com.easysubway.route.domain.BoardingSlackPolicy;
 import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.InternalRouteResult;
@@ -1208,12 +1209,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	private int boardingSlackSeconds(MobilityType mobilityType) {
-		return switch (mobilityType) {
-			case LUGGAGE -> 60;
-			case SENIOR, PREGNANT -> 90;
-			case STROLLER, TEMPORARY_INJURY -> 120;
-			case WHEELCHAIR -> 180;
-		};
+		return BoardingSlackPolicy.secondsFor(mobilityType);
 	}
 
 	private String directionFor(RouteStep step) {
