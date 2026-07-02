@@ -5630,30 +5630,25 @@ void main() {
       expect(find.text('즐겨찾기한 경로'), findsOneWidget);
       expect(find.text('상록수에서 사당까지'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('이동 편의도 92점'), findsNothing);
-      expect(find.text('다시 찾으면 자세히 볼 수 있어요'), findsOneWidget);
+      // 고정 플레이스홀더 문구는 카드에서 제거됐다(#1488).
+      expect(find.text('다시 찾으면 자세히 볼 수 있어요'), findsNothing);
       expect(
         find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13 · 도착 정보를 확인하고 있어요'),
         findsOneWidget,
       );
       expect(
         find.text('예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.text('계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요'),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.text('상록수에서 사당까지'), findsOneWidget);
-      expect(find.bySemanticsLabel('상록수에서 사당까지 더 보기'), findsOneWidget);
+      // 항목 1개짜리 더 보기 메뉴 → 삭제 아이콘 버튼으로 단순화(#1488).
       expect(
-        tester.getSemantics(find.bySemanticsLabel('상록수에서 사당까지 더 보기')),
-        isSemantics(
-          label: '상록수에서 사당까지 더 보기',
-          isButton: true,
-          hasTapAction: true,
-        ),
+        find.byKey(const Key('favoriteRouteRemove-route-1')),
+        findsOneWidget,
       );
       expect(
         find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
@@ -5680,8 +5675,6 @@ void main() {
         },
       );
 
-      await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
       await tester.pumpAndSettle();
       expect(find.text('즐겨찾기 경로 삭제'), findsOneWidget);
@@ -5728,8 +5721,6 @@ void main() {
 
     await _openFavoriteList(tester);
 
-    await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -5739,9 +5730,12 @@ void main() {
 
     expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
     expect(find.text('삭제 중'), findsOneWidget);
-    expect(find.bySemanticsLabel('상록수에서 사당까지 더 보기, 삭제 중'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('favoriteRouteMore-route-1')));
+    // 삭제 중에는 삭제 버튼이 비활성화되어 다시 눌러도 재요청되지 않는다.
+    await tester.tap(
+      find.byKey(const Key('favoriteRouteRemove-route-1')),
+      warnIfMissed: false,
+    );
     await tester.pump();
 
     expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
