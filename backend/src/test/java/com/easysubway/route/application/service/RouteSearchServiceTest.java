@@ -8,6 +8,7 @@ import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.adapter.out.persistence.InMemoryRouteSearchRepository;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
 import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
 import com.easysubway.route.domain.ArrivalCandidate;
@@ -801,7 +802,7 @@ class RouteSearchServiceTest {
 		);
 		var planner = new RouteV2Planner(routeSearchService);
 
-		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
 			"station-b",
 			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
@@ -837,7 +838,7 @@ class RouteSearchServiceTest {
 		);
 		var planner = new RouteV2Planner(routeSearchService);
 
-		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
 			"station-b",
 			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
@@ -872,7 +873,7 @@ class RouteSearchServiceTest {
 		);
 		var planner = new RouteV2Planner(routeSearchService);
 
-		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
 			"station-b",
 			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
@@ -1557,13 +1558,13 @@ class RouteSearchServiceTest {
 		return new RouteV2Planner(new RouteSearchService(repository, repository, transitMasterPort, CLOCK));
 	}
 
-	private static RouteV2Planner.SearchRouteV2Command routeV2Command(
+	private static RouteV2SearchUseCase.SearchRouteV2Command routeV2Command(
 		ConstraintMode constraintMode,
 		MobilityType mobilityType,
 		int maxTransfers,
 		int alternativeCount
 	) {
-		return new RouteV2Planner.SearchRouteV2Command(
+		return new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
 			"station-b",
 			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
