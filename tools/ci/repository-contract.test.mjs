@@ -1317,12 +1317,9 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
-  assert.match(main, /homeFacilityAlertLoadingState/);
-  assert.match(main, /homeFacilityAlertErrorState/);
-  assert.match(main, /homeFacilityAlertEmptyState/);
-  assert.match(main, /homeRecentRouteLoadingState/);
-  assert.match(main, /homeRecentRouteErrorState/);
-  assert.match(main, /homeRecentRouteEmptyState/);
+  assert.doesNotMatch(main, /class _HomeHero/);
+  assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
+  assert.match(main, /return const SizedBox\.shrink\(\);/);
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
@@ -9261,6 +9258,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const networkMap = read("apps/mobile/lib/network_map.dart");
   const stationLineBadges = read("apps/mobile/lib/features/stations/presentation/station_line_badges.dart");
   const stationLine = read("apps/mobile/lib/features/stations/domain/station_line.dart");
   const stationApiRepository = read(
@@ -9319,8 +9317,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(main, /역 검색/);
-  assert.match(main, /길찾기/);
+  assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
   assert.match(main, /이동 조건/);
   assert.match(main, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
