@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'accessible_design.dart';
@@ -3483,6 +3485,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       );
                     },
                   ),
+                  _AppSettingsActionTile(
+                    key: const Key('dataSourceAttributionSettingsButton'),
+                    icon: Icons.source_outlined,
+                    title: '데이터 및 지도 출처',
+                    subtitle: '지도와 경로 판단 자료의 출처와 이용 조건을 확인해요',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DataSourceAttributionScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
               _AppSettingsSection(
@@ -4467,6 +4482,25 @@ class SupportAccessScreen extends StatelessWidget {
                 subtitle: ProductionScopeCopy.helpNotice,
               ),
             ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('supportDataSourceAttributionButton'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DataSourceAttributionScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.source_outlined),
+              label: const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('데이터 및 지도 출처'),
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
             _SupportAccessItem(
@@ -5438,6 +5472,273 @@ class _PrivacyDataUseLine extends StatelessWidget {
                 color: EasySubwayAccessibleColors.secondaryText,
                 height: 1.35,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DataSourceAttributionScreen extends StatelessWidget {
+  const DataSourceAttributionScreen({super.key});
+
+  static const _mapManifestAsset =
+      'assets/datapacks/metro_map_pack/manifest.json';
+  static const _sourceInventoryAsset = 'assets/datapacks/source-inventory.json';
+
+  Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
+  _load() async {
+    final [manifestText, inventoryText] = await Future.wait([
+      rootBundle.loadString(_mapManifestAsset),
+      rootBundle.loadString(_sourceInventoryAsset),
+    ]);
+    return (
+      manifest: jsonDecode(manifestText) as Map<String, Object?>,
+      inventory: jsonDecode(inventoryText) as Map<String, Object?>,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: const Key('dataSourceAttributionScreen'),
+      appBar: AppBar(title: const Text('데이터 및 지도 출처')),
+      body: SafeArea(
+        child:
+            FutureBuilder<
+              ({Map<String, Object?> manifest, Map<String, Object?> inventory})
+            >(
+              future: _load(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return ListView(
+                    padding: _mainPagePadding,
+                    children: const [
+                      _AppCard(
+                        child: _AppInfoRow(
+                          icon: Icons.error_outline,
+                          iconBackground: EasySubwayAccessibleColors.amberSoft,
+                          iconColor: EasySubwayAccessibleColors.amber,
+                          title: '자료 제공 정보를 불러오지 못했어요',
+                          subtitle: '앱을 다시 열고, 계속 보이지 않으면 고객지원에 알려 주세요.',
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final manifest = snapshot.data!.manifest;
+                final inventory = snapshot.data!.inventory;
+                final maps = (manifest['maps'] as List)
+                    .cast<Map<String, Object?>>();
+                final sources = (inventory['sources'] as List)
+                    .cast<Map<String, Object?>>()
+                    .toList(growable: false);
+                return ListView(
+                  padding: _mainPagePadding,
+                  children: [
+                    const _AppCard(
+                      backgroundColor: EasySubwayAccessibleColors.mintSoft,
+                      borderColor: EasySubwayAccessibleColors.mintBorder,
+                      child: _AppInfoRow(
+                        icon: Icons.info_outline,
+                        iconBackground: Colors.white,
+                        iconColor: EasySubwayAccessibleColors.mintDark,
+                        title: '지원 범위',
+                        subtitle: ProductionScopeCopy.supportedClaimKo,
+                      ),
+                    ),
+                    const _AppSectionTitle(title: '지도 표시용 asset'),
+                    for (final map in maps) _AttributionCard.map(map, manifest),
+                    const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
+                    for (final source in sources)
+                      _AttributionCard.source(source),
+                  ],
+                );
+              },
+            ),
+      ),
+    );
+  }
+}
+
+class _AttributionCard extends StatelessWidget {
+  const _AttributionCard._({
+    required this.title,
+    required this.subtitle,
+    required this.rows,
+  });
+
+  factory _AttributionCard.map(
+    Map<String, Object?> map,
+    Map<String, Object?> manifest,
+  ) {
+    final license = (map['license'] as Map<String, Object?>?) ?? const {};
+    final offline = (map['offline'] as Map<String, Object?>?) ?? const {};
+    return _AttributionCard._(
+      title: _text(map['name_ko']),
+      subtitle: 'provider/owner: ${_text(map['operator'])}',
+      rows: [
+        ('source name', _text(license['source'], _text(map['name_ko']))),
+        (
+          'license type',
+          '${_text(license['name'])} (${_text(license['spdx'])})',
+        ),
+        ('license URL', _text(license['url'])),
+        ('attribution required', _yesNo(license['attributionRequired'])),
+        ('last retrieved', _text(license['date'])),
+        ('last verified', _text(manifest['generated_at_utc'])),
+        (
+          'commercial use / redistribution',
+          '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
+        ),
+        ('review status', _text(license['reviewStatus'])),
+        ('changes', _text(license['changes'])),
+        ('asset path', _text(offline['path'])),
+      ],
+    );
+  }
+
+  factory _AttributionCard.source(Map<String, Object?> source) {
+    final license = (source['license'] as Map<String, Object?>?) ?? const {};
+    return _AttributionCard._(
+      title: _text(source['displayName']),
+      subtitle:
+          'provider/owner: ${_text(source['provider'])} / ${_text(source['owner'])}',
+      rows: [
+        ('source name', _text(source['displayName'])),
+        (
+          'license type',
+          '${_text(license['name'])} (${_text(license['type'])})',
+        ),
+        ('license URL', _text(license['evidenceUrl'])),
+        ('attribution required', _text(license['attribution'])),
+        ('last retrieved', _text(source['retrievedAt'])),
+        ('last verified', _text(source['observedDataUpdatedAt'])),
+        (
+          'commercial use / redistribution',
+          '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
+        ),
+        (
+          'changes',
+          source.containsKey('changes')
+              ? _text(source['changes'])
+              : 'inventory에 별도 변경 고지 없음',
+        ),
+      ],
+    );
+  }
+
+  final String title;
+  final String subtitle;
+  final List<(String, String)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final semanticLabel = [
+      title,
+      subtitle,
+      for (final row in rows) '${row.$1}: ${row.$2}',
+    ].join(', ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Semantics(
+        label: semanticLabel,
+        child: _AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final row in rows)
+                _AttributionRow(label: row.$1, value: row.$2),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _text(Object? value, [String fallback = '미기록']) {
+    if (value is List) {
+      final joined = value
+          .whereType<Object>()
+          .map((item) => '$item')
+          .join(', ');
+      return joined.isEmpty ? fallback : joined;
+    }
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  static String _yesNo(Object? value) {
+    if (value == true) {
+      return '예';
+    }
+    if (value == false) {
+      return '아니오';
+    }
+    return '미확정';
+  }
+
+  static String _allowed(Object? value) {
+    if (value == true) {
+      return '가능';
+    }
+    if (value == false) {
+      return '불가';
+    }
+    return '미확정';
+  }
+}
+
+class _AttributionRow extends StatelessWidget {
+  const _AttributionRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: EasySubwayAccessibleColors.secondaryText,
+              fontWeight: FontWeight.w900,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
             ),
           ),
         ],

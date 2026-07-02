@@ -31,6 +31,11 @@
         "source_page": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
         "date": "2007-12-26",
         "authors": ["IRTC1015"],
+        "attributionRequired": false,
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "reviewStatus": "confirmed",
         "changes": "File stored unchanged as a bundled offline route-map asset. Station coordinate data was regenerated from embedded SVG text positions for app hit testing."
       }
     },
@@ -46,6 +51,21 @@
         "path": "assets/datapacks/maps/busan-official-route-map.svg",
         "official_asset_url": "https://www2.humetro.busan.kr/upload/default/integrate.zip",
         "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "기관 공식 노선도 asset - 재배포 권한 확인 필요",
+        "spdx": "LicenseRef-Humetro-Route-Map-Permission-Required",
+        "url": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
+        "source": "부산교통공사 사이버스테이션 노선도",
+        "source_page": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
+        "date": "2026-06-23",
+        "authors": ["부산교통공사"],
+        "attributionRequired": true,
+        "commercialUseAllowed": false,
+        "derivativeWorkAllowed": false,
+        "redistributionAllowed": false,
+        "reviewStatus": "permission-required",
+        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
       }
     },
     {
@@ -69,7 +89,12 @@
         "based_on": "파일:서울 지하철 7호선 노선도(2021_05).svg",
         "date": "210712",
         "authors": ["kiwitree", "grafiker"],
-        "changes": "File stored unchanged as a bundled offline route-map asset."
+        "attributionRequired": true,
+        "commercialUseAllowed": false,
+        "derivativeWorkAllowed": false,
+        "redistributionAllowed": false,
+        "reviewStatus": "legal-review-required",
+        "changes": "File stored unchanged as a bundled offline route-map asset. Derivative-work license chain is pending legal review; commercial use and redistribution remain blocked until confirmed."
       }
     },
     {
@@ -84,6 +109,21 @@
         "path": "assets/datapacks/maps/daegu-official-route-map.svg",
         "official_asset_url": "https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip",
         "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "기관 공식 노선도 asset - 재배포 권한 확인 필요",
+        "spdx": "LicenseRef-DTRO-Route-Map-Permission-Required",
+        "url": "https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do",
+        "source": "대구교통공사 사이버스테이션 노선도",
+        "source_page": "https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do",
+        "date": "2026-06-23",
+        "authors": ["대구교통공사"],
+        "attributionRequired": true,
+        "commercialUseAllowed": false,
+        "derivativeWorkAllowed": false,
+        "redistributionAllowed": false,
+        "reviewStatus": "permission-required",
+        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
       }
     },
     {
@@ -98,6 +138,21 @@
         "path": "assets/datapacks/maps/daejeon-official-route-map.svg",
         "official_asset_url": "https://www.djtc.kr/kor/resources/routemap/korean.zip",
         "mime_type": "image/svg+xml"
+      },
+      "license": {
+        "name": "기관 공식 노선도 asset - 재배포 권한 확인 필요",
+        "spdx": "LicenseRef-DJTC-Route-Map-Permission-Required",
+        "url": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
+        "source": "대전교통공사 사이버스테이션 노선도",
+        "source_page": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
+        "date": "2026-06-23",
+        "authors": ["대전교통공사"],
+        "attributionRequired": true,
+        "commercialUseAllowed": false,
+        "derivativeWorkAllowed": false,
+        "redistributionAllowed": false,
+        "reviewStatus": "permission-required",
+        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
       }
     }
   ]
