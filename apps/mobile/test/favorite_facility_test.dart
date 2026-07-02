@@ -101,6 +101,7 @@ void main() {
     expect(reported.nextActionLabel, '역무원 도움 요청');
     expect(unknown.severityLabel, '확인 중');
     expect(unknown.nextActionLabel, '자세히 보기');
+    expect(operationalUnknown.statusLabel, '설치 확인 · 운행상태 미확인');
     expect(operationalUnknown.statusTitle, '설치 확인 · 운행상태 미확인');
     expect(operationalUnknown.needsAttention, isTrue);
     expect(available.severityLabel, '정상');
