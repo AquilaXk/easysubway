@@ -4436,6 +4436,35 @@ test("데이터팩 headway report는 stop_times와 frequencies에서 대기시�
   );
   assert.deepEqual(sangnoksu.departures, [29100, 90300]);
   assert.equal(sangnoksu.minHeadwaySeconds, 61200);
+
+  const noPickupFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  noPickupFixture.packs[0].transitStopTimes.find(
+    (row) => row.tripId === "trip-seoul-4-local-2505" && row.stationId === "station-sangnoksu",
+  ).pickupType = 1;
+  const noPickupFixturePath = path.join(outputDir, "no-pickup-fixture.json");
+  const noPickupReportPath = path.join(outputDir, "artifacts/datapack-headways-no-pickup.json");
+  await writeFile(noPickupFixturePath, `${JSON.stringify(noPickupFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      noPickupFixturePath,
+      "--output",
+      noPickupReportPath,
+    ],
+    { cwd: root },
+  );
+  const noPickupReport = JSON.parse(await readFile(noPickupReportPath, "utf8"));
+  assert.equal(
+    noPickupReport.packs[0].observedHeadways.some(
+      (row) =>
+        row.stationId === "station-sangnoksu" &&
+        row.stationLineId === "seoul-4" &&
+        row.servicePattern === "LOCAL",
+    ),
+    false,
+  );
 });
 
 test("데이터팩 quality metric report는 freshness metric 누락 manifest를 거부한다", async () => {

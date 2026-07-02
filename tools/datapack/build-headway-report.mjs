@@ -42,6 +42,9 @@ function headwaysForPack(pack) {
   const departuresByGroup = new Map();
 
   for (const stopTime of pack.transitStopTimes ?? []) {
+    if (stopTime.pickupType === 1) {
+      continue;
+    }
     const trip = tripsById.get(stopTime.tripId);
     const route = trip ? routesById.get(trip.routeId) : undefined;
     if (!trip || !route) {
