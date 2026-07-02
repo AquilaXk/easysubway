@@ -4371,6 +4371,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.ok(Array.isArray(inventory.sources));
   assert.ok(inventory.sources.length >= 6);
   assert.equal(targets.artifactKind, "nationwide-datapack-coverage-targets");
+  assert.equal(targets.targetVersion, "2026-07-02");
   assert.deepEqual(
     targets.requiredSourceDomains.map((domain) => domain.id),
     [
@@ -4384,6 +4385,47 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   );
   assert.ok(targets.regions.some((region) => region.id === "capital"));
   assert.ok(targets.regions.some((region) => region.id !== "capital"));
+  const capitalTarget = targets.regions.find((region) => region.id === "capital");
+  assert.ok(capitalTarget.operatorIds.includes("airport-railroad"));
+  assert.ok(capitalTarget.operatorIds.includes("gtx-a"));
+  assert.ok(capitalTarget.operatorIds.includes("shinbundang"));
+  assert.ok(capitalTarget.operatorIds.includes("gimpo-goldline"));
+  assert.ok(capitalTarget.operatorIds.includes("ui-sinseol-light-rail"));
+  assert.deepEqual(targets.roadmapConditionAxes, [
+    "station-line membership",
+    "adjacent ride edges",
+    "facility evidence",
+    "entry/exit",
+    "transfer/pathway",
+    "schedule/realtime",
+    "route map positions",
+    "source/license evidence",
+  ]);
+  assert.ok(
+    targets.roadmapGateCommands.some((entry) => entry.id === "coverage_gap_report" && entry.command.includes("report-coverage-gaps.mjs")),
+  );
+  assert.ok(
+    targets.roadmapGateCommands.some(
+      (entry) => entry.id === "source_inventory_validation" && entry.command.includes("validate-source-inventory.mjs"),
+    ),
+  );
+  assert.ok(
+    targets.claimLedger.some(
+      (claim) => claim.claimId === "nationwide_subway_support" && claim.status === "NO_GO",
+    ),
+  );
+  assert.ok(
+    targets.claimLedger.some((claim) => claim.claimId === "realtime_eta_accuracy" && claim.status === "NO_GO"),
+  );
+  assert.deepEqual(
+    targets.expansionRoadmap.map((stage) => stage.stage),
+    [0, 1, 2, 3, 4, 5],
+  );
+  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("airport-railroad"));
+  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("gtx-c"));
+  assert.ok(targets.expansionRoadmap.every((stage) => stage.status === "NO_GO" || stage.status === "CURRENT_LIMITED_GO"));
+  assert.ok(targets.expansionRoadmap.every((stage) => stage.conditionAxesRef === "roadmapConditionAxes"));
+  assert.ok(targets.expansionRoadmap.every((stage) => stage.verificationCommandIds.length > 0));
   assert.match(gapReporter, /nationwide coverage gaps remain/);
   assert.match(gapReporter, /coverageScope/);
   assert.match(gapReporter, /coverageComplete/);
