@@ -1,6 +1,7 @@
 package com.easysubway.route.application.service;
 
 import com.easysubway.profile.domain.MobilityType;
+import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaSource;
@@ -17,16 +18,16 @@ public class RouteV2Planner {
 
 	private static final String PLANNER_ADR = "tools/routes/route-algorithm-v2-adr.json";
 
-	private final RouteSearchService routeSearchService;
+	private final RouteSearchUseCase routeSearchUseCase;
 
-	public RouteV2Planner(RouteSearchService routeSearchService) {
-		this.routeSearchService = routeSearchService;
+	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
+		this.routeSearchUseCase = routeSearchUseCase;
 	}
 
 	public RouteV2Plan search(SearchRouteV2Command command) {
 		try {
 			SearchRouteCommand searchRouteCommand = command.toSearchRouteCommand();
-			List<RouteSearchResult> itineraries = routeSearchService.searchRouteAlternatives(
+			List<RouteSearchResult> itineraries = routeSearchUseCase.searchRouteAlternatives(
 				searchRouteCommand,
 				command.alternativeCount()
 			);

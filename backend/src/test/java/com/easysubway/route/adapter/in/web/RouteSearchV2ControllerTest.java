@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.profile.domain.MobilityType;
-import com.easysubway.route.application.service.RouteSearchService;
+import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.RouteRefreshResult;
@@ -45,12 +45,12 @@ class RouteSearchV2ControllerTest {
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private RouteSearchService routeSearchService;
+	private RouteSearchUseCase routeSearchUseCase;
 
 	@Test
 	@DisplayName("모바일 V2 계약으로 itinerary와 leg 단위 ETA 필드를 반환한다")
 	void routeSearchV2ReturnsItineraryContract() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			"station-sangnoksu".equals(command.originStationId())
 				&& "station-sadang".equals(command.destinationStationId())
 				&& command.mobilityType() == MobilityType.STROLLER
@@ -119,7 +119,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 경로 검색은 시간표 서비스가 없으면 NO_TIMETABLE_SERVICE status와 빈 itinerary를 반환한다")
 	void routeSearchV2ReturnsNoTimetableServiceStatus() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			"station-no-service-origin".equals(command.originStationId())
 				&& "station-no-service-destination".equals(command.destinationStationId())
 		), eq(3))).thenThrow(new RouteNotFoundException());
@@ -148,7 +148,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 route refresh는 저장된 itinerary와 refresh 상태를 반환한다")
 	void routeRefreshV2ReturnsRefreshStatusAndStoredRoute() throws Exception {
-		when(routeSearchService.refreshRoute("route-search-1"))
+		when(routeSearchUseCase.refreshRoute("route-search-1"))
 			.thenReturn(new RouteRefreshResult(
 				"route-search-1",
 				RouteRefreshStatus.STALE_FALLBACK,
@@ -177,7 +177,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 route refresh는 없는 routeSearchId를 안정 JSON 404로 반환한다")
 	void routeRefreshV2UnknownRouteSearchIdReturnsJsonNotFound() throws Exception {
-		when(routeSearchService.refreshRoute("route-missing"))
+		when(routeSearchUseCase.refreshRoute("route-missing"))
 			.thenThrow(new com.easysubway.route.domain.RouteSearchNotFoundException());
 
 		mockMvc.perform(post("/api/v2/routes/route-missing/refresh"))
@@ -190,7 +190,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("모바일 V2 계약으로 accessibility risk vector count를 반환한다")
 	void routeSearchV2ReturnsAccessibilityRiskVectorCounts() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			"station-risk-origin".equals(command.originStationId())
 				&& "station-risk-destination".equals(command.destinationStationId())
 		), eq(1))).thenReturn(List.of(riskyRouteSearch()));
@@ -231,7 +231,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 leg ETA source와 confidence는 step data에서 파생한다")
 	void routeSearchV2MapsLegEtaSourceAndConfidence() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command != null && "station-realtime-origin".equals(command.originStationId())
 		), eq(1))).thenReturn(List.of(realtimeRouteSearch()));
 
@@ -259,7 +259,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 첫 탑승과 환승 후 탑승은 이동약자 준비시간 이후로 계산한다")
 	void routeSearchV2AppliesBoardingAndTransferSlackBeforeRideLegs() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command != null && "station-boarding-origin".equals(command.originStationId())
 		), eq(1))).thenReturn(List.of(boardingTransferRouteSearch()));
 
@@ -291,7 +291,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 큰 짐 이동은 탑승 준비시간 60초를 적용한다")
 	void routeSearchV2AppliesLuggageBoardingSlack() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command != null && command.mobilityType() == MobilityType.LUGGAGE
 		), eq(1))).thenReturn(List.of(boardingTransferRouteSearch(MobilityType.LUGGAGE)));
 
@@ -321,7 +321,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("모바일 V2 계약의 blocked reasonCodes는 사용자 문장 대신 안정적인 코드만 반환한다")
 	void routeSearchV2BlockedRiskReasonCodesAreStableCodes() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			"station-blocked-origin".equals(command.originStationId())
 				&& "station-blocked-destination".equals(command.destinationStationId())
 		), eq(1))).thenReturn(List.of(blockedRouteSearch()));
@@ -369,7 +369,7 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.message").value("출발 시간은 ISO offset 형식이어야 합니다."));
 
-		verifyNoInteractions(routeSearchService);
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	@Test
@@ -394,7 +394,7 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.message").exists());
 
-		verifyNoInteractions(routeSearchService);
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	@Test
@@ -418,13 +418,13 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.message").exists());
 
-		verifyNoInteractions(routeSearchService);
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	@Test
 	@DisplayName("V2 prefer step-free는 mobility type을 유지한 채 command에 전달한다")
 	void routeSearchV2PreferStepFreeKeepsMobilityType() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command.mobilityType() == MobilityType.STROLLER
 				&& command.constraintMode() == ConstraintMode.PREFER_STEP_FREE
 		), eq(3))).thenReturn(List.of(foundRouteSearch()));
@@ -450,7 +450,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 PROFILE_DEFAULT는 기존 client 호환을 위해 mobility type 기본 constraint로 처리한다")
 	void routeSearchV2ProfileDefaultUsesMobilityTypeDefaultConstraintMode() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command.mobilityType() == MobilityType.STROLLER
 				&& command.constraintMode() == ConstraintMode.PREFER_STEP_FREE
 		), eq(3))).thenReturn(List.of(foundRouteSearch()));
@@ -476,7 +476,7 @@ class RouteSearchV2ControllerTest {
 	@Test
 	@DisplayName("V2 allow-with-warnings는 constraintMode를 command와 응답에 반영한다")
 	void routeSearchV2AllowWithWarningsKeepsConstraintMode() throws Exception {
-		when(routeSearchService.searchRouteAlternatives(argThat(command ->
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command.mobilityType() == MobilityType.STROLLER
 				&& command.constraintMode() == ConstraintMode.ALLOW_WITH_WARNINGS
 		), eq(3))).thenReturn(List.of(foundRouteSearch()));
@@ -521,7 +521,7 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.success").value(false))
 			.andExpect(jsonPath("$.message").value("지원하지 않는 이동 제약 조건입니다."));
 
-		verifyNoInteractions(routeSearchService);
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	private RouteSearchResult foundRouteSearch() {
