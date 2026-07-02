@@ -7,7 +7,7 @@
     {
       "claimId": "android_v1_public_support_scope",
       "claimKo": "상록수·사당 검증 pilot",
-      "status": "GO_LIMITED",
+      "status": "SCOPE_LOCKED_NO_GO_UNTIL_EVIDENCE_CLOSED",
       "releaseScopeArtifact": "apps/mobile/release/production-datapack-scope.json",
       "unblockConditionKo": "#1392-#1398 Android v1 pilot evidence만 대상으로 한다."
     },
@@ -186,7 +186,7 @@
     {
       "stage": 0,
       "scopeKo": "상록수·사당 pilot",
-      "status": "CURRENT_LIMITED_GO",
+      "status": "CURRENT_NO_GO_UNTIL_PILOT_EVIDENCE_CLOSED",
       "operatorIds": ["seoul-metro"],
       "conditionAxesRef": "roadmapConditionAxes",
       "goIssueIds": [1392, 1393, 1394, 1395, 1396, 1397, 1398],
