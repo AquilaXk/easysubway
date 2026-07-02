@@ -29,6 +29,10 @@ const facilityEvidenceProvenanceColumns = [
   "retrieved_at",
 ];
 const productionFacilityProvenanceKinds = ["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"];
+const allowedRealtimeDatapackTables = new Set([
+  "realtime_provider_line_mappings",
+  "realtime_provider_station_mappings",
+]);
 const allowedNetworkEdgeTypes = new Set([
   "RIDE",
   "IN_STATION_TRANSFER",
@@ -138,6 +142,7 @@ function validateSqlite(sqlitePath, pack) {
       }
     }
 
+    validateNoRealtimePayloadTables(database, pack);
     validateNetworkEdgeReferences(database, pack);
     validateTransitSchedule(database, pack);
     validateStationPathways(database, pack);
@@ -161,6 +166,20 @@ function validateSqlite(sqlitePath, pack) {
     }
   } finally {
     database.close();
+  }
+}
+
+function validateNoRealtimePayloadTables(database, pack) {
+  if (pack.artifactKind !== "production") {
+    return;
+  }
+  const rows = database
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name LIKE 'realtime_%' ORDER BY name")
+    .all();
+  for (const row of rows) {
+    if (!allowedRealtimeDatapackTables.has(row.name)) {
+      throw new Error(`${pack.id}@${pack.version} realtime payload table is not allowed in production datapack: ${row.name}`);
+    }
   }
 }
 
@@ -1302,8 +1321,8 @@ function validateProductionFacilityPositiveStatus(row, statusMeaning, pack) {
   const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
     String(row.status ?? "").toUpperCase(),
   );
-  if (positiveStatus && statusMeaning !== "REALTIME_OPERATION") {
-    throw new Error(`${pack.id}@${pack.version} facilities positive status requires REALTIME_OPERATION evidence: ${row.id}`);
+  if (positiveStatus && !["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    throw new Error(`${pack.id}@${pack.version} facilities positive status requires verified operation evidence: ${row.id}`);
   }
 }
 
@@ -1361,6 +1380,18 @@ function validateProductionStationFacilityEvidenceRow(row, sourceIds, pack) {
   }
   if (row.strict_route_eligible === 1) {
     requiredString(row.strict_route_eligible_reason, `station_facility_evidence.${id}.strict_route_eligible_reason`);
+    validateStrictRouteEligibleFacilityEvidence(row, pack, id);
+  }
+}
+
+function validateStrictRouteEligibleFacilityEvidence(row, pack, id) {
+  const operationalStatus = String(row.operational_status ?? "").toUpperCase();
+  const statusMeaning = String(row.status_meaning ?? "").toUpperCase();
+  if (!["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(operationalStatus)) {
+    throw new Error(`${pack.id}@${pack.version} station_facility_evidence strict route eligibility requires available operation status: ${id}`);
+  }
+  if (!["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    throw new Error(`${pack.id}@${pack.version} station_facility_evidence strict route eligibility requires verified operation evidence: ${id}`);
   }
 }
 

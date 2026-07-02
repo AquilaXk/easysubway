@@ -340,6 +340,11 @@ void main() {
     expect(result.transferCount, 0);
     expect(result.evidenceSummary, contains('DURATION_ESTIMATED'));
     expect(result.evidenceSummary, contains('DISTANCE_UNKNOWN'));
+    expect(result.etaSource, 'STATIC_LOCAL');
+    expect(result.sourceNotice, contains('저장된 데이터 기준'));
+    expect(result.sourceNotice, contains('최근 확인 2026-06-19'));
+    expect(result.sourceNotice, isNot(contains('실시간')));
+    expect(result.sourceNotice, isNot(contains('시간표')));
     expect(
       result.steps
           .map((step) => step.lineId)

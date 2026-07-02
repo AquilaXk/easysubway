@@ -1,5 +1,5 @@
-import { gunzipSync } from "node:zlib";
-import { createHash } from "node:crypto";
+import { gzipSync, gunzipSync } from "node:zlib";
+import { createHash, createSign } from "node:crypto";
 import { copyFile, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
@@ -925,6 +925,38 @@ test("데이터팩 생성기는 만료된 source snapshot buildSpec을 거부한
         },
       ),
       /buildSpec\.sourceSnapshots\[0\]\.freshnessExpiresAt must be in the future/,
+    );
+  } finally {
+    await rm(buildSpecDir, { recursive: true, force: true });
+  }
+});
+
+test("데이터팩 생성기는 admin review 없는 source snapshot buildSpec을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-build-spec-admin-output-${Date.now()}`);
+  const buildSpecDir = path.join(root, "tmp", `easysubway-datapack-build-spec-admin-${process.pid}-${Date.now()}`);
+  const buildSpecPath = path.join(buildSpecDir, "candidate-build-spec.missing-admin.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await rm(buildSpecDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(buildSpecDir, { recursive: true });
+  const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
+  delete buildSpec.sourceSnapshots[0].adminReviewRecordHash;
+  await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+  try {
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/build-datapack.mjs",
+          "--build-spec",
+          buildSpecPath,
+          "--output",
+          outputDir,
+        ],
+        { cwd: root, env: productionEnv },
+      ),
+      /buildSpec\.sourceSnapshots\[0\]\.adminReviewRecordHash must be a non-empty string/,
     );
   } finally {
     await rm(buildSpecDir, { recursive: true, force: true });
@@ -3010,6 +3042,85 @@ test("데이터팩 생성기는 production 시설 status 의미와 검증 근거
   );
 });
 
+test("데이터팩 검증기는 현장·운영기관 확인 시설 AVAILABLE 근거를 허용한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-production-facility-positive-evidence-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "catalog-fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  for (const [index, statusMeaning] of ["FIELD_SURVEY", "OPERATOR_CONFIRMED"].entries()) {
+    fixture.packs[0].facilities[index].status = "NORMAL";
+    fixture.packs[0].facilities[index].operationalStatus = "AVAILABLE";
+    fixture.packs[0].facilities[index].statusMeaning = statusMeaning;
+    fixture.packs[0].facilities[index].provenanceKind = statusMeaning;
+  }
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest",
+      path.join(packOutputDir, "current.json"),
+      "--root",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+});
+
+test("데이터팩 검증기는 UNKNOWN 운행상태 시설의 strict route eligibility를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-production-facility-strict-unknown-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "catalog-fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  fixture.packs[0].stationFacilityEvidence[0].strictRouteEligible = true;
+  fixture.packs[0].stationFacilityEvidence[0].strictRouteEligibleReason = "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /station_facility_evidence strict route eligibility requires available operation status/,
+  );
+});
+
 test("데이터팩 검증기는 production verified edge coverage report를 출력한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-production-edge-report-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
@@ -3505,6 +3616,71 @@ test("데이터팩 검증기는 production sourceInventory coverageScope 누락�
       { cwd: root, env: productionEnv },
     ),
     /capital@1 production sourceInventory.coverageScope must be an object/,
+  );
+});
+
+test("데이터팩 검증기는 production pack의 realtime payload table을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-realtime-payload-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  markFixturePackProduction(fixture);
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const manifestPath = path.join(outputDir, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const pack = manifest.packs[0];
+  const sqlitePath = path.join(outputDir, "catalog", "capital-v1.sqlite");
+  const database = new DatabaseSync(sqlitePath);
+  try {
+    database.exec(`
+      CREATE TABLE realtime_station_arrivals (
+        provider_id TEXT NOT NULL,
+        station_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL
+      )
+    `);
+    database.exec("INSERT INTO realtime_station_arrivals VALUES ('topis', 'station-sadang', '{}')");
+  } finally {
+    database.close();
+  }
+
+  const sqliteBytes = await readFile(sqlitePath);
+  const compressedBytes = gzipSync(sqliteBytes);
+  await writeFile(path.join(outputDir, "catalog", "capital-v1.sqlite.gz"), compressedBytes);
+  pack.sizeBytes = compressedBytes.length;
+  pack.sha256 = sha256(compressedBytes);
+  pack.sqliteSha256 = sha256(sqliteBytes);
+  resignProductionManifest(manifest);
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /capital@1 realtime payload table is not allowed in production datapack: realtime_station_arrivals/,
   );
 });
 
@@ -4057,6 +4233,82 @@ test("데이터팩 생성기는 시설 coverage를 시설이 있는 역 비율�
       outputDir,
     ],
     { cwd: root },
+  );
+});
+
+test("데이터팩 quality metric report는 denominator 기반 metric과 freshness를 산출한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-quality-report-${Date.now()}`);
+  const reportPath = path.join(outputDir, "artifacts/datapack-quality-metrics.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-quality-metric-report.mjs",
+      "--manifest",
+      path.join(outputDir, "current.json"),
+      "--output",
+      reportPath,
+    ],
+    { cwd: root },
+  );
+
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  assert.equal(report.artifactKind, "datapack-quality-metric-report");
+  assert.equal(report.summary.packCount, 1);
+  assert.equal(report.summary.worstRequiredFacilityEvidenceCoverageRatio, 0.1852);
+  assert.equal(report.summary.worstFreshnessValidRatio, 0);
+  assert.equal(report.packs[0].denominatorPolicy, "station_line_x_required_facility_type");
+  assert.equal(report.packs[0].metrics.requiredFacilityEvidenceCoverageRatio, 0.1852);
+  assert.equal(report.packs[0].metrics.freshnessValidRatio, 0);
+});
+
+test("데이터팩 quality metric report는 freshness metric 누락 manifest를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-quality-report-invalid-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  const manifestPath = path.join(outputDir, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete manifest.packs[0].regionalQualityMetrics.freshnessValidRatio;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-quality-metric-report.mjs",
+        "--manifest",
+        manifestPath,
+      ],
+      { cwd: root },
+    ),
+    /freshnessValidRatio must be a ratio/,
   );
 });
 
@@ -5487,6 +5739,61 @@ test("source candidate sample 검증기는 KRIC live evidence metadata를 허용
   const samplePath = path.join(outputDir, "sample.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
+  const sample = {
+    candidateId: "kric-subway-route-info",
+    endpoint: "https://openapi.kric.go.kr/openapi/trainUseInfo/subwayRouteInfo",
+    format: "json",
+    fields: [
+      "lnCd",
+      "mreaWideCd",
+      "railOprIsttCd",
+      "routCd",
+      "routNm",
+      "stinCd",
+      "stinConsOrdr",
+      "stinNm",
+    ],
+    rowCount: 1,
+    rawSha256: sha256("kric-subway-route-info raw sample"),
+    schemaFingerprint: sha256(JSON.stringify([
+      "lnCd",
+      "mreaWideCd",
+      "railOprIsttCd",
+      "routCd",
+      "routNm",
+      "stinCd",
+      "stinConsOrdr",
+      "stinNm",
+    ])),
+    credentialRedacted: true,
+    providerRecordHashes: [sha256("kric-subway-route-info row")],
+  };
+  sample.evidenceHash = sha256(JSON.stringify(sample));
+  await writeFile(
+    samplePath,
+    `${JSON.stringify(sample, null, 2)}\n`,
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-source-candidate-sample.mjs",
+      "--candidate",
+      "kric-subway-route-info",
+      "--sample",
+      samplePath,
+    ],
+    { cwd: root },
+  );
+
+  assert.match(stdout, /source candidate sample evidence valid: kric-subway-route-info/);
+});
+
+test("source candidate sample 검증기는 evidence hash metadata 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-candidate-sample-hash-${Date.now()}`);
+  const samplePath = path.join(outputDir, "sample.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
   await writeFile(
     samplePath,
     `${JSON.stringify(
@@ -5510,19 +5817,56 @@ test("source candidate sample 검증기는 KRIC live evidence metadata를 허용
     )}\n`,
   );
 
-  const { stdout } = await execFileAsync(
-    process.execPath,
-    [
-      "tools/datapack/validate-source-candidate-sample.mjs",
-      "--candidate",
-      "kric-subway-route-info",
-      "--sample",
-      samplePath,
-    ],
-    { cwd: root },
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidate",
+        "kric-subway-route-info",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    /rawSha256 must be a sha256 hex string/,
   );
+});
 
-  assert.match(stdout, /source candidate sample evidence valid: kric-subway-route-info/);
+test("source candidate sample 검증기는 hand-edited evidence hash를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-candidate-stale-hash-${Date.now()}`);
+  const samplePath = path.join(outputDir, "sample.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const sample = {
+    candidateId: "kric-train-operation-organ",
+    endpoint: "https://openapi.kric.go.kr/openapi/convenientInfo/trainOperationOrgan",
+    format: "json",
+    fields: ["railOprIsttCd", "railOprIsttNm"],
+    rowCount: 1,
+    rawSha256: sha256("raw"),
+    schemaFingerprint: sha256(JSON.stringify(["railOprIsttCd", "railOprIsttNm"])),
+    credentialRedacted: true,
+    providerRecordHashes: [sha256("row")],
+  };
+  sample.evidenceHash = sha256(JSON.stringify(sample));
+  sample.fields.push("unexpectedField");
+  await writeFile(samplePath, `${JSON.stringify(sample, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidate",
+        "kric-train-operation-organ",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    /output field missing|schemaFingerprint does not match fields/,
+  );
 });
 
 test("source candidate sample 검증기는 endpoint mismatch를 거부한다", async () => {
@@ -5742,25 +6086,14 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
   await mkdir(outputDir, { recursive: true });
   await writeFile(
     responsePath,
-    `${JSON.stringify({
-      response: {
-        body: {
-          pageNo: 1,
-          numOfRows: 10,
-          totalCount: 1,
-          items: {
-            item: [
-              {
-                railOprIsttCd: "S1",
-              },
-              {
-                railOprIsttNm: "서울교통공사",
-              },
-            ],
-          },
-        },
+    `${JSON.stringify([
+      {
+        railOprIsttCd: "S1",
       },
-    })}\n`,
+      {
+        railOprIsttNm: "서울교통공사",
+      },
+    ])}\n`,
   );
 
   const { stdout } = await execFileAsync(
@@ -5775,6 +6108,13 @@ test("source candidate sample evidence builder는 raw JSON response를 validator
     { cwd: root },
   );
   await writeFile(evidencePath, stdout);
+  const evidence = JSON.parse(stdout);
+  assert.match(evidence.rawSha256, /^[0-9a-f]{64}$/);
+  assert.match(evidence.schemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.equal(evidence.credentialRedacted, true);
+  assert.equal(evidence.rowCount, 2);
+  assert.equal(evidence.providerRecordHashes.length, 2);
+  assert.match(evidence.evidenceHash, /^[0-9a-f]{64}$/);
 
   await execFileAsync(
     process.execPath,
@@ -5817,6 +6157,13 @@ test("source candidate sample evidence builder는 raw XML response를 validator 
     { cwd: root },
   );
   await writeFile(evidencePath, stdout);
+  const evidence = JSON.parse(stdout);
+  assert.match(evidence.rawSha256, /^[0-9a-f]{64}$/);
+  assert.match(evidence.schemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.equal(evidence.credentialRedacted, true);
+  assert.equal(evidence.rowCount, 2);
+  assert.equal(evidence.providerRecordHashes.length, 2);
+  assert.match(evidence.evidenceHash, /^[0-9a-f]{64}$/);
 
   await execFileAsync(
     process.execPath,
@@ -6981,6 +7328,38 @@ test("공식 source ingest adapter는 production schedule pass-through를 거부
   );
 });
 
+test("공식 source ingest adapter는 admission 전 schedule provenance도 production 적재하지 않는다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-schedule-candidate-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.sourceIds.push("molit-tago-subway-info");
+  input.scheduleProvenance = {
+    sourceId: "molit-tago-subway-info",
+    sourceSnapshotId: "molit-tago-subway-info-snapshot-20260702",
+    providerRecordHash: sha256("provider:molit-tago-subway-info:schedule:20260702"),
+    evidenceHash: sha256("evidence:molit-tago-subway-info:schedule:20260702"),
+    retrievedAt: "2026-07-02T00:00:00.000Z",
+  };
+  input.serviceCalendars = [
+    {
+      serviceId: "weekday-2026",
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: false,
+      sunday: false,
+      startDate: "20260701",
+      endDate: "20261231",
+    },
+  ];
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /scheduleProvenance source is not a schedule_timetable source: molit-tago-subway-info/,
+  );
+});
+
 test("공식 source ingest adapter는 station-line 단위 facility evidence coverage를 요구한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-facility-line-coverage-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -7026,12 +7405,13 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
           row.lineId === "seoul-4" &&
           row.facilityType === "ELEVATOR",
       )
-      .map(({ stationId, lineId, facilityType, sourceId, strictRouteEligible }) => ({
+      .map(({ stationId, lineId, facilityType, sourceId, strictRouteEligible, strictRouteEligibleReason }) => ({
         stationId,
         lineId,
         facilityType,
         sourceId,
         strictRouteEligible,
+        strictRouteEligibleReason,
       })),
     [
       {
@@ -7039,7 +7419,8 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
         lineId: "seoul-4",
         facilityType: "ELEVATOR",
         sourceId: "kric-station-elevator",
-        strictRouteEligible: true,
+        strictRouteEligible: false,
+        strictRouteEligibleReason: "OPERATION_STATUS_UNKNOWN",
       },
     ],
   );
@@ -9503,6 +9884,43 @@ function productionSourceCoverageScope() {
 
 function packSignaturePayload(pack) {
   return `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}`;
+}
+
+function resignProductionManifest(manifest) {
+  const pack = manifest.packs[0];
+  const packUrl = new URL(pack.url).toString();
+  const fixturePayload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+  pack.signature.value = rsaSha256Signature(`${fixturePayload}:${packUrl}`);
+  pack.representativeRouteRegressionSignature.value = rsaSha256Signature(
+    `${fixturePayload}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}:${packUrl}`,
+  );
+  if (manifest.signature) {
+    manifest.signature.value = rsaSha256Signature(canonicalJson(withoutSignature(manifest)));
+  }
+}
+
+function rsaSha256Signature(value) {
+  return createSign("RSA-SHA256").update(value).sign(testPrivateKeyPem).toString("base64url");
+}
+
+function withoutSignature(value) {
+  const copy = { ...value };
+  delete copy.signature;
+  return copy;
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(canonicalValue(value));
+}
+
+function canonicalValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue);
+  }
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
 }
 
 function representativeRouteRegressionPayload(routes) {
