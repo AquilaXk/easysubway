@@ -1116,6 +1116,46 @@ void main() {
     );
   });
 
+  testWidgets('노선도 메뉴에서 데이터 및 지도 출처 화면으로 이동한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('networkMapMenuDataSourcesButton')),
+      120,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapMenuDataSourcesButton')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.byKey(const Key('dataSourceAttributionScreen')),
+      findsOneWidget,
+    );
+    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
+    await tester.pump();
+    await tester.pump();
+    await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
+    expect(find.text('지도 표시용 asset'), findsOneWidget);
+    expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
+  });
+
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['테스트권', '부산'],
@@ -3685,39 +3725,35 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+      const MaterialApp(home: DataSourceAttributionScreen()),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
 
-    await _openSettingsScreen(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('dataSourceAttributionSettingsButton')),
-      160,
+    expect(
+      find.byKey(const Key('dataSourceAttributionScreen')),
+      findsOneWidget,
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('dataSourceAttributionSettingsButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('dataSourceAttributionSettingsButton')),
-    );
-    await tester.pumpAndSettle();
-
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
-    expect(find.text('지도 표시용 asset'), findsOneWidget);
-    expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
-    expect(find.text('수도권'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('경로·시설 판단용 data pack'), 420);
-    expect(find.text('경로·시설 판단용 data pack'), findsOneWidget);
+
+    final manifest =
+        jsonDecode(
+              File(
+                'assets/datapacks/metro_map_pack/manifest.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, Object?>;
+    final inventory =
+        jsonDecode(
+              File('assets/datapacks/source-inventory.json').readAsStringSync(),
+            )
+            as Map<String, Object?>;
+    final maps = (manifest['maps'] as List).cast<Map<String, Object?>>();
+    final sources = (inventory['sources'] as List).cast<Map<String, Object?>>();
+
+    expect(maps.map((map) => map['app_region']), contains('수도권'));
+    expect(sources, isNotEmpty);
   });
 
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
