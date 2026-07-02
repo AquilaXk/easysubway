@@ -2831,11 +2831,12 @@ class _RoutePointPickerCard extends StatelessWidget {
         color: Colors.white,
         border: Border.all(color: _routeCardBorderColor),
         borderRadius: _routeSearchPickerRadius,
+        // 최소 그림자 원칙: 보더 중심으로 낮춘다.
         boxShadow: const [
           BoxShadow(
             color: _routeCardShadowColor,
-            blurRadius: 16,
-            offset: Offset(0, 5),
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
       ),

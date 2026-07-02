@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'accessible_design.dart';
+import 'ad_slot.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
@@ -1649,24 +1650,12 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    // 실광고 미연동: release에서는 "광고" 플레이스홀더를 노출하지 않고 슬롯을 숨긴다.
+    return const SafeArea(
       top: false,
-      child: Container(
-        key: const Key('networkMapBottomAdBanner'),
+      child: AdBannerSlot(
+        slotKey: Key('networkMapBottomAdBanner'),
         height: _networkMapBottomAdHeight,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
-        ),
-        child: const Text(
-          '광고',
-          style: TextStyle(
-            color: Color(0xFF666666),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
       ),
     );
   }
