@@ -1402,8 +1402,10 @@ void main() {
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
     expect(saved.mobilityLabel, '천천히 이동');
-    expect(saved.scoreLabel, '다시 찾으면 자세히 볼 수 있어요');
-    expect(saved.scoreLabel, isNot(contains('92점')));
+    // 플레이스홀더(score/이동·접근성 메트릭) 문구는 카드·시맨틱에서 제거됐다(#1488).
+    expect(saved.semanticLabel, contains('상록수에서 사당까지'));
+    expect(saved.semanticLabel, isNot(contains('92점')));
+    expect(saved.semanticLabel, isNot(contains('아직 알 수 없어요')));
   });
 
   test('경로 피드백 API 저장소는 익명 사용자 식별자와 평가를 전송한다', () async {
