@@ -1002,6 +1002,63 @@ void main() {
     expect(result.hasOutOfStationTransfer, isFalse);
   });
 
+  test('경로 결과 badge는 ETA, 접근성, 환승 explicit 필드에서 파생된다', () {
+    final tightTransfer = _sampleRouteSearchResult(
+      etaSource: 'STATIC_ESTIMATE',
+      accessibilityRiskLevel: 'HIGH',
+      transferSlackSeconds: 45,
+      hasOutOfStationTransfer: true,
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'transfer',
+          title: '역 밖 환승',
+          description: '밖으로 나가 다음 노선으로 갈아탑니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 5,
+          distanceMeters: 180,
+          includesStairs: false,
+          stairAccessState: 'unknown',
+          requiresAccessibilityCheck: true,
+        ),
+      ],
+    );
+
+    expect(tightTransfer.badgeLabels, ['정적 추정', '엘리베이터 상태 확인 필요', '역 밖 환승']);
+    expect(tightTransfer.semanticLabel, contains('정적 추정'));
+    expect(tightTransfer.semanticLabel, contains('엘리베이터 상태 확인 필요'));
+    expect(tightTransfer.semanticLabel, contains('역 밖 환승'));
+
+    final clearTransfer = _sampleRouteSearchResult(
+      etaSource: 'PLANNED',
+      accessibilityRiskLevel: 'LOW',
+      transferSlackSeconds: 180,
+      warnings: const [],
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'transfer',
+          title: '노선 변경 준비',
+          description: '다음 노선으로 갈아탑니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 4,
+          distanceMeters: 120,
+          includesStairs: false,
+          stairAccessState: 'stepFree',
+          requiresAccessibilityCheck: false,
+        ),
+      ],
+    );
+
+    expect(clearTransfer.badgeLabels, ['시간표 기준', '계단 없는 경로 확인', '환승 여유 충분']);
+  });
+
   test('경로 V2 blocked reasonCodes가 비어 있으면 status를 보존한다', () {
     const clearRisk = RouteSearchV2AccessibilityRisk(
       stairCount: 0,
@@ -1567,6 +1624,11 @@ RouteSearchResult _sampleRouteSearchResult({
     ),
   ],
   List<String> blockedReasons = const [],
+  String etaSource = '',
+  String etaConfidence = '',
+  String accessibilityRiskLevel = '',
+  int? transferSlackSeconds,
+  bool hasOutOfStationTransfer = false,
 }) {
   return RouteSearchResult(
     routeSearchId: routeSearchId,
@@ -1585,6 +1647,11 @@ RouteSearchResult _sampleRouteSearchResult({
     recommendationReasons: recommendationReasons,
     blockedReasons: blockedReasons,
     createdAt: '2026-06-13T04:20:00',
+    etaSource: etaSource,
+    etaConfidence: etaConfidence,
+    accessibilityRiskLevel: accessibilityRiskLevel,
+    transferSlackSeconds: transferSlackSeconds,
+    hasOutOfStationTransfer: hasOutOfStationTransfer,
   );
 }
 
