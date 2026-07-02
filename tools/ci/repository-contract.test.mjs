@@ -114,6 +114,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.evidence.routeAccuracyReportRequired, true);
   assert.equal(gate.evidence.providerCoverageReportRequired, true);
   assert.equal(gate.evidence.accessibilityRegressionReportRequired, true);
+  assert.equal(gate.evidence.runtimeTraceabilityRequired, true);
   assert.deepEqual(gate.requiredReports, {
     accuracy: "artifacts/route-accuracy-report.json",
     accessibility: "artifacts/route-accessibility-regression-report.json",
