@@ -862,6 +862,10 @@ class RouteSearchServiceTest {
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("timeSource")
 			.containsExactly(EtaSource.REALTIME.name(), EtaSource.REALTIME.name());
+		assertThat(plan.itineraries().getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("estimatedMinutes")
+			.containsExactly(4, 4);
 	}
 
 	@Test

@@ -1155,7 +1155,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			);
 			RouteStep realtimeStep = withEtaOverlay(step, overlay);
 			realtimeSteps.set(index, realtimeStep);
-			elapsedMinutes += Math.max(0, realtimeStep.estimatedMinutes()) + Math.max(0, step.estimatedMinutes());
+			elapsedMinutes += roundedWaitMinutes(overlay) + Math.max(0, step.estimatedMinutes());
 		}
 		return List.copyOf(realtimeSteps);
 	}
@@ -1184,7 +1184,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			step.lineName(),
 			step.fromStationId(),
 			step.toStationId(),
-			Math.max(1, (overlay.waitSeconds() + 59) / 60),
+			step.estimatedMinutes(),
 			step.distanceMeters(),
 			step.includesStairs(),
 			step.stairAccessState(),
@@ -1193,6 +1193,10 @@ public class RouteSearchService implements RouteSearchUseCase {
 			step.distanceSource(),
 			overlay.confidence().name()
 		);
+	}
+
+	private int roundedWaitMinutes(RealtimeEtaOverlay.Result overlay) {
+		return Math.max(0, (overlay.waitSeconds() + 59) / 60);
 	}
 
 	private String directionFor(RouteStep step) {
