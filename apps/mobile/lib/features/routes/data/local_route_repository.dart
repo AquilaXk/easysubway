@@ -507,6 +507,9 @@ class _RouteCatalogSnapshot {
           FROM station_lines
           ORDER BY line_id, line_sequence
           ''').get();
+    final outOfStationTransferPolicy = await _OutOfStationTransferPolicy.load(
+      database,
+    );
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -754,6 +757,11 @@ class _RouteCatalogSnapshot {
                 row.read<String>('evidence_hash'),
           );
         })
+        .where(
+          (edge) =>
+              edge.routeEdgeType != graph.RouteEdgeType.outOfStationTransfer ||
+              outOfStationTransferPolicy.allows(edge),
+        )
         .toList(growable: false);
     final strictEvidenceSupported =
         networkEdgeColumnNames.containsAll({
@@ -1043,6 +1051,60 @@ String _metadataUpdatedAtIso(int? updatedAtMillis) {
     normalizedMillis,
     isUtc: true,
   ).toIso8601String();
+}
+
+class _OutOfStationTransferPolicy {
+  const _OutOfStationTransferPolicy({
+    required this.enabled,
+    required this.runtimeEnabled,
+    required this.allowlist,
+  });
+
+  final bool enabled;
+  final bool runtimeEnabled;
+  final Set<String> allowlist;
+
+  static Future<_OutOfStationTransferPolicy> load(
+    CatalogDatabase database,
+  ) async {
+    final rows = await database.customSelect('''
+      SELECT key, value
+      FROM catalog_metadata
+      WHERE key IN (
+        'route.outOfStationTransfer.enabled',
+        'route.outOfStationTransfer.runtimeEnabled',
+        'route.outOfStationTransfer.allowlist'
+      )
+    ''').get();
+    final values = {
+      for (final row in rows)
+        row.read<String>('key'): row.read<String>('value'),
+    };
+    return _OutOfStationTransferPolicy(
+      enabled:
+          values['route.outOfStationTransfer.enabled']?.toLowerCase() == 'true',
+      runtimeEnabled:
+          values['route.outOfStationTransfer.runtimeEnabled']?.toLowerCase() !=
+          'false',
+      allowlist: _parseOutOfStationTransferAllowlist(
+        values['route.outOfStationTransfer.allowlist'] ?? '',
+      ),
+    );
+  }
+
+  bool allows(_NetworkEdgeSnapshot edge) {
+    return enabled &&
+        runtimeEnabled &&
+        allowlist.contains(_edgePairKey(edge.fromNodeId, edge.toNodeId));
+  }
+}
+
+Set<String> _parseOutOfStationTransferAllowlist(String value) {
+  return value
+      .split(RegExp(r'[\s,]+'))
+      .map((pair) => pair.trim())
+      .where((pair) => pair.isNotEmpty)
+      .toSet();
 }
 
 String _edgePairKey(String fromNodeId, String toNodeId) {
