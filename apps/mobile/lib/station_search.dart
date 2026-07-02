@@ -861,6 +861,18 @@ class SubwayLineOption {
 
   String get semanticLabel => name;
 
+  /// 지역 접두어를 뗀 짧은 노선명(지역이 이미 상단에 표시될 때 사용).
+  String get shortName {
+    final prefix = '$region ';
+    if (region.isNotEmpty && name.startsWith(prefix)) {
+      final stripped = name.substring(prefix.length).trim();
+      if (stripped.isNotEmpty) {
+        return stripped;
+      }
+    }
+    return name;
+  }
+
   StationSearchLine get badgeLine => StationSearchLine(
     id: id,
     name: name,
@@ -2703,8 +2715,8 @@ class _StationLineFilterSection extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 10,
+              runSpacing: 10,
               children: [
                 _StationLineFilterButton(
                   key: const Key('stationLineFilter-all'),
@@ -2716,7 +2728,7 @@ class _StationLineFilterSection extends StatelessWidget {
                 for (final line in visibleLines)
                   _StationLineFilterButton(
                     key: Key('stationLineFilter-${line.id}'),
-                    label: line.name,
+                    label: line.shortName,
                     semanticLabel: line.semanticLabel,
                     selected: selectedLine?.id == line.id,
                     badgeLine: line.badgeLine,
@@ -2792,7 +2804,7 @@ class _StationLineFilterSection extends StatelessWidget {
                 for (final line in linesByRegion[region]!)
                   _StationLineSheetRow(
                     key: Key('stationLineFilter-${line.id}'),
-                    label: line.name,
+                    label: line.shortName,
                     semanticLabel: line.semanticLabel,
                     selected: selectedLine?.id == line.id,
                     badgeLine: line.badgeLine,
@@ -2837,13 +2849,19 @@ class _StationLineRegionButton extends StatelessWidget {
           label: Text(label),
           selected: selected,
           onSelected: onPressed == null ? null : (_) => onPressed?.call(),
+          showCheckmark: true,
+          checkmarkColor: Colors.white,
           labelStyle: TextStyle(
             color: selected ? Colors.white : EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w800,
           ),
           selectedColor: _stationLineFilterSelectedColor,
           backgroundColor: Colors.white,
-          side: const BorderSide(color: _stationLineFilterBorderColor),
+          side: BorderSide(
+            color: selected
+                ? _stationLineFilterSelectedColor
+                : _stationLineFilterBorderColor,
+          ),
           shape: const RoundedRectangleBorder(
             borderRadius: _stationLineRegionChipRadius,
           ),
@@ -4843,26 +4861,33 @@ class _StationDetailHeader extends StatelessWidget {
                         height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      detail.dataQualityLabel,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w500,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '마지막 확인 ${detail.lastVerifiedAt}',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w500,
-                        height: 1.3,
-                      ),
-                    ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    '마지막 확인',
+                    style: TextStyle(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail.lastVerifiedAt,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -5164,7 +5189,10 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
       children: [
         OutlinedButton.icon(
           onPressed: () => setState(() => _expanded = !_expanded),
-          icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+          icon: Icon(
+            _expanded ? Icons.expand_less : Icons.expand_more,
+            size: 24,
+          ),
           label: Text(_expanded ? '안내 확인 방법 접기' : '안내 확인 방법 보기'),
         ),
         if (_expanded) ...[
