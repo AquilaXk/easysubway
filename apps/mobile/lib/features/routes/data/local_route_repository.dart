@@ -576,6 +576,17 @@ class _RouteCatalogSnapshot {
           SELECT provider_id, station_id, line_id
           FROM realtime_provider_station_mappings
           ''').get();
+    final realtimeStationLineKeysByProvider = <String, Set<String>>{};
+    for (final row in realtimeRows) {
+      realtimeStationLineKeysByProvider
+          .putIfAbsent(row.read<String>('provider_id'), () => <String>{})
+          .add(
+            _stationLineKey(
+              row.read<String>('station_id'),
+              row.read<String>('line_id'),
+            ),
+          );
+    }
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -869,9 +880,7 @@ class _RouteCatalogSnapshot {
       sourceUpdatedAt: _metadataUpdatedAtIso(
         sourceUpdatedAtRow?.readNullable<int>('source_updated_at'),
       ),
-      realtimeStationLineKeysByProvider: _realtimeStationLineKeysByProvider(
-        realtimeRows,
-      ),
+      realtimeStationLineKeysByProvider: realtimeStationLineKeysByProvider,
     );
   }
 
@@ -1354,23 +1363,6 @@ String _lineTransferPairKey(_RouteNodeKey from, _RouteNodeKey to) {
 
 String _stationLineKey(String stationId, String lineId) {
   return '$stationId:$lineId';
-}
-
-Map<String, Set<String>> _realtimeStationLineKeysByProvider(
-  List<dynamic> rows,
-) {
-  final keysByProvider = <String, Set<String>>{};
-  for (final row in rows) {
-    keysByProvider
-        .putIfAbsent(row.read<String>('provider_id'), () => <String>{})
-        .add(
-          _stationLineKey(
-            row.read<String>('station_id'),
-            row.read<String>('line_id'),
-          ),
-        );
-  }
-  return keysByProvider;
 }
 
 graph.RouteEdge _toGraphRouteEdge(
