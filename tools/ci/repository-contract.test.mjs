@@ -4393,6 +4393,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "route_graph_topology",
       "accessibility_facilities",
       "realtime_arrivals",
+      "schedule_timetable",
       "route_map_positions",
       "demand_reference",
     ],
@@ -4460,11 +4461,12 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(targets.roadmapEvidenceLedger.issue, 1399);
   assert.equal(targets.roadmapEvidenceLedger.goNoGoSummaryIssue, 1020);
   assert.match(targets.roadmapEvidenceLedger.goNoGoSummaryReferencePolicyKo, /#1020/);
-  assert.equal(targets.roadmapEvidenceLedger.targetComparison.nationwideTargets.requiredSourceDomainCount, 6);
+  assert.equal(targets.roadmapEvidenceLedger.targetComparison.nationwideTargets.requiredSourceDomainCount, 7);
   assert.equal(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.requiredSourceDomainCount, 2);
   assert.deepEqual(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.deferredSourceDomains, [
     "route_graph_topology",
     "realtime_arrivals",
+    "schedule_timetable",
     "route_map_positions",
     "demand_reference",
   ]);
@@ -5534,6 +5536,43 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
       assert.match(candidate.productionInventoryRelationship, /live_provider_contract_remains_candidate/);
     }
   }
+});
+
+test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되지 않는다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const candidate = candidates.candidates.find(({ id }) => id === "molit-tago-subway-info");
+
+  assert.ok(candidate);
+  assert.equal(candidate.priority, "P0");
+  assert.equal(candidate.domain, "schedule_timetable");
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
+  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
+  assert.equal(candidate.mobileEmbeddingAllowed, false);
+  assert.equal(candidate.productionInventoryReferenceId, "molit-tago-subway-info");
+  assert.equal(candidate.requestUrl, "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList");
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.match(candidate.evidence.sampleUrl, /subwayStationId=448/);
+  assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
+
+  const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
+  assert.equal(inventorySource.requiredForProductionPack, false);
+  assert.equal(inventorySource.capabilities.schedule.status, "CANDIDATE");
+  assert.equal(inventorySource.capabilities.schedule.productionUseAllowed, false);
+  assert.equal(inventorySource.coverageScope.sourceDomains.includes("schedule_timetable"), false);
+
+  assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
+  assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "SAMPLE_EVIDENCE_REQUIRED");
+  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "scheduleImporterValidation"]);
+  assert.ok(candidate.evidence.outputFields.includes("depTime"));
+  assert.ok(candidate.evidence.outputFields.includes("arrTime"));
+  assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
+  assert.ok(candidate.evidence.outputFields.includes("upDownTypeCode"));
 });
 
 test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
