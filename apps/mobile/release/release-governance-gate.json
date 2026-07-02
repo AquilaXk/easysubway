@@ -93,7 +93,7 @@
     "reviewedMainMergeSha": "da34e5215daf64ae4c1c31a7682d4fa774588074",
     "currentDecision": "NO_GO",
     "decisionOwner": "release-owner",
-    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230],
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230, 1419],
     "recentlyResolvedEvidence": [
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
@@ -115,7 +115,8 @@
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
       "play-installed-server-minimized-final-acceptance-evidence",
-      "route-result-v2-ui-badge-accessibility-copy-evidence"
+      "route-result-v2-ui-badge-accessibility-copy-evidence",
+      "datapack-release-readiness-tracker-evidence"
     ],
     "remainingApprovalPrerequisites": [
       "release-owner-final-go-approval"
@@ -292,9 +293,18 @@
       "owner": "mobile-ux",
       "nextAction": "Route result V2 badge와 accessibility copy evidence 수집",
       "evidenceReference": "apps/mobile/release/route-result-v2-ui-copy-gate.json"
+    },
+    {
+      "id": "G13_DATAPACK_RELEASE_READINESS",
+      "issue": 1419,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "datapack-release",
+      "nextAction": "데이터팩·실시간 ETA readiness tracker 하위 이슈와 production artifact evidence 수집",
+      "evidenceReference": "apps/mobile/release/datapack-release-readiness-gate.json"
     }
   ],
-  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230],
+  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1419],
   "evidencePolicy": {
     "localOnlyEvidenceRoot": ".codex/evidence/release/android-release-100/",
     "githubEvidencePolicy": "summary_or_public_link",

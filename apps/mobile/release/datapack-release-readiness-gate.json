@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "datapack-release-readiness",
+  "issue": 1419,
+  "status": "IN_PROGRESS",
+  "releaseBlockerPolicy": true,
+  "currentDecision": "NO_GO",
+  "scope": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "productionClaim": "blocked_until_child_issues_and_evidence_closed",
+    "safePublicClaimKo": "상록수·사당 검증 pilot",
+    "forbiddenPublicClaimsKo": [
+      "데이터팩 상용 준비 완료",
+      "전국 지하철 완전 지원",
+      "실시간 길찾기 정확 보장",
+      "휠체어 경로 보장",
+      "모든 역 완벽 지원"
+    ]
+  },
+  "architecturePrinciples": {
+    "offlineDatapackKo": "routing graph, 시간표, 시설·pathway, 노선도 좌표, realtime join key만 담고 오프라인 PLANNED 길찾기를 제공한다.",
+    "onlineRealtimeOverlayKo": "backend-only provider key로 실시간 provider를 조회하고, graph를 변형하지 않은 ETA 보정과 warning badge로만 얹는다.",
+    "fallbackLadder": ["REALTIME", "PLANNED", "STATIC_LOCAL"]
+  },
+  "offlineDatapackRequiredContents": [
+    "adjacent-station RIDE graph",
+    "service calendar",
+    "trip and stop_times",
+    "station pathway graph",
+    "facility evidence",
+    "route map positions",
+    "canonical-to-provider realtime join keys"
+  ],
+  "realtimePayloadPolicy": {
+    "allowedInDatapack": false,
+    "joinKeysAllowedInDatapack": true,
+    "validatorNegativeTestRequired": true,
+    "backendOnlyProviderKeyRequired": true,
+    "staleAsFreshAllowed": false,
+    "silentFallbackAllowed": false
+  },
+  "strictAccessibilityPolicy": {
+    "unknownCanProduceStrictFound": false,
+    "staleCanProduceStrictFound": false,
+    "generatedConnectorCanBeVerifiedEvidence": false,
+    "operationalEvidenceRequiredForAvailableClaim": true
+  },
+  "childIssueLinks": {
+    "sourceAdmission": [1397, 1416, 1399],
+    "offlineDatapackCompleteness": [1400, 1394, 1415],
+    "artifactVerificationAccuracy": [1393, 1395, 1417, 1418],
+    "userClaimUi": [1392, 1396, 1398]
+  },
+  "completionConditions": [
+    "all checklist child issues are closed",
+    "production pack contains adjacent graph, timetable, facility/pathway, route map positions, and join keys",
+    "production pack contains zero realtime payload rows and includes a validator negative test",
+    "airplane-mode station-to-station route works with PLANNED label",
+    "route accuracy report passes offline and online P50/P90 thresholds with sample size at least 100",
+    "realtime provider coverage report proves freshness, stale-as-fresh zero, and mapping failure rate",
+    "deployed artifact URL validation and one freshness cadence cycle evidence are attached",
+    "quality metric artifact includes denominator-based coverage and freshnessValidRatio",
+    "app, Play listing, help, and screenshots contain zero exaggerated support or realtime claims"
+  ],
+  "requiredArtifacts": {
+    "routeAccuracyReport": "artifacts/route-accuracy-report.json",
+    "realtimeProviderCoverageReport": "artifacts/realtime-provider-coverage-report.json",
+    "routeAccessibilityRegressionReport": "artifacts/route-accessibility-regression-report.json",
+    "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
+    "coverageGapReport": "artifacts/datapack-coverage-gaps.json",
+    "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
+    "androidOfflineRouteEvidence": ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md"
+  },
+  "requiredVerificationCommands": [
+    "node tools/datapack/validate-datapack.mjs --require-production ...",
+    "node --test tools/datapack/*.test.mjs tools/routes/*.test.mjs",
+    "node tools/routes/evaluate-eta-accuracy.mjs ...",
+    "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --contract artifacts/route-v2-contract-report.json",
+    "node tools/datapack/report-coverage-gaps.mjs ..."
+  ],
+  "evidencePolicy": {
+    "githubSummaryOnly": true,
+    "localOnlyEvidenceRoot": ".codex/evidence/datapack-release-readiness/<rc-or-run>/",
+    "forbiddenInGithubSummary": [
+      "provider credential or quota token",
+      "backend-only provider key",
+      "object storage credential",
+      "Play Console account data",
+      "raw user location or movement trace"
+    ]
+  }
+}
