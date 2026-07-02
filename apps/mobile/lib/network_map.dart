@@ -314,6 +314,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.onOpenSavedItems,
     this.onOpenRecentSearch,
     this.onOpenNearbyStations,
+    this.onOpenSettings,
     this.onOpenDataSources,
     this.notificationAction,
     this.bottomNavigationBar,
@@ -330,6 +331,7 @@ class NetworkMapScreen extends StatefulWidget {
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenRecentSearch;
   final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
   final Widget? notificationAction;
   final Widget? bottomNavigationBar;
@@ -651,6 +653,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: widget.onOpenNearbyStations,
           onOpenRecentSearch: widget.onOpenRecentSearch,
+          onOpenSettings: widget.onOpenSettings,
           onOpenDataSources: widget.onOpenDataSources,
         );
       },
@@ -1679,6 +1682,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
     required this.onOpenRecentSearch,
+    required this.onOpenSettings,
     required this.onOpenDataSources,
   });
 
@@ -1687,6 +1691,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenRecentSearch;
+  final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
 
   void _runAction(BuildContext context, VoidCallback action) {
@@ -1749,14 +1754,22 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                     label: '최근 검색',
                     onTap: () => _runAction(context, onOpenRecentSearch!),
                   ),
-                if (onOpenSavedItems != null) ...[
+                if (onOpenSavedItems != null || onOpenSettings != null) ...[
                   const _NetworkMapMenuSectionLabel('내 정보'),
-                  _NetworkMapMenuTile(
-                    key: const Key('networkMapMenuSavedButton'),
-                    icon: Icons.star_border_rounded,
-                    label: '즐겨찾기',
-                    onTap: () => _runAction(context, onOpenSavedItems!),
-                  ),
+                  if (onOpenSavedItems != null)
+                    _NetworkMapMenuTile(
+                      key: const Key('networkMapMenuSavedButton'),
+                      icon: Icons.star_border_rounded,
+                      label: '즐겨찾기',
+                      onTap: () => _runAction(context, onOpenSavedItems!),
+                    ),
+                  if (onOpenSettings != null)
+                    _NetworkMapMenuTile(
+                      key: const Key('networkMapMenuSettingsButton'),
+                      icon: Icons.settings_outlined,
+                      label: '설정',
+                      onTap: () => _runAction(context, onOpenSettings!),
+                    ),
                 ],
                 if (onOpenDataSources != null) ...[
                   const _NetworkMapMenuSectionLabel('안내'),
