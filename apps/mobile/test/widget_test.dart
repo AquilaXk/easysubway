@@ -1158,7 +1158,7 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(find.text('지도 표시용 파일'), 240);
     expect(find.text('지도 표시용 파일'), findsOneWidget);
-    expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
+    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsOneWidget);
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -3789,7 +3789,7 @@ void main() {
 
     expect(find.text('저장된 안내 상태'), findsOneWidget);
     expect(find.text('검증 구간'), findsOneWidget);
-    expect(find.text('상록수·사당 검증 pilot'), findsNWidgets(2));
+    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNWidgets(2));
     expect(find.text('마지막 갱신'), findsOneWidget);
     expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
     expect(find.text('저장 정보 다시 확인'), findsOneWidget);
@@ -5921,7 +5921,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AppBar),
-          matching: find.text('상록수·사당 검증 pilot'),
+          matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
         findsOneWidget,
       );
@@ -6209,7 +6209,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AppBar),
-          matching: find.text('상록수·사당 검증 pilot'),
+          matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
         findsOneWidget,
       );
@@ -7957,7 +7957,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AppBar),
-        matching: find.text('상록수·사당 검증 pilot'),
+        matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
       ),
       findsOneWidget,
     );
