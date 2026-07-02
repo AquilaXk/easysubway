@@ -2388,7 +2388,7 @@ class _HomeHero extends StatelessWidget {
                   onPressed: onRouteSearch,
                   style: FilledButton.styleFrom(
                     backgroundColor: EasySubwayAccessibleColors.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: EasySubwayAccessibleColors.surface,
                     minimumSize: const Size.fromHeight(104),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(_buttonRadius),
@@ -2415,7 +2415,7 @@ class _HomeHero extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onStationSearch,
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: EasySubwayAccessibleColors.surface,
                       foregroundColor: EasySubwayAccessibleColors.primary,
                       side: const BorderSide(
                         color: EasySubwayAccessibleColors.line,
