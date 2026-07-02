@@ -45,7 +45,7 @@ function buildFixture(inventory, input) {
   const transitSchedule = transitScheduleRows(input);
   const transitScheduleTableRows = transitScheduleMinimumTableRows(transitSchedule);
   if (isProductionPack && Object.keys(transitScheduleTableRows).length > 0) {
-    throw new Error("production transit schedule import requires sourced schedule provenance");
+    validateProductionScheduleProvenance(input.scheduleProvenance, selectedSources, allowedSourceIds);
   }
   validateSelectedSourceRows(input, sourceIds);
   validateSupportedScopeDenominator(input, stationRows, networkEdges, facilities, movementCandidates, routeMapPositions);
@@ -811,6 +811,7 @@ function stationFacilityEvidenceRows(input, stationRows, facilities, isProductio
       for (const facility of [...facilitiesByCoverageKey.values()]
         .filter((entry) => entry.stationId === stationId && entry.type === facilityType)
         .sort((left, right) => left.lineId.localeCompare(right.lineId))) {
+        const strictEligibility = facilityStrictRouteEligibility(facility);
         rows.push({
           stationId,
           lineId: facility.lineId,
@@ -827,13 +828,28 @@ function stationFacilityEvidenceRows(input, stationRows, facilities, isProductio
           confidence: facility.confidence,
           verifiedAt: facility.verifiedAt,
           retrievedAt: facility.retrievedAt,
-          strictRouteEligible: true,
-          strictRouteEligibleReason: "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED",
+          strictRouteEligible: strictEligibility.eligible,
+          strictRouteEligibleReason: strictEligibility.reason,
         });
       }
     }
   }
   return rows;
+}
+
+function facilityStrictRouteEligibility(facility) {
+  const operationalStatus = String(facility.operationalStatus ?? "").toUpperCase();
+  const statusMeaning = String(facility.statusMeaning ?? "").toUpperCase();
+  if (["UNKNOWN", "CHECK_REQUIRED", ""].includes(operationalStatus)) {
+    return { eligible: false, reason: "OPERATION_STATUS_UNKNOWN" };
+  }
+  if (!["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(operationalStatus)) {
+    return { eligible: false, reason: "OPERATION_STATUS_NOT_AVAILABLE" };
+  }
+  if (!["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    return { eligible: false, reason: "OPERATION_EVIDENCE_MISSING" };
+  }
+  return { eligible: true, reason: "FACILITY_OPERATION_VERIFIED" };
 }
 
 function productionString(value, isProductionPack, label) {
@@ -950,6 +966,24 @@ function transitScheduleMinimumTableRows(rows) {
       ["transit_frequencies", rows.transitFrequencies.length],
     ].filter(([, count]) => count > 0),
   );
+}
+
+function validateProductionScheduleProvenance(provenance, selectedSources, allowedSourceIds) {
+  if (!provenance || typeof provenance !== "object" || Array.isArray(provenance)) {
+    throw new Error("production transit schedule import requires sourced schedule provenance");
+  }
+  const sourceId = requiredKnownSource(provenance.sourceId, allowedSourceIds, "scheduleProvenance.sourceId");
+  const source = selectedSources.find((entry) => entry.id === sourceId);
+  if (!sourceDomainEnabled([source], "schedule_timetable")) {
+    throw new Error(`scheduleProvenance source is not a schedule_timetable source: ${sourceId}`);
+  }
+  if (source.capabilities?.schedule?.productionUseAllowed !== true) {
+    throw new Error(`scheduleProvenance source is not admitted for production schedule use: ${sourceId}`);
+  }
+  requiredString(provenance.sourceSnapshotId, "scheduleProvenance.sourceSnapshotId");
+  productionEvidenceHash(provenance.providerRecordHash, true, sourceId, "scheduleProvenance.providerRecordHash");
+  productionEvidenceHash(provenance.evidenceHash, true, sourceId, "scheduleProvenance.evidenceHash");
+  requiredString(provenance.retrievedAt, "scheduleProvenance.retrievedAt");
 }
 
 function optionalRows(value, label) {
