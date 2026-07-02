@@ -3100,6 +3100,29 @@ void main() {
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
   });
 
+  testWidgets('노선도 좌측 메뉴 하단에 광고 슬롯이 있다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+
+    // debug 빌드에서는 자리 확인용 슬롯이 패널 하단에 렌더링된다.
+    // (release에서는 실광고가 없으면 collapse — 노출 규칙은 #1485)
+    expect(find.byKey(const Key('networkMapMenuAdBanner')), findsOneWidget);
+  });
+
   testWidgets('노선도 chrome은 시스템 글자 크기를 따른다', (tester) async {
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);

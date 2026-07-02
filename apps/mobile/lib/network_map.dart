@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'accessible_design.dart';
+import 'ad_slot.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
@@ -1649,24 +1650,12 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    // 실광고 미연동: release에서는 "광고" 플레이스홀더를 노출하지 않고 슬롯을 숨긴다.
+    return const SafeArea(
       top: false,
-      child: Container(
-        key: const Key('networkMapBottomAdBanner'),
+      child: AdBannerSlot(
+        slotKey: Key('networkMapBottomAdBanner'),
         height: _networkMapBottomAdHeight,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
-        ),
-        child: const Text(
-          '광고',
-          style: TextStyle(
-            color: Color(0xFF666666),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
       ),
     );
   }
@@ -1715,75 +1704,93 @@ class _NetworkMapMenuPanel extends StatelessWidget {
         child: SizedBox(
           width: width.clamp(280.0, 430.0).toDouble(),
           height: double.infinity,
-          child: SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                const _NetworkMapMenuHeader(),
-                const Divider(height: 1, color: Color(0xFFE4E4E4)),
-                const _NetworkMapMenuSectionLabel('탐색'),
-                _NetworkMapMenuTile(
-                  key: const Key('networkMapMenuStationSearchButton'),
-                  icon: Icons.search,
-                  label: '역 검색',
-                  onTap: () => _runAction(context, onOpenStationSearch),
+          child: Column(
+            children: [
+              Expanded(
+                child: SafeArea(
+                  bottom: false,
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      const _NetworkMapMenuHeader(),
+                      const Divider(height: 1, color: Color(0xFFE4E4E4)),
+                      const _NetworkMapMenuSectionLabel('탐색'),
+                      _NetworkMapMenuTile(
+                        key: const Key('networkMapMenuStationSearchButton'),
+                        icon: Icons.search,
+                        label: '역 검색',
+                        onTap: () => _runAction(context, onOpenStationSearch),
+                      ),
+                      _NetworkMapMenuTile(
+                        key: const Key('networkMapMenuRouteSearchButton'),
+                        icon: Icons.route_outlined,
+                        label: '길찾기',
+                        onTap: () =>
+                            _runFutureAction(context, onOpenRouteSearch),
+                      ),
+                      if (onOpenNearbyStations != null)
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuNearbyButton'),
+                          icon: Icons.near_me_outlined,
+                          label: '가까운 역',
+                          onTap: () =>
+                              _runAction(context, onOpenNearbyStations!),
+                        ),
+                      if (onOpenRecentSearch != null)
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuRecentButton'),
+                          icon: Icons.history,
+                          label: '최근 검색',
+                          onTap: () => _runAction(context, onOpenRecentSearch!),
+                        ),
+                      if (onOpenSavedItems != null) ...[
+                        const _NetworkMapMenuSectionLabel('내 정보'),
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuSavedButton'),
+                          icon: Icons.star_border_rounded,
+                          label: '즐겨찾기',
+                          onTap: () => _runAction(context, onOpenSavedItems!),
+                        ),
+                      ],
+                      if (onOpenDataSources != null) ...[
+                        const _NetworkMapMenuSectionLabel('안내'),
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuDataSourcesButton'),
+                          icon: Icons.source_outlined,
+                          label: '자료 제공 정보',
+                          onTap: () => _runActionAfterMenuClose(
+                            context,
+                            onOpenDataSources!,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: Color(0xFFEDEDED)),
+                      const _NetworkMapMenuInfoBanner(),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(24, 6, 24, 8),
+                        child: Text(
+                          '교통약자 이동을 더 쉽게',
+                          style: TextStyle(
+                            color: Color(0xFF9A9A9A),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _NetworkMapMenuTile(
-                  key: const Key('networkMapMenuRouteSearchButton'),
-                  icon: Icons.route_outlined,
-                  label: '길찾기',
-                  onTap: () => _runFutureAction(context, onOpenRouteSearch),
+              ),
+              // 패널 최하단 고정 광고 슬롯(항목 스크롤과 분리, release는 collapse).
+              const SafeArea(
+                top: false,
+                child: AdBannerSlot(
+                  slotKey: Key('networkMapMenuAdBanner'),
+                  height: 56,
                 ),
-                if (onOpenNearbyStations != null)
-                  _NetworkMapMenuTile(
-                    key: const Key('networkMapMenuNearbyButton'),
-                    icon: Icons.near_me_outlined,
-                    label: '가까운 역',
-                    onTap: () => _runAction(context, onOpenNearbyStations!),
-                  ),
-                if (onOpenRecentSearch != null)
-                  _NetworkMapMenuTile(
-                    key: const Key('networkMapMenuRecentButton'),
-                    icon: Icons.history,
-                    label: '최근 검색',
-                    onTap: () => _runAction(context, onOpenRecentSearch!),
-                  ),
-                if (onOpenSavedItems != null) ...[
-                  const _NetworkMapMenuSectionLabel('내 정보'),
-                  _NetworkMapMenuTile(
-                    key: const Key('networkMapMenuSavedButton'),
-                    icon: Icons.star_border_rounded,
-                    label: '즐겨찾기',
-                    onTap: () => _runAction(context, onOpenSavedItems!),
-                  ),
-                ],
-                if (onOpenDataSources != null) ...[
-                  const _NetworkMapMenuSectionLabel('안내'),
-                  _NetworkMapMenuTile(
-                    key: const Key('networkMapMenuDataSourcesButton'),
-                    icon: Icons.source_outlined,
-                    label: '자료 제공 정보',
-                    onTap: () =>
-                        _runActionAfterMenuClose(context, onOpenDataSources!),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFEDEDED)),
-                const _NetworkMapMenuInfoBanner(),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 6, 24, 8),
-                  child: Text(
-                    '교통약자 이동을 더 쉽게',
-                    style: TextStyle(
-                      color: Color(0xFF9A9A9A),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
