@@ -634,6 +634,42 @@ void main() {
     );
   });
 
+  test('ETA source 라벨은 상용 claim 전에 무음 또는 실시간 claim으로 떨어지지 않는다', () {
+    expect(routeEtaSourceLabels.keys.toSet(), {
+      'REALTIME',
+      'MIXED',
+      'PLANNED',
+      'STATIC_BACKEND_V1',
+      'STATIC_LOCAL',
+      'STATIC_ESTIMATE',
+      'FALLBACK',
+      'UNSUPPORTED',
+      'STALE',
+    });
+    expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보 준비 중');
+    expect(routeEtaSourceLabel('MIXED'), '일부 도착정보를 확인하고 있어요');
+    expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
+    expect(routeEtaSourceLabel('UNSUPPORTED'), '실시간 미지원');
+    expect(routeEtaSourceLabel('STALE'), '저장된 데이터 기준 · 갱신 필요');
+    expect(routeEtaSourceLabel(''), '도착 정보를 확인하고 있어요');
+    expect(routeEtaSourceLabel('SERVER_NEW_VALUE'), '도착 정보를 확인하고 있어요');
+    expect(routeEtaSourceLabels.values, isNot(contains('실시간 반영')));
+    expect(routeEtaSourceLabels.values, isNot(contains('일부 실시간 반영')));
+  });
+
+  test('즐겨찾기 경로는 STATIC_ESTIMATE와 누락된 ETA source를 명시한다', () {
+    final staticEstimate = FavoriteRoute.fromJson({
+      ..._favoriteRouteJson(),
+      'etaSource': 'STATIC_ESTIMATE',
+    });
+    final missingSource = FavoriteRoute.fromJson(_favoriteRouteJson());
+
+    expect(staticEstimate.scoreBasisText, contains('정적 추정'));
+    expect(staticEstimate.semanticLabel, contains('정적 추정'));
+    expect(missingSource.scoreBasisText, contains('도착 정보를 확인하고 있어요'));
+    expect(missingSource.semanticLabel, contains('도착 정보를 확인하고 있어요'));
+  });
+
   test('경로 V2 contract는 itinerary와 leg 단위 ETA 필드를 읽는다', () {
     final result = RouteSearchV2Result.fromJson({
       'contractVersion': 'ROUTE_SEARCH_V2',
