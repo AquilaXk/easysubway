@@ -5553,6 +5553,10 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.productionInventoryReferenceId, "molit-tago-subway-info");
+  assert.equal(candidate.requestUrl, "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList");
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.match(candidate.evidence.sampleUrl, /subwayStationId=448/);
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
   const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
@@ -5567,6 +5571,8 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "scheduleImporterValidation"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
+  assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
+  assert.ok(candidate.evidence.outputFields.includes("upDownTypeCode"));
 });
 
 test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {

@@ -654,7 +654,7 @@
       "domain": "schedule_timetable",
       "displayName": "국토교통부_(TAGO)_지하철정보",
       "detailUrl": "https://www.data.go.kr/data/15098554/openapi.do",
-      "requestUrl": "https://www.data.go.kr/data/15098554/openapi.do",
+      "requestUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "sample_url_documented_key_required",
       "admissionStatus": "evidence_recorded_admin_review_required",
@@ -665,8 +665,8 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15098554/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://www.data.go.kr/data/15098554/openapi.do",
-        "sampleUrl": "https://www.data.go.kr/data/15098554/openapi.do",
+        "endpoint": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
+        "sampleUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList?serviceKey=[서비스키값]&pageNo=1&numOfRows=10&_type=json&subwayStationId=448&dailyTypeCode=01&upDownTypeCode=U",
         "usePermissionRange": "공공데이터포털 이용허락범위 제한 없음",
         "formats": [
           "XML",
@@ -677,11 +677,15 @@
           "route graph RIDE edge duration과 stop_times 정합 검증 필요"
         ],
         "outputFields": [
-          "subwayRouteName",
+          "endSubwayStationNm",
+          "subwayRouteId",
           "subwayStationId",
-          "subwayStationName",
+          "subwayStationNm",
+          "dailyTypeCode",
+          "upDownTypeCode",
           "depTime",
-          "arrTime"
+          "arrTime",
+          "endSubwayStationId"
         ],
         "missingEvidence": [
           "sampleResponse",
