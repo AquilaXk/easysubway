@@ -111,6 +111,11 @@ const _forbiddenUserCopy = <String>[
   'local-user',
 ];
 
+bool _isAllowedAttributionCopy(String copy) =>
+    copy == '데이터 및 지도 출처' ||
+    copy == '지도와 경로 판단 자료의 출처와 이용 조건을 확인해요' ||
+    copy.startsWith('데이터 및 지도 출처, 지도와 경로 판단 자료의 출처와 이용 조건을 확인해요');
+
 void expectNoForbiddenUserCopy(WidgetTester tester) {
   final visibleCopy = <String>{};
   for (final widget in tester.allWidgets) {
@@ -130,6 +135,9 @@ void expectNoForbiddenUserCopy(WidgetTester tester) {
 
   for (final copy in visibleCopy.where((copy) => copy.trim().isNotEmpty)) {
     for (final forbidden in _forbiddenUserCopy) {
+      if (forbidden == '출처' && _isAllowedAttributionCopy(copy)) {
+        continue;
+      }
       expect(copy, isNot(contains(forbidden)));
     }
     expect(
