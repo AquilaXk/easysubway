@@ -43,7 +43,7 @@ const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _homeHeroCardPadding = EdgeInsets.fromLTRB(0, 8, 0, 8);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
-const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
+const _mainScaffoldBackgroundColor = EasySubwayAccessibleColors.scaffoldSurface;
 const _appCardRadius = 20.0;
 const _homeActionButtonRadius = 12.0;
 const _homeRouteDraftRadius = 18.0;
@@ -52,15 +52,19 @@ const _homeRecentRouteRadius = 26.0;
 const _dataDeletionResultIconRadius = 16.0;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(12));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
-const _appCardShadowColor = Color(0x0A071B2F);
-const _highContrastTextColor = Color(0xFF000000);
-const _highContrastPrimaryColor = Color(0xFF003D40);
-const _highContrastSecondaryColor = Color(0xFF005E68);
+const _appCardShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _highContrastTextColor = EasySubwayAccessibleColors.highContrastText;
+const _highContrastPrimaryColor =
+    EasySubwayAccessibleColors.highContrastPrimary;
+const _highContrastSecondaryColor =
+    EasySubwayAccessibleColors.highContrastSecondary;
 const _homeInfoBorderColor = Color(0xFFB7DDF4);
 const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
 const _homeFacilityInfoBorderColor = Color(0xFFC8E6F8);
-const _settingsSwitchActiveTrackColor = Color(0xFF0D8A6D);
-const _settingsSwitchInactiveTrackColor = Color(0xFFC8D3DC);
+const _settingsSwitchActiveTrackColor =
+    EasySubwayAccessibleColors.switchActiveTrack;
+const _settingsSwitchInactiveTrackColor =
+    EasySubwayAccessibleColors.switchInactiveTrack;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -3236,21 +3240,7 @@ class _HomeLineSymbol extends StatelessWidget {
 }
 
 String _lineColorForRoute(FavoriteRoute route) {
-  final lineId = route.lineId.toLowerCase();
-  final lineName = route.lineName;
-  if (lineId.contains('4') || lineName.contains('4호선')) {
-    return '#00A5DE';
-  }
-  if (lineId.contains('1') || lineName.contains('1호선')) {
-    return '#0052A4';
-  }
-  if (lineId.contains('2') || lineName.contains('2호선')) {
-    return '#00A84D';
-  }
-  if (lineId.contains('3') || lineName.contains('3호선')) {
-    return '#EF7C1C';
-  }
-  return '#006D77';
+  return fallbackLineColorHex(lineId: route.lineId, lineName: route.lineName);
 }
 
 String _stationNameWithSuffix(String name) {

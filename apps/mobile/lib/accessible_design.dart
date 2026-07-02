@@ -7,6 +7,11 @@ import 'package:flutter/material.dart';
 ///   이 액센트로 통일했다.
 /// - 상태색(정상/주의/고장)은 의미가 있는 곳에만 쓴다.
 /// - soft 틴트 배경은 상태 표현용이며 장식용으로 쓰지 않는다.
+///
+/// 타이포 위계 가이드(전 화면 공통):
+/// - 본문·라벨: w500~w600
+/// - 강조(행 타이틀·값): w700~w800
+/// - 화면 타이틀만 w800 이상(w900은 화면 타이틀에 한정)
 class EasySubwayAccessibleColors {
   const EasySubwayAccessibleColors._();
 
@@ -65,6 +70,24 @@ class EasySubwayAccessibleColors {
 
   /// 정보 틴트(레거시). 장식용이므로 화면 정비 시 여백·구분선으로 대체한다.
   static const skySoft = Color(0xFFE6F5FF);
+
+  // --- 공용 표면·컨트롤 토큰 ---
+  /// 스캐폴드 기본 배경(플랫 화이트에 아주 옅은 그레이).
+  static const scaffoldSurface = Color(0xFFF6F8F9);
+
+  /// 카드 그림자(최소 그림자 원칙).
+  static const cardShadow = Color(0x0A071B2F);
+
+  /// 스위치 켜짐 트랙(브랜드 액센트 1계열).
+  static const switchActiveTrack = primary;
+
+  /// 스위치 꺼짐 트랙.
+  static const switchInactiveTrack = Color(0xFFC8D3DC);
+
+  // --- 고대비 모드 ---
+  static const highContrastText = Color(0xFF000000);
+  static const highContrastPrimary = Color(0xFF003D40);
+  static const highContrastSecondary = Color(0xFF005E68);
 }
 
 class EasySubwayTouchTarget {
@@ -150,15 +173,7 @@ class AccessibleStateCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: EasySubwayAccessibleColors.mintSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: colorScheme.primary, size: 28),
-              ),
+              Icon(icon, color: colorScheme.primary, size: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

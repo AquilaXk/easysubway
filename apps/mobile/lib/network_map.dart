@@ -28,6 +28,14 @@ const _networkMapMenuLabelColor = Color(0xFF1E3234);
 const _networkMapMenuSectionColor = Color(0xFF7C949A);
 const _networkMapMenuChevronColor = Color(0xFFB0BEC5);
 
+// 지도(웹뷰) 위에 겹쳐 그리는 오버레이 액센트는 지도 배경과의 시인성 때문에
+// 브랜드 액센트(primary teal)로 수렴하지 않고 network_map 전용 밝은 톤을 유지한다.
+/// 지도 위 선택 역 말풍선 배경(밝은 시안).
+const _networkMapSelectedStationAccent = Color(0xFF13B8D6);
+
+/// 지도 위 지역 선택 칩의 선택 배경(밝은 블루).
+const _networkMapRegionSelectedColor = Color(0xFF006FD6);
+
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
 }
@@ -1428,7 +1436,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
           child: Container(
             height: 26,
             decoration: BoxDecoration(
-              color: const Color(0xFF13B8D6),
+              color: _networkMapSelectedStationAccent,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -1455,7 +1463,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: const Color(0xFF13B8D6),
+                      color: _networkMapSelectedStationAccent,
                       width: 3,
                     ),
                   ),
@@ -1620,7 +1628,7 @@ class _NetworkMapToggleSegment extends StatelessWidget {
         width: 50,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF006FD6) : Colors.transparent,
+          color: selected ? _networkMapRegionSelectedColor : Colors.transparent,
           borderRadius: _networkMapPillRadius,
         ),
         child: Text(
