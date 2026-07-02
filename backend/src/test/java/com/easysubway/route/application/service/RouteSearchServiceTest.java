@@ -826,6 +826,38 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 useRealtime=true는 환승 이후 승차 단계에도 provider ETA를 반영한다")
+	void routeV2PlannerAppliesRealtimeEtaAfterTransfer() {
+		var repository = new InMemoryRouteSearchRepository();
+		var resolver = new CountingRealtimeArrivalResolver();
+		var routeSearchService = new RouteSearchService(
+			repository,
+			repository,
+			new OneTransferTransitMasterPort(),
+			CLOCK,
+			resolver
+		);
+		var planner = new RouteV2Planner(routeSearchService);
+
+		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			true,
+			1,
+			1
+		));
+
+		assertThat(resolver.callCount()).isEqualTo(2);
+		assertThat(plan.itineraries().getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("timeSource")
+			.containsExactly(EtaSource.REALTIME.name(), EtaSource.REALTIME.name());
+	}
+
+	@Test
 	@DisplayName("V2 useRealtime=false는 provider를 호출하지 않고 계획 ETA를 유지한다")
 	void routeV2PlannerSkipsRealtimeProviderWhenDisabled() {
 		var repository = new InMemoryRouteSearchRepository();

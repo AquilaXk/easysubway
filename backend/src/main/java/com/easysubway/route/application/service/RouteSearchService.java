@@ -1153,8 +1153,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 				resolution.candidates().size(),
 				resolution.candidates()
 			);
-			realtimeSteps.set(index, withEtaOverlay(step, overlay));
-			break;
+			RouteStep realtimeStep = withEtaOverlay(step, overlay);
+			realtimeSteps.set(index, realtimeStep);
+			elapsedMinutes += Math.max(0, realtimeStep.estimatedMinutes());
 		}
 		return List.copyOf(realtimeSteps);
 	}
