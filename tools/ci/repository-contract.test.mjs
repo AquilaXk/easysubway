@@ -9225,29 +9225,32 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
 
 test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 전달한다", () => {
   const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const useCasePath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteV2SearchUseCase.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
 
+  assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
 
+  const useCase = read(useCasePath);
   const planner = read(plannerPath);
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
 
-  assert.match(v2Endpoint, /routeV2Planner\.search/);
+  assert.match(v2Endpoint, /routeV2SearchUseCase\.search/);
   assert.doesNotMatch(v2Endpoint, /routeSearchUseCase\.searchRoute/);
   assert.match(controller, /toV2Command\(departureTime\)/);
   assert.match(controller, /RouteSearchV2Response\.from\(plan, request, departureTime\)/);
   assert.match(controller, /plan\.statuses\(\)/);
   assert.doesNotMatch(controller, /List\.of\(\s*"FOUND"[\s\S]*"ROUTE_GRAPH_UNKNOWN"/);
-  assert.match(planner, /class RouteV2Planner/);
+  assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
-  assert.match(planner, /record SearchRouteV2Command/);
-  assert.match(planner, /OffsetDateTime departureTime/);
-  assert.match(planner, /boolean useRealtime/);
-  assert.match(planner, /int maxTransfers/);
-  assert.match(planner, /int alternativeCount/);
+  assert.match(useCase, /record SearchRouteV2Command/);
+  assert.match(useCase, /OffsetDateTime departureTime/);
+  assert.match(useCase, /boolean useRealtime/);
+  assert.match(useCase, /int maxTransfers/);
+  assert.match(useCase, /int alternativeCount/);
   assert.match(planner, /route-algorithm-v2-adr\.json|Range RAPTOR/);
 });
 
