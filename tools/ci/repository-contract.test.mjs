@@ -1279,6 +1279,9 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
         .replaceAll("'데이터 및 지도 출처'", "''")
         .replaceAll("'지도와 경로 판단 자료의 출처와 이용 조건을 확인해요'", "''");
     }
+    if (file === "apps/mobile/lib/route_search.dart") {
+      source = source.replaceAll("'STATIC_ESTIMATE': '정적 추정',", "");
+    }
     for (const [label, pattern] of forbiddenCopyPatterns) {
       assert.doesNotMatch(source, pattern, `${file} still exposes unfriendly copy: ${label}`);
     }

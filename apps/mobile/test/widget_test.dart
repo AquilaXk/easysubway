@@ -260,14 +260,18 @@ Future<void> _openRouteDestinationStationInput(WidgetTester tester) async {
 }
 
 Future<void> _openFirstRouteResultDetail(WidgetTester tester) async {
+  await _tapFirstRouteResultListItem(tester);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
   final routeResult = find.byKey(
     const Key('routeResultListItem'),
     skipOffstage: false,
   );
   await tester.ensureVisible(routeResult);
   await tester.pumpAndSettle();
-  await tester.tap(routeResult);
-  await tester.pumpAndSettle();
+  await tester.tapAt(tester.getTopLeft(routeResult) + const Offset(24, 24));
 }
 
 void main() {
@@ -5607,7 +5611,7 @@ void main() {
       expect(find.text('이동 편의도 92점'), findsNothing);
       expect(find.text('다시 찾으면 자세히 볼 수 있어요'), findsOneWidget);
       expect(
-        find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13'),
+        find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13 · 도착 정보를 확인하고 있어요'),
         findsOneWidget,
       );
       expect(
@@ -8904,7 +8908,7 @@ void main() {
 
       await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeResultListItem')));
+      await _tapFirstRouteResultListItem(tester);
       await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView), const Offset(0, 600));
       await tester.pumpAndSettle();
@@ -9004,7 +9008,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await _tapFirstRouteResultListItem(tester);
     await tester.pumpAndSettle();
     expect(find.text('이동 순서'), findsOneWidget);
 
@@ -9013,7 +9017,7 @@ void main() {
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
     expect(find.text('이동 순서'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await _tapFirstRouteResultListItem(tester);
     await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const Key('routeStartGuidanceButton')),
@@ -9994,7 +9998,7 @@ void main() {
 
     await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await _tapFirstRouteResultListItem(tester);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);

@@ -93,16 +93,24 @@ String _routeDateLabel(String value) {
   return '최근 확인일을 아직 알 수 없어요';
 }
 
-String _routeEtaSourceLabel(String value) {
-  return switch (value.trim()) {
-    'REALTIME' => '실시간 반영',
-    'PLANNED' => '시간표 기준',
-    'STATIC_BACKEND_V1' => '시간표 기준',
-    'MIXED' => '일부 실시간 반영',
-    'FALLBACK' => '실시간 미지원',
-    'STATIC_LOCAL' => '저장된 데이터 기준',
-    _ => '',
-  };
+const routeEtaSourceLabels = <String, String>{
+  'REALTIME': '실시간 도착정보 준비 중',
+  'MIXED': '일부 도착정보를 확인하고 있어요',
+  'PLANNED': '시간표 기준',
+  'STATIC_BACKEND_V1': '시간표 기준',
+  'STATIC_LOCAL': '저장된 데이터 기준',
+  'STATIC_ESTIMATE': '정적 추정',
+  'FALLBACK': '실시간 미지원',
+  'UNSUPPORTED': '실시간 미지원',
+  'STALE': '저장된 데이터 기준 · 갱신 필요',
+};
+
+String routeEtaSourceLabel(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return '도착 정보를 확인하고 있어요';
+  }
+  return routeEtaSourceLabels[trimmed] ?? '도착 정보를 확인하고 있어요';
 }
 
 abstract class RouteSearchRepository {
@@ -732,7 +740,7 @@ class FavoriteRoute {
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
-  String get etaSourceLabel => _routeEtaSourceLabel(etaSource);
+  String get etaSourceLabel => routeEtaSourceLabel(etaSource);
 
   String get scoreBasisText {
     return [
@@ -1404,8 +1412,7 @@ class RouteSearchResult {
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
-  String get sourceNotice =>
-      etaSource == 'STATIC_LOCAL' ? '실시간 미반영, 저장된 데이터 기준' : '';
+  String get sourceNotice => '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
 
   RouteSearchResult withDisplayLabels({
     String? originStationName,
