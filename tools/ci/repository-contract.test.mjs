@@ -624,6 +624,10 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /name: Changes/);
+  assert.match(workflow, /name: PR Title/);
+  assert.match(workflow, /PR Title \/ Validate bracket prefix/);
+  assert.ok(workflow.includes("^\\[(Feat|Fix|Test|Chore|Docs|Build|CI|Style|Refactor|Backend|Mobile)\\]\\ .+"));
+  assert.match(workflow, /Use '\[Type\] 한국어 작업 요약' format\./);
   assert.match(workflow, /name: Repository CI/);
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
