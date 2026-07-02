@@ -2022,22 +2022,42 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                       },
                     )
                   else if (items.isEmpty)
-                    const _AppCard(
-                      child: _AppInfoRow(
-                        icon: Icons.notifications_none,
-                        iconColor: EasySubwayAccessibleColors.mintDark,
-                        title: '새 알림이 없습니다',
-                        subtitle: '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
+                    Padding(
+                      padding: const EdgeInsets.only(top: 80),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.notifications_none,
+                            size: 44,
+                            color: EasySubwayAccessibleColors.mutedText,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '새 알림이 없습니다',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: EasySubwayAccessibleColors.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: EasySubwayAccessibleColors.mutedText,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   else ...[
                     _NotificationInboxChips(items: items),
-                    const SizedBox(height: 12),
-                    for (final item in items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _NotificationInboxCard(item: item),
-                      ),
+                    for (final item in items) _NotificationInboxRow(item: item),
                   ],
                 ],
               ),
@@ -2174,20 +2194,27 @@ class _NotificationInboxChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final facilityCount = items.where((item) => item.kind == '시설').length;
     final reportCount = items.length - facilityCount;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _HomeMiniBadge('전체 ${items.length}'),
-        if (facilityCount > 0) _HomeMiniBadge('시설 $facilityCount'),
-        if (reportCount > 0) _HomeMiniBadge('제보 $reportCount'),
-      ],
+    final parts = <String>[
+      '전체 ${items.length}',
+      if (facilityCount > 0) '시설 $facilityCount',
+      if (reportCount > 0) '제보 $reportCount',
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, top: 4),
+      child: Text(
+        parts.join('  ·  '),
+        style: const TextStyle(
+          color: EasySubwayAccessibleColors.mutedText,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
-class _NotificationInboxCard extends StatelessWidget {
-  const _NotificationInboxCard({required this.item});
+class _NotificationInboxRow extends StatelessWidget {
+  const _NotificationInboxRow({required this.item});
 
   final _NotificationInboxItem item;
 
@@ -2206,49 +2233,90 @@ class _NotificationInboxCard extends StatelessWidget {
     }
 
     final accent = _facilitySeverityAccent(item.severity);
-    final card = _AppCard(
-      backgroundColor: accent.backgroundColor,
-      borderColor: accent.borderColor,
-      showBorder: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final row = Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AppInfoRow(
-            icon: item.icon,
-            iconColor: accent.iconColor,
-            title: item.title,
-            subtitle: item.subtitle,
-            subtitleColor: accent.iconColor,
-            trailing: item.kind,
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(item.icon, color: accent.iconColor, size: 22),
           ),
-          if (item.actionLabel.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              item.actionLabel,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                height: 1.3,
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item.kind,
+                      style: const TextStyle(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    color: accent.iconColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+                if (item.actionLabel.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    item.actionLabel,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
     if (item.report == null) {
-      return Semantics(label: item.semanticLabel, child: card);
+      return Semantics(
+        label: item.semanticLabel,
+        child: ExcludeSemantics(child: row),
+      );
     }
     return Semantics(
       button: true,
       label: item.semanticLabel,
       onTap: open,
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: open,
-          borderRadius: BorderRadius.circular(_appCardRadius),
-          child: card,
-        ),
+        child: InkWell(onTap: open, child: row),
       ),
     );
   }
