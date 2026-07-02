@@ -33,6 +33,14 @@ class LocalRouteRepository implements RouteSearchRepository {
       ),
       plannedTimetableSupported: routeGraphConnected,
       outOfStationTransferAllowed: false,
+      regions: catalog.regionsFor(
+        request.originStationId,
+        request.destinationStationId,
+      ),
+      operatorIds: catalog.operatorIdsFor(
+        request.originStationId,
+        request.destinationStationId,
+      ),
     );
   }
 
@@ -386,6 +394,8 @@ class RouteCapabilityMetadata {
     required this.realtimeSupported,
     required this.plannedTimetableSupported,
     required this.outOfStationTransferAllowed,
+    required this.regions,
+    required this.operatorIds,
   });
 
   final bool stationExists;
@@ -394,6 +404,8 @@ class RouteCapabilityMetadata {
   final bool realtimeSupported;
   final bool plannedTimetableSupported;
   final bool outOfStationTransferAllowed;
+  final List<String> regions;
+  final List<String> operatorIds;
 }
 
 class LocalFirstRouteSearchRepository implements RouteSearchRepository {
@@ -521,7 +533,9 @@ class RouteSearchOnlineFirstMetrics {
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,
+    required this.regionsByStationId,
     required this.linesById,
+    required this.operatorIdsByLineId,
     required this.stationLines,
     required this.networkEdges,
     required this.strictEvidenceSupported,
@@ -530,7 +544,9 @@ class _RouteCatalogSnapshot {
   });
 
   final Map<String, String> stationsById;
+  final Map<String, String> regionsByStationId;
   final Map<String, String> linesById;
+  final Map<String, String> operatorIdsByLineId;
   final List<_StationLineSnapshot> stationLines;
   final List<_NetworkEdgeSnapshot> networkEdges;
   final bool strictEvidenceSupported;
@@ -543,10 +559,10 @@ class _RouteCatalogSnapshot {
           FROM catalog_metadata
           ''').getSingleOrNull();
     final stationRows = await database
-        .customSelect('SELECT id, name_ko FROM stations')
+        .customSelect('SELECT id, name_ko, region FROM stations')
         .get();
     final lineRows = await database
-        .customSelect('SELECT id, name_ko FROM lines')
+        .customSelect('SELECT id, name_ko, operator_id FROM lines')
         .get();
     final stationLineRows = await database.customSelect('''
           SELECT station_id, line_id, line_sequence
@@ -827,9 +843,17 @@ class _RouteCatalogSnapshot {
         for (final row in stationRows)
           row.read<String>('id'): row.read<String>('name_ko'),
       },
+      regionsByStationId: {
+        for (final row in stationRows)
+          row.read<String>('id'): row.read<String>('region'),
+      },
       linesById: {
         for (final row in lineRows)
           row.read<String>('id'): row.read<String>('name_ko'),
+      },
+      operatorIdsByLineId: {
+        for (final row in lineRows)
+          row.read<String>('id'): row.read<String>('operator_id'),
       },
       stationLines: stationLineRows
           .map(
@@ -875,6 +899,35 @@ class _RouteCatalogSnapshot {
       (keys) =>
           originKeys.any(keys.contains) && destinationKeys.any(keys.contains),
     );
+  }
+
+  List<String> regionsFor(String originStationId, String destinationStationId) {
+    return {
+      if ((regionsByStationId[originStationId] ?? '').isNotEmpty)
+        regionsByStationId[originStationId]!,
+      if ((regionsByStationId[destinationStationId] ?? '').isNotEmpty)
+        regionsByStationId[destinationStationId]!,
+    }.toList(growable: false);
+  }
+
+  List<String> operatorIdsFor(
+    String originStationId,
+    String destinationStationId,
+  ) {
+    final lineIds = {
+      ...stationLines
+          .where(
+            (stationLine) =>
+                stationLine.stationId == originStationId ||
+                stationLine.stationId == destinationStationId,
+          )
+          .map((stationLine) => stationLine.lineId),
+    };
+    return {
+      for (final lineId in lineIds)
+        if ((operatorIdsByLineId[lineId] ?? '').isNotEmpty)
+          operatorIdsByLineId[lineId]!,
+    }.toList(growable: false);
   }
 
   graph.NetworkGraph toGraph() {

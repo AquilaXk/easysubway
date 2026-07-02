@@ -411,6 +411,8 @@ void main() {
     expect(capability.realtimeSupported, isFalse);
     expect(capability.plannedTimetableSupported, isTrue);
     expect(capability.outOfStationTransferAllowed, isFalse);
+    expect(capability.regions, ['수도권']);
+    expect(capability.operatorIds, ['seoul-metro']);
   });
 
   test('로컬 capability는 같은 provider의 양끝 mapping이 있을 때 realtime을 지원한다', () async {
