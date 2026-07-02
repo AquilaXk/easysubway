@@ -1512,6 +1512,18 @@ void main() {
       final extension = path.split('.').last.toLowerCase();
       expect(extension, anyOf('pdf', 'svg'));
       expect(offline['type'], extension);
+      final license = map['license'] as Map<String, Object?>;
+      expect(license['name'], isA<String>());
+      expect(license['spdx'], isA<String>());
+      expect(license['url'], startsWith('https://'));
+      expect(license['source_page'], startsWith('https://'));
+      expect(license['authors'], isA<List<Object?>>());
+      expect(license['changes'], isA<String>());
+      expect(license['attributionRequired'], isA<bool>());
+      expect(license['commercialUseAllowed'], isA<bool>());
+      expect(license['derivativeWorkAllowed'], isA<bool>());
+      expect(license['redistributionAllowed'], isA<bool>());
+      expect(license['reviewStatus'], isA<String>());
     }
     final gwangju = maps.singleWhere((map) => map['id'] == 'gwangju');
     final license = gwangju['license'] as Map<String, Object?>;
@@ -1520,6 +1532,7 @@ void main() {
       license['url'],
       'https://creativecommons.org/licenses/by-sa/2.0/kr/',
     );
+    expect(license['reviewStatus'], 'legal-review-required');
   });
 
   testWidgets('노선도는 카드가 아니라 공식 지도처럼 전면 캔버스로 보인다', (tester) async {
@@ -3594,12 +3607,22 @@ void main() {
         findsOneWidget,
       );
       expect(
+        find.byKey(const Key('dataSourceAttributionSettingsButton')),
+        findsOneWidget,
+      );
+      expect(
         find.byKey(const Key('settingsSupportPrivacyButton')),
         findsOneWidget,
       );
       expect(
         settingsActionSemantics(
           '알림 설정, 시설 상태, 제보 진행 상황, 최신 안내 알림을 관리해요',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(
+        settingsActionSemantics(
+          '데이터 및 지도 출처, 지도와 경로 판단 자료의 출처와 이용 조건을 확인해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -3656,6 +3679,45 @@ void main() {
     expect(find.text('안내 범위'), findsOneWidget);
     expect(find.text('제한 사항'), findsOneWidget);
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
+  });
+
+  testWidgets('데이터 및 지도 출처 화면은 manifest와 source inventory를 보여준다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSettingsScreen(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('dataSourceAttributionSettingsButton')),
+      160,
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('dataSourceAttributionSettingsButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('dataSourceAttributionSettingsButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
+    expect(find.text('지도 표시용 asset'), findsOneWidget);
+    expect(find.text('상록수·사당 검증 pilot'), findsOneWidget);
+    expect(find.text('수도권'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('경로·시설 판단용 data pack'), 420);
+    expect(find.text('경로·시설 판단용 data pack'), findsOneWidget);
   });
 
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {

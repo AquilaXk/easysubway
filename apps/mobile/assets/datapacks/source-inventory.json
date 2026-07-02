@@ -1,0 +1,1356 @@
+{
+  "schemaVersion": 1,
+  "region": "nationwide",
+  "artifactKind": "production-source-inventory",
+  "retrievedAt": "2026-06-22",
+  "sources": [
+    {
+      "id": "seoulmetro-station-line-info",
+      "displayName": "서울교통공사_노선별 지하철역 정보",
+      "owner": "서울특별시",
+      "provider": "서울교통공사",
+      "providerDepartment": "정보운영센터",
+      "sourceSystem": "서울교통공사 홈페이지",
+      "datasetUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
+      "datasetKind": "sheet-open-api",
+      "coverage": "서울교통공사 1~8호선, 9호선 2~3단계 노선별 지하철역",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "irregular-on-change",
+      "observedDataUpdatedAt": "2026-06-21",
+      "retrievedAt": "2026-06-21",
+      "license": {
+        "type": "KOGL-1",
+        "name": "공공누리 1유형",
+        "attribution": "공공누리 제1유형: 출처표시 (상업적 이용 및 변경 가능)",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do"
+      },
+      "fieldsProvided": [
+        "line",
+        "station_name",
+        "station_code"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "seoul-realtime-arrival-station-info",
+      "displayName": "서울시 지하철 실시간 도착정보 역정보",
+      "owner": "서울특별시",
+      "provider": "서울특별시",
+      "providerDepartment": "교통정보과",
+      "sourceSystem": "TOPIS",
+      "datasetUrl": "https://data.seoul.go.kr/dataList/OA-12764/F/1/datasetView.do",
+      "datasetKind": "file-and-open-api",
+      "coverage": "서울시 지하철 실시간 도착정보 조회 API와 역정보 파일",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro"
+        ],
+        "sourceDomains": [
+          "realtime_arrivals"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "irregular-file-snapshot",
+      "observedDataUpdatedAt": "2026-06-05",
+      "retrievedAt": "2026-06-21",
+      "license": {
+        "type": "KOGL-1",
+        "name": "공공누리 1유형",
+        "attribution": "공공누리 제1유형: 출처표시 (상업적 이용 및 변경 가능)",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://data.seoul.go.kr/dataList/OA-12764/F/1/datasetView.do"
+      },
+      "fieldsProvided": [
+        "station_name_alias",
+        "external_station_code",
+        "realtime_arrival_reference"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-file-snapshot",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA",
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "irregular-file-snapshot",
+          "unsupportedNotes": "provider terms and rate limits are not approved for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-file-snapshot",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "seoulmetro-cyberstation-route-map",
+      "displayName": "서울교통공사 사이버스테이션 노선도",
+      "owner": "서울교통공사",
+      "provider": "서울교통공사",
+      "providerDepartment": "정보운영센터",
+      "sourceSystem": "서울교통공사 사이버스테이션",
+      "datasetUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+      "datasetKind": "official-route-map-web",
+      "coverage": "서울교통공사 사이버스테이션 수도권 노선도 좌표 검수 기준",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro"
+        ],
+        "sourceDomains": [
+          "route_map_positions"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "irregular-on-change",
+      "observedDataUpdatedAt": "2026-06-28",
+      "retrievedAt": "2026-06-28",
+      "license": {
+        "type": "KOGL-1",
+        "name": "공공누리 1유형",
+        "attribution": "공공누리 제1유형: 출처표시 (상업적 이용 및 변경 가능)",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do"
+      },
+      "fieldsProvided": [
+        "station_name",
+        "line",
+        "route_map_position",
+        "route_map_label_polygon"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular-on-change",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "seoul-subway-hourly-boarding",
+      "displayName": "서울시 지하철 호선별 역별 시간대별 승하차 인원 정보",
+      "owner": "서울특별시",
+      "provider": "서울특별시",
+      "providerDepartment": "교통실 교통기획관 교통정책과",
+      "sourceSystem": "교통카드 정산시스템",
+      "datasetUrl": "https://data.seoul.go.kr/dataList/OA-12252/S/1/datasetView.do",
+      "datasetKind": "sheet-open-api",
+      "coverage": "서울시 관할 운송기관 1~9호선 시간대별 승하차 인원",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro"
+        ],
+        "sourceDomains": [
+          "demand_reference"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "monthly-day-5",
+      "observedDataUpdatedAt": "2026-06-06",
+      "retrievedAt": "2026-06-21",
+      "license": {
+        "type": "KOGL-1",
+        "name": "공공누리 1유형",
+        "attribution": "공공누리 제1유형: 출처표시 (상업적 이용 및 변경 가능)",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://data.seoul.go.kr/dataList/OA-12252/S/1/datasetView.do"
+      },
+      "fieldsProvided": [
+        "line",
+        "station_name",
+        "hourly_boarding_count",
+        "hourly_alighting_count"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "monthly-day-5",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "monthly-day-5",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "monthly-day-5",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "molit-urban-rail-full-route",
+      "displayName": "국토교통부_도시철도 전체노선",
+      "owner": "국토교통부",
+      "provider": "국토교통부",
+      "providerDepartment": "도시철도 담당부서",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15122916/fileData.do",
+      "datasetKind": "file-and-converted-rest-api",
+      "coverage": "전국 도시철도 권역, 운영기관, 노선명, 역 순서 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "annual",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15122916/fileData.do"
+      },
+      "fieldsProvided": [
+        "region",
+        "operator_name",
+        "line_name",
+        "station_name",
+        "station_sequence"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "molit-tago-subway-info",
+      "displayName": "국토교통부_(TAGO)_지하철정보",
+      "owner": "국토교통부",
+      "provider": "국토교통부",
+      "providerDepartment": "모빌리티총괄과",
+      "sourceSystem": "TAGO",
+      "datasetUrl": "https://www.data.go.kr/data/15098554/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 지하철역 목록, 역별 출구, 주변 시설, 시간표 조회 API",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-03-05",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15098554/openapi.do"
+      },
+      "fieldsProvided": [
+        "subwayRouteName",
+        "subwayStationId",
+        "subwayStationName",
+        "exitNo",
+        "depTime",
+        "arrTime"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "commercial schedule import remains blocked until C-1 production schedule importer and provider sample validation are complete"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "busan-transportation-urban-rail-station-info",
+      "displayName": "부산교통공사_도시철도역사정보",
+      "owner": "부산교통공사",
+      "provider": "부산교통공사",
+      "providerDepartment": "IT지원단",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15043686/fileData.do",
+      "datasetKind": "file-and-open-api",
+      "coverage": "부산교통공사 도시철도 각 역사 기초 정보",
+      "coverageScope": {
+        "regionIds": [
+          "busan"
+        ],
+        "operatorIds": [
+          "busan-transportation"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "ad-hoc",
+      "observedDataUpdatedAt": "2025-09-11",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15043686/fileData.do"
+      },
+      "fieldsProvided": [
+        "station_name",
+        "line_number",
+        "line_name",
+        "english_station_name",
+        "transfer_flag",
+        "latitude",
+        "longitude",
+        "phone_number"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "ad-hoc",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "ad-hoc",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "ad-hoc",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
+      "id": "kric-station-elevator",
+      "displayName": "국가철도공단_역사별 엘리베이터 현황",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041682/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 엘리베이터 위치, 출구, 운행층, 정원 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041682/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "exit_no",
+        "location",
+        "floor_from",
+        "floor_to",
+        "capacity"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-station-elevator-movement",
+      "displayName": "국가철도공단_역사별 엘리베이터 이동동선",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041689/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 엘리베이터 이동동선 문구와 이미지 경로를 관리자 검수 후보로 제공",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041689/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "from_location",
+        "to_location",
+        "movement_order",
+        "facility_type",
+        "instruction",
+        "image_path"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-station-escalator",
+      "displayName": "국가철도공단_역사별 에스컬레이터 현황",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041683/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 에스컬레이터 위치와 운행 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041683/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "location",
+        "direction",
+        "floor_from",
+        "floor_to"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-wheelchair-lift-location",
+      "displayName": "국가철도공단_역사별 휠체어리프트 위치",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041686/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 휠체어리프트 위치 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041686/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "location",
+        "floor_from",
+        "floor_to"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-wheelchair-lift-movement",
+      "displayName": "국가철도공단_역사별 휠체어리프트 이동동선",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041690/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 휠체어리프트 이동동선 문구와 이미지 경로를 관리자 검수 후보로 제공",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": true,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041690/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "from_location",
+        "to_location",
+        "movement_order",
+        "facility_type",
+        "instruction",
+        "image_path"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-disabled-toilet",
+      "displayName": "국가철도공단_역사별 장애인 화장실 위치",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041692/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 장애인 화장실 위치 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041692/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "location",
+        "floor"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-braille-displays",
+      "displayName": "국가철도공단_역사별 점자표지판",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041685/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 역사별 점자표지판 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041685/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "location",
+        "display_type"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-platform-train-distance",
+      "displayName": "국가철도공단_승강장 열차 간격",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041687/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 승강장과 열차 사이 간격 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041687/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "platform",
+        "train_distance"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-safety-platform",
+      "displayName": "국가철도공단_안전발판 설치정보",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041688/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 안전발판 설치 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041688/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "platform",
+        "safety_platform"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-elevator-car-number",
+      "displayName": "국가철도공단_엘리베이터 인접 승강장 차량번호",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15041691/openapi.do",
+      "datasetKind": "open-api",
+      "coverage": "전국 도시철도 엘리베이터 인접 승강장 차량번호 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "accessibility_facilities"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "realtime",
+      "observedDataUpdatedAt": "2026-06-22",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15041691/openapi.do"
+      },
+      "fieldsProvided": [
+        "station_code",
+        "station_name",
+        "platform",
+        "car_number",
+        "elevator_location"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "realtime",
+          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+        }
+      }
+    },
+    {
+      "id": "kric-metropolitan-rail-station-info",
+      "displayName": "국가철도공단_도시광역철도_역사정보",
+      "owner": "국가철도공단",
+      "provider": "국가철도공단",
+      "providerDepartment": "철도산업정보센터",
+      "sourceSystem": "공공데이터포털 표준데이터",
+      "datasetUrl": "https://www.data.go.kr/data/15093755/fileData.do",
+      "datasetKind": "standard-file-data",
+      "coverage": "전국 도시광역철도 역사 기본 정보, 환승 여부와 환승 노선, 위치, 운영기관 정보",
+      "coverageScope": {
+        "regionIds": [
+          "capital",
+          "busan",
+          "daegu",
+          "gwangju",
+          "daejeon"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail",
+          "incheon-transit",
+          "busan-transportation",
+          "daegu-transportation",
+          "gwangju-metropolitan-rapid-transit",
+          "daejeon-transportation"
+        ],
+        "sourceDomains": [
+          "station_line_membership"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "annual",
+      "observedDataUpdatedAt": "2025-12-05",
+      "retrievedAt": "2026-06-22",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/dcat/metadata/15093755"
+      },
+      "fieldsProvided": [
+        "station_number",
+        "station_name",
+        "line_number",
+        "line_name",
+        "english_station_name",
+        "chinese_station_name",
+        "transfer_station_flag",
+        "transfer_lines",
+        "latitude",
+        "longitude",
+        "operator_name",
+        "road_address",
+        "phone_number",
+        "data_reference_date"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "annual",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    }
+  ]
+}
