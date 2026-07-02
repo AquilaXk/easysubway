@@ -397,9 +397,10 @@ class EasySubwayApp extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        // 주 행동(채움)만 강하게: 높이 60, 진한 채움.
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
+            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.primary),
             shape: const RoundedRectangleBorder(
               borderRadius: _mainThemeControlRadius,
             ),
@@ -409,18 +410,21 @@ class EasySubwayApp extends StatelessWidget {
             ),
           ),
         ),
+        // 보조 행동은 조용하게: 중립 얇은 보더(line 토큰) + primary 텍스트,
+        // 높이는 접근성 최소(56). 고대비 대비는 _themeForPreferences에서 보정.
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
+            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
+            foregroundColor: EasySubwayAccessibleColors.primary,
             side: const BorderSide(
-              color: EasySubwayAccessibleColors.primary,
-              width: 2,
+              color: EasySubwayAccessibleColors.line,
+              width: 1.5,
             ),
             shape: const RoundedRectangleBorder(
               borderRadius: _mainThemeControlRadius,
             ),
             textStyle: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1112,6 +1116,17 @@ ThemeData _themeForPreferences(
       foregroundColor: _highContrastTextColor,
       titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
         color: _highContrastTextColor,
+      ),
+    ),
+    // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: baseTheme.outlinedButtonTheme.style?.copyWith(
+        foregroundColor: const WidgetStatePropertyAll(
+          _highContrastPrimaryColor,
+        ),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: _highContrastTextColor, width: 1.5),
+        ),
       ),
     ),
   );

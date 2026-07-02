@@ -7209,7 +7209,10 @@ void main() {
       final nearbyButtonSize = tester.getSize(
         find.byKey(const Key('nearbyStationSearchButton')),
       );
-      expect(nearbyButtonSize.height, greaterThanOrEqualTo(60));
+      expect(
+        nearbyButtonSize.height,
+        greaterThanOrEqualTo(EasySubwayTouchTarget.general),
+      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
