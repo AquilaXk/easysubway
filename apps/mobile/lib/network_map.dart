@@ -306,6 +306,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.onOpenSavedItems,
     this.onOpenRecentSearch,
     this.onOpenNearbyStations,
+    this.onOpenDataSources,
     this.notificationAction,
     this.bottomNavigationBar,
     super.key,
@@ -321,6 +322,7 @@ class NetworkMapScreen extends StatefulWidget {
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenRecentSearch;
   final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenDataSources;
   final Widget? notificationAction;
   final Widget? bottomNavigationBar;
 
@@ -641,6 +643,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: widget.onOpenNearbyStations,
           onOpenRecentSearch: widget.onOpenRecentSearch,
+          onOpenDataSources: widget.onOpenDataSources,
         );
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -1668,6 +1671,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
     required this.onOpenRecentSearch,
+    required this.onOpenDataSources,
   });
 
   final VoidCallback onOpenStationSearch;
@@ -1675,10 +1679,16 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenRecentSearch;
+  final VoidCallback? onOpenDataSources;
 
   void _runAction(BuildContext context, VoidCallback action) {
     Navigator.of(context).pop();
     action();
+  }
+
+  void _runActionAfterMenuClose(BuildContext context, VoidCallback action) {
+    Navigator.of(context).pop();
+    Future<void>.delayed(const Duration(milliseconds: 180), action);
   }
 
   void _runFutureAction(BuildContext context, Future<void> Function() action) {
@@ -1699,8 +1709,8 @@ class _NetworkMapMenuPanel extends StatelessWidget {
           height: double.infinity,
           child: SafeArea(
             bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
+              padding: EdgeInsets.zero,
               children: [
                 const _NetworkMapMenuHeader(),
                 const Divider(height: 1, color: Color(0xFFE4E4E4)),
@@ -1738,6 +1748,16 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                     icon: Icons.star_border_rounded,
                     label: '즐겨찾기',
                     onTap: () => _runAction(context, onOpenSavedItems!),
+                  ),
+                ],
+                if (onOpenDataSources != null) ...[
+                  const _NetworkMapMenuSectionLabel('안내'),
+                  _NetworkMapMenuTile(
+                    key: const Key('networkMapMenuDataSourcesButton'),
+                    icon: Icons.source_outlined,
+                    label: '자료 제공 정보',
+                    onTap: () =>
+                        _runActionAfterMenuClose(context, onOpenDataSources!),
                   ),
                 ],
                 const SizedBox(height: 10),
