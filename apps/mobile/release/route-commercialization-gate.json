@@ -10,6 +10,7 @@
     "accuracy": "artifacts/route-accuracy-report.json",
     "accessibility": "artifacts/route-accessibility-regression-report.json",
     "coverage": "artifacts/realtime-provider-coverage-report.json",
+    "routeGraphCoverage": "artifacts/route-graph-coverage-report.json",
     "contract": "artifacts/route-v2-contract-report.json"
   },
   "routeEtaAccuracy": {
