@@ -746,6 +746,40 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 realtime provider를 사용할 수 없으면 fallback ETA source와 planned 사용 상태를 노출한다")
+	void routeV2PlannerReportsRealtimeUnavailableFallbackStatus() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(
+			repository,
+			repository,
+			new RampAccessibleTransitMasterPort(),
+			CLOCK,
+			query -> new RealtimeArrivalResolver.Resolution(
+				ArrivalFreshness.UNAVAILABLE,
+				"PROVIDER_QUOTA_EXCEEDED",
+				null,
+				null,
+				List.of()
+			)
+		);
+		var planner = new RouteV2Planner(routeSearchService);
+
+		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			true,
+			1,
+			1
+		));
+
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.FALLBACK);
+		assertThat(plan.statuses()).containsExactly("FOUND", "REALTIME_UNAVAILABLE_PLANNED_USED");
+	}
+
+	@Test
 	@DisplayName("휠체어 이동 유형은 우회 거리가 길어도 무단차 환승역을 우선한다")
 	void wheelchairRoutePrefersStepFreeTransferStationEvenWhenDetourIsLong() {
 		var repository = new InMemoryRouteSearchRepository();
