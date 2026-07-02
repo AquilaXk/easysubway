@@ -178,6 +178,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
     coverageGapReport: "artifacts/datapack-coverage-gaps.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
+    routeGraphTopologyReport: "artifacts/route-graph-topology-report.json",
     freshnessSlaPolicy: "apps/mobile/release/datapack-freshness-sla.json",
     androidOfflineRouteEvidence: ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md",
   });
@@ -187,6 +188,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     ),
   );
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
+  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
   assert.ok(gate.evidencePolicy.forbiddenInGithubSummary.includes("backend-only provider key"));
@@ -3884,12 +3886,19 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /release mode cannot use fixture input/);
   assert.match(workflow, /release request approver must differ from requester/);
   assert.match(workflow, /manifest channel must match targetChannel/);
+  assert.match(workflow, /Data Pack Release \/ Write route graph topology evidence/);
+  assert.match(workflow, /EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT/);
+  assert.match(workflow, /tools\/datapack\/build-route-graph-topology-report\.mjs/);
   assert.match(workflow, /Data Pack Release \/ Validate release evidence bundle/);
   assert.match(workflow, /tools\/datapack\/validate-release-evidence-bundle\.mjs/);
   assert.match(workflow, /--build-spec "\$\{EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH\}"/);
   assert.match(workflow, /const buildSpec = JSON\.parse\(fs\.readFileSync\(buildSpecPath, "utf8"\)\)/);
   assert.match(workflow, /sourceSnapshotSetHash: releaseHash\("sourceSnapshotSetHash"\)/);
   assert.match(workflow, /approvedOverrideSetHash: releaseHash\("approvedOverrideSetHash"\)/);
+  assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
+  assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
+  assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
+  assert.match(workflow, /routeGraphTopologyStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
@@ -3909,6 +3918,8 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     "coverageStatus",
     "routeMapPositionCoverageSha256",
     "routeMapPositionCoverageStatus",
+    "routeGraphTopologySha256",
+    "routeGraphTopologyStatus",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "strictRouteRegressionStatus",
@@ -4257,11 +4268,13 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "manifestSha256",
     "coverageSummarySha256",
     "routeMapPositionCoverageSha256",
+    "routeGraphTopologySha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "validatorStatus",
     "coverageStatus",
     "routeMapPositionCoverageStatus",
+    "routeGraphTopologyStatus",
     "strictRouteRegressionStatus",
     "manifestSignatureStatus",
     "androidEvidenceStatus",
